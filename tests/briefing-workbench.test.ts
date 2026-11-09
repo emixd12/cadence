@@ -205,7 +205,7 @@ describe("briefing workbench boundary", () => {
     vi.doMock('@/lib/services/daily-brief-request', () => ({ runDailyBriefRequest: accountRead }));
     vi.doMock('@/lib/services/briefing-account-context.service', () => ({ prepareAccountBriefingContexts: accountRead, briefingAccountRef: vi.fn(), workbenchBehaviorRef: vi.fn() }));
     const provider = vi.fn();
-    vi.doMock("@/lib/services/daily-brief-openai", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", generateOpenAIDailyBrief: provider }));
+    vi.doMock("@/lib/services/daily-brief-openai", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", DAILY_BRIEF_REASONING_EFFORT: "low", OPENAI_REASONING_EFFORTS: ["low"], generateOpenAIDailyBrief: provider }));
     const network = vi.fn();
     vi.stubGlobal("fetch", network);
     const run = await loadService();

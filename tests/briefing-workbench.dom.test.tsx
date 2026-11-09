@@ -27,6 +27,10 @@ const ready = (text: string): Result => ({ state: "ready", briefing: briefing(te
 type Candidate = { id: string; label: string; role: "baseline" | "candidate"; parentCandidateId: string | null; proposalId: string | null; rationale: string };
 type Detail = { case: Record<string, unknown>; candidates: (Candidate & { config: unknown })[]; runs: Record<string, unknown>[]; feedback: Record<string, unknown>[]; proposals: unknown[]; invalidProposals: string[]; dispositions: unknown[] };
 
+/** Ticket 290: allowed generation values. Model IDs are fake; only the server's list is offered. */
+const GENERATION_OPTIONS = { models: ["bench-model-prod", "bench-model-a"], efforts: ["low", "medium", "high"], promptVariants: ["layered", "consolidated"],
+  defaults: { model: "bench-model-prod", effort: "low", promptVariant: "layered" } };
+
 /** A small in-memory stand-in for the development routes. */
 const server = {
   cases: new Map<string, Detail>(),
@@ -35,6 +39,7 @@ const server = {
   mode: "synthetic" as "synthetic" | "account",
   comparison: null as null | ((body: Record<string, unknown>) => Promise<Response> | Response),
   account: (() => Response.json(accountMetadata())) as () => Response | Promise<Response>,
+  generation: (() => Response.json(GENERATION_OPTIONS)) as () => Response | Promise<Response>,
   posts: [] as Record<string, unknown>[],
 };
 
@@ -62,6 +67,7 @@ async function route(input: RequestInfo | URL, init?: RequestInit): Promise<Resp
   const url = new URL(String(input), "http://127.0.0.1:4321");
   const body = init?.body ? JSON.parse(init.body as string) as Record<string, unknown> : null;
   if (url.pathname === "/api/dev/briefing-comparison") {
+    if (init?.method !== "POST" && url.searchParams.get("view") === "generation") return server.generation();
     if (init?.method !== "POST") return server.account();
     server.posts.push(body!);
     return server.comparison ? server.comparison(body!) : Response.json(compareResponse(body!));
@@ -89,6 +95,8 @@ function button(label: string, index = 0) {
 }
 const maybeButton = (label: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find((element) => element.textContent?.trim() === label) ?? null;
 const output = (side: "A" | "B") => container.querySelector(`[aria-label="Output ${side}"]`)!;
+/** Requests other than the one-time generation-options read on mount. */
+const calls = () => fetcher.mock.calls.filter(([url]) => !String(url).includes("view=generation"));
 const reviewPosts = () => fetcher.mock.calls.filter(([url, init]) => String(url).startsWith("/api/dev/briefing-reviews") && init?.method === "POST").map(([, init]) => JSON.parse(init!.body as string));
 
 function change(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string) {
@@ -108,7 +116,7 @@ function deferred<T>() {
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   localStorage.clear();
-  Object.assign(server, { cases: new Map(), results: null, save: true, mode: "synthetic", comparison: null, account: () => Response.json(accountMetadata()), posts: [] });
+  Object.assign(server, { cases: new Map(), results: null, save: true, mode: "synthetic", comparison: null, account: () => Response.json(accountMetadata()), generation: () => Response.json(GENERATION_OPTIONS), posts: [] });
   fetcher = vi.fn<typeof fetch>(route);
   vi.stubGlobal("fetch", fetcher);
   container = document.createElement("div");
@@ -134,7 +142,7 @@ describe("Daily Brief workbench: Compare", () => {
     expect(button("Rerun candidate on this case").disabled).toBe(true);
     const configurations = [...container.querySelectorAll('details')].filter(element => element.querySelector('summary')?.textContent?.startsWith('Configure '));
     expect(configurations.every(element => !element.open)).toBe(true);
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
   });
 
   it("shows the server recovery instructions when comparison context is incomplete", async () => {
@@ -148,7 +156,7 @@ describe("Daily Brief workbench: Compare", () => {
     await act(() => change(container.querySelector<HTMLSelectElement>('select[aria-label="Preset 1"]')!, "cadence-default"));
     await act(() => button("Edit JSON").click());
     await act(() => button("Load into configuration 1").click());
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
   });
 
   it("shows the loaded preset and returns to Choose preset after a custom edit", async () => {
@@ -166,7 +174,9 @@ describe("Daily Brief workbench: Compare", () => {
     await act(() => button("Run new comparison").click());
     await vi.waitFor(() => expect(output("B").textContent).toContain("Generated candidate"));
     const body = server.posts[0]!;
-    expect(Object.keys(body).sort()).toEqual(["configs", "fixtureId", "review"]);
+    expect(Object.keys(body).sort()).toEqual(["configs", "fixtureId", "generation", "review"]);
+    // Ticket 290: both candidates default to the production values the server listed.
+    expect(body.generation).toEqual([GENERATION_OPTIONS.defaults, GENERATION_OPTIONS.defaults]);
     expect(body.fixtureId).toBe("sparse");
     expect(body.configs).toHaveLength(2);
     const review = body.review as { caseId: string; candidates: Candidate[] };
@@ -316,7 +326,7 @@ describe("Daily Brief workbench: Compare", () => {
     expect(rerun.configs).toHaveLength(1);
     expect(output("A").textContent).toContain("Generated baseline");
     expect(container.querySelector<HTMLSelectElement>('select[aria-label="Candidate run"]')!.options).toHaveLength(2);
-    expect(container.querySelector('[aria-label="Output B"]')!.parentElement!.parentElement!.textContent).toContain("Differences between A and B");
+    expect(container.querySelector('[aria-label="Output B"]')!.closest("main")!.textContent).toContain("Differences between A and B");
   });
 
   it("writes a review packet, loads a configuration proposal into B and records a decision", async () => {
@@ -379,7 +389,7 @@ describe("Daily Brief workbench: Compare", () => {
     await act(() => button("Load into configuration 1").click());
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Invalid configuration JSON");
     expect(history.value).toBe("90");
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
   });
 });
 
@@ -399,13 +409,13 @@ describe("Daily Brief workbench: My account", () => {
     server.account = () => Response.json({ ...accountMetadata(), travelSpend: { localMonth: "2026-11-01", reservedMicrodollars: 125000 } });
     await selectAccount();
     expect(container.textContent).toContain("Travel usage for 2026-11: US$0.125 reserved at list price (US$5 monthly limit).");
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(calls()).toHaveLength(1);
   });
 
   it("shows account sign-in requirements without generating or persisting anything", async () => {
     server.account = () => Response.json({ error: "unauthenticated" }, { status: 401 });
     await selectAccount();
-    expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls[0][1]?.method).toBeUndefined();
+    expect(calls()).toHaveLength(1); expect(calls()[0]![1]?.method).toBeUndefined();
     expect(container.querySelector('a[href^="/login?next="]')?.textContent).toBe("Sign in to My account");
     expect(button("Run new comparison").disabled).toBe(true); expect(localStorage.length).toBe(0);
   });
@@ -420,7 +430,7 @@ describe("Daily Brief workbench: My account", () => {
 
   it("runs account comparison only on click, binds the expected owner, and saves the review in the account partition", async () => {
     await selectAccount();
-    expect(fetcher).toHaveBeenCalledOnce(); expect(container.textContent).toContain("PRIVATE_ACCOUNT_BEHAVIOR");
+    expect(calls()).toHaveLength(1); expect(container.textContent).toContain("PRIVATE_ACCOUNT_BEHAVIOR");
     const calendar = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(input => input.parentElement?.textContent === "Include available Calendar context")!;
     expect(calendar.disabled).toBe(true); expect(calendar.checked).toBe(false);
     expect(button("Save draft").disabled).toBe(true); expect(button("Export configuration").disabled).toBe(true);
@@ -538,7 +548,7 @@ it("keeps context controls independent and marks finish times unavailable", asyn
   expect(checkbox("Historical average duration").checked).toBe(true);
   await act(() => checkbox("Recorded elapsed durations").click());
   expect(checkbox("Recorded elapsed durations").checked).toBe(true);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(calls()).toHaveLength(0);
   await act(() => button("Run new comparison").click());
   await vi.waitFor(() => expect(server.posts).toHaveLength(1));
   expect((server.posts[0]!.configs as { context: unknown }[])[0]!.context).toMatchObject({ includeCompletionHistory: false, includeRecordedElapsedDurations: true, includeHistoricalCompletionTimes: true });
@@ -556,6 +566,75 @@ it("migrates legacy saved drafts and rejects unsupported recipe imports without 
   await act(() => change(editor, JSON.stringify({ ...DEFAULT_BRIEFING_CONFIG, recipe: { id: "other_recipe", version: "1.0" } })));
   await act(() => button("Load into configuration 1").click());
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Invalid configuration JSON");
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(calls()).toHaveLength(0);
   expect(maybeButton("Cancel comparison")).toBeNull();
+});
+
+describe("Daily Brief workbench: Generation (Ticket 290)", () => {
+  const select = (label: string) => container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+
+  it("offers only the server's values, defaults to production, and sends each candidate's choice", async () => {
+    for (const index of [1, 2]) {
+      const group = container.querySelector(`[aria-label="Generation ${index}"]`)!;
+      expect(group.querySelector("legend")?.textContent).toBe("Generation");
+      expect([...select(`Model ${index}`).options].map((option) => option.value)).toEqual(GENERATION_OPTIONS.models);
+      expect([...select(`Reasoning effort ${index}`).options].map((option) => option.value)).toEqual(GENERATION_OPTIONS.efforts);
+      expect([...select(`Prompt ${index}`).options].map((option) => option.value)).toEqual(GENERATION_OPTIONS.promptVariants);
+      expect([select(`Model ${index}`).value, select(`Reasoning effort ${index}`).value, select(`Prompt ${index}`).value]).toEqual(["bench-model-prod", "low", "layered"]);
+    }
+    await act(() => change(select("Model 2"), "bench-model-a"));
+    await act(() => change(select("Reasoning effort 2"), "high"));
+    await act(() => change(select("Prompt 2"), "consolidated"));
+    expect(calls()).toHaveLength(0);
+    await act(() => button("Run new comparison").click());
+    await vi.waitFor(() => expect(output("B").textContent).toContain("Generated candidate"));
+    expect(server.posts[0]!.generation).toEqual([GENERATION_OPTIONS.defaults, { model: "bench-model-a", effort: "high", promptVariant: "consolidated" }]);
+  });
+
+  it("shows model, effort, prompt, token usage and the failure reason in each result column", async () => {
+    server.results = [
+      { ...ready("Generated baseline"), model: "bench-model-prod", effort: "low", promptVariant: "layered", promptRevision: "rev-layered",
+        usage: [{ call: "brief", inputTokens: 100, cachedInputTokens: 20, outputTokens: 30, reasoningTokens: 10 }] },
+      { state: "error" as const, error: "advisor_unavailable", reason: "validation_word_limit", inspector: {}, latencyMs: 1, validation: "withheld",
+        model: "bench-model-a", effort: "high", promptVariant: "consolidated", promptRevision: "rev-consolidated", usage: [] },
+    ] as unknown as Result[];
+    await act(() => button("Run new comparison").click());
+    await vi.waitFor(() => expect(container.querySelector('[aria-label="Generation B"]')).not.toBeNull());
+    const a = container.querySelector('[aria-label="Generation A"]')!.textContent!;
+    const b = container.querySelector('[aria-label="Generation B"]')!.textContent!;
+    expect(a).toContain("Model bench-model-prod · Reasoning effort low · Prompt Layered (production) (revision rev-layered)");
+    expect(a).toContain("1 model call · input tokens 100 (cached 20) · output tokens 30 (reasoning 10)");
+    expect(a).not.toContain("Failure");
+    expect(b).toContain("Model bench-model-a · Reasoning effort high · Prompt Consolidated (revision rev-consolidated)");
+    expect(b).toContain("No model call reported token usage.");
+    expect(b).toContain("Failure: advisor_unavailable · reason validation_word_limit");
+    expect(container.textContent).toContain("Generation differs between A and B: reasoning effort low → high; prompt layered → consolidated.");
+  });
+
+  it("marks the run stale when a generation choice changes, and reruns it as a new candidate", async () => {
+    await act(() => button("Run new comparison").click());
+    await vi.waitFor(() => expect(output("B").textContent).toContain("Generated candidate"));
+    expect(output("B").textContent).not.toContain("the draft has changed");
+    const original = (server.posts[0]!.review as { candidates: Candidate[] }).candidates[1]!;
+    await act(() => change(select("Reasoning effort 2"), "medium"));
+    expect(output("B").textContent).toContain("the draft has changed since this run");
+    expect(output("A").textContent).not.toContain("the draft has changed");
+    await act(() => button("Rerun candidate on this case").click());
+    await vi.waitFor(() => expect(server.posts).toHaveLength(2));
+    const rerun = server.posts[1]!;
+    expect(rerun.generation).toEqual([{ ...GENERATION_OPTIONS.defaults, effort: "medium" }]);
+    expect((rerun.review as { candidates: Candidate[] }).candidates[0]!.id).not.toBe(original.id);
+  });
+
+  it("sends no generation and says so when the server cannot list the values", async () => {
+    await act(() => root.unmount());
+    server.generation = () => Response.json({ error: "access_denied" }, { status: 403 });
+    root = createRoot(container);
+    await act(() => root.render(<DailyBriefWorkbench />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Generation choices unavailable (access_denied). Runs use the production model, effort and prompt."));
+    expect(container.querySelector('select[aria-label="Model 1"]')).toBeNull();
+    await act(() => button("Run new comparison").click());
+    await vi.waitFor(() => expect(server.posts).toHaveLength(1));
+    expect(server.posts[0]).not.toHaveProperty("generation");
+  });
 });

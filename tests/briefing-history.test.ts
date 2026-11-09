@@ -18,7 +18,7 @@ vi.mock("@/lib/db/occurrences.repo", () => ({ listUserOccurrences: mocks.occurre
 vi.mock("@/lib/db/occurrenceStatusEvents.repo", () => ({ listOccurrenceStatusEventsByOccurrenceIds: mocks.statuses }));
 vi.mock("@/lib/db/behaviorConfigurationEvents.repo", () => ({ listBehaviorConfigurationEvents: mocks.configurations }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarEventsForWorkbenchHistory: mocks.pastCalendar, getCalendarConnection: mocks.calendar }));
-vi.mock("@/lib/services/daily-brief-openai", () => ({ generateOpenAIDailyBrief: mocks.generate, DAILY_BRIEF_MODEL: "not_called" }));
+vi.mock("@/lib/services/daily-brief-openai", () => ({ generateOpenAIDailyBrief: mocks.generate, DAILY_BRIEF_MODEL: "not_called", DAILY_BRIEF_REASONING_EFFORT: "low", OPENAI_REASONING_EFFORTS: ["low"] }));
 vi.mock("@/lib/services/google-calendar-request", () => ({ authenticateCalendarRequest: mocks.authenticate,
   calendarResponse: (_request: Request, body: unknown, status = 200) => Response.json(body, { status }), calendarPreflight: vi.fn(), readCalendarRequestBody: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.preferences, listDailyBriefBehaviorIds: mocks.behaviorIds, listBriefingWorkbenchBehaviors: vi.fn(), DailyBriefStorageError: class extends Error {} }));

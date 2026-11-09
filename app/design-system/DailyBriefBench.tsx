@@ -10,7 +10,48 @@ import { BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId 
 import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, type BriefingAnalysisFixtureId } from "@/lib/services/briefing-analysis-fixtures";
 import { BRIEFING_ANALYSIS_LANES } from "@cadence/core/resolvers/briefing-analysis.resolver";
 type Account = { travelSpend?: { localMonth: string; reservedMicrodollars: number } | null; settings: DailyBriefSettings; behaviors: { ref: string; title: string }[] };
-type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error' | 'cancelled'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
+type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: ({ state: 'ready' | 'error' | 'cancelled'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string } & RunGenerationRecord)[] };
+/** Ticket 290: the generation values the server allows; the interface offers nothing else. */
+type GenerationOptions = { models: string[]; efforts: string[]; promptVariants: string[]; defaults: BenchGeneration };
+/** Ticket 290: what a run recorded about its generation, token usage and failure reason. */
+type RunGenerationRecord = { model?: string; effort?: string; promptVariant?: string; promptRevision?: string; usage?: readonly DailyBriefCallUsage[]; reason?: string };
+/** A reading-column run plus the candidate's generation choices (Ticket 290). */
+type BenchViewRun = ViewRun & RunGenerationRecord & { generation?: BenchGeneration };
+
+const GENERATION_OPTIONS = '/api/dev/briefing-comparison?view=generation';
+const PROMPT_LABELS: Record<string, string> = { layered: 'Layered (production)', consolidated: 'Consolidated' };
+
+async function fetchGenerationOptions(signal: AbortSignal): Promise<GenerationOptions> {
+  const response = await fetch(GENERATION_OPTIONS, { signal, cache: 'no-store', credentials: 'same-origin' });
+  const body = await response.json();
+  if (!response.ok || !Array.isArray(body.models) || !Array.isArray(body.efforts) || !Array.isArray(body.promptVariants) || !body.defaults) throw new Error(typeof body.error === 'string' ? body.error : `unexpected response, HTTP ${response.status}`);
+  return body;
+}
+
+/** Candidate identity: a missing record means the production values. */
+function sameGeneration(left: BenchGeneration | undefined, right: BenchGeneration | undefined, defaults: BenchGeneration | undefined): boolean {
+  const a = left ?? defaults, b = right ?? defaults;
+  return a?.model === b?.model && a?.effort === b?.effort && a?.promptVariant === b?.promptVariant;
+}
+
+/** Token totals across one run's model calls; a count stays unknown when no call reported it. */
+function usageLine(usage: readonly DailyBriefCallUsage[] | undefined): string {
+  if (!usage) return 'Token usage not recorded.';
+  if (!usage.length) return 'No model call reported token usage.';
+  const total = (pick: (item: DailyBriefCallUsage) => number | null) => usage.reduce<number | null>((sum, item) => pick(item) === null ? sum : (sum ?? 0) + pick(item)!, null);
+  const count = (value: number | null) => value === null ? 'not reported' : String(value);
+  return `${usage.length} model ${usage.length === 1 ? 'call' : 'calls'} · input tokens ${count(total(item => item.inputTokens))} (cached ${count(total(item => item.cachedInputTokens))}) · output tokens ${count(total(item => item.outputTokens))} (reasoning ${count(total(item => item.reasoningTokens))})`;
+}
+
+/** Ticket 290: model, effort, prompt, token usage and failure reason beside one output. */
+function RunGeneration({ side, run }: { side: 'A' | 'B'; run: BenchViewRun | null }) {
+  if (!run) return null;
+  return <div aria-label={`Generation ${side}`} className="space-y-1 border-t pt-2 text-sm">
+    <p>Model {run.model ?? 'not recorded'} · Reasoning effort {run.effort ?? 'not recorded'} · Prompt {run.promptVariant ? PROMPT_LABELS[run.promptVariant] ?? run.promptVariant : 'not recorded'}{run.promptRevision ? ` (revision ${run.promptRevision})` : ''}</p>
+    <p>{usageLine(run.usage)}</p>
+    {run.state === 'error' ? <p>Failure: {run.error ?? 'unknown'}{run.reason ? ` · reason ${run.reason}` : ''}</p> : null}
+  </div>;
+}
 
 async function fetchAccount(signal: AbortSignal): Promise<Account> {
   const response = await fetch('/api/dev/briefing-comparison', { signal, cache: 'no-store', credentials: 'same-origin' });
@@ -27,7 +68,8 @@ import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSetting
 import { BriefingWorkbenchGuide } from "./BriefingWorkbenchGuide";
 import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type EstimateReviewInput, type FeedbackDraft, type ViewRun } from "./BriefingReview";
 import { BriefingDays } from "./BriefingDays";
-import type { BenchCaseDetail, BenchCaseSummary, BenchProposal } from "@/lib/services/briefing-bench-store";
+import type { BenchCaseDetail, BenchCaseSummary, BenchGeneration, BenchProposal } from "@/lib/services/briefing-bench-store";
+import type { DailyBriefCallUsage } from "@/lib/services/daily-brief-consumer";
 
 const client: DailyBriefClient = {
   // Ticket 239 states: Outlook allowed but reselected since (Allow again), Hevy disclosed while disconnected, iCloud not offered.
@@ -107,11 +149,11 @@ async function reviewRequest<T>(input: { method?: 'POST'; query?: string; body?:
   return body as T;
 }
 
-/** Saved runs of one role, newest last, with their candidate labels and configurations. */
-function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): ViewRun[] {
+/** Saved runs of one role, newest last, with their candidate labels, configurations and generation choices. */
+function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): BenchViewRun[] {
   return detail.runs.flatMap((run) => {
     const candidate = detail.candidates.find((item) => item.id === run.candidateId);
-    return candidate?.role === role && run.evaluation?.mode !== 'diagnostic' ? [{ ...run, label: candidate.label, config: candidate.config }] : [];
+    return candidate?.role === role && run.evaluation?.mode !== 'diagnostic' ? [{ ...run, label: candidate.label, config: candidate.config, generation: candidate.generation }] : [];
   });
 }
 
@@ -137,7 +179,11 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const [accountLoading, setAccountLoading] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
   const [detail, setDetail] = useState<CaseDetail | null>(null);
-  const [unsaved, setUnsaved] = useState<{ runs: [ViewRun, ViewRun]; capturedAt?: string; expiresAt?: string; mode: 'synthetic' | 'account' } | null>(null);
+  const [unsaved, setUnsaved] = useState<{ runs: [BenchViewRun, BenchViewRun]; capturedAt?: string; expiresAt?: string; mode: 'synthetic' | 'account' } | null>(null);
+  // Ticket 290: per-candidate model, reasoning effort and prompt variant. Null until the server lists the allowed values.
+  const [generationOptions, setGenerationOptions] = useState<GenerationOptions | null>(null);
+  const [generationError, setGenerationError] = useState("");
+  const [choices, setChoices] = useState<[BenchGeneration, BenchGeneration] | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -157,6 +203,12 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const pendingCase = useRef<string | null>(null);
   const columns = useRef<HTMLDivElement>(null);
   useEffect(() => () => { generation.current++; request.current?.abort(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchGenerationOptions(controller.signal).then((value) => { setGenerationOptions(value); setChoices(current => current ?? [value.defaults, value.defaults]); },
+      (failure) => { if (!controller.signal.aborted) setGenerationError(failure instanceof Error ? failure.message : 'unexpected response'); });
+    return () => controller.abort();
+  }, []);
   const source = mode;
   const accountRef = mode === 'account' ? account?.settings.accountRef ?? null : null;
 
@@ -245,6 +297,9 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const candidateRuns = unsaved ? [unsaved.runs[1]] : detail ? savedRuns(detail, 'candidate') : [];
   const runA = baselineRuns.at(-1) ?? null;
   const runB = candidateRuns.find((item) => item.id === selectedRunId) ?? candidateRuns.at(-1) ?? null;
+  /** A changed configuration or generation choice makes the shown run stale for the draft (Ticket 290). */
+  const changedSince = (run: BenchViewRun | null, index: number) => !!run?.config && (JSON.stringify(run.config) !== JSON.stringify(configs[index]) ||
+    (!!choices && !sameGeneration(run.generation, choices[index], generationOptions?.defaults)));
   const labelOf = (candidateId: string | null) => detail?.candidates.find((item) => item.id === candidateId)?.label ?? 'none';
   const feedbackKey = JSON.stringify([detail?.case.id, runA?.id, runB?.id]);
   const feedback = feedbackDrafts[feedbackKey] ?? EMPTY_FEEDBACK;
@@ -260,20 +315,23 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     if (kind === 'new') setSides(current => current.map(side => ({ ...side, parentCandidateId: null, proposalId: null })) as [Side, Side]);
     const caseId = kind === 'new' ? newId('case') : detail!.case.id;
     const previous = kind === 'rerun' ? detail!.candidates.filter((item) => item.role === 'candidate') : [];
-    const reuse = previous.find((item) => JSON.stringify(item.config) === JSON.stringify(configs[1]) && item.label === sides[1].label.trim() &&
+    const reuse = previous.find((item) => JSON.stringify(item.config) === JSON.stringify(configs[1]) && sameGeneration(item.generation, choices?.[1], generationOptions?.defaults) && item.label === sides[1].label.trim() &&
       item.rationale === sides[1].rationale.trim() && item.parentCandidateId === sides[1].parentCandidateId && item.proposalId === sides[1].proposalId);
     const indexes = kind === 'rerun' ? [1] : [0, 1];
     const candidates = indexes.map((index) => ({ id: index === 1 && reuse ? reuse.id : newId('cand'), label: sides[index].label.trim() || (index ? 'Candidate' : 'Baseline'),
       role: index ? 'candidate' as const : 'baseline' as const, parentCandidateId: kind === 'new' ? null : sides[index].parentCandidateId,
       proposalId: kind === 'new' ? null : sides[index].proposalId, rationale: sides[index].rationale }));
     const runConfigs = indexes.map((index) => configs[index]);
+    // Without loaded options the request omits `generation`, and the server uses the production values.
+    const runGeneration = choices ? indexes.map((index) => choices[index]!) : null;
+    const generationField = runGeneration ? { generation: runGeneration } : {};
     const review = { caseId, candidates };
     pendingCase.current = caseId;
     try {
-      const body = kind !== 'new' ? { mode: 'saved', accountRef, configs: runConfigs, review }
-        : mode === 'account' ? { mode, configs: runConfigs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review,
+      const body = kind !== 'new' ? { mode: 'saved', accountRef, configs: runConfigs, ...generationField, review }
+        : mode === 'account' ? { mode, configs: runConfigs, ...generationField, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review,
           ...(descriptionsConfirmed && runConfigs.some(estimatesDurations) ? { descriptionsConfirmed: true } : {}) }
-          : { fixtureId, configs: runConfigs, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }), review };
+          : { fixtureId, configs: runConfigs, ...generationField, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }), review };
       const response = await fetch("/api/dev/briefing-comparison", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body), signal: controller.signal, cache: "no-store", credentials: 'same-origin' });
       const result = await response.json() as Comparison & { review?: ReviewResponse };
@@ -291,13 +349,13 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         await loadCase(caseId, controller.signal, true);
         if (version !== generation.current) return;
       } else if (kind !== 'rerun') {
-        const toView = (index: number): ViewRun => ({ id: null, candidateId: null, label: candidates[index]!.label, config: runConfigs[index], model: result.model,
-          promptRevision: result.promptRevision, ...result.results[index]! });
+        const toView = (index: number): BenchViewRun => ({ id: null, candidateId: null, label: candidates[index]!.label, config: runConfigs[index], model: result.model,
+          promptRevision: result.promptRevision, ...(runGeneration ? { generation: runGeneration[index] } : {}), ...result.results[index]! });
         setDetail(null); setUnsaved({ runs: [toView(0), toView(1)], capturedAt: result.capturedAt, expiresAt: result.expiresAt, mode: result.mode === 'account' ? 'account' : 'synthetic' });
         setNotice(result.review ? 'Not saved. These results stay visible until you leave or run again.' : '');
       } else {
         if (runA) setUnsaved({ runs: [runA, { id: null, candidateId: null, label: candidates[0]!.label, config: runConfigs[0],
-          model: result.model, promptRevision: result.promptRevision, ...result.results[0]! }], mode });
+          model: result.model, promptRevision: result.promptRevision, ...(runGeneration ? { generation: runGeneration[0] } : {}), ...result.results[0]! }], mode });
         setNotice('Not saved. These results stay visible until you leave or run again.');
       }
     } catch (failure) { if (version === generation.current) {
@@ -383,6 +441,9 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
       const latest = opened.candidates.filter((item) => item.role === 'candidate').at(-1);
       try {
         if (!preserveDrafts) setConfigs((current) => [baseline ? parseBriefingConfig(baseline.config) : current[0], latest ? parseBriefingConfig(latest.config) : current[1]]);
+        // Ticket 290: continue from the saved generation choices; older candidates used the production values.
+        if (!preserveDrafts && generationOptions) setChoices((current) => [baseline?.generation ?? (baseline ? generationOptions.defaults : current?.[0] ?? generationOptions.defaults),
+          latest?.generation ?? (latest ? generationOptions.defaults : current?.[1] ?? generationOptions.defaults)]);
         if (!preserveDrafts) setSides((current) => [baseline ? { label: baseline.label, rationale: '', parentCandidateId: null, proposalId: null } : current[0],
           latest ? { label: latest.label, rationale: '', parentCandidateId: latest.id, proposalId: null } : current[1]]);
       } catch { setNotice('This case was saved with a configuration version the workbench no longer reads. Drafts were kept.'); }
@@ -402,6 +463,15 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const editor = (index: number) => { const config = configs[index]; return <section aria-label={`Configuration ${index + 1}`} className="min-w-0 space-y-4 pt-2">
       <p className="text-sm">Daily Brief · Recipe {config.recipe.version}</p>
       <label className="block">Load preset<select aria-label={`Preset ${index + 1}`} className="ml-3 min-h-11 max-w-full border p-2" value={BRIEFING_PRESETS.find((preset) => JSON.stringify(preset.config) === JSON.stringify(config))?.id ?? ""} onChange={(event) => { const preset = BRIEFING_PRESETS.find((entry) => entry.id === event.target.value); if (preset) change(index, preset.config); }}><option value="">Choose preset</option>{BRIEFING_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
+      <fieldset className="grid gap-3 sm:grid-cols-2" aria-label={`Generation ${index + 1}`}><legend className="mb-2">Generation</legend>
+        {generationOptions && choices ? <>
+          {([['model', 'Model', generationOptions.models], ['effort', 'Reasoning effort', generationOptions.efforts], ['promptVariant', 'Prompt', generationOptions.promptVariants]] as const).map(([field, label, values]) =>
+            <label key={field} className="grid gap-1">{label}<select aria-label={`${label} ${index + 1}`} className="min-h-11 w-full border p-2" value={choices[index][field]}
+              onChange={(event) => setChoices((current) => current ? current.map((entry, i) => i === index ? { ...entry, [field]: event.target.value } : entry) as [BenchGeneration, BenchGeneration] : current)}>
+              {values.map((value) => <option key={value} value={value}>{field === 'promptVariant' ? PROMPT_LABELS[value] ?? value : value}{value === generationOptions.defaults[field] && field !== 'promptVariant' ? ' (production)' : ''}</option>)}</select></label>)}
+          <p className="text-sm sm:col-span-2">Workbench only. Production always uses {generationOptions.defaults.model}, effort {generationOptions.defaults.effort} and the layered prompt. Change one of these at a time. The consolidated prompt changes only recipes 1.1 and 1.2. Duration estimates keep the production model.</p>
+        </> : <p className="text-sm sm:col-span-2">{generationError ? `Generation choices unavailable (${generationError}). Runs use the production model, effort and prompt.` : 'Loading generation choices…'}</p>}
+      </fieldset>
       <fieldset className="grid gap-3 sm:grid-cols-2"><legend className="mb-2">Voice</legend>
         {([['tone', ['calm', 'warm', 'matter_of_fact']], ['directness', ['gentle', 'balanced', 'direct']], ['encouragement', ['low', 'moderate', 'high']]] as const).map(([field, values]) => <label key={field} className="grid gap-1">{field}<select aria-label={`${field} ${index + 1}`} className="min-h-11 border p-2" value={config[field]} onChange={(event) => change(index, { ...config, [field]: event.target.value })}>{values.map((value) => <option key={value}>{value}</option>)}</select></label>)}
         <label className="grid gap-1">Maximum words<input aria-label={`Maximum words ${index + 1}`} className="min-h-11 w-full border p-2" type="number" min={40} max={180} value={config.length.maxWords} onChange={(event) => change(index, { ...config, length: { maxWords: Number(event.target.value) } })} /></label>
@@ -462,7 +532,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         <p className="text-sm">Permitted windows: {config.planner.permittedWindows.map((window) => `${window.startMinute}–${window.endMinute}`).join(', ')} local minutes. Edit exact windows in configuration JSON.</p>
       </fieldset>
       <div className="flex flex-wrap gap-3">
-        <button className="min-h-11 underline" type="button" onClick={() => change(1 - index, config)}>Duplicate to other side</button>
+        <button className="min-h-11 underline" type="button" onClick={() => { change(1 - index, config); setChoices((current) => current ? current.map((entry, i) => i === 1 - index ? current[index] : entry) as [BenchGeneration, BenchGeneration] : current); }}>Duplicate to other side</button>
         <button className="min-h-11 underline disabled:opacity-50" type="button" disabled={mode === 'account'} onClick={() => save(index)}>Save draft</button>
         <button className="min-h-11 underline" type="button" onClick={() => loadSaved(index)}>Load saved draft</button>
         <button className="min-h-11 underline disabled:opacity-50" type="button" disabled={mode === 'account'} onClick={() => exportConfig(index)}>Export configuration</button>
@@ -502,7 +572,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     </div>}
     <BriefingDays key={`${mode}:${accountRef}:${account?.settings.revision ?? 0}`} view={view} mode={mode} accountRef={accountRef}
       preferenceRevision={account?.settings.revision} timezone={account?.settings.timezone}
-      blocked={running || (mode === 'account' && (!account?.settings.enabled || accountLoading))} configs={configs}
+      blocked={running || (mode === 'account' && (!account?.settings.enabled || accountLoading))} configs={configs} generation={choices}
       labels={sides.map(side => side.label)} fixtureId={fixtureId} analysisFixtureId={analysisFixtureId} cases={cases}
       onRefresh={() => void loadCases()} onOpen={id => void openCase(id, true).then(() => loadCases())} onAccountFailure={clearAccountFailure} />
     {view === 'saved' ? <SavedReviews cases={cases} retentionDays={retentionDays} loading={casesLoading} error={casesError} onOpen={(id) => void openCase(id)} onDelete={(id) => void deleteCase(id)} onRefresh={() => void loadCases()} /> : <>
@@ -517,9 +587,10 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <p role="alert">Comparison unavailable: {error}</p> : null}
       <div ref={columns} className="grid gap-8 lg:grid-cols-2">
-        <ReadingColumn side="A" title="Baseline" run={runA} draftChanged={!!runA?.config && JSON.stringify(runA.config) !== JSON.stringify(configs[0])} onEstimateReview={detail ? saveEstimateReview : undefined} />
-        <ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={!!runB?.config && JSON.stringify(runB.config) !== JSON.stringify(configs[1])} onEstimateReview={detail ? saveEstimateReview : undefined} />
+        <div className="min-w-0 space-y-3"><ReadingColumn side="A" title="Baseline" run={runA} draftChanged={changedSince(runA, 0)} onEstimateReview={detail ? saveEstimateReview : undefined} /><RunGeneration side="A" run={runA} /></div>
+        <div className="min-w-0 space-y-3"><ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={changedSince(runB, 1)} onEstimateReview={detail ? saveEstimateReview : undefined} /><RunGeneration side="B" run={runB} /></div>
       </div>
+      {runA && runB && (runA.effort !== runB.effort || runA.promptVariant !== runB.promptVariant) ? <p className="text-sm">Generation differs between A and B: reasoning effort {runA.effort ?? 'not recorded'} → {runB.effort ?? 'not recorded'}; prompt {runA.promptVariant ?? 'not recorded'} → {runB.promptVariant ?? 'not recorded'}.</p> : null}
       <RunDifferences a={runA} b={runB} />
       {detail && !unsaved ? <FeedbackForm draft={feedback} onChange={setFeedback} onQuote={quoteSelection} onSave={() => void saveFeedback()} disabled={!runA && !runB} saving={savingFeedback} />
         : unsaved ? <p className="text-sm">Feedback needs a saved comparison. Run again to save.</p> : null}

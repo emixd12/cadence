@@ -73,6 +73,9 @@ describe("OpenAI adapter usage and reasons", () => {
     }));
     expect(bodies[0]).not.toContain("onUsage");
     expect(JSON.parse(bodies[2]).text.format.name).toBe("cadence_duration_estimates_v1_2");
+    // Ticket 290: a workbench override changes only the model and the effort, in the same key order.
+    await generateOpenAIDailyBrief(adapterInput, { apiKey: "key", fetch: fetcher, model: "bench-model-a", effort: "medium" });
+    expect(bodies[4]).toBe(bodies[0].replace(JSON.stringify(DAILY_BRIEF_MODEL), '"bench-model-a"').replace('{"effort":"low"}', '{"effort":"medium"}'));
   });
 
   it.each([

@@ -20,8 +20,14 @@ and compares. The run covers 119 captures in 28 combinations of recipe, route, a
 connector sources and travel. The `insufficient_context` route is not reached by any
 fixture; that route is covered only by the direct composition tests.
 
+Since Ticket 290 `generateDailyBrief` calls `composeDailyBriefInstructions`, so that
+comparison no longer checks an independent string. `tests/daily-brief-production-pin.test.ts`
+now carries the proof: it pins a hash of every captured instruction string and the
+production request bodies to values computed before the change.
+
 `consolidated` differs only for recipes 1.1 (`isPlainRecipe`) and 1.2 (`isLaneRecipe`). For
-recipe 1.0 it returns the layered text. Nothing in production or the workbench selects it.
+recipe 1.0 it returns the layered text. Production never selects it. Since Ticket 290 the
+development workbench can select it per candidate.
 
 ## Structure of the consolidated text
 
@@ -229,17 +235,26 @@ the later layer's rule.
 
 ## How the owner compares the two variants
 
-The workbench does not select a prompt variant yet. Once a later ticket wires
-`composeDailyBriefInstructions` into `generateDailyBrief` and the workbench:
+Since Ticket 290, `generateDailyBrief` builds its instructions through
+`composeDailyBriefInstructions`, and each workbench candidate chooses a prompt variant in
+its Generation group (`docs/qa/briefing-workbench.md`).
 
-1. Choose the `advisor-analysis-2` (recipe 1.1) or `advisor-analysis-3` (recipe 1.2) preset.
-2. Run the same fixture or account snapshot with the `layered` and the `consolidated`
-   variant, keeping the planning time frozen.
-3. Compare the prose and the validator result. The run record shows each variant's
-   `dailyBriefPromptRevision`, so the two runs are distinguishable.
-4. Check the quiet-day fixtures (`uneventful`, `completed`), an overlap fixture (`overlap`),
+1. Open the workbench (`/design-system?preview=briefing-workbench`) on a development port.
+2. Load the `advisor-analysis-2` (recipe 1.1) or `advisor-analysis-3` (recipe 1.2) preset on
+   A, then use "Duplicate to other side" so B has the same configuration.
+3. In "Configure B", set Prompt to Consolidated. Leave Model and Reasoning effort at their
+   production values, so the prompt is the only difference.
+4. Run new comparison on a synthetic fixture or an account snapshot. The planning time stays
+   frozen. To repeat on the same inputs, use "Rerun candidate on this case".
+5. Compare the prose, the validator result and any failure reason. Each result column and
+   each saved run shows its prompt variant and `dailyBriefPromptRevision`, so the two runs
+   are distinguishable. The review packet lists the generation difference.
+6. Check the quiet-day fixtures (`uneventful`, `completed`), an overlap fixture (`overlap`),
    a travel fixture (`travel_day`) and the connector context, because those reach the
    resolved conflicts.
+
+For recipe 1.0 the consolidated choice sends the layered text, and the run records
+`layered`.
 
 The consolidated variant is not promoted. Promoting it needs an owner decision and a
 separate ticket.

@@ -8,11 +8,11 @@ import { visibleDailyBriefText } from "@cadence/core/services/daily-brief-presen
 import { briefingAccountRef } from "./briefing-account-context.service";
 import {
   benchPartition, BRIEFING_BENCH_RETENTION_DAYS, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
-  type BenchCaseDetail, type BenchDisposition, type BenchEstimateReview, type BenchFeedback, type BenchPartition, type BenchPreference, type BenchRun, type BriefingBenchStore,
+  type BenchCandidate, type BenchCaseDetail, type BenchDisposition, type BenchEstimateReview, type BenchFeedback, type BenchGeneration, type BenchPartition, type BenchPreference, type BenchRun, type BriefingBenchStore,
 } from "./briefing-bench-store";
 import { DailyBriefError, raceBriefAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefUsageTotals, type DurationEstimateReport } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
-import { guard, json, readComparisonBody } from "./briefing-workbench.service";
+import { guard, json, productionGeneration, readComparisonBody } from "./briefing-workbench.service";
 import type { CalendarCaller } from "./google-calendar.service";
 
 const PREFERENCES: readonly BenchPreference[] = ["prefer_a", "prefer_b", "both_work", "neither_works"];
@@ -175,6 +175,23 @@ function describeUsageTotals(total: DailyBriefUsageTotals): string {
   return `${total.calls} model ${total.calls === 1 ? "call" : "calls"}; input tokens ${count(total.inputTokens)} (cached ${count(total.cachedInputTokens)}); output tokens ${count(total.outputTokens)} (reasoning ${count(total.reasoningTokens)})`;
 }
 
+/** Ticket 290: a candidate's generation choices as text. Older candidates recorded none. */
+export function describeGeneration(generation: BenchGeneration | undefined): string {
+  return generation ? `model ${generation.model}; reasoning effort ${generation.effort}; prompt ${generation.promptVariant}`
+    : "not recorded (saved before Ticket 290; it used the production model, effort and layered prompt)";
+}
+
+/** Ticket 290: generation fields that differ between two candidates. A missing record counts as the production values. */
+export function generationDifferences(before: BenchCandidate, after: BenchCandidate): { path: string; before: string; after: string }[] {
+  const left = before.generation ?? productionGeneration(), right = after.generation ?? productionGeneration();
+  return (["model", "effort", "promptVariant"] as const).flatMap((field) => left[field] === right[field] ? [] : [{ path: `generation.${field}`, before: left[field], after: right[field] }]);
+}
+
+/** Ticket 290: the generation a run used. Runs saved before Ticket 290 recorded only the model. */
+function describeRunGeneration(run: BenchRun): string {
+  return `model ${run.model}; reasoning effort ${run.effort ?? "not recorded"}; prompt variant ${run.promptVariant ?? "not recorded"}; prompt revision \`${run.promptRevision}\``;
+}
+
 function describeRunError(run: BenchRun): string {
   return run.error ? `${run.error}${run.reason ? `, reason ${run.reason}` : ""}` : "";
 }
@@ -236,6 +253,7 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
       `### ${item.label} (${item.role}, \`${item.id}\`)`,
       "",
       `- Parent: ${item.parentCandidateId ?? "none"}; proposal: ${item.proposalId ?? "none"}; configuration revision \`${item.configurationRevision.slice(0, 12)}\``,
+      `- Generation: ${describeGeneration(item.generation)}`,
       item.rationale ? `- Rationale: ${item.rationale}` : "- Rationale: none given",
       "",
       "```json", JSON.stringify(item.config, null, 2), "```", "",
@@ -244,16 +262,16 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
   const baseline = detail.candidates.find((item) => item.role === "baseline");
   for (const other of detail.candidates.filter((item) => item.role === "candidate")) {
     if (!baseline) break;
-    const differences = diffBriefingConfigs(baseline.config, other.config);
+    const differences = [...diffBriefingConfigs(baseline.config, other.config), ...generationDifferences(baseline, other)];
     lines.push(`## Differences: ${baseline.label} → ${other.label}`, "", ...(differences.length
-      ? differences.map((item) => `- \`${item.path}\`: ${JSON.stringify(item.before)} → ${JSON.stringify(item.after)}`) : ["- No configuration differences."]), "");
+      ? differences.map((item) => `- \`${item.path}\`: ${JSON.stringify(item.before)} → ${JSON.stringify(item.after)}`) : ["- No configuration or generation differences."]), "");
   }
   lines.push("## Runs", "");
   for (const run of detail.runs) {
     const owner = candidate(run.candidateId);
     lines.push(`### Run \`${run.id}\` — ${owner?.label ?? run.candidateId}`, "",
       `- State: ${run.state}${run.error ? ` (${describeRunError(run)})` : ""}; validation ${run.validation}; ${run.latencyMs} ms`,
-      `- Model ${run.model}; prompt revision \`${run.promptRevision}\`; pipeline ${run.pipelineVersion}; attempt \`${run.attemptId}\``,
+      `- Generation: ${describeRunGeneration(run)}; pipeline ${run.pipelineVersion}; attempt \`${run.attemptId}\``,
       `- ${describeRunUsage(run.usage)}`);
     if (run.briefing) {
       const review = reviewBriefingReading({ visibleText: visibleBriefingText(run.briefing), behaviorTitles: titles, segments: [
@@ -324,6 +342,14 @@ export async function writeSequenceReport(store: BriefingBenchStore, partition: 
     lines.push(`## ${record.localDate} · ${record.evidenceType} · ${record.id}`, '',
       `Clock: ${record.capturedAt} (${record.timezone}).`,
       ...(record.history ? ['Coverage:', '```json', JSON.stringify(record.history, null, 2), '```'] : ['Coverage: original case capture; no reconstructed history claim.']), '');
+    // Ticket 290: what each candidate asked for, and how each candidate differs from the baseline.
+    const baseline = detail.candidates.find(item => item.role === 'baseline');
+    for (const candidate of detail.candidates) {
+      const differences = baseline && candidate.role === 'candidate' ? generationDifferences(baseline, candidate) : [];
+      lines.push(`Generation · ${candidate.role} · ${candidate.label}: ${describeGeneration(candidate.generation)}.${baseline && candidate.role === 'candidate'
+        ? ` Differences from ${baseline.label}: ${differences.map(item => `${item.path} ${item.before} → ${item.after}`).join('; ') || 'none'}.` : ''}`);
+    }
+    if (detail.candidates.length) lines.push('');
     if (!detail.feedback.length) judgments.unreviewed++;
     for (const feedback of detail.feedback) if (feedback.preference) judgments[feedback.preference]++;
     for (const run of detail.runs) {
@@ -333,7 +359,7 @@ export async function writeSequenceReport(store: BriefingBenchStore, partition: 
       lines.push(`### ${candidate?.role ?? 'unknown'} · ${candidate?.label ?? run.candidateId} · run ${run.id}`, '',
         `State: ${run.state}; validation: ${run.validation}${run.error ? `; error: ${run.error}` : ''}${run.reason ? `; reason: ${run.reason}` : ''}.`,
         describeRunUsage(run.usage),
-        `Attempt: ${run.attemptId}; model: ${run.model}; prompt: ${run.promptRevision}; pipeline: ${run.pipelineVersion}; configuration: ${run.configurationRevision}.`,
+        `Attempt: ${run.attemptId}; model: ${run.model}; effort: ${run.effort ?? 'not recorded'}; prompt variant: ${run.promptVariant ?? 'not recorded'}; prompt: ${run.promptRevision}; pipeline: ${run.pipelineVersion}; configuration: ${run.configurationRevision}.`,
         ...(run.evaluation ? [`Evaluation: ${JSON.stringify(run.evaluation)}`] : []));
       if (run.state === 'ready' && run.briefing) {
         ready++;
