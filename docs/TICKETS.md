@@ -6540,7 +6540,7 @@ Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open.
 
 Local implementation and checks pass. Hosted migration `20260905020741` and the
 five-minute reminder cron reached production in the September 12 rollout
-(`STATUS.md`, "Current repository state", "Production rollout (2026-09-12)");
+(`docs/status/archive/legacy-current-repository-state.md`, "Current repository state", "Production rollout (2026-09-12)");
 `vercel.json` still schedules `*/5 * * * *`. That entry leaves "Ticket 091's
 separately authorized reminder-delivery check" open, and no later record closes it
 or the Preview inspection of Export reads.
@@ -9489,7 +9489,7 @@ The shared verification and rollout requirements below apply to all three ticket
 
 ## Ticket 129: Bounded reminder bookkeeping and storage recovery
 
-Status: complete (2026-09-09; reconciled October 27, 2026). `STATUS.md`, "Desktop
+Status: complete (2026-09-09; reconciled October 27, 2026). `docs/status/archive/legacy-current-repository-state.md`, "Desktop
 repair acceptance — 2026-09-09": installed preview.21 reduced the live database from
 6.21 GB to 6.53 MB with records preserved, converged with the hosted account, and
 repeated native reminder reconciliation kept one receipt per operation with zero
@@ -9693,7 +9693,7 @@ Platform impact:
 
 ## Ticket 131: Automatic downloads with user-controlled installation
 
-Status: complete (reconciled October 27, 2026). On September 9 `STATUS.md` ("Handoff
+Status: complete (reconciled October 27, 2026). On September 9 `docs/status/archive/legacy-current-repository-state.md` ("Handoff
 notes") kept it open only "until a newer signed release verifies the corrected
 download/install lifecycle". Ticket 180 (complete September 29) verified it on signed
 builds: discovery, Install and separate Restart, partial-download failure and Retry,
@@ -10913,7 +10913,7 @@ Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
 Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
-reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+reached production on September 20 (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release — September 20,
 2026"), and the web app deployed on September 26 ("Daily Brief web production
 deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
 and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
@@ -10982,7 +10982,7 @@ Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
 Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
-reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+reached production on September 20 (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release — September 20,
 2026"), and the web app deployed on September 26 ("Daily Brief web production
 deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
 and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
@@ -11077,7 +11077,7 @@ No schema, new connector, or provider permission change.
 
 Status: in_progress (September 20, 2026). Implementation and focused/browser QA
 passed. Reconciled October 27, 2026: still open. The September 20 consolidated release
-superseded the concurrent test/build failures (`STATUS.md`, "Consolidated release —
+superseded the concurrent test/build failures (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release —
 September 20, 2026"); commit `b127df2` is in the September 26 production deployment.
 Still open: the live check that a calendar with a custom name (Northwestern Work)
 shows that name in production and can be selected and saved. No later record closes it.

@@ -12,7 +12,9 @@ makes release decisions. Nothing else goes to her.
 ## Read first
 
 1. `AGENTS.md`, "Installed and live acceptance".
-2. `STATUS.md`, top section, and `docs/TICKETS.md`, Tickets 247–256.
+2. `STATUS.md` ("Open work" and "Recent entries"); the entry "Automated MCP client
+   acceptance: Tickets 247–258 — October 31, 2026" in `docs/status/archive/2026-10.md`;
+   and `docs/TICKETS.md`, Tickets 247–256.
 3. `docs/qa/mcp-server.md`, "Automated acceptance", and `docs/qa/agent-secrets.md`.
 4. The run folder's `STATE.md` if you are resuming (see "Resume").
 

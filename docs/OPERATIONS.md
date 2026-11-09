@@ -1875,8 +1875,9 @@ rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
 
 ## Connector expansion acceptance and operation (Tickets 233–241)
 
-Tickets 233–241 have independent local source/synthetic approval. `STATUS.md`,
-under "Owner-run live acceptance", records the later authorized provider tests.
+Tickets 233–241 have independent local source/synthetic approval.
+`docs/status/archive/2026-10.md`, under "Owner-run live acceptance — October 19, 2026",
+records the later authorized provider tests.
 Those tests do not establish installed-desktop, hosted-deployment or public-release
 acceptance. Repository review alone does not authorize real provider reads,
 publication, deployment, or hosted configuration changes.
