@@ -242,8 +242,9 @@ export function ticketsInHeading(heading) {
   return [...numbers].sort((a, b) => a - b);
 }
 
-function escapeCell(text) {
-  return text.replace(/\|/g, "\\|");
+/** Escapes a Markdown table cell: backslashes first, so an existing backslash cannot undo the pipe escape. */
+export function escapeCell(text) {
+  return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
 function headingText(line) {

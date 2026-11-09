@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildIndex,
+  escapeCell,
   INDEX_BEGIN,
   INDEX_END,
   main,
@@ -139,6 +140,14 @@ describe('index', () => {
     expect(index).toContain('| 240 | 2026-10.md | Ticket 240 \\| iCloud |');
     const rows = index.split('\n').filter((l) => /^\| \d{3} \|/.test(l)).map((l) => Number(l.slice(2, 5)));
     expect(rows).toEqual([...rows].sort((a, b) => a - b));
+  });
+
+  it('escapes backslashes before pipes in a table cell', () => {
+    expect(escapeCell('plain heading')).toBe('plain heading');
+    expect(escapeCell('a | b')).toBe('a \\| b');
+    // A backslash already in the text must not undo the pipe escape that follows it.
+    expect(escapeCell('a \\| b')).toBe('a \\\\\\| b');
+    expect(escapeCell('C:\\path')).toBe('C:\\\\path');
   });
 
   it('replaces only the generated block and is stable', () => {
