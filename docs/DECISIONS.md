@@ -1881,3 +1881,20 @@ step 2, drives 0.1.8's own updater to 0.1.9. The owner quits Cadence for the swa
 
 Platform impact: desktop, Mac 0.1.9 publication. Web, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-09: Agent-architecture run (Tickets 286–291)
+
+The owner directed on November 9, 2026 that six agent-architecture actions be carried out
+by parallel subagents, checked by an orchestrating agent, and merged to `main`. The actions
+are Tickets 286–291: a bounded `STATUS.md` with archived history, an `AGENTS.md` audit,
+Daily Brief token usage and failure reasons, a consolidated Daily Brief prompt candidate,
+model, reasoning effort and prompt variant as workbench candidates, and skill-rule
+scenarios for MCP client acceptance.
+
+This direction approved no Daily Brief prompt, model or reasoning-effort change for
+production. Tickets 289 and 290 add candidates to the development workbench only.
+Production keeps the layered prompt, the current model and low effort until the owner
+compares candidates and promotes one under Ticket 184's rules.
+
+Platform impact: repository guidance, development tooling and web server diagnostics only.
+Desktop, marketing and future mobile: not applicable. Messaging impact: none.

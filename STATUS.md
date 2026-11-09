@@ -47,6 +47,9 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
+| Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
+| Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
@@ -79,6 +82,51 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Agent-architecture run: Tickets 286–291 — November 9, 2026
+
+Owner direction: `docs/DECISIONS.md`, 2026-11-09. Six packages ran as parallel subagents. An
+orchestrating agent checked each diff against the repository before merging it. Delivered in
+one pull request from branch `agentic-architecture`. Details: `docs/TICKETS.md`, Tickets
+286–291.
+
+- **Ticket 286, complete.** `STATUS.md` went from 819,376 bytes to under 40,000. History
+  moved unchanged to `docs/status/archive/`; all 10,837 non-blank lines of the old file are
+  present. `npm run agents:check` enforces the limit and `npm run status:archive` moves old
+  entries.
+- **Ticket 287, complete.** Thirteen stale statements in `AGENTS.md` are fixed or removed,
+  repeated rules are merged, and the reading order names a bounded `STATUS.md` and the
+  `docs/OPERATIONS.md` sections every task reads. No product, security, data or scope rule
+  changed meaning.
+- **Ticket 288, complete in source.** Each Daily Brief model call reports token usage, and
+  each failure carries an internal reason such as `provider_incomplete_max_output_tokens` or
+  `validation_word_limit`. Both reach the `daily_brief.model` performance span and workbench
+  runs. The OpenAI request body and the `/api/advisor/brief` responses are unchanged; tests
+  prove both.
+- **Ticket 289, candidate only.** A "consolidated" Daily Brief prompt states each rule once
+  for recipes 1.1 and 1.2. Mapping, nine resolved conflicts and five owner ambiguities:
+  `docs/qa/daily-brief-prompt-consolidation.md`. Not promoted.
+- **Ticket 290, implemented.** Each workbench candidate can choose a model, a reasoning
+  effort and a prompt variant; runs record what they used. Production stays on
+  `DAILY_BRIEF_MODEL`, low effort and the layered prompt. A test pins the production request
+  bodies, instructions and `DAILY_BRIEF_PROMPT_REVISION` (`5588d260d8e145ad`).
+- **Ticket 291, implemented.** Three headless-client scenarios test the published skills'
+  rule to write nothing before the user confirms. Unit-tested with fakes only.
+
+Verification on the merged branch with Node 24: all 15 checks passed. `agents:check`, `interactions:check`,
+`resolvers:check`, `core:check`, `design-system:check`, `public-source:check`,
+`public-trust:check`, `public-trust:fixtures`, `lint` (0 errors, 1 existing warning),
+`typecheck`, `test` (5,305 passed, 122 skipped; `main` before the run had 5,199 passed and
+122 skipped), `build`, `desktop:build`, `marketing:build` and `marketing:check`.
+
+Not verified: no model call was made, so prompt quality, the candidate models and the
+effort values are untested against the provider. No local-stack or live run of the Ticket
+291 scenarios. The token figures in `docs/COSTS.md` stay assumed. Dagger and Docker are not
+installed on this machine, so the npm commands ran directly.
+
+Platform impact: repository guidance, development tooling and web server diagnostics. The
+web response contract is unchanged; desktop, marketing and future mobile are not applicable.
+Messaging impact: none.
 
 ## Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026
 

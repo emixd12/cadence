@@ -1132,6 +1132,11 @@ two sides and forwards each side's item to every run on that side.
 The model and effort apply to the brief call only. The Ticket 188 duration-estimate
 call keeps the production model and effort.
 
+The 2,000 output-token limit applies to every candidate. Reasoning tokens count toward
+it, so a higher effort can end as `advisor_unavailable` with reason
+`provider_incomplete_max_output_tokens`. Read that reason as the limit being reached, not
+as a quality result.
+
 Records:
 
 - A saved candidate stores `generation` (model, effort, prompt variant). It is part
