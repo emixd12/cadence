@@ -9,21 +9,25 @@ import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { briefingAccountRef } from "./briefing-account-context.service";
 import { briefingBenchBudget, type BriefingBenchBudgetSnapshot, type BriefingBenchReservation } from "./briefing-bench-budget";
-import { benchPartition, createBriefingBenchStore, isBenchId, BRIEFING_BENCH_SCHEMA_VERSION, type BenchCaseDetail, type BenchRun, type BriefingBenchStore } from "./briefing-bench-store";
+import { benchPartition, createBriefingBenchStore, isBenchId, BRIEFING_BENCH_SCHEMA_VERSION, type BenchCaseDetail, type BenchGeneration, type BenchRun, type BriefingBenchStore } from "./briefing-bench-store";
 import { briefingFixture, type BriefingFixtureId } from "./briefing-fixtures";
 import { briefingAnalysisFixture, type BriefingAnalysisFixtureId } from "./briefing-analysis-fixtures";
 import { prepareBriefing, type BriefingAnalysisInput } from "./briefing-pipeline";
-import { DAILY_BRIEF_MODEL } from "./daily-brief-openai";
-import { DAILY_BRIEF_PROMPT_REVISION, DailyBriefError, type DailyBriefGenerator } from "./daily-brief-consumer";
+import { DailyBriefError, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
+import { dailyBriefPromptRevision, effectiveDailyBriefPromptVariant, type DailyBriefPromptVariant } from "./daily-brief-instructions";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import type { CalendarCaller } from "./google-calendar.service";
-import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseReview, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
+import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseGeneration, parseReview, productionGeneration, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
 
 export type BriefingSequenceHistory = Readonly<{ fingerprint: string; lastShownLocalDate: string }>;
 export type BriefingSequenceResult = Readonly<{
   caseId: string; localDate: string; side: 0 | 1; candidateId: string; laneId: BriefingAnalysisLaneId | null;
   state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; inspector: ReturnType<typeof prepareBriefing>;
   error?: string; validation: string; latencyMs: number; runId: string | null; saved: boolean; retainedFingerprints: readonly string[];
+  /** Ticket 288: internal failure reason and per-call token usage, when the run recorded them. */
+  reason?: string; usage?: readonly DailyBriefCallUsage[];
+  /** Ticket 290: the model, effort and prompt the run used. */
+  model?: string; effort?: string; promptVariant?: DailyBriefPromptVariant; promptRevision?: string;
 }>;
 export type BriefingSequencePlan = Readonly<{
   caseIds: readonly string[]; mode: "daily" | "diagnostic"; plannedCalls: number; callBudget: number;
@@ -39,12 +43,15 @@ export type BriefingSequencePlan = Readonly<{
 export type BriefingSequenceStatus = Readonly<{
   id: string; state: "queued" | "running" | "ready" | "partial" | "cancelled" | "error";
   plan: BriefingSequencePlan; results: readonly BriefingSequenceResult[]; dispatchedCalls: number;
-  error?: string; usage: "unavailable"; budget: BriefingBenchBudgetSnapshot;
+  /** Ticket 288: "per_result" once any result carries token usage; counts are on each result. */
+  error?: string; usage: "unavailable" | "per_result"; budget: BriefingBenchBudgetSnapshot;
 }>;
 
 type SequenceInput = { action: "simulate" | "start"; accountRef: string | null; caseIds: string[]; configs: BriefingConfig[];
-  candidates: readonly ReviewCandidateInput[]; mode: "daily" | "diagnostic"; warmup: BriefingSequenceHistory[]; callBudget: number };
-type Task = { detail: BenchCaseDetail; side: 0 | 1; candidate: ReviewCandidateInput; config: BriefingConfig; laneId: BriefingAnalysisLaneId | null };
+  candidates: readonly ReviewCandidateInput[]; mode: "daily" | "diagnostic"; warmup: BriefingSequenceHistory[]; callBudget: number;
+  /** Ticket 290: optional generation choices, parallel to `configs`; null keeps production values. */
+  generation: BenchGeneration[] | null };
+type Task = { detail: BenchCaseDetail; side: 0 | 1; candidate: ReviewCandidateInput; config: BriefingConfig; laneId: BriefingAnalysisLaneId | null; generation: BenchGeneration | null };
 type Job = { id: string; accountRef: string | null; createdAt: number; controller: AbortController; state: BriefingSequenceStatus["state"];
   plan: BriefingSequencePlan; results: BriefingSequenceResult[]; error?: string; reservation: BriefingBenchReservation; details: BenchCaseDetail[]; tasks: Task[] };
 // ponytail: one-hour process memory retains unsaved outputs after cancellation; persisted runs remain the durable review record.
@@ -52,17 +59,18 @@ const jobs = new Map<string, Job>();
 
 function view(job: Job): BriefingSequenceStatus {
   return { id: job.id, state: job.state, plan: job.plan, results: job.results, dispatchedCalls: job.reservation.used,
-    ...(job.error ? { error: job.error } : {}), usage: "unavailable", budget: briefingBenchBudget().snapshot() };
+    ...(job.error ? { error: job.error } : {}), usage: job.results.some((result) => result.usage?.length) ? "per_result" : "unavailable", budget: briefingBenchBudget().snapshot() };
 }
 function parseInput(value: unknown): SequenceInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new DailyBriefError("invalid_request");
   const item = value as Record<string, unknown>;
-  if (Object.keys(item).some(key => !["action", "accountRef", "caseIds", "configs", "candidates", "mode", "warmup", "callBudget"].includes(key)) ||
+  if (Object.keys(item).some(key => !["action", "accountRef", "caseIds", "configs", "candidates", "mode", "warmup", "callBudget", "generation"].includes(key)) ||
       !["simulate", "start"].includes(String(item.action)) || !["daily", "diagnostic"].includes(String(item.mode)) ||
       !(item.accountRef === null || typeof item.accountRef === "string") || !Array.isArray(item.caseIds) || item.caseIds.length < 1 || item.caseIds.length > 14 ||
       !item.caseIds.every(isBenchId) || new Set(item.caseIds).size !== item.caseIds.length || !Array.isArray(item.configs) || item.configs.length !== 2 || !Array.isArray(item.warmup) || item.warmup.length > 256) throw new DailyBriefError("invalid_request");
   benchPartition(item.accountRef as string | null);
   const configs = item.configs.map(parseBriefingConfig);
+  const generation = parseGeneration(item.generation, 2);
   const candidates = parseReview({ caseId: item.caseIds[0], candidates: item.candidates }, 2).candidates;
   const warmup = item.warmup.map(value => {
     const entry = value as Record<string, unknown>;
@@ -73,7 +81,7 @@ function parseInput(value: unknown): SequenceInput {
   });
   const callBudget = item.callBudget ?? briefingBenchBudget().snapshot().limit;
   if (!Number.isSafeInteger(callBudget) || Number(callBudget) < 1 || Number(callBudget) > briefingBenchBudget().snapshot().limit) throw new DailyBriefError("invalid_request");
-  return { ...item, configs, candidates, warmup, callBudget } as SequenceInput;
+  return { ...item, configs, candidates, warmup, callBudget, generation } as SequenceInput;
 }
 function inputs(detail: BenchCaseDetail, config: BriefingConfig) {
   const saved = detail.case;
@@ -105,10 +113,11 @@ function planSequence(input: SequenceInput, details: BenchCaseDetail[]) {
         return prepareBriefing(replay.context, diagnostic, replay.context.capturedAt, replay.analysis).analysis?.tip ? [contract.id] : [];
       });
       if (prepared.analysis?.tip) for (const fingerprint of prepared.analysis.recordFingerprints) histories[index].push({ fingerprint, lastShownLocalDate: detail.case.localDate });
-      if (input.mode === "daily") tasks.push({ detail, side, candidate: input.candidates[index]!, config, laneId: null });
+      const generation = input.generation?.[index] ?? null;
+      if (input.mode === "daily") tasks.push({ detail, side, candidate: input.candidates[index]!, config, laneId: null, generation });
       else for (const laneId of eligibleLanes) tasks.push({ detail, side, candidate: { ...input.candidates[index]!, id: randomUUID(),
         label: `${input.candidates[index]!.label.slice(0, 45)} · ${laneId}`, parentCandidateId: detail.candidates.some(candidate => candidate.id === input.candidates[index]!.id) ? input.candidates[index]!.id : null },
-        config: parseBriefingConfig({ ...config, analysis: { ...config.analysis, lanes: [laneId], maxTips: 1 } }), laneId });
+        config: parseBriefingConfig({ ...config, analysis: { ...config.analysis, lanes: [laneId], maxTips: 1 } }), laneId, generation });
       return { side, candidateId: input.candidates[index]!.id, tipId: prepared.analysis?.selection.tipId ?? null,
         fingerprint: prepared.analysis?.fingerprint ?? null, decisions: prepared.analysis?.selection.decisions ?? [], eligibleLanes, cooldownDays: config.analysis.cooldownDays, nextDaySpacing: !isLaneRecipe(config.recipe) };
     });
@@ -171,7 +180,8 @@ async function execute(job: Job, input: SequenceInput, request: Request, generat
     for (const task of job.tasks) {
       if (job.controller.signal.aborted) { job.results.push(await skipped(task, job, "cancelled", store)); continue; }
       const comparison = new Request(request.url, { method: "POST", headers: request.headers, signal: job.controller.signal,
-        body: JSON.stringify({ mode: "saved", accountRef: job.accountRef, configs: [task.config], review: { caseId: task.detail.case.id, candidates: [task.candidate] } }) });
+        body: JSON.stringify({ mode: "saved", accountRef: job.accountRef, configs: [task.config], ...(task.generation ? { generation: [task.generation] } : {}),
+          review: { caseId: task.detail.case.id, candidates: [task.candidate] } }) });
       const response = await runBriefingComparison(comparison, generate, store, { reservation: job.reservation, sequenceId: job.id,
         shown: [histories[task.side]], ...(task.laneId ? { diagnosticLane: task.laneId } : {}),
         onRetainedTip: (_, fingerprints, localDate) => { for (const fingerprint of fingerprints) histories[task.side].push({ fingerprint, lastShownLocalDate: localDate }); } });
@@ -194,26 +204,32 @@ async function skipped(task: Task, job: Job, error: string, store: BriefingBench
   const existing = await store.readCase(partition, task.detail.case.id).catch(() => null);
   const recorded = existing?.runs.findLast(run => run.evaluation?.sequenceId === job.id && run.candidateId === task.candidate.id);
   if (recorded) return { caseId: task.detail.case.id, localDate: task.detail.case.localDate, side: task.side, candidateId: task.candidate.id, laneId: task.laneId,
-    state: recorded.state, ...(recorded.briefing ? { briefing: recorded.briefing } : {}), ...(recorded.error ? { error: recorded.error } : {}), validation: recorded.validation,
+    state: recorded.state, ...(recorded.briefing ? { briefing: recorded.briefing } : {}), ...(recorded.error ? { error: recorded.error } : {}),
+    ...(recorded.reason ? { reason: recorded.reason } : {}), ...(recorded.usage ? { usage: recorded.usage } : {}), validation: recorded.validation,
+    model: recorded.model, ...(recorded.effort ? { effort: recorded.effort } : {}), ...(recorded.promptVariant ? { promptVariant: recorded.promptVariant } : {}), promptRevision: recorded.promptRevision,
     latencyMs: recorded.latencyMs, inspector: recorded.inspector as ReturnType<typeof prepareBriefing>, saved: true, runId: recorded.id, retainedFingerprints: recorded.evaluation?.retainedFingerprints ?? [] };
   const replay = inputs(task.detail, task.config);
   const inspector = prepareBriefing(replay.context, replay.config, replay.context.capturedAt, replay.analysis);
   const state = error === "cancelled" ? "cancelled" as const : "error" as const;
   const id = randomUUID(), createdAt = new Date().toISOString();
   let saved = true;
+  // Ticket 290: a skipped run records the generation it would have used.
+  const generation = task.generation ?? productionGeneration();
+  const promptVariant = effectiveDailyBriefPromptVariant(generation.promptVariant, replay.config);
+  const used = { model: generation.model, effort: generation.effort, promptVariant, promptRevision: dailyBriefPromptRevision(promptVariant) };
   const run: BenchRun = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "run", id, caseId: task.detail.case.id, candidateId: task.candidate.id,
-    attemptId: randomUUID(), createdAt, state, error, validation: "not_completed", latencyMs: 0, model: DAILY_BRIEF_MODEL,
-    promptRevision: DAILY_BRIEF_PROMPT_REVISION, configurationRevision: inspector.configurationRevision, pipelineVersion: inspector.pipelineVersion, inspector,
+    attemptId: randomUUID(), createdAt, state, error, validation: "not_completed", latencyMs: 0, ...used,
+    configurationRevision: inspector.configurationRevision, pipelineVersion: inspector.pipelineVersion, inspector,
     evaluation: { sequenceId: job.id, mode: task.laneId ? "diagnostic" : "daily", ...(task.laneId ? { laneId: task.laneId } : {}), retainedFingerprints: [] } };
   try {
     if (!existing?.candidates.some(candidate => candidate.id === task.candidate.id)) {
       await store.append(partition, task.detail.case.id, "candidates", { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "candidate", ...task.candidate,
-        label: task.candidate.label.trim(), rationale: task.candidate.rationale.trim(), caseId: task.detail.case.id, createdAt, config: task.config, configurationRevision: inspector.configurationRevision });
+        label: task.candidate.label.trim(), rationale: task.candidate.rationale.trim(), caseId: task.detail.case.id, createdAt, config: task.config, configurationRevision: inspector.configurationRevision, generation });
     }
     await store.append(partition, task.detail.case.id, "runs", run);
   } catch { saved = false; }
   return { caseId: task.detail.case.id, localDate: task.detail.case.localDate, side: task.side, candidateId: task.candidate.id, laneId: task.laneId,
-    state, error, validation: "not_completed", latencyMs: 0, inspector, saved, runId: saved ? id : null, retainedFingerprints: [] };
+    state, error, validation: "not_completed", latencyMs: 0, inspector, saved, runId: saved ? id : null, retainedFingerprints: [], ...used };
 }
 function sequenceError(error: unknown) {
   const code = error instanceof DailyBriefError ? error.code : "invalid_request";

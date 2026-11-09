@@ -42,6 +42,17 @@ describe("in-app briefing routes", () => {
     expect(result.status).toBe(429);
     expect(await result.json()).toEqual({ error: "retry_exhausted" });
   });
+  it("keeps the internal failure reason out of the production response (Ticket 288)", async () => {
+    const { DailyBriefError } = await import("@/lib/services/daily-brief-consumer");
+    for (const [code, reason, status] of [["advisor_unavailable", "validation_word_limit", 503], ["advisor_unavailable", "provider_incomplete_max_output_tokens", 503], ["rate_limited", "provider_http_429", 429]] as const) {
+      mocks.generate.mockRejectedValue(new DailyBriefError(code, undefined, reason));
+      const result = await POST(new Request("https://cadence.example/api/advisor/brief", { method: "POST", body: "{}" }));
+      expect(result.status).toBe(status);
+      const text = await result.text();
+      expect(JSON.parse(text)).toEqual({ error: code });
+      expect(text).not.toContain(reason);
+    }
+  });
   it("allows only fixed native preflight origins", () => {
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "https://attacker.invalid" } })).status).toBe(403);
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "tauri://localhost" } })).status).toBe(204);

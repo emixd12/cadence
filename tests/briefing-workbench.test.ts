@@ -205,14 +205,15 @@ describe("briefing workbench boundary", () => {
     vi.doMock('@/lib/services/daily-brief-request', () => ({ runDailyBriefRequest: accountRead }));
     vi.doMock('@/lib/services/briefing-account-context.service', () => ({ prepareAccountBriefingContexts: accountRead, briefingAccountRef: vi.fn(), workbenchBehaviorRef: vi.fn() }));
     const provider = vi.fn();
-    vi.doMock("@/lib/services/daily-brief-openai", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", generateOpenAIDailyBrief: provider }));
+    vi.doMock("@/lib/services/daily-brief-openai", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", DAILY_BRIEF_REASONING_EFFORT: "low", OPENAI_REASONING_EFFORTS: ["low"], generateOpenAIDailyBrief: provider }));
     const network = vi.fn();
     vi.stubGlobal("fetch", network);
     const run = await loadService();
     const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue(output);
     const response = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
     expect(response.status).toBe(200);
-    expect(generate.mock.calls.every(([input]) => Object.keys(input).sort().join() === "facts,instructions,signal")).toBe(true);
+    // Ticket 288: the only addition is a usage callback; the generator still gets no data or mutation capability.
+    expect(generate.mock.calls.every(([input]) => Object.keys(input).sort().join() === "facts,instructions,onUsage,signal" && typeof input.onUsage === "function")).toBe(true);
     expect(provider).not.toHaveBeenCalled();
     expect(network).not.toHaveBeenCalled();
     expect(accountRead).not.toHaveBeenCalled();

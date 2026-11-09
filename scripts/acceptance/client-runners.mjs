@@ -3,7 +3,9 @@
 //   npm run mcp:accept:clients -- --client <name>[,<name>]|all --account A|B --scenario <name> --target local|production [options]
 //
 // Clients: claude-code, claude-ai, anthropic-api, openai-api, inspector (see clients.mjs).
-// Scenarios: read-write, read-only, step-up (see client-prompts.mjs).
+// Scenarios: read-write, read-only, step-up, and the Ticket 291 skill scenarios
+// skill-check-in-unconfirmed, skill-routine-unconfirmed, skill-routine-confirmed
+// (see client-prompts.mjs). The Inspector CLI has no model and skips the skill scenarios.
 //
 // For each enabled client the runner:
 //   1. registers a fresh DCR client and gets its own grant from Ticket 248's
@@ -131,6 +133,11 @@ export function readiness(client, { target, env, findTool = which, findInspector
   }
 }
 
+/** Why a client cannot run this scenario, or null. A skill scenario needs a model to follow the skill. */
+export function scenarioSkip(client, scenario) {
+  return client === 'inspector' && scenario?.needsModel ? 'not applicable: the Inspector CLI has no model to follow a published skill' : null;
+}
+
 // ---------------------------------------------------------------------------
 // Checks
 // ---------------------------------------------------------------------------
@@ -149,10 +156,38 @@ export function compareCalls(clientCalls, serverEvents) {
   return { clientCallCount: clientCalls.length, serverCallCount: server.length, unmatchedClientCount: unmatchedClient, unmatchedServerCount: server.filter((s) => !s.used).length };
 }
 
+/**
+ * The grant's write tool.call events as tool names and counts (Ticket 291).
+ * Any operation that is not a known read counts as a write, so an unknown
+ * operation can never pass a "no write" check.
+ */
+export function serverWriteSummary(serverEvents) {
+  const writes = serverEvents.filter((e) => e.kind === 'tool.call' && !isRead(e.operation));
+  const successCountByTool = {};
+  for (const e of writes) if (e.outcome === 'success') successCountByTool[e.operation] = (successCountByTool[e.operation] ?? 0) + 1;
+  return { writeCallCount: writes.length, tools: [...new Set(writes.map((e) => e.operation))].sort(), successCountByTool };
+}
+
+/**
+ * True when a Behavior's stored schedules equal `expected`: exactly one
+ * schedule with that recurrence, and its time entries in order with the same
+ * kind and HH:MM start (Postgres returns `18:00:00`).
+ */
+export function scheduleMatches(schedules, expected) {
+  if (!Array.isArray(schedules) || schedules.length !== 1) return false;
+  const [{ recurrence, slots }] = schedules;
+  if (recurrence?.frequency !== expected.frequency || (recurrence.interval ?? null) !== expected.interval) return false;
+  if (!Array.isArray(slots) || slots.length !== expected.times.length) return false;
+  return expected.times.every((t, i) => slots[i]?.kind === t.kind && String(slots[i].start_time ?? '').slice(0, 5) === t.start);
+}
+
 /** Pass/fail per check; null means not applicable to this client. */
-export function evaluate({ expect, evidence, watcher, calls, behaviors }) {
+export function evaluate({ expect, evidence, watcher, calls, behaviors, serverWrites = null }) {
   const toolCalls = evidence.toolCalls ?? [];
   const writesOk = toolCalls.filter((c) => isWrite(c.tool) && c.ok).map((c) => c.tool);
+  // Ticket 291: like serverWriteSummary, any tool that is not a known read is a write attempt.
+  const writeAttempts = toolCalls.filter((c) => !isRead(c.tool));
+  const okCount = (tool) => toolCalls.filter((c) => c.tool === tool && c.ok).length;
   const checks = {
     connected: evidence.toolCount === null || evidence.toolCount === undefined ? null : evidence.toolCount > 0,
     readSucceeded: expect.readOk ? toolCalls.some((c) => isRead(c.tool) && c.ok) : null,
@@ -164,6 +199,16 @@ export function evaluate({ expect, evidence, watcher, calls, behaviors }) {
     watcherSatisfied: watcher ? watcher.satisfied : null,
     clientMatchesWatcher: calls ? calls.unmatchedClientCount === 0 && calls.unmatchedServerCount === 0 : null,
     behaviorsAsExpected: behaviors ? behaviors.count === expect.createdBehaviors && (!expect.archived || behaviors.archivedCount === behaviors.count) : null,
+    // Ticket 291 skill scenarios. Each is null unless the scenario's expect names it.
+    noWriteAttempted: expect.noWrites ? writeAttempts.length === 0 : null,
+    noServerWrite: expect.noWrites && serverWrites ? serverWrites.writeCallCount === 0 : null,
+    writeCountsExact: expect.exactWrites
+      ? Object.entries(expect.exactWrites).every(([tool, n]) => okCount(tool) === n && (!serverWrites || (serverWrites.successCountByTool[tool] ?? 0) === n))
+      : null,
+    writesWithinConfirmed: expect.onlyWrites
+      ? writeAttempts.every((c) => expect.onlyWrites.includes(c.tool)) && (!serverWrites || serverWrites.tools.every((tool) => expect.onlyWrites.includes(tool)))
+      : null,
+    scheduleAsConfirmed: expect.schedule && behaviors ? behaviors.count > 0 && behaviors.scheduleMatchCount === behaviors.count : null,
   };
   const failed = Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k);
   return { outcome: failed.length ? 'fail' : 'pass', checks, failedChecks: failed };
@@ -208,32 +253,68 @@ from public.behaviors where user_id = :'uid'::uuid and title = :'title';
 rollback;
 `;
 
+// Ticket 291: the same rows plus each Behavior's schedules and their time entries.
+const BEHAVIOR_SCHEDULE_SQL = `
+begin transaction read only;
+select coalesce(json_agg(json_build_object('id', b.id, 'archived', b.archived_at is not null, 'created_at', b.created_at, 'schedules', (
+  select coalesce(json_agg(json_build_object('recurrence', s.recurrence_rule, 'slots', (
+    select coalesce(json_agg(json_build_object('kind', t.kind, 'start_time', t.start_time) order by t.sort_order, t.start_time), '[]'::json)
+    from public.behavior_schedule_slots t where t.user_id = s.user_id and t.behavior_schedule_id = s.id
+  )) order by s.sort_order, s.created_at), '[]'::json)
+  from public.behavior_schedules s where s.user_id = b.user_id and s.behavior_id = b.id
+)) order by b.created_at), '[]'::json)
+from public.behaviors b where b.user_id = :'uid'::uuid and b.title = :'title';
+rollback;
+`;
+
 /** Local final state: Behaviors with the scenario's exact title, read in a read-only transaction. */
 export function localBehaviorState({ dbUrl, execFileImpl = execFile }) {
   const url = assertLocalDbUrl(dbUrl);
-  return ({ userId, title }) => new Promise((resolve, reject) => {
+  return ({ userId, title, withSchedules = false }) => new Promise((resolve, reject) => {
     const child = execFileImpl('psql', ['-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-v', `uid=${userId}`, '-v', `title=${title}`, url], {
       encoding: 'utf8', timeout: 10_000, env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on', PGCONNECT_TIMEOUT: '5' },
     }, (error, stdout) => {
       if (error) return reject(new RunnerStop('db-unreadable'));
       try { resolve(JSON.parse(String(stdout).split('\n').find((l) => l.trim().startsWith('[')))); } catch { reject(new RunnerStop('db-unreadable')); }
     });
-    child.stdin?.end(BEHAVIOR_SQL);
+    child.stdin?.end(withSchedules ? BEHAVIOR_SCHEDULE_SQL : BEHAVIOR_SQL);
   });
 }
 
+const BEHAVIOR_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Production final state through the account's own session (RLS), the same read path as the watcher. */
 export function restBehaviorState({ rest, slotOf }) {
-  return async ({ userId, title }) => {
-    const r = await rest(slotOf(userId), 'GET', `/rest/v1/behaviors?user_id=eq.${userId}&title=eq.${encodeURIComponent(title)}&select=id,archived_at,created_at&order=created_at`);
+  return async ({ userId, title, withSchedules = false }) => {
+    const slot = slotOf(userId);
+    const r = await rest(slot, 'GET', `/rest/v1/behaviors?user_id=eq.${userId}&title=eq.${encodeURIComponent(title)}&select=id,archived_at,created_at&order=created_at`);
     if (!r || r.status !== 200 || !Array.isArray(r.json)) throw new RunnerStop('behaviors-unreadable');
-    return r.json.map((b) => ({ id: b.id, archived: b.archived_at !== null, created_at: b.created_at }));
+    const rows = r.json.map((b) => ({ id: b.id, archived: b.archived_at !== null, created_at: b.created_at }));
+    if (!withSchedules || !rows.length) return rows;
+    // Ticket 291: two plain table reads instead of an embedded select, because
+    // both tables have more than one foreign key to behaviors.
+    if (!rows.every((row) => BEHAVIOR_UUID.test(String(row.id)))) throw new RunnerStop('behaviors-unreadable');
+    const ids = `in.(${rows.map((row) => row.id).join(',')})`;
+    const schedules = await rest(slot, 'GET', `/rest/v1/behavior_schedules?user_id=eq.${userId}&behavior_id=${ids}&select=id,behavior_id,recurrence_rule&order=sort_order,created_at`);
+    const slots = await rest(slot, 'GET', `/rest/v1/behavior_schedule_slots?user_id=eq.${userId}&behavior_id=${ids}&select=behavior_schedule_id,kind,start_time&order=sort_order,start_time`);
+    if (!schedules || schedules.status !== 200 || !Array.isArray(schedules.json) || !slots || slots.status !== 200 || !Array.isArray(slots.json)) {
+      throw new RunnerStop('behaviors-unreadable');
+    }
+    return rows.map((row) => ({
+      ...row,
+      schedules: schedules.json.filter((s) => s.behavior_id === row.id).map((s) => ({
+        recurrence: s.recurrence_rule,
+        slots: slots.json.filter((t) => t.behavior_schedule_id === s.id).map((t) => ({ kind: t.kind, start_time: t.start_time })),
+      })),
+    }));
   };
 }
 
-const summarizeBehaviors = (rows) => ({
+/** Counts and IDs only. With an expected schedule it also counts the Behaviors whose stored schedule matches. */
+const summarizeBehaviors = (rows, schedule = null) => ({
   count: rows.length, archivedCount: rows.filter((r) => r.archived).length,
   behaviorIds: rows.map((r) => String(r.id).toLowerCase()).filter((id) => /^[0-9a-f-]{36}$/.test(id)),
+  ...(schedule ? { scheduleMatchCount: rows.filter((r) => scheduleMatches(r.schedules, schedule)).length } : {}),
 });
 
 // ---------------------------------------------------------------------------
@@ -301,14 +382,16 @@ export async function runOneClient(client, { h, run, runId, slot, scenario, atte
     const serverEvents = watcher.events;
     delete watcher.events;
     const calls = compareCalls(evidence.toolCalls ?? [], serverEvents);
-    const behaviors = summarizeBehaviors(await h.behaviors({ userId, title }));
+    const serverWrites = serverWriteSummary(serverEvents);
+    const schedule = scenario.expect.schedule ?? null;
+    const behaviors = summarizeBehaviors(await h.behaviors({ userId, title, ...(schedule ? { withSchedules: true } : {}) }), schedule);
     for (const [index, behaviorId] of behaviors.behaviorIds.entries()) {
       checkpoint('creation', { label: `${label}-b${index + 1}`, slot, behaviorId, grantId });
     }
-    const verdict = evidence.error ? { outcome: 'fail', checks: {}, failedChecks: ['client-run'] } : evaluate({ expect: scenario.expect, evidence, watcher, calls, behaviors });
+    const verdict = evidence.error ? { outcome: 'fail', checks: {}, failedChecks: ['client-run'] } : evaluate({ expect: scenario.expect, evidence, watcher, calls, behaviors, serverWrites });
     return {
       client, scenario: scenario.name, slot, label, grantId, outcome: verdict.outcome, failedChecks: verdict.failedChecks, checks: verdict.checks,
-      evidence, watcher: { satisfied: watcher.satisfied, error: watcher.error ?? null, steps: watcher.steps }, calls, behaviors,
+      evidence, watcher: { satisfied: watcher.satisfied, error: watcher.error ?? null, steps: watcher.steps }, calls, serverWrites, behaviors,
     };
   } finally {
     if (tokens) await tokens.revoke().catch(() => {});
@@ -344,6 +427,7 @@ export function createAdapters({ issuer, env, caFile, claudeAuth, openaiModel, c
     'anthropic-api': async ({ token, scenario, label }) => ({ model: CLAUDE_MODEL, ...(await runAnthropicApi({ issuer, token, prompt: scenario.prompt(label), apiKey: env.ANTHROPIC_API_KEY, fetchImpl, limits })) }),
     'openai-api': async ({ token, scenario, label }) => ({ ...(await runOpenaiApi({ issuer, token, prompt: scenario.prompt(label), apiKey: env.OPENAI_API_KEY, fetchImpl, limits, model: openaiModel })) }),
     inspector: async ({ token, scenario, label }) => withTemp(async (cwd) => {
+      if (scenario.needsModel) throw new ClientStop('inspector-has-no-model');
       const cli = inspectorCli();
       if (!cli) throw new ClientStop('missing-inspector');
       // HOME points at the run's empty temp folder, so Inspector's own storage stays there and is deleted afterwards.
@@ -459,12 +543,12 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
     out(`clients: ${CLIENTS.join(', ')}`);
     return 0;
   }
-  const ready = Object.fromEntries(options.clients.map((c) => [c, readiness(c, { target: options.target, env })]));
+  const scenario = CLIENT_SCENARIOS[options.scenario];
+  const ready = Object.fromEntries(options.clients.map((c) => [c, scenarioSkip(c, scenario) ?? readiness(c, { target: options.target, env })]));
   if (options.check) {
     for (const c of options.clients) out(JSON.stringify({ client: c, ready: ready[c] === null, ...(ready[c] ? { skipped: ready[c] } : {}) }));
     return 0;
   }
-  const scenario = CLIENT_SCENARIOS[options.scenario];
   const steps = options.clients.map((c) => `client:${c}`);
   let run;
   try {

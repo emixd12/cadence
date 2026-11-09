@@ -6540,7 +6540,7 @@ Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open.
 
 Local implementation and checks pass. Hosted migration `20260905020741` and the
 five-minute reminder cron reached production in the September 12 rollout
-(`STATUS.md`, "Current repository state", "Production rollout (2026-09-12)");
+(`docs/status/archive/legacy-current-repository-state.md`, "Current repository state", "Production rollout (2026-09-12)");
 `vercel.json` still schedules `*/5 * * * *`. That entry leaves "Ticket 091's
 separately authorized reminder-delivery check" open, and no later record closes it
 or the Preview inspection of Export reads.
@@ -9489,7 +9489,7 @@ The shared verification and rollout requirements below apply to all three ticket
 
 ## Ticket 129: Bounded reminder bookkeeping and storage recovery
 
-Status: complete (2026-09-09; reconciled October 27, 2026). `STATUS.md`, "Desktop
+Status: complete (2026-09-09; reconciled October 27, 2026). `docs/status/archive/legacy-current-repository-state.md`, "Desktop
 repair acceptance — 2026-09-09": installed preview.21 reduced the live database from
 6.21 GB to 6.53 MB with records preserved, converged with the hosted account, and
 repeated native reminder reconciliation kept one receipt per operation with zero
@@ -9693,7 +9693,7 @@ Platform impact:
 
 ## Ticket 131: Automatic downloads with user-controlled installation
 
-Status: complete (reconciled October 27, 2026). On September 9 `STATUS.md` ("Handoff
+Status: complete (reconciled October 27, 2026). On September 9 `docs/status/archive/legacy-current-repository-state.md` ("Handoff
 notes") kept it open only "until a newer signed release verifies the corrected
 download/install lifecycle". Ticket 180 (complete September 29) verified it on signed
 builds: discovery, Install and separate Restart, partial-download failure and Retry,
@@ -10913,7 +10913,7 @@ Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
 Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
-reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+reached production on September 20 (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release — September 20,
 2026"), and the web app deployed on September 26 ("Daily Brief web production
 deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
 and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
@@ -10982,7 +10982,7 @@ Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
 Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
-reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+reached production on September 20 (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release — September 20,
 2026"), and the web app deployed on September 26 ("Daily Brief web production
 deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
 and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
@@ -11077,7 +11077,7 @@ No schema, new connector, or provider permission change.
 
 Status: in_progress (September 20, 2026). Implementation and focused/browser QA
 passed. Reconciled October 27, 2026: still open. The September 20 consolidated release
-superseded the concurrent test/build failures (`STATUS.md`, "Consolidated release —
+superseded the concurrent test/build failures (`docs/status/archive/legacy-current-repository-state.md`, "Consolidated release —
 September 20, 2026"); commit `b127df2` is in the September 26 production deployment.
 Still open: the live check that a calendar with a custom name (Northwestern Work)
 shows that name in production and can be selected and saved. No later record closes it.
@@ -16833,3 +16833,293 @@ Messaging impact: P-027 (recovery wording approved, D21).
 
 Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`. The blank-window fix:
 `tests/desktop-render-recovery.dom.test.tsx` and `tests/desktop-main-recovery.dom.test.tsx`.
+
+## Agent architecture: Tickets 286–291
+
+Owner direction: `docs/DECISIONS.md`, 2026-11-09. Six packages ran as parallel subagents on
+November 9, 2026. An orchestrating agent checked each diff against the repository before
+merging it. The tickets change repository guidance, development tooling and Daily Brief
+diagnostics. No ticket changes the production Daily Brief prompt, model or reasoning effort.
+
+## Ticket 286: Bound STATUS.md and archive its history
+
+Status: complete November 9, 2026.
+Dependencies: none.
+
+Goal: `STATUS.md` becomes a current-state file that an agent can read in full. Its history
+moves unchanged into archive files that agents search on demand.
+
+Scope and acceptance:
+
+- `STATUS.md` is at most 40,000 bytes, with these sections in order: `# Implementation
+  Status`, "How to use this file", "Update rules", "Open work", "Recent entries".
+- History moves verbatim to `docs/status/archive/YYYY-MM.md`, one file per month, taken
+  from the date in each entry's heading. The former "Current repository state" block goes
+  to `docs/status/archive/legacy-current-repository-state.md`.
+- `docs/status/README.md` explains the layout and filing rules and holds a generated index:
+  each archive file with its date range and entry count, and a ticket index.
+- `npm run status:archive` moves the oldest entries until `STATUS.md` is at most 30,000
+  bytes and keeps at least the 3 newest. `--check` exits 1 above 40,000 bytes; `--index`
+  regenerates the index only. A second run changes nothing.
+- `npm run agents:check` fails above 40,000 bytes and requires `docs/status/README.md`.
+- Every non-blank line of the previous `STATUS.md` appears in the new files at least as
+  often as before.
+
+References: `STATUS.md`, `docs/status/README.md`, `scripts/archive-status.mjs`,
+`scripts/check-agents.mjs`, `tests/archive-status.test.mjs`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: repository documentation and tooling only; no app change. |
+| Desktop | Not applicable: repository documentation and tooling only; no app change. |
+| Marketing | Not applicable: no public page changes. |
+| Future mobile | Not applicable: repository documentation and tooling only. |
+
+Messaging impact: none.
+
+Verification: `npx vitest run tests/archive-status.test.mjs`, `npm run agents:check`,
+`node scripts/archive-status.mjs --check`, a second `npm run status:archive` with no change,
+and a line-count preservation check against `git show HEAD:STATUS.md`.
+
+## Ticket 287: Audit AGENTS.md for stale and conflicting rules
+
+Status: complete November 9, 2026. Two rules are left for the owner; see "Left for the owner".
+Dependencies: Ticket 286 (bounded `STATUS.md`, `docs/status/archive/`,
+`npm run status:archive`).
+
+Goal: every statement in `AGENTS.md` is current, no rule is stated twice or
+contradicted in the file, and agents can complete the mandatory read list.
+
+Scope and acceptance:
+
+- The reading order keeps six steps. Step 2 reads the bounded `STATUS.md` and
+  greps `docs/status/archive/` on demand. Step 3 names the `docs/OPERATIONS.md`
+  sections every task reads.
+- Stale statements are fixed or removed, each with cited evidence: Ticket 115
+  state, MCP and connector state, the resolver location, Ticket 108, Temporal,
+  the leave reminder spec, the missing-command clause, `DESIGN.md`, and the build
+  sequence.
+- Duplicate completion checks are merged into a reference to "Testing rules".
+  The two mobile out-of-scope bullets are merged.
+- The MCP acceptance sign-in sentence follows `docs/DECISIONS.md`, 2026-11-06.
+- `docs/OPERATIONS.md` "Current state", "Source-of-truth order" and "Status
+  updates" match the repository and the new `STATUS.md` layout.
+- No product, security, data or scope rule changes meaning. Conflicts the
+  evidence does not settle are listed for the owner.
+
+References: `AGENTS.md`, `docs/OPERATIONS.md`, `docs/DECISIONS.md` (2026-11-06),
+`docs/AGENT_RESOLVERS.md`, `scripts/check-agents.mjs`.
+
+Left for the owner:
+
+- `AGENTS.md`, "Security rules": "Add desktop account controls only within Tickets 116–122."
+  Those tickets are complete. Either new desktop account controls need a new ticket, or the
+  rule is stale. The text is unchanged.
+- The leave-time rule appears in both "Out of scope" and "Security rules". The two agree.
+  Both are kept, because each section needs it.
+- `docs/TICKETS.md` `Status:` lines for Tickets 220–231 and Ticket 241 are older than the
+  recorded state. `STATUS.md`, "Open work", lists them for reconciliation.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: agent guidance only; no runtime change. |
+| Desktop | Not applicable: agent guidance only; no runtime change. |
+| Marketing | Not applicable: no public copy changes. |
+| Future mobile | Not applicable: the mobile out-of-scope rule keeps its meaning. |
+
+Messaging impact: none.
+
+Verification: `npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check`, `git diff --stat`.
+
+## Ticket 288: Daily Brief token usage and failure reasons
+
+Status: complete in source November 9, 2026. No live provider measurement was made;
+the token figures in `docs/COSTS.md` stay assumed.
+Dependencies: Tickets 146–148 (Daily Brief), 161 and 176–177 (workbench), 188
+(estimate call).
+
+Goal: record token usage per Daily Brief model call and an internal reason per
+failure, in the performance log and workbench runs, without changing production
+behavior.
+
+Scope and acceptance:
+
+- The OpenAI adapter reports input, cached input, output and reasoning tokens for
+  the brief call and the duration-estimate call, including calls whose output
+  Cadence rejects.
+- Each provider failure and each validation rejection carries an internal reason.
+  `DailyBriefError.code` stays the public value.
+- The `daily_brief.model` span logs usage counts and, on failure, `error_reason`.
+  Only the five exact usage keys bypass the "token" key filter.
+- Workbench results and saved runs carry optional `usage` and `reason`. Older saved
+  runs load. Review packet and sequence report print usage and reasons.
+- The OpenAI request body is byte-identical; `/api/advisor/brief` never returns the
+  reason; public codes, statuses, validated output and
+  `DAILY_BRIEF_PROMPT_REVISION` are unchanged. Tests prove the body and the route.
+- Logs hold numbers and short codes only; never prompts, facts, output or response
+  IDs.
+
+References: `lib/services/daily-brief-openai.ts`, `daily-brief-consumer.ts`,
+`daily-brief.service.ts`, `performance-timing.ts`, `briefing-workbench.service.ts`,
+`docs/COSTS.md` "Daily Brief model", `docs/qa/in-app-daily-brief.md`,
+`docs/qa/briefing-workbench.md`. OpenAI Responses API reference for `usage` and
+`incomplete_details`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Server-side only: adapter, consumer, service span, workbench services. No response or UI change. Workbench UI display is a follow-up in a later package. |
+| Desktop | Not applicable: linked desktop calls the hosted route, whose response is unchanged; no desktop code changed. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable: no client contract change. |
+
+Messaging impact: none. Logs gain aggregate counts and short codes only.
+
+Verification: `tests/daily-brief-telemetry.test.ts`, `tests/daily-brief.service.test.ts`,
+`tests/daily-brief-route.test.ts`, `tests/briefing-workbench.test.ts`; typecheck,
+lint, agents, interactions and resolvers checks; full `npm run test`.
+
+## Ticket 289: Consolidated Daily Brief prompt candidate
+
+Status: candidate implemented November 9, 2026. Not promoted. The owner comparison is
+pending and follows Ticket 184's rules.
+Dependencies: Ticket 184 (recipes 1.1 and 1.2), Ticket 219 (travel policy), Ticket 239
+(connector sources policy).
+
+Goal: give the owner a Daily Brief prompt that states each rule once. The production prompt
+stacks layers that override each other ("Where they conflict with anything above, these rules
+win"), so the model must work out which rule applies.
+
+Scope and acceptance:
+
+- `lib/services/daily-brief-instructions.ts` offers the variants `layered` and
+  `consolidated`, `composeDailyBriefInstructions(variant, input)` and
+  `dailyBriefPromptRevision(variant)`.
+- `layered` is byte-identical to the string `generateDailyBrief` builds. A test captures the
+  production string across fixtures, presets, analysis, connector sources and travel.
+- `dailyBriefPromptRevision("layered")` equals `DAILY_BRIEF_PROMPT_REVISION`.
+- `consolidated` for recipes 1.1 and 1.2 contains no override header, no legacy names and no
+  overridden priority values. It states the route in words. It keeps every literal the
+  validator and the interface depend on. For other recipes it equals `layered`.
+- `docs/qa/daily-brief-prompt-consolidation.md` maps every layered sentence, lists the
+  resolved conflicts and the owner ambiguities, and says the variant is not promoted.
+- No production path changes.
+
+References: `lib/services/daily-brief-consumer.ts`, `docs/qa/briefing-workbench.md`,
+`docs/plans/2026-09-28-briefing-owner-review.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Server-side candidate module only: `lib/services/daily-brief-instructions.ts`. Not wired into generation or the workbench; a later ticket wires it. |
+| Desktop | Not applicable: the Daily Brief is generated by the hosted service; desktop sends no prompt. |
+| Marketing | Not applicable: no public copy changes. |
+| Future mobile | Not applicable: no client surface changes. |
+
+Messaging impact: none. No user-facing text changes until the owner promotes the variant.
+
+Verification: `tests/daily-brief-instructions.test.ts` and `tests/daily-brief-consumer.test.ts`;
+`npm run typecheck`, `npm run lint`, `npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check`.
+
+## Ticket 290: Model, reasoning effort and prompt variant as workbench candidates
+
+Status: implemented November 9, 2026 with provider-free verification. No live model run.
+Dependencies: Tickets 288 and 289.
+
+Goal: let the development briefing workbench compare a different model, reasoning effort or
+the consolidated prompt per candidate, while production stays pinned.
+
+Scope and acceptance:
+
+- The comparison and sequence requests accept an optional `generation` array parallel to
+  `configs`, items `{ model?, effort?, promptVariant? }`. Unknown keys, null, unlisted models,
+  unlisted efforts and unknown variants return `invalid_request`. Without it, requests behave
+  as before.
+- Models: `DAILY_BRIEF_MODEL` plus `CADENCE_BRIEFING_BENCH_MODELS`. Efforts: the documented
+  Responses API values. Variants: `layered`, `consolidated`.
+- `generateOpenAIDailyBrief` accepts optional model and effort; without them the body is
+  byte-identical. The duration-estimate call keeps production values.
+- `generateDailyBrief` accepts an optional prompt variant and builds instructions through
+  `composeDailyBriefInstructions`; the instruction constants live in the instructions module.
+- Candidates store generation as part of their identity; runs store model, effort, effective
+  prompt variant and prompt revision. Older records load and rerun.
+- The packet and sequence report print generation and baseline/candidate differences.
+- The workbench shows a Generation group per configuration, filled from the server's list, and
+  each result's generation, token usage and failure reason.
+- Production passes no generation option; a test pins its request bodies, instructions and
+  `DAILY_BRIEF_PROMPT_REVISION`.
+
+References: `docs/qa/briefing-workbench.md` "Ticket 290", `docs/qa/daily-brief-prompt-consolidation.md`,
+`docs/COSTS.md` "Ticket 290 workbench candidate models".
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only workbench: `lib/services/briefing-workbench.service.ts`, `briefing-sequence.service.ts`, `briefing-review.service.ts`, `app/design-system/DailyBriefBench.tsx`, `BriefingDays.tsx`. Production Daily Brief unchanged and pinned by `tests/daily-brief-production-pin.test.ts`. |
+| Desktop | Not applicable: the workbench is web development only; desktop calls the hosted Daily Brief, which is unchanged. |
+| Marketing | Not applicable: no public surface changes. |
+| Future mobile | Not applicable: development tooling only. |
+
+Messaging impact: none.
+
+Verification: `tests/daily-brief-production-pin.test.ts`, `tests/briefing-workbench-generation.test.ts`,
+`tests/daily-brief-telemetry.test.ts`, `tests/briefing-sequence.test.ts`,
+`tests/briefing-workbench.dom.test.tsx`; typecheck, lint, agents, interactions, resolvers and
+design-system checks; full `npm run test`.
+
+## Ticket 291: Skill-rule scenarios for MCP client acceptance
+
+Status: implemented and unit-tested with fakes on November 9, 2026. No local-stack or
+live run yet.
+Dependencies: Tickets 251 and 256; the published skills in `integrations/skills/`.
+
+Goal: check, with real headless clients, that a model following a published Cadence
+skill writes nothing until the user confirms, and writes exactly what the user
+confirmed.
+
+Scope and acceptance:
+
+- Three Tier 1 scenarios in `scripts/acceptance/client-prompts.mjs`, each on a `full`
+  grant. Each prompt is the `[Cadence QA]` marker, the run limits, the whole published
+  `SKILL.md` read at run time, then the user's message. None uses the
+  confirm-everything preamble.
+- `skill-check-in-unconfirmed` (`daily-check-in`): at least one successful read; no
+  write attempted by the client; no write `tool.call` on the grant.
+- `skill-routine-unconfirmed` (`routine-setup`): no write attempted; no write
+  `tool.call` on the grant; no Behavior with the test title.
+- `skill-routine-confirmed` (`routine-setup`): exactly one successful `create_behavior`
+  in the client's calls and in the watcher; no write other than `create_behavior` and
+  `archive_behavior`; one Behavior with the test title, archived; stored schedule
+  daily at exact 18:00.
+- The Inspector CLI skips these scenarios with a named reason and does not fail the run.
+- The ledger keeps tool names, outcomes and counts only; never a prompt, skill text,
+  tool input or tool output.
+- Out of scope: a local-stack or production run; changes to the skills themselves.
+
+References: `docs/qa/mcp-server.md` "Skill-rule scenarios — Ticket 291",
+`.claude/skills/mcp-acceptance/SKILL.md`, `integrations/skills/`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Acceptance tooling only: `scripts/acceptance/client-prompts.mjs` and `client-runners.mjs` test the hosted MCP server; no product change. |
+| Desktop | Not applicable: the MCP server reads hosted data only; desktop is unchanged. |
+| Marketing | Not applicable: no public page or copy changes. |
+| Future mobile | Not applicable: no client surface. |
+
+Messaging impact: none.
+
+Verification: `tests/acceptance-client-prompts.test.mjs` and
+`tests/acceptance-client-runners.test.mjs`; `npm run lint`, `agents:check`,
+`interactions:check`, `resolvers:check`. Follow-up: one local `tier1` run per scenario
+with claude-code, then a production run with the API clients.

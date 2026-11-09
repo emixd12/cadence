@@ -2612,7 +2612,7 @@
       "id": "workbench.model",
       "label": "Model",
       "category": "Provenance",
-      "definition": "Names the configured server-side model adapter used for the attempts.",
+      "definition": "Names the model each attempt used. Production uses DAILY_BRIEF_MODEL; a workbench candidate may choose another model listed in CADENCE_BRIEFING_BENCH_MODELS (Ticket 290).",
       "contracts": [
         {
           "path": "lib/services/daily-brief-openai.ts",
@@ -2627,7 +2627,7 @@
       "id": "workbench.usage",
       "label": "Usage telemetry",
       "category": "Provenance",
-      "definition": "The current workbench reports unavailable because runtime token, effort, and cost telemetry are not exposed by its response contract.",
+      "definition": "Each result and saved run records token usage per model call (Ticket 288) and the model, reasoning effort and prompt variant it used (Ticket 290). Monetary cost is not calculated.",
       "contracts": [
         {
           "path": "lib/services/briefing-workbench.service.ts",

@@ -4,8 +4,9 @@
 
 This repository contains Cadence, a public, open-source personal behavior
 tracker product. The implemented surfaces are an authenticated web app for one
-account at a time and a separate public Astro marketing site under
-`apps/marketing`.
+account at a time, a separate public Astro marketing site under
+`apps/marketing`, a macOS desktop app under `apps/desktop`, a remote MCP
+server, and Claude and ChatGPT plugins under `integrations/`.
 
 The app lets a user create recurring behaviors, view scheduled occurrences in a timeline, and manually mark each occurrence as Completed or Not Completed. Unmarked occurrences remain Unresolved, and prior-day unresolved occurrences are grouped under Needs decision.
 
@@ -33,19 +34,23 @@ surface for the BehaviorLog Bundle standard:
 
 Public-product surfaces are scoped in `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`.
 The Astro marketing site is implemented as a sibling app. Tauri desktop and
-shared-package work is implemented under Tickets 107–114. Ticket 115 owns
-Apple-trusted distribution acceptance and is in progress. macOS 14 runtime
+shared-package work is implemented under Tickets 107–114. Ticket 115
+(Apple-trusted distribution acceptance) is complete: notarized Cadence for Mac
+builds are published on the public `desktop-stable` release. macOS 14 runtime
 testing is owner-deferred; the compiled minimum does not establish compatibility.
 Tickets 116–122 implement optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
-in-app horse briefing. Tickets 220–232 plan one remote MCP server, a
-Cadence-owned OAuth server, and Claude and ChatGPT plugins; see
+in-app horse briefing. Tickets 220–232 implement one remote MCP server, a
+Cadence-owned OAuth server, and Claude and ChatGPT plugins; the MCP server is
+live on production since October 29, 2026 (Ticket 232). See
 `docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
 read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
-web and linked desktop with local verification. Ticket 241 owns final
-disclosure/evidence review; live and release gates remain open. Tickets 263–285
+web and linked desktop; the hosted connectors run on production since October 23,
+2026. Ticket 241 owns final disclosure/evidence review; connector release steps 6–7
+(production smoke on the owner's accounts and public disclosure copy) and
+installed connector acceptance remain open. Tickets 263–285
 implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Mobile and
 broader workspace restructuring remain deferred.
 
@@ -54,8 +59,14 @@ broader workspace restructuring remain deferred.
 Before implementing a task, read in this order:
 
 1. `AGENTS.md`
-2. `STATUS.md`
-3. `docs/OPERATIONS.md`
+2. `STATUS.md`, in full. It is bounded to 40,000 bytes and holds open work and
+   recent entries. Older history lives in `docs/status/archive/YYYY-MM.md`;
+   `docs/status/README.md` maps each ticket number to its archive file. Search
+   the archive with grep when a task needs history. Never read it in full.
+3. `docs/OPERATIONS.md`, these sections for every task: "Current state",
+   "Setup", "Required commands" and "Dagger checks" (under "Standard
+   verification"), "Source-of-truth order", "Secrets and local files" and
+   "Status updates". Read another section only when the task touches its area.
 4. Provider or governance docs relevant to the task:
    - `docs/SUPABASE_WORKFLOW.md`
    - `docs/SEQUENZY_WORKFLOW.md`
@@ -112,7 +123,8 @@ in the dedicated QA Chrome profile. They check each step against Cadence's own
 records with `npm run mcp:watch`, and resume from the run ledger in
 `.intent/acceptance/<run-id>/`. Agents sign in as test accounts A and B from kept
 sessions, click consent for them and read agent-scoped keys through
-`npm run agent:secret`. The owner keeps sign-ins, creating keys, vaults and service
+`npm run agent:secret`. The owner keeps sign-ins other than the test-account
+steps above, creating keys, vaults and service
 accounts, owner-secret approvals and release decisions. Run the testing agent as a
 top-level agent so it can ask the owner directly, one numbered list per batch, and
 never ask the owner to report outputs. Procedure: the project skill
@@ -209,7 +221,7 @@ Out of scope for v1:
 - Multi-user collaboration
 - Social features
 - Gamification
-- Native mobile apps
+- Native mobile apps and any other mobile implementation
 - Apple Health / Google Fit integration
 - Structured measurement templates
 - Supply/refill inventory
@@ -222,7 +234,7 @@ Out of scope for v1:
   client provenance in synced history and BehaviorLog, and a production reviewer
   sign-in (see `docs/FUTURE_UPDATES.md`)
 - Calendar sync and event editing, except read-only Google Calendar context in
-  Tickets 132–137 and locally implemented read-only Outlook and iCloud Calendar context in
+  Tickets 132–137 and read-only Outlook and iCloud Calendar context in
   Tickets 233–241
 - Background location tracking; leave times in Daily Brief model input or MCP; snooze,
   notification action buttons and email leave reminders; a new paid Google place search
@@ -235,7 +247,6 @@ Out of scope for v1:
 - Web offline writes or PWA conflict handling
 - Automatic missed status
 - Speech features
-- Mobile implementation
 
 ## Domain language
 
@@ -252,8 +263,9 @@ Do not use “missed” as a stored status in v1.
 
 ## Architecture rule: resolver-first
 
-Core logic lives in `/lib/resolvers`, with incremental extraction into
-`packages/core` under Ticket 109. Preserve the existing web module APIs through
+Core logic lives in resolvers. Tracking resolver implementations live in
+`packages/core/src/resolvers`, and the `/lib/resolvers` modules re-export them.
+Web-only resolvers, such as Public Trust evidence, stay in `/lib/resolvers`. Preserve the existing web module APIs through
 adapters or compatibility exports. Do not duplicate domain rules per platform.
 
 Resolvers should be pure or nearly pure functions. They should not:
@@ -274,8 +286,7 @@ UI components call services/server actions. UI components must not implement rec
 Desktop components use callbacks and client services instead of Server Actions.
 Operation-specific DataStore methods own atomic mutations; thin native code
 may handle SQLite transactions, files, notifications, and lifecycle. Business
-decisions remain in TypeScript. Prove native boundaries in Ticket 108 before
-broad shared-core or UI refactoring.
+decisions remain in TypeScript.
 
 Desktop synchronization planning follows the same boundary. A pure planner
 compares typed local, hosted, and saved common-baseline snapshots. Services own
@@ -288,7 +299,8 @@ Run `npm run resolvers:check` after resolver, service, API route, cron/process, 
 
 ## Required resolver modules
 
-Implement and preserve these modules:
+Preserve these modules. Each re-exports its implementation from
+`packages/core/src/resolvers`:
 
 - `/lib/resolvers/recurrence.resolver.ts`
 - `/lib/resolvers/occurrence.resolver.ts`
@@ -325,7 +337,7 @@ The day boundary is local midnight.
 
 Date/time implementation details are locked in `docs/DATETIME_STRATEGY.md`:
 
-- Use Temporal for timezone-aware recurrence and day-boundary logic when implementation begins.
+- Use Temporal for timezone-aware recurrence and day-boundary logic.
 - Store both UTC instants (`timestamptz`) and local calendar dates (`local_date`).
 - Inject `now` into resolvers. Do not call `new Date()` inside resolvers.
 - Do not parse `YYYY-MM-DD` with JavaScript `Date`.
@@ -383,8 +395,8 @@ Leave reminders (decision D3, Tickets 275–280) are a separate reminder kind:
 - Web uses a hosted job and web push. The job starts from Home or the previous stop.
 - Mac uses native scheduled notifications from the last estimate, with no background
   helper. They stay out of the Behavior reminder coverage calculation.
-- The text names the start or estimate time. `docs/NOTIFICATION_SPEC.md` gains the full
-  rules under Ticket 275.
+- The text names the start or estimate time. `docs/NOTIFICATION_SPEC.md`, "Leave
+  reminders", holds the full rules (Ticket 275).
 
 ## Supabase CLI rules
 
@@ -513,8 +525,6 @@ line per check. A failing check prints only its own log. Rerun one check with
 unavailable, run the npm commands directly. Setup and limits:
 `docs/OPERATIONS.md`, "Dagger checks".
 
-If a command does not exist yet, either add it or state clearly that it is not available.
-
 ## UI and design rules
 
 The interface should be sparse.
@@ -542,7 +552,7 @@ node .agents/skills/impeccable/scripts/context.mjs
 
 Then read `.agents/skills/impeccable/reference/product.md`. If a specific impeccable command is relevant, read the matching reference file.
 
-`DESIGN.md` is seeded. After real UI exists beyond the scaffold, update it from actual code rather than intentions.
+Keep `DESIGN.md` current. Update it from actual code rather than intentions.
 
 `interaction-registry.json` is the canonical inventory of implemented user
 interaction intents. Update it in the same change whenever a user-facing
@@ -556,16 +566,12 @@ A task is complete only when:
 
 1. The implementation matches the relevant docs.
 2. Resolver logic is tested when resolver logic exists or changes.
-3. Agent drift checks pass.
-4. TypeScript passes.
-5. Lint passes.
-6. Tests pass.
-7. Build passes.
-8. Schema changes include migrations.
-9. UI changes are mobile-responsive.
-10. No out-of-scope features were added.
-11. `STATUS.md` is updated if ticket state changed.
-12. The final response explains:
+3. The checks in "Testing rules" pass.
+4. Schema changes include migrations.
+5. UI changes are mobile-responsive.
+6. No out-of-scope features were added.
+7. `STATUS.md` is updated if ticket state changed.
+8. The final response explains:
    - What changed
    - Files changed
    - Tests run
@@ -624,23 +630,6 @@ Do not expand scope to solve speculative future requirements.
 ## Implementation strategy
 
 Implement in small vertical slices.
-
-Do not attempt to build the whole application in one pass.
-
-Recommended sequence:
-1. Project scaffold
-2. Supabase auth and schema
-3. Behavior CRUD
-4. Recurrence resolver
-5. Occurrence generation
-6. Timeline
-7. Status marking
-8. Notes
-9. Reminder scheduling
-10. Browser push
-11. Email reminders
-12. Analytics
-13. Exports
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -378,8 +378,48 @@ input tokens and US$1.20 per million output tokens, recorded 2026-09-07 in
 | **Monthly cost** | **US$0.06** | **US$0.13** | **US$0.25** |
 
 About US$0.004 per brief. The database allows one completed attempt per
-installation per day. Token counts are not recorded yet; the workbench reports
-usage as `unavailable`. Replace the assumptions with measured usage.
+installation per day. The token figures above stay assumed until someone measures
+them.
+
+Ticket 288 records usage per model call. The OpenAI adapter reads the Responses API
+`usage` object (`input_tokens`, `input_tokens_details.cached_tokens`,
+`output_tokens`, `output_tokens_details.reasoning_tokens`). It reports usage even
+when Cadence then rejects the output, because the provider still billed the call.
+Usage is never returned to the app.
+
+How to measure now:
+
+- Production: set `CADENCE_PERF_LOG=1`. Each `daily_brief.model` performance event
+  then carries `usage_calls`, `input_tokens`, `cached_input_tokens`,
+  `output_tokens` and `reasoning_tokens` in `counts`, on success and on failure. A
+  failed event also carries `error_reason`, such as `validation_word_limit` or
+  `provider_incomplete_max_output_tokens`, beside the public `error_code`. A count
+  the provider did not report is omitted.
+- Workbench: each comparison result and each saved run under
+  `.local/briefing-bench/` carries `usage`, one entry per model call (`brief` or
+  `duration_estimate`). The review packet prints usage per run. The sequence report
+  prints totals across all attempts and counts failure reasons.
+
+Multiply measured input and output tokens by the provider rates above. Cached input
+tokens are part of `input_tokens`; this file does not yet record a cached-input
+price, so treat them at the full input rate until someone checks it. Reasoning
+tokens are part of `output_tokens`.
+
+### Ticket 290 workbench candidate models
+
+The development workbench can run a candidate on another model, another reasoning
+effort or the consolidated prompt. Extra models come only from
+`CADENCE_BRIEFING_BENCH_MODELS`; the source names no model other than
+`DAILY_BRIEF_MODEL`. These choices are workbench-only. A candidate model may cost
+more per call than `gpt-5.6-luna`, and a higher effort usually adds reasoning
+tokens, which bill as output. Check the provider rate for a candidate model before a
+long sequence, and read each run's recorded `usage`. The workbench call budget
+(`CADENCE_BRIEFING_BENCH_CALL_LIMIT`) limits the number of calls, not their price.
+The duration-estimate call keeps the production model and effort.
+
+Nothing changes in production cost. The live Daily Brief still sends
+`DAILY_BRIEF_MODEL` with low effort and the layered prompt; a test pins its request
+body.
 
 ### Ticket 188 candidate duration estimates
 
@@ -395,8 +435,9 @@ For planning only, assume 2,000 input tokens and 500 output tokens per estimate
 request, and 15 / 30 / 60 requests per month. Using the historical rates above
 (recorded September 7; not rechecked in this review), that adds US$0.001 per
 estimated brief, or US$0.015 / US$0.030 / US$0.060 monthly. Tokens and billed cost
-remain unmeasured. Recheck provider rates and measure both calls before promoting
-the candidate or treating these assumptions as a budget limit.
+remain unmeasured. Workbench runs record the estimate call's usage separately as
+`duration_estimate` (Ticket 288). Recheck provider rates and measure both calls
+before promoting the candidate or treating these assumptions as a budget limit.
 
 ## QA-only acceptance model calls
 
@@ -482,7 +523,8 @@ arrives, fees reduce the US$5:
 
 - Keep an account-wide Google Cloud budget alert.
 - Record Sequenzy's plan and per-email price.
-- Record Daily Brief token usage per attempt to replace the assumptions.
+- Measure Daily Brief token usage from the `daily_brief.model` performance events or
+  workbench runs (recorded since Ticket 288) and replace the assumptions.
 
 ## Change log
 
@@ -520,6 +562,8 @@ arrives, fees reduce the US$5:
   looked up once more on its next refresh, at US$0.005 each, under the same spend
   reservation and the 80% automatic-refresh pause. The new row is then reused as before.
   Places that now resolve get routed, within the usage model above. Totals are unchanged.
+- 2026-11-09: Ticket 288 records Daily Brief token usage per model call in the
+  performance log and in workbench runs. Token figures stay assumed until measured.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

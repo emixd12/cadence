@@ -220,6 +220,7 @@ contract remains `docs/plans/first-external-consumer.md`.
 `GET/POST /api/dev/briefing-comparison` call `briefing-workbench.service.ts`.
 Both require development mode, loopback ports 4321–4330 and same-origin Fetch
 Metadata. POST additionally requires matching Origin and JSON content type.
+`GET ?view=generation` returns the workbench's allowed generation values (Ticket 290).
 Production returns 404. GET uses existing sign-in and returns current briefing
 access plus authorized Behavior labels only; it never captures context or generates.
 POST accepts either a known fixture ID plus two validated configurations, or exact

@@ -6,6 +6,8 @@ import type { BriefingAnalysisLaneId } from "@cadence/core/types/briefing-analys
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
+import type { DailyBriefCallUsage } from "./daily-brief-consumer";
+import type { DailyBriefPromptVariant } from "./daily-brief-instructions";
 
 /**
  * Local, development-only review records for the briefing workbench
@@ -115,6 +117,12 @@ export type BenchCase = Readonly<{
   behaviorTitles: readonly Readonly<{ ref: string; title: string }>[];
 }>;
 
+/**
+ * Ticket 290: the model, reasoning effort and prompt variant one workbench candidate
+ * asks for. Part of the candidate's identity, like its configuration.
+ */
+export type BenchGeneration = Readonly<{ model: string; effort: string; promptVariant: DailyBriefPromptVariant }>;
+
 export type BenchCandidate = Readonly<{
   schemaVersion: typeof BRIEFING_BENCH_SCHEMA_VERSION;
   kind: "candidate";
@@ -128,6 +136,8 @@ export type BenchCandidate = Readonly<{
   rationale: string;
   config: BriefingConfig;
   configurationRevision: string;
+  /** Ticket 290. Absent on candidates saved before Ticket 290; they used the production values. */
+  generation?: BenchGeneration;
 }>;
 
 export type BenchRun = Readonly<{
@@ -141,9 +151,21 @@ export type BenchRun = Readonly<{
   state: "ready" | "error" | "cancelled";
   briefing?: DailyBriefing;
   error?: string;
+  /** Ticket 288: internal failure reason, such as `validation_word_limit`. Absent on older runs. */
+  reason?: string;
   validation: string;
+  /** Ticket 288: token usage per model call. Absent on runs saved before usage was recorded. */
+  usage?: readonly DailyBriefCallUsage[];
   latencyMs: number;
   model: string;
+  /** Ticket 290: the reasoning effort sent. Absent on runs saved before Ticket 290. */
+  effort?: string;
+  /**
+   * Ticket 290: the prompt variant whose text was sent. "consolidated" rewrites only
+   * recipes 1.1 and 1.2, so other recipes record "layered". Absent on older runs.
+   */
+  promptVariant?: DailyBriefPromptVariant;
+  /** The revision of the text sent: `dailyBriefPromptRevision(promptVariant)`. */
   promptRevision: string;
   configurationRevision: string;
   pipelineVersion: string;

@@ -8,17 +8,16 @@ connections separate from agent access to provider accounts.
 
 ## Current state
 
-The repository contains the complete numbered implementation sequence through
-Ticket 063, including the authenticated web app, BehaviorLog portability,
-public-launch hardening, performance and UX follow-ups, the Astro marketing
-site, the export prompt library, and the locally actionable P3
-interaction-audit cleanup. IA-024 remains product-decision-gated; no other
-interaction-audit item is open. `STATUS.md` remains the detailed implementation
-ledger and should be checked before starting or continuing any ticket.
+The repository contains the authenticated Next.js web app, the sibling Astro
+marketing site, the Tauri macOS desktop app (published on the public
+`desktop-stable` release), the remote MCP server and Cadence-owned OAuth server
+(live on production since October 29, 2026), and the Claude and ChatGPT plugin
+packages under `integrations/`. IA-024 remains the only product-decision-gated
+interaction-audit item. Check "Open work" in `STATUS.md` before starting or
+continuing any ticket.
 
 Cadence's product posture has moved from private-only usage to a public
-open-source product with multiple surfaces. The current implemented surfaces
-are the authenticated Next.js web app and the sibling Astro marketing site. See
+open-source product with multiple surfaces. See
 `docs/PUBLIC_PRODUCT_ARCHITECTURE.md` before starting public-product,
 marketing-site, workspace, desktop, or mobile work.
 
@@ -1047,7 +1046,8 @@ keep the standard authenticated redirect behavior.
 ## Source-of-truth order
 
 1. `AGENTS.md`: operating rules and architecture constraints.
-2. `STATUS.md`: current implementation state and handoff notes.
+2. `STATUS.md`: open work and recent entries. History lives in
+   `docs/status/archive/`.
 3. This runbook plus provider workflow docs.
 4. Product docs under `docs/`.
 5. Tests and implementation.
@@ -1467,6 +1467,13 @@ publication.
 
 Update `STATUS.md` when a ticket starts, completes, becomes blocked, is reopened, or materially changes scope. Record verification commands with real pass/fail results.
 
+Follow "Update rules" at the top of `STATUS.md`. Add each entry under "Recent
+entries", newest first, and keep "Open work" current. `npm run agents:check`
+fails when `STATUS.md` exceeds 40,000 bytes. Run `npm run status:archive` to move
+older entries to `docs/status/archive/YYYY-MM.md`. `docs/status/README.md` maps
+each ticket number to its archive file. Search the archive with grep; never read
+it in full.
+
 Do not use `STATUS.md` to expand v1 product scope. Put future ideas in `docs/FUTURE_UPDATES.md` unless the user explicitly changes v1 scope.
 
 ## Ticket 102 Public Trust publication
@@ -1868,8 +1875,9 @@ rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
 
 ## Connector expansion acceptance and operation (Tickets 233–241)
 
-Tickets 233–241 have independent local source/synthetic approval. `STATUS.md`,
-under "Owner-run live acceptance", records the later authorized provider tests.
+Tickets 233–241 have independent local source/synthetic approval.
+`docs/status/archive/2026-10.md`, under "Owner-run live acceptance — October 19, 2026",
+records the later authorized provider tests.
 Those tests do not establish installed-desktop, hosted-deployment or public-release
 acceptance. Repository review alone does not authorize real provider reads,
 publication, deployment, or hosted configuration changes.

@@ -1070,3 +1070,114 @@ lint with zero warnings, web and desktop TypeScript, Vitest (3,153 passed, 94 sk
 the web build pass. Earlier full runs had one desktop release test file exceed its 5 s
 limit under load; it passed alone. No candidate is accepted. No production preset,
 schema or hosted change.
+
+### Ticket 288 usage and failure reasons — November 9, 2026
+
+Each comparison result now carries `usage`: one entry per model call, labeled
+`brief` or `duration_estimate`, with input, cached input, output and reasoning
+token counts. A count the provider did not report is null. A failed result also
+carries `reason`, an internal short code such as `validation_word_limit` or
+`provider_incomplete_max_output_tokens`, beside the unchanged `error` code. Saved
+runs store both as optional fields. Runs saved before this change have neither
+field and still load; the review packet prints "Usage: not recorded" for them.
+
+The top-level `usage` field stays a string for the current UI: `per_result` when
+any result reported usage, otherwise `unavailable`. A failed duration estimate
+records its reason in the inspector's `durationEstimates.reason`. Sequence status
+uses the same `usage` string, and each sequence result carries `usage` and
+`reason`. The review packet prints usage and the reason per run. The sequence
+report prints token totals across all attempts, the number of runs saved without
+usage, and a count per failure reason. Monetary cost is not calculated.
+
+One development-only change: a provider body that is not JSON now records
+`advisor_unavailable` with reason `provider_body_not_json`, where it earlier
+recorded `generation_failed`. Production returns `advisor_unavailable` in both
+cases.
+
+The workbench UI did not show the new fields in Ticket 288; Ticket 290 adds them
+(see below). Verification: provider-free tests with injected generators and
+authored provider responses. No live provider call was made, so no measured token
+figure is recorded here.
+
+### Ticket 290 model, reasoning effort and prompt variant — November 9, 2026
+
+Each configuration column has a Generation group with three selects: Model,
+Reasoning effort and Prompt. The defaults are the production values:
+`DAILY_BRIEF_MODEL`, effort `low` and the `layered` prompt. The interface reads the
+allowed values from `GET /api/dev/briefing-comparison?view=generation`, so it never
+offers a value the server rejects. If that read fails, the group says so and runs
+send no choices; the server then uses the production values.
+
+Allowed values:
+
+- Model: `DAILY_BRIEF_MODEL` plus the comma-separated IDs in
+  `CADENCE_BRIEFING_BENCH_MODELS`. An ID must match `^[A-Za-z0-9._:-]{1,64}$`; other
+  entries are ignored. No other model ID is in the source.
+- Reasoning effort: the values the OpenAI Responses API reference documents for
+  `reasoning.effort` (checked November 9, 2026): `none`, `minimal`, `low`, `medium`,
+  `high`, `xhigh`, `max`. Not every model supports every value. The provider rejects
+  an unsupported one, and the run records `advisor_unavailable` with reason
+  `provider_http_4xx`.
+- Prompt: `layered` (production) or `consolidated` (Ticket 289). `consolidated`
+  rewrites only recipes 1.1 and 1.2; other recipes receive the layered text.
+
+The comparison request accepts an optional `generation` array, parallel to
+`configs`. Each item may set `model`, `effort` and `promptVariant`; an omitted field
+takes the production value. An unknown key, a null value, an unlisted model or
+effort, an unknown variant or a length that differs from `configs` returns
+`invalid_request` before any model call. A request without `generation` sends
+exactly what it sent before. The sequence request accepts the same array for its
+two sides and forwards each side's item to every run on that side.
+
+The model and effort apply to the brief call only. The Ticket 188 duration-estimate
+call keeps the production model and effort.
+
+The 2,000 output-token limit applies to every candidate. Reasoning tokens count toward
+it, so a higher effort can end as `advisor_unavailable` with reason
+`provider_incomplete_max_output_tokens`. Read that reason as the limit being reached, not
+as a quality result.
+
+Records:
+
+- A saved candidate stores `generation` (model, effort, prompt variant). It is part
+  of the candidate's identity, like its configuration: reusing a candidate ID with a
+  different choice returns `invalid_request`, and the interface creates a new
+  candidate instead. Changing a choice marks the shown run as changed since the
+  draft. A candidate saved before Ticket 290 has no `generation`; it counts as the
+  production values.
+- A run stores `model`, `effort`, `promptVariant` and `promptRevision`
+  (`dailyBriefPromptRevision(promptVariant)`). `promptVariant` is the text actually
+  sent, so a recipe 1.0 candidate that asked for `consolidated` records `layered`.
+  Runs saved before Ticket 290 have no `effort` or `promptVariant` and still load
+  and rerun.
+- Each comparison result carries the same four fields. The top-level `model` and
+  `promptRevision` stay the production values.
+- Each result column shows model, reasoning effort, prompt and revision, token
+  usage and, for a failed run, the error code and the Ticket 288 reason.
+- The review packet prints each candidate's generation, each run's generation and
+  the generation differences between baseline and candidate. The sequence report
+  prints each candidate's generation, its differences from the baseline and each
+  run's model, effort and prompt variant.
+
+How to compare:
+
+1. Load the same configuration on A and B. Use "Duplicate to other side"; it copies
+   the Generation choices too.
+2. Change one thing on B: the model, the reasoning effort or the prompt. A
+   comparison that changes one thing at a time stays interpretable. If B also
+   changes its configuration, a difference in the output cannot be attributed.
+3. Run new comparison, or rerun B on a saved case, so A and B share the frozen
+   inputs and clock.
+4. Read both outputs, the token usage and any failure reason. Repeat the run before
+   drawing a conclusion: wording varies with identical inputs.
+5. To compare the consolidated prompt, use a recipe 1.1 or 1.2 preset. See
+   `docs/qa/daily-brief-prompt-consolidation.md`.
+
+Production is unchanged. `requestInAppDailyBrief` passes no generation option, and
+no production route accepts one. `tests/daily-brief-production-pin.test.ts` pins the
+production request body (three recipes, through the real adapter with a stubbed
+`fetch`), the instructions the consumer builds for every preset and fixture, and
+`DAILY_BRIEF_PROMPT_REVISION` (`5588d260d8e145ad`) to values computed before this
+change. Verification used injected generators and stubbed `fetch` only. No model
+call was made, so no output quality or cost of another model, effort or the
+consolidated prompt is measured.
