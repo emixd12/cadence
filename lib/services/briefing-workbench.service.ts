@@ -7,7 +7,7 @@ import { authRequestUrl } from "@/lib/auth/redirects";
 import { listBriefingWorkbenchBehaviors, listDailyBriefBehaviorIds, readDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { briefingFixture, BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "./briefing-fixtures";
 import { BRIEFING_PIPELINE_VERSION, briefingConfigurationRevision, prepareBriefing } from "./briefing-pipeline";
-import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
+import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefCallUsage, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
 import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief, generateOpenAIDurationEstimates } from "./daily-brief-openai";
 import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
@@ -183,11 +183,13 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           const inspected = () => planned ? { ...planned.prepared, durationEstimates: planned.estimates } : prepared;
           const start = Date.now();
           let retainedFingerprints: readonly string[] = [];
-          const record = async (entry: { state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; error?: string; validation: string }) => {
+          // Ticket 288: token usage per model call of this run, including calls whose output was rejected.
+          const usage: DailyBriefCallUsage[] = [];
+          const record = async (entry: { state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; error?: string; reason?: string; validation: string }) => {
             if (!persisted || !review) return null;
             const id = randomUUID();
             const run: BenchRun = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "run", id, caseId: review.caseId, candidateId: review.candidates[index]!.id, attemptId,
-              createdAt: new Date().toISOString(), ...entry, latencyMs: Date.now() - start, model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION,
+              createdAt: new Date().toISOString(), ...entry, usage: [...usage], latencyMs: Date.now() - start, model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION,
               configurationRevision: revisions[index]!, pipelineVersion: BRIEFING_PIPELINE_VERSION, inspector: inspected(),
               ...(options.sequenceId ? { evaluation: { sequenceId: options.sequenceId, mode: options.diagnosticLane ? "diagnostic" as const : "daily" as const,
                 ...(options.diagnosticLane ? { laneId: options.diagnosticLane, label: "Diagnostic preview: bypasses cross-lane ranking and cooldown. Evidence and validation still apply." } : {}), retainedFingerprints } } : {}) };
@@ -210,20 +212,23 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
               planningNow: context.capturedAt, now: frozenClock ? () => captured : () => Temporal.Now.instant(),
               generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY! })))(input), recheck(input)),
               ...(descriptions ? { descriptions, estimate: (input: Parameters<DailyBriefGenerator>[0]) => reservation.dispatch(input.signal, () => estimate(input), recheck(input)) } : {}),
+              onUsage: (item) => { usage.push(item); },
               onPrepared: (value) => { planned = value; } });
             if (account) await raceBriefAbort(account.assertCurrent(), signal);
             if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, signal), signal);
             retainedFingerprints = briefing.tip ? prepared.analysis?.recordFingerprints ?? [] : [];
             if (!options.diagnosticLane) options.onRetainedTip?.(index, retainedFingerprints, context.localDate);
             const runId = await record({ state: "ready", briefing, validation: "passed" });
-            results.push({ state: "ready", briefing, inspector: inspected(), latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints });
+            results.push({ state: "ready", briefing, inspector: inspected(), latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints, usage: [...usage] });
           } catch (error) {
             const cancelled = signal.aborted;
             const code = cancelled ? "cancelled" : error instanceof DailyBriefError ? error.code : "generation_failed";
             const state = cancelled ? "cancelled" as const : "error" as const;
             const validation = cancelled ? "not_completed" : "withheld";
-            const runId = await record({ state, error: code, validation });
-            results.push({ state, error: code, inspector: inspected(), latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [] });
+            // Development-only: the internal reason is saved and returned here, never by the production route.
+            const reason = !cancelled && error instanceof DailyBriefError && error.reason ? error.reason : undefined;
+            const runId = await record({ state, error: code, ...(reason ? { reason } : {}), validation });
+            results.push({ state, error: code, ...(reason ? { reason } : {}), inspector: inspected(), latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [], usage: [...usage] });
             if (code === "access_denied" || code === "context_changed") throw error;
           }
         }
@@ -238,7 +243,8 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           preferenceRevision: preferences?.revision ?? null, capturedAt: contexts[0].capturedAt, expiresAt: contexts[0].expiresAt,
           fixtureId: source?.mode === "account" || accountMode ? null : fixtureId, fixtureVersion: source?.mode === "account" || accountMode ? null : BRIEFING_FIXTURE_VERSION,
           analysisFixtureId: source?.mode === "account" || accountMode ? null : analysisFixtureId ?? null, analysisFixtureVersion: source?.mode === "account" || accountMode ? null : BRIEFING_ANALYSIS_FIXTURE_VERSION,
-          model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION, usage: "unavailable", results,
+          // `usage` stays a string for the workbench UI; per-call counts are on each result.
+          model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION, usage: results.some((result) => result.usage.length) ? "per_result" : "unavailable", results,
           cancelled: signal.aborted, dispatchedCalls: reservation.used, budget: briefingBenchBudget().snapshot(),
           ...(review ? { review: { caseId: review.caseId, saved: persisted === true && runIds.length === results.length, runIds, candidateIds: review.candidates.map((candidate) => candidate.id) } } : {}) };
       } finally { if (!options.reservation) reservation.close(); }

@@ -323,3 +323,39 @@ describe("tip delivery accounting", () => {
     expect(await requestInAppDailyBrief(caller, input, { generate, now })).toMatchObject({ state: "ready" });
   });
 });
+
+describe("Ticket 288 model span usage", () => {
+  const events = (info: { mock: { calls: unknown[][] } }) => info.mock.calls.map(([line]) => JSON.parse(line as string)).filter((event) => event.span === "daily_brief.model");
+
+  it("records the usage counts on a successful daily_brief.model span and never in the response", async () => {
+    vi.stubEnv("CADENCE_PERF_LOG", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      generate.mockImplementation(async (request: { onUsage?: (usage: object) => void }) => {
+        request.onUsage?.({ inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
+        return { suggestions: [], text: "Take time for your walk.", occurrenceRefs: [fixture.cadence.occurrences[0].ref] };
+      });
+      const result = await requestInAppDailyBrief(caller, input, { generate, now });
+      expect(result.state).toBe("ready");
+      expect(JSON.stringify(result)).not.toMatch(/tokens|usage/i);
+      expect(events(info)).toEqual([expect.objectContaining({ status: "success",
+        counts: { usage_calls: 1, input_tokens: 1200, cached_input_tokens: 300, output_tokens: 150, reasoning_tokens: 64 } })]);
+    } finally { info.mockRestore(); vi.unstubAllEnvs(); }
+  });
+
+  it("records the reason beside the public error code and the usage of the rejected call", async () => {
+    vi.stubEnv("CADENCE_PERF_LOG", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      generate.mockImplementation(async (request: { onUsage?: (usage: object) => void }) => {
+        request.onUsage?.({ inputTokens: 900, cachedInputTokens: null, outputTokens: 400, reasoningTokens: null });
+        return { suggestions: [], text: "word ".repeat(200), occurrenceRefs: [] };
+      });
+      await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "advisor_unavailable", reason: "validation_word_limit" });
+      const [event] = events(info);
+      expect(event).toMatchObject({ status: "error", error_code: "advisor_unavailable", error_reason: "validation_word_limit",
+        counts: { usage_calls: 1, input_tokens: 900, output_tokens: 400 } });
+      expect(event.counts).not.toHaveProperty("cached_input_tokens");
+    } finally { info.mockRestore(); vi.unstubAllEnvs(); }
+  });
+});

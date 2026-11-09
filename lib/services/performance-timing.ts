@@ -19,6 +19,8 @@ type PerformanceTimingEvent = {
   counts?: Record<string, number>;
   error_name?: string;
   error_code?: string;
+  /** Ticket 288: internal failure reason, under the same short-code rule as `error_code`. */
+  error_reason?: string;
 };
 
 type CountResolver<T> =
@@ -48,6 +50,18 @@ const SENSITIVE_COUNT_KEY_PARTS = [
   "user_agent",
   "uuid",
 ];
+/**
+ * Ticket 288: model token usage counts. These exact keys bypass the sensitive-key
+ * filter, which still drops every other key containing "token".
+ */
+export const MODEL_USAGE_COUNT_KEYS = [
+  "usage_calls",
+  "input_tokens",
+  "cached_input_tokens",
+  "output_tokens",
+  "reasoning_tokens",
+] as const;
+const ALLOWED_COUNT_KEYS: ReadonlySet<string> = new Set(MODEL_USAGE_COUNT_KEYS);
 
 export function isPerformanceTimingEnabled(): boolean {
   return process.env.CADENCE_PERF_LOG === "1";
@@ -80,6 +94,8 @@ export async function measurePerformanceSpan<T>(
     span: string;
     route?: string | null;
     counts?: CountResolver<T>;
+    /** Counts for a failed span, such as tokens a rejected model call consumed. */
+    errorCounts?: () => PerformanceTimingCounts;
   },
   operation: () => Promise<T>,
 ): Promise<T> {
@@ -114,8 +130,10 @@ export async function measurePerformanceSpan<T>(
       span: sanitizeTimingName(input.span, "unknown_span"),
       duration_ms: roundDuration(performance.now() - start),
       status: "error",
+      ...safeErrorCounts(input.errorCounts),
       error_name: safeErrorName(error),
       ...safeErrorCode(error),
+      ...safeErrorReason(error),
     });
 
     throw error;
@@ -138,6 +156,18 @@ function resolveCounts<T>(
   const safeCounts = sanitizeCounts(rawCounts);
 
   return Object.keys(safeCounts).length > 0 ? safeCounts : undefined;
+}
+
+function safeErrorCounts(
+  errorCounts: (() => PerformanceTimingCounts) | undefined,
+): { counts?: Record<string, number> } {
+  if (!errorCounts) {
+    return {};
+  }
+
+  const safeCounts = sanitizeCounts(errorCounts());
+
+  return Object.keys(safeCounts).length > 0 ? { counts: safeCounts } : {};
 }
 
 function sanitizeCounts(
@@ -190,6 +220,10 @@ function sanitizeCountKey(key: string): string {
 function isSensitiveCountKey(key: string): boolean {
   const normalized = sanitizeCountKey(key);
 
+  if (ALLOWED_COUNT_KEYS.has(normalized)) {
+    return false;
+  }
+
   return SENSITIVE_COUNT_KEY_PARTS.some((part) => normalized.includes(part));
 }
 
@@ -197,10 +231,18 @@ function roundDuration(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+const SAFE_ERROR_CODE = /^[a-z][a-z0-9_]{0,39}$/;
+
 /** Only short machine codes such as `timeout`; never messages or provider bodies. */
 function safeErrorCode(error: unknown): { error_code?: string } {
   const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
-  return typeof code === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(code) ? { error_code: code } : {};
+  return typeof code === "string" && SAFE_ERROR_CODE.test(code) ? { error_code: code } : {};
+}
+
+/** Ticket 288: an internal reason such as `validation_word_limit`; same short-code rule. */
+function safeErrorReason(error: unknown): { error_reason?: string } {
+  const reason = error && typeof error === "object" ? (error as { reason?: unknown }).reason : undefined;
+  return typeof reason === "string" && SAFE_ERROR_CODE.test(reason) ? { error_reason: reason } : {};
 }
 
 function safeErrorName(error: unknown): string {

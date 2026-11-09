@@ -10,7 +10,7 @@ import {
   benchPartition, BRIEFING_BENCH_RETENTION_DAYS, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
   type BenchCaseDetail, type BenchDisposition, type BenchEstimateReview, type BenchFeedback, type BenchPartition, type BenchPreference, type BenchRun, type BriefingBenchStore,
 } from "./briefing-bench-store";
-import { DailyBriefError, raceBriefAbort, type DurationEstimateReport } from "./daily-brief-consumer";
+import { DailyBriefError, raceBriefAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefUsageTotals, type DurationEstimateReport } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { guard, json, readComparisonBody } from "./briefing-workbench.service";
 import type { CalendarCaller } from "./google-calendar.service";
@@ -162,6 +162,22 @@ export function runEstimates(inspector: unknown): DurationEstimateReport | null 
 }
 
 function invalid(): never { throw new DailyBriefError("invalid_request"); }
+
+/** Ticket 288: token totals as packet text. Runs saved before usage was recorded say so. */
+export function describeRunUsage(usage: readonly DailyBriefCallUsage[] | undefined): string {
+  if (!usage) return "Usage: not recorded (run saved before usage recording).";
+  if (!usage.length) return "Usage: no model call reported usage.";
+  return `Usage: ${describeUsageTotals(sumDailyBriefUsage(usage))}.`;
+}
+
+function describeUsageTotals(total: DailyBriefUsageTotals): string {
+  const count = (value: number | null) => value === null ? "not reported" : String(value);
+  return `${total.calls} model ${total.calls === 1 ? "call" : "calls"}; input tokens ${count(total.inputTokens)} (cached ${count(total.cachedInputTokens)}); output tokens ${count(total.outputTokens)} (reasoning ${count(total.reasoningTokens)})`;
+}
+
+function describeRunError(run: BenchRun): string {
+  return run.error ? `${run.error}${run.reason ? `, reason ${run.reason}` : ""}` : "";
+}
 function normalizeSpace(value: string): string { return value.replace(/\s+/gu, " ").trim().toLowerCase(); }
 
 type InspectorAnalysis = { result?: { lanes?: { laneId: BriefingAnalysisLaneId; state: BriefingAnalysisLaneState; reason: BriefingAnalysisUnavailableReason | null }[] };
@@ -236,8 +252,9 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
   for (const run of detail.runs) {
     const owner = candidate(run.candidateId);
     lines.push(`### Run \`${run.id}\` — ${owner?.label ?? run.candidateId}`, "",
-      `- State: ${run.state}${run.error ? ` (${run.error})` : ""}; validation ${run.validation}; ${run.latencyMs} ms`,
-      `- Model ${run.model}; prompt revision \`${run.promptRevision}\`; pipeline ${run.pipelineVersion}; attempt \`${run.attemptId}\``);
+      `- State: ${run.state}${run.error ? ` (${describeRunError(run)})` : ""}; validation ${run.validation}; ${run.latencyMs} ms`,
+      `- Model ${run.model}; prompt revision \`${run.promptRevision}\`; pipeline ${run.pipelineVersion}; attempt \`${run.attemptId}\``,
+      `- ${describeRunUsage(run.usage)}`);
     if (run.briefing) {
       const review = reviewBriefingReading({ visibleText: visibleBriefingText(run.briefing), behaviorTitles: titles, segments: [
         { label: "overview", text: run.briefing.text },
@@ -295,7 +312,9 @@ export async function writeSequenceReport(store: BriefingBenchStore, partition: 
     .sort((a, b) => a.case.localDate.localeCompare(b.case.localDate) || a.case.id.localeCompare(b.case.id));
   const judgments = { prefer_a: 0, prefer_b: 0, both_work: 0, neither_works: 0, unreviewed: 0 };
   const themes = new Map<string, Set<string>>();
-  let words = 0, ready = 0, failed = 0, cancelled = 0;
+  let words = 0, ready = 0, failed = 0, cancelled = 0, unrecorded = 0;
+  const usage: DailyBriefCallUsage[] = [];
+  const reasons: Record<string, number> = {};
   const lines = ['# Consecutive-day briefing review', '',
     `${cases.length} cases. Reading counts include supporting lines. Retries and diagnostics remain separate attempts.`,
     'Owner judgments apply to exact run pairs. Factual, privacy and delivery failures remain release blockers.',
@@ -309,8 +328,11 @@ export async function writeSequenceReport(store: BriefingBenchStore, partition: 
     for (const feedback of detail.feedback) if (feedback.preference) judgments[feedback.preference]++;
     for (const run of detail.runs) {
       const candidate = detail.candidates.find(item => item.id === run.candidateId);
+      if (run.usage) usage.push(...run.usage); else unrecorded++;
+      if (run.reason) reasons[run.reason] = (reasons[run.reason] ?? 0) + 1;
       lines.push(`### ${candidate?.role ?? 'unknown'} · ${candidate?.label ?? run.candidateId} · run ${run.id}`, '',
-        `State: ${run.state}; validation: ${run.validation}${run.error ? `; error: ${run.error}` : ''}.`,
+        `State: ${run.state}; validation: ${run.validation}${run.error ? `; error: ${run.error}` : ''}${run.reason ? `; reason: ${run.reason}` : ''}.`,
+        describeRunUsage(run.usage),
         `Attempt: ${run.attemptId}; model: ${run.model}; prompt: ${run.promptRevision}; pipeline: ${run.pipelineVersion}; configuration: ${run.configurationRevision}.`,
         ...(run.evaluation ? [`Evaluation: ${JSON.stringify(run.evaluation)}`] : []));
       if (run.state === 'ready' && run.briefing) {
@@ -335,7 +357,9 @@ export async function writeSequenceReport(store: BriefingBenchStore, partition: 
   lines.splice(6, 0, `Ready attempts: ${ready}; failed/withheld: ${failed}; cancelled: ${cancelled}; total visible words across all attempts: ${words}.`,
     `Exact feedback counts (not independent case votes): ${JSON.stringify(judgments)}.`,
     `Repeated observation lanes (theme signal, not a semantic repetition verdict): ${[...themes].filter(([, days]) => days.size > 1).map(([lane, days]) => `${BRIEFING_LANE_LABELS[lane as BriefingAnalysisLaneId] ?? lane}: ${days.size} days`).join('; ') || 'none in retained outputs'}.`,
-    'Tokens and monetary cost: unavailable. Review missing inputs, rejected outputs, and owner concerns before any acceptance.', '');
+    `Token usage across all attempts: ${usage.length ? describeUsageTotals(sumDailyBriefUsage(usage)) : 'no model call reported usage'}; runs saved without usage records: ${unrecorded}. Monetary cost: not calculated.`,
+    `Failure reasons (internal codes): ${Object.keys(reasons).length ? JSON.stringify(reasons) : 'none recorded'}.`,
+    'Review missing inputs, rejected outputs, and owner concerns before any acceptance.', '');
   const file = await store.writeText(partition, caseIds[0]!, 'sequence-report.md', `${lines.join('\n')}\n`);
   return { path: path.relative(process.cwd(), file) };
 }

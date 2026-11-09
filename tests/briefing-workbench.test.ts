@@ -212,7 +212,8 @@ describe("briefing workbench boundary", () => {
     const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue(output);
     const response = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
     expect(response.status).toBe(200);
-    expect(generate.mock.calls.every(([input]) => Object.keys(input).sort().join() === "facts,instructions,signal")).toBe(true);
+    // Ticket 288: the only addition is a usage callback; the generator still gets no data or mutation capability.
+    expect(generate.mock.calls.every(([input]) => Object.keys(input).sort().join() === "facts,instructions,onUsage,signal" && typeof input.onUsage === "function")).toBe(true);
     expect(provider).not.toHaveBeenCalled();
     expect(network).not.toHaveBeenCalled();
     expect(accountRead).not.toHaveBeenCalled();

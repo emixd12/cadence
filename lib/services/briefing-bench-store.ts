@@ -6,6 +6,7 @@ import type { BriefingAnalysisLaneId } from "@cadence/core/types/briefing-analys
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
+import type { DailyBriefCallUsage } from "./daily-brief-consumer";
 
 /**
  * Local, development-only review records for the briefing workbench
@@ -141,7 +142,11 @@ export type BenchRun = Readonly<{
   state: "ready" | "error" | "cancelled";
   briefing?: DailyBriefing;
   error?: string;
+  /** Ticket 288: internal failure reason, such as `validation_word_limit`. Absent on older runs. */
+  reason?: string;
   validation: string;
+  /** Ticket 288: token usage per model call. Absent on runs saved before usage was recorded. */
+  usage?: readonly DailyBriefCallUsage[];
   latencyMs: number;
   model: string;
   promptRevision: string;

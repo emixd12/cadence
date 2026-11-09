@@ -3,7 +3,7 @@ import type { DailyBriefResponse, DailyBriefSettings } from "@cadence/core/types
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
-import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, type DailyBriefGenerator } from "./daily-brief-consumer";
+import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
@@ -11,7 +11,7 @@ import { getIcloudCalendarConnection } from "./icloud-calendar.service";
 import { getHevyConnection } from "./hevy.service";
 
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
-import { measurePerformanceSpan } from "./performance-timing";
+import { measurePerformanceSpan, type PerformanceTimingCounts } from "./performance-timing";
 import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
 
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
@@ -26,6 +26,14 @@ const SETTINGS_KEY_SETS = [
 
 /** Phase diagnostics record span, duration and error code only; never prompts, facts or output. */
 const phase = <T,>(span: string, operation: () => Promise<T>) => measurePerformanceSpan({ span: `daily_brief.${span}` }, operation);
+
+/** Ticket 288: token counts for the `daily_brief.model` span, summed across the calls that reported usage. */
+export function dailyBriefUsageCounts(usage: readonly DailyBriefCallUsage[]): PerformanceTimingCounts {
+  if (!usage.length) return {};
+  const total = sumDailyBriefUsage(usage);
+  return { usage_calls: total.calls, input_tokens: total.inputTokens, cached_input_tokens: total.cachedInputTokens,
+    output_tokens: total.outputTokens, reasoning_tokens: total.reasoningTokens };
+}
 
 export async function getDailyBriefSettings(caller: CalendarCaller): Promise<DailyBriefSettings> {
   const preferences = await readDailyBriefPreferences(caller.client);
@@ -167,10 +175,14 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       };
       await assertCurrent();
       const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
-      const briefing = await phase("model", () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
-        analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
-        onTip: (fingerprints) => { tipFingerprints = fingerprints; },
-        generate: options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey })) }), modelSignal));
+      // Usage reaches only the performance log, never the response.
+      const usage: DailyBriefCallUsage[] = [];
+      const briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
+        () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
+          analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
+          onTip: (fingerprints) => { tipFingerprints = fingerprints; },
+          onUsage: (item) => { usage.push(item); },
+          generate: options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey })) }), modelSignal));
       // The lease must still belong to this attempt. A superseded attempt never returns text.
       const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
       if (!finished) throw new DailyBriefError("context_changed");

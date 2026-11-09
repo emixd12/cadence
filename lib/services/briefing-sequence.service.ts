@@ -14,7 +14,7 @@ import { briefingFixture, type BriefingFixtureId } from "./briefing-fixtures";
 import { briefingAnalysisFixture, type BriefingAnalysisFixtureId } from "./briefing-analysis-fixtures";
 import { prepareBriefing, type BriefingAnalysisInput } from "./briefing-pipeline";
 import { DAILY_BRIEF_MODEL } from "./daily-brief-openai";
-import { DAILY_BRIEF_PROMPT_REVISION, DailyBriefError, type DailyBriefGenerator } from "./daily-brief-consumer";
+import { DAILY_BRIEF_PROMPT_REVISION, DailyBriefError, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import type { CalendarCaller } from "./google-calendar.service";
 import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseReview, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
@@ -24,6 +24,8 @@ export type BriefingSequenceResult = Readonly<{
   caseId: string; localDate: string; side: 0 | 1; candidateId: string; laneId: BriefingAnalysisLaneId | null;
   state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; inspector: ReturnType<typeof prepareBriefing>;
   error?: string; validation: string; latencyMs: number; runId: string | null; saved: boolean; retainedFingerprints: readonly string[];
+  /** Ticket 288: internal failure reason and per-call token usage, when the run recorded them. */
+  reason?: string; usage?: readonly DailyBriefCallUsage[];
 }>;
 export type BriefingSequencePlan = Readonly<{
   caseIds: readonly string[]; mode: "daily" | "diagnostic"; plannedCalls: number; callBudget: number;
@@ -39,7 +41,8 @@ export type BriefingSequencePlan = Readonly<{
 export type BriefingSequenceStatus = Readonly<{
   id: string; state: "queued" | "running" | "ready" | "partial" | "cancelled" | "error";
   plan: BriefingSequencePlan; results: readonly BriefingSequenceResult[]; dispatchedCalls: number;
-  error?: string; usage: "unavailable"; budget: BriefingBenchBudgetSnapshot;
+  /** Ticket 288: "per_result" once any result carries token usage; counts are on each result. */
+  error?: string; usage: "unavailable" | "per_result"; budget: BriefingBenchBudgetSnapshot;
 }>;
 
 type SequenceInput = { action: "simulate" | "start"; accountRef: string | null; caseIds: string[]; configs: BriefingConfig[];
@@ -52,7 +55,7 @@ const jobs = new Map<string, Job>();
 
 function view(job: Job): BriefingSequenceStatus {
   return { id: job.id, state: job.state, plan: job.plan, results: job.results, dispatchedCalls: job.reservation.used,
-    ...(job.error ? { error: job.error } : {}), usage: "unavailable", budget: briefingBenchBudget().snapshot() };
+    ...(job.error ? { error: job.error } : {}), usage: job.results.some((result) => result.usage?.length) ? "per_result" : "unavailable", budget: briefingBenchBudget().snapshot() };
 }
 function parseInput(value: unknown): SequenceInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new DailyBriefError("invalid_request");
@@ -194,7 +197,8 @@ async function skipped(task: Task, job: Job, error: string, store: BriefingBench
   const existing = await store.readCase(partition, task.detail.case.id).catch(() => null);
   const recorded = existing?.runs.findLast(run => run.evaluation?.sequenceId === job.id && run.candidateId === task.candidate.id);
   if (recorded) return { caseId: task.detail.case.id, localDate: task.detail.case.localDate, side: task.side, candidateId: task.candidate.id, laneId: task.laneId,
-    state: recorded.state, ...(recorded.briefing ? { briefing: recorded.briefing } : {}), ...(recorded.error ? { error: recorded.error } : {}), validation: recorded.validation,
+    state: recorded.state, ...(recorded.briefing ? { briefing: recorded.briefing } : {}), ...(recorded.error ? { error: recorded.error } : {}),
+    ...(recorded.reason ? { reason: recorded.reason } : {}), ...(recorded.usage ? { usage: recorded.usage } : {}), validation: recorded.validation,
     latencyMs: recorded.latencyMs, inspector: recorded.inspector as ReturnType<typeof prepareBriefing>, saved: true, runId: recorded.id, retainedFingerprints: recorded.evaluation?.retainedFingerprints ?? [] };
   const replay = inputs(task.detail, task.config);
   const inspector = prepareBriefing(replay.context, replay.config, replay.context.capturedAt, replay.analysis);

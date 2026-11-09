@@ -100,18 +100,61 @@ placeLabels count where the user was when marking each Behavior Completed: home,
 /** Identifies the exact instruction text, so workbench runs can show prompt changes between candidates. */
 export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}\0${DAILY_BRIEF_V1_1_INSTRUCTIONS}\0${DAILY_BRIEF_V1_2_INSTRUCTIONS}\0${DURATION_ESTIMATE_INSTRUCTIONS}\0${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}\0${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}`).digest("hex").slice(0, 16);
 
+/**
+ * Ticket 288: token counts one model call reported. A count is null when the
+ * provider did not report it. Counts only; never prompts, output or response IDs.
+ */
+export type DailyBriefModelUsage = Readonly<{
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
+}>;
+
+/** Which model call reported the usage: the brief itself or the Ticket 188 estimate step. */
+export type DailyBriefModelCall = "brief" | "duration_estimate";
+
+export type DailyBriefCallUsage = Readonly<{ call: DailyBriefModelCall }> & DailyBriefModelUsage;
+
+/** Totals across calls. A token total is null when no call reported that count. */
+export type DailyBriefUsageTotals = Readonly<{ calls: number }> & DailyBriefModelUsage;
+
+export function sumDailyBriefUsage(usage: readonly DailyBriefModelUsage[]): DailyBriefUsageTotals {
+  const total = (pick: (item: DailyBriefModelUsage) => number | null) => usage.reduce<number | null>((sum, item) => {
+    const value = pick(item);
+    return value === null ? sum : (sum ?? 0) + value;
+  }, null);
+  return { calls: usage.length, inputTokens: total((item) => item.inputTokens), cachedInputTokens: total((item) => item.cachedInputTokens),
+    outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens) };
+}
+
 export type DailyBriefGenerator = (input: Readonly<{
   instructions: string;
   facts: string;
   signal: AbortSignal;
   /** Recipe 1.2 estimate calls also return `alongside`; the adapter picks the matching schema. */
   estimateVariant?: "alongside";
+  /**
+   * Ticket 288: present only when the caller asked for usage. The adapter calls it
+   * once per provider response that reports usage. It never changes the request.
+   */
+  onUsage?: (usage: DailyBriefModelUsage) => void;
 }>) => Promise<unknown>;
 
+/**
+ * `code` is the public value that routes return. `reason` is an internal short
+ * machine code (Ticket 288) for logs and development workbench records only;
+ * production routes never return it.
+ */
 export class DailyBriefError extends Error {
-  constructor(public readonly code: string, public readonly retryAfterSeconds?: number) {
+  constructor(public readonly code: string, public readonly retryAfterSeconds?: number, public readonly reason?: string) {
     super(code);
   }
+}
+
+/** The one public code for rejected provider output, with the internal reason attached. */
+export function adviceRejected(reason: string): DailyBriefError {
+  return new DailyBriefError("advisor_unavailable", undefined, reason);
 }
 
 /** Provider-neutral generation. The adapter gets facts, never database or mutation capabilities. */
@@ -132,12 +175,14 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   estimate?: DailyBriefGenerator;
   /** Receives what was actually planned, including accepted estimates, for inspection. */
   onPrepared?: (value: Readonly<{ prepared: ReturnType<typeof prepareBriefing>; estimates: DurationEstimateReport }>) => void;
+  /** Ticket 288: receives token usage per model call. Without it, generator input stays unchanged. */
+  onUsage?: (usage: DailyBriefCallUsage) => void;
 }>): Promise<DailyBriefing> {
   validateVersionedAdvisorDayContext(context);
   assertBriefContextFresh(context, input.now());
   input.signal.throwIfAborted();
   const config = parseBriefingConfig(input.config ?? activeBriefingConfig());
-  const { planned, report } = await estimateDurations(context, config, input);
+  const { planned, report } = await estimateDurations(context, config, input, usageReporter(input.onUsage, "duration_estimate"));
   const alongside = new Set(report.estimates.filter((item) => item.alongside).map((item) => item.behaviorRef));
   const planningNow = input.planningNow ?? input.now().toString();
   const prepared = prepareBriefing(planned, config, planningNow, input.analysis, alongside);
@@ -172,36 +217,40 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   // Deterministic local-time labels, so the model never converts UTC instants itself.
   const payload = JSON.stringify({ ...body, clock: { timezone: context.timezone, labels: localTimeLabels(body, context.timezone) } });
   if (Buffer.byteLength(payload, "utf8") > 512 * 1024) throw new DailyBriefError("context_limit_exceeded");
-  const result = await raceBriefAbort(input.generate({ instructions, facts: payload, signal: input.signal }), input.signal);
+  const onBriefUsage = usageReporter(input.onUsage, "brief");
+  const result = await raceBriefAbort(input.generate({ instructions, facts: payload, signal: input.signal, ...(onBriefUsage ? { onUsage: onBriefUsage } : {}) }), input.signal);
   input.signal.throwIfAborted();
   const now = input.now();
   assertBriefContextFresh(context, now);
   if (briefingConfigurationRevision(config) !== configurationRevision) throw new DailyBriefError("context_changed");
-  if (!result || typeof result !== "object" || Array.isArray(result)) throw new DailyBriefError("advisor_unavailable");
+  // Ticket 288: each rejection keeps the public code and names its internal reason.
+  if (!result || typeof result !== "object" || Array.isArray(result)) throw adviceRejected("validation_shape");
   const value = result as Record<string, unknown>;
   const refs = new Set(facts.cadence.occurrences.map((item) => item.ref));
   const keys = Object.keys(value).sort().join();
   // Recipe 1.2 returns empty text on a quiet day; the tip or nothing is shown instead.
   if ((keys !== "occurrenceRefs,suggestions,text" && keys !== "occurrenceRefs,suggestions,text,tip") || typeof value.text !== "string" || (!v12 && !value.text.trim()) || value.text.length > 2_000 ||
-      !Array.isArray(value.occurrenceRefs) || value.occurrenceRefs.length > 200 ||
-      value.occurrenceRefs.some((ref) => typeof ref !== "string" || !refs.has(ref)) || new Set(value.occurrenceRefs).size !== value.occurrenceRefs.length) {
-    throw new DailyBriefError("advisor_unavailable");
+      !Array.isArray(value.occurrenceRefs) || value.occurrenceRefs.length > 200) {
+    throw adviceRejected("validation_shape");
+  }
+  if (value.occurrenceRefs.some((ref) => typeof ref !== "string" || !refs.has(ref)) || new Set(value.occurrenceRefs).size !== value.occurrenceRefs.length) {
+    throw adviceRejected("validation_unknown_ref");
   }
   const validRefs = (items: unknown, allowed: Set<string>, max: number): items is string[] => Array.isArray(items) && items.length <= max && items.every((item) => typeof item === "string" && allowed.has(item)) && new Set(items).size === items.length;
-  if (!Array.isArray(value.suggestions) || value.suggestions.length > config.alternatives) throw new DailyBriefError("advisor_unavailable");
+  if (!Array.isArray(value.suggestions) || value.suggestions.length > config.alternatives) throw adviceRejected("validation_suggestion");
   const sources = new Set(references.included.map((source) => source.id));
   const selectedOptionIds = new Set<string>();
   const suggestions = value.suggestions.map((item: unknown) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) throw new DailyBriefError("advisor_unavailable");
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw adviceRejected("validation_suggestion");
     const suggestion = item as Record<string, unknown>;
     // Recipe 1.2 move blocks carry no reason text (owner review, October 23); other suggestions need text.
     if (Object.keys(suggestion).sort().join() !== "occurrenceRefs,optionId,referenceIds,text" || typeof suggestion.text !== "string" || (!(v12 && suggestion.optionId !== null) && !suggestion.text.trim()) || suggestion.text.length > 1000 ||
-        !validRefs(suggestion.occurrenceRefs, refs, 200) || !validRefs(suggestion.referenceIds, sources, 4) ||
-        (plan.route !== "priority_suggestions" && plan.route !== "scheduling_options")) throw new DailyBriefError("advisor_unavailable");
+        (plan.route !== "priority_suggestions" && plan.route !== "scheduling_options")) throw adviceRejected("validation_suggestion");
+    if (!validRefs(suggestion.occurrenceRefs, refs, 200) || !validRefs(suggestion.referenceIds, sources, 4)) throw adviceRejected("validation_unknown_ref");
     const option = offeredOptions.find((option) => option.id === suggestion.optionId);
-    if (plan.route === "scheduling_options" ? !option || !suggestion.occurrenceRefs.includes(option.occurrenceRef) : suggestion.optionId !== null) throw new DailyBriefError("advisor_unavailable");
+    if (plan.route === "scheduling_options" ? !option || !suggestion.occurrenceRefs.includes(option.occurrenceRef) : suggestion.optionId !== null) throw adviceRejected("validation_option");
     if (option) {
-      if (selectedOptionIds.has(option.id)) throw new DailyBriefError("advisor_unavailable");
+      if (selectedOptionIds.has(option.id)) throw adviceRejected("validation_option");
       selectedOptionIds.add(option.id);
     }
     // Recipe 1.2 shows the moved Behavior's name in the suggestion's own block.
@@ -228,7 +277,8 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   const tip = validateTip(value.tip ?? null, analysis);
   // Count the text actually shown, including a recipe 1.2 overview Cadence wrote.
   const combined = [text, ...suggestions.map((item) => item.text), ...(tip ? [tip.text] : [])].join(" ");
-  if (combined.length > 2600 || combined.trim().split(/\s+/u).filter(Boolean).length > config.length.maxWords || /https?:|www\./i.test(combined)) throw new DailyBriefError("advisor_unavailable");
+  if (combined.length > 2600 || combined.trim().split(/\s+/u).filter(Boolean).length > config.length.maxWords) throw adviceRejected("validation_word_limit");
+  if (/https?:|www\./i.test(combined)) throw adviceRejected("validation_url");
   const tipFinding = tip ? analysis!.tip! : null;
   if (tipFinding && analysis?.recordFingerprints.length) input.onTip?.(analysis.recordFingerprints);
   const analysisTip: DailyBriefing["tip"] | null = tip && tipFinding ? {
@@ -275,7 +325,14 @@ export type DurationEstimateReport = Readonly<{
   state: "not_requested" | "none_needed" | "ready" | "failed";
   items: readonly DescriptionEstimateItem[];
   estimates: readonly DescriptionEstimate[];
+  /** Ticket 288: internal short code for a failed estimate step; inspector only. */
+  reason?: string;
 }>;
+
+/** Binds a call name to the caller's usage callback; undefined keeps generator input unchanged. */
+function usageReporter(onUsage: ((usage: DailyBriefCallUsage) => void) | undefined, call: DailyBriefModelCall) {
+  return onUsage ? (usage: DailyBriefModelUsage) => onUsage({ call, ...usage }) : undefined;
+}
 
 /**
  * Ticket 188: one bounded estimate call before planning. A failed or malformed reply
@@ -283,7 +340,7 @@ export type DurationEstimateReport = Readonly<{
  */
 async function estimateDurations<T extends AdvisorDayContext>(context: T, config: BriefingConfig, input: Readonly<{
   descriptions?: Readonly<Record<string, string>>; estimate?: DailyBriefGenerator; signal: AbortSignal;
-}>): Promise<Readonly<{ planned: T; report: DurationEstimateReport }>> {
+}>, onUsage?: (usage: DailyBriefModelUsage) => void): Promise<Readonly<{ planned: T; report: DurationEstimateReport }>> {
   if (!isPlainRecipe(config.recipe) || !config.context.duration.includeDescriptionEstimate || !input.descriptions || !input.estimate) {
     return { planned: context, report: { state: "not_requested", items: [], estimates: [] } };
   }
@@ -291,12 +348,13 @@ async function estimateDurations<T extends AdvisorDayContext>(context: T, config
   if (!items.length) return { planned: context, report: { state: "none_needed", items, estimates: [] } };
   try {
     const lanes = isLaneRecipe(config.recipe);
-    const raw = await raceBriefAbort(input.estimate({ instructions: lanes ? `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}` : DURATION_ESTIMATE_INSTRUCTIONS, facts: JSON.stringify({ items }), signal: input.signal, ...(lanes ? { estimateVariant: "alongside" as const } : {}) }), input.signal);
+    const raw = await raceBriefAbort(input.estimate({ instructions: lanes ? `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}` : DURATION_ESTIMATE_INSTRUCTIONS, facts: JSON.stringify({ items }), signal: input.signal, ...(lanes ? { estimateVariant: "alongside" as const } : {}), ...(onUsage ? { onUsage } : {}) }), input.signal);
     const estimates = parseDescriptionEstimates(raw, items, { alongside: lanes });
     return { planned: applyDescriptionEstimates(context, estimates), report: { state: "ready", items, estimates } };
   } catch (error) {
     if (input.signal.aborted) throw error;
-    return { planned: context, report: { state: "failed", items, estimates: [] } };
+    const reason = error instanceof DailyBriefError ? error.reason ?? error.code : "estimate_failed";
+    return { planned: context, report: { state: "failed", items, estimates: [], reason } };
   }
 }
 
@@ -308,17 +366,17 @@ async function estimateDurations<T extends AdvisorDayContext>(context: T, config
 function validateTip(value: unknown, analysis: ReturnType<typeof prepareBriefing>["analysis"]): { text: string; noteRefs: string[] } | null {
   if (value === null) return null;
   const offered = analysis?.modelTip;
-  if (!offered || !value || typeof value !== "object" || Array.isArray(value)) throw new DailyBriefError("advisor_unavailable");
+  if (!offered || !value || typeof value !== "object" || Array.isArray(value)) throw adviceRejected("validation_tip");
   const tip = value as Record<string, unknown>;
   if (Object.keys(tip).sort().join() !== "findingId,noteRefs,text" || tip.findingId !== "tip" ||
       typeof tip.text !== "string" || !tip.text.trim() || tip.text.length > 600 ||
       !Array.isArray(tip.noteRefs) || tip.noteRefs.some((ref) => typeof ref !== "string") || new Set(tip.noteRefs).size !== tip.noteRefs.length) {
-    throw new DailyBriefError("advisor_unavailable");
+    throw adviceRejected("validation_tip");
   }
   const noteRefs = tip.noteRefs as string[];
   const text = tip.text.trim();
   if (offered.laneId !== "notes-failure-themes") {
-    if (noteRefs.length) throw new DailyBriefError("advisor_unavailable");
+    if (noteRefs.length) throw adviceRejected("validation_tip");
     return { text, noteRefs };
   }
   const notes = new Map((offered.notes ?? []).map((note) => [note.ref, note.text]));
