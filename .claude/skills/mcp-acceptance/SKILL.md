@@ -164,7 +164,7 @@ in a fresh shell (Bash-tool agents get one per call); there is nothing to source
 S=.claude/skills/mcp-acceptance/local-stack.mjs; N=cadence-accept-<you>
 node $S up --name $N [--db-base 56150] [--app-port 4450]   # a few minutes
 node $S tier0 --name $N                                     # protocol suite, then the watcher over the same run
-node $S tier1 --name $N [--scenario read-write|step-up]     # headless clients
+node $S tier1 --name $N [--scenario <name>]                 # headless clients; names: npm run -s mcp:accept:clients -- --list
 node $S check --name $N                                     # every grant and token family revoked?
 node $S down --name $N
 ```
@@ -190,6 +190,10 @@ node $S down --name $N
 - **Tier 1 pass:** `tier1 <id>: PASS`. claude-code and inspector must pass;
   claude-ai, anthropic-api and openai-api skip with a named reason (they need a
   public server or keys). Run `--scenario step-up` too when a change touches scopes.
+  Run the skill scenarios (Ticket 291: `skill-check-in-unconfirmed`,
+  `skill-routine-unconfirmed`, `skill-routine-confirmed`; `docs/qa/mcp-server.md`,
+  "Skill-rule scenarios") when a published skill in `integrations/skills/` changes.
+  For those only claude-code must pass; inspector skips because it has no model.
   For readiness only, `node $S exec --name $N -- sh -c 'npm run -s mcp:accept:clients -- --target local --issuer "$CADENCE_ACCEPT_ISSUER" --check --client all'`;
   `--check` starts nothing and creates no run folder.
 - **Cleanup check:** `check` exits 0 with `all revoked`. Anything else means a
