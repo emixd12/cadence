@@ -98,6 +98,18 @@ undelivered, expired and outdated. Server phase spans (`daily_brief.preferences`
 `admission`, `context`, `model`, `finish`, `request`) record duration and error
 code only, when `CADENCE_PERF_LOG=1`.
 
+Ticket 288 (November 9, 2026) adds numbers and short codes to these spans. The
+`daily_brief.model` span records token usage in `counts`: `usage_calls`,
+`input_tokens`, `cached_input_tokens`, `output_tokens` and `reasoning_tokens`,
+summed over the calls that reported usage. A failed span records the same counts
+and an internal `error_reason` beside `error_code`. Reasons name the cause, for
+example `provider_http_5xx`, `provider_incomplete_max_output_tokens`,
+`provider_body_too_large`, `provider_refusal`, `output_not_json`,
+`validation_unknown_ref` or `validation_word_limit`. The public code stays
+`advisor_unavailable` (or `rate_limited` for HTTP 429). `/api/advisor/brief` never
+returns the reason or usage, and the request body sent to OpenAI is unchanged; tests
+prove both. Prompts, facts, model output and provider response IDs are never logged.
+
 Verification: focused Daily Brief suites pass (77 tests). A port-less local
 Postgres 17 container (`supabase/postgres:17.6.1.159`) applied the original and
 new migrations over auth/profile/Calendar stubs. A rollback-free smoke script

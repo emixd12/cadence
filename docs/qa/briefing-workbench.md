@@ -1070,3 +1070,31 @@ lint with zero warnings, web and desktop TypeScript, Vitest (3,153 passed, 94 sk
 the web build pass. Earlier full runs had one desktop release test file exceed its 5 s
 limit under load; it passed alone. No candidate is accepted. No production preset,
 schema or hosted change.
+
+### Ticket 288 usage and failure reasons — November 9, 2026
+
+Each comparison result now carries `usage`: one entry per model call, labeled
+`brief` or `duration_estimate`, with input, cached input, output and reasoning
+token counts. A count the provider did not report is null. A failed result also
+carries `reason`, an internal short code such as `validation_word_limit` or
+`provider_incomplete_max_output_tokens`, beside the unchanged `error` code. Saved
+runs store both as optional fields. Runs saved before this change have neither
+field and still load; the review packet prints "Usage: not recorded" for them.
+
+The top-level `usage` field stays a string for the current UI: `per_result` when
+any result reported usage, otherwise `unavailable`. A failed duration estimate
+records its reason in the inspector's `durationEstimates.reason`. Sequence status
+uses the same `usage` string, and each sequence result carries `usage` and
+`reason`. The review packet prints usage and the reason per run. The sequence
+report prints token totals across all attempts, the number of runs saved without
+usage, and a count per failure reason. Monetary cost is not calculated.
+
+One development-only change: a provider body that is not JSON now records
+`advisor_unavailable` with reason `provider_body_not_json`, where it earlier
+recorded `generation_failed`. Production returns `advisor_unavailable` in both
+cases.
+
+The workbench UI does not show the new fields yet (`app/design-system/` is owned by
+a later package). Verification: provider-free tests with injected generators and
+authored provider responses. No live provider call was made, so no measured token
+figure is recorded here.
