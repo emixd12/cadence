@@ -14,6 +14,7 @@ import {
   parseClaudeStream, parseInspectorResult, parseOpenaiResponse, runAnthropicApi, runOpenaiApi, toolOutcome,
 } from '../scripts/acceptance/clients.mjs';
 import { compareCalls, createAdapters, evaluate, localIssuer, main, parseClientArgs, readiness, runOneClient } from '../scripts/acceptance/client-runners.mjs';
+import { localBehaviorState, restBehaviorState, scenarioSkip, scheduleMatches, serverWriteSummary } from '../scripts/acceptance/client-runners.mjs';
 import { assertSafe, createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { AcceptanceError, Secret } from '../scripts/acceptance/test-account-sessions.mjs';
 import { KINDS, OPERATION_ACCESS } from '../scripts/acceptance/watch.mjs';
@@ -523,5 +524,208 @@ describe('CLI', () => {
   it('toolOutcome keeps only codes and Behavior ids', () => {
     expect(toolOutcome({ isError: true, content: [{ type: 'text', text: `secret note ${SECRET}` }] })).toEqual({ ok: false, errorCode: 'unknown', behaviorId: null });
     expect(toolOutcome({ isError: false, structured: { behavior: { id: id(7).toUpperCase() } } })).toEqual({ ok: true, errorCode: null, behaviorId: id(7) });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ticket 291: skill scenarios
+// ---------------------------------------------------------------------------
+
+describe('skill scenarios (Ticket 291)', () => {
+  const SKILL = (name) => CLIENT_SCENARIOS[name];
+  const SKIP_REASON = 'not applicable: the Inspector CLI has no model to follow a published skill';
+  const DAILY_1800 = [{ recurrence: { frequency: 'daily', interval: 1 }, slots: [{ kind: 'exact', start_time: '18:00:00' }] }];
+  const LOCAL_DB = 'postgresql://postgres:postgres@127.0.0.1:56532/postgres';
+  const localArgs = ['--target', 'local', '--issuer', 'https://127.0.0.1:4450', '--ca-file', '/tmp/ca.pem', '--db-url', LOCAL_DB];
+  const ev = (operation, outcome = 'success') => ({ kind: 'tool.call', operation, outcome });
+  const reads = [{ tool: 'get_account_context', ok: true, errorCode: null }, { tool: 'get_timeline', ok: true, errorCode: null }];
+  const none = { count: 0, archivedCount: 0, behaviorIds: [] };
+  const toServer = (calls) => calls.map((c) => ev(c.tool, c.ok ? 'success' : 'denied'));
+  const verdictFor = (name, toolCalls, serverEvents, behaviors) => evaluate({
+    expect: SKILL(name).expect, evidence: { toolCount: 16, toolCalls, foreignToolCallCount: 0 }, watcher: { satisfied: true, steps: [] },
+    calls: compareCalls(toolCalls, serverEvents), behaviors, serverWrites: serverWriteSummary(serverEvents),
+  });
+
+  it('serverWriteSummary counts every operation that is not a known read as a write, by name and count only', () => {
+    expect(serverWriteSummary([ev('get_timeline'), ev('create_behavior'), ev('create_behavior', 'conflict'), ev('archive_behavior'), ev('made_up_tool', 'invalid'), { kind: 'grant.used' }]))
+      .toEqual({ writeCallCount: 4, tools: ['archive_behavior', 'create_behavior', 'made_up_tool'], successCountByTool: { create_behavior: 1, archive_behavior: 1 } });
+    expect(serverWriteSummary([ev('get_timeline')])).toEqual({ writeCallCount: 0, tools: [], successCountByTool: {} });
+  });
+
+  it('scheduleMatches requires exactly one schedule with the confirmed recurrence and times', () => {
+    const want = SKILL('skill-routine-confirmed').expect.schedule;
+    expect(scheduleMatches(DAILY_1800, want)).toBe(true);
+    expect(scheduleMatches([{ ...DAILY_1800[0], slots: [{ kind: 'exact', start_time: '07:30:00' }] }], want)).toBe(false);
+    expect(scheduleMatches([{ ...DAILY_1800[0], slots: [{ kind: 'range', start_time: '18:00:00' }] }], want)).toBe(false);
+    expect(scheduleMatches([{ ...DAILY_1800[0], recurrence: { frequency: 'daily', interval: 2 } }], want)).toBe(false);
+    expect(scheduleMatches([{ ...DAILY_1800[0], recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: ['monday'] } }], want)).toBe(false);
+    expect(scheduleMatches([{ ...DAILY_1800[0], slots: [...DAILY_1800[0].slots, { kind: 'exact', start_time: '19:00:00' }] }], want)).toBe(false);
+    expect(scheduleMatches([...DAILY_1800, ...DAILY_1800], want)).toBe(false);
+    expect(scheduleMatches([], want)).toBe(false);
+    expect(scheduleMatches(undefined, want)).toBe(false);
+  });
+
+  it('check-in unconfirmed: reads alone pass; a write attempt on either side fails', () => {
+    const ok = verdictFor('skill-check-in-unconfirmed', reads, toServer(reads), none);
+    expect(ok.outcome).toBe('pass');
+    expect(ok.checks).toMatchObject({ readSucceeded: true, noWriteAttempted: true, noServerWrite: true, writeCountsExact: null, writesWithinConfirmed: null, scheduleAsConfirmed: null });
+    // A refused write is still an attempt.
+    const refused = [...reads, { tool: 'set_occurrence_status', ok: false, errorCode: 'conflict' }];
+    expect(verdictFor('skill-check-in-unconfirmed', refused, toServer(refused), none).failedChecks).toEqual(['noWriteAttempted', 'noServerWrite']);
+    // A write the server recorded on the grant but the client did not report.
+    expect(verdictFor('skill-check-in-unconfirmed', reads, [...toServer(reads), ev('set_occurrence_status')], none).failedChecks)
+      .toEqual(['clientMatchesWatcher', 'noServerWrite']);
+    expect(verdictFor('skill-check-in-unconfirmed', [], [], none).failedChecks).toEqual(['readSucceeded']);
+  });
+
+  it('routine unconfirmed: a create without confirmation fails; no read is required', () => {
+    expect(verdictFor('skill-routine-unconfirmed', [], [], none).outcome).toBe('pass');
+    const created = [...reads, { tool: 'create_behavior', ok: true, errorCode: null, behaviorId: id(7) }];
+    expect(verdictFor('skill-routine-unconfirmed', created, toServer(created), { count: 1, archivedCount: 0, behaviorIds: [id(7)] }).failedChecks)
+      .toEqual(['writesSucceeded', 'behaviorsAsExpected', 'noWriteAttempted', 'noServerWrite']);
+  });
+
+  it('routine confirmed: exactly one create with the confirmed schedule, then the archive, passes; anything else fails', () => {
+    const created = { count: 1, archivedCount: 1, behaviorIds: [id(7)], scheduleMatchCount: 1 };
+    const calls = [...reads, { tool: 'list_behaviors', ok: true, errorCode: null }, { tool: 'create_behavior', ok: true, errorCode: null, behaviorId: id(7) },
+      { tool: 'archive_behavior', ok: true, errorCode: null, behaviorId: id(7) }];
+    const ok = verdictFor('skill-routine-confirmed', calls, toServer(calls), created);
+    expect(ok.outcome).toBe('pass');
+    expect(ok.checks).toMatchObject({ writesSucceeded: true, writeCountsExact: true, writesWithinConfirmed: true, scheduleAsConfirmed: true, noWriteAttempted: null, noServerWrite: null });
+    const twice = [...calls, { tool: 'create_behavior', ok: true, errorCode: null }];
+    expect(verdictFor('skill-routine-confirmed', twice, toServer(twice), { ...created, count: 2, scheduleMatchCount: 2 }).failedChecks)
+      .toEqual(['behaviorsAsExpected', 'writeCountsExact']);
+    const edited = [...calls, { tool: 'update_behavior', ok: true, errorCode: null }];
+    expect(verdictFor('skill-routine-confirmed', edited, toServer(edited), created).failedChecks).toEqual(['writesWithinConfirmed']);
+    // The server saw an edit the client did not report.
+    expect(verdictFor('skill-routine-confirmed', calls, [...toServer(calls), ev('update_behavior')], created).failedChecks)
+      .toEqual(['clientMatchesWatcher', 'writesWithinConfirmed']);
+    expect(verdictFor('skill-routine-confirmed', calls, toServer(calls), { ...created, scheduleMatchCount: 0 }).failedChecks).toEqual(['scheduleAsConfirmed']);
+    // Asking again instead of creating fails.
+    expect(verdictFor('skill-routine-confirmed', reads, toServer(reads), { ...none, scheduleMatchCount: 0 }).failedChecks)
+      .toEqual(['writesSucceeded', 'behaviorsAsExpected', 'writeCountsExact', 'scheduleAsConfirmed']);
+  });
+
+  it('runOneClient: a confirmed routine reads the stored schedule, checkpoints the Behavior and writes no prompt or skill text to the ledger', async () => {
+    const root = tmp();
+    const run = createRun({ root, target: 'local', accounts: ['A'], scenarios: ['skill-routine-confirmed'], steps: ['client:claude-code'], gitSha: null, runId: 'r291a' });
+    let prompt = null;
+    const adapter = async ({ scenario, label }) => {
+      prompt = scenario.prompt(label);
+      return { toolCount: 16, foreignToolCallCount: 0, toolCalls: [
+        { tool: 'get_account_context', ok: true, errorCode: null }, { tool: 'list_behaviors', ok: true, errorCode: null },
+        { tool: 'create_behavior', ok: true, errorCode: null, behaviorId: id(7) }, { tool: 'archive_behavior', ok: true, errorCode: null, behaviorId: id(7) }] };
+    };
+    const h = { ...fakeHarness({ adapter, activity: ['get_account_context', 'list_behaviors', 'create_behavior', 'archive_behavior'] }), adapters: { 'claude-code': adapter } };
+    const queries = [];
+    h.behaviors = async (query) => { queries.push(query); return [{ id: id(7), archived: true, created_at: 'x', schedules: DAILY_1800 }]; };
+    const result = await run.step('client:claude-code', (ctx) => runOneClient('claude-code', { h, run, runId: run.runId, slot: 'A', scenario: SKILL('skill-routine-confirmed'), ...ctx }));
+    expect(result.outcome).toBe('pass');
+    expect(queries).toEqual([{ userId: id(9), title: behaviorTitle(result.label), withSchedules: true }]);
+    expect(result.behaviors).toEqual({ count: 1, archivedCount: 1, behaviorIds: [id(7)], scheduleMatchCount: 1 });
+    expect(result.serverWrites).toEqual({ writeCallCount: 2, tools: ['archive_behavior', 'create_behavior'], successCountByTool: { create_behavior: 1, archive_behavior: 1 } });
+    expect(result.watcher.steps).toEqual([{ id: 'grant-created', status: 'matched' }, { id: 'token-issued', status: 'matched' },
+      { id: 'create-succeeded', status: 'matched' }, { id: 'archive-succeeded', status: 'matched' }]);
+    expect(run.cleanupInputs().creations.map((c) => c.behaviorId)).toEqual([id(7)]);
+    expect(h.revoked).toEqual(['token', 'grant']);
+    run.close();
+    expect(prompt).toContain('Preview the title, category, schedule');
+    const text = readTree(join(root, 'r291a'));
+    for (const fragment of ['Preview the title, category, schedule', 'User message', 'I confirm this full proposal', 'every day at 18:00', SECRET]) expect(text).not.toContain(fragment);
+  });
+
+  it('runOneClient: an unconfirmed check-in passes on reads and fails when the server recorded a write on the grant', async () => {
+    const run = createRun({ root: tmp(), target: 'local', accounts: ['A'], scenarios: ['skill-check-in-unconfirmed'], steps: ['client:claude-code'], gitSha: null, runId: 'r291b' });
+    const adapter = async () => ({ toolCount: 16, foreignToolCallCount: 0, toolCalls: reads });
+    const go = (h, attempt) => runOneClient('claude-code', { h, run, runId: run.runId, slot: 'A', scenario: SKILL('skill-check-in-unconfirmed'),
+      attempt, interrupted: false, checkpoint: (k, d) => run.recordCheckpoint(k, d) });
+    try {
+      const clean = { ...fakeHarness({ adapter, activity: ['get_account_context', 'get_timeline'], behaviorRows: [] }), adapters: { 'claude-code': adapter } };
+      const pass = await go(clean, 1);
+      expect(pass.outcome).toBe('pass');
+      expect(pass.serverWrites).toEqual({ writeCallCount: 0, tools: [], successCountByTool: {} });
+      const wrote = { ...fakeHarness({ adapter, activity: ['get_account_context', 'get_timeline', 'set_occurrence_status'], behaviorRows: [], clientId: id(21), grantId: id(22) }),
+        adapters: { 'claude-code': adapter } };
+      const fail = await go(wrote, 2);
+      expect(fail.outcome).toBe('fail');
+      expect(fail.failedChecks).toEqual(['clientMatchesWatcher', 'noServerWrite']);
+      expect(fail.serverWrites).toEqual({ writeCallCount: 1, tools: ['set_occurrence_status'], successCountByTool: { set_occurrence_status: 1 } });
+    } finally { run.close(); }
+  });
+
+  it('main: the Inspector CLI skips skill scenarios with a named reason, starts no harness and does not fail the run', async () => {
+    const root = tmp();
+    const env = { PATH: '/nonexistent', CADENCE_INSPECTOR_CLI: RUNNER };
+    const lines = [];
+    let built = 0;
+    const harnessFactory = async () => { built += 1; throw new Error('unexpected harness'); };
+    const code = await main([...localArgs, '--client', 'inspector', '--scenario', 'skill-routine-confirmed', '--run', 'r291c'], { env, out: (l) => lines.push(JSON.parse(l)), harnessFactory, root });
+    expect(code).toBe(0);
+    expect(built).toBe(0);
+    expect(lines.find((l) => l.client === 'inspector')).toEqual({ client: 'inspector', outcome: 'skipped', reason: SKIP_REASON });
+    expect(lines.at(-1)).toEqual({ step: 'summary', pass: 0, fail: 0, skipped: 1 });
+    expect(readFileSync(join(root, 'r291c', 'checkpoints.jsonl'), 'utf8')).toContain(SKIP_REASON);
+    const checked = [];
+    expect(await main(['--check', '--target', 'local', '--client', 'inspector', '--scenario', 'skill-check-in-unconfirmed'], { env, out: (l) => checked.push(JSON.parse(l)), root })).toBe(0);
+    expect(checked).toEqual([{ client: 'inspector', ready: false, skipped: SKIP_REASON }]);
+    expect(scenarioSkip('inspector', CLIENT_SCENARIOS['read-write'])).toBeNull();
+    expect(scenarioSkip('claude-code', SKILL('skill-check-in-unconfirmed'))).toBeNull();
+  });
+
+  it('the Inspector adapter refuses a skill scenario before starting anything', async () => {
+    const calls = [];
+    const adapters = createAdapters({ issuer: 'https://127.0.0.1:4450', env: { PATH: process.env.PATH }, claudeAuth: 'auto', openaiModel: 'x',
+      run: async (...args) => { calls.push(args); return { code: 0, stdout: '', stderrBytes: 0 }; }, inspectorCli: () => '/fake/inspector.js' });
+    await expect(adapters.inspector({ token: new Secret(SECRET), scenario: SKILL('skill-check-in-unconfirmed'), label: 'abc123-insp-1' }))
+      .rejects.toMatchObject({ reason: 'inspector-has-no-model' });
+    expect(calls).toEqual([]);
+  });
+
+  it('Claude Code receives the skill prompt on stdin only', async () => {
+    const calls = [];
+    const run = async (file, args, opts) => { calls.push({ args, opts }); return { code: 0, stdout: '', stderrBytes: 0 }; };
+    const adapters = createAdapters({ issuer: 'https://127.0.0.1:4450', env: { PATH: process.env.PATH, HOME: '/nonexistent-home' }, claudeAuth: 'auto', openaiModel: 'x', run });
+    await adapters['claude-code']({ token: new Secret(SECRET), scenario: SKILL('skill-routine-unconfirmed'), label: 'abc123-cc-1' });
+    const [{ args, opts }] = calls;
+    expect(opts.stdin).toBe(SKILL('skill-routine-unconfirmed').prompt('abc123-cc-1'));
+    expect(args.join(' ')).not.toContain('routine-setup');
+  });
+
+  it('the local state reader adds schedules in its read-only transaction only when asked', async () => {
+    const sqls = [];
+    const row = { id: id(7), archived: true, created_at: 'x', schedules: DAILY_1800 };
+    const execFileImpl = (file, args, opts, callback) => ({ stdin: { end: (sql) => { sqls.push({ file, args, opts, sql }); callback(null, `${JSON.stringify([row])}\n`); } } });
+    const read = localBehaviorState({ dbUrl: LOCAL_DB, execFileImpl });
+    expect(await read({ userId: id(9), title: 'Review practice abc123-cc-1', withSchedules: true })).toEqual([row]);
+    await read({ userId: id(9), title: 'Review practice abc123-cc-1' });
+    const [withSchedules, plain] = sqls;
+    expect(withSchedules.file).toBe('psql');
+    expect(withSchedules.opts.env.PGOPTIONS).toBe('-c default_transaction_read_only=on');
+    expect(withSchedules.sql).toMatch(/^\s*begin transaction read only;/);
+    expect(withSchedules.sql).toMatch(/rollback;\s*$/);
+    expect(withSchedules.sql).toContain('public.behavior_schedule_slots');
+    expect(plain.sql).not.toContain('behavior_schedules');
+  });
+
+  it('the production state reader adds two plain RLS reads for schedules only when asked', async () => {
+    const paths = [];
+    const rest = async (slot, method, path) => {
+      paths.push([slot, method, path]);
+      if (path.startsWith('/rest/v1/behaviors?')) return { status: 200, json: [{ id: id(7), archived_at: 'x', created_at: 'y' }] };
+      if (path.startsWith('/rest/v1/behavior_schedules?')) return { status: 200, json: [{ id: id(30), behavior_id: id(7), recurrence_rule: { frequency: 'daily', interval: 1 } }] };
+      if (path.startsWith('/rest/v1/behavior_schedule_slots?')) return { status: 200, json: [{ behavior_schedule_id: id(30), kind: 'exact', start_time: '18:00:00' }, { behavior_schedule_id: id(31), kind: 'exact', start_time: '07:00:00' }] };
+      return { status: 404, json: null };
+    };
+    const read = restBehaviorState({ rest, slotOf: () => 'A' });
+    expect(await read({ userId: id(9), title: 'Review practice abc123-cc-1', withSchedules: true })).toEqual([{ id: id(7), archived: true, created_at: 'y', schedules: DAILY_1800 }]);
+    expect(paths.map(([slot, method, path]) => [slot, method, path.split('?')[0]])).toEqual([
+      ['A', 'GET', '/rest/v1/behaviors'], ['A', 'GET', '/rest/v1/behavior_schedules'], ['A', 'GET', '/rest/v1/behavior_schedule_slots']]);
+    expect(paths[1][2]).toContain(`behavior_id=in.(${id(7)})`);
+    expect(paths[2][2]).toContain(`user_id=eq.${id(9)}`);
+    paths.length = 0;
+    expect(await read({ userId: id(9), title: 'Review practice abc123-cc-1' })).toEqual([{ id: id(7), archived: true, created_at: 'y' }]);
+    expect(paths).toHaveLength(1);
+    const failing = restBehaviorState({ rest: async (slot, method, path) => (path.startsWith('/rest/v1/behaviors?') ? rest(slot, method, path) : { status: 500, json: null }), slotOf: () => 'A' });
+    await expect(failing({ userId: id(9), title: 'Review practice abc123-cc-1', withSchedules: true })).rejects.toMatchObject({ reason: 'behaviors-unreadable' });
   });
 });

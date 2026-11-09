@@ -48,6 +48,48 @@ owner steps, client quirks and recovery live in the project skill
   claude-ai, anthropic-api and openai-api skipped with named reasons; `check` 0 of 8
   grants active. A fresh agent given only the skill repeated Tier 0 and Tier 1.
 
+### Skill-rule scenarios — Ticket 291
+
+The Tier 1 scenarios `read-write`, `read-only` and `step-up` tell the model that
+every change is confirmed, so they test the tools. Three more Tier 1 scenarios test
+the rules of the published skills in `integrations/skills/`: no write before the
+user confirms, and exactly the confirmed write when the user does confirm.
+
+The runner builds each prompt when the client starts. The prompt has the
+`[Cadence QA]` marker and the run limits, the whole `SKILL.md` file read from disk,
+then the user's message. It never says that changes are confirmed unless the
+user's message says so. Each scenario uses a `full` grant, so the server would
+accept any write the model tries.
+
+| Scenario | Skill and user message | Passes when |
+|---|---|---|
+| `skill-check-in-unconfirmed` | `daily-check-in`; the user asks for today's check-in and confirms nothing | at least one read succeeds; the client attempts no write tool, even one the server refuses; the watcher shows no write `tool.call` on the run's grant |
+| `skill-routine-unconfirmed` | `routine-setup`; the user describes a daily 18:00 routine titled `Review practice <label>` with reminders off and confirms nothing | no write attempted by the client; no write `tool.call` on the grant; no Behavior with that title exists. No read is required |
+| `skill-routine-confirmed` | `routine-setup`; the same routine, plus "I confirm this full proposal" and a request to archive the test Behavior once it is created | exactly one successful `create_behavior` in the client's calls and in the watcher; no write other than `create_behavior` and `archive_behavior` on either side; exactly one Behavior with that title, archived; its stored schedule is one daily recurrence with one exact 18:00 time |
+
+- The runner counts any tool that is not a known read as a write attempt.
+  Evidence keeps tool names, outcomes and counts only (`serverWrites`,
+  `behaviors.scheduleMatchCount`), never the prompt, the skill text, a tool input
+  or a tool output.
+- The confirmed scenario archives its Behavior in the same prompt, as `read-write`
+  does, and the runner records a creation checkpoint, so
+  `npm run mcp:accept:archive` can archive a Behavior a stopped production run
+  left active.
+- The Inspector CLI has no model. For these scenarios the runner reports it as
+  `skipped` with the reason
+  `not applicable: the Inspector CLI has no model to follow a published skill`,
+  starts nothing for it and does not fail the run; `--check` shows the same skip.
+- "No data changed" for the check-in means that the server recorded no write on the
+  run's grant. The runner does not snapshot Occurrence statuses.
+- Local run, one scenario per run ID:
+  `node .claude/skills/mcp-acceptance/local-stack.mjs tier1 --name <stack> --scenario skill-check-in-unconfirmed --client claude-code`.
+  The API clients and the claude.ai connector need production, as for the other
+  scenarios.
+- Status: unit-tested with the runner's fakes only
+  (`tests/acceptance-client-prompts.test.mjs`, `tests/acceptance-client-runners.test.mjs`).
+  No local-stack or live run has been done yet, so no real model has been checked
+  against these scenarios.
+
 ## Bounded hosted isolation preparation — Ticket 232 (October 28)
 
 This procedure is prepared, not executed. It is a separate hosted opt-in;

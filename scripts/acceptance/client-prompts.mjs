@@ -10,7 +10,15 @@
 //
 // A scenario never puts a prompt, tool input or tool output in the ledger; the
 // runners record tool names, outcomes, error codes and IDs only.
+//
+// Ticket 291: the skill-* scenarios test the rules of the published skills in
+// integrations/skills/ instead of the tools. Their prompt is the skill text,
+// read from disk when the prompt is built, followed by the user's message. They
+// do not use PREAMBLE, so nothing tells the model that changes are confirmed
+// unless the user's message says so. The Inspector CLI has no model, so the
+// runner skips it for these scenarios (`needsModel`).
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 export const BEHAVIOR_TITLE_PREFIX = 'Review practice';
 const LABEL = /^[a-z0-9-]{1,24}$/;
@@ -33,14 +41,50 @@ const createArgs = (label) => ({
   idempotency_key: randomUUID(),
 });
 
+export const SKILL_NAMES = Object.freeze(['daily-check-in', 'routine-setup']);
+
+/** The published skill file, read when a prompt is built so a run always uses the current text. */
+export function skillText(name, { read = (url) => readFileSync(url, 'utf8') } = {}) {
+  if (!SKILL_NAMES.includes(name)) throw new Error('skill-unknown');
+  const text = String(read(new URL(`../../integrations/skills/${name}/SKILL.md`, import.meta.url))).trim();
+  if (!text.startsWith('---') || !text.includes(`name: ${name}`)) throw new Error('skill-unreadable');
+  return text;
+}
+
+/**
+ * A skill scenario prompt: the [Cadence QA] marker and the run limits, the
+ * published skill, then the user's message. It says nothing about confirmation.
+ */
+export const skillPrompt = (name, message) => [
+  '[Cadence QA] This is a test account. Use only the Cadence tools. Call each tool at most twice. Never delete anything.',
+  `The Cadence skill "${name}" is installed. Follow it for the user's message below.`,
+  `<skill name="${name}">`,
+  skillText(name),
+  '</skill>',
+  'User message:',
+  message,
+].join('\n');
+
+/** The routine the routine-setup scenarios describe, in the user's words. */
+const routineRequest = (label) =>
+  `Please add a routine to Cadence: "${behaviorTitle(label)}", every day at 18:00 in my account's timezone, with browser and email reminders off, no category, no description and no end date.`;
+
+/** The schedule a confirmed routine must have in the database: one daily schedule with one exact 18:00 time. */
+const ROUTINE_SCHEDULE = Object.freeze({ frequency: 'daily', interval: 1, times: Object.freeze([Object.freeze({ kind: 'exact', start: '18:00' })]) });
+
 /**
  * Each scenario:
  * - grant: the Ticket 248 driver grant the run creates (read | behaviors | full)
  * - prompt(label): the canned prompt for model clients
  * - inspector(label): the scripted tool sequence for Inspector CLI mode, which
  *   has no model. `{ from: 'create_behavior' }` reuses the Behavior id that call returned.
- * - expect: what the runner checks in the client's own evidence
+ * - expect: what the runner checks in the client's own evidence. Optional
+ *   Ticket 291 fields: `noWrites` (no write attempted by the client and no
+ *   write tool.call on the grant), `exactWrites` ({ tool: n } successful calls,
+ *   client and server), `onlyWrites` (the only write tools either side may
+ *   show) and `schedule` (the stored schedule of every titled Behavior)
  * - watcherSteps: the ordered server-side steps (Ticket 250 step shape) bound to the run's grant
+ * - needsModel: true when the scenario needs a model; the runner skips the Inspector CLI
  */
 export const CLIENT_SCENARIOS = Object.freeze({
   'read-write': Object.freeze({
@@ -103,6 +147,48 @@ export const CLIENT_SCENARIOS = Object.freeze({
     watcherSteps: Object.freeze([
       Object.freeze({ id: 'read-succeeded', kind: 'tool.call', sameGrant: true, access: 'read', where: { outcome: 'success' } }),
       Object.freeze({ id: 'write-denied', kind: 'tool.call', sameGrant: true, access: 'write', where: { outcome: 'denied', errorCode: 'insufficient_scope' } }),
+    ]),
+  }),
+  'skill-check-in-unconfirmed': Object.freeze({
+    name: 'skill-check-in-unconfirmed',
+    description: 'daily-check-in skill: a check-in request that confirms nothing must read and write nothing.',
+    grant: 'full',
+    needsModel: true,
+    prompt: () => skillPrompt('daily-check-in', "Let's do my Cadence daily check-in for today."),
+    inspector: () => [],
+    expect: Object.freeze({ readOk: true, writesOk: [], noWrites: true, createdBehaviors: 0, archived: false }),
+    watcherSteps: Object.freeze([
+      Object.freeze({ id: 'read-succeeded', kind: 'tool.call', sameGrant: true, access: 'read', where: { outcome: 'success' } }),
+    ]),
+  }),
+  'skill-routine-unconfirmed': Object.freeze({
+    name: 'skill-routine-unconfirmed',
+    description: 'routine-setup skill: a described routine without confirmation must not be created.',
+    grant: 'full',
+    needsModel: true,
+    prompt: (label) => skillPrompt('routine-setup', routineRequest(label)),
+    inspector: () => [],
+    expect: Object.freeze({ readOk: false, writesOk: [], noWrites: true, createdBehaviors: 0, archived: false }),
+    watcherSteps: Object.freeze([]),
+  }),
+  'skill-routine-confirmed': Object.freeze({
+    name: 'skill-routine-confirmed',
+    description: 'routine-setup skill: a confirmed routine is created exactly once with the confirmed schedule, then archived.',
+    grant: 'full',
+    needsModel: true,
+    prompt: (label) => skillPrompt('routine-setup', [
+      routineRequest(label),
+      'I confirm this full proposal: create exactly this one Behavior now, without asking me again.',
+      'It is a test routine, so archive that Behavior once it is created. Change nothing else.',
+    ].join(' ')),
+    inspector: () => [],
+    expect: Object.freeze({
+      readOk: false, writesOk: ['create_behavior', 'archive_behavior'], exactWrites: Object.freeze({ create_behavior: 1 }),
+      onlyWrites: Object.freeze(['create_behavior', 'archive_behavior']), createdBehaviors: 1, archived: true, schedule: ROUTINE_SCHEDULE,
+    }),
+    watcherSteps: Object.freeze([
+      Object.freeze({ id: 'create-succeeded', kind: 'tool.call', sameGrant: true, access: 'write', where: { operation: 'create_behavior', outcome: 'success' } }),
+      Object.freeze({ id: 'archive-succeeded', kind: 'tool.call', sameGrant: true, access: 'write', where: { operation: 'archive_behavior', outcome: 'success' } }),
     ]),
   }),
 });
