@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
-import type { BenchCaseSummary } from "@/lib/services/briefing-bench-store";
+import type { BenchCaseSummary, BenchGeneration } from "@/lib/services/briefing-bench-store";
 import type { BriefingSequencePlan, BriefingSequenceStatus } from "@/lib/services/briefing-sequence.service";
 import { BRIEFING_LANE_LABELS } from "@cadence/core/services/briefing-review";
 import { AnalysisSummary, ReadingColumn } from "./BriefingReview";
@@ -13,6 +13,8 @@ const STATE_LABELS: Record<string, string> = { retained: 'Retained rows only', s
 type Props = {
   view: 'compare' | 'days' | 'saved'; mode: 'synthetic' | 'account'; accountRef: string | null;
   preferenceRevision?: number; timezone?: string; blocked: boolean; configs: BriefingConfig[];
+  /** Ticket 290: A and B generation choices; null sends none, so the server uses the production values. */
+  generation?: readonly BenchGeneration[] | null;
   labels: readonly string[]; fixtureId: string; analysisFixtureId: string; cases: readonly BenchCaseSummary[];
   onRefresh: () => void; onOpen: (id: string) => void; onAccountFailure: (error: unknown) => void;
 };
@@ -93,7 +95,7 @@ export function BriefingDays(props: Props) {
   async function simulate(mode: 'daily' | 'diagnostic') {
     setBusy(true); setError(''); setPlan(null); setPlannedInput(null);
     try {
-      const input = { accountRef: props.accountRef, caseIds: selectedCases, configs: props.configs, mode, warmup: [], callBudget,
+      const input = { accountRef: props.accountRef, caseIds: selectedCases, configs: props.configs, ...(props.generation ? { generation: props.generation } : {}), mode, warmup: [], callBudget,
         candidates: props.configs.map((_, index) => ({ id: `cand-${crypto.randomUUID()}`, label: props.labels[index] || (index ? 'Candidate' : 'Baseline'),
           role: index ? 'candidate' : 'baseline', parentCandidateId: null, proposalId: null, rationale: '' })) };
       const value = await request<BriefingSequencePlan>('/api/dev/briefing-sequence', { ...input, action: 'simulate' });
@@ -124,7 +126,7 @@ export function BriefingDays(props: Props) {
     finally { if (active.current) setBusy(false); }
   }
 
-  const planCurrent = !!plannedInput && JSON.stringify(plannedInput.configs) === JSON.stringify(props.configs);
+  const planCurrent = !!plannedInput && JSON.stringify(plannedInput.configs) === JSON.stringify(props.configs) && JSON.stringify(plannedInput.generation ?? null) === JSON.stringify(props.generation ?? null);
   const day = history?.days.find(item => item.localDate === selectedDay);
   return <div hidden={props.view === 'saved'} className="space-y-4">
     <details open={props.view === 'days' ? true : undefined}>
@@ -168,7 +170,7 @@ export function BriefingDays(props: Props) {
         <button type="button" disabled={busy || running || props.blocked || !selectedCases.length} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void simulate('diagnostic')}>Plan previews for each eligible lane</button>
       </div>
       {plan ? <div className="space-y-2" role="status">
-        {!planCurrent ? <p>Configuration changed. Plan again before generating.</p> : null}
+        {!planCurrent ? <p>Configuration or generation changed. Plan again before generating.</p> : null}
         <p>Planned calls: {plan.plannedCalls}. {plan.mode === 'diagnostic' ? 'Diagnostic only: previews bypass ranking and cooldown. Evidence and permission checks still apply.' : 'Complete daily briefs, in chronological order.'}</p>
         <details><summary className="min-h-11 cursor-pointer py-2">Selection simulation</summary><ul className="space-y-2 text-sm">{plan.days.map(day => <li key={day.caseId}><strong>{day.localDate} · {day.evidenceType}</strong><ul>{day.selections.map(side => <li key={side.side}>{side.side ? 'B' : 'A'}: {side.tipId ? 'Observation selected' : 'No observation selected'}; eligible lanes: {side.eligibleLanes.map(lane => BRIEFING_LANE_LABELS[lane]).join(', ') || 'none'}. Cooldown: {side.cooldownDays} days.{side.nextDaySpacing ? '' : ' A different tip may follow the next day.'}</li>)}</ul></li>)}</ul></details>
         <button type="button" disabled={busy || running || props.blocked || !plan.plannedCalls || !planCurrent} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void generate()}>{plan.mode === 'diagnostic' ? 'Preview each lane' : 'Generate daily briefs'}</button>
@@ -178,7 +180,7 @@ export function BriefingDays(props: Props) {
         {running ? <button type="button" className="min-h-11 underline" onClick={() => void cancel()}>Cancel queued work</button> : null}
         <p className="text-sm">Cancellation keeps completed output. Dispatched calls still count and may incur provider charges.</p>
         <ul>{job.results.map((result, index) => <li key={index} className="flex flex-wrap items-center gap-3 border-t text-sm">
-          <span>{result.localDate} · {result.side ? 'B' : 'A'}{result.laneId ? ` · Diagnostic: ${BRIEFING_LANE_LABELS[result.laneId]}` : ''} · {result.state}{result.saved ? '' : ' · Not saved'}{result.error ? ` · ${result.error}` : ''}</span>
+          <span>{result.localDate} · {result.side ? 'B' : 'A'}{result.laneId ? ` · Diagnostic: ${BRIEFING_LANE_LABELS[result.laneId]}` : ''} · {result.state}{result.saved ? '' : ' · Not saved'}{result.error ? ` · ${result.error}` : ''}{result.reason ? ` (${result.reason})` : ''}{result.model ? ` · ${result.model}, effort ${result.effort ?? 'not recorded'}, prompt ${result.promptVariant ?? 'not recorded'}` : ''}</span>
           {result.saved && !result.laneId ? <button type="button" className="min-h-11 underline" onClick={() => props.onOpen(result.caseId)}>Read saved output</button> : <details className="w-full"><summary className="min-h-11 cursor-pointer py-2">{result.laneId ? 'Read diagnostic output' : 'Read unsaved output'}</summary><ReadingColumn side={result.side ? 'B' : 'A'} title={result.laneId ? "Diagnostic only" : "Not saved"} draftChanged={false} run={{ ...result, id: null, label: result.side ? 'Candidate' : 'Baseline' }} /></details>}
         </li>)}</ul>
       </section> : null}

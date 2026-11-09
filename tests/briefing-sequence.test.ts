@@ -254,3 +254,22 @@ it("keeps retrospective schedule coverage partial in both inspector and model in
     expect(result.inspector.plan.dayEvidence.findings.some(finding => finding.kind === "feasible_opportunity")).toBe(false);
   }
 });
+
+it("forwards each side's generation choices to its runs and records them (Ticket 290)", async () => {
+  vi.stubEnv("CADENCE_BRIEFING_BENCH_MODELS", "bench-model-a");
+  await save("case-sequence-0001", "2026-11-02");
+  const { startBriefingSequence } = await import("@/lib/services/briefing-sequence.service");
+  const { DAILY_BRIEF_MODEL } = await import("@/lib/services/daily-brief-openai");
+  const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue(output);
+  const generation = [{}, { model: "bench-model-a", effort: "medium" }];
+  for (const invalid of [[{}, { model: "bench-model-z" }], [{}], [{}, { effort: "low", seed: 1 }]]) {
+    expect((await startBriefingSequence(request(input(["case-sequence-0001"], { action: "simulate", generation: invalid })), generate, store)).status).toBe(400);
+  }
+  const response = await startBriefingSequence(request(input(["case-sequence-0001"], { action: "start", generation })), generate, store);
+  expect(response.status).toBe(202);
+  const job = await waitJob((await response.json()).id);
+  expect(job.results.map(result => [result.side, result.model, result.effort, result.promptVariant])).toEqual([[0, DAILY_BRIEF_MODEL, "low", "layered"], [1, "bench-model-a", "medium", "layered"]]);
+  const detail = await store.readCase("synthetic", "case-sequence-0001");
+  expect(detail.candidates.map(item => item.generation)).toEqual([{ model: DAILY_BRIEF_MODEL, effort: "low", promptVariant: "layered" }, { model: "bench-model-a", effort: "medium", promptVariant: "layered" }]);
+  expect(detail.runs.map(run => run.model)).toEqual([DAILY_BRIEF_MODEL, "bench-model-a"]);
+});

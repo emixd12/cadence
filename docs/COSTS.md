@@ -405,6 +405,22 @@ tokens are part of `input_tokens`; this file does not yet record a cached-input
 price, so treat them at the full input rate until someone checks it. Reasoning
 tokens are part of `output_tokens`.
 
+### Ticket 290 workbench candidate models
+
+The development workbench can run a candidate on another model, another reasoning
+effort or the consolidated prompt. Extra models come only from
+`CADENCE_BRIEFING_BENCH_MODELS`; the source names no model other than
+`DAILY_BRIEF_MODEL`. These choices are workbench-only. A candidate model may cost
+more per call than `gpt-5.6-luna`, and a higher effort usually adds reasoning
+tokens, which bill as output. Check the provider rate for a candidate model before a
+long sequence, and read each run's recorded `usage`. The workbench call budget
+(`CADENCE_BRIEFING_BENCH_CALL_LIMIT`) limits the number of calls, not their price.
+The duration-estimate call keeps the production model and effort.
+
+Nothing changes in production cost. The live Daily Brief still sends
+`DAILY_BRIEF_MODEL` with low effort and the layered prompt; a test pins its request
+body.
+
 ### Ticket 188 candidate duration estimates
 
 Recipes 1.1 and 1.2 can opt into one additional model request before each brief.

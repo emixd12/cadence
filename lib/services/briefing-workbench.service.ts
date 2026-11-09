@@ -8,7 +8,8 @@ import { listBriefingWorkbenchBehaviors, listDailyBriefBehaviorIds, readDailyBri
 import { briefingFixture, BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "./briefing-fixtures";
 import { BRIEFING_PIPELINE_VERSION, briefingConfigurationRevision, prepareBriefing } from "./briefing-pipeline";
 import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefCallUsage, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief, generateOpenAIDurationEstimates } from "./daily-brief-openai";
+import { DAILY_BRIEF_MODEL, DAILY_BRIEF_REASONING_EFFORT, generateOpenAIDailyBrief, generateOpenAIDurationEstimates, OPENAI_REASONING_EFFORTS, type OpenAIReasoningEffort } from "./daily-brief-openai";
+import { DAILY_BRIEF_PROMPT_VARIANTS, dailyBriefPromptRevision, effectiveDailyBriefPromptVariant, type DailyBriefPromptVariant } from "./daily-brief-instructions";
 import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { getDailyBriefSettings } from "./daily-brief.service";
@@ -22,7 +23,7 @@ import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-co
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import {
   benchPartition, BRIEFING_BENCH_MAX_INPUT_BYTES, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
-  type BenchCandidate, type BenchCase, type BenchPartition, type BenchRun, type BriefingBenchStore,
+  type BenchCandidate, type BenchCase, type BenchGeneration, type BenchPartition, type BenchRun, type BriefingBenchStore,
 } from "./briefing-bench-store";
 
 export const json = (body: unknown, status = 200) => Response.json(body, { status, headers: {
@@ -59,6 +60,67 @@ export async function readBriefingWorkbenchAccount(request: Request): Promise<Re
   });
 }
 
+/** Ticket 290: extra workbench models come only from this environment variable. */
+export const BRIEFING_BENCH_MODELS_ENV = "CADENCE_BRIEFING_BENCH_MODELS";
+const BENCH_MODEL_ID = /^[A-Za-z0-9._:-]{1,64}$/;
+const GENERATION_KEYS = ["model", "effort", "promptVariant"];
+
+export type BriefingGenerationOptions = Readonly<{
+  models: readonly string[];
+  efforts: readonly OpenAIReasoningEffort[];
+  promptVariants: readonly DailyBriefPromptVariant[];
+  defaults: BenchGeneration;
+}>;
+
+/** The production model, reasoning effort and prompt variant. A candidate without choices uses these. */
+export function productionGeneration(): BenchGeneration {
+  return { model: DAILY_BRIEF_MODEL, effort: DAILY_BRIEF_REASONING_EFFORT, promptVariant: "layered" };
+}
+
+/**
+ * Ticket 290: what a workbench candidate may choose. Models are DAILY_BRIEF_MODEL plus the
+ * comma-separated IDs in CADENCE_BRIEFING_BENCH_MODELS; IDs that do not match the allowed
+ * pattern are ignored.
+ */
+export function briefingGenerationOptions(env: Readonly<Record<string, string | undefined>> = process.env): BriefingGenerationOptions {
+  const extra = (env[BRIEFING_BENCH_MODELS_ENV] ?? "").split(",").map((item) => item.trim()).filter((item) => BENCH_MODEL_ID.test(item));
+  return { models: [...new Set([DAILY_BRIEF_MODEL, ...extra])], efforts: OPENAI_REASONING_EFFORTS, promptVariants: DAILY_BRIEF_PROMPT_VARIANTS, defaults: productionGeneration() };
+}
+
+/** Development-only: the allowed generation values, so the interface never offers one the server rejects. */
+export function readBriefingGenerationOptions(request: Request): Response {
+  const denied = guard(request);
+  if (denied) return denied;
+  return json(briefingGenerationOptions());
+}
+
+/**
+ * Ticket 290: validates the optional `generation` array, parallel to `configs`. Each item may set
+ * `model`, `effort` and `promptVariant`; an omitted field takes the production value. Unknown keys
+ * and unlisted values are `invalid_request`. Returns null when the request has no `generation`.
+ */
+export function parseGeneration(value: unknown, count: number): BenchGeneration[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length !== count) throw new DailyBriefError("invalid_request");
+  const options = briefingGenerationOptions();
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== "object" || Array.isArray(item) || Object.keys(item).some((key) => !GENERATION_KEYS.includes(key))) throw new DailyBriefError("invalid_request");
+    const entry = item as Record<string, unknown>;
+    // Only an omitted field takes the production value; null or any other non-listed value is rejected.
+    const pick = (key: keyof BenchGeneration) => key in entry ? entry[key] : options.defaults[key];
+    const model = pick("model"), effort = pick("effort"), promptVariant = pick("promptVariant");
+    if (!options.models.includes(model as string) || !options.efforts.includes(effort as OpenAIReasoningEffort) ||
+        !options.promptVariants.includes(promptVariant as DailyBriefPromptVariant)) throw new DailyBriefError("invalid_request");
+    return { model: model as string, effort: effort as string, promptVariant: promptVariant as DailyBriefPromptVariant };
+  });
+}
+
+/** Candidate identity: a candidate saved before Ticket 290 used the production values. */
+export function sameGeneration(saved: BenchGeneration | undefined, requested: BenchGeneration): boolean {
+  const left = saved ?? productionGeneration();
+  return left.model === requested.model && left.effort === requested.effort && left.promptVariant === requested.promptVariant;
+}
+
 export type BriefingComparisonOptions = Readonly<{
   reservation?: BriefingBenchReservation;
   shown?: readonly (readonly Readonly<{ fingerprint: string; lastShownLocalDate: string }>[] )[];
@@ -92,7 +154,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
     const isObject = !!value && typeof value === "object" && !Array.isArray(value);
     const accountMode = isObject && value.mode === "account";
     const savedMode = isObject && value.mode === "saved";
-    const keys = isObject ? Object.keys(value).filter((key) => key !== "review").sort().join() : "";
+    const keys = isObject ? Object.keys(value).filter((key) => key !== "review" && key !== "generation").sort().join() : "";
     if (!isObject ||
         (savedMode ? keys !== "accountRef,configs,mode" : accountMode ? keys !== "accountRef,configs,mode,preferenceRevision" && keys !== "accountRef,configs,descriptionsConfirmed,mode,preferenceRevision" : keys !== "configs,fixtureId" && keys !== "analysisFixtureId,configs,fixtureId") ||
         (accountMode && value.descriptionsConfirmed !== undefined && value.descriptionsConfirmed !== true) ||
@@ -103,6 +165,9 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         !Array.isArray(value.configs) || (savedMode ? value.configs.length < 1 || value.configs.length > 2 : value.configs.length !== 2) ||
         (savedMode && value.review === undefined)) throw new DailyBriefError("invalid_request");
     const configs = value.configs.map(parseBriefingConfig) as BriefingConfig[];
+    // Ticket 290: null keeps today's request exactly; recorded values then are the production ones.
+    const chosen = parseGeneration(value.generation, configs.length);
+    const generation = chosen ?? configs.map(productionGeneration);
     const estimating = configs.map(estimatesDurations);
     const descriptionsConfirmed = accountMode && value.descriptionsConfirmed === true && estimating.some(Boolean);
     const review = value.review === undefined ? null : parseReview(value.review, configs.length);
@@ -147,7 +212,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         const revisions = effectiveConfigs.map(briefingConfigurationRevision);
         const frozenClock = !account;
         let persisted = review ? await startReview(store, partition, review, {
-          saved: saved?.case ?? null, configs, revisions, contexts,
+          saved: saved?.case ?? null, configs, revisions, contexts, generation,
           source: account ? { mode: "account", accountRef: ownerRef!, preferenceRevision: preferences!.revision }
             : { mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
           capture: account ? {
@@ -185,11 +250,14 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           let retainedFingerprints: readonly string[] = [];
           // Ticket 288: token usage per model call of this run, including calls whose output was rejected.
           const usage: DailyBriefCallUsage[] = [];
+          // Ticket 290: what this run sends. "consolidated" changes only recipes 1.1 and 1.2.
+          const promptVariant = effectiveDailyBriefPromptVariant(generation[index]!.promptVariant, config);
+          const used = { model: generation[index]!.model, effort: generation[index]!.effort, promptVariant, promptRevision: dailyBriefPromptRevision(promptVariant) };
           const record = async (entry: { state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; error?: string; reason?: string; validation: string }) => {
             if (!persisted || !review) return null;
             const id = randomUUID();
             const run: BenchRun = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "run", id, caseId: review.caseId, candidateId: review.candidates[index]!.id, attemptId,
-              createdAt: new Date().toISOString(), ...entry, usage: [...usage], latencyMs: Date.now() - start, model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION,
+              createdAt: new Date().toISOString(), ...entry, usage: [...usage], latencyMs: Date.now() - start, ...used,
               configurationRevision: revisions[index]!, pipelineVersion: BRIEFING_PIPELINE_VERSION, inspector: inspected(),
               ...(options.sequenceId ? { evaluation: { sequenceId: options.sequenceId, mode: options.diagnosticLane ? "diagnostic" as const : "daily" as const,
                 ...(options.diagnosticLane ? { laneId: options.diagnosticLane, label: "Diagnostic preview: bypasses cross-lane ranking and cooldown. Evidence and validation still apply." } : {}), retainedFingerprints } } : {}) };
@@ -206,11 +274,14 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
               if (account) await raceBriefAbort(account.assertCurrent(), input.signal);
               if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, input.signal), input.signal);
             };
+            // The estimate step keeps the production model and effort (Ticket 290).
             const estimate = options.estimate ?? generate ?? ((payload: Parameters<DailyBriefGenerator>[0]) => generateOpenAIDurationEstimates(payload, { apiKey: process.env.OPENAI_API_KEY! }));
+            const override = chosen ? { model: chosen[index]!.model, effort: chosen[index]!.effort as OpenAIReasoningEffort } : {};
             const briefing = await generateDailyBrief(context, { config, signal: modelSignal, analysis,
+              ...(chosen ? { promptVariant: chosen[index]!.promptVariant } : {}),
               // Saved and synthetic cases replay on their captured clock; production keeps live freshness checks.
               planningNow: context.capturedAt, now: frozenClock ? () => captured : () => Temporal.Now.instant(),
-              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY! })))(input), recheck(input)),
+              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY!, ...override })))(input), recheck(input)),
               ...(descriptions ? { descriptions, estimate: (input: Parameters<DailyBriefGenerator>[0]) => reservation.dispatch(input.signal, () => estimate(input), recheck(input)) } : {}),
               onUsage: (item) => { usage.push(item); },
               onPrepared: (value) => { planned = value; } });
@@ -219,7 +290,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             retainedFingerprints = briefing.tip ? prepared.analysis?.recordFingerprints ?? [] : [];
             if (!options.diagnosticLane) options.onRetainedTip?.(index, retainedFingerprints, context.localDate);
             const runId = await record({ state: "ready", briefing, validation: "passed" });
-            results.push({ state: "ready", briefing, inspector: inspected(), latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints, usage: [...usage] });
+            results.push({ state: "ready", briefing, inspector: inspected(), latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints, usage: [...usage], ...used });
           } catch (error) {
             const cancelled = signal.aborted;
             const code = cancelled ? "cancelled" : error instanceof DailyBriefError ? error.code : "generation_failed";
@@ -228,7 +299,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             // Development-only: the internal reason is saved and returned here, never by the production route.
             const reason = !cancelled && error instanceof DailyBriefError && error.reason ? error.reason : undefined;
             const runId = await record({ state, error: code, ...(reason ? { reason } : {}), validation });
-            results.push({ state, error: code, ...(reason ? { reason } : {}), inspector: inspected(), latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [], usage: [...usage] });
+            results.push({ state, error: code, ...(reason ? { reason } : {}), inspector: inspected(), latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [], usage: [...usage], ...used });
             if (code === "access_denied" || code === "context_changed") throw error;
           }
         }
@@ -244,6 +315,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           fixtureId: source?.mode === "account" || accountMode ? null : fixtureId, fixtureVersion: source?.mode === "account" || accountMode ? null : BRIEFING_FIXTURE_VERSION,
           analysisFixtureId: source?.mode === "account" || accountMode ? null : analysisFixtureId ?? null, analysisFixtureVersion: source?.mode === "account" || accountMode ? null : BRIEFING_ANALYSIS_FIXTURE_VERSION,
           // `usage` stays a string for the workbench UI; per-call counts are on each result.
+          // Top-level model and prompt revision are the production values; each result carries what it used (Ticket 290).
           model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION, usage: results.some((result) => result.usage.length) ? "per_result" : "unavailable", results,
           cancelled: signal.aborted, dispatchedCalls: reservation.used, budget: briefingBenchBudget().snapshot(),
           ...(review ? { review: { caseId: review.caseId, saved: persisted === true && runIds.length === results.length, runIds, candidateIds: review.candidates.map((candidate) => candidate.id) } } : {}) };
@@ -286,6 +358,8 @@ type ReviewStart = Readonly<{
   configs: readonly BriefingConfig[];
   revisions: readonly string[];
   contexts: readonly AdvisorDayContextV1[];
+  /** Ticket 290: resolved generation choices, parallel to `configs`. */
+  generation: readonly BenchGeneration[];
   source: BenchCase["source"];
   capture: BenchCase["capture"] | null;
   inputs: BenchCase["inputs"] | null;
@@ -313,13 +387,13 @@ async function startReview(store: BriefingBenchStore, partition: BenchPartition,
     const existing = input.saved ? (await store.readCase(partition, review.caseId)).candidates : [];
     for (const [index, candidate] of review.candidates.entries()) {
       const previous = existing.find((item) => item.id === candidate.id);
-      if (previous && (previous.configurationRevision !== input.revisions[index] || previous.label !== candidate.label.trim() ||
+      if (previous && (previous.configurationRevision !== input.revisions[index] || !sameGeneration(previous.generation, input.generation[index]!) || previous.label !== candidate.label.trim() ||
           previous.role !== candidate.role || previous.parentCandidateId !== candidate.parentCandidateId ||
           previous.proposalId !== candidate.proposalId || previous.rationale !== candidate.rationale.trim())) throw new DailyBriefError("invalid_request");
       if (previous) continue;
       const record: BenchCandidate = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "candidate", id: candidate.id, caseId: review.caseId, createdAt,
         label: candidate.label.trim(), role: candidate.role, parentCandidateId: candidate.parentCandidateId, proposalId: candidate.proposalId,
-        rationale: candidate.rationale.trim(), config: input.configs[index]!, configurationRevision: input.revisions[index]! };
+        rationale: candidate.rationale.trim(), config: input.configs[index]!, configurationRevision: input.revisions[index]!, generation: input.generation[index]! };
       await store.append(partition, review.caseId, "candidates", record);
     }
     return true;
