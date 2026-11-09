@@ -115,7 +115,7 @@
     "@cadence-fixture/supabase-js": "npm:@supabase/supabase-js@2.107.0",
     "@modelcontextprotocol/client": "2.3.1",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
