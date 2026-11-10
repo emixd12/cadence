@@ -20,6 +20,7 @@ type TimelineProps = Readonly<{
   stopTimeTrackingAction: TimeTrackingFormAction;
   resetTimeTrackingAction: TimeTrackingFormAction;
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
+  dayNoteAction?: OccurrenceFormAction;
   dayProgress?: DayProgressContext;
   onDayChange?: () => void;
   liveCalendar?: boolean;
@@ -36,6 +37,7 @@ export function Timeline({
   stopTimeTrackingAction,
   resetTimeTrackingAction,
   shortcutsByBehavior = {},
+  dayNoteAction,
   dayProgress,
   onDayChange,
   liveCalendar = false,
@@ -78,6 +80,8 @@ export function Timeline({
                   resetTimeTrackingAction={resetTimeTrackingAction}
                   shortcutsByBehavior={shortcutsByBehavior}
                   variant="needsDecisionDialog"
+                  dayNoteAction={dayNoteAction}
+                  dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
                 />
               ))}
             </div>
@@ -93,6 +97,7 @@ export function Timeline({
           stopTimeTrackingAction={stopTimeTrackingAction}
           resetTimeTrackingAction={resetTimeTrackingAction}
           shortcutsByBehavior={shortcutsByBehavior}
+          dayNoteAction={dayNoteAction}
           onDayChange={onDayChange}
           liveCalendar={liveCalendar}
           travelAccountId={travelAccountId}

@@ -12,7 +12,7 @@ vi.mock("../apps/desktop/src/local-generation.service", async (original) => ({
 it("loads the visible window and prior unresolved occurrences with bounded duration history", async () => {
   mocks.command.mockImplementation(async (operation: string) => {
     if (operation === "readProfile") return { id: "owner", timezone: "America/New_York" };
-    if (operation === "readBehaviorGraphs" || operation === "readCategories" || operation === "readOccurrences") return [];
+    if (operation === "readBehaviorGraphs" || operation === "readCategories" || operation === "readOccurrences" || operation === "readDayNotes") return [];
     if (operation === "readOccurrenceHistory") return { statusEvents: [], timeSessions: [] };
     throw new Error(operation);
   });

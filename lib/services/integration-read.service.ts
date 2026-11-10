@@ -24,6 +24,9 @@ import { ensureUserOccurrencesFresh } from "./occurrence.service";
 import { readOccurrenceSyncState } from "./occurrence-sync-state.service";
 import { integrationInstant, serializeIntegrationBehavior, serializeIntegrationOccurrence } from "./integration-read-serialization";
 import type { Occurrence } from "@/lib/types/database";
+import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
+import { listDayNotes } from "@cadence/core/services/day-note.service";
+import { dayNotesByDate } from "@cadence/core/resolvers/day-note.resolver";
 
 export class IntegrationReadError extends Error {
   readonly error: IntegrationError;
@@ -174,12 +177,14 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
   const end = Temporal.PlainDate.from(start).add({ days: days - 1 }).toString();
   const lookback = Temporal.PlainDate.from(account.today).subtract({ days: L.needsDecisionLookbackDays }).toString();
   const includeNeedsDecision = input.include_needs_decision !== false;
-  const [range, backlog] = await Promise.all([
+  const [range, backlog, dayNoteRows] = await Promise.all([
     readIntegrationOccurrences(context.supabase, context.userId, { startLocalDate: start, endLocalDate: end }),
     includeNeedsDecision ? readIntegrationOccurrences(context.supabase, context.userId, {
       startLocalDate: lookback, endLocalDate: Temporal.PlainDate.from(account.today).subtract({ days: 1 }).toString(),
     }) : Promise.resolve([]),
+    listDayNotesInRange(context.supabase, context.userId, { from: start, to: end }),
   ]);
+  const dayNotes = dayNotesByDate(dayNoteRows);
   const rows = [...new Map([...range, ...backlog].map((row) => [row.id, row])).values()];
   const timeline = resolvePersistedTimeline({
     behaviors: account.behaviors, occurrences: rows, timeSessions: [], now: account.now,
@@ -195,8 +200,22 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
     needs_decision: includeNeedsDecision ? { occurrences: needs, total_count: needs.length, truncated: false, lookback_start_local_date: lookback } : null,
     days: timeline.daySections.map((day) => ({
       local_date: day.localDate, is_today: day.localDate === account.today,
+      day_note: dayNotes[day.localDate] ?? null,
       occurrences: day.occurrences.map((row) => serialized.get(row.id)!),
     })), freshness: account.freshness,
+  };
+}
+
+export async function listIntegrationDayNotes(context: IntegrationContext, input: IntegrationOperationInput<"list_day_notes">): Promise<IntegrationOperationOutput<"list_day_notes">> {
+  const account = await readAccount(context);
+  const rows = await listDayNotes({ listDayNotes: (range) => listDayNotesInRange(context.supabase, context.userId, range) },
+    { from: input.start_local_date, to: input.end_local_date });
+  return {
+    timezone: account.timezone,
+    day_notes: rows.filter((row) => row.note !== null).map((row) => ({
+      id: row.id, local_date: row.local_date, note: row.note,
+      revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at),
+    })),
   };
 }
 

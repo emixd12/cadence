@@ -17,8 +17,9 @@ import { integrationInstant, serializeIntegrationBehavior, serializeIntegrationO
 import { invalidateBehaviorData } from "@/lib/cache/stable-user-data.cache";
 import type { Occurrence } from "@/lib/types/database";
 import { integrationBehaviorInput } from "./integration-behavior-input";
+import { resolveDayNoteUpdate } from "@cadence/core/resolvers/day-note.resolver";
 
-export type WriteOperationName = "set_occurrence_status" | "update_occurrence_note" | "create_behavior" |
+export type WriteOperationName = "set_occurrence_status" | "update_occurrence_note" | "update_day_note" | "create_behavior" |
   "update_behavior" | "archive_behavior" | "restore_behavior";
 export type WriteOperationResult<N extends WriteOperationName> =
   | { ok: true; value: IntegrationOperationOutput<N> }
@@ -109,6 +110,26 @@ async function performWrite<N extends WriteOperationName>(
   }
 }
 
+function replayTargetIds(replay: IntegrationOperationOutput<WriteOperationName>): string[] {
+  if ("occurrence" in replay) return [replay.occurrence.id];
+  if ("behavior" in replay) return [replay.behavior.id];
+  return replay.day_note ? [replay.day_note.id] : [];
+}
+
+/** Day notes have no Behavior or Occurrence graph; the transaction builds its own receipt. */
+async function applyDayNoteWrite(
+  context: IntegrationContext, input: IntegrationOperationInput<"update_day_note">, requestHash: string,
+): Promise<unknown> {
+  const plan = resolveDayNoteUpdate({ localDate: input.local_date, expectedNote: "", note: input.note });
+  const { data, error } = await context.supabase.rpc("integration_apply_day_note_write", {
+    p_key: (input.idempotency_key ?? null) as string, p_hash: requestHash, p_local_date: plan.localDate,
+    p_note: plan.note as string, p_expected_revision: (input.expected_revision ?? null) as string,
+  });
+  if (error) throw Object.assign(new Error(error.message), error);
+  if (!data || typeof data !== "object" || Array.isArray(data) || !("receipt" in data)) throw new Error("Invalid write result");
+  return data.receipt;
+}
+
 function checkRevision(expected: string | undefined, actual: string) {
   if (expected !== undefined && expected !== integrationInstant(actual)) {
     fail("conflict", "This record changed. Read it again before saving.");
@@ -166,8 +187,12 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
         committed = true;
         recover = true;
         await recordIntegrationActivity(context.supabase, { operation: name,
-          targetIds: ["occurrence" in replay ? replay.occurrence.id : replay.behavior.id], outcome: "success", errorCode: null });
+          targetIds: replayTargetIds(replay), outcome: "success", errorCode: null });
       } else claim = key;
+    }
+    if (!receipt && name === "update_day_note") {
+      receipt = await applyDayNoteWrite(context, input as IntegrationOperationInput<"update_day_note">, requestHash);
+      committed = true;
     }
     if (!receipt) {
       const writer = createIntegrationWriteClient(context.supabase, {

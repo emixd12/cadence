@@ -76,6 +76,12 @@ Still deferred:
 Promote these separately only when their own scope is approved. Ticket 134
 capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
+## Day notes in the Daily Brief
+
+The owner wants the Daily Brief to read day notes (Ticket 292) as part of a later
+Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
+before any day note reaches a provider.
+
 ## Public product surfaces
 
 Cadence's public-product direction is documented in

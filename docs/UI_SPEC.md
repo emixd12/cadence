@@ -579,6 +579,15 @@ of sending the user back to the top of the Timeline.
 
 Do not show previous days except for unresolved prior-day items inside the Needs decision modal.
 
+### Day notes (Ticket 292)
+
+Under each Timeline day's date, including future days and Needs decision day
+sections, a quiet disclosure reads "Add day note", or "Day note" followed by a
+one-line preview when a note exists. Opening it shows the shared note editor with the
+label "Day note", the placeholder "Add a note about this day", accepted day-note
+shortcut chips, and Save note. Saving refreshes the Timeline; a conflict keeps the
+draft and shows the factual conflict message. No modal and no status controls.
+
 ## Disclosure controls
 
 Use native `details` and `summary` for hide/show sections and drawer-like

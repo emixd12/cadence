@@ -6,11 +6,11 @@ import type { IntegrationContext } from "@/lib/integrations/request-context";
 import {
   IntegrationReadError, getIntegrationAccountContext, listIntegrationBehaviors, getIntegrationBehavior,
   listIntegrationCategories, getIntegrationTimeline, listIntegrationOccurrences, getIntegrationOccurrence,
-  getIntegrationAdherenceSummary, searchIntegrationRecords, fetchIntegrationRecord,
+  getIntegrationAdherenceSummary, searchIntegrationRecords, fetchIntegrationRecord, listIntegrationDayNotes,
 } from "@/lib/services/integration-read.service";
 
 export type ReadOperationName = "get_account_context" | "list_behaviors" | "get_behavior" | "list_categories" |
-  "get_timeline" | "list_occurrences" | "get_occurrence" | "get_adherence_summary" | "search" | "fetch";
+  "get_timeline" | "list_occurrences" | "get_occurrence" | "list_day_notes" | "get_adherence_summary" | "search" | "fetch";
 export type ReadOperationResult<N extends ReadOperationName> =
   | { ok: true; value: IntegrationOperationOutput<N> }
   | { ok: false; error: IntegrationError };
@@ -45,6 +45,7 @@ export const readOperationHandlers = {
   get_timeline: handler("get_timeline", getIntegrationTimeline),
   list_occurrences: handler("list_occurrences", listIntegrationOccurrences),
   get_occurrence: handler("get_occurrence", getIntegrationOccurrence),
+  list_day_notes: handler("list_day_notes", listIntegrationDayNotes),
   get_adherence_summary: handler("get_adherence_summary", getIntegrationAdherenceSummary),
   search: handler("search", searchIntegrationRecords),
   fetch: handler("fetch", fetchIntegrationRecord),

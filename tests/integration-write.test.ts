@@ -26,9 +26,29 @@ describe("integration write boundary", () => {
       const result = await handler({ ...context, actor: { ...context.actor, grantedScopes: ["cadence.read"] } }, {});
       expect(result).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });
     }
-    expect(recordIntegrationActivity).toHaveBeenCalledTimes(6);
+    expect(recordIntegrationActivity).toHaveBeenCalledTimes(7);
     expect(beginIdempotentWrite).not.toHaveBeenCalled();
     expect(getBehaviorById).not.toHaveBeenCalled();
+  });
+  it("writes a day note through one transaction with the normalized note and returns its receipt", async () => {
+    const output = { local_date: "2026-10-18", changed: true, day_note: { id, local_date: "2026-10-18", note: "Travel day",
+      revision: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z" } };
+    const rpc = vi.fn().mockResolvedValue({ data: { receipt: { version: 2, output_json: JSON.stringify(output) } }, error: null });
+    const result = await writeOperationHandlers.update_day_note({ ...context, supabase: { rpc } } as unknown as IntegrationContext,
+      { local_date: "2026-10-18", note: "  Travel day \r\n" });
+    expect(result).toEqual({ ok: true, value: output });
+    expect(rpc).toHaveBeenCalledWith("integration_apply_day_note_write", expect.objectContaining({
+      p_key: null, p_local_date: "2026-10-18", p_note: "Travel day", p_expected_revision: null,
+    }));
+    const cleared = vi.fn().mockResolvedValue({ data: { receipt: { version: 2, output_json: JSON.stringify({ local_date: "2026-10-18", changed: false, day_note: null }) } }, error: null });
+    await writeOperationHandlers.update_day_note({ ...context, supabase: { rpc: cleared } } as unknown as IntegrationContext, { local_date: "2026-10-18", note: "" });
+    expect(cleared).toHaveBeenCalledWith("integration_apply_day_note_write", expect.objectContaining({ p_note: null }));
+  });
+  it("maps a day note compare-and-set failure to conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "integration_conflict" } });
+    expect(await writeOperationHandlers.update_day_note({ ...context, supabase: { rpc } } as unknown as IntegrationContext,
+      { local_date: "2026-10-18", note: "x", expected_revision: "2026-10-18T11:00:00Z" }))
+      .toMatchObject({ ok: false, error: { code: "conflict" } });
   });
   it("returns contract errors for invalid status and malformed create", async () => {
     expect(await writeOperationHandlers.set_occurrence_status(context, { occurrence_id: id, status: "missed" }))

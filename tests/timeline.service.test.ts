@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   listTimeSessionsByOccurrenceIds: vi.fn(),
   resolveGenerationWindow: vi.fn(),
   resolveTimeline: vi.fn(),
+  listDayNotesInRange: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -47,6 +48,9 @@ vi.mock("@/lib/db/timeSessions.repo", () => ({
   listTimeSessionHistory: mocks.listTimeSessionHistory,
   listTimeSessionsByOccurrenceIds: mocks.listTimeSessionsByOccurrenceIds,
 }));
+vi.mock("@/lib/db/dayNotes.repo", () => ({
+  listDayNotesInRange: mocks.listDayNotesInRange,
+}));
 vi.mock("@/lib/resolvers/occurrence.resolver", () => ({
   resolveGenerationWindow: mocks.resolveGenerationWindow,
 }));
@@ -77,6 +81,7 @@ describe("timeline service time-session routing", () => {
       endLocalDate: "2026-09-07",
     });
     mocks.resolveTimeline.mockReturnValue({ kind: "timeline-view" });
+    mocks.listDayNotesInRange.mockResolvedValue([]);
   });
 
   it("keeps the arbitrary-ID repository contract", async () => {

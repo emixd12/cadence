@@ -203,6 +203,7 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "place_marker", snapshot.placeMarkers ?? []);
   add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
   add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
+  add(entities, "day_note", snapshot.dayNotes ?? []);
   return entities;
 }
 

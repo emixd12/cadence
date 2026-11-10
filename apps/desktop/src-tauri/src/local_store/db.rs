@@ -117,6 +117,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "completion_place_labels",
         include_str!("../../migrations/0020_completion_place_labels.sql"),
     ),
+    (
+        21,
+        "day_notes",
+        include_str!("../../migrations/0021_day_notes.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {

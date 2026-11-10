@@ -2263,3 +2263,39 @@ fn account_sync_applies_place_label_rows_in_dependency_order() {
     ] }).unwrap_err();
     assert!(!failure.is_empty());
 }
+
+#[test]
+fn day_notes_save_edit_clear_and_reject_stale_writes() {
+    let mut fixture = Fixture::new();
+    let save = |date: &str, expected: Value, note: Value| {
+        json!({"operation":"saveDayNote","newId":id(900),"localDate":date,"expectedNote":expected,"note":note})
+    };
+    let first = fixture.run(save("2026-08-31", Value::Null, json!("Travel day")), 301).unwrap();
+    assert_eq!(first["note"], "Travel day");
+    assert_eq!(first["revision"], 1);
+    assert_eq!(first["id"], id(900));
+    // A stale expected note returns null and writes nothing.
+    assert!(fixture.run(save("2026-08-31", json!("Other"), json!("Overwrite")), 302).unwrap().is_null());
+    assert!(fixture.run(save("2026-08-31", Value::Null, json!("Overwrite")), 303).unwrap().is_null());
+    let edited = fixture.run(save("2026-08-31", json!("Travel day"), json!("Travel day, slept badly")), 304).unwrap();
+    assert_eq!(edited["revision"], 2);
+    assert_eq!(edited["id"], id(900));
+    // Replaying the same mutation returns the journaled result.
+    assert_eq!(fixture.run(save("2026-08-31", json!("Travel day"), json!("Travel day, slept badly")), 304).unwrap(), edited);
+    let cleared = fixture.run(save("2026-08-31", json!("Travel day, slept badly"), Value::Null), 305).unwrap();
+    assert!(cleared["note"].is_null());
+    assert_eq!(cleared["revision"], 3);
+    assert_eq!(fixture.count("day_notes"), 1);
+    // Clearing a day without a note writes nothing; future days are allowed.
+    assert!(fixture.run(save("2026-09-01", Value::Null, Value::Null), 306).unwrap().is_null());
+    fixture.run(json!({"operation":"saveDayNote","newId":id(901),"localDate":"2027-01-01","expectedNote":null,"note":"Rest day"}), 307).unwrap();
+    assert_eq!(fixture.count("day_notes"), 2);
+    // Invalid notes and dates are rejected.
+    assert!(fixture.run(save("2026-09-02", Value::Null, json!("   ")), 308).is_err());
+    assert!(fixture.run(save("2026-09-02", Value::Null, json!("a".repeat(2001))), 309).is_err());
+    assert!(fixture.run(save("2026-02-30", Value::Null, json!("x")), 310).is_err());
+    let profile = fixture.profile.clone();
+    let read = execute(&mut fixture.db, serde_json::from_value(json!({"operation":"readDayNotes","profileId":profile,"startLocalDate":"2026-08-01","endLocalDate":"2026-12-31"})).unwrap()).unwrap();
+    assert_eq!(read.as_array().unwrap().len(), 1);
+    assert!(read[0]["note"].is_null());
+}

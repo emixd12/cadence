@@ -37,6 +37,8 @@ const LIMIT_LABELS: Record<keyof typeof INTEGRATION_LIMITS, string> = {
   maxRecurrenceInterval: "Recurrence interval (input)",
   maxDefaultDurationMinutes: "Default duration (minutes)",
   maxOccurrenceNoteLength: "Occurrence note length",
+  maxDayNoteLength: "Day note length",
+  maxDayNoteRangeDays: "`list_day_notes` maximum date range (days, inclusive)",
   maxArchiveNoteLength: "Archive note length",
   maxCursorLength: "Cursor length",
   maxRevisionLength: "Revision length",

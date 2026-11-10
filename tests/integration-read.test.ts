@@ -8,8 +8,9 @@ import type { Occurrence } from "@/lib/types/database";
 
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), occurrences: vi.fn(), categories: vi.fn(), occurrence: vi.fn(),
-  events: vi.fn(), sessions: vi.fn(), references: vi.fn(), fresh: vi.fn(), sync: vi.fn(),
+  events: vi.fn(), sessions: vi.fn(), references: vi.fn(), fresh: vi.fn(), sync: vi.fn(), dayNotes: vi.fn(),
 }));
+vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes }));
 vi.mock("@/lib/services/behavior.service", () => ({ getBehaviorReadDataForUser: mocks.account }));
 vi.mock("@/lib/services/occurrence.service", () => ({ ensureUserOccurrencesFresh: mocks.fresh }));
 vi.mock("@/lib/services/occurrence-sync-state.service", () => ({ readOccurrenceSyncState: mocks.sync }));
@@ -59,13 +60,17 @@ beforeEach(() => {
     source_capture_method: "system_generated", recorded_at: at, effective_at: null, local_date: "2026-03-08", timezone: "America/New_York" }]);
   mocks.sessions.mockResolvedValue([{ id: id(50), user_id: id(1), started_at: "2026-03-08T07:00:00Z", stopped_at: "2026-03-08T07:10:00Z" }]);
   mocks.fresh.mockResolvedValue({ synced: true });
+  mocks.dayNotes.mockResolvedValue([
+    { id: id(60), user_id: id(1), local_date: "2026-03-08", note: "Travel day", revision: 2, created_at: at, updated_at: at },
+    { id: id(61), user_id: id(1), local_date: "2026-03-07", note: null, revision: 3, created_at: at, updated_at: at },
+  ]);
   mocks.sync.mockResolvedValue({ stale: false, timezone: "America/New_York", last_synced_local_date: "2026-03-08", synced_through_local_date: "2026-04-07" });
 });
 
 const inputs: Record<ReadOperationName, unknown> = {
   get_account_context: {}, list_behaviors: {}, get_behavior: { behavior_id: id(10) }, list_categories: {},
   get_timeline: {}, list_occurrences: range, get_occurrence: { occurrence_id: id(30) }, get_adherence_summary: range,
-  search: { query: "air" }, fetch: { id: `occurrence:${id(30)}` },
+  list_day_notes: range, search: { query: "air" }, fetch: { id: `occurrence:${id(30)}` },
 };
 function assertAllowed(value: unknown): void {
   if (Array.isArray(value)) { value.forEach(assertAllowed); return; }

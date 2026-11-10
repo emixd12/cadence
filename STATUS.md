@@ -47,6 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) in source on branch `note-add`; not merged or deployed | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, then hosted migrations with owner authorization | TICKETS, Ticket 292; STATUS, "Ticket 292: day notes in progress — November 10, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
 | Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
 | Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
@@ -82,6 +83,37 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 292: day notes in progress — November 10, 2026
+
+Approved by the owner on November 10. Web day notes are implemented in source: the
+`day_notes` table and `save_day_note` function (migration
+`20261110120000_day_notes.sql`), the shared `NoteEditor`, the day-note control under
+every Timeline date, the core resolver and service with tests, and day notes in web
+Full JSON and BehaviorLog exports (one-day `review` records that pass the reference
+validator). Local verification on November 10: a clean local stack (project
+`habit-tracking-app`, network `cadence-local`, through the reviewed Docker proxy)
+applied every migration including `20261110120000`, with every published port on
+`127.0.0.1`. `tests/sql/ticket-292-day-notes.sql` passed: owner-only reads, revoked
+direct writes, compare-and-set saves, clear keeps the row, future days, and no access
+for a second account or `anon`. A catalog read matched the hand-written
+`database.types.ts` entries; `gen types --local` was not run because the proxy policy
+rejects the `postgres-meta` image. MCP contract 1.1.0 adds `list_day_notes`, `update_day_note` and `day_note` on
+`get_timeline` days (migration `20261110130000_day_note_integration_writes.sql`); its
+SQL fixture and the local read and write integration suites (39 tests) pass.
+Desktop: SQLite migration 0021, the native `readDayNotes`/`saveDayNote` commands and
+the desktop Timeline control are implemented; account sync contract 3 adds the
+`day_note` kind (hosted migration `20261110140000`), with same-date merges described in
+`docs/DESKTOP_DATA_MODEL.md`. All 125 Rust tests, the sync resolver tests and the hosted
+account-sync SQL fixtures pass locally. Installed-app acceptance has not run.
+Desktop export includes day notes like web. A clean local start replayed all 99
+migrations with loopback-only ports, and the day-note, account-sync and write-replay SQL
+fixtures passed (November 10).
+Open in this ticket: day-note shortcuts, restore/import of day-note reviews, day notes
+in MCP `search`/`fetch`, and installed-app acceptance. The desktop native
+store and SQL verification need the Rust toolchain and Docker.
+
+Platform impact: web, MCP and desktop (local and sync) implemented in source; marketing not applicable; future mobile deferred. Messaging impact: P-028.
 
 ## Agent-architecture run: Tickets 286–291 — November 9, 2026
 

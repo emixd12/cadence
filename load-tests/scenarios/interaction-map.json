@@ -1354,6 +1354,11 @@
       "reason": "Accepted shortcut insertion changes only an in-browser Note draft; ordinary Note saves own the guarded mutation route."
     },
     {
+      "id": "INT-TIMELINE-012",
+      "classification": "not_load_bearing",
+      "reason": "A day note is at most a few saves per user per day through the same guarded Timeline Server Action pattern as INT-TIMELINE-008; Timeline loads add one indexed day_notes range read."
+    },
+    {
       "id": "INT-BEHAVIOR-029",
       "classification": "destructive_serial_only",
       "reason": "Behavior shortcut commands need isolated owner, revision, suppression, and sync verification."

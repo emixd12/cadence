@@ -246,6 +246,9 @@ export const locationTextInput = () =>
 export const occurrenceNoteInput = () =>
   string({ maxLength: L.maxOccurrenceNoteLength, pattern: MULTI_LINE, description: "Note text. An empty string clears the note." });
 
+export const dayNoteInput = () =>
+  string({ maxLength: L.maxDayNoteLength, pattern: MULTI_LINE, description: "Day note text. An empty string clears the day note." });
+
 export const archiveNoteInput = () =>
   string({ maxLength: L.maxArchiveNoteLength, pattern: MULTI_LINE, description: "Optional reason or context for archiving." });
 

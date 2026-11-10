@@ -13,7 +13,8 @@ const DEFAULT_TIMEZONE = "America/New_York";
 // which also omits Behavior Where (Ticket 215) and completion place labels (Ticket 216).
 export function firstLinkIncludesTravel(snapshot: AccountSyncSnapshot): boolean {
   return snapshot.entities.some(({ kind, value }) => {
-    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal") return true;
+    // BehaviorLog import does not restore day notes (Ticket 292), so they also need the private path.
+    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal" || kind === "day_note") return true;
     const row = object(value);
     // Learned travel habits (Ticket 217) have a revision once anything was learned.
     if (kind === "profile") return !!(row.travel_enabled || row.base_location_text || row.travel_mode ||

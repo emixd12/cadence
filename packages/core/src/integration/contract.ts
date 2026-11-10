@@ -43,6 +43,8 @@ export function validateOperationInput<N extends IntegrationOperationName>(
 
   const maxRange = name === "list_occurrences"
     ? INTEGRATION_LIMITS.maxOccurrenceRangeDays
+    : name === "list_day_notes"
+      ? INTEGRATION_LIMITS.maxDayNoteRangeDays
     : name === "get_adherence_summary"
       ? INTEGRATION_LIMITS.maxAdherenceRangeDays
       : null;

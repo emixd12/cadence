@@ -868,3 +868,53 @@ describe("Ticket 216 place label synchronization", () => {
       .some(({ kind }) => kind === "completion_place_label")).toBe(false);
   });
 });
+
+describe("day note synchronization (Ticket 292)", () => {
+  const dayNote = (id: string, note: string | null, overrides: Record<string, string | number | null> = {}): AccountSyncEntity => ({
+    kind: "day_note", id, value: { id, local_date: "2026-11-10", note, revision: 1,
+      created_at: "2026-11-10T12:00:00Z", updated_at: "2026-11-10T12:00:00Z", user_id: "owner", ...overrides },
+  });
+  const notes = (result: ReturnType<typeof plan>) => result.mergedEntities.filter(({ kind }) => kind === "day_note")
+    .map(({ id, value }) => ({ id, note: (value as Record<string, unknown>).note }));
+
+  it("copies a new day note in either direction", () => {
+    const toHosted = plan(empty, snapshot([dayNote("d1", "Travel day")]), empty);
+    expect(toHosted.hostedWrites).toEqual([expect.objectContaining({ kind: "day_note", id: "d1", operation: "upsert", expected: null })]);
+    const toLocal = plan(empty, empty, snapshot([dayNote("d1", "Travel day")]));
+    expect(toLocal.localWrites).toEqual([expect.objectContaining({ kind: "day_note", id: "d1", operation: "upsert" })]);
+  });
+
+  it("sends concurrent edits of the same day note to conflict review", () => {
+    const base = snapshot([dayNote("d1", "Travel day")]);
+    const result = plan(base, snapshot([dayNote("d1", "Local edit", { revision: 2 })]), snapshot([dayNote("d1", "Hosted edit", { revision: 2 })]));
+    expect(result.conflicts).toEqual([expect.objectContaining({ kind: "day_note", id: "d1", reason: "concurrent_update" })]);
+  });
+
+  it("merges two new notes for the same date into the hosted row without losing either text", () => {
+    const result = plan(empty, snapshot([dayNote("local", "Slept badly", { updated_at: "2026-11-10T13:00:00Z" })]),
+      snapshot([dayNote("hosted", "Travel day", { revision: 2 })]));
+    expect(result.conflicts).toEqual([]);
+    expect(notes(result)).toEqual([{ id: "hosted", note: "Travel day\n\nSlept badly" }]);
+    const merged = result.mergedEntities.find(({ kind }) => kind === "day_note")!.value as Record<string, unknown>;
+    expect(merged).toMatchObject({ revision: 3, updated_at: "2026-11-10T13:00:00.000000Z" });
+    expect(result.localWrites.map(({ id, operation }) => `${operation}:${id}`)).toEqual(["delete:local", "upsert:hosted"]);
+    expect(result.hostedWrites).toEqual([expect.objectContaining({ kind: "day_note", id: "hosted", operation: "upsert" })]);
+  });
+
+  it("keeps the hosted row unchanged when both devices wrote the same text", () => {
+    const result = plan(empty, snapshot([dayNote("local", "Travel day")]), snapshot([dayNote("hosted", "Travel day")]));
+    expect(notes(result)).toEqual([{ id: "hosted", note: "Travel day" }]);
+    expect(result.hostedWrites).toEqual([]);
+  });
+
+  it("refuses to merge same-date notes that would exceed the limit", () => {
+    expect(() => plan(empty, snapshot([dayNote("local", "a".repeat(1500))]), snapshot([dayNote("hosted", "b".repeat(1500))])))
+      .toThrow("Shorten one so both fit in 2,000 characters");
+  });
+
+  it("rejects invalid day note rows", () => {
+    expect(() => plan(empty, snapshot([dayNote("d1", "   ")]), empty)).toThrow("The synced day note is invalid.");
+    expect(() => plan(empty, snapshot([dayNote("d1", "x", { local_date: "2026-02-30" })]), empty)).toThrow("The synced day note is invalid.");
+    expect(() => plan(empty, snapshot([{ kind: "day_note", id: "d1", value: { id: "d1", note: "x" } }]), empty)).toThrow("Update Cadence before synchronizing day notes.");
+  });
+});

@@ -16,6 +16,7 @@ export type BehaviorConfigurationEvent =
 export type BehaviorSchedule = Tables<"behavior_schedules">;
 export type BehaviorScheduleSlot = Tables<"behavior_schedule_slots">;
 export type Occurrence = Tables<"occurrences">;
+export type DayNote = Tables<"day_notes">;
 export type OccurrenceSyncState = Tables<"occurrence_sync_state">;
 export type OccurrenceTimeSession = Tables<"occurrence_time_sessions">;
 export type OccurrenceStatusEvent = Tables<"occurrence_status_events">;

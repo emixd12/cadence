@@ -87,7 +87,8 @@ pub fn snapshot(db: &Connection, profile_id: &str) -> Result<Value> {
         "travelSettings":super::travel::read_value(db,profile_id)?,
         "placeLabelSettings":db::owned::<PlaceLabelSettings>(db,profile_id)?,"placeMarkers":db::owned::<PlaceMarker>(db,profile_id)?,
         "completionPlaceLabels":db::owned::<CompletionPlaceLabel>(db,profile_id)?,
-        "whereSuggestionDismissals":db::owned::<WhereSuggestionDismissal>(db,profile_id)?
+        "whereSuggestionDismissals":db::owned::<WhereSuggestionDismissal>(db,profile_id)?,
+        "dayNotes":super::day_note::owned_if_present(db,profile_id)?
     }))
 }
 

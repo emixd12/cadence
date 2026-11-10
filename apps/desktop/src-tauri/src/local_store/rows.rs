@@ -577,3 +577,21 @@ impl StoredRow for WhereSuggestionDismissal {
     const JSON_COLUMNS: &'static [&'static str] = &[];
     const BOOL_COLUMNS: &'static [&'static str] = &[];
 }
+
+/// Ticket 292: one note per calendar date; never attached to an Occurrence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DayNote {
+    pub id: String,
+    pub user_id: String,
+    pub local_date: String,
+    pub note: Option<String>,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+impl StoredRow for DayNote {
+    const TABLE: &'static str = "day_notes";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}

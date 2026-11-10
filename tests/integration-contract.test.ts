@@ -113,11 +113,13 @@ describe("integration operation registry", () => {
       "get_timeline",
       "list_occurrences",
       "get_occurrence",
+      "list_day_notes",
       "get_adherence_summary",
       "search",
       "fetch",
       "set_occurrence_status",
       "update_occurrence_note",
+      "update_day_note",
       "create_behavior",
       "update_behavior",
       "archive_behavior",
@@ -125,15 +127,17 @@ describe("integration operation registry", () => {
     ]);
   });
 
-  it("uses contract version 1.0.0 everywhere", () => {
-    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.0.0");
-    for (const [, operation] of operations) expect(operation.since).toBe("1.0.0");
+  it("uses contract version 1.1.0 and records when each tool arrived", () => {
+    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.1.0");
+    for (const [name, operation] of operations) {
+      expect(operation.since, name).toBe(name === "list_day_notes" || name === "update_day_note" ? "1.1.0" : "1.0.0");
+    }
   });
 
   it("maps every tool to one of the three scopes as the Spec requires", () => {
     expect(INTEGRATION_SCOPE_LIST).toEqual(["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"]);
     const byScope = (scope: string) => operations.filter(([, operation]) => operation.scope === scope).map(([name]) => name);
-    expect(byScope(INTEGRATION_SCOPES.occurrencesWrite)).toEqual(["set_occurrence_status", "update_occurrence_note"]);
+    expect(byScope(INTEGRATION_SCOPES.occurrencesWrite)).toEqual(["set_occurrence_status", "update_occurrence_note", "update_day_note"]);
     expect(byScope(INTEGRATION_SCOPES.behaviorsWrite)).toEqual(["create_behavior", "update_behavior", "archive_behavior", "restore_behavior"]);
     for (const [, operation] of operations) {
       expect(operation.access === "read").toBe(operation.scope === INTEGRATION_SCOPES.read);
@@ -162,7 +166,7 @@ describe("integration operation registry", () => {
       }
     }
     const destructive = operations.filter(([, operation]) => operation.annotations.destructiveHint).map(([name]) => name);
-    expect(destructive).toEqual(["set_occurrence_status", "update_occurrence_note", "update_behavior", "archive_behavior", "restore_behavior"]);
+    expect(destructive).toEqual(["set_occurrence_status", "update_occurrence_note", "update_day_note", "update_behavior", "archive_behavior", "restore_behavior"]);
     expect(INTEGRATION_OPERATIONS.create_behavior.annotations.idempotentHint).toBe(false);
   });
 
@@ -355,7 +359,7 @@ describe("integration errors", () => {
     for (const code of INTEGRATION_ERROR_CODES) {
       const error = createIntegrationError(code, `Example ${code}.`, { retryAfterSeconds: code === "rate_limited" ? 30 : undefined });
       expect(validateAgainstSchema(integrationErrorSchema.schema, error).ok, code).toBe(true);
-      expect(error.contract_version).toBe("1.0.0");
+      expect(error.contract_version).toBe("1.1.0");
     }
   });
 

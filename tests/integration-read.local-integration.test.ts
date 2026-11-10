@@ -86,6 +86,7 @@ localDescribe("integration reads with two isolated accounts", () => {
       get_account_context: {}, list_behaviors: {}, get_behavior: { behavior_id: behaviorA }, list_categories: {},
       get_timeline: {}, list_occurrences: { start_local_date: today, end_local_date: today }, get_occurrence: { occurrence_id: occurrenceA },
       get_adherence_summary: { start_local_date: "2000-01-01", end_local_date: "2000-01-03" },
+      list_day_notes: { start_local_date: today, end_local_date: today },
       search: { query: "Private note" }, fetch: { id: `occurrence:${occurrenceA}` },
     };
     for (const name of Object.keys(inputs) as ReadOperationName[]) {

@@ -77,3 +77,18 @@ export type OccurrenceDataStore = {
     usedShortcut?: boolean;
   }): Promise<OccurrenceRecord | null>;
 };
+
+export type DayNoteSaveCommit = {
+  localDate: string;
+  expectedNote: string | null;
+  note: string | null;
+  usedShortcut?: boolean;
+};
+
+// Day notes belong to a calendar date, never to an Occurrence. Adapters are scoped
+// to one authorized web user or the stable local profile and compare-and-set on
+// the stored note text. A null result means the stored note changed.
+export type DayNoteDataStore = {
+  listDayNotes(range: { from: string; to: string }): Promise<import("./resolvers/day-note.resolver").DayNoteRecord[]>;
+  saveDayNote(input: DayNoteSaveCommit): Promise<import("./resolvers/day-note.resolver").DayNoteRecord | null>;
+};
