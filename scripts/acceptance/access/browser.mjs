@@ -36,16 +36,49 @@ export async function withOneTab(attach, fn) {
   }
 }
 
-/** A JSON route needs no app code: 200 means the cookie session is valid, 401 means signed out. */
-export async function cadenceWebStatus(page) {
-  const response = await page.goto(`${ORIGIN}/api/google-calendar/connection`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-  return response?.status() ?? 0;
+const AUTH_COOKIE = /^sb-[a-z0-9]+-auth-token(?:\.(\d+))?$/;
+
+/**
+ * The user ID in Cadence's Supabase auth cookie, which may be split into `.0`, `.1` chunks
+ * and may carry a `base64-` prefix. Read in memory only; never printed. The server's 200
+ * on the JSON route vouches for the same cookie.
+ */
+export function cookieUserId(cookies) {
+  const auth = cookies.flatMap((cookie) => {
+    const match = AUTH_COOKIE.exec(cookie.name ?? '');
+    return match ? [{ chunk: match[1] === undefined ? -1 : Number(match[1]), value: String(cookie.value ?? '') }] : [];
+  });
+  const whole = auth.find(({ chunk }) => chunk === -1);
+  const raw = whole ? whole.value : auth.sort((left, right) => left.chunk - right.chunk).map(({ value }) => value).join('');
+  if (!raw) return null;
+  try {
+    const session = JSON.parse(raw.startsWith('base64-') ? Buffer.from(raw.slice(7), 'base64url').toString('utf8') : raw);
+    if (typeof session?.user?.id === 'string') return session.user.id;
+    const payload = String(session?.access_token ?? '').split('.')[1];
+    const sub = payload ? JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')).sub : null;
+    return typeof sub === 'string' ? sub : null;
+  } catch { return null; }
 }
 
-export function classifyCadenceWeb(status) {
-  if (status === 200) return { code: PROBE.PRESENT, detail: 'signed in' };
+/** A JSON route needs no app code: 200 means the cookie session is valid, 401 means signed out. */
+export async function cadenceWebStatus(page, context) {
+  const response = await page.goto(`${ORIGIN}/api/google-calendar/connection`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  const status = response?.status() ?? 0;
+  return { status, userId: status === 200 ? cookieUserId(await context.cookies(ORIGIN)) : null };
+}
+
+/** Present only when the session belongs to the requested slot's account. */
+export function classifyCadenceWeb({ status, userId }, wantUserId) {
+  if (status === 200 && userId === wantUserId) return { code: PROBE.PRESENT, detail: 'signed in as the slot account' };
+  if (status === 200 && userId) return { code: PROBE.MISSING, detail: 'signed in as another account' };
+  if (status === 200) return { code: PROBE.ERROR, detail: 'session account unreadable' };
   if (status === 401) return { code: PROBE.MISSING, detail: 'signed out' };
   return { code: PROBE.ERROR, detail: `status ${status}` };
+}
+
+/** Signs the profile out of Cadence only, so /login does not redirect into another account's session. */
+export async function clearCadenceSession(context) {
+  await context.clearCookies({ name: AUTH_COOKIE, domain: new URL(ORIGIN).hostname });
 }
 
 export function classifyPermission(state, expect) {
@@ -103,8 +136,9 @@ export async function main(argv, { out = (line) => process.stdout.write(`${line}
         return signedIn[flags.site] ? finish(out, PROBE.PRESENT, { detail: 'signed in' }) : finish(out, PROBE.MISSING, { detail: 'signed out' });
       } finally { await detach(); }
     }
+    const want = PRODUCTION.accounts[flags.slot]?.userId;
     if (command === 'cadence-web') {
-      const { code, detail } = classifyCadenceWeb(await withOneTab(attach, cadenceWebStatus));
+      const { code, detail } = classifyCadenceWeb(await withOneTab(attach, cadenceWebStatus), want);
       return finish(out, code, { detail });
     }
     if (command === 'permission') {
@@ -116,8 +150,17 @@ export async function main(argv, { out = (line) => process.stdout.write(`${line}
       return finish(out, code, { detail });
     }
     const email = PRODUCTION.accounts[flags.slot].email.toLowerCase();
-    const result = await withOneTab(attach, (page) => cadenceSignIn(page, { email }));
-    if (result === 'signed-in') return finish(out, RENEW.RENEWED, { detail: 'signed in' });
+    const result = await withOneTab(attach, async (page, context) => {
+      const before = await cadenceWebStatus(page, context);
+      if (before.status === 200 && before.userId === want) return 'signed-in';
+      if (before.status === 200) await clearCadenceSession(context);
+      const outcome = await cadenceSignIn(page, { email });
+      if (outcome !== 'signed-in') return outcome;
+      const after = await cadenceWebStatus(page, context);
+      return after.status === 200 && after.userId === want ? 'signed-in' : 'wrong-account';
+    });
+    if (result === 'signed-in') return finish(out, RENEW.RENEWED, { detail: 'signed in as the slot account' });
+    if (result === 'wrong-account') return finish(out, RENEW.ERROR, { detail: 'signed in as another account' });
     if (result === 'phone-prompt') return finish(out, RENEW.NEEDS_OWNER, { detail: 'sign-in stopped: phone-prompt', stop: 'phone-prompt' });
     return finish(out, RENEW.ERROR, { detail: 'sign-in timed out' });
   } catch (error) {

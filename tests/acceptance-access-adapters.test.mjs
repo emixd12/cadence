@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { main as agentStep } from '../scripts/acceptance/access/agent-step.mjs';
-import { classifyPermission, main as browser } from '../scripts/acceptance/access/browser.mjs';
+import { classifyPermission, cookieUserId, main as browser } from '../scripts/acceptance/access/browser.mjs';
 import { main as cadenceSession } from '../scripts/acceptance/access/cadence-session.mjs';
 import { classifyConsent, main as calendar } from '../scripts/acceptance/access/calendar.mjs';
 import { main as connection } from '../scripts/acceptance/access/connection.mjs';
@@ -17,7 +17,7 @@ import { signInStop } from '../scripts/acceptance/access/lib.mjs';
 import { main as record } from '../scripts/acceptance/access/record.mjs';
 import { main as vault } from '../scripts/acceptance/access/vault.mjs';
 import { CLIENT_ACCOUNT, CLIENT_SERVICE, TOKEN_SERVICE } from '../scripts/acceptance/google-calendar-fixtures.mjs';
-import { AcceptanceError } from '../scripts/acceptance/test-account-sessions.mjs';
+import { AcceptanceError, PRODUCTION } from '../scripts/acceptance/test-account-sessions.mjs';
 
 const FAKE_VALUE = 'fake-secret-value-0001';
 
@@ -133,6 +133,14 @@ describe('calendar.mjs', () => {
 });
 
 /** A fake attached profile whose one tab reports `url` and `content`, and counts tabs. */
+function authCookies(userId, { chunks = 1, prefix = true } = {}) {
+  const json = JSON.stringify({ access_token: 'header.payload.signature', user: { id: userId } });
+  const value = prefix ? `base64-${Buffer.from(json).toString('base64url')}` : json;
+  if (chunks === 1) return [{ name: 'sb-abc-auth-token', value }];
+  const size = Math.ceil(value.length / chunks);
+  return Array.from({ length: chunks }, (_, index) => ({ name: `sb-abc-auth-token.${index}`, value: value.slice(index * size, (index + 1) * size) })).reverse();
+}
+
 function fakeProfile({ url = 'https://myaccount.google.com/', content = '', status = 200, permission = 'granted', cookies = [] } = {}) {
   const tabs = { opened: 0, closed: 0 };
   const page = {
@@ -143,7 +151,7 @@ function fakeProfile({ url = 'https://myaccount.google.com/', content = '', stat
     evaluate: vi.fn(async () => permission),
     close: vi.fn(async () => { tabs.closed += 1; }),
   };
-  const context = { newPage: vi.fn(async () => { tabs.opened += 1; return page; }), cookies: vi.fn(async () => cookies) };
+  const context = { newPage: vi.fn(async () => { tabs.opened += 1; return page; }), cookies: vi.fn(async () => cookies), clearCookies: vi.fn(async () => {}) };
   const detach = vi.fn(async () => {});
   const attach = vi.fn(async () => ({ context, detach }));
   return { attach, page, tabs, detach };
@@ -280,12 +288,22 @@ describe('browser.mjs', () => {
   });
 
   it('reads the Cadence web session from a JSON route in one tab', async () => {
-    const ok = fakeProfile({ status: 200 });
+    const ok = fakeProfile({ status: 200, cookies: authCookies(PRODUCTION.accounts.A.userId) });
     expect(await browser(['cadence-web', '--slot', 'A'], { attach: ok.attach, out: () => {} })).toBe(0);
     expect(ok.tabs).toEqual({ opened: 1, closed: 1 });
     expect(ok.page.goto.mock.calls[0][0]).toBe('https://app.cadence-me.com/api/google-calendar/connection');
     expect(await browser(['cadence-web', '--slot', 'A'], { attach: fakeProfile({ status: 401 }).attach, out: () => {} })).toBe(21);
     expect(await browser(['cadence-web', '--slot', 'A'], { attach: fakeProfile({ status: 500 }).attach, out: () => {} })).toBe(1);
+  });
+
+  it('reports another account session as missing, never as the slot session', async () => {
+    const asB = fakeProfile({ status: 200, cookies: authCookies(PRODUCTION.accounts.B.userId) });
+    expect(await browser(['cadence-web', '--slot', 'A'], { attach: asB.attach, out: () => {} })).toBe(21);
+    expect(await browser(['cadence-web', '--slot', 'A'], { attach: fakeProfile({ status: 200 }).attach, out: () => {} })).toBe(1);
+    expect(await browser(['cadence-signin', '--slot', 'B'], { attach: asB.attach, out: () => {} })).toBe(0);
+    expect(cookieUserId(authCookies('user-1', { chunks: 2 }))).toBe('user-1');
+    expect(cookieUserId(authCookies('user-1', { prefix: false }))).toBe('user-1');
+    expect(cookieUserId([{ name: 'sb-abc-auth-token', value: 'base64-not-json' }])).toBeNull();
   });
 
   it('reads permissions on robots.txt so no app code runs', async () => {

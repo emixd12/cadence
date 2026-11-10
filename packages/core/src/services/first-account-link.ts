@@ -77,5 +77,7 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
     snapshot.importedNotes.length > 0 || snapshot.importedInterventions.length > 0 ||
     (snapshot.reminderDeliveries?.length ?? 0) > 0 ||
     (snapshot.noteShortcutStates?.length ?? 0) > 0 ||
-    (snapshot.placeLabelSettings?.length ?? 0) > 0;
+    (snapshot.placeLabelSettings?.length ?? 0) > 0 ||
+    // A day note row, even a cleared one, is local data the hydrate path would drop (Ticket 292).
+    (snapshot.dayNotes?.length ?? 0) > 0;
 }

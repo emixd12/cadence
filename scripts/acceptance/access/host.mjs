@@ -17,8 +17,15 @@ import { PROBE, USAGE, cliMain, finish, parseFlags, runProcess } from './lib.mjs
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
 const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 
+// PATH is the operating system's command search path, not Cadence configuration, so it
+// stays out of .env.example (an empty PATH= line there would break shells that load it).
+function systemPath() {
+  const { PATH = '' } = process.env;
+  return PATH;
+}
+
 /** True when an executable named `name` is in one of PATH's folders. Runs no shell. */
-export function onPath(name, pathValue = process.env.PATH ?? '') {
+export function onPath(name, pathValue = systemPath()) {
   return String(pathValue).split(delimiter).filter((dir) => isAbsolute(dir)).some((dir) => {
     try { accessSync(join(dir, name), constants.X_OK); return true; } catch { return false; }
   });
