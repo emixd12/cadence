@@ -84,6 +84,12 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "day notes",
+    resolver: "packages/core/src/resolvers/day-note.resolver.ts",
+    test: "tests/day-note.resolver.test.ts",
+    source: "docs/TICKETS.md",
+  },
+  {
     domain: "Note shortcuts",
     resolver: "packages/core/src/resolvers/note-suggestion.resolver.ts",
     test: "tests/note-suggestion.resolver.test.ts",

@@ -261,6 +261,16 @@ The resolver has no I/O or clock access. Behavior services, export/import
 resolvers, account-sync validation, and tests may call it. Paired checks live in
 `tests/archive-note.resolver.test.ts`; see Ticket 125 and `docs/DATA_MODEL.md`.
 
+## Day notes (Ticket 292)
+
+`packages/core/src/resolvers/day-note.resolver.ts` owns day-note date parsing,
+normalization, the character limit, read ranges, and Timeline attachment.
+`tests/day-note.resolver.test.ts` pairs its checks with the shared
+`services/day-note.service.ts`, which orchestrates the owner-scoped
+`DayNoteDataStore`. Web and desktop adapters compare-and-set on the stored note.
+UI, MCP handlers and repositories must not normalize or validate day notes
+themselves. The resolver has no I/O or clock access.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

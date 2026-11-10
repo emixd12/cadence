@@ -1882,6 +1882,85 @@ step 2, drives 0.1.8's own updater to 0.1.9. The owner quits Cadence for the swa
 Platform impact: desktop, Mac 0.1.9 publication. Web, marketing and future mobile: not
 applicable. Messaging impact: none.
 
+## 2026-11-07: Agents also renew sessions, connectors and test-device sign-in
+
+The owner decided on November 7, 2026, extending the 2026-11-06 entry "Agents act as the test
+accounts, end to end". For test accounts A and B only:
+
+1. Agents re-enroll the kept Cadence (Supabase) sessions with `npm run mcp:oauth -- enroll`
+   after `scripts/acceptance/google-signin.mjs`. This replaces "Cadence sign-in from the kept
+   sessions stays as it was".
+2. The owner creates Outlook, iCloud and Hevy test identities and stores them in "Cadence
+   Agents" as `outlook-test-account-a` (username, password, one-time password if 2-step is
+   on), `icloud-test-account-a` (username, app-specific password) and `hevy-test-account-a`
+   (credential: the Hevy API key). Connecting them to Cadence account A is an agent step.
+   Until an item exists, the test-access preflight lists it as an owner step.
+3. Agents complete Cadence for Mac's Google sign-in as account A on test devices, using the
+   vault item. The owner keeps macOS permission prompts and quitting Cadence.
+4. An AgentMail test inbox is a standing approved recipient for automated Sequenzy test sends.
+5. Ticket 284's Cadence QA Chrome restrictions are lifted. Agents use the profile normally and
+   still never touch the owner's own accounts or other Chrome profiles.
+
+The owner still sets each paid test's spend cap, creates vault items, keys and OAuth clients'
+secrets, and decides releases and publication. Ticket 293 encodes these steps in the
+test-access manifest (`.agentic/test-access.json`).
+
+Platform impact: acceptance tooling only; no product change. Web: agents connect A's
+connectors through Cadence's own API. Desktop: test-device sign-in becomes an agent step; the
+owner's Mac keeps its owner steps. Marketing and future mobile: not applicable. Messaging
+impact: none.
+
+## 2026-11-07: Daily Brief on the user's ChatGPT plan, Mac first (D27)
+
+The owner approved the plan "Use your ChatGPT plan in Cadence" on November 7, 2026, with
+three decisions. Tickets 294–300 carry the work.
+
+1. **Signed-in Mac users first.** The first slice serves Cadence for Mac linked to a Cadence
+   account. Cadence's server still builds the Daily Brief context and validates the output.
+   The Mac runs only the model call, on the user's ChatGPT plan. ChatGPT tokens stay in the
+   Mac's Keychain and never reach Cadence's server.
+2. **No fallback to Cadence's OpenAI key.** When a connected plan with plan usage cannot run
+   a brief (usage limit, not eligible, reconnect needed, unavailable), Cadence shows the
+   reason and "Manage usage" where it applies. It does not run that brief on Cadence's key
+   and does not loop retries. A user who connected ChatGPT without granting plan usage, or
+   never connected, keeps today's hosted path.
+3. **Cadence picks the model.** Cadence chooses from the models the user's ChatGPT catalog
+   lists. There is no model setting.
+
+Deferred, each needing its own ticket and decision:
+
+- ChatGPT as a Cadence login ("Continue with ChatGPT" for web or Mac sign-in). OpenAI offers
+  identity sign-in only as a limited trial for selected partners, through its interest form.
+  Web sign-in stays Google only.
+- ChatGPT plan usage in the hosted web app. OpenAI's program requires a 127.0.0.1 callback
+  and tokens kept in the user's own local or self-hosted runtime, and a remotely hosted app
+  needs OpenAI's approval.
+- Billing and any discount for bringing a ChatGPT plan. Billing is still not launch scope
+  ("Pricing and AI" above). `docs/FUTURE_UPDATES.md` records the discount as a pricing
+  proposal only.
+- An account-free Mac Daily Brief on the user's plan.
+
+Reasons:
+
+- OpenAI's ChatGPT plan program covers open-source and locally hosted apps today. Cadence for
+  Mac is MIT-licensed and runs locally; the web app runs on Vercel.
+- The money is small. The Daily Brief model costs Cadence about US$0.004 per brief, or
+  US$0.06 / US$0.13 / US$0.25 a month for light, typical and heavy users (`docs/COSTS.md`,
+  assumed). The plan is worth more as a feature than as a discount.
+- Anthropic bars consumer Claude subscriptions from third-party apps, and Google offers no
+  approved route for Google AI subscriptions. OpenAI is the only major provider found with an
+  approved program. GitHub Copilot was not checked.
+- OpenAI's Sign in with ChatGPT DevKit has a noncommercial licence. Cadence writes its own
+  client from the public docs and uses no DevKit code or components.
+
+Legal entries L-017 to L-019 log the program's approval condition, the DevKit licence and the
+brand guidelines. Under the 2026-11-04 rule they hold nothing.
+
+Platform impact: desktop, Tickets 297, 299 and 300. Web: the hosted prepare and complete steps
+(Tickets 296 and 298); the web app shows no ChatGPT controls. Marketing: none until release
+(P-032). Future mobile: not applicable, the program needs a local app; revisit with any
+native mobile ticket. Messaging impact: P-029, P-030, P-031 and P-032.
+
 ## 2026-11-09: Agent-architecture run (Tickets 286–291)
 
 The owner directed on November 9, 2026 that six agent-architecture actions be carried out
@@ -1898,3 +1977,54 @@ compares candidates and promotes one under Ticket 184's rules.
 
 Platform impact: repository guidance, development tooling and web server diagnostics only.
 Desktop, marketing and future mobile: not applicable. Messaging impact: none.
+
+## 2026-11-10: Day notes (Ticket 292)
+
+The owner approved one note per calendar date, editable and clearable, separate from
+Occurrence notes and statuses.
+
+- Web, MCP and desktop ship together. Day notes have their own `day_notes` Note
+  shortcuts pool.
+- MCP writes reuse `cadence.occurrences.write`, so existing connections need no new
+  consent; the permission description widens to day notes (P-028).
+- Day notes are allowed on future days.
+- BehaviorLog has no day attachment for notes, so a day note exports as a one-day
+  `review` record (`period_start_local_date = period_end_local_date`,
+  `review_role: user`, `summary_markdown` = note) with a `cadence` extension that marks
+  it as a day note. No BehaviorLog schema change.
+- Clearing keeps the row with a null note, so synchronization needs no tombstone.
+- Daily Brief input from day notes is deferred to a later Daily Brief upgrade.
+
+
+## 2026-11-10: Standing approval for additive hosted migrations
+
+The owner decided on November 10, 2026 that agents may run `npm run supabase -- db push`
+against the hosted project without asking each time, when every condition holds:
+
+1. Each pending migration is additive. Allowed: new tables, new nullable or defaulted
+   columns, indexes, new functions, `create or replace` of a function that keeps its
+   signature and its behavior for existing callers, new RLS policies, and grants to
+   `authenticated` only. Not allowed: `drop`, renames, column type changes, `not null` on an
+   existing column, data `insert`/`update`/`delete` or backfills on user tables, disabling
+   RLS, and grants to `anon`, `public` or `service_role`.
+2. A clean local start (`npm run supabase -- db reset`) applied every migration, and the
+   ticket's SQL fixtures passed.
+3. `npm run supabase -- migration list` shows hosted equal to git except the pending
+   migrations.
+4. The migrations are on `main`, or merge to `main` in the same change, and the push runs
+   before the deploy that needs them.
+5. After the push, the agent reads back RLS and grants on the new objects and records the
+   push in `STATUS.md`.
+
+Anything else still needs the owner's yes: destructive or data-changing migrations,
+`--include-seed`, Auth or project settings, Dashboard edits, and any other Supabase project.
+
+Credential: agents use the `cadence-agents` item in the Cadence Agents vault, a Supabase
+personal access token, through `npm run agent:secret -- --env
+SUPABASE_ACCESS_TOKEN=cadence-agents -- npm run supabase -- db push`. Supabase tokens reach
+the whole account, not one project, so this decision, not the token, limits agents to the
+Cadence project. The preflight requirement is `vault-supabase-access-token` (suite
+`hosted-migrations`). The owner's own CLI login stays the owner's credential.
+
+Platform impact: web hosted database only. Desktop, marketing and future mobile: not
+applicable. Messaging impact: none.

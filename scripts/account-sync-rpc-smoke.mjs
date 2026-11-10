@@ -83,7 +83,15 @@ try {
   assert(!legacy.entities.some((row) => ["place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"].includes(row.kind)), "contract 1 omits place-label kinds");
   assert(legacy.fingerprint === entityDigest(legacy.entities), "contract 1 fingerprint covers its projection");
   assert((await readSnapshot(clients[0], 1)).fingerprint === legacy.fingerprint, "contract 1 by argument matches the legacy read");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 3 }), "unknown read contract");
+  // Contract 3 adds the day_note kind (Ticket 292); contract 2 builds never see it.
+  const savedDayNote = await applied(clients[0].rpc("save_day_note", { target_local_date: "2026-09-01", expected_note: null, next_note: "Account sync smoke day note" }));
+  assert(Array.isArray(savedDayNote) && savedDayNote.length === 1, "day note saved for contract 3");
+  const c3 = await readSnapshot(clients[0], 3);
+  assert(c3.entities.some((row) => row.kind === "day_note" && row.value.note === "Account sync smoke day note"), "contract 3 shows day notes");
+  assert(!(await readSnapshot(clients[0])).entities.some((row) => row.kind === "day_note"), "contract 2 omits day notes");
+  assert(!(await readSnapshot(clients[1], 3)).entities.some((row) => row.kind === "day_note"), "day notes stay with their owner");
+  assert(c3.fingerprint === entityDigest(c3.entities), "contract 3 fingerprint covers its projection");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 4 }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
@@ -91,7 +99,7 @@ try {
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: { ...c1Value, travel_place_modes: [] } }], "c1a1".repeat(16)) }),
     "contract 1 cannot write a later field");
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c3c3".repeat(16)), contract: 3 } }), "unknown apply contract");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c4c4".repeat(16)), contract: 4 } }), "unknown apply contract");
   const c1Result = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
   assert(c1Result.fingerprint === entityDigest(c1Merged) && c1Result.snapshot.entities.length === legacy.entities.length, "contract 1 apply returns its projection");

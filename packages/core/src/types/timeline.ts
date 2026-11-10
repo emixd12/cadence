@@ -114,6 +114,8 @@ export type TimelineView = {
   nextFutureDays: number | null;
   needsDecision: TimelineNeedsDecisionGroup;
   daySections: TimelineDaySection[];
+  /** Saved day notes by local date for the dates this view shows (Ticket 292). */
+  dayNotes?: Record<string, string>;
 };
 
 export type OccurrenceActionField = "occurrence_id" | "status" | "note";

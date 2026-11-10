@@ -36,11 +36,12 @@ import { qaPublishableKey } from './qa-config.mjs';
 // (tools/list order); tests/acceptance-protocol.test.mjs keeps them equal.
 export const REGISTRY_TOOLS = Object.freeze([
   'get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences',
-  'get_occurrence', 'get_adherence_summary', 'search', 'fetch',
-  'set_occurrence_status', 'update_occurrence_note', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
+  'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
+  'set_occurrence_status', 'update_occurrence_note', 'update_day_note', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
 ]);
 export const WRITE_SCOPE = Object.freeze({
   set_occurrence_status: 'cadence.occurrences.write', update_occurrence_note: 'cadence.occurrences.write',
+  update_day_note: 'cadence.occurrences.write',
   create_behavior: 'cadence.behaviors.write', update_behavior: 'cadence.behaviors.write',
   archive_behavior: 'cadence.behaviors.write', restore_behavior: 'cadence.behaviors.write',
 });
@@ -305,6 +306,7 @@ export async function runProtocolSuite({
     const occurrences = await expectOk(session, check, 'list_occurrences', { start_local_date: today, end_local_date: today });
     check('occurrences-have-occurrence', (occurrences?.occurrences ?? []).some((o) => o.id === occurrenceId));
     await expectOk(session, check, 'get_occurrence', { occurrence_id: occurrenceId });
+    await expectOk(session, check, 'list_day_notes', { start_local_date: today, end_local_date: today });
     await expectOk(session, check, 'get_adherence_summary', { start_local_date: today, end_local_date: today });
     const found = await expectOk(session, check, 'search', { query: behaviorTitle });
     check('search-finds-behavior', (found?.results ?? []).some((r) => r.id === `behavior:${behaviorId}`));
@@ -312,6 +314,7 @@ export async function runProtocolSuite({
     const writes = {
       set_occurrence_status: { occurrence_id: occurrenceId, status: 'completed' },
       update_occurrence_note: { occurrence_id: occurrenceId, note: SAMPLE_NOTE },
+      update_day_note: { local_date: today, note: SAMPLE_NOTE },
       create_behavior: { title: `${behaviorTitle} denied`, schedules },
       update_behavior: { behavior_id: behaviorId, expected_revision: behaviors.behaviorRevision ?? 1, title: `${behaviorTitle} denied` },
       archive_behavior: { behavior_id: behaviorId },

@@ -660,6 +660,44 @@ export type Database = {
           },
         ]
       }
+      day_notes: {
+        Row: {
+          created_at: string
+          id: string
+          local_date: string
+          note: string | null
+          revision: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          local_date: string
+          note?: string | null
+          revision?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          local_date?: string
+          note?: string | null
+          revision?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_agent_connections: {
         Row: {
           attempt_hash: string | null
@@ -2062,6 +2100,16 @@ export type Database = {
         }
         Returns: Json
       }
+      integration_apply_day_note_write: {
+        Args: {
+          p_expected_revision: string
+          p_hash: string
+          p_key: string
+          p_local_date: string
+          p_note: string
+        }
+        Returns: Json
+      }
       integration_apply_write: {
         Args: {
           p_args: Json
@@ -2394,6 +2442,28 @@ export type Database = {
           p_include_reminder_history: boolean
         }
         Returns: Json
+      }
+      save_day_note: {
+        Args: {
+          expected_note: string
+          next_note: string
+          target_local_date: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          local_date: string
+          note: string | null
+          revision: number
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "day_notes"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       save_place_label_settings: {
         Args: {

@@ -28,6 +28,7 @@ pub enum AccountSyncEntityKind {
     PlaceMarker,
     CompletionPlaceLabel,
     WhereSuggestionDismissal,
+    DayNote,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -73,6 +74,7 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::PlaceMarker => { decode_row::<PlaceMarker>(value)?; }
             AccountSyncEntityKind::CompletionPlaceLabel => { decode_row::<CompletionPlaceLabel>(value)?; }
             AccountSyncEntityKind::WhereSuggestionDismissal => { decode_row::<WhereSuggestionDismissal>(value)?; }
+            AccountSyncEntityKind::DayNote => { decode_row::<DayNote>(value)?; }
         }
     }
     Ok(())
@@ -233,6 +235,7 @@ fn apply_mode(
             AccountSyncEntityKind::WhereSuggestionDismissal => {
                 row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)?
             }
+            AccountSyncEntityKind::DayNote => row_write::<DayNote>(db, profile, write, false, false)?,
         }
     }
     Ok(())
@@ -448,6 +451,9 @@ fn validate_write(
         AccountSyncEntityKind::WhereSuggestionDismissal => {
             validate_row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)
         }
+        AccountSyncEntityKind::DayNote => {
+            validate_row_write::<DayNote>(db, profile, write, false, false)
+        }
     }
 }
 
@@ -643,6 +649,7 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         AccountSyncEntityKind::PlaceMarker
         | AccountSyncEntityKind::CompletionPlaceLabel
         | AccountSyncEntityKind::WhereSuggestionDismissal => 11,
+        AccountSyncEntityKind::DayNote => 12,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first
@@ -653,8 +660,9 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         if replacement {
             (write.operation == AccountSyncOperation::Upsert) as u8
         } else if write.operation == AccountSyncOperation::Delete
-            && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery)
+            && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery | AccountSyncEntityKind::DayNote)
         {
+            // A merged same-date day note also leaves its unique date before the replacement row arrives.
             // Validated disposable rows must leave their unique schedule slot before replacement.
             0
         } else {
@@ -1246,6 +1254,53 @@ mod tests {
             db::profile(&connection).unwrap().timezone,
             "America/New_York"
         );
+    }
+
+    #[test]
+    fn account_sync_replaces_a_same_date_day_note_by_deleting_before_upserting() {
+        let (_directory, mut connection, profile, _category) = database();
+        let local = DayNote {
+            id: "00000000-0000-4000-8000-000000000901".into(),
+            user_id: profile.clone(),
+            local_date: "2026-11-10".into(),
+            note: Some("Slept badly".into()),
+            revision: 1,
+            created_at: "2026-11-10T12:00:00.000000Z".into(),
+            updated_at: "2026-11-10T12:00:00.000000Z".into(),
+        };
+        db::insert(&connection, &profile, &local).unwrap();
+        let merged = DayNote {
+            id: "00000000-0000-4000-8000-000000000902".into(),
+            note: Some("Travel day\n\nSlept badly".into()),
+            revision: 2,
+            ..local.clone()
+        };
+        // The planner lists the upsert first; apply order must still delete first.
+        execute(
+            &mut connection,
+            Request::ApplyAccountSync {
+                profile_id: profile.clone(),
+                writes: vec![
+                    AccountSyncWrite {
+                        kind: AccountSyncEntityKind::DayNote,
+                        id: merged.id.clone(),
+                        operation: AccountSyncOperation::Upsert,
+                        expected: None,
+                        value: Some(normalized(&merged).unwrap()),
+                    },
+                    AccountSyncWrite {
+                        kind: AccountSyncEntityKind::DayNote,
+                        id: local.id.clone(),
+                        operation: AccountSyncOperation::Delete,
+                        expected: Some(normalized(&local).unwrap()),
+                        value: None,
+                    },
+                ],
+            },
+        )
+        .unwrap();
+        let rows = db::owned::<DayNote>(&connection, &profile).unwrap();
+        assert_eq!(rows, vec![merged]);
     }
 
     #[test]

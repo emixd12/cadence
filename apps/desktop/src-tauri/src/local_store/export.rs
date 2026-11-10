@@ -58,6 +58,7 @@ pub fn read(
         "importedNotes":db::owned::<ImportedNote>(db,profile_id)?,
         "importedInterventions":db::owned::<ImportedIntervention>(db,profile_id)?,
         "importRuns":db::owned::<BehaviorLogImportRun>(db,profile_id)?.into_iter().filter(|row| row.status == "applied").collect::<Vec<_>>(),
-        "importMappings":db::owned::<BehaviorLogImportRecordMapping>(db,profile_id)?
+        "importMappings":db::owned::<BehaviorLogImportRecordMapping>(db,profile_id)?,
+        "dayNotes":super::day_note::owned_if_present(db,profile_id)?
     }))
 }

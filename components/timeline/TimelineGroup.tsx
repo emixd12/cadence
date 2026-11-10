@@ -5,6 +5,8 @@ import type {
 } from "@/lib/types/timeline";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
+import { DayNoteControl } from "@/components/timeline/DayNoteControl";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 
 type TimelineGroupProps = Readonly<{
   section: TimelineDaySection;
@@ -15,6 +17,8 @@ type TimelineGroupProps = Readonly<{
   resetTimeTrackingAction: TimeTrackingFormAction;
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
   variant?: "feed" | "needsDecisionDialog";
+  dayNoteAction?: OccurrenceFormAction;
+  dayNote?: string;
 }>;
 
 const SECTION_CLASSES: Record<TimelineDaySection["kind"], string> = {
@@ -32,7 +36,18 @@ export function TimelineGroup({
   resetTimeTrackingAction,
   shortcutsByBehavior = {},
   variant = "feed",
+  dayNoteAction,
+  dayNote = "",
 }: TimelineGroupProps) {
+  const dayNoteControl = dayNoteAction ? (
+    <DayNoteControl
+      localDate={section.localDate}
+      dayLabel={section.label}
+      note={dayNote}
+      action={dayNoteAction}
+      shortcuts={shortcutsByBehavior[DAY_NOTE_SHORTCUT_POOL_ID]}
+    />
+  ) : null;
   const isEmpty = section.occurrenceGroups.length === 0;
   const isNeedsDecisionDialog = variant === "needsDecisionDialog";
 
@@ -58,6 +73,7 @@ export function TimelineGroup({
             <p className="mt-1 text-sm font-bold text-muted-readable">
               {decisionCountLabel(section.unresolvedOccurrenceCount)}
             </p>
+            {dayNoteControl}
           </div>
         ) : (
           <div>
@@ -73,6 +89,7 @@ export function TimelineGroup({
             >
               <time dateTime={section.localDate}>{section.label}</time>
             </h2>
+            {dayNoteControl}
           </div>
         )}
       </div>

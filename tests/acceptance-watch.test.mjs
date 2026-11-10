@@ -133,7 +133,7 @@ describe('registry parity', () => {
   it('mirrors every integration operation and its access', () => {
     const fromRegistry = Object.fromEntries(Object.entries(INTEGRATION_OPERATIONS).map(([name, op]) => [name, op.access]));
     expect(OPERATION_ACCESS).toEqual(fromRegistry);
-    expect(Object.keys(OPERATION_ACCESS)).toHaveLength(16);
+    expect(Object.keys(OPERATION_ACCESS)).toHaveLength(18);
   });
   it('uses the same production test accounts as Ticket 232', () => {
     expect(TEST_ACCOUNTS.A.userId).toBe(USERS.A);

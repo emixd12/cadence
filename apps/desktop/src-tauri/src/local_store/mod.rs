@@ -1,6 +1,7 @@
 mod adoption;
 mod behavior;
 mod category;
+mod day_note;
 mod db;
 mod export;
 mod import;
@@ -295,6 +296,11 @@ pub enum Request {
         profile_id: String,
         occurrence_ids: Vec<String>,
     },
+    ReadDayNotes {
+        profile_id: String,
+        start_local_date: String,
+        end_local_date: String,
+    },
     ReadSyncState {
         profile_id: String,
     },
@@ -461,6 +467,15 @@ pub enum Request {
         note: Option<String>,
         #[serde(default)]
         used_shortcut: Option<bool>,
+    },
+    SaveDayNote {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        new_id: String,
+        local_date: String,
+        expected_note: Option<String>,
+        note: Option<String>,
     },
     CommitNoteShortcutState {
         profile_id: String,
@@ -695,6 +710,14 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             db::owner(&tx, profile_id)?;
             behavior::read_graphs(&tx, profile_id)?
         }
+        Request::ReadDayNotes {
+            profile_id,
+            start_local_date,
+            end_local_date,
+        } => {
+            db::owner(&tx, profile_id)?;
+            day_note::read(&tx, profile_id, start_local_date, end_local_date)?
+        }
         Request::ReadOccurrence {
             profile_id,
             occurrence_id,
@@ -877,6 +900,15 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             note,
             used_shortcut == &Some(true),
         ),
+        Request::SaveDayNote {
+            profile_id,
+            now,
+            new_id,
+            local_date,
+            expected_note,
+            note,
+            ..
+        } => day_note::save(db, profile_id, now, new_id, local_date, expected_note, note),
         Request::CommitNoteShortcutState {
             profile_id,
             now,
@@ -1005,6 +1037,12 @@ impl Request {
                 ..
             }
             | Self::UpdateOccurrenceNote {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::SaveDayNote {
                 profile_id,
                 mutation_id,
                 now,

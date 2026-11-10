@@ -37,6 +37,8 @@ export type ExportAssemblyInput = ExportOptions & ExportImportedHistory & {
   reminderDeliveries: ExportPageReminderDeliveryRow[]; timeSessions: ExportTimeSessionRow[];
   finalBehaviors?: ExportPageBehaviorRow[];
   nativeReminders?: ExportNativeReminderInput[];
+  /** Day note rows (Ticket 292); exported only when notes are included. */
+  dayNotes?: ReadonlyArray<{ id: string; local_date: string; note: string | null; created_at: string; updated_at: string }>;
 };
 
 export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
@@ -74,6 +76,9 @@ export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
     importRuns: input.importRuns,
     importMappings: input.importMappings,
     timeSessions: timeSessions.map(toExportTimeSessionInput),
+    dayNotes: (input.dayNotes ?? []).map((row) => ({
+      id: row.id, localDate: row.local_date, note: row.note, createdAt: row.created_at, updatedAt: row.updated_at,
+    })),
     now,
     timezone,
     range: input.range,

@@ -421,6 +421,17 @@ Nothing changes in production cost. The live Daily Brief still sends
 `DAILY_BRIEF_MODEL` with low effort and the layered prompt; a test pins its request
 body.
 
+### Briefs on the user's ChatGPT plan (Tickets 294–300)
+
+Planned, not in source. A signed-in Mac user who connects a ChatGPT plan with plan usage
+runs the Daily Brief model call on that plan (`docs/DECISIONS.md`, 2026-11-07, D27). Such
+a brief costs Cadence no model spend. Cadence's server still prepares the context and
+validates the output, so that hosted compute remains (Vercel and Supabase usage, not
+measured). When the plan cannot run a brief, Cadence does not fall back to its own key, so
+a failed plan brief adds no model spend either. Web briefs, and Mac briefs without plan
+usage, keep the cost above. The per-user totals do not change until the share of plan users
+is known. Ticket 300 records measured latency here.
+
 ### Ticket 188 candidate duration estimates
 
 Recipes 1.1 and 1.2 can opt into one additional model request before each brief.
@@ -562,6 +573,8 @@ arrives, fees reduce the US$5:
   looked up once more on its next refresh, at US$0.005 each, under the same spend
   reservation and the 80% automatic-refresh pause. The new row is then reused as before.
   Places that now resolve get routed, within the usage model above. Totals are unchanged.
+- 2026-11-07: Decision D27 (Tickets 294–300). A Mac brief on the user's ChatGPT plan costs
+  Cadence no model spend; hosted preparation compute remains. Totals are unchanged.
 - 2026-11-09: Ticket 288 records Daily Brief token usage per model call in the
   performance log and in workbench runs. Token figures stay assumed until measured.
 

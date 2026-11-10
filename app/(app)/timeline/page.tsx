@@ -15,6 +15,7 @@ import { listAcceptedNoteShortcutsForCurrentUser } from "@/lib/services/note-sho
 import {
   markOccurrenceStatusAction,
   resetTimeTrackingAction,
+  saveDayNoteAction,
   startTimeTrackingAction,
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
@@ -108,6 +109,7 @@ async function TimelineContent({
         stopTimeTrackingAction={stopTimeTrackingAction}
         resetTimeTrackingAction={resetTimeTrackingAction}
         shortcutsByBehavior={shortcutsByBehavior}
+        dayNoteAction={saveDayNoteAction}
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
       />

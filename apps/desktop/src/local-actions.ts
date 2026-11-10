@@ -11,6 +11,7 @@ import type { BehaviorFormAction } from "../../../lib/types/behavior";
 import type { Profile } from "../../../lib/types/database";
 import { createLocalBehaviorStore, withNativeReminderSummary } from "./local-behavior.service";
 import { localCommand } from "./local-store";
+import { saveLocalDayNote } from "./local-day-note.service";
 
 export function createLocalOccurrenceActions(profileId: string, refresh: () => void) {
   const statusAction: OccurrenceFormAction = async (_previous, form) => {
@@ -45,7 +46,15 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
         tracking: { recordedSeconds: result.tracking.recordedSeconds, runningStartedAt: result.tracking.runningSession?.startedAt ?? null }, ...request };
     } catch (error) { return { status: "error", message: localErrorMessage(error), ...request }; }
   };
-  return { statusAction, noteAction, startTimeTrackingAction: timing("start"),
+  const dayNoteAction: OccurrenceFormAction = async (_previous, form) => {
+    try {
+      const result = await saveLocalDayNote(profileId, {
+        localDate: form.get("local_date"), expectedNote: form.get("expected_note"), note: form.get("note"),
+      }, Temporal.Now.instant());
+      return { status: "success", message: result.note === null ? "Day note cleared." : "Day note saved." };
+    } catch (error) { return { status: "error", message: localErrorMessage(error) }; }
+  };
+  return { statusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
     stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset") };
 }
 

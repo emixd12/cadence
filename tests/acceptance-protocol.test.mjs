@@ -92,6 +92,7 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
       case 'get_timeline': return okResult({ days: [{ local_date: TODAY, occurrences: data.occurrences.filter((o) => o.slot === slot).map(occView) }] });
       case 'list_occurrences': return okResult({ occurrences: data.occurrences.filter((o) => o.slot === slot && (!args.behavior_ids || args.behavior_ids.includes(o.behavior_id))).map(occView) });
       case 'get_occurrence': { const o = own(data.occurrences, slot, args.occurrence_id); return o ? okResult({ occurrence: occView(o) }) : notFound(); }
+      case 'list_day_notes': return okResult({ timezone: 'America/New_York', day_notes: [] });
       case 'get_adherence_summary': return okResult({ overall: {}, behaviors: [] });
       case 'search': return okResult({ results: data.behaviors.filter((b) => b.slot === slot && b.title.startsWith(args.query)).map((b) => ({ id: `behavior:${b.id}`, title: b.title, url: 'https://x' })) });
       case 'fetch': { const b = own(data.behaviors, slot, args.id.split(':')[1]); return b ? okResult({ id: args.id }) : notFound(); }
@@ -188,7 +189,7 @@ describe('Ticket 249 protocol acceptance suite', () => {
       if (scope === 'cadence.read') expect(READ_TOOLS).toContain(name);
       else expect(WRITE_SCOPE[name]).toBe(scope);
     }
-    expect(READ_TOOLS).toHaveLength(10);
+    expect(READ_TOOLS).toHaveLength(11);
   });
 
   it('passes every check against a correct server and leaves no grant active', async () => {

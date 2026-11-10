@@ -33,6 +33,8 @@ import type {
   ExportStatusEventInput,
   ExportTimeSessionInput,
   ExportImportedHistory,
+  ExportDayNoteInput,
+  ExportJsonDayNote,
 } from "../types/export";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import type { BehaviorWhereKind } from "../types/behavior";
@@ -52,6 +54,7 @@ const BEHAVIORLOG_CONFIGURATION_HISTORY_PATH =
   "raw/cadence/behavior_configuration_events.jsonl";
 const BEHAVIORLOG_PORTABLE_CONFIGURATION_HISTORY_PATH = "data/behavior_configuration_events.jsonl";
 const BEHAVIORLOG_TIME_SESSIONS_PATH = "data/time_sessions.jsonl";
+const BEHAVIORLOG_REVIEWS_PATH = "data/reviews.jsonl";
 const BEHAVIORLOG_INTERVENTION_RULES_PATH =
   "data/intervention_rules.jsonl";
 const BEHAVIORLOG_GENERATION_RULE_ID = "rule_recurrence_calendar_simple_v1";
@@ -186,6 +189,7 @@ export type ResolveExportInput = ExportImportedHistory & {
   includeNotes?: boolean;
   includeTimeTracking?: boolean;
   timeSessions?: ExportTimeSessionInput[];
+  dayNotes?: ExportDayNoteInput[];
 };
 
 export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
@@ -259,6 +263,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     statusEvents: input.statusEvents ?? [],
     occurrences,
   });
+  const dayNotes = includeNotes ? toJsonDayNotes(input.dayNotes ?? [], range) : [];
   const fileBaseName = [
     "cadence-export",
     range.key === "all" ? "all-time" : `${range.key}-days`,
@@ -278,8 +283,11 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     behaviorDefinitionEvents,
     behaviorConfigurationEvents,
     timeSessions: includeTimeTracking ? timeSessions : undefined,
+    dayNotes: includeNotes ? dayNotes : undefined,
   });
   const behaviorLog = toBehaviorLogBundle({
+    dayNotes,
+    timezone,
     categories,
     exportedAtInstant: input.now,
     fileBaseName,
@@ -626,6 +634,7 @@ function toJsonBackup(input: {
   behaviorDefinitionEvents: ExportJsonBehaviorDefinitionEvent[];
   behaviorConfigurationEvents: ExportJsonBehaviorConfigurationEvent[];
   timeSessions?: ExportJsonTimeSession[];
+  dayNotes?: ExportJsonDayNote[];
 }): ExportJsonBackup {
   return {
     exported_at: input.exportedAt,
@@ -639,7 +648,45 @@ function toJsonBackup(input: {
     behavior_definition_events: input.behaviorDefinitionEvents,
     behavior_configuration_events: input.behaviorConfigurationEvents,
     ...(input.timeSessions ? { time_sessions: input.timeSessions } : {}),
+    ...(input.dayNotes ? { day_notes: input.dayNotes } : {}),
   };
+}
+
+/** Non-empty day notes inside the export range, oldest date first (Ticket 292). */
+function toJsonDayNotes(dayNotes: readonly ExportDayNoteInput[], range: ExportDateRange): ExportJsonDayNote[] {
+  return dayNotes
+    .filter((dayNote): dayNote is ExportDayNoteInput & { note: string } => Boolean(dayNote.note && dayNote.note.trim()))
+    .filter((dayNote) => isLocalDateWithinRange(dayNote.localDate, range))
+    .sort((left, right) => (left.localDate < right.localDate ? -1 : left.localDate > right.localDate ? 1 : left.id.localeCompare(right.id)))
+    .map((dayNote) => ({
+      id: dayNote.id,
+      local_date: dayNote.localDate,
+      note: dayNote.note,
+      created_at: formatUtc(dayNote.createdAt),
+      updated_at: formatUtc(dayNote.updatedAt),
+    }));
+}
+
+/** BehaviorLog has no day attachment for notes; a day note is a one-day user review. */
+function toBehaviorLogDayNoteReviews(input: {
+  dayNotes: readonly ExportJsonDayNote[];
+  timezone: string;
+  profile: ExportProfileInput;
+}): Record<string, unknown>[] {
+  return input.dayNotes.map((dayNote) => ({
+    record_type: "review",
+    review_id: dayNote.id,
+    period_start_local_date: dayNote.local_date,
+    period_end_local_date: dayNote.local_date,
+    timezone: input.timezone,
+    created_at_utc: dayNote.created_at,
+    review_role: "user",
+    summary_markdown: dayNote.note,
+    barriers_markdown: null,
+    adjustments_markdown: null,
+    source: createBehaviorLogSource({ profile: input.profile, originalId: dayNote.id, captureMethod: "manual_text", confidence: "high" }),
+    extensions: { [BEHAVIORLOG_EXTENSION_NAMESPACE]: { day_note: true, updated_at_utc: dayNote.updated_at } },
+  }));
 }
 
 function toJsonTimeSessions(input: {
@@ -856,6 +903,8 @@ function neutralizeSpreadsheetFormula(value: string): string {
 }
 
 function toBehaviorLogBundle(input: ExportImportedHistory & {
+  dayNotes: readonly ExportJsonDayNote[];
+  timezone: string;
   exportedAtInstant: Temporal.Instant;
   fileBaseName: string;
   profile: ExportProfileInput;
@@ -1016,6 +1065,15 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
       path: "data/notes.jsonl",
       mediaType: "application/jsonl",
       content: toJsonlRecords(noteRecords),
+    });
+  }
+
+  const reviewRecords = toBehaviorLogDayNoteReviews({ dayNotes: input.dayNotes, timezone: input.timezone, profile: input.profile });
+  if (reviewRecords.length > 0) {
+    filesWithoutManifest.push({
+      path: BEHAVIORLOG_REVIEWS_PATH,
+      mediaType: "application/jsonl",
+      content: toJsonlRecords(reviewRecords),
     });
   }
 
@@ -2486,6 +2544,8 @@ function schemaRefForBehaviorLogPath(path: string): string | null {
       return "#/$defs/StatusEvent";
     case "data/notes.jsonl":
       return "#/$defs/Note";
+    case BEHAVIORLOG_REVIEWS_PATH:
+      return "#/$defs/Review";
     case "data/interventions.jsonl":
       return "#/$defs/Intervention";
     case "data/intervention_rules.jsonl":
@@ -2986,8 +3046,12 @@ function isOccurrenceWithinRange(
   occurrence: ExportOccurrenceInput,
   range: ExportDateRange,
 ): boolean {
+  return isLocalDateWithinRange(occurrence.localDate, range);
+}
+
+function isLocalDateWithinRange(value: string, range: ExportDateRange): boolean {
   if (range.key === "all") return true;
-  const localDate = Temporal.PlainDate.from(occurrence.localDate);
+  const localDate = Temporal.PlainDate.from(value);
   const endDate = Temporal.PlainDate.from(range.endLocalDate);
 
   if (Temporal.PlainDate.compare(localDate, endDate) > 0) {

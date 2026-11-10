@@ -46,6 +46,34 @@ const bookkeepingColumns = {
   occurrence_sync_state: ["last_successful_sync_at", "last_sync_behavior_count", "last_sync_created_count", "last_sync_deleted_count", "last_sync_updated_count", "last_synced_local_date", "stale", "stale_reason", "state_version", "synced_through_local_date", "updated_at"],
 };
 const reminderReceiptOperations = ["commitNativeReminderPlan", "recordNativeReminderCoverage"];
+// A launch sync may rewrite these rows only. A before row that no longer matches exactly is accepted
+// when it is `changeable`, and an unused after row that is `syncShaped` matches it with `columns` ignored.
+const launchSyncRules = {
+  // complete_account_sync (auth.rs) replaces the baseline; identity, choice, and backup path stay.
+  account_sync_baselines: {
+    columns: ["idempotency_key", "local_fingerprint", "hosted_fingerprint", "baseline_fingerprint", "baseline_json", "completed_at"],
+    changeable: "1",
+    syncShaped: `typeof(baseline_fingerprint)='text' AND length(baseline_fingerprint)=64
+      AND local_fingerprint IS baseline_fingerprint AND hosted_fingerprint IS baseline_fingerprint
+      AND typeof(idempotency_key)='text' AND length(idempotency_key)=64
+      AND json_valid(baseline_json) AND typeof(completed_at)='text' AND length(completed_at)>0`,
+  },
+  // The same transaction advances only the account-sync cursor to the new baseline.
+  sync_cursors: {
+    columns: ["value", "updated_at"],
+    requires: { account_sync_baselines: ["local_profile_id", "baseline_fingerprint", "completed_at"] },
+    changeable: "name='account-sync'",
+    syncShaped: `name='account-sync' AND EXISTS(SELECT 1 FROM account_sync_baselines baseline
+      WHERE baseline.local_profile_id=sync_cursors.user_id
+      AND baseline.baseline_fingerprint IS sync_cursors.value AND baseline.completed_at IS sync_cursors.updated_at)`,
+  },
+  // Hosted processing moves pending deliveries to sent, failed, or cancelled. Other rows are final here.
+  reminder_deliveries: {
+    columns: ["status", "error", "sent_at", "processing_started_at", "updated_at"],
+    changeable: "status='pending'",
+    syncShaped: "status IN ('pending','sent','failed','cancelled')",
+  },
+};
 
 function databaseEvidence(database) {
   const schema = sql(database, "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' ORDER BY type,name");
@@ -69,13 +97,28 @@ function databaseEvidence(database) {
       : undefined;
     const excludedReceipts = Object.fromEntries(reminderReceiptOperations.map((operation) => [operation, 0]));
     if (receiptPredicate) for (const { operation, count } of sql(database, `SELECT operation,count(*) AS count FROM mutation_outbox WHERE ${receiptPredicate} GROUP BY operation`)) excludedReceipts[operation] = count;
+    const rule = Object.hasOwn(launchSyncRules, table) ? launchSyncRules[table] : undefined;
+    const ruleApplies = rule && rule.columns.every((column) => columns.includes(column))
+      && Object.entries(rule.requires ?? {}).every(([required, requiredColumns]) => names.has(required)
+        && requiredColumns.every((column) => sql(database, `PRAGMA table_xinfo(${identifier(required)})`).some(({ name }) => name === column)));
     // Encode types, NUL-containing text, blobs, full-width integers, and exact floating-point values without printing data.
     const projection = columns.flatMap((column, index) => {
       const name = identifier(column);
       return [`typeof(${name}) AS type_${index}`, `CASE typeof(${name}) WHEN 'real' THEN printf('%!.26g',${name}) ELSE hex(CAST(${name} AS BLOB)) END AS value_${index}`];
-    }).join(",");
-    rowHashes[table] = sql(database, `SELECT ${projection} FROM ${identifier(table)}${receiptPredicate ? ` WHERE NOT coalesce((${receiptPredicate}),0)` : ""}`).map((row) => sha256(JSON.stringify(row))).sort();
-    preservedContent[table] = { columns, excludedColumns, sha256: sha256(JSON.stringify(rowHashes[table])), ...(table === "mutation_outbox" ? { excludedReceipts } : {}) };
+    }).concat(ruleApplies ? [`coalesce((${rule.changeable}),0) AS rule_changeable`, `coalesce((${rule.syncShaped}),0) AS rule_sync_shaped`] : []).join(",");
+    const ruleIndexes = ruleApplies ? rule.columns.map((column) => columns.indexOf(column)) : [];
+    rowHashes[table] = sql(database, `SELECT ${projection} FROM ${identifier(table)}${receiptPredicate ? ` WHERE NOT coalesce((${receiptPredicate}),0)` : ""}`).map(({ rule_changeable, rule_sync_shaped, ...row }) => ({
+      hash: sha256(JSON.stringify(row)),
+      ...(ruleApplies ? {
+        retainedHash: sha256(JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key]) => !ruleIndexes.includes(Number(key.split("_")[1])))))),
+        changeable: rule_changeable === 1, syncShaped: rule_sync_shaped === 1,
+      } : {}),
+    })).sort((left, right) => left.hash < right.hash ? -1 : left.hash > right.hash ? 1 : 0);
+    preservedContent[table] = { columns, excludedColumns, sha256: sha256(JSON.stringify(rowHashes[table].map(({ hash }) => hash))),
+      ...(table === "mutation_outbox" ? { excludedReceipts } : {}),
+      ...(ruleApplies ? { launchSync: { columns: rule.columns,
+        changeableRows: rowHashes[table].filter(({ changeable }) => changeable).length,
+        syncShapedRows: rowHashes[table].filter(({ syncShaped }) => syncShaped).length } } : {}) };
   }
   const profileIds = sql(database, "SELECT id FROM profiles ORDER BY id").map(({ id }) => id);
   return { rowHashes, evidence: {
@@ -135,15 +178,31 @@ if (sameSchema) {
   if (before.schemaVersion !== expectedSchemaVersion || after.schemaVersion !== expectedSchemaVersion || before.schemaSha256 !== after.schemaSha256) throw new Error("The same-schema release must preserve the expected schema version and schema.");
 } else if (after.schemaVersion <= before.schemaVersion || after.schemaVersion !== expectedSchemaVersion) throw new Error("The release database did not advance to the expected schema version.");
 if (before.profileIdentitySha256 !== after.profileIdentitySha256) throw new Error("The stable local profile changed across migration.");
+const launchSyncChanges = Object.create(null);
 for (const [table, count] of Object.entries(before.counts)) {
   if ((after.counts[table] ?? -1) < count) throw new Error(`${table} lost records across ${sameSchema ? "release" : "migration"}.`);
   if (sameSchema) {
     const remaining = new Map();
-    for (const hash of afterRows[table]) remaining.set(hash, (remaining.get(hash) ?? 0) + 1);
-    for (const hash of beforeRows[table]) {
-      if (!remaining.get(hash)) throw new Error(`${table} lost or changed retained content across release.`);
-      remaining.set(hash, remaining.get(hash) - 1);
+    for (const { hash } of afterRows[table]) remaining.set(hash, (remaining.get(hash) ?? 0) + 1);
+    const changed = [];
+    for (const row of beforeRows[table]) {
+      if (remaining.get(row.hash)) remaining.set(row.hash, remaining.get(row.hash) - 1);
+      else if (row.changeable) changed.push(row);
+      else throw new Error(`${table} lost or changed retained content across release.`);
     }
+    if (!changed.length) continue;
+    // Rows with the same full hash are interchangeable, so the unused after rows are any `remaining` copies.
+    const candidates = new Map();
+    for (const row of afterRows[table]) {
+      if (!remaining.get(row.hash)) continue;
+      remaining.set(row.hash, remaining.get(row.hash) - 1);
+      if (row.syncShaped) candidates.set(row.retainedHash, (candidates.get(row.retainedHash) ?? 0) + 1);
+    }
+    for (const { retainedHash } of changed) {
+      if (!candidates.get(retainedHash)) throw new Error(`${table} lost or changed retained content across release.`);
+      candidates.set(retainedHash, candidates.get(retainedHash) - 1);
+    }
+    launchSyncChanges[table] = changed.length;
   }
 }
 const additionalFiles = extraPaths.flatMap((entry) => !existsSync(entry) ? [] : lstatSync(entry).isDirectory() ? files(entry) : [entry]);
@@ -167,6 +226,7 @@ process.stdout.write(`${JSON.stringify({
   system: { productVersion: execFileSync("sw_vers", ["-productVersion"], { encoding: "utf8", env: commandEnvironment }).trim(), buildVersion: execFileSync("sw_vers", ["-buildVersion"], { encoding: "utf8", env: commandEnvironment }).trim(), architecture: execFileSync("uname", ["-m"], { encoding: "utf8", env: commandEnvironment }).trim() },
   app: { path: realpathSync(appPath), identifier: plistValue("CFBundleIdentifier"), version: plistValue("CFBundleShortVersionString"), sha256: sha256(readFileSync(path.join(appPath, "Contents", "MacOS", plistValue("CFBundleExecutable")))) },
   before, after,
+  ...(sameSchema ? { launchSyncChanges } : {}),
   secretScan: {
     scannedFiles: scannedFiles.length,
     scopes: [appPath, beforePath, afterPath, ...extraPaths].map((entry) => ({ path: scopePath(entry), files: scopeFiles(entry), exists: existsSync(entry) })),

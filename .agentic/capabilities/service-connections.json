@@ -13,6 +13,7 @@
   "canonicalSources": [
     ".agentic/capabilities/service-connections.json",
     ".agentic/scripts/check-service-operations.mjs",
+    ".agentic/scripts/test-access-preflight.mjs",
     ".agentic/service-operations.json"
   ],
   "capabilityId": "service-connections",
@@ -42,6 +43,29 @@
         "node",
         ".agentic/scripts/check-service-operations.mjs",
         "status",
+        "--json"
+      ],
+      "dependencies": [
+        "node"
+      ],
+      "effect": "none",
+      "evidenceFormat": "exit_code_and_json",
+      "network": "none",
+      "outputs": [],
+      "phase": "local",
+      "retryPolicy": {
+        "transientAttempts": 1
+      },
+      "workspace": "read_only"
+    },
+    "service-connections.test-access.plan": {
+      "argv": [
+        "node",
+        ".agentic/scripts/test-access-preflight.mjs",
+        "--suite",
+        "all",
+        "--dry-run",
+        "--if-present",
         "--json"
       ],
       "dependencies": [
@@ -97,6 +121,13 @@
       "classification": "operation_check_executable",
       "kind": "exact",
       "path": ".agentic/scripts/check-service-operations.mjs",
+      "sourceEffects": ["none"]
+    },
+    {
+      "allowMultipleOwners": false,
+      "classification": "test_access_preflight_executable",
+      "kind": "exact",
+      "path": ".agentic/scripts/test-access-preflight.mjs",
       "sourceEffects": ["none"]
     },
     {

@@ -76,6 +76,12 @@ Still deferred:
 Promote these separately only when their own scope is approved. Ticket 134
 capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
+## Day notes in the Daily Brief
+
+The owner wants the Daily Brief to read day notes (Ticket 292) as part of a later
+Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
+before any day note reaches a provider.
+
 ## Public product surfaces
 
 Cadence's public-product direction is documented in
@@ -156,6 +162,37 @@ Future commercial work may add:
 Billing, general AI chat/coaching and audio speech remain deferred. The in-app
 read-only horse briefing is the narrow implemented AI feature under Tickets 146–148.
 It adds no payment infrastructure, subscription gate, general chatbot or voice.
+
+## ChatGPT plan follow-ups
+
+Tickets 294–300 let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
+(`docs/DECISIONS.md`, 2026-11-07, D27). These follow-ups are deferred. Each needs its own
+ticket and owner decision.
+
+- **"Continue with ChatGPT" as a Cadence login on web.** OpenAI offers identity sign-in only
+  as a limited trial for selected partners. It needs a client ID from OpenAI through its
+  interest form (`https://openai.com/form/sign-in-with-chatgpt-interest/`). Web sign-in
+  stays Google only until then.
+- **ChatGPT plan usage in the hosted web app.** OpenAI's program requires a 127.0.0.1
+  callback and tokens kept in the user's own local or self-hosted runtime, and a remotely
+  hosted app needs OpenAI's approval
+  (`docs/LEGAL.md` L-017). The web Daily Brief keeps Cadence's OpenAI key.
+- **An account-free Mac Daily Brief.** Today the brief context comes from Cadence's server,
+  so the Mac must be linked to an account. A local brief would need the context builder and
+  validator to run on the Mac.
+- **Pricing proposal: a discount for bringing a ChatGPT plan.** The Daily Brief model costs
+  Cadence about US$0.13 a month for a typical user (`docs/COSTS.md`), so a discount could be
+  at most about 13 cents a month. A stronger model or more briefs for plan users may be worth
+  more than a discount. Billing is not launch scope; this needs a billing ticket first.
+- **In-app agent chat on the user's ChatGPT plan.** An owner idea from November 7, 2026: a
+  chat inside Cadence that runs on the user's ChatGPT plan. It is out of v1 scope, because
+  `AGENTS.md` lists general AI coaching and chat as out of scope. It needs its own product
+  decision covering tools, writes, safety and cost. Tickets 294–300 build nothing for chat.
+  They keep the ChatGPT connection and streaming adapter free of Daily Brief specifics, so
+  such a feature could reuse them (`docs/TICKETS.md`, Tickets 294–300 shared rules).
+
+The owner decides when to submit OpenAI's interest form for web sign-in and hosted plan
+usage. No ticket asks for it now.
 
 ## Location permission VM images
 

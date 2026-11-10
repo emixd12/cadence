@@ -27,6 +27,9 @@ export const INTEGRATION_LIMITS = Object.freeze({
   maxDefaultDurationMinutes: 1440,
   /** Note limits. Archive notes match the web limit. */
   maxOccurrenceNoteLength: 2000,
+  /** Day notes (Ticket 292): note length and the longest inclusive `list_day_notes` range. */
+  maxDayNoteLength: 2000,
+  maxDayNoteRangeDays: 92,
   maxArchiveNoteLength: 2000,
   /** Opaque token sizes. */
   maxCursorLength: 512,

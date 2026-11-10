@@ -32,6 +32,8 @@ import type {
 
 import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
+import { DayNoteControl } from "@/components/timeline/DayNoteControl";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
@@ -116,6 +118,8 @@ type DayProgressTimelineProps = Readonly<{
   stopTimeTrackingAction: TimeTrackingFormAction;
   resetTimeTrackingAction: TimeTrackingFormAction;
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
+  /** Saves the one note for a whole day; omitted where day notes are unavailable. */
+  dayNoteAction?: OccurrenceFormAction;
   onDayChange?: () => void;
   onOpenExternal?: (url: string) => void | Promise<void>;
   liveCalendar?: boolean;
@@ -177,6 +181,7 @@ export function DayProgressTimeline({
   stopTimeTrackingAction,
   resetTimeTrackingAction,
   shortcutsByBehavior = {},
+  dayNoteAction,
   onDayChange,
   onOpenExternal,
   liveCalendar = false,
@@ -560,6 +565,8 @@ export function DayProgressTimeline({
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
         nextTrip={nextTrip}
         shortcutsByBehavior={shortcutsByBehavior}
+        dayNoteAction={dayNoteAction}
+        dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
         onPreview={openPreview}
@@ -632,6 +639,7 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   registerMeasurement: (date: string, measure: () => MeasuredDay) => () => void;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
   onRestoreAllDay: () => void;
+  dayNote: string;
   nextTrip: DayProgressNextTripInput | null;
 }>;
 
@@ -665,6 +673,8 @@ function DayProgressDay({
   stopTimeTrackingAction,
   resetTimeTrackingAction,
   shortcutsByBehavior,
+  dayNoteAction,
+  dayNote,
 }: DayProgressDayProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -761,6 +771,13 @@ function DayProgressDay({
               {visibleAllDay.length && visibleAllDay.length < allDay.length ? <button type="button" className="min-h-11 text-xs underline" onClick={onRestoreAllDay}>Restore ({allDay.length - visibleAllDay.length})</button> : null}
             </aside> : null}
           </div>
+          {dayNoteAction ? <DayNoteControl
+            localDate={section.localDate}
+            dayLabel={section.label}
+            note={dayNote}
+            action={dayNoteAction}
+            shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
+          /> : null}
           <RecordedActivityList activity={activity} timezone={timezone} label={section.label} />
         </div>
       </header>

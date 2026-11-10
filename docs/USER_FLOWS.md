@@ -352,6 +352,17 @@ If a day has no occurrences, show:
 No behaviors on this day
 ```
 
+### Save a day note (Ticket 292)
+
+1. Under a day's date on the Timeline, the user opens "Add day note" (or "Day note").
+2. The user types or picks an accepted day-note shortcut, then selects Save note.
+3. Cadence saves the one note for that date and refreshes the Timeline. The header
+   shows a one-line preview.
+4. To edit, the user opens the same disclosure, changes the text and saves. To clear,
+   the user empties the text and saves.
+5. If the note changed elsewhere, Cadence keeps the draft and asks the user to review
+   the latest note before saving again.
+
 ## Occurrence card flow
 
 Collapsed unresolved cards show:

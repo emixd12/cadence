@@ -11,6 +11,7 @@ import type {
   StatusTransitionCommit,
 } from "@cadence/core/data-store";
 import type { AccountSyncEntity, AccountSyncWrite } from "@cadence/core/resolvers/account-sync.resolver";
+import type { DayNoteRecord } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcutContext, NoteShortcutState } from "@cadence/core/types/note-shortcut";
 import type { TravelHabits, TravelSettings } from "@cadence/core/types/travel";
 
@@ -97,7 +98,7 @@ export type LocalCommandMap = {
       occurrences: OccurrenceRecord[]; statusEvents: OccurrenceStatusEventRecord[]; reminderDeliveries: ReminderDelivery[];
       timeSessions: OccurrenceTimeSession[]; nativeReminders: NativeReminderRow[];
       importedNotes: PortabilityNoteRow[]; importedInterventions: PortabilityInterventionRow[];
-      importRuns: PortabilityImportRunRow[]; importMappings: PortabilityMappingRow[] };
+      importRuns: PortabilityImportRunRow[]; importMappings: PortabilityMappingRow[]; dayNotes: DayNoteRecord[] };
   };
   readProfile: { input: Record<string, never>; result: Profile };
   readCategories: { input: Owned; result: Category[] };
@@ -138,6 +139,11 @@ export type LocalCommandMap = {
   updateOccurrenceNote: {
     input: Mutation & { occurrenceId: string; expectedNote: string | null; note: string | null; usedShortcut?: boolean };
     result: OccurrenceRecord | null;
+  };
+  readDayNotes: { input: Owned & { startLocalDate: string; endLocalDate: string }; result: DayNoteRecord[] };
+  saveDayNote: {
+    input: Mutation & { newId: string; localDate: string; expectedNote: string | null; note: string | null };
+    result: DayNoteRecord | null;
   };
   startTimeSession: { input: Mutation & { session: OccurrenceTimeSession }; result: OccurrenceTimeSession | null };
   stopTimeSession: { input: Mutation & { occurrenceId: string; sessionId: string; stoppedAt: string }; result: OccurrenceTimeSession | null };

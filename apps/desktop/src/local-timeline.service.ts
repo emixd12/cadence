@@ -4,6 +4,7 @@ import { resolvePersistedTimeline } from "@cadence/core/services/timeline.servic
 import { localCommand } from "./local-store";
 import { ensureLocalOccurrencesFresh, toLocalBehaviorGraphRecord } from "./local-generation.service";
 import { toTimeSession } from "./local-occurrence.service";
+import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
 
 export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.instant()) {
   const profile = await localCommand("readProfile", {});
@@ -24,7 +25,9 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
   const durationHistory = await localCommand("readOccurrenceHistory", { profileId,
     occurrenceIds: historyOccurrences.map(({ id }) => id) });
   const behaviors = graphs.map((graph) => toLocalBehaviorGraphRecord(graph, categories));
-  return { profile, behaviors, categories,
-    timeline: resolvePersistedTimeline({ durationHistory: { occurrences: historyOccurrences, timeSessions: durationHistory.timeSessions.map(toTimeSession) }, behaviors, occurrences, timeSessions: history.timeSessions.map(toTimeSession),
-      now, timezone: profile.timezone, futureDays }) };
+  const view = resolvePersistedTimeline({ durationHistory: { occurrences: historyOccurrences, timeSessions: durationHistory.timeSessions.map(toTimeSession) }, behaviors, occurrences, timeSessions: history.timeSessions.map(toTimeSession),
+    now, timezone: profile.timezone, futureDays });
+  const dayNoteRange = timelineDayNoteRange(view);
+  const dayNotes = dayNoteRange ? await localCommand("readDayNotes", { profileId, startLocalDate: dayNoteRange.from, endLocalDate: dayNoteRange.to }) : [];
+  return { profile, behaviors, categories, timeline: attachTimelineDayNotes(view, dayNotes) };
 }

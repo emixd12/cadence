@@ -5,13 +5,13 @@ import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/trav
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
-export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"] as const;
+export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note"] as const;
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
  * `cadence_private.account_sync_contract_additions` entry; see docs/DESKTOP_DATA_MODEL.md.
  */
-export const ACCOUNT_SYNC_CONTRACT = 2;
+export const ACCOUNT_SYNC_CONTRACT = 3;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -54,7 +54,10 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
   const fingerprints = { baseline: fingerprint(baseline.values()), local: fingerprint(local.values()), hosted: fingerprint(hosted.values()) };
   const keys = [...new Set([...baseline.keys(), ...local.keys(), ...hosted.keys()])].sort();
   const conflicts: AccountSyncConflict[] = [], mergedEntities: AccountSyncEntity[] = [];
+  const dayNoteMerges = mergeDayNoteDateCollisions(baseline, local, hosted);
   for (const key of keys) {
+    const dayNoteMerge = dayNoteMerges.get(key);
+    if (dayNoteMerge !== undefined) { if (dayNoteMerge) mergedEntities.push(dayNoteMerge); continue; }
     const base = baseline.get(key) ?? null, left = local.get(key) ?? null, right = hosted.get(key) ?? null;
     if (base?.kind === "occurrence" && (!left || !right) && protectedOccurrences.has(base.id)) {
       const retained = left ?? right;
@@ -251,6 +254,8 @@ function writesBetween(previous: Map<string, AccountSyncEntity>, next: Map<strin
 }
 
 function writeOrder(write: AccountSyncWrite): number {
+  // A merged same-date day note replaces a local row; its delete must precede the upsert.
+  if (write.operation === "delete" && write.kind === "day_note") return -1;
   if (write.operation !== "delete") return 0;
   if (write.kind === "reminder_delivery") return 1;
   if (write.kind === "occurrence") return 2;
@@ -429,6 +434,7 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     validateBehaviorPersistenceFields(value);
   }
   if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
+  if (entity.kind === "day_note") validateDayNoteRow(entity.id, value);
   return { kind: entity.kind, id: entity.id, value };
 }
 
@@ -499,6 +505,56 @@ function retainPlaceLabelInvariants(entities: readonly AccountSyncEntity[]): Acc
       && field(occurrence!.value, "behavior_id") === field(entity.value, "behavior_id")
       && field(occurrence!.value, "local_date") === field(entity.value, "local_date");
   });
+}
+
+const DAY_NOTE_FIELDS = ["id", "local_date", "note", "revision", "created_at", "updated_at"] as const;
+
+/** Mirrors the hosted and SQLite day_notes checks (Ticket 292). */
+function validateDayNoteRow(id: string, value: Json): void {
+  const instant = (item: Json | undefined) => { try { return typeof item === "string" && Boolean(Temporal.Instant.from(item)); } catch { return false; } };
+  if (!value || Array.isArray(value) || typeof value !== "object" || value.id !== id
+    || Object.keys(value).length !== DAY_NOTE_FIELDS.length || !DAY_NOTE_FIELDS.every((name) => name in value)) {
+    throw new Error("Update Cadence before synchronizing day notes.");
+  }
+  const note = value.note;
+  let date = false;
+  try { date = typeof value.local_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.local_date) && Temporal.PlainDate.from(value.local_date, { overflow: "reject" }).toString() === value.local_date; } catch { date = false; }
+  if (!date || !(note === null || (typeof note === "string" && note.trim() !== "" && [...note].length <= 2000))
+    || !Number.isInteger(value.revision) || (value.revision as number) < 1 || (value.revision as number) > 2_147_483_647
+    || !instant(value.created_at) || !instant(value.updated_at)) {
+    throw new Error("The synced day note is invalid.");
+  }
+}
+
+/**
+ * Two devices can each create a note for the same date offline under different IDs.
+ * Only one row may exist per date, so the hosted ID is kept and both texts are combined.
+ * Returns merged entities by key; null marks a key whose row is dropped.
+ */
+function mergeDayNoteDateCollisions(
+  baseline: Map<string, AccountSyncEntity>, local: Map<string, AccountSyncEntity>, hosted: Map<string, AccountSyncEntity>,
+): Map<string, AccountSyncEntity | null> {
+  const result = new Map<string, AccountSyncEntity | null>();
+  const hostedByDate = new Map([...hosted.values()].filter(({ kind }) => kind === "day_note").map((entity) => [field(entity.value, "local_date"), entity]));
+  for (const left of local.values()) {
+    if (left.kind !== "day_note") continue;
+    const right = hostedByDate.get(field(left.value, "local_date"));
+    if (!right || right.id === left.id || hosted.has(entityKey(left)) || local.has(entityKey(right))
+      || baseline.has(entityKey(left)) || baseline.has(entityKey(right))) continue;
+    const leftNote = field(left.value, "note"), rightNote = field(right.value, "note");
+    const note = !leftNote ? rightNote : !rightNote || leftNote === rightNote ? leftNote : `${rightNote}\n\n${leftNote}`;
+    if (note !== null && [...note].length > 2000) {
+      throw new Error(`Two devices saved different day notes for ${field(left.value, "local_date")}. Shorten one so both fit in 2,000 characters, then sync again.`);
+    }
+    const value = right.value as Record<string, Json>, leftValue = left.value as Record<string, Json>;
+    const later = Temporal.Instant.compare(String(leftValue.updated_at), String(value.updated_at)) > 0 ? leftValue.updated_at : value.updated_at;
+    const merged = note === rightNote ? right : { kind: "day_note" as const, id: right.id, value: {
+      ...value, note, revision: Math.min(2_147_483_647, Math.max(Number(value.revision), Number(leftValue.revision)) + 1), updated_at: later,
+    } };
+    result.set(entityKey(left), null);
+    result.set(entityKey(right), merged);
+  }
+  return result;
 }
 
 function validateProfileSyncValue(value: Json): void {

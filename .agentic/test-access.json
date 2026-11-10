@@ -1,0 +1,1487 @@
+{
+  "$schema": "https://skills.local/service-connections-bootstrap/test-access-manifest.schema.json",
+  "schema_version": "1.0",
+  "project": "cadence",
+  "defaults": {
+    "probe_timeout_seconds": 60,
+    "renew_timeout_seconds": 600,
+    "freshness_seconds": 900
+  },
+  "identities": [
+    {
+      "id": "account-a",
+      "label": "test account A"
+    },
+    {
+      "id": "account-b",
+      "label": "test account B"
+    },
+    {
+      "id": "owner-mac",
+      "label": "the owner's Mac"
+    },
+    {
+      "id": "test-mac",
+      "label": "the test Mac"
+    }
+  ],
+  "suites": [
+    {
+      "id": "mcp-local",
+      "summary": "MCP Tier 0 and Tier 1 against a disposable local stack."
+    },
+    {
+      "id": "mcp-protocol",
+      "summary": "MCP Tier 0 on production (mcp:accept:protocol) and the watcher."
+    },
+    {
+      "id": "mcp-clients",
+      "summary": "MCP Tier 1 on production: claude-code, claude-ai, anthropic-api, openai-api, inspector."
+    },
+    {
+      "id": "mcp-web",
+      "summary": "MCP Tier 2: ChatGPT web and Claude web in the Cadence QA Chrome profile."
+    },
+    {
+      "id": "calendar-fixtures",
+      "summary": "QA Calendar create, list and delete for test account A."
+    },
+    {
+      "id": "calendar-fixtures-b",
+      "summary": "QA Calendar create, list and delete for test account B."
+    },
+    {
+      "id": "web-travel",
+      "summary": "Ticket 284-style web travel acceptance in QA Chrome as test account A."
+    },
+    {
+      "id": "connectors",
+      "summary": "Google, Outlook and iCloud Calendar and Hevy connection checks for test account A."
+    },
+    {
+      "id": "desktop-owner-mac",
+      "summary": "Dev-signed build, install and installed checks on the owner's Mac."
+    },
+    {
+      "id": "desktop-test-mac",
+      "summary": "Installed checks on the test Mac over Tailscale SSH as test account A."
+    },
+    {
+      "id": "desktop-release",
+      "summary": "Notarized release checks and publication."
+    },
+    {
+      "id": "email",
+      "summary": "Sequenzy reminder test send to the AgentMail test inbox."
+    },
+    {
+      "id": "hosted-migrations",
+      "summary": "Hosted Supabase migration list and pushes that docs/DECISIONS.md, 2026-11-10, approves in advance."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "op-service-token",
+      "kind": "secret-store-item",
+      "summary": "1Password service-account token for the Cadence Agents vault, in the Keychain (cadence-agent-1password / service-account-token), scoped to that vault only.",
+      "identity": "owner-mac",
+      "suites": [
+        "mcp-protocol",
+        "mcp-clients",
+        "mcp-web",
+        "calendar-fixtures",
+        "web-travel",
+        "connectors",
+        "desktop-test-mac"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--token"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Create or renew the Cadence Agents service account and store its token with agent:secret --store-token (docs/qa/agent-secrets.md, steps 4 and 5).",
+      "freshness_seconds": 86400,
+      "expiry": "The service account's own expiry date; not readable without the owner's 1Password session."
+    },
+    {
+      "id": "vault-anthropic-key",
+      "kind": "vault-item",
+      "summary": "Anthropic API key for agent clients, Cadence Agents item anthropic-api-key.",
+      "suites": [
+        "mcp-clients"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "anthropic-api-key"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the anthropic-api-key item (field credential) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-openai-key",
+      "kind": "vault-item",
+      "summary": "OpenAI API key for agent clients, Cadence Agents item openai-api-key.",
+      "suites": [
+        "mcp-clients"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "openai-api-key"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the openai-api-key item (field credential) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-google-a",
+      "kind": "vault-item",
+      "summary": "Google Login item for test account A (password, one-time password).",
+      "identity": "account-a",
+      "suites": [
+        "calendar-fixtures",
+        "web-travel",
+        "desktop-test-mac"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "google-test-account-a"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the google-test-account-a Login item (password and one-time password) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-google-b",
+      "kind": "vault-item",
+      "summary": "Google Login item for test account B (password, one-time password).",
+      "identity": "account-b",
+      "suites": [
+        "calendar-fixtures-b",
+        "mcp-protocol"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "google-test-account-b"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the google-test-account-b Login item (password and one-time password) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-outlook-a",
+      "kind": "vault-item",
+      "summary": "Outlook test identity for A (username, password, one-time password if 2-step is on). Decision 2026-11-07, item 2.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "outlook-test-account-a"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Create the Outlook test identity and add the outlook-test-account-a item (username, password, one-time password) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-icloud-a",
+      "kind": "vault-item",
+      "summary": "iCloud test identity for A (username, app-specific password). Decision 2026-11-07, item 2.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "icloud-test-account-a"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Create the iCloud test Apple Account and add the icloud-test-account-a item (username, app-specific password) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-hevy-a",
+      "kind": "vault-item",
+      "summary": "Hevy test identity for A (its credential field holds the Hevy Pro API key). Decision 2026-11-07, item 2.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "hevy-test-account-a"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Create the Hevy Pro test account and add the hevy-test-account-a item (its credential field holds the API key) to the Cadence Agents vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "qa-oauth-client",
+      "kind": "oauth-client",
+      "summary": "QA Calendar OAuth client JSON for cadence-qa-498717 in the Keychain (cadence-qa-google-oauth-client).",
+      "suites": [
+        "calendar-fixtures",
+        "calendar-fixtures-b",
+        "web-travel"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/calendar.mjs",
+          "client"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Store the cadence-qa-498717 Desktop OAuth client JSON in the Keychain (docs/qa/agent-secrets.md, Calendar fixtures for test accounts).",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "qa-consent-test-users",
+      "kind": "provider-config",
+      "summary": "A and B listed as test users on the cadence-qa-498717 OAuth Audience. No CLI read; an owner-confirmed date, and a consent that stops with not-a-test-user.",
+      "suites": [
+        "calendar-fixtures",
+        "calendar-fixtures-b"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/record.mjs",
+          "confirmation",
+          "--id",
+          "qa-consent-test-users",
+          "--max-age-days",
+          "90"
+        ]
+      },
+      "owner_step": "Confirm that A and B are still test users on the cadence-qa-498717 OAuth Audience page; the agent then records the date.",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "qa-chrome-profile",
+      "kind": "local-config",
+      "summary": "Cadence QA Chrome profile open with remote debugging on port 4430. Decision 2026-11-07, item 5: normal agent use.",
+      "identity": "owner-mac",
+      "suites": [
+        "calendar-fixtures",
+        "web-travel",
+        "mcp-web"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "profile"
+        ],
+        "timeout_seconds": 30
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/web-client.mjs",
+          "open"
+        ],
+        "timeout_seconds": 60
+      },
+      "owner_step": "Open the Cadence QA Chrome window with npm run mcp:accept:web -- open.",
+      "freshness_seconds": 300
+    },
+    {
+      "id": "google-browser-a",
+      "kind": "browser-session",
+      "summary": "Test account A signed in to Google in the Cadence QA Chrome profile.",
+      "identity": "account-a",
+      "suites": [
+        "calendar-fixtures",
+        "web-travel"
+      ],
+      "depends_on": [
+        "vault-google-a",
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/google.mjs",
+          "session",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/google.mjs",
+          "signin",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 600
+      },
+      "owner_step": "If the agent's Google sign-in stops, finish test account A's Google sign-in in the Cadence QA Chrome window.",
+      "owner_stops": {
+        "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
+        "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
+        "verification-required": "Complete Google's identity check for this test account in the Cadence QA Chrome window.",
+        "browser-not-secure": "Google refused the Cadence QA Chrome window as not secure; sign this test account in there by hand once.",
+        "challenge-unsupported": "Google asked for a check the script cannot pass; finish this test account's sign-in in the Cadence QA Chrome window.",
+        "credentials-rejected": "Google rejected the password or authenticator seed in this account's Cadence Agents vault item; update the item."
+      },
+      "freshness_seconds": 1800,
+      "expiry": "Google's session lifetime."
+    },
+    {
+      "id": "google-browser-b",
+      "kind": "browser-session",
+      "summary": "Test account B signed in to Google in the Cadence QA Chrome profile.",
+      "identity": "account-b",
+      "suites": [
+        "calendar-fixtures-b"
+      ],
+      "depends_on": [
+        "vault-google-b",
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/google.mjs",
+          "session",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/google.mjs",
+          "signin",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 600
+      },
+      "owner_step": "If the agent's Google sign-in stops, finish test account B's Google sign-in in the Cadence QA Chrome window.",
+      "owner_stops": {
+        "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
+        "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
+        "verification-required": "Complete Google's identity check for this test account in the Cadence QA Chrome window.",
+        "browser-not-secure": "Google refused the Cadence QA Chrome window as not secure; sign this test account in there by hand once.",
+        "challenge-unsupported": "Google asked for a check the script cannot pass; finish this test account's sign-in in the Cadence QA Chrome window.",
+        "credentials-rejected": "Google rejected the password or authenticator seed in this account's Cadence Agents vault item; update the item."
+      },
+      "freshness_seconds": 1800,
+      "expiry": "Google's session lifetime."
+    },
+    {
+      "id": "qa-calendar-grant-a",
+      "kind": "oauth-grant",
+      "summary": "QA Calendar refresh token for test account A in the Keychain (cadence-qa-google-calendar / production:A).",
+      "identity": "account-a",
+      "suites": [
+        "calendar-fixtures",
+        "web-travel"
+      ],
+      "depends_on": [
+        "qa-oauth-client",
+        "qa-consent-test-users",
+        "google-browser-a",
+        "vault-google-a"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/calendar.mjs",
+          "grant",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/calendar.mjs",
+          "consent",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 600
+      },
+      "owner_step": "If the agent's Calendar consent stops, approve the Cadence QA fixtures consent for test account A in the Cadence QA Chrome window.",
+      "owner_stops": {
+        "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
+        "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
+        "verification-required": "Complete Google's identity check for this test account in the Cadence QA Chrome window.",
+        "browser-not-secure": "Google refused the Cadence QA Chrome window as not secure; sign this test account in there by hand once.",
+        "challenge-unsupported": "Google asked for a check the script cannot pass; finish this test account's sign-in in the Cadence QA Chrome window.",
+        "credentials-rejected": "Google rejected the password or authenticator seed in this account's Cadence Agents vault item; update the item.",
+        "not-a-test-user": "Add test account A back as a test user on the cadence-qa-498717 OAuth Audience page."
+      },
+      "freshness_seconds": 3600,
+      "expiry": "7 days while the cadence-qa-498717 app is in Testing."
+    },
+    {
+      "id": "qa-calendar-grant-b",
+      "kind": "oauth-grant",
+      "summary": "QA Calendar refresh token for test account B in the Keychain (cadence-qa-google-calendar / production:B).",
+      "identity": "account-b",
+      "suites": [
+        "calendar-fixtures-b"
+      ],
+      "depends_on": [
+        "qa-oauth-client",
+        "qa-consent-test-users",
+        "google-browser-b",
+        "vault-google-b"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/calendar.mjs",
+          "grant",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/calendar.mjs",
+          "consent",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 600
+      },
+      "owner_step": "If the agent's Calendar consent stops, approve the Cadence QA fixtures consent for test account B in the Cadence QA Chrome window.",
+      "owner_stops": {
+        "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
+        "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
+        "verification-required": "Complete Google's identity check for this test account in the Cadence QA Chrome window.",
+        "browser-not-secure": "Google refused the Cadence QA Chrome window as not secure; sign this test account in there by hand once.",
+        "challenge-unsupported": "Google asked for a check the script cannot pass; finish this test account's sign-in in the Cadence QA Chrome window.",
+        "credentials-rejected": "Google rejected the password or authenticator seed in this account's Cadence Agents vault item; update the item.",
+        "not-a-test-user": "Add test account B back as a test user on the cadence-qa-498717 OAuth Audience page."
+      },
+      "freshness_seconds": 3600,
+      "expiry": "7 days while the cadence-qa-498717 app is in Testing."
+    },
+    {
+      "id": "supabase-session-a",
+      "kind": "stored-session",
+      "summary": "Kept Cadence (Supabase) session for test account A in the Keychain (cadence-qa-oauth-session / production:A). Decision 2026-11-07, item 1: agents re-enroll.",
+      "identity": "account-a",
+      "suites": [
+        "mcp-protocol",
+        "mcp-clients",
+        "mcp-web",
+        "web-travel",
+        "connectors"
+      ],
+      "depends_on": [
+        "google-browser-a",
+        "qa-chrome-profile"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "status",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "enroll",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 300
+      },
+      "owner_stops": {
+        "enroll-timeout": "Finish the kept-session enrollment (mcp:oauth enroll) for test account A in the 127.0.0.1 tab the agent opened in Cadence QA Chrome, then tell the agent to rerun."
+      },
+      "freshness_seconds": 900,
+      "expiry": "Until Google or Supabase ends it; refreshed automatically with a 15-minute margin."
+    },
+    {
+      "id": "supabase-session-b",
+      "kind": "stored-session",
+      "summary": "Kept Cadence (Supabase) session for test account B in the Keychain (cadence-qa-oauth-session / production:B). Decision 2026-11-07, item 1: agents re-enroll.",
+      "identity": "account-b",
+      "suites": [
+        "mcp-protocol",
+        "mcp-clients",
+        "mcp-web"
+      ],
+      "depends_on": [
+        "google-browser-b",
+        "qa-chrome-profile"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "status",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "enroll",
+          "--slot",
+          "B"
+        ],
+        "timeout_seconds": 300
+      },
+      "owner_stops": {
+        "enroll-timeout": "Finish the kept-session enrollment (mcp:oauth enroll) for test account B in the 127.0.0.1 tab the agent opened in Cadence QA Chrome, then tell the agent to rerun."
+      },
+      "freshness_seconds": 900,
+      "expiry": "Until Google or Supabase ends it; refreshed automatically with a 15-minute margin."
+    },
+    {
+      "id": "cadence-web-a",
+      "kind": "browser-session",
+      "summary": "Test account A signed in to app.cadence-me.com in the Cadence QA Chrome profile.",
+      "identity": "account-a",
+      "suites": [
+        "web-travel",
+        "connectors"
+      ],
+      "depends_on": [
+        "google-browser-a",
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "cadence-web",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "cadence-signin",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 300
+      },
+      "owner_step": "If the agent's Cadence sign-in stops, sign test account A in to app.cadence-me.com in the Cadence QA Chrome window.",
+      "owner_stops": {
+        "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun."
+      },
+      "freshness_seconds": 1800
+    },
+    {
+      "id": "chatgpt-browser",
+      "kind": "browser-session",
+      "summary": "The owner's ChatGPT account signed in in the Cadence QA Chrome profile (session cookie names only).",
+      "suites": [
+        "mcp-web"
+      ],
+      "depends_on": [
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "site",
+          "--site",
+          "chatgpt"
+        ],
+        "timeout_seconds": 60
+      },
+      "owner_step": "Sign in to ChatGPT in the Cadence QA Chrome window.",
+      "freshness_seconds": 1800
+    },
+    {
+      "id": "claude-browser",
+      "kind": "browser-session",
+      "summary": "The owner's Claude account signed in in the Cadence QA Chrome profile (session cookie names only).",
+      "suites": [
+        "mcp-web"
+      ],
+      "depends_on": [
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "site",
+          "--site",
+          "claude-web"
+        ],
+        "timeout_seconds": 60
+      },
+      "owner_step": "Sign in to Claude in the Cadence QA Chrome window.",
+      "freshness_seconds": 1800
+    },
+    {
+      "id": "qa-chrome-push-a",
+      "kind": "browser-permission",
+      "summary": "Notifications allowed for app.cadence-me.com in QA Chrome, with A's push subscription (decision 2026-11-06, item 5).",
+      "identity": "account-a",
+      "suites": [
+        "web-travel"
+      ],
+      "depends_on": [
+        "cadence-web-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "permission",
+          "--name",
+          "notifications",
+          "--expect",
+          "granted"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "qa-chrome-notifications-a"
+        ]
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "qa-chrome-location-a",
+      "kind": "browser-permission",
+      "summary": "Location blocked for app.cadence-me.com in QA Chrome (Ticket 284 setup).",
+      "identity": "account-a",
+      "suites": [
+        "web-travel"
+      ],
+      "depends_on": [
+        "qa-chrome-profile"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/browser.mjs",
+          "permission",
+          "--name",
+          "geolocation",
+          "--expect",
+          "denied"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "qa-chrome-location-a"
+        ]
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "claude-ai-connector",
+      "kind": "linked-account",
+      "summary": "The owner's claude.ai Cadence QA connector holds exactly one active grant for account A.",
+      "identity": "account-a",
+      "suites": [
+        "mcp-clients",
+        "mcp-web"
+      ],
+      "depends_on": [
+        "supabase-session-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "claude-grant",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 60
+      },
+      "owner_step": "Connect the Cadence QA connector in claude.ai as test account A once (mcp-acceptance skill, Emi's whole part).",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "claude-cli-auth",
+      "kind": "provider-cli-session",
+      "summary": "Claude Code CLI available for the claude-code and claude-ai clients (subscription sign-in or the vault API key).",
+      "identity": "owner-mac",
+      "suites": [
+        "mcp-clients"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--command",
+          "claude"
+        ],
+        "timeout_seconds": 15
+      },
+      "owner_step": "Install Claude Code and sign in to it on this Mac.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "gcal-connection-a",
+      "kind": "linked-account",
+      "summary": "Cadence's Google Calendar connector for account A (decision 2026-11-06, item 2).",
+      "identity": "account-a",
+      "suites": [
+        "web-travel",
+        "connectors"
+      ],
+      "depends_on": [
+        "supabase-session-a",
+        "cadence-web-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "status",
+          "--slot",
+          "A",
+          "--connector",
+          "google-calendar"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "gcal-connect-a"
+        ]
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "outlook-connection-a",
+      "kind": "linked-account",
+      "summary": "Cadence's Outlook connector for account A with outlook-test-account-a. Decision 2026-11-07, item 2: agent connects.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "vault-outlook-a",
+        "supabase-session-a",
+        "cadence-web-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "status",
+          "--slot",
+          "A",
+          "--connector",
+          "outlook-calendar"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "outlook-connect-a"
+        ]
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "icloud-connection-a",
+      "kind": "linked-account",
+      "summary": "Cadence's iCloud Calendar connector for account A with icloud-test-account-a. Decision 2026-11-07, item 2: agent connects.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "vault-icloud-a",
+        "supabase-session-a",
+        "cadence-web-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "status",
+          "--slot",
+          "A",
+          "--connector",
+          "icloud-calendar"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "connect",
+          "--slot",
+          "A",
+          "--connector",
+          "icloud-calendar"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_stops": {
+        "credential-rejected": "Cadence rejected the iCloud credential; update the icloud-test-account-a item in the Cadence Agents vault."
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "hevy-connection-a",
+      "kind": "linked-account",
+      "summary": "Cadence's Hevy connector for account A with hevy-test-account-a. Decision 2026-11-07, item 2: agent connects.",
+      "identity": "account-a",
+      "suites": [
+        "connectors"
+      ],
+      "depends_on": [
+        "vault-hevy-a",
+        "supabase-session-a",
+        "cadence-web-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "status",
+          "--slot",
+          "A",
+          "--connector",
+          "hevy"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/connection.mjs",
+          "connect",
+          "--slot",
+          "A",
+          "--connector",
+          "hevy"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_stops": {
+        "credential-rejected": "Cadence rejected the Hevy credential; update the hevy-test-account-a item in the Cadence Agents vault."
+      },
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "travel-settings-a",
+      "kind": "provider-config",
+      "summary": "Account A: Travel estimates on with routing consent, Home saved, leave reminders on (decision 2026-11-06, item 3).",
+      "identity": "account-a",
+      "suites": [
+        "web-travel"
+      ],
+      "depends_on": [
+        "supabase-session-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/cadence-session.mjs",
+          "travel",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 60
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "travel-settings-a"
+        ]
+      },
+      "freshness_seconds": 900
+    },
+    {
+      "id": "maps-spend-cap",
+      "kind": "owner-approval",
+      "summary": "The owner's spend cap for this paid travel test (decision 2026-11-06; D5 set US$5 for Ticket 284).",
+      "suites": [
+        "web-travel"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/record.mjs",
+          "approval",
+          "--id",
+          "maps-spend-cap"
+        ]
+      },
+      "owner_step": "Set the Google Maps spend cap for this test run; the agent records it in the run folder.",
+      "freshness_seconds": 0
+    },
+    {
+      "id": "prod-mcp-enabled",
+      "kind": "provider-config",
+      "summary": "MCP enabled on production: /.well-known/oauth-protected-resource answers 200.",
+      "suites": [
+        "mcp-protocol",
+        "mcp-clients",
+        "mcp-web"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--url",
+          "https://app.cadence-me.com/.well-known/oauth-protected-resource",
+          "--expect-status",
+          "200"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Turn on CADENCE_MCP_ENABLED for production and redeploy.",
+      "freshness_seconds": 900
+    },
+    {
+      "id": "test-devices-inventory",
+      "kind": "local-config",
+      "summary": "Private test device inventory lists test-mac (Cadence Release/test-devices.json or CADENCE_TEST_DEVICES).",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-test-mac",
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "inventory",
+          "--device",
+          "test-mac"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Add test-mac to the test device inventory (docs/TEST_DEVICES.md, Adding a device).",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "test-mac-ssh",
+      "kind": "device-reachability",
+      "summary": "Test Mac reachable over Tailscale SSH with the labelled agent key.",
+      "identity": "test-mac",
+      "suites": [
+        "desktop-test-mac",
+        "desktop-release"
+      ],
+      "depends_on": [
+        "test-devices-inventory"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "reachable",
+          "--device",
+          "test-mac"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_step": "Wake the test Mac and make sure it is on Tailscale.",
+      "freshness_seconds": 300
+    },
+    {
+      "id": "test-mac-accessibility",
+      "kind": "host-permission",
+      "summary": "Accessibility (Device Control and Data Access) for sshd-keygen-wrapper on the test Mac.",
+      "identity": "test-mac",
+      "suites": [
+        "desktop-test-mac"
+      ],
+      "depends_on": [
+        "test-mac-ssh"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "accessibility",
+          "--device",
+          "test-mac"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_step": "Grant Accessibility to /usr/libexec/sshd-keygen-wrapper on the test Mac (docs/TEST_DEVICES.md).",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "test-mac-screen-recording",
+      "kind": "host-permission",
+      "summary": "Screen Recording for sshd-keygen-wrapper on the test Mac (screenshots over SSH).",
+      "identity": "test-mac",
+      "suites": [
+        "desktop-test-mac"
+      ],
+      "depends_on": [
+        "test-mac-ssh"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "screen-recording",
+          "--device",
+          "test-mac"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_step": "Grant Screen Recording to /usr/libexec/sshd-keygen-wrapper on the test Mac (docs/TEST_DEVICES.md, step 6).",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "test-mac-cadence-link-a",
+      "kind": "app-session",
+      "summary": "Cadence for Mac on the test Mac linked to account A. Decision 2026-11-07, item 3: agents sign in with the vault item.",
+      "identity": "test-mac",
+      "suites": [
+        "desktop-test-mac"
+      ],
+      "depends_on": [
+        "test-mac-ssh",
+        "test-mac-accessibility",
+        "vault-google-a"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "cadence-link",
+          "--device",
+          "test-mac",
+          "--slot",
+          "A"
+        ],
+        "timeout_seconds": 120
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "test-mac-cadence-signin-a"
+        ]
+      },
+      "freshness_seconds": 900
+    },
+    {
+      "id": "test-mac-app-permissions",
+      "kind": "host-permission",
+      "summary": "Notifications and Location allowed for Cadence on the test Mac, read from Cadence Settings text.",
+      "identity": "test-mac",
+      "suites": [
+        "desktop-test-mac"
+      ],
+      "depends_on": [
+        "test-mac-accessibility"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "app-permissions",
+          "--device",
+          "test-mac"
+        ],
+        "timeout_seconds": 200
+      },
+      "owner_step": "Allow Notifications and Location for Cadence on the test Mac (System Settings).",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "owner-mac-cadence-link",
+      "kind": "app-session",
+      "summary": "Cadence for Mac on this Mac linked to the owner's account (read-only SQLite count).",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-owner-mac"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/device.mjs",
+          "cadence-link",
+          "--local"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Sign Cadence for Mac on this Mac in to your own account.",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "owner-mac-ax-read",
+      "kind": "host-permission",
+      "summary": "Accessibility for the agent's process on this Mac, to read the Cadence window.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-owner-mac"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--ax"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Grant Accessibility on this Mac to the app that runs the agent.",
+      "freshness_seconds": 3600
+    },
+    {
+      "id": "developer-id",
+      "kind": "signing-identity",
+      "summary": "Developer ID Application certificate (team HK26VT477G) in the login Keychain.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-owner-mac",
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--codesign",
+          "Developer ID Application: Emiliano Bache Rodriguez (HK26VT477G)"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Install or renew the Developer ID Application certificate in the login Keychain.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "provisioning-profile",
+      "kind": "signing-identity",
+      "summary": "Cadence Desktop Developer ID provisioning profile in Cadence Release/apple.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-owner-mac",
+        "desktop-release"
+      ],
+      "depends_on": [
+        "developer-id"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--profile-expiry",
+          "~/Library/Application Support/Cadence Release/apple/Cadence_Desktop_Developer_ID.provisionprofile"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Download a current Cadence Desktop Developer ID provisioning profile into Cadence Release/apple.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "dev-signed-env",
+      "kind": "local-config",
+      "summary": "Cadence Release/dev-signed-env.sh for dev-signed builds (no secrets).",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-owner-mac"
+      ],
+      "depends_on": [
+        "developer-id",
+        "provisioning-profile"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--path",
+          "~/Library/Application Support/Cadence Release/dev-signed-env.sh"
+        ],
+        "timeout_seconds": 15
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "dev-signed-env"
+        ]
+      },
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "notarization-go-ahead",
+      "kind": "owner-approval",
+      "summary": "Owner instruction to notarize and publish this build, with the notary and updater signing secrets for it (D-1023; custody not documented in the repo).",
+      "suites": [
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/record.mjs",
+          "approval",
+          "--id",
+          "notarization-go-ahead"
+        ]
+      },
+      "owner_step": "Give the go-ahead to notarize this build and supply its notary and updater signing secrets through the per-version build-env.sh.",
+      "freshness_seconds": 0
+    },
+    {
+      "id": "local-stack-tools",
+      "kind": "local-config",
+      "summary": "Docker, the Supabase CLI, psql and openssl on this Mac for the disposable local stack.",
+      "identity": "owner-mac",
+      "suites": [
+        "mcp-local"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--command",
+          "docker",
+          "--command",
+          "supabase",
+          "--command",
+          "psql",
+          "--command",
+          "openssl"
+        ],
+        "timeout_seconds": 30
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "local-stack-tools"
+        ]
+      },
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "inspector-cli",
+      "kind": "local-config",
+      "summary": "npx for the MCP Inspector CLI (or CADENCE_INSPECTOR_CLI).",
+      "identity": "owner-mac",
+      "suites": [
+        "mcp-local",
+        "mcp-clients"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--command",
+          "npx"
+        ],
+        "timeout_seconds": 15
+      },
+      "owner_step": "Install Node 24 with npx on this Mac.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "sequenzy-cli",
+      "kind": "provider-cli-session",
+      "summary": "Sequenzy API key name set in .env.local (the value is never read out).",
+      "identity": "owner-mac",
+      "suites": [
+        "email"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--env-name",
+          "SEQUENZY_API_KEY",
+          "--dotenv",
+          ".env.local"
+        ],
+        "timeout_seconds": 15
+      },
+      "owner_step": "Log in to Sequenzy with npm run sequenzy -- login, or set SEQUENZY_API_KEY in .env.local.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "agentmail-key",
+      "kind": "secret-store-item",
+      "summary": "AgentMail API key name set in .env.local for the QA test inbox.",
+      "identity": "owner-mac",
+      "suites": [
+        "email"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/host.mjs",
+          "--env-name",
+          "AGENTMAIL_API_KEY",
+          "--dotenv",
+          ".env.local"
+        ],
+        "timeout_seconds": 15
+      },
+      "owner_step": "Create an AgentMail API key and set AGENTMAIL_API_KEY in .env.local.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "email-test-recipient",
+      "kind": "owner-approval",
+      "summary": "Standing approved recipient for automated Sequenzy test sends: the AgentMail test inbox (decision 2026-11-07, item 4).",
+      "suites": [
+        "email"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/record.mjs",
+          "decision",
+          "--file",
+          "docs/DECISIONS.md",
+          "--contains",
+          "AgentMail test inbox is a standing approved recipient"
+        ]
+      },
+      "owner_step": "Approve a test recipient for automated Sequenzy test sends.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-supabase-access-token",
+      "kind": "vault-item",
+      "summary": "Supabase personal access token for agent hosted-migration work, Cadence Agents item cadence-agents (field credential). Account-wide: Supabase tokens cannot be limited to one project.",
+      "suites": [
+        "hosted-migrations"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "cadence-agents"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the cadence-agents item (field credential) with a Supabase personal access token to the Cadence Agents vault; revoke and replace it in the Supabase dashboard when it expires.",
+      "freshness_seconds": 86400
+    }
+  ]
+}

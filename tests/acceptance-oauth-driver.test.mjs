@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { inspect } from 'node:util';
 import { EventEmitter } from 'node:events';
 import { JSDOM } from 'jsdom';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
-  AcceptanceError, PRODUCTION, Secret, SESSION_FORMAT, createKeychainSessionStore, createMemorySessionStore,
+  AcceptanceError, PRODUCTION, Secret, SESSION_FORMAT, createFileLock, createKeychainSessionStore, createMemorySessionStore,
   createSessionManager, enrollProduction, recordFromSession, toBrokerSession,
 } from '../scripts/acceptance/test-account-sessions.mjs';
 import { GRANTS, checkConsentView, consentRecord, requestedScopesFrom } from '../scripts/acceptance/consent-page.mjs';
@@ -297,7 +300,9 @@ describe('Keychain store', () => {
     });
     const startProcess = () => createSessionManager({
       target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, fetchImpl, now: () => clock,
-      store: createKeychainSessionStore({ execImpl, conflictDelayMs: 10 }),
+      // No shared lock: this models writers outside Ticket 256's file lock (an older checkout's
+      // runner), so the exit-45 retry path is what keeps both processes alive.
+      store: createKeychainSessionStore({ execImpl, conflictDelayMs: 10, lock: { withLock: (_name, fn) => fn() } }),
     });
     await createKeychainSessionStore({ execImpl }).set('production:A', recordFromSession(fakeSession(ACCOUNTS.A, 'refresh-1'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } }));
     const runner = startProcess();
@@ -323,6 +328,61 @@ describe('Keychain store', () => {
   it('rejects unexpected account names', async () => {
     const store = createKeychainSessionStore({ execImpl: fakeSecurity().execImpl });
     await expect(store.get('production:C')).rejects.toMatchObject({ code: 'keychain-account-invalid' });
+  });
+
+  it('two managers sharing one item (runner and watcher) refresh one after the other with the rotated token', async () => {
+    const { execImpl } = limitedSecurity();
+    const lock = createFileLock({ dir: mkdtempSync(join(tmpdir(), 'lock256-')) });
+    const store = createKeychainSessionStore({ execImpl, lock });
+    await store.set('production:A', recordFromSession(bigSession('refresh-1'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } }));
+    const sent = [];
+    let inFlight = 0;
+    let overlap = false;
+    const fetchImpl = vi.fn(async (input, init = {}) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/auth/v1/token') {
+        inFlight += 1;
+        if (inFlight > 1) overlap = true;
+        const used = JSON.parse(init.body).refresh_token;
+        sent.push(used);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        inFlight -= 1;
+        return json(bigSession(`refresh-${Number(used.split('-')[1]) + 1}`));
+      }
+      if (url.pathname === '/auth/v1/user') return json({ id: ACCOUNTS.A, email: 'cadence.testing.is@gmail.com' });
+      return json({}, 404);
+    });
+    const runner = createSessionManager({ target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, store, fetchImpl });
+    const watcher = createSessionManager({ target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, store, fetchImpl });
+    const [a, b, c] = await Promise.all([runner.current('A'), watcher.current('A'), runner.current('A')]);
+    expect(overlap).toBe(false);
+    // Each manager refreshes once, the second with the token the first stored.
+    expect(sent).toEqual(['refresh-1', 'refresh-2']);
+    expect([a, b, c].every((r) => r.accessToken === bigAccess)).toBe(true);
+    expect((await store.get('production:A')).refreshToken).toBe('refresh-3');
+  });
+});
+
+describe('file lock', () => {
+  const freshDir = () => mkdtempSync(join(tmpdir(), 'lock256-'));
+  it('runs holders of the same name one at a time and releases on error', async () => {
+    const lock = createFileLock({ dir: freshDir(), pollMs: 5 });
+    let active = 0;
+    let max = 0;
+    const hold = () => lock.withLock('production_A', async () => { active += 1; max = Math.max(max, active); await new Promise((r) => setTimeout(r, 20)); active -= 1; });
+    await Promise.all([hold(), hold(), hold()]);
+    expect(max).toBe(1);
+    await expect(lock.withLock('production_A', async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(await lock.withLock('production_A', async () => 'free')).toBe('free');
+  });
+  it('takes over a lock whose owner process is gone, and times out on a live owner', async () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'item.lock'));
+    writeFileSync(join(dir, 'item.lock', 'pid'), '999999');
+    expect(await createFileLock({ dir, pollMs: 5 }).withLock('item', async () => 'taken-over')).toBe('taken-over');
+    mkdirSync(join(dir, 'item.lock'));
+    writeFileSync(join(dir, 'item.lock', 'pid'), String(process.pid));
+    await expect(createFileLock({ dir, pollMs: 5, waitMs: 50 }).withLock('item', async () => 'never')).rejects.toMatchObject({ code: 'session-lock-timeout' });
   });
 });
 

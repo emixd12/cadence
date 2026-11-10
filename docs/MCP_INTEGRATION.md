@@ -570,3 +570,20 @@ publication or directory approval. Ticket 232 verifies actual host behavior.
 Platform impact: web, desktop and future mobile have no runtime changes in
 Ticket 230. Marketing links to the packages under Ticket 229. Hosted tracking
 and synchronization behavior remain governed by the existing operation contract.
+
+## 15. Day notes (Ticket 292, contract 1.1.0)
+
+Contract 1.1.0 adds `list_day_notes` (`cadence.read`) and `update_day_note`
+(`cadence.occurrences.write`, owner decision 2026-11-10), and an optional `day_note`
+string on each `get_timeline` day. Both tool descriptions say a day note is one note
+about a whole date, separate from Occurrence notes and statuses, and never changes
+adherence, Needs decision or reminders. `update_day_note` runs as the grant's user
+through `public.integration_apply_day_note_write`, which checks scope and idempotency
+with `integration_lock_write`, compares and sets through `save_day_note`, and stores a
+version-2 receipt. It needs no prepared preview because a day note has no Behavior or
+Occurrence graph. Evidence: `tests/sql/ticket-292-day-note-integration-write.sql`,
+`tests/integration-write.test.ts`, and the local read suite including
+`list_day_notes` in the cross-account check (November 10, 2026). The
+`mcp-server.local-integration` suite was not rerun; it is pinned to the isolated
+port-56922 project. `search` and `fetch` do not cover day notes yet.
+

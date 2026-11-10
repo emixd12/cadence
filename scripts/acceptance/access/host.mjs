@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+// Test-access probe for things on this Mac (Ticket 293). One check per call:
+//
+//   host.mjs --path <file> [--path …]               files or folders exist (a leading ~/ is the home folder)
+//   host.mjs --command <name> [--command …]         commands are on PATH
+//   host.mjs --codesign "<identity name>"           a valid code-signing identity with that name (names only)
+//   host.mjs --profile-expiry <file>                a provisioning profile; reports its ExpirationDate
+//   host.mjs --env-name <NAME> --dotenv <file>       the file sets NAME to something (the value is never kept or printed);
+//                                                    a relative file is looked up in this checkout, then in the main checkout
+//   host.mjs --url <https-url> --expect-status <n>  a public URL answers with that status
+//   host.mjs --ax                                   this Mac lets the agent's process read windows through System Events
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { delimiter, dirname, isAbsolute, join, resolve, sep } from 'node:path';
+import { PROBE, USAGE, cliMain, finish, parseFlags, runProcess } from './lib.mjs';
+
+const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+
+// PATH is the operating system's command search path, not Cadence configuration, so it
+// stays out of .env.example (an empty PATH= line there would break shells that load it).
+function systemPath() {
+  const { PATH = '' } = process.env;
+  return PATH;
+}
+
+/** True when an executable named `name` is in one of PATH's folders. Runs no shell. */
+export function onPath(name, pathValue = systemPath()) {
+  return String(pathValue).split(delimiter).filter((dir) => isAbsolute(dir)).some((dir) => {
+    try { accessSync(join(dir, name), constants.X_OK); return true; } catch { return false; }
+  });
+}
+
+export const expandPath = (path, home = homedir(), cwd = process.cwd()) =>
+  (path.startsWith('~/') ? join(home, path.slice(2)) : isAbsolute(path) ? path : resolve(cwd, path));
+
+/** True when a dotenv-style file assigns a non-empty value to `name`. Only the boolean leaves. */
+export function envFileSets(text, name) {
+  return String(text).split(/\r?\n/).some((line) => {
+    const match = /^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    return match !== null && match[1] === name && match[2].replace(/^["']|["']$/g, '').trim() !== '';
+  });
+}
+
+/**
+ * Files to check for a dotenv name, in order: this checkout's, then the main checkout's.
+ * The main checkout is the parent of `git rev-parse --git-common-dir`; agent worktrees
+ * share it but have no `.env.local` of their own. Only a relative path without `..` gets
+ * the second place; nothing else is ever searched.
+ */
+export function dotenvCandidates(path, { run = runProcess, home = homedir(), cwd = process.cwd() } = {}) {
+  const own = expandPath(path, home, cwd);
+  if (path.startsWith('~/') || isAbsolute(path) || path.split(/[\\/]/).includes('..')) return [own];
+  const result = run('git', ['rev-parse', '--git-common-dir'], { cwd, timeoutMs: 10_000 });
+  const commonDir = result.status === 0 ? result.stdout.trim() : '';
+  if (!commonDir) return [own];
+  const mainRoot = dirname(resolve(cwd, commonDir));
+  const main = join(mainRoot, path);
+  return main === own || !main.startsWith(mainRoot + sep) ? [own] : [own, main];
+}
+
+/** ExpirationDate from `security cms -D` plist output, as RFC3339, or null. */
+export function profileExpiry(plist) {
+  const match = /<key>ExpirationDate<\/key>\s*<date>([0-9T:-]+Z)<\/date>/.exec(String(plist));
+  return match ? match[1] : null;
+}
+
+export async function main(argv, {
+  run = runProcess, out = (line) => process.stdout.write(`${line}\n`), exists = existsSync, readFile = (path) => readFileSync(path, 'utf8'), hasCommand = onPath,
+  fetchImpl = fetch, now = () => Date.now(), home = homedir(), cwd = process.cwd(),
+} = {}) {
+  let flags;
+  try {
+    flags = parseFlags(argv, { values: ['codesign', 'profile-expiry', 'env-name', 'dotenv', 'url', 'expect-status'], flags: ['ax'], repeat: ['path', 'command'] });
+  } catch { flags = null; }
+  const usage = () => finish(out, USAGE, { detail: 'usage: one of --path, --command, --codesign, --profile-expiry, --env-name/--dotenv, --url/--expect-status, --ax' });
+  if (!flags) return usage();
+  const modes = [flags.path.length > 0, flags.command.length > 0, Boolean(flags.codesign), Boolean(flags['profile-expiry']),
+    Boolean(flags['env-name']), Boolean(flags.url), Boolean(flags.ax)].filter(Boolean).length;
+  if (modes !== 1) return usage();
+
+  if (flags.path.length) {
+    const missing = flags.path.filter((path) => !exists(expandPath(path, home)));
+    return missing.length ? finish(out, PROBE.MISSING, { detail: `${missing.length} of ${flags.path.length} missing` }) : finish(out, PROBE.PRESENT, { detail: 'present' });
+  }
+  if (flags.command.length) {
+    if (!flags.command.every((name) => COMMAND_NAME.test(name))) return usage();
+    const missing = flags.command.filter((name) => !hasCommand(name));
+    return missing.length ? finish(out, PROBE.MISSING, { detail: `missing: ${missing.join(' ')}` }) : finish(out, PROBE.PRESENT, { detail: 'all on PATH' });
+  }
+  if (flags.codesign) {
+    const result = run('/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning'], { timeoutMs: 30_000 });
+    if (result.error || result.status !== 0) return finish(out, PROBE.ERROR, { detail: 'security find-identity failed' });
+    return result.stdout.includes(`"${flags.codesign}`) ? finish(out, PROBE.PRESENT, { detail: 'identity valid' }) : finish(out, PROBE.MISSING, { detail: 'identity missing or invalid' });
+  }
+  if (flags['profile-expiry']) {
+    const file = expandPath(flags['profile-expiry'], home);
+    if (!exists(file)) return finish(out, PROBE.MISSING, { detail: 'profile file missing' });
+    const result = run('/usr/bin/security', ['cms', '-D', '-i', file], { timeoutMs: 30_000 });
+    const expiresAt = result.status === 0 ? profileExpiry(result.stdout) : null;
+    if (!expiresAt) return finish(out, PROBE.ERROR, { detail: 'profile unreadable' });
+    if (Date.parse(expiresAt) <= now()) return finish(out, PROBE.EXPIRED, { detail: 'profile expired', expires_at: expiresAt });
+    return finish(out, PROBE.PRESENT, { detail: 'profile valid', expires_at: expiresAt });
+  }
+  if (flags['env-name']) {
+    if (!ENV_NAME.test(flags['env-name']) || !flags['dotenv']) return usage();
+    const candidates = dotenvCandidates(flags.dotenv, { run, home, cwd });
+    const files = candidates.filter((file) => exists(file));
+    if (!files.length) return finish(out, PROBE.MISSING, { detail: 'env file missing' });
+    for (const file of files) {
+      let text = '';
+      try { text = readFile(file); } catch { return finish(out, PROBE.ERROR, { detail: 'env file unreadable' }); }
+      const set = envFileSets(text, flags['env-name']);
+      text = '';
+      if (set) return finish(out, PROBE.PRESENT, { detail: file === candidates[0] ? 'name set' : 'name set in main checkout' });
+    }
+    return finish(out, PROBE.MISSING, { detail: 'name not set' });
+  }
+  if (flags.url) {
+    const expected = Number(flags['expect-status']);
+    if (!/^https:\/\//.test(flags.url) || !Number.isInteger(expected)) return usage();
+    try {
+      const response = await fetchImpl(flags.url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+      return response.status === expected ? finish(out, PROBE.PRESENT, { detail: `status ${response.status}` }) : finish(out, PROBE.MISSING, { detail: `status ${response.status}` });
+    } catch (error) {
+      return finish(out, PROBE.ERROR, { detail: `request failed (${error?.name ?? 'error'})` });
+    }
+  }
+  const result = run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', 'Application("System Events").processes.whose({backgroundOnly:false})().length'], { timeoutMs: 30_000 });
+  if (result.status === 0) return finish(out, PROBE.PRESENT, { detail: 'System Events answers' });
+  if (/-1712|-1719|-25211|assistive|not allowed/i.test(result.stderr)) return finish(out, PROBE.MISSING, { detail: 'Accessibility not granted' });
+  return finish(out, PROBE.ERROR, { detail: `osascript exited ${result.status}` });
+}
+
+cliMain(import.meta, main);

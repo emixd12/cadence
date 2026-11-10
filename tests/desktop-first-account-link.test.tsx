@@ -77,6 +77,14 @@ describe("first desktop account link", () => {
     expect(hasRecognizedLocalData({ ...snapshot(), noteShortcutStates: [{ id: "global", enabled: true }] })).toBe(true);
   });
 
+  it("offers the first-link choice when only day notes exist", () => {
+    const dayNote = { id: "day-note-1", user_id: "local", local_date: "2026-11-10", note: "Slept badly", revision: 1,
+      created_at: "2026-11-10T12:00:00Z", updated_at: "2026-11-10T12:00:00Z" };
+    expect(hasRecognizedLocalData({ ...snapshot(), dayNotes: [] })).toBe(false);
+    expect(hasRecognizedLocalData({ ...snapshot(), dayNotes: [dayNote] })).toBe(true);
+    expect(hasRecognizedLocalData({ ...snapshot(), dayNotes: [{ ...dayNote, note: null, revision: 2 }] })).toBe(true);
+  });
+
   it("reuses the pending attempt and pre-commit fingerprints after a hosted-success retry", async () => {
     let saved: { attemptId: string; localFingerprint: string; hostedFingerprint: string; preAttemptBaselineJson: string } | null = null;
     const begin = async (proposed: typeof saved & {}) => saved ??= proposed;

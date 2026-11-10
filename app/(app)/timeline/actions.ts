@@ -11,6 +11,7 @@ import {
   stopOccurrenceTimeTracking,
 } from "@/lib/services/time-tracking.service";
 import { revalidatePath } from "next/cache";
+import { saveDayNoteFromFormData } from "@/lib/services/day-note.service";
 import type {
   OccurrenceActionState,
   TimelineStatus,
@@ -34,6 +35,21 @@ export async function markOccurrenceStatusAction(
       status: "success",
       message: "Occurrence updated.",
       ...(nextStatus ? { nextStatus } : {}),
+    };
+  } catch (error) {
+    return occurrenceErrorToActionState(error);
+  }
+}
+
+export async function saveDayNoteAction(
+  _previousState: OccurrenceActionState,
+  formData: FormData,
+): Promise<OccurrenceActionState> {
+  try {
+    const result = await saveDayNoteFromFormData(formData);
+    return {
+      status: "success",
+      message: result.note === null ? "Day note cleared." : "Day note saved.",
     };
   } catch (error) {
     return occurrenceErrorToActionState(error);

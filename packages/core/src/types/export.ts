@@ -2,6 +2,23 @@ import type { RecurrenceRule } from "./recurrence";
 import type { ArchiveNote, BehaviorWhereKind } from "./behavior";
 import type { PortabilityNoteRow, PortabilityInterventionRow, PortabilityImportRunRow, PortabilityMappingRow } from "./portability-rows";
 
+/** One saved day note (Ticket 292). It is about a whole date, not an Occurrence. */
+export type ExportDayNoteInput = {
+  id: string;
+  localDate: string;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ExportJsonDayNote = {
+  id: string;
+  local_date: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ExportImportedHistory = {
   importedNotes?: PortabilityNoteRow[];
   importedInterventions?: PortabilityInterventionRow[];
@@ -264,6 +281,8 @@ export type ExportJsonBackup = {
   behavior_definition_events: ExportJsonBehaviorDefinitionEvent[];
   behavior_configuration_events: ExportJsonBehaviorConfigurationEvent[];
   time_sessions?: ExportJsonTimeSession[];
+  /** Present when notes are included (Ticket 292). */
+  day_notes?: ExportJsonDayNote[];
 };
 
 export type ExportJsonCategory = {
