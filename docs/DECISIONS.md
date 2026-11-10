@@ -1878,7 +1878,7 @@ accounts, end to end". For test accounts A and B only:
    still never touch the owner's own accounts or other Chrome profiles.
 
 The owner still sets each paid test's spend cap, creates vault items, keys and OAuth clients'
-secrets, and decides releases and publication. Ticket 286 encodes these steps in the
+secrets, and decides releases and publication. Ticket 293 encodes these steps in the
 test-access manifest (`.agentic/test-access.json`).
 
 Platform impact: acceptance tooling only; no product change. Web: agents connect A's

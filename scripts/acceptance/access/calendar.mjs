@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access adapter for QA Google Calendar fixtures (Ticket 286).
+// Test-access adapter for QA Google Calendar fixtures (Ticket 293).
 //
 //   node scripts/acceptance/access/calendar.mjs client               probe: QA OAuth client JSON in the Keychain
 //   node scripts/acceptance/access/calendar.mjs grant --slot A|B     probe: stored refresh token still refreshes

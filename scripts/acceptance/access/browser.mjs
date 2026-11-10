@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access adapter for the Cadence QA Chrome profile (Ticket 286).
+// Test-access adapter for the Cadence QA Chrome profile (Ticket 293).
 //
 //   node scripts/acceptance/access/browser.mjs profile                                 probe: profile folder and its Chrome on port 4430
 //   node scripts/acceptance/access/browser.mjs cadence-web --slot A                    probe: Cadence web session for the account

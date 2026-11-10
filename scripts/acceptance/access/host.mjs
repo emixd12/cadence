@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access probe for things on this Mac (Ticket 286). One check per call:
+// Test-access probe for things on this Mac (Ticket 293). One check per call:
 //
 //   host.mjs --path <file> [--path …]               files or folders exist (a leading ~/ is the home folder)
 //   host.mjs --command <name> [--command …]         commands are on PATH

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access probe for one macOS Keychain generic password (Ticket 286).
+// Test-access probe for one macOS Keychain generic password (Ticket 293).
 //
 //   node scripts/acceptance/access/keychain.mjs --service <service> --account <account>
 //

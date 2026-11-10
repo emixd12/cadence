@@ -1,4 +1,4 @@
-// Ticket 286: exit-code mapping of the test-access adapters, with stubs only
+// Ticket 293: exit-code mapping of the test-access adapters, with stubs only
 // (no network, no Keychain, no browser, no SSH).
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

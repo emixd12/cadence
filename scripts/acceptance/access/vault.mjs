@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access probe for the "Cadence Agents" vault (Ticket 286).
+// Test-access probe for the "Cadence Agents" vault (Ticket 293).
 //
 //   node scripts/acceptance/access/vault.mjs --token          service-account token and its vault scope
 //   node scripts/acceptance/access/vault.mjs --item <name>    one item's presence (title only)

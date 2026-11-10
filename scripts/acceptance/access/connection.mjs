@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Test-access adapter for Cadence's connector connections for test account A
-// (Ticket 286; decision 2026-11-07, item 2).
+// (Ticket 293; decision 2026-11-07, item 2).
 //
 //   node scripts/acceptance/access/connection.mjs status  --slot A --connector <id>   probe: connected / reconnect_required / disconnected
 //   node scripts/acceptance/access/connection.mjs connect --slot A --connector hevy|icloud-calendar

@@ -16827,7 +16827,7 @@ Messaging impact: P-027 (recovery wording approved, D21).
 Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`. The blank-window fix:
 `tests/desktop-render-recovery.dom.test.tsx` and `tests/desktop-main-recovery.dom.test.tsx`.
 
-## Ticket 286: Test-access preflight for acceptance runs
+## Ticket 293: Test-access preflight for acceptance runs
 
 Status: implemented November 7, 2026 on branch `accounts-test`; awaiting verification. No live
 probe has run yet; the first live run is the Calendar create-list-delete for A and B.

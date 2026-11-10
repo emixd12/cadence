@@ -130,7 +130,7 @@ async function accessToken(slot, d) {
 }
 
 /**
- * Test-access probe (Ticket 286): one token refresh for the slot's stored grant. Returns
+ * Test-access probe (Ticket 293): one token refresh for the slot's stored grant. Returns
  * `{ slot, state: 'ok' }` or throws FixtureStop (`consent-required`, `token-invalid_grant`, …).
  * The access token is discarded.
  */

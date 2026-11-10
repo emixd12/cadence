@@ -1,4 +1,4 @@
-// Ticket 286: the Cadence test-access manifest validates with the installed engine,
+// Ticket 293: the Cadence test-access manifest validates with the installed engine,
 // every suite dry-runs without running a probe, and every command it names exists.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

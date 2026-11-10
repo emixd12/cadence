@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Placeholder renewal for agent steps that have no script yet (Ticket 286).
+// Placeholder renewal for agent steps that have no script yet (Ticket 293).
 //
 //   node scripts/acceptance/access/agent-step.mjs --step <id>
 //

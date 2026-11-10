@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Test-access adapter for the kept Cadence (Supabase) sessions of test accounts A and B
-// (Tickets 248 and 286; decision 2026-11-07, item 1).
+// (Tickets 248 and 293; decision 2026-11-07, item 1).
 //
 //   node scripts/acceptance/access/cadence-session.mjs status --slot A|B        probe: kept session refreshes and is the right account
 //   node scripts/acceptance/access/cadence-session.mjs enroll --slot A|B        renew: mcp:oauth enroll, driven in one QA Chrome tab

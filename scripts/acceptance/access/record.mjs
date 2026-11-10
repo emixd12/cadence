@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access probe for owner approvals and owner-confirmed facts (Ticket 286).
+// Test-access probe for owner approvals and owner-confirmed facts (Ticket 293).
 //
 //   record.mjs decision --file <repo file> --contains "<text>"         a recorded decision or rule exists
 //   record.mjs approval --id <id>                                       this run's folder holds the owner's approval

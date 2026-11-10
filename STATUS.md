@@ -1,6 +1,6 @@
 # Implementation Status
 
-## Ticket 286: test-access preflight for acceptance runs — November 7, 2026
+## Ticket 293: test-access preflight for acceptance runs — November 7, 2026
 
 **On branch `accounts-test`. Awaiting verification. No live probe has run.**
 

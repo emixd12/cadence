@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Test-access adapter for a test account's Google sign-in in the Cadence QA Chrome
-// profile (Ticket 286; decision 2026-11-06, item 1).
+// profile (Ticket 293; decision 2026-11-06, item 1).
 //
 //   node scripts/acceptance/access/google.mjs session --slot A|B   probe: signed in? (one new tab, closed after)
 //   node scripts/acceptance/access/google.mjs signin --slot A|B    renew: google-signin.mjs through agent-secret

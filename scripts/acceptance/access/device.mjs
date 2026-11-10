@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-access adapter for test devices and the Cadence for Mac link (Ticket 286).
+// Test-access adapter for test devices and the Cadence for Mac link (Ticket 293).
 //
 //   node scripts/acceptance/access/device.mjs inventory        --device <name>   probe: device listed in the private inventory
 //   node scripts/acceptance/access/device.mjs reachable        --device <name>   probe: Tailscale SSH with the agent key

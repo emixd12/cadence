@@ -1,4 +1,4 @@
-// Shared helpers for the test-access preflight adapters (Ticket 286).
+// Shared helpers for the test-access preflight adapters (Ticket 293).
 //
 // The engine (.agentic/scripts/test-access-preflight.mjs, from the
 // service-connections-bootstrap skill) runs each adapter as a probe or a renewal and

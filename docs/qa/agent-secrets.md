@@ -242,7 +242,7 @@ Live runs:
 - **2026-11-07, account B: not run.** `qa:preflight --suite calendar-fixtures-b` exited 10:
   the `google-test-account-b` vault item is missing (owner step).
 
-## Test-access preflight (2026-11-07, Ticket 286)
+## Test-access preflight (2026-11-07, Ticket 293)
 
 `npm run qa:preflight -- --suite <suite>` checks every credential and authorization a suite
 needs before the run, renews what agents may renew, and prints one numbered owner list for
