@@ -26,6 +26,9 @@ while read -r old new ref; do
   # Only creations: the old value is all zeros and the new value is not.
   case "$old" in *[!0]*) continue ;; esac
   case "$new" in *[!0]*) ;; *) continue ;; esac
+  # pack-refs and gc also send an all-zero old value when they pack a branch
+  # that already exists. A real creation has no ref yet at this stage.
+  git rev-parse --quiet --verify "$ref" >/dev/null 2>&1 && continue
 
   base=$(git rev-parse --quiet --verify refs/remotes/origin/main 2>/dev/null) || continue
   git merge-base --is-ancestor "$base" "$new" 2>/dev/null && continue

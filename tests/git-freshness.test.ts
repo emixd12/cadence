@@ -125,6 +125,23 @@ describe("branch guard Git hook", () => {
     expect(run(work, "git", ["branch", "-D", "x"]).status).toBe(0);
   });
 
+  it("lets pack-refs and gc pack an existing stale branch", () => {
+    const { work } = makeRepos("pack");
+    git(work, "branch", "old-stale", "main");
+    git(work, "config", "core.hooksPath", hooksDir);
+    expect(run(work, "git", ["pack-refs", "--all"]).status).toBe(0);
+    expect(
+      run(work, "git", ["update-ref", "refs/heads/loose-again", "main"], { CADENCE_ALLOW_STALE_BRANCH: "1" })
+        .status,
+    ).toBe(0);
+    expect(run(work, "git", ["gc", "--quiet"]).status).toBe(0);
+    expect(git(work, "branch", "--format=%(refname:short)").split("\n").sort()).toEqual([
+      "loose-again",
+      "main",
+      "old-stale",
+    ]);
+  });
+
   it("honors the escape hatches", () => {
     const { work } = makeRepos("escape");
     git(work, "config", "core.hooksPath", hooksDir);
