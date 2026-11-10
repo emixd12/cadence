@@ -1995,3 +1995,36 @@ Occurrence notes and statuses.
 - Clearing keeps the row with a null note, so synchronization needs no tombstone.
 - Daily Brief input from day notes is deferred to a later Daily Brief upgrade.
 
+
+## 2026-11-10: Standing approval for additive hosted migrations
+
+The owner decided on November 10, 2026 that agents may run `npm run supabase -- db push`
+against the hosted project without asking each time, when every condition holds:
+
+1. Each pending migration is additive. Allowed: new tables, new nullable or defaulted
+   columns, indexes, new functions, `create or replace` of a function that keeps its
+   signature and its behavior for existing callers, new RLS policies, and grants to
+   `authenticated` only. Not allowed: `drop`, renames, column type changes, `not null` on an
+   existing column, data `insert`/`update`/`delete` or backfills on user tables, disabling
+   RLS, and grants to `anon`, `public` or `service_role`.
+2. A clean local start (`npm run supabase -- db reset`) applied every migration, and the
+   ticket's SQL fixtures passed.
+3. `npm run supabase -- migration list` shows hosted equal to git except the pending
+   migrations.
+4. The migrations are on `main`, or merge to `main` in the same change, and the push runs
+   before the deploy that needs them.
+5. After the push, the agent reads back RLS and grants on the new objects and records the
+   push in `STATUS.md`.
+
+Anything else still needs the owner's yes: destructive or data-changing migrations,
+`--include-seed`, Auth or project settings, Dashboard edits, and any other Supabase project.
+
+Credential: agents use the `cadence-agents` item in the Cadence Agents vault, a Supabase
+personal access token, through `npm run agent:secret -- --env
+SUPABASE_ACCESS_TOKEN=cadence-agents -- npm run supabase -- db push`. Supabase tokens reach
+the whole account, not one project, so this decision, not the token, limits agents to the
+Cadence project. The preflight requirement is `vault-supabase-access-token` (suite
+`hosted-migrations`). The owner's own CLI login stays the owner's credential.
+
+Platform impact: web hosted database only. Desktop, marketing and future mobile: not
+applicable. Messaging impact: none.

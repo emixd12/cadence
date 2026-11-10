@@ -433,7 +433,9 @@ Rules:
 - Never change the hosted database directly.
 - Keep local and hosted schema congruent through git-tracked migrations.
 - Run `npm run supabase -- db reset` to verify migrations from a clean local database.
-- Use `npm run supabase -- db push` for hosted deployment only after user authorization.
+- Use `npm run supabase -- db push` for hosted deployment only after user authorization,
+  or under the standing approval for additive migrations (`docs/DECISIONS.md`,
+  2026-11-10).
 - Generate database types after schema changes.
 
 Never change the database schema without:

@@ -313,7 +313,10 @@ First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
 Not in the manifest (from the test access inventory), one reason each:
 
 - `supabase-cli-login`: the owner's Supabase CLI token serves only the Ticket 232 tools and
-  `supabase db push`; routine acceptance must not use an owner credential.
+  owner-approved `supabase db push`; routine acceptance must not use an owner credential.
+  Agents' own hosted-migration credential is the vault item `cadence-agents`, checked by
+  `vault-supabase-access-token` in suite `hosted-migrations` (`docs/DECISIONS.md`,
+  2026-11-10).
 - `mcp-signing-key`: kept in the owner's "Cadence" vault behind Touch ID and used only for key
   custody and hosted fixtures, each use with the owner's approval; no value-free probe exists.
 - `owner-mac-desktop-control`: desktop-control consent is given per agent session, not stored,

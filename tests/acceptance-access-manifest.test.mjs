@@ -22,7 +22,7 @@ describe('Cadence test-access manifest', () => {
     expect(model.project).toBe('cadence');
     expect([...model.suites.keys()]).toEqual([
       'mcp-local', 'mcp-protocol', 'mcp-clients', 'mcp-web', 'calendar-fixtures', 'calendar-fixtures-b', 'web-travel',
-      'connectors', 'desktop-owner-mac', 'desktop-test-mac', 'desktop-release', 'email',
+      'connectors', 'desktop-owner-mac', 'desktop-test-mac', 'desktop-release', 'email', 'hosted-migrations',
     ]);
   });
 

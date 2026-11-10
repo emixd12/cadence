@@ -47,7 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; the owner authorized the three hosted migrations and the production deploy | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
+| Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
@@ -102,6 +102,14 @@ horse avatar to stay out of production, and stale branches pruned. Merged throug
 - `mcp-accept/256`: the cross-process session lock, kept alongside `main`'s exit-45 retries.
 - Acceptance mirrors (`scripts/acceptance/protocol.mjs`, `watch.mjs`) gained the two day-note
   tools; `read-a` reads `list_day_notes` and checks the `update_day_note` step-up.
+
+Hosted: the owner authorized the three day-notes migrations, and an agent pushed them
+with the pinned CLI (2.105.0) on November 10. Read back on hosted: RLS on `day_notes`,
+`authenticated` holds SELECT only, `save_day_note` executes for `authenticated` only, and
+the contract-3 `day_note` sync kind is registered. The same day the owner approved additive
+migrations in advance (`docs/DECISIONS.md`, 2026-11-10) and added the `cadence-agents`
+Supabase token to the Cadence Agents vault (preflight `vault-supabase-access-token`; it
+needs the vault's service-account token in this Mac's Keychain first).
 
 Pruned: `note-add-backup`, `agentic-architecture` and an empty agent branch. The two
 `backup/*` branches became tags `archive/advisor-analysis-wip-2026-10-22` and

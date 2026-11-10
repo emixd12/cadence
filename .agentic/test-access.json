@@ -73,6 +73,10 @@
     {
       "id": "email",
       "summary": "Sequenzy reminder test send to the AgentMail test inbox."
+    },
+    {
+      "id": "hosted-migrations",
+      "summary": "Hosted Supabase migration list and pushes that docs/DECISIONS.md, 2026-11-10, approves in advance."
     }
   ],
   "requirements": [
@@ -1454,6 +1458,29 @@
         ]
       },
       "owner_step": "Approve a test recipient for automated Sequenzy test sends.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-supabase-access-token",
+      "kind": "vault-item",
+      "summary": "Supabase personal access token for agent hosted-migration work, Cadence Agents item cadence-agents (field credential). Account-wide: Supabase tokens cannot be limited to one project.",
+      "suites": [
+        "hosted-migrations"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "cadence-agents"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Add the cadence-agents item (field credential) with a Supabase personal access token to the Cadence Agents vault; revoke and replace it in the Supabase dashboard when it expires.",
       "freshness_seconds": 86400
     }
   ]

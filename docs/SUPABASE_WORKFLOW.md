@@ -711,7 +711,7 @@ If hosted appears ahead or different:
 | Verify migrations from scratch | Yes | `npm run supabase -- db reset` |
 | Generate TypeScript database types | Yes | `npm run supabase -- gen types typescript --local > lib/db/database.types.ts` |
 | Link hosted project | Yes, with user authorization | `npm run supabase -- login` then `npm run supabase -- link` |
-| Deploy migrations to hosted | Yes, with user authorization | `npm run supabase -- db push` |
+| Deploy migrations to hosted | Yes, with user authorization, or for additive migrations under `docs/DECISIONS.md`, 2026-11-10 | `npm run supabase -- db push` |
 | Make hosted schema edit in dashboard | No | Create a migration locally instead |
 | Investigate hosted drift | Yes, cautiously | `migration list`, then `db pull` only if needed |
 
