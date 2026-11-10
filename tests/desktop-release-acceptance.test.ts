@@ -69,6 +69,114 @@ describe.skipIf(process.platform !== "darwin")("desktop release acceptance", () 
     `]);
   }
 
+  const fingerprint = (character: string) => character.repeat(64);
+
+  // Real desktop column sets (migrations 0001 and 0008) without unrelated constraints.
+  function prepareLaunchSync() {
+    createDatabase(after, 9);
+    for (const database of [before, after]) execFileSync("sqlite3", [database, `
+      CREATE TABLE occurrences(id TEXT PRIMARY KEY, note TEXT, status TEXT);
+      INSERT INTO occurrences VALUES('occurrence-one','Preserved private Note','completed'),('occurrence-two',NULL,'unresolved');
+      CREATE TABLE account_link_metadata(local_profile_id TEXT PRIMARY KEY,hosted_user_id TEXT,email TEXT,authenticated_at TEXT);
+      INSERT INTO account_link_metadata VALUES('stable-profile','same-account','owner@example.test','before');
+      CREATE TABLE account_sync_baselines(local_profile_id TEXT PRIMARY KEY REFERENCES profiles(id),hosted_user_id TEXT NOT NULL UNIQUE,choice TEXT NOT NULL,idempotency_key TEXT NOT NULL UNIQUE,local_fingerprint TEXT NOT NULL,hosted_fingerprint TEXT NOT NULL,baseline_fingerprint TEXT NOT NULL,baseline_json TEXT NOT NULL,backup_path TEXT,completed_at TEXT NOT NULL);
+      INSERT INTO account_sync_baselines VALUES('stable-profile','same-account','import','${fingerprint("1")}','${fingerprint("a")}','${fingerprint("a")}','${fingerprint("a")}','{"note":"Preserved baseline Note"}',NULL,'before');
+      CREATE TABLE sync_cursors(user_id TEXT NOT NULL,name TEXT NOT NULL,value TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(user_id,name));
+      INSERT INTO sync_cursors VALUES('stable-profile','account-sync','${fingerprint("a")}','before'),('stable-profile','other-cursor','other','before');
+      CREATE TABLE reminder_deliveries(channel TEXT NOT NULL,created_at TEXT NOT NULL,error TEXT,id TEXT PRIMARY KEY NOT NULL,import_run_id TEXT,imported_intervention_id TEXT,occurrence_id TEXT NOT NULL,processing_started_at TEXT,scheduled_send_at TEXT NOT NULL,sent_at TEXT,status TEXT NOT NULL,updated_at TEXT NOT NULL,user_id TEXT NOT NULL);
+      INSERT INTO reminder_deliveries VALUES
+        ('browser_push','before',NULL,'pending-one',NULL,NULL,'occurrence-two',NULL,'yesterday',NULL,'pending','before','stable-profile'),
+        ('browser_push','before',NULL,'sent-one',NULL,NULL,'occurrence-one','before','earlier','earlier','sent','before','stable-profile'),
+        ('email','before','Provider failure','failed-one',NULL,NULL,'occurrence-one','before','earlier',NULL,'failed','before','stable-profile'),
+        ('browser_push','before',NULL,'cancelled-one',NULL,NULL,'occurrence-one',NULL,'earlier',NULL,'cancelled','before','stable-profile');
+    `]);
+  }
+
+  // What one signed-in launch writes: a restored session, a new baseline and cursor, and hosted reminder processing.
+  function runLaunchSync() {
+    execFileSync("sqlite3", [after, `
+      UPDATE account_link_metadata SET authenticated_at='after';
+      UPDATE account_sync_baselines SET idempotency_key='${fingerprint("2")}',local_fingerprint='${fingerprint("b")}',hosted_fingerprint='${fingerprint("b")}',baseline_fingerprint='${fingerprint("b")}',baseline_json='{"note":"Synced baseline Note"}',completed_at='after';
+      UPDATE sync_cursors SET value='${fingerprint("b")}',updated_at='after' WHERE name='account-sync';
+      UPDATE reminder_deliveries SET status='failed',error='No active browser push subscription is available.',processing_started_at='after',updated_at='after' WHERE id='pending-one';
+      INSERT INTO reminder_deliveries VALUES('browser_push','after',NULL,'pending-two',NULL,NULL,'occurrence-two',NULL,'tomorrow',NULL,'pending','after','stable-profile');
+    `]);
+  }
+
+  it("accepts a post-launch-sync snapshot and reports the classified rows without private content", () => {
+    prepareLaunchSync();
+    const unchanged = sameSchema();
+    expect(unchanged.status, unchanged.stderr).toBe(0);
+    expect(JSON.parse(unchanged.stdout).launchSyncChanges).toEqual({});
+    runLaunchSync();
+    const accepted = sameSchema();
+    expect(accepted.status, accepted.stderr).toBe(0);
+    const evidence = JSON.parse(accepted.stdout);
+    expect(evidence.launchSyncChanges).toEqual({ account_sync_baselines: 1, sync_cursors: 1, reminder_deliveries: 1 });
+    expect(evidence.after.counts.reminder_deliveries).toBe(5);
+    expect(evidence.before.preservedContent.reminder_deliveries.launchSync).toEqual({
+      columns: ["status", "error", "sent_at", "processing_started_at", "updated_at"], changeableRows: 1, syncShapedRows: 4,
+    });
+    expect(evidence.after.preservedContent.sync_cursors.launchSync).toMatchObject({ changeableRows: 1, syncShapedRows: 1 });
+    expect(evidence.after.preservedContent.account_sync_baselines.launchSync).toMatchObject({ changeableRows: 1, syncShapedRows: 1 });
+    for (const text of ["Preserved private Note", "Preserved baseline Note", "Synced baseline Note", "owner@example.test", "No active browser push"]) {
+      expect(accepted.stdout).not.toContain(text);
+    }
+  });
+
+  it("accepts a pending reminder that hosted processing sent or cancelled", () => {
+    prepareLaunchSync();
+    execFileSync("sqlite3", [after, "UPDATE reminder_deliveries SET status='sent',sent_at='after',processing_started_at='after',updated_at='after' WHERE id='pending-one';"]);
+    expect(sameSchema().status).toBe(0);
+    execFileSync("sqlite3", [after, "UPDATE reminder_deliveries SET status='cancelled',sent_at=NULL,updated_at='later' WHERE id='pending-one';"]);
+    expect(sameSchema().status).toBe(0);
+  });
+
+  it.each([
+    ["a changed baseline account", "UPDATE account_sync_baselines SET hosted_user_id='other-account';", "account_sync_baselines lost or changed retained content"],
+    ["a changed baseline choice", "UPDATE account_sync_baselines SET choice='hydrate';", "account_sync_baselines lost or changed retained content"],
+    ["a changed baseline backup path", "UPDATE account_sync_baselines SET backup_path='/elsewhere';", "account_sync_baselines lost or changed retained content"],
+    ["unequal baseline fingerprints", `UPDATE account_sync_baselines SET local_fingerprint='${"c".repeat(64)}';`, "account_sync_baselines lost or changed retained content"],
+    ["a short idempotency key", "UPDATE account_sync_baselines SET idempotency_key='short';", "account_sync_baselines lost or changed retained content"],
+    ["an invalid baseline document", "UPDATE account_sync_baselines SET baseline_json='not json';", "account_sync_baselines lost or changed retained content"],
+    ["a removed baseline", "DELETE FROM account_sync_baselines;", "account_sync_baselines lost records"],
+    ["a cursor ahead of the baseline", `UPDATE sync_cursors SET value='${"c".repeat(64)}' WHERE name='account-sync';`, "sync_cursors lost or changed retained content"],
+    ["a cursor time unlike the baseline", "UPDATE sync_cursors SET updated_at='later' WHERE name='account-sync';", "sync_cursors lost or changed retained content"],
+    ["a changed other cursor", "UPDATE sync_cursors SET value='changed' WHERE name='other-cursor';", "sync_cursors lost or changed retained content"],
+    ["a renamed cursor", "UPDATE sync_cursors SET name='renamed' WHERE name='account-sync';", "sync_cursors lost or changed retained content"],
+    ["a sent reminder changed", "UPDATE reminder_deliveries SET status='failed' WHERE id='sent-one';", "reminder_deliveries lost or changed retained content"],
+    ["a failed reminder returned to pending", "UPDATE reminder_deliveries SET status='pending',error=NULL WHERE id='failed-one';", "reminder_deliveries lost or changed retained content"],
+    ["a cancelled reminder reactivated", "UPDATE reminder_deliveries SET status='pending' WHERE id='cancelled-one';", "reminder_deliveries lost or changed retained content"],
+    ["a pending reminder moved to another Occurrence", "UPDATE reminder_deliveries SET occurrence_id='occurrence-one' WHERE id='pending-one';", "reminder_deliveries lost or changed retained content"],
+    ["a pending reminder rescheduled", "UPDATE reminder_deliveries SET scheduled_send_at='later' WHERE id='pending-one';", "reminder_deliveries lost or changed retained content"],
+    ["a pending reminder replaced", "DELETE FROM reminder_deliveries WHERE id='pending-one'; INSERT INTO reminder_deliveries VALUES('browser_push','after',NULL,'replacement',NULL,NULL,'occurrence-two',NULL,'yesterday',NULL,'failed','after','stable-profile');", "reminder_deliveries lost or changed retained content"],
+    ["a removed reminder", "DELETE FROM reminder_deliveries WHERE id IN ('pending-two','sent-one');", "reminder_deliveries lost records"],
+    ["a removed pending reminder", "DELETE FROM reminder_deliveries WHERE id='pending-one';", "reminder_deliveries lost or changed retained content"],
+    ["a changed Occurrence Note", "UPDATE occurrences SET note='changed' WHERE id='occurrence-one';", "occurrences lost or changed retained content"],
+    ["a removed Occurrence", "DELETE FROM occurrences WHERE id='occurrence-two';", "occurrences lost records"],
+    ["a changed account identity", "UPDATE account_link_metadata SET hosted_user_id='other-account';", "account_link_metadata lost or changed retained content"],
+    ["a changed profile", "INSERT INTO profiles VALUES('second-profile');", "stable local profile changed"],
+  ])("rejects %s alongside a launch sync", (_name, change, message) => {
+    prepareLaunchSync();
+    runLaunchSync();
+    execFileSync("sqlite3", [after, change]);
+    expect(sameSchema().stderr).toContain(message);
+  });
+
+  it("rejects integrity errors and secrets alongside a launch sync", () => {
+    prepareLaunchSync();
+    runLaunchSync();
+    execFileSync("sqlite3", [after, "PRAGMA foreign_keys=OFF; UPDATE account_sync_baselines SET local_profile_id='missing-profile';"]);
+    expect(sameSchema().stderr).toContain("failed integrity validation");
+    execFileSync("sqlite3", [after, "UPDATE account_sync_baselines SET local_profile_id='stable-profile';"]);
+    expect(sameSchema().status).toBe(0);
+    execFileSync("sqlite3", [after, `UPDATE account_sync_baselines SET baseline_json=json_object('token','${canary}');`]);
+    const leaked = sameSchema();
+    expect(leaked.status).toBe(1);
+    expect(leaked.stdout).not.toContain(canary);
+    expect(JSON.parse(leaked.stdout).secretScan).toMatchObject({ exactSecretCanaryFindings: 1, totalFindings: 1 });
+  });
+
   it("requires an advancing expected schema, owner-only databases, and exact secret canaries", () => {
     const accepted = run();
     expect(accepted.status, accepted.stderr).toBe(0);
