@@ -394,6 +394,63 @@ Not yet verified in a cloud session:
 - the hook firing at a fresh session start, as opposed to a resume. The first
   cloud session after this hook reaches `main` confirms it.
 
+### Branches and worktrees
+
+The rules are in `AGENTS.md`, "Git branches and worktrees". The decision is in
+`docs/DECISIONS.md`, 2026-11-10, "Agents branch from fresh origin/main". Every
+piece works the same for any agent and for the owner. Agent-specific files only
+call the shared command.
+
+| Piece | File | Runs for |
+| --- | --- | --- |
+| Branch guard | `.githooks/reference-transaction` | Any Git client, once `core.hooksPath` is `.githooks` |
+| Freshness and pruning | `scripts/git-freshness.mjs` (`npm run git:fresh`) | Anyone who runs it |
+| Claude Code adapter | `.claude/settings.json` SessionStart, and `worktree.baseRef: fresh` | Claude Code sessions |
+| Codex adapter | `.codex/hooks.json` SessionStart | Codex sessions, after the owner trusts the hook |
+
+**Branch guard.** Git runs the hook for every ref update. The hook acts only when
+a local branch is created. It refuses the new branch when it does not contain
+`origin/main` as last fetched. That covers `git switch -c`, `git checkout -b`,
+`git branch` and `git worktree add -b`, from any tool. Existing branches,
+commits, rebases, deletions, tags and remote-tracking refs pass. Escape hatches,
+which the refusal message also names:
+
+- `CADENCE_ALLOW_STALE_BRANCH=1 git ...` for one command, such as stacking on or
+  reviewing an older branch, or renaming one;
+- `git config cadence.branchGuard warn`, which prints the message but allows the
+  branch;
+- `git config cadence.branchGuard off`.
+
+`core.hooksPath` lives in the repository's shared config, so one setting covers
+the main checkout and every worktree on the machine. A worktree whose branch
+predates `.githooks` has no hook until it is rebased.
+
+**`npm run git:fresh`.** It exits 0 on every error and prints nothing when
+everything is current. In about one second, it:
+
+- sets `core.hooksPath` to `.githooks` when it is unset. When another value is
+  set, it reports that and changes nothing;
+- runs `git fetch origin --prune` with a 15-second limit;
+- fast-forwards local `main` to `origin/main`. Where `main` is checked out, it
+  runs `git merge --ff-only`, which refuses when uncommitted changes overlap.
+  Elsewhere, it moves the ref. It never moves `main` if `main` has commits that
+  are not on `origin/main`;
+- deletes a local branch only when it is merged into `origin/main`, its remote
+  branch is gone and no worktree has it checked out;
+- reports, without changing anything: how far the current branch is behind
+  `origin/main`; clean worktrees whose branch is already merged; worktrees with
+  uncommitted changes and no commit for 14 days; unmerged branches with no
+  commit for 14 days; and folders in `.claude/worktrees` that Git does not track.
+
+It skips Claude Code cloud sessions (`CLAUDE_CODE_REMOTE=true`), which start
+from a fresh clone.
+
+GitHub deletes the head branch after a PR merges (repository setting, turned on
+November 10, 2026).
+
+Tests: `tests/git-freshness.test.ts` runs the real hook and command against
+throwaway repositories.
+
 ### Codex local timing QA action
 
 The project-local Codex environment includes **Run Local Timing App**. Stop any

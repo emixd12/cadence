@@ -97,7 +97,8 @@
     "services:preflight:network": "node scripts/service-preflight.mjs --network",
     "cloudflare": "node scripts/cloudflare-api.mjs",
     "cloudflare:verify": "node scripts/cloudflare-api.mjs verify",
-    "search-console": "node scripts/search-console.mjs"
+    "search-console": "node scripts/search-console.mjs",
+    "git:fresh": "node scripts/git-freshness.mjs"
   },
   "dependencies": {
     "@cadence/core": "*",

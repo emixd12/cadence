@@ -2028,3 +2028,29 @@ Cadence project. The preflight requirement is `vault-supabase-access-token` (sui
 
 Platform impact: web hosted database only. Desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-10: Agents branch from fresh origin/main
+
+The owner decided on November 10, 2026 that every agent task starts from the latest
+`origin/main`. Before this, local `main` had fallen 44 commits behind, and new tasks
+started from old code. An earlier session the same day merged eight branches into
+`main` (PR #203), and the merged branches and worktrees were then pruned.
+
+- Agents branch with an explicit base, normally `origin/main`, after `git fetch`.
+- Work merges through small PRs. Unfinished features land on `main` behind a
+  production gate (a `/design-system` bench or a flag that is off in production), not
+  on long-lived branches. The horse avatar trial stays WIP this way: `/design-system`
+  returns 404 in production.
+- Unfinished work is committed and pushed as a draft PR before a session ends.
+- Merged branches and worktrees are removed. GitHub deletes merged PR branches. A
+  session-start hook deletes local branches whose remote branch is gone.
+
+Enforcement is agent-agnostic. A Git hook (`.githooks/reference-transaction`) refuses
+new local branches that do not contain `origin/main`, for any agent or person. One
+command, `npm run git:fresh`, fetches, fast-forwards `main`, prunes and reports. Claude
+Code and Codex session-start hooks only call that command. Agent-specific files never
+hold workflow logic. Details: `docs/OPERATIONS.md`, "Branches and worktrees". Rules:
+`AGENTS.md`, "Git branches and worktrees".
+
+Platform impact: agent tooling only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.

@@ -653,6 +653,39 @@ Do not expand scope to solve speculative future requirements.
 
 Implement in small vertical slices.
 
+## Git branches and worktrees
+
+`main` is production: Vercel deploys it. Every task starts from the latest
+`origin/main`.
+
+- Start every session or task with `npm run git:fresh`. It fetches, fast-forwards
+  local `main`, prunes merged branches and reports anything stale.
+- Branch with an explicit base: `git switch -c <branch> origin/main` or
+  `git worktree add -b <branch> <path> origin/main`. Never branch from local
+  `main` or an implicit HEAD.
+- Use one branch per task and merge it through a small PR as soon as checks
+  pass. Do not leave finished work on a branch.
+- When the session-start report says your branch is behind `origin/main`,
+  rebase onto `origin/main` before new work, a push or a PR.
+- Before a session ends, commit unfinished work and push it as a draft PR. Never
+  leave uncommitted changes in a worktree.
+- Unfinished features land on `main` behind a production gate, not on a
+  long-lived branch. Use a `/design-system` bench (it returns 404 in
+  production) or a flag that is off in production. The horse avatar trial is
+  the example.
+- After a merge, remove your worktree and local branch. GitHub deletes merged PR
+  branches. The session-start hook deletes local branches whose remote branch
+  is gone. Never delete another session's worktree or uncommitted work without
+  the owner's yes.
+
+Enforcement does not depend on which agent runs. The Git hook
+`.githooks/reference-transaction` refuses to create a local branch that does not
+contain `origin/main`, whoever runs Git. Its message explains how to stack on
+or review an older branch on purpose. `npm run git:fresh` turns the hook on for
+the clone. The Claude Code and Codex session-start hooks (`.claude/settings.json`,
+`.codex/hooks.json`) only call that command. Agents without session hooks run it
+themselves. Details: `docs/OPERATIONS.md`, "Branches and worktrees".
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

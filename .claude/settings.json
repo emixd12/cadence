@@ -1,4 +1,7 @@
 {
+  "worktree": {
+    "baseRef": "fresh"
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +10,12 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-cloud-session.sh\"",
             "timeout": 900
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/git-freshness.mjs\"",
+            "timeout": 60,
+            "statusMessage": "Checking Git freshness"
           }
         ]
       }
