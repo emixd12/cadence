@@ -1910,6 +1910,57 @@ connectors through Cadence's own API. Desktop: test-device sign-in becomes an ag
 owner's Mac keeps its owner steps. Marketing and future mobile: not applicable. Messaging
 impact: none.
 
+## 2026-11-07: Daily Brief on the user's ChatGPT plan, Mac first (D27)
+
+The owner approved the plan "Use your ChatGPT plan in Cadence" on November 7, 2026, with
+three decisions. Tickets 294–300 carry the work.
+
+1. **Signed-in Mac users first.** The first slice serves Cadence for Mac linked to a Cadence
+   account. Cadence's server still builds the Daily Brief context and validates the output.
+   The Mac runs only the model call, on the user's ChatGPT plan. ChatGPT tokens stay in the
+   Mac's Keychain and never reach Cadence's server.
+2. **No fallback to Cadence's OpenAI key.** When a connected plan with plan usage cannot run
+   a brief (usage limit, not eligible, reconnect needed, unavailable), Cadence shows the
+   reason and "Manage usage" where it applies. It does not run that brief on Cadence's key
+   and does not loop retries. A user who connected ChatGPT without granting plan usage, or
+   never connected, keeps today's hosted path.
+3. **Cadence picks the model.** Cadence chooses from the models the user's ChatGPT catalog
+   lists. There is no model setting.
+
+Deferred, each needing its own ticket and decision:
+
+- ChatGPT as a Cadence login ("Continue with ChatGPT" for web or Mac sign-in). OpenAI offers
+  identity sign-in only as a limited trial for selected partners, through its interest form.
+  Web sign-in stays Google only.
+- ChatGPT plan usage in the hosted web app. OpenAI's program requires a 127.0.0.1 callback
+  and tokens kept in the user's own local or self-hosted runtime, and a remotely hosted app
+  needs OpenAI's approval.
+- Billing and any discount for bringing a ChatGPT plan. Billing is still not launch scope
+  ("Pricing and AI" above). `docs/FUTURE_UPDATES.md` records the discount as a pricing
+  proposal only.
+- An account-free Mac Daily Brief on the user's plan.
+
+Reasons:
+
+- OpenAI's ChatGPT plan program covers open-source and locally hosted apps today. Cadence for
+  Mac is MIT-licensed and runs locally; the web app runs on Vercel.
+- The money is small. The Daily Brief model costs Cadence about US$0.004 per brief, or
+  US$0.06 / US$0.13 / US$0.25 a month for light, typical and heavy users (`docs/COSTS.md`,
+  assumed). The plan is worth more as a feature than as a discount.
+- Anthropic bars consumer Claude subscriptions from third-party apps, and Google offers no
+  approved route for Google AI subscriptions. OpenAI is the only major provider found with an
+  approved program. GitHub Copilot was not checked.
+- OpenAI's Sign in with ChatGPT DevKit has a noncommercial licence. Cadence writes its own
+  client from the public docs and uses no DevKit code or components.
+
+Legal entries L-017 to L-019 log the program's approval condition, the DevKit licence and the
+brand guidelines. Under the 2026-11-04 rule they hold nothing.
+
+Platform impact: desktop, Tickets 297, 299 and 300. Web: the hosted prepare and complete steps
+(Tickets 296 and 298); the web app shows no ChatGPT controls. Marketing: none until release
+(P-032). Future mobile: not applicable, the program needs a local app; revisit with any
+native mobile ticket. Messaging impact: P-029, P-030, P-031 and P-032.
+
 ## 2026-11-09: Agent-architecture run (Tickets 286–291)
 
 The owner directed on November 9, 2026 that six agent-architecture actions be carried out

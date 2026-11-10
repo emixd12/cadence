@@ -49,6 +49,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) in source on branch `note-add`; not merged or deployed | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, then hosted migrations with owner authorization | TICKETS, Ticket 292; STATUS, "Ticket 292: day notes in progress — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
+| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
 | Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
 | Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
@@ -177,6 +178,33 @@ probe has run.**
   preflight reports them as check errors for an agent.
 - Platform impact: acceptance tooling only. Web, desktop, marketing and future mobile: not
   applicable. Messaging impact: none.
+
+## Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026
+
+**Written on branch `chatgpt-https` (base `main` at `7c698ecc`) as Tickets 286–292, D25 and
+P-028 to P-031; renumbered to Tickets 294–300, D27 and P-029 to P-032 and merged to `main`
+on November 10, 2026 during branch consolidation.**
+
+- The owner approved the plan on November 7, 2026 (`docs/DECISIONS.md`, D27): signed-in Mac
+  users first; no fallback to Cadence's OpenAI key when the user's plan cannot run a brief;
+  Cadence picks the model from the user's ChatGPT catalog. Deferred: ChatGPT as a Cadence
+  login, plan usage in the hosted web app, billing and any discount.
+- Ticket 294 (completed November 7, docs only; commits `155ee10b` and `d802882f`): records D27, files Tickets 294–300 in
+  `docs/TICKETS.md`, adds the scope lines to `AGENTS.md` and `docs/PRODUCT_SPEC.md`, the
+  follow-ups to `docs/FUTURE_UPDATES.md`, the cost effect to `docs/COSTS.md`, L-017 to L-019
+  and P-029 to P-032. Checks: `agents:check` and `interactions:check` pass. Dagger passed every
+  check but `test`; its six failing files are environmental (missing `.claude` files, Chrome and
+  git access in the container, a timeout) and unrelated to the docs.
+- Ticket 295 (in progress): a development-only spike script that proves the Daily Brief
+  request on a real ChatGPT plan. Mock mode first; the live run needs the owner's ChatGPT
+  sign-in and consent. Results go to `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
+- Tickets 296–300 are not started; Wave 2 waits for the spike's request contract.
+- Owner actions: provide a ChatGPT Plus or Pro account for the spike and acceptance. The owner
+  decides when to submit OpenAI's interest form for web sign-in and hosted plan usage; it is
+  not a step in Tickets 294–300.
+- Platform impact: see Tickets 294–300. Web: hosted prepare and complete only, no ChatGPT
+  controls. Desktop: the connection, UI and acceptance. Marketing: none until release (P-032).
+  Future mobile: not applicable. Messaging impact: P-029 to P-032.
 
 ## Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026
 
