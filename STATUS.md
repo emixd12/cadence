@@ -1,29 +1,29 @@
 # Implementation Status
 
-## Tickets 286 and 287: Daily Brief on the user's ChatGPT plan started — November 7, 2026
+## Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026
 
 **On branch `chatgpt-https` (base `main` at `7c698ecc`). Not merged; no PR yet.**
 
-- The owner approved the plan on November 7, 2026 (`docs/DECISIONS.md`, D25): signed-in Mac
+- The owner approved the plan on November 7, 2026 (`docs/DECISIONS.md`, D27): signed-in Mac
   users first; no fallback to Cadence's OpenAI key when the user's plan cannot run a brief;
   Cadence picks the model from the user's ChatGPT catalog. Deferred: ChatGPT as a Cadence
   login, plan usage in the hosted web app, billing and any discount.
-- Ticket 286 (completed November 7, docs only; commits `155ee10b` and `d802882f`, not merged): records D25, files Tickets 286–292 in
+- Ticket 294 (completed November 7, docs only; commits `155ee10b` and `d802882f`, not merged): records D27, files Tickets 294–300 in
   `docs/TICKETS.md`, adds the scope lines to `AGENTS.md` and `docs/PRODUCT_SPEC.md`, the
   follow-ups to `docs/FUTURE_UPDATES.md`, the cost effect to `docs/COSTS.md`, L-017 to L-019
-  and P-028 to P-031. Checks: `agents:check` and `interactions:check` pass. Dagger passed every
+  and P-029 to P-032. Checks: `agents:check` and `interactions:check` pass. Dagger passed every
   check but `test`; its six failing files are environmental (missing `.claude` files, Chrome and
   git access in the container, a timeout) and unrelated to the docs.
-- Ticket 287 (in progress): a development-only spike script that proves the Daily Brief
+- Ticket 295 (in progress): a development-only spike script that proves the Daily Brief
   request on a real ChatGPT plan. Mock mode first; the live run needs the owner's ChatGPT
   sign-in and consent. Results go to `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
-- Tickets 288–292 are not started; Wave 2 waits for the spike's request contract.
+- Tickets 296–300 are not started; Wave 2 waits for the spike's request contract.
 - Owner actions: provide a ChatGPT Plus or Pro account for the spike and acceptance. The owner
   decides when to submit OpenAI's interest form for web sign-in and hosted plan usage; it is
-  not a step in Tickets 286–292.
-- Platform impact: see Tickets 286–292. Web: hosted prepare and complete only, no ChatGPT
-  controls. Desktop: the connection, UI and acceptance. Marketing: none until release (P-031).
-  Future mobile: not applicable. Messaging impact: P-028 to P-031.
+  not a step in Tickets 294–300.
+- Platform impact: see Tickets 294–300. Web: hosted prepare and complete only, no ChatGPT
+  controls. Desktop: the connection, UI and acceptance. Marketing: none until release (P-032).
+  Future mobile: not applicable. Messaging impact: P-029 to P-032.
 
 ## Ticket 285: installed Mac acceptance run — November 6–7, 2026
 

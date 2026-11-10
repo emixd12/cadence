@@ -64,9 +64,9 @@ Risk levels:
 | [L-014](#l-014-last-known-leave-time-after-the-five-minute-window) | Last-known leave time after the five-minute window | open | medium | 163, 164, 170, 214, 267, 268 |
 | [L-015](#l-015-leave-reminder-schedule-derived-from-a-route-estimate) | Leave reminder schedule derived from a route estimate | open | medium | 275, 277, 280 |
 | [L-016](#l-016-calendar-reads-with-no-user-session) | Calendar reads with no user session | open | medium | 276, 277 |
-| [L-017](#l-017-chatgpt-plan-usage-in-a-paid-or-hosted-app) | ChatGPT plan usage in a paid or hosted app | open | medium | 286–292 |
-| [L-018](#l-018-sign-in-with-chatgpt-devkit-licence) | Sign in with ChatGPT DevKit licence | open | low | 287, 289, 291 |
-| [L-019](#l-019-openai-brand-guidelines-for-the-chatgpt-button) | OpenAI brand guidelines for the ChatGPT button | open | low | 291 |
+| [L-017](#l-017-chatgpt-plan-usage-in-a-paid-or-hosted-app) | ChatGPT plan usage in a paid or hosted app | open | medium | 294–300 |
+| [L-018](#l-018-sign-in-with-chatgpt-devkit-licence) | Sign in with ChatGPT DevKit licence | open | low | 295, 297, 299 |
+| [L-019](#l-019-openai-brand-guidelines-for-the-chatgpt-button) | OpenAI brand guidelines for the ChatGPT button | open | low | 299 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -481,9 +481,9 @@ part of L-002.
 - **Question:** Does Cadence for Mac stay within OpenAI's ChatGPT plan program once Cadence
   charges for accounts, or because the signed-in Mac brief relies on Cadence's hosted server
   for its context? Would plan usage in the hosted web app need OpenAI's approval?
-- **Affected:** Tickets 286–292. Files: the planned Mac connection
+- **Affected:** Tickets 294–300. Files: the planned Mac connection
   (`apps/desktop/src-tauri`, `apps/desktop/src`) and hosted prepare and complete routes under
-  `app/api/advisor/brief`. Decision: `docs/DECISIONS.md`, 2026-11-07, D25.
+  `app/api/advisor/brief`. Decision: `docs/DECISIONS.md`, 2026-11-07, D27.
 - **Provider, clause, source and check date:** OpenAI, Sign in with ChatGPT, token sharing
   for open-source apps: "open-source and locally hosted apps" may use a user's ChatGPT plan,
   and "ChatGPT plan usage is available to all open-source partners and selected private
@@ -497,7 +497,7 @@ part of L-002.
   OpenAI's approval too. Whether hosted context preparation makes the Mac app "remotely
   hosted" is unclear.
 - **Risk level:** medium.
-- **Owner decision or risk acceptance:** none on the terms question. Owner decision D25,
+- **Owner decision or risk acceptance:** none on the terms question. Owner decision D27,
   November 7, 2026: signed-in Mac users first; hosted web plan usage and billing deferred.
   Under the 2026-11-04 rule, this entry holds nothing.
 - **Status:** open.
@@ -509,7 +509,7 @@ part of L-002.
 
 - **Question:** May Cadence, a product of Identity Scaffolding LLC, use OpenAI's Sign in with
   ChatGPT DevKit code or React components?
-- **Affected:** Tickets 287, 289 and 291. Files: the spike script under `scripts/`, the Mac
+- **Affected:** Tickets 295, 297 and 299. Files: the spike script under `scripts/`, the Mac
   connection and the Settings card.
 - **Provider, clause, source and check date:** OpenAI, "Sign-in with ChatGPT DevKit
   Noncommercial License",
@@ -522,18 +522,18 @@ part of L-002.
   not copy, vendor or depend on DevKit code or components. The public docs themselves are
   read, not copied as code.
 - **Risk level:** low, while no DevKit code is used.
-- **Owner decision or risk acceptance:** owner decision D25, November 7, 2026, adopts the
+- **Owner decision or risk acceptance:** owner decision D27, November 7, 2026, adopts the
   plan that excludes DevKit code. Under the 2026-11-04 rule, this entry holds nothing.
 - **Status:** open.
-- **Next action:** reviewers of Tickets 287, 289 and 291 confirm no DevKit package, file or
+- **Next action:** reviewers of Tickets 295, 297 and 299 confirm no DevKit package, file or
   component is present.
 
 ## L-019: OpenAI brand guidelines for the ChatGPT button
 
 - **Question:** Do the "Continue with ChatGPT" button, the ChatGPT name and any OpenAI logo in
   the Mac app's Settings follow OpenAI's brand and UI guidelines?
-- **Affected:** Ticket 291. Files: the planned Settings card in
-  `apps/desktop/src/settings-screen.tsx`. Related messaging entry: P-031.
+- **Affected:** Ticket 299. Files: the planned Settings card in
+  `apps/desktop/src/settings-screen.tsx`. Related messaging entry: P-032.
 - **Provider, clause, source and check date:** OpenAI, Sign in with ChatGPT UI and UX
   guidelines and brand guidelines.
   `https://developers.openai.com/siwc/ui-ux-guidelines.md`. Not checked for this entry.
@@ -542,5 +542,5 @@ part of L-002.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** none.
 - **Status:** open.
-- **Next action:** Ticket 291 reads the guidelines before building the card and records the
+- **Next action:** Ticket 299 reads the guidelines before building the card and records the
   clauses it follows.

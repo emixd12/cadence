@@ -1858,10 +1858,10 @@ The owner decided on November 7, 2026:
 Platform impact: desktop, Mac 0.1.9 publication. Web: not applicable. Marketing: the download
 link moves at publication. Future mobile: not applicable. Messaging impact: none.
 
-## 2026-11-07: Daily Brief on the user's ChatGPT plan, Mac first (D25)
+## 2026-11-07: Daily Brief on the user's ChatGPT plan, Mac first (D27)
 
 The owner approved the plan "Use your ChatGPT plan in Cadence" on November 7, 2026, with
-three decisions. Tickets 286–292 carry the work.
+three decisions. Tickets 294–300 carry the work.
 
 1. **Signed-in Mac users first.** The first slice serves Cadence for Mac linked to a Cadence
    account. Cadence's server still builds the Daily Brief context and validates the output.
@@ -1904,7 +1904,7 @@ Reasons:
 Legal entries L-017 to L-019 log the program's approval condition, the DevKit licence and the
 brand guidelines. Under the 2026-11-04 rule they hold nothing.
 
-Platform impact: desktop, Tickets 289, 291 and 292. Web: the hosted prepare and complete steps
-(Tickets 288 and 290); the web app shows no ChatGPT controls. Marketing: none until release
-(P-031). Future mobile: not applicable, the program needs a local app; revisit with any
-native mobile ticket. Messaging impact: P-028, P-029, P-030 and P-031.
+Platform impact: desktop, Tickets 297, 299 and 300. Web: the hosted prepare and complete steps
+(Tickets 296 and 298); the web app shows no ChatGPT controls. Marketing: none until release
+(P-032). Future mobile: not applicable, the program needs a local app; revisit with any
+native mobile ticket. Messaging impact: P-029, P-030, P-031 and P-032.

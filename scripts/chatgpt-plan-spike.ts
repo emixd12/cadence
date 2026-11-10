@@ -1,5 +1,5 @@
 /**
- * Ticket 287: dev-only spike of the Daily Brief request on a ChatGPT plan.
+ * Ticket 295: dev-only spike of the Daily Brief request on a ChatGPT plan.
  *
  * Written from OpenAI's public "Sign in with ChatGPT" docs for open-source apps
  * (developers.openai.com/siwc/token-sharing-open-source). No DevKit code. Never

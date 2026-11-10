@@ -1,5 +1,5 @@
 /**
- * Ticket 287: local mock of OpenAI's sign-in, token, JWKS, revocation, models and
+ * Ticket 295: local mock of OpenAI's sign-in, token, JWKS, revocation, models and
  * streaming Responses endpoints, for the spike's mock mode and its unit tests.
  * It follows the rules in OpenAI's public docs; it is not OpenAI's behavior.
  * All values are synthetic and generated per run.

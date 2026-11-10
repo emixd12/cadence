@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-032` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-033` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -97,10 +97,10 @@ Status values:
 | [P-025](#p-025-corrected-places-are-remembered-for-their-location-text) | Corrected places are remembered for their location text | logged | 281 | Privacy, in-app copy, user guide |
 | [P-026](#p-026-outlook-and-icloud-events-get-leave-reminders-and-mac-cached-locations) | Outlook and iCloud events get leave reminders, and Mac-cached locations | logged | 283 | Privacy, Travel Settings, user guide, provider submissions |
 | [P-027](#p-027-mac-screen-recovery-message) | Mac screen recovery message | logged | 285 | In-app copy (Mac), user guide |
-| [P-028](#p-028-daily-brief-facts-sent-to-openai-under-the-users-chatgpt-account) | Daily Brief facts sent to OpenAI under the user's ChatGPT account | logged | 286, 289, 290, 291 | Privacy, Trust, provider submissions |
-| [P-029](#p-029-daily-brief-disclosure-on-a-mac-using-a-chatgpt-plan) | Daily Brief disclosure on a Mac using a ChatGPT plan | logged | 286, 291 | In-app copy (Mac) |
-| [P-030](#p-030-user-guide-for-using-a-chatgpt-plan) | User guide for using a ChatGPT plan | logged | 286, 291 | User guide |
-| [P-031](#p-031-marketing-claim-use-your-chatgpt-plan) | Marketing claim "Use your ChatGPT plan" | logged | 286, 291, 292 | Marketing |
+| [P-029](#p-029-daily-brief-facts-sent-to-openai-under-the-users-chatgpt-account) | Daily Brief facts sent to OpenAI under the user's ChatGPT account | logged | 294, 297, 298, 299 | Privacy, Trust, provider submissions |
+| [P-030](#p-030-daily-brief-disclosure-on-a-mac-using-a-chatgpt-plan) | Daily Brief disclosure on a Mac using a ChatGPT plan | logged | 294, 299 | In-app copy (Mac) |
+| [P-031](#p-031-user-guide-for-using-a-chatgpt-plan) | User guide for using a ChatGPT plan | logged | 294, 299 | User guide |
+| [P-032](#p-032-marketing-claim-use-your-chatgpt-plan) | Marketing claim "Use your ChatGPT plan" | logged | 294, 299, 300 | Marketing |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1008,9 +1008,9 @@ cite has not changed.
   message. The wording itself is approved (D21).
 - **Status:** logged.
 
-## P-028: Daily Brief facts sent to OpenAI under the user's ChatGPT account
+## P-029: Daily Brief facts sent to OpenAI under the user's ChatGPT account
 
-- **Change:** decided November 7, 2026 (`docs/DECISIONS.md`, D25); Tickets 289–291
+- **Change:** decided November 7, 2026 (`docs/DECISIONS.md`, D27); Tickets 297–299
   implement it. On a signed-in Mac with a connected ChatGPT plan, the Mac sends the Daily
   Brief facts to OpenAI under the user's own ChatGPT account, not Cadence's API account.
   Cadence's server prepares the facts and validates the output but makes no OpenAI request for
@@ -1018,7 +1018,7 @@ cite has not changed.
   never receives them. The Mac shows the ChatGPT account's email. Disconnect
   revokes the refresh token at OpenAI. Web briefs and Mac briefs without plan usage are
   unchanged.
-- **Affected:** Tickets 286, 289, 290 and 291. Files: `components/settings/LegalContent.tsx`
+- **Affected:** Tickets 294, 297, 298 and 299. Files: `components/settings/LegalContent.tsx`
   (Privacy, "Optional Daily Brief", the processor table's OpenAI rows; Trust, "Data
   boundaries"). Related legal entry: L-017.
 - **Surfaces:** Privacy, Trust, provider submissions.
@@ -1036,26 +1036,26 @@ cite has not changed.
   retention terms apply to plan requests.
 - **Status:** logged.
 
-## P-029: Daily Brief disclosure on a Mac using a ChatGPT plan
+## P-030: Daily Brief disclosure on a Mac using a ChatGPT plan
 
-- **Change:** decided November 7, 2026 (D25); Ticket 291 implements it. On a Mac with plan
+- **Change:** decided November 7, 2026 (D27); Ticket 299 implements it. On a Mac with plan
   usage, the brief runs on the user's ChatGPT plan, and a usage limit stops the brief with
   "Manage usage" instead of falling back to Cadence's key.
-- **Affected:** Tickets 286 and 291. Files: `components/briefing/DailyBriefSettingsPanel.tsx`.
+- **Affected:** Tickets 294 and 299. Files: `components/briefing/DailyBriefSettingsPanel.tsx`.
 - **Surfaces:** in-app copy (Mac).
 - **Conflicting current text:** Daily Brief settings: "Cadence sends today's Behavior schedule
   and completion history, including findings calculated from it, to OpenAI." and "OpenAI data
   retention may apply.", which links OpenAI's API data controls.
 - **Update needed:** on a Mac with plan usage, say the brief runs on the user's ChatGPT plan
-  and link the data controls that apply. Ticket 291 leaves this text unchanged and logs its own
+  and link the data controls that apply. Ticket 299 leaves this text unchanged and logs its own
   new card copy separately.
 - **Status:** logged.
 
-## P-030: User guide for using a ChatGPT plan
+## P-031: User guide for using a ChatGPT plan
 
-- **Change:** decided November 7, 2026 (D25); Ticket 291 implements it. Mac users can connect
+- **Change:** decided November 7, 2026 (D27); Ticket 299 implements it. Mac users can connect
   ChatGPT from Settings, see "Using ChatGPT plan", open "Manage usage" and disconnect.
-- **Affected:** Tickets 286 and 291. Files: `docs/user-guide/timeline.md` ("Daily Brief"),
+- **Affected:** Tickets 294 and 299. Files: `docs/user-guide/timeline.md` ("Daily Brief"),
   `docs/user-guide/privacy-and-account.md` ("Outlook, iCloud, Hevy, and Daily Brief data").
 - **Surfaces:** user guide.
 - **Conflicting current text:** `docs/user-guide/timeline.md`, "Daily Brief": "Cadence sends
@@ -1066,11 +1066,11 @@ cite has not changed.
   Disconnect, and that the web app has no ChatGPT option.
 - **Status:** logged.
 
-## P-031: Marketing claim "Use your ChatGPT plan"
+## P-032: Marketing claim "Use your ChatGPT plan"
 
-- **Change:** decided November 7, 2026 (D25). After Ticket 292 passes and a Mac release ships
+- **Change:** decided November 7, 2026 (D27). After Ticket 300 passes and a Mac release ships
   the feature, marketing may say Mac users can run the Daily Brief on their ChatGPT plan.
-- **Affected:** Tickets 286, 291 and 292. Files: `apps/marketing/src/data/faq.ts`
+- **Affected:** Tickets 294, 299 and 300. Files: `apps/marketing/src/data/faq.ts`
   ("use-external-ai"), `apps/marketing/src/data/routes.ts`,
   `apps/marketing/src/pages/about.astro`. Related legal entry: L-019.
 - **Surfaces:** marketing.

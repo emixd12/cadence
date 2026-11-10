@@ -1,4 +1,4 @@
-# Ticket 287 — Daily Brief request on a ChatGPT plan (spike)
+# Ticket 295 — Daily Brief request on a ChatGPT plan (spike)
 
 ## State
 
@@ -174,7 +174,7 @@ The report adds this section only when the run stopped early or recorded an erro
 
 | Decision | Recommendation | Evidence |
 | --- | --- | --- |
-| Request contract for Ticket 288 | | |
+| Request contract for Ticket 296 | | |
 | Model selection rule | | |
 | Attempt deadline on the plan route | | |
 | Mac transport: webview or Rust | | |

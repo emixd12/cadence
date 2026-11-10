@@ -913,9 +913,9 @@ service. Ordinary user Settings remains small. Web and linked desktop share
 results; no native workbench, marketing claim or native mobile implementation is
 added. Existing live-data and release gates remain separate.
 
-### Daily Brief on the user's ChatGPT plan (Tickets 286–292)
+### Daily Brief on the user's ChatGPT plan (Tickets 294–300)
 
-The owner approved this on November 7, 2026 (`docs/DECISIONS.md`, D25). A signed-in user of
+The owner approved this on November 7, 2026 (`docs/DECISIONS.md`, D27). A signed-in user of
 Cadence for Mac can connect one ChatGPT Plus or Pro account from Settings. With plan usage
 granted, Cadence's server still builds the brief context and validates the output, but the
 Mac runs the model call on the user's ChatGPT plan, so Cadence's server makes no OpenAI
