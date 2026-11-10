@@ -5,6 +5,7 @@ import { LeaveReminderSettingBench, TravelDevelopmentTextBench, TravelHabitsBenc
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
+import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -385,6 +386,8 @@ export default async function DesignSystemPage({
   const selectedFixtureState = firstSearchParam(params?.state);
 
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
+
+  if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
 
   if (selectedPreviewId === "day-progress") {
     return (

@@ -1,0 +1,481 @@
+/* Trial: circled horse avatar for the advisor. Bench-only until promoted. */
+
+.avatar {
+  --size: 64px;
+  --ring: color-mix(in oklab, var(--primary) 28%, transparent);
+  --dot-blue: #2f7bbf;
+  --dot-red: var(--accent);
+  --from-y: 0px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border: 0;
+  border-radius: 9999px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.avatar:hover {
+  transform: scale(1.04);
+}
+
+.avatar:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+/* Soft halo behind the circle. Pulses when advice is waiting. */
+.halo {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--primary) 16%, transparent) 0%,
+    transparent 70%
+  );
+  transform: scale(1.35);
+  opacity: 0.6;
+  transition: opacity 400ms ease;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--background);
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    0 1px 2px color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 6px 18px -8px color-mix(in oklab, var(--primary) 45%, transparent);
+  transition: box-shadow 300ms ease;
+}
+
+.horse {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 40% 80%;
+  animation: breathe 5.2s ease-in-out infinite;
+}
+
+/* Mane: rotates around its root behind the ears. Negative angles lift the
+   tips, as if wind were coming from the horse's face. */
+.mane,
+.wisps {
+  --lift: -6deg;
+  animation: sway 5s ease-in-out infinite;
+}
+
+/* Wisps hang left of their root, so a positive angle lifts them. */
+.wisps {
+  --lift: 12deg;
+  animation-delay: -0.6s;
+}
+
+.avatar[data-state="thinking"] :is(.mane, .wisps) {
+  animation-name: sway-strong;
+  animation-duration: 1.6s;
+}
+
+.avatar[data-state="advice"] :is(.mane, .wisps) {
+  animation-name: gust;
+  animation-duration: 2.8s;
+  animation-timing-function: ease-out;
+}
+
+.avatar[data-state="open"] :is(.mane, .wisps) {
+  animation-name: drift;
+  animation-duration: 8s;
+}
+
+/* Eyelid: three nested layers so state, waking and blinking add up. */
+.lid {
+  fill: var(--background);
+}
+
+.lash {
+  fill: none;
+  stroke: #4d6f99;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.lidRest {
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Preparing narrows the eye; blinks then only travel the remaining distance. */
+.avatar[data-state="thinking"] .lidRest {
+  transform: translateY(10px);
+}
+
+.avatar[data-state="thinking"] .lidBlink {
+  --close: 6px;
+}
+
+.lidWake {
+  animation: wake 900ms cubic-bezier(0.3, 0.7, 0.3, 1) var(--wake-delay, 0.25s) backwards;
+}
+
+.lidBlink {
+  animation: blink 5.5s linear calc(var(--wake-delay, 0.25s) + 1.6s) infinite;
+}
+
+.avatar[data-state="thinking"] .lidBlink {
+  animation-duration: 3.2s;
+}
+
+.avatar[data-state="advice"] .lidBlink {
+  animation: blink-double 3s linear 0.4s infinite;
+}
+
+.avatar[data-state="open"] .lidBlink {
+  animation-duration: 6.5s;
+}
+
+/* Arc that spins while the advisor is preparing. */
+.ring {
+  position: absolute;
+  inset: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+
+.ringArc {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 38 200;
+  transform-origin: 50% 50%;
+  animation: spin 1.1s linear infinite;
+}
+
+/* The banner's blue and terracotta dots orbit the circle. */
+.orbit {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  animation: spin 18s linear infinite;
+  transition: opacity 300ms ease;
+}
+
+.orbitReverse {
+  animation-duration: 26s;
+  animation-direction: reverse;
+  animation-delay: -9s;
+}
+
+.dot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: max(5px, calc(var(--size) * 0.085));
+  height: max(5px, calc(var(--size) * 0.085));
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+
+.dotBlue {
+  background: var(--dot-blue);
+}
+
+.dotRed {
+  background: var(--dot-red);
+}
+
+/* Terracotta dot that settles at the top right when advice is waiting. */
+.badge {
+  position: absolute;
+  top: 4%;
+  right: 4%;
+  width: max(9px, calc(var(--size) * 0.16));
+  height: max(9px, calc(var(--size) * 0.16));
+  border-radius: 9999px;
+  background: var(--dot-red);
+  box-shadow: 0 0 0 2px var(--background);
+  opacity: 0;
+  transform: scale(0.2);
+  transition:
+    opacity 200ms ease,
+    transform 380ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+/* States */
+
+.avatar[data-state="thinking"] .ring {
+  opacity: 1;
+}
+
+.avatar[data-state="thinking"] .orbit {
+  animation-duration: 1.6s;
+  animation-direction: normal;
+}
+
+.avatar[data-state="thinking"] .orbitReverse {
+  animation-delay: -0.8s;
+}
+
+.avatar[data-state="thinking"] .horse {
+  animation-duration: 2.6s;
+}
+
+.avatar[data-state="advice"] .orbit,
+.avatar[data-state="open"] .orbit {
+  opacity: 0;
+}
+
+.avatar[data-state="advice"] .badge {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.avatar[data-state="advice"] .face {
+  animation: call 2.8s ease-out infinite;
+}
+
+.avatar[data-state="open"] .face {
+  box-shadow:
+    inset 0 0 0 1.5px var(--primary),
+    0 1px 2px color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 8px 22px -8px color-mix(in oklab, var(--primary) 60%, transparent);
+}
+
+.avatar[data-state="open"] .horse {
+  animation: lean 600ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.avatar[data-state="open"] .halo {
+  opacity: 1;
+}
+
+/* Entrances */
+
+.arriveTop {
+  animation: arriveTop 700ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.arriveCenter {
+  z-index: 10;
+  animation: arriveCenter 2200ms cubic-bezier(0.65, 0, 0.35, 1) backwards;
+}
+
+/* Advice card under the avatar */
+
+.card {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cardInner {
+  overflow: hidden;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.03) rotate(-1.5deg);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes call {
+  0% {
+    box-shadow:
+      inset 0 0 0 1px var(--ring),
+      0 0 0 0 color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+  60%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px var(--ring),
+      0 0 0 12px color-mix(in oklab, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes lean {
+  to {
+    transform: scale(1.06) rotate(-3deg) translateX(2%);
+  }
+}
+
+@keyframes arriveTop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+    filter: blur(6px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes arriveCenter {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--from-y)) scale(0.8);
+    filter: blur(8px);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(var(--from-y)) scale(2);
+    filter: blur(0);
+  }
+  55% {
+    transform: translateY(var(--from-y)) scale(2);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(var(--lift));
+  }
+}
+
+@keyframes sway-strong {
+  0%,
+  100% {
+    transform: rotate(calc(var(--lift) * 0.4));
+  }
+  50% {
+    transform: rotate(calc(var(--lift) * 1.7));
+  }
+}
+
+@keyframes gust {
+  0% {
+    transform: rotate(0deg);
+  }
+  14% {
+    transform: rotate(calc(var(--lift) * 2));
+  }
+  32% {
+    transform: rotate(calc(var(--lift) * 0.5));
+  }
+  46% {
+    transform: rotate(calc(var(--lift) * 1.1));
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(calc(var(--lift) * 0.6));
+  }
+}
+
+@keyframes wake {
+  0% {
+    transform: translateY(16px);
+  }
+  55% {
+    transform: translateY(1px);
+  }
+  70% {
+    transform: translateY(7px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink {
+  0%,
+  93% {
+    transform: translateY(0);
+  }
+  95.5% {
+    transform: translateY(var(--close, 16px));
+  }
+  98%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink-double {
+  0%,
+  82% {
+    transform: translateY(0);
+  }
+  85% {
+    transform: translateY(var(--close, 16px));
+  }
+  88% {
+    transform: translateY(0);
+  }
+  91% {
+    transform: translateY(var(--close, 16px));
+  }
+  94%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horse,
+  .mane,
+  .wisps,
+  .lidWake,
+  .lidBlink,
+  .orbit,
+  .ringArc,
+  .face,
+  .arriveTop,
+  .arriveCenter {
+    animation: none !important;
+  }
+
+  .avatar[data-state="thinking"] .ring {
+    opacity: 0.6;
+  }
+}

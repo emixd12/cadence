@@ -405,6 +405,13 @@
       "reason": "Ticket 132 development-only synthetic comparison bench. No production interaction or provider access."
     },
     {
+      "path": "app/design-system/HorseAvatarTrial.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 9,
+      "interaction_ids": [],
+      "reason": "Development-only trial of an animated advisor horse avatar with sample advice. Not a product surface; no account or provider access."
+    },
+    {
       "path": "app/design-system/page.tsx",
       "classification": "excluded",
       "interaction_marker_count": 30,
