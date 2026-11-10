@@ -1,4 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
+import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 
 import {
   type AppSupabaseClient,
@@ -195,13 +197,15 @@ async function getTimelineViewForUser(input: {
     listTimeSessionHistory(supabase, { userId, startLocalDate: historyStart, endLocalDate: historyEnd,
       includeArchived: false, throughStartedAt: now.toString() }),
   ]);
-  return resolvePersistedTimeline({
+  const view = resolvePersistedTimeline({
     durationHistory: { occurrences: historyOccurrences, timeSessions: historySessions.map(toTimeSession) },
     behaviors,
     occurrences: occurrenceRows,
     timeSessions: timeSessions.map(toTimeSession),
     now, timezone, futureDays: input.futureDays,
   });
+  const dayNoteRange = timelineDayNoteRange(view);
+  return attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
 }
 
 async function requireUserId(supabase: AppSupabaseClient): Promise<string> {

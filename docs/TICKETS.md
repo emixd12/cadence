@@ -17123,3 +17123,65 @@ Verification: `tests/acceptance-client-prompts.test.mjs` and
 `tests/acceptance-client-runners.test.mjs`; `npm run lint`, `agents:check`,
 `interactions:check`, `resolvers:check`. Follow-up: one local `tier1` run per scenario
 with claude-code, then a production run with the API clients.
+
+## Ticket 292: Day notes
+
+Status: approved by the owner on 2026-11-10; in progress. Owner decisions,
+2026-11-10:
+
+1. Web, MCP and desktop (local and linked) ship together in this ticket.
+2. One note per day. The user can edit or clear it at any time.
+3. Day notes get their own Note shortcuts pool, separate from Behavior pools.
+4. Day notes appear in Full JSON and BehaviorLog exports; CSV, JSONL and Markdown
+   stay unchanged.
+5. MCP writes reuse `cadence.occurrences.write`; its description widens to day notes.
+6. Day notes are allowed on future days.
+7. Day notes in the Daily Brief are a later Daily Brief upgrade, not this ticket
+   (`docs/FUTURE_UPDATES.md`).
+
+Goal: a user can add, edit or clear one note for a whole day from a small control
+under each day's date on the Timeline.
+
+Domain rule: a day note belongs to a calendar date in the user's timezone. It has no
+status, no Behavior and no Occurrence. It never changes adherence, Needs decision,
+reminders or analytics. Clearing keeps the row with a null note, so synchronization
+needs no tombstone. A timezone change leaves notes on their dates.
+
+Scope and acceptance:
+
+- Data: `day_notes` (`id`, `user_id`, `local_date`, `note`, `revision`,
+  `created_at`, `updated_at`), unique per user and date, owner-only RLS select, writes
+  only through `save_day_note`, which compares the stored note with the expected note.
+  Notes use Occurrence-note normalization and a 2,000-character limit.
+- UI: every Timeline day header, including future days and Needs decision day
+  sections, shows "Add day note" (or "Day note" with a one-line preview) under the
+  date. It opens the shared `NoteEditor`, the same editor Occurrence notes use, with
+  the same compare-and-set, shortcut chips and unsaved-draft handling.
+- Note shortcuts: a `day_notes` pool learns only from repeated day notes, appears only
+  in the day-note editor, and follows the global Note shortcuts switch. Settings
+  manages it. Evidence and exclusion IDs in this pool are day-note IDs.
+- Desktop: SQLite migration, DataStore methods and native store commands for local
+  day notes; account sync adds the `day_note` kind under sync contract 3.
+- MCP: `list_day_notes` (read) and `update_day_note` (write, `cadence.occurrences.write`),
+  a `day_note` field on `get_timeline` days, and `day_note` records in `search` and
+  `fetch`. Descriptions say a day note is separate from Occurrence statuses and
+  Occurrence notes. Contract minor version bump.
+- Exports: Full JSON gains `day_notes`. BehaviorLog writes each non-empty day note as a
+  one-day `review` record (`review_role: user`, `summary_markdown` = note, a
+  `cadence` extension marking it as a day note). Restore and import of Cadence-produced
+  day-note reviews write back to `day_notes`.
+- Interaction registry `INT-TIMELINE-012`; required checks pass.
+
+Non-goals: several entries per day, note history, Daily Brief input, the Behaviors
+selected-day review, CSV/JSONL/Markdown changes, model-based shortcut analysis.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `components/timeline/DayNoteControl.tsx`, `components/notes/NoteEditor.tsx`, `app/(app)/timeline/actions.ts`, `lib/services/day-note.service.ts`, migration `20261110120000_day_notes.sql`. |
+| Desktop | Shared Timeline components; SQLite migration, DataStore methods, native store and account sync contract 3 in this ticket. |
+| Marketing | Not applicable: no marketing claim changes in this ticket; any copy goes through P-028. |
+| Future mobile | Deferred: no mobile surface. |
+
+Messaging impact: P-028.

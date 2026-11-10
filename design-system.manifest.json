@@ -32,6 +32,34 @@
       "notes": ""
     },
     {
+      "id": "composite.note-editor",
+      "name": "NoteEditor",
+      "kind": "composite",
+      "source": "components/notes/NoteEditor.tsx",
+      "exportName": "NoteEditor",
+      "usageNames": [
+        "NoteEditor"
+      ],
+      "benchAnchor": "design-system#ds-composite-note-editor",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Shared note editor for Occurrence notes and day notes: compare-and-set expected note, shortcut chips, unsaved-draft guard."
+    },
+    {
+      "id": "composite.day-note-control",
+      "name": "DayNoteControl",
+      "kind": "composite",
+      "source": "components/timeline/DayNoteControl.tsx",
+      "exportName": "DayNoteControl",
+      "usageNames": [
+        "DayNoteControl"
+      ],
+      "benchAnchor": "design-system#ds-composite-day-note-control",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 292: one note for a whole day under each Timeline date; uses the shared NoteEditor."
+    },
+    {
       "id": "composite.occurrence-row",
       "name": "OccurrenceRow",
       "kind": "composite",

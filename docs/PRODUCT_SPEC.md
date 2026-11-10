@@ -280,6 +280,20 @@ Example:
 - Behavior title: "Take body measurements"
 - Description: "Weight, hips, waist, chest. Add values in the note."
 
+### Day notes (Ticket 292)
+
+Each calendar date can have one free-text day note. The user opens it from a small
+control under the date of any Timeline day, including future days and Needs decision
+days, and can add, edit or clear it at any time. A day note is about the whole day
+("Travel day", "Sick"). It has no status and is not attached to a Behavior or an
+Occurrence. It never changes adherence, Needs decision, reminders or analytics.
+
+Day notes use the same editor as Occurrence notes, the same normalization, and a
+2,000-character limit. Repeated day notes feed a separate `day_notes` Note shortcuts
+pool. Full JSON and BehaviorLog exports include day notes; MCP clients can read and
+write them (`docs/MCP_CONTRACT.md`). Daily Brief does not read day notes yet
+(`docs/FUTURE_UPDATES.md`).
+
 ## Behavior review and adherence
 
 The Behaviors screen is the primary behavior object surface. It combines

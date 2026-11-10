@@ -18,6 +18,7 @@ import type {
   ExportBehaviorInput,
   ExportBehaviorDefinitionEventInput,
   ExportCategoryInput,
+  ExportDayNoteInput,
   ExportOccurrenceInput,
   ExportReminderDeliveryInput,
   ExportStatusEventInput,
@@ -349,6 +350,8 @@ function conformanceReminderDeliveries(): ExportReminderDeliveryInput[] {
 function resolveConformanceBundle(input: {
   includeTimeTracking?: boolean;
   timeSessions?: ExportTimeSessionInput[];
+  includeNotes?: boolean;
+  dayNotes?: ExportDayNoteInput[];
 } = {}) {
   return resolveExportBundle({
     profile: {
@@ -367,13 +370,63 @@ function resolveConformanceBundle(input: {
     now: NOW,
     timezone: DEFAULT_TIMEZONE,
     range: "all",
-    includeNotes: false,
+    includeNotes: input.includeNotes ?? false,
     includeTimeTracking: input.includeTimeTracking,
     timeSessions: input.timeSessions,
+    dayNotes: input.dayNotes,
   }).behaviorLog;
 }
 
 describe("BehaviorLog core conformance", () => {
+  it("includes day notes in Full JSON only when notes are included and inside the range", () => {
+    const base = {
+      profile: { timezone: DEFAULT_TIMEZONE, subjectId: "subject_test", producerName: "Cadence Tracker", producerVersion: "0.1.0" },
+      categories, behaviors: [conformanceBehavior()], occurrences: conformanceOccurrences(), now: NOW, timezone: DEFAULT_TIMEZONE,
+      dayNotes: [
+        { id: "60000000-0000-4000-8000-000000000001", localDate: "2026-06-07", note: "Sick", createdAt: "2026-06-07T12:00:00Z", updatedAt: "2026-06-07T12:00:00Z" },
+        { id: "60000000-0000-4000-8000-000000000004", localDate: "2026-01-02", note: "Old", createdAt: "2026-01-02T12:00:00Z", updatedAt: "2026-01-02T12:00:00Z" },
+      ],
+    };
+    expect(resolveExportBundle({ ...base, range: "all", includeNotes: false }).jsonBackup.day_notes).toBeUndefined();
+    expect(resolveExportBundle({ ...base, range: "all", includeNotes: true }).jsonBackup.day_notes?.map((note) => note.note)).toEqual(["Old", "Sick"]);
+    expect(resolveExportBundle({ ...base, range: 30, includeNotes: true }).jsonBackup.day_notes).toEqual([{
+      id: "60000000-0000-4000-8000-000000000001", local_date: "2026-06-07", note: "Sick",
+      created_at: "2026-06-07T12:00:00Z", updated_at: "2026-06-07T12:00:00Z",
+    }]);
+  });
+
+  it("exports day notes as one-day user reviews that pass the reference validator", async () => {
+    const dayNotes: ExportDayNoteInput[] = [
+      { id: "60000000-0000-4000-8000-000000000002", localDate: "2026-06-08", note: "Travel day", createdAt: "2026-06-08T12:00:00Z", updatedAt: "2026-06-08T13:00:00Z" },
+      { id: "60000000-0000-4000-8000-000000000001", localDate: "2026-06-07", note: "Sick", createdAt: "2026-06-07T12:00:00Z", updatedAt: "2026-06-07T12:00:00Z" },
+      { id: "60000000-0000-4000-8000-000000000003", localDate: "2026-06-06", note: null, createdAt: "2026-06-06T12:00:00Z", updatedAt: "2026-06-06T12:30:00Z" },
+    ];
+    expect(resolveConformanceBundle({ includeNotes: false, dayNotes }).files.some((file) => file.path === "data/reviews.jsonl")).toBe(false);
+    const bundle = resolveConformanceBundle({ includeNotes: true, dayNotes });
+    const filesByPath = new Map(bundle.files.map((file) => [file.path, file]));
+    const reviews = parseJsonl(filesByPath.get("data/reviews.jsonl")?.content ?? "");
+    expect(reviews.map((review) => review.summary_markdown)).toEqual(["Sick", "Travel day"]);
+    expect(reviews[0]).toMatchObject({
+      record_type: "review", review_id: "60000000-0000-4000-8000-000000000001",
+      period_start_local_date: "2026-06-07", period_end_local_date: "2026-06-07", review_role: "user",
+      extensions: { "app.cadence": { day_note: true } },
+    });
+    const manifest = parseJson(filesByPath.get("manifest.json")?.content ?? "");
+    expect(manifest.files).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "data/reviews.jsonl", schema_ref: "#/$defs/Review" }),
+    ]));
+    expect(resolveBehaviorLogImportPreview({ files: bundle.files }).valid).toBe(true);
+
+    const { root, bundlePath } = await writeBehaviorLogDirectory(bundle.files);
+    try {
+      const result = spawnSync(process.execPath, ["scripts/behaviorlog-conformance.mjs", bundlePath], { cwd: process.cwd(), encoding: "utf8" });
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      expect(result.stdout).toContain("BehaviorLog bundle valid:");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("exports standard time tracking with matching privacy and profile declarations", async () => {
     const bundle = resolveConformanceBundle({
       includeTimeTracking: true,

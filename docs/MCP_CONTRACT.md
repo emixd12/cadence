@@ -89,7 +89,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.0.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.1.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -102,11 +102,13 @@ Contract version: `1.0.0`. Generated from `packages/core/src/integration/`.
 | `get_timeline` | Get Timeline | `cadence.read` | yes | no | yes |
 | `list_occurrences` | List Occurrences | `cadence.read` | yes | no | yes |
 | `get_occurrence` | Get Occurrence | `cadence.read` | yes | no | yes |
+| `list_day_notes` | List day notes | `cadence.read` | yes | no | yes |
 | `get_adherence_summary` | Get adherence summary | `cadence.read` | yes | no | yes |
 | `search` | Search Cadence | `cadence.read` | yes | no | yes |
 | `fetch` | Fetch Cadence record | `cadence.read` | yes | no | yes |
 | `set_occurrence_status` | Set Occurrence status | `cadence.occurrences.write` | no | yes | yes |
 | `update_occurrence_note` | Update Occurrence note | `cadence.occurrences.write` | no | yes | yes |
+| `update_day_note` | Update day note | `cadence.occurrences.write` | no | yes | yes |
 | `create_behavior` | Create Behavior | `cadence.behaviors.write` | no | no | no |
 | `update_behavior` | Update Behavior | `cadence.behaviors.write` | no | yes | yes |
 | `archive_behavior` | Archive Behavior | `cadence.behaviors.write` | no | yes | yes |
@@ -118,8 +120,8 @@ Every tool sets `openWorldHint: false`.
 
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
-| `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes. | `set_occurrence_status`, `update_occurrence_note` |
+| `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `update_day_note` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior` |
 
 ## Error catalog
@@ -160,6 +162,8 @@ Every tool sets `openWorldHint: false`.
 | Recurrence interval (input) | 999 |
 | Default duration (minutes) | 1440 |
 | Occurrence note length | 2000 |
+| Day note length | 2000 |
+| `list_day_notes` maximum date range (days, inclusive) | 92 |
 | Archive note length | 2000 |
 | Cursor length | 512 |
 | Revision length | 128 |
@@ -179,6 +183,7 @@ Included:
 - Categories
 - Occurrences, stored statuses, and status history
 - Occurrence notes and archive notes
+- Day notes (one note per calendar date, separate from Occurrence notes and statuses)
 - Occurrence time sessions
 - Adherence analytics (Unresolved excluded, no streaks)
 - Per-Behavior reminder settings
@@ -236,7 +241,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.0.0"` |
+| `contract_version` | yes | `"1.1.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -395,6 +400,30 @@ Output:
 |---|---|---|
 | `occurrence` | yes | object |
 
+### `list_day_notes`
+
+**List day notes.** Lists the user's day notes for a date range of up to 92 days. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders. Use it for questions about how a day went overall. Only dates with a saved note are returned.
+
+- Scope: `cadence.read`
+- Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
+- Annotation rationale: Reads account data and changes nothing, so readOnlyHint is true. Claude runs read-only tools without per-call confirmation, and OpenAI asks for readOnlyHint on every read. openWorldHint is false because the tool reaches only the user's own Cadence account.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `limit_exceeded`
+- Since: 1.1.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `start_local_date` | yes | string (date) |
+| `end_local_date` | yes | string (date) |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `timezone` | yes | string |
+| `day_notes` | yes | array of object |
+
 ### `get_adherence_summary`
 
 **Get adherence summary.** Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to 366 days. Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved. Use it for "how am I doing" questions. Cadence does not compute streaks.
@@ -523,6 +552,33 @@ Output:
 | Field | Required | Type |
 |---|---|---|
 | `occurrence` | yes | object |
+| `changed` | yes | boolean |
+
+### `update_day_note`
+
+**Update day note.** Adds, replaces, or clears the user's one note for a calendar date. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders. Use update_occurrence_note for one scheduled instance and set_occurrence_status for Completed or Not Completed. Future dates are allowed.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Replaces the previous day note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same day note, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `conflict`, `idempotency_key_reused`
+- Since: 1.1.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `local_date` | yes | string (date) |
+| `note` | yes | string |
+| `expected_revision` | no | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `local_date` | yes | string (date) |
+| `day_note` | yes | object or null |
 | `changed` | yes | boolean |
 
 ### `create_behavior`

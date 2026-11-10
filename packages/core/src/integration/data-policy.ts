@@ -5,6 +5,7 @@ export const INTEGRATION_INCLUDED_DATA: readonly string[] = Object.freeze([
   "Categories",
   "Occurrences, stored statuses, and status history",
   "Occurrence notes and archive notes",
+  "Day notes (one note per calendar date, separate from Occurrence notes and statuses)",
   "Occurrence time sessions",
   "Adherence analytics (Unresolved excluded, no streaks)",
   "Per-Behavior reminder settings",

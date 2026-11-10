@@ -167,6 +167,8 @@ export type PortabilitySnapshot = {
   placeMarkers?: (import("./place-labels").PlaceMarkerRecord & { user_id: string })[];
   completionPlaceLabels?: (import("./place-labels").CompletionPlaceLabelRecord & { user_id: string })[];
   whereSuggestionDismissals?: (import("./place-labels").WhereSuggestionDismissalRecord & { user_id: string })[];
+  /** Ticket 292 rows, with the local owner column. Older snapshots omit them. */
+  dayNotes?: (import("../resolvers/day-note.resolver").DayNoteRecord)[];
 };
 export type PortabilityRowWrite<T> = { expected: T | null; next: T };
 export type LocalImportWritePlan = {

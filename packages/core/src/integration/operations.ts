@@ -9,6 +9,7 @@ import {
   BEHAVIOR_STATES,
   adherenceCounts,
   archiveNoteInput,
+  dayNoteInput,
   behaviorDescriptionInput,
   behaviorOutput,
   behaviorTitleInput,
@@ -96,6 +97,8 @@ const READ_RATIONALE =
 
 type ReadSpec<I, O> = {
   name: string;
+  /** Contract version that introduced the tool. Defaults to 1.0.0. */
+  since?: string;
   title: string;
   description: string;
   input: SchemaNode<I>;
@@ -121,7 +124,7 @@ function readOperation<I, O>(spec: ReadSpec<I, O>): IntegrationOperationDefiniti
     }),
     annotationRationale: READ_RATIONALE,
     errors: Object.freeze([...COMMON_ERROR_CODES, ...(spec.errors ?? [])]),
-    since: INTEGRATION_CONTRACT_VERSION,
+    since: spec.since ?? "1.0.0",
   });
 }
 
@@ -150,7 +153,7 @@ function writeOperation<I, O>(spec: WriteSpec<I, O>): IntegrationOperationDefini
     }),
     annotationRationale: spec.annotationRationale,
     errors: Object.freeze<IntegrationErrorCode[]>([...COMMON_ERROR_CODES, "insufficient_scope", ...(spec.errors ?? [])]),
-    since: INTEGRATION_CONTRACT_VERSION,
+    since: spec.since ?? "1.0.0",
   });
 }
 
@@ -233,9 +236,21 @@ const listCategories = readOperation({
   }),
 });
 
+const DAY_NOTE_MEANING =
+  "A day note is the user's one note about a whole calendar date (for example \"Travel day\" or \"Sick\"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.";
+
+const dayNoteOutput = object({
+  id: uuid(),
+  local_date: localDate(),
+  note: nullable(string({ description: "Day note text. Null after the user cleared it." })),
+  revision: revision(),
+  updated_at: utcInstant(),
+});
+
 const timelineDay = object({
   local_date: localDate(),
   is_today: boolean(),
+  day_note: optional(nullable(string({ description: "The user's day note for this date, or null. Separate from Occurrence notes and statuses." }))),
   occurrences: array(occurrenceOutput),
 });
 
@@ -283,6 +298,23 @@ const listOccurrences = readOperation({
     occurrences: array(occurrenceOutput),
     next_cursor: nextCursor(),
     freshness: freshnessOutput,
+  }),
+  errors: ["limit_exceeded"],
+});
+
+const listDayNotes = readOperation({
+  name: "list_day_notes",
+  since: "1.1.0",
+  title: "List day notes",
+  description:
+    `Lists the user's day notes for a date range of up to ${L.maxDayNoteRangeDays} days. ${DAY_NOTE_MEANING} Use it for questions about how a day went overall. Only dates with a saved note are returned.`,
+  input: object({
+    start_local_date: localDate("First local date, inclusive."),
+    end_local_date: localDate("Last local date, inclusive."),
+  }),
+  output: object({
+    timezone: timezone(),
+    day_notes: array(dayNoteOutput, { maxItems: L.maxDayNoteRangeDays }),
   }),
   errors: ["limit_exceeded"],
 });
@@ -410,6 +442,31 @@ const updateOccurrenceNote = writeOperation({
     "Replaces the previous note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same note, so idempotentHint is true. openWorldHint is false.",
 });
 
+const updateDayNote = writeOperation({
+  name: "update_day_note",
+  since: "1.1.0",
+  title: "Update day note",
+  description:
+    `Adds, replaces, or clears the user's one note for a calendar date. ${DAY_NOTE_MEANING} Use update_occurrence_note for one scheduled instance and set_occurrence_status for Completed or Not Completed. Future dates are allowed.`,
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    local_date: localDate("Calendar date the note is about, in the account timezone."),
+    note: dayNoteInput(),
+    expected_revision: optional(revision("Revision the client last read. If the day note changed since, or does not exist, the call fails with `conflict`.")),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    local_date: localDate(),
+    day_note: nullable(dayNoteOutput, { description: "Null when the date never had a note and the request cleared it." }),
+    changed: boolean({ description: "False when the day note already had this text." }),
+  }),
+  errors: ["conflict", "idempotency_key_reused"],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Replaces the previous day note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same day note, so idempotentHint is true. openWorldHint is false.",
+});
+
 const createBehavior = writeOperation({
   name: "create_behavior",
   title: "Create Behavior",
@@ -531,11 +588,13 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   get_timeline: getTimeline,
   list_occurrences: listOccurrences,
   get_occurrence: getOccurrence,
+  list_day_notes: listDayNotes,
   get_adherence_summary: getAdherenceSummary,
   search,
   "fetch": fetchRecord,
   set_occurrence_status: setOccurrenceStatus,
   update_occurrence_note: updateOccurrenceNote,
+  update_day_note: updateDayNote,
   create_behavior: createBehavior,
   update_behavior: updateBehavior,
   archive_behavior: archiveBehavior,

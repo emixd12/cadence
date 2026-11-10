@@ -88,6 +88,17 @@ describe("desktop export read and download", () => {
     expect(contents).not.toMatch(/Private (note|title|body|error)/);
   });
 
+  it("exports local day notes only when notes are included", async () => {
+    const snapshot = await mocks.command();
+    snapshot.dayNotes = [{ id: "50000000-0000-4000-8000-000000000001", user_id: USER_ID, local_date: "2026-08-31", note: "Private day note",
+      revision: 1, created_at: "2026-08-31T12:00:00Z", updated_at: "2026-08-31T12:00:00Z" }];
+    mocks.command.mockResolvedValue(snapshot);
+    expect((await getLocalExportPageData(profile, { now, range: "all" })).jsonBackup).not.toHaveProperty("day_notes");
+    const bundle = await getLocalExportPageData(profile, { now, range: "all", includeNotes: true });
+    expect(bundle.jsonBackup.day_notes).toEqual([expect.objectContaining({ local_date: "2026-08-31", note: "Private day note" })]);
+    expect(bundle.behaviorLog.files.find(({ path }) => path === "data/reviews.jsonl")?.content).toContain("Private day note");
+  });
+
   it.each(["jsonl", "csv", "json", "markdown", "behaviorlog"] as const)("produces a %s payload without filesystem or browser download side effects", async (format) => {
     const payload = await getLocalExportDownload(profile, format, { now, range: "all", includeNotes: true });
     if (format === "behaviorlog") {

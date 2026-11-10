@@ -1898,3 +1898,21 @@ compares candidates and promotes one under Ticket 184's rules.
 
 Platform impact: repository guidance, development tooling and web server diagnostics only.
 Desktop, marketing and future mobile: not applicable. Messaging impact: none.
+
+## 2026-11-10: Day notes (Ticket 292)
+
+The owner approved one note per calendar date, editable and clearable, separate from
+Occurrence notes and statuses.
+
+- Web, MCP and desktop ship together. Day notes have their own `day_notes` Note
+  shortcuts pool.
+- MCP writes reuse `cadence.occurrences.write`, so existing connections need no new
+  consent; the permission description widens to day notes (P-028).
+- Day notes are allowed on future days.
+- BehaviorLog has no day attachment for notes, so a day note exports as a one-day
+  `review` record (`period_start_local_date = period_end_local_date`,
+  `review_role: user`, `summary_markdown` = note) with a `cadence` extension that marks
+  it as a day note. No BehaviorLog schema change.
+- Clearing keeps the row with a null note, so synchronization needs no tombstone.
+- Daily Brief input from day notes is deferred to a later Daily Brief upgrade.
+

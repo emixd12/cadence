@@ -1,0 +1,74 @@
+{
+  "operation": "list_day_notes",
+  "valid_inputs": [
+    {
+      "name": "one month",
+      "value": {
+        "start_local_date": "2026-03-01",
+        "end_local_date": "2026-03-31"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "range over the cap",
+      "value": {
+        "start_local_date": "2026-01-01",
+        "end_local_date": "2026-12-31"
+      },
+      "code": "limit_exceeded",
+      "semantic": true,
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "missing end date",
+      "value": {
+        "start_local_date": "2026-03-01"
+      },
+      "code": "invalid_input",
+      "path": "$.end_local_date"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "one note",
+      "value": {
+        "timezone": "America/New_York",
+        "day_notes": [
+          {
+            "id": "00000006-1111-4111-8111-000000000006",
+            "local_date": "2026-03-08",
+            "note": "Travel day",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no notes",
+      "value": {
+        "timezone": "America/New_York",
+        "day_notes": []
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing revision",
+      "value": {
+        "timezone": "America/New_York",
+        "day_notes": [
+          {
+            "id": "00000006-1111-4111-8111-000000000006",
+            "local_date": "2026-03-08",
+            "note": "Travel day",
+            "updated_at": "2026-03-08T07:30:00Z"
+          }
+        ]
+      },
+      "code": "internal_error",
+      "path": "$.day_notes[0].revision"
+    }
+  ]
+}

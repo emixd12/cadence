@@ -2177,6 +2177,28 @@ authorization. Full preview records are recomputed and fingerprint-checked befor
 apply. Applied replay returns its receipt without claiming a compact ledger is a
 full preview. No historical product records are omitted.
 
+## Day notes (Ticket 292)
+
+`day_notes` stores one note per user and calendar date:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid | Primary key. Stable across sync and exports. |
+| `user_id` | uuid | Owner; references `profiles(id)`, cascades on account deletion. |
+| `local_date` | date | Calendar date in the user's timezone. Unique per user. |
+| `note` | text, nullable | Normalized like Occurrence notes; non-blank, at most 2,000 characters, or null when cleared. |
+| `revision` | integer | Starts at 1 and increases on each change. |
+| `created_at`, `updated_at` | timestamptz | Server time. |
+
+RLS allows the owner to select rows. Direct writes are revoked.
+`public.save_day_note(target_local_date, expected_note, next_note)` binds ownership
+to `auth.uid()` and compares the stored note with `expected_note`; it returns no row
+on a mismatch. Clearing keeps the row with a null note, so synchronization never
+deletes day notes. A day note has no status, Behavior or Occurrence reference and
+never feeds adherence, Needs decision, reminders or analytics. Migration:
+`20261110120000_day_notes.sql`; local check `tests/sql/ticket-292-day-notes.sql`.
+Desktop mirrors the table in SQLite (`docs/DESKTOP_DATA_MODEL.md`).
+
 ## Google Calendar connector (Ticket 134)
 
 Migration `20260917002649_google_calendar_connector.sql` adds owner-scoped

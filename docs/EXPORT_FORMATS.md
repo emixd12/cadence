@@ -95,6 +95,17 @@ Export options should include:
   activity patterns. Only `include_time_tracking=1` opts in; disabled exports
   do not read timing rows or expose timing fields, files, counts, or filenames.
 
+Day notes (Ticket 292) follow the notes option. With notes included, Full JSON adds
+`day_notes` (`id`, `local_date`, `note`, `created_at`, `updated_at`) for non-empty day
+notes inside the export range, oldest date first. BehaviorLog writes each one to
+`data/reviews.jsonl` as a `review` record with `period_start_local_date` and
+`period_end_local_date` set to the note's date, `review_role: "user"`,
+`summary_markdown` set to the note, and the `app.cadence` extension
+`{ "day_note": true, "updated_at_utc": … }`. The manifest lists the file with
+`#/$defs/Review`. JSONL, CSV and Markdown do not include day notes. The Mac app export includes the same
+records. Restore and import of these review records into day notes are still open in
+Ticket 292; until then an import keeps them out of Cadence data.
+
 Behavior definition and configuration history has a separate privacy posture
 from occurrence notes. Full JSON and BehaviorLog exports include full prior and
 next title, description, schedule, reminder, category, timezone, and active

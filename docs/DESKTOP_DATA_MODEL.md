@@ -1,5 +1,24 @@
 # Desktop data model
 
+Schema version 21 adds day notes (Ticket 292). Migration `0021_day_notes.sql` mirrors
+hosted `day_notes`: one row per profile and local date, a nullable note of 1–2,000
+non-blank characters, a revision of at least 1, and a cascade from `profiles`. The
+`saveDayNote` mutation compares the stored note with the expected note and returns
+null on a mismatch; clearing keeps the row with a null note, so account sync needs no
+tombstone. `readDayNotes` reads an inclusive date range. Rust test
+`day_notes_save_edit_clear_and_reject_stale_writes` covers save, edit, clear, replay,
+future dates and invalid input.
+
+Account sync contract 3 (hosted migration `20261110140000_account_sync_day_notes.sql`)
+adds the `day_note` kind. Contract 2 builds neither see nor write it. Edits to the same
+day note on both sides go to conflict review. Two new notes for the same date under
+different IDs merge into the hosted row: the hosted ID is kept, the texts are joined
+with a blank line, the revision rises above both, and the later `updated_at` wins. The
+local row is deleted before the merged row is written. If the joined text would
+exceed 2,000 characters, sync stops and asks the user to shorten one note. First link
+treats day notes like private travel rows, because BehaviorLog import does not
+restore them.
+
 Schema version 20 adds completion place labels (Ticket 216). Migration
 `0020_completion_place_labels.sql` mirrors the four hosted tables in DATA_MODEL:
 `place_label_settings`, `place_markers`, `completion_place_labels` and

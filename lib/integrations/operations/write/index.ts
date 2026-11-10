@@ -12,6 +12,7 @@ function handler<N extends WriteOperationName>(name: N) {
 export const writeOperationHandlers = {
   set_occurrence_status: handler("set_occurrence_status"),
   update_occurrence_note: handler("update_occurrence_note"),
+  update_day_note: handler("update_day_note"),
   create_behavior: handler("create_behavior"),
   update_behavior: handler("update_behavior"),
   archive_behavior: handler("archive_behavior"),

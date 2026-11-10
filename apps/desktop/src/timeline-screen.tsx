@@ -24,6 +24,7 @@ export type TimelineScreenProps = Readonly<{
   dayProgress?: DayProgressContext;
   statusAction: OccurrenceFormAction;
   noteAction: OccurrenceFormAction;
+  dayNoteAction?: OccurrenceFormAction;
   startTimeTrackingAction: TimeTrackingFormAction;
   stopTimeTrackingAction: TimeTrackingFormAction;
   resetTimeTrackingAction: TimeTrackingFormAction;
@@ -217,6 +218,7 @@ export function TimelineScreen({
                       {...actions}
                       shortcutsByBehavior={shortcutsByBehavior}
                       variant="needsDecisionDialog"
+                      dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
                     />
                   ))}
                 </div>

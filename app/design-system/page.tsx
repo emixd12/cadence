@@ -57,6 +57,8 @@ import { TrustEvidencePanel } from "@/components/trust/TrustEvidencePanel";
 import { MobileTimelinePullToRefresh } from "@/components/timeline/MobileTimelinePullToRefresh";
 import { NeedsDecisionDialog } from "@/components/timeline/NeedsDecisionDialog";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
+import { NoteEditor } from "@/components/notes/NoteEditor";
+import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import type { NoteShortcut, NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
@@ -1768,6 +1770,29 @@ const previewFactories: Record<
         <OccurrenceNoteForm
           occurrenceId="bench-occurrence-note"
           note="Slept poorly, but completed the evening reset."
+          action={occurrenceAction}
+          shortcuts={noteShortcutFixture}
+        />
+      </ProductPreview>
+    ),
+  "composite.note-editor": () => (
+      <ProductPreview>
+        <NoteEditor
+          targetFields={{ local_date: "2026-11-10" }}
+          note=""
+          action={occurrenceAction}
+          label="Day note"
+          placeholder="Add a note about this day"
+          shortcutsLabel="Day note shortcuts"
+        />
+      </ProductPreview>
+    ),
+  "composite.day-note-control": () => (
+      <ProductPreview>
+        <DayNoteControl
+          localDate="2026-11-09"
+          dayLabel="Monday, November 9"
+          note="Travel day. Slept on the plane and skipped the evening reset."
           action={occurrenceAction}
           shortcuts={noteShortcutFixture}
         />

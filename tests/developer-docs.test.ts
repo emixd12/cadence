@@ -92,7 +92,7 @@ describe("developer documentation", () => {
   });
 
   it("exposes every guide as canonical HTML and a Markdown mirror without claiming launch", () => {
-    expect(developerPages).toHaveLength(29);
+    expect(developerPages).toHaveLength(31);
     for (const page of developerPages) {
       const route = marketingRoutes.find((entry) => entry.path === `/developers${page.slug ? `/${page.slug}` : ""}`)!;
       expect(route.includeInSitemap && route.includeInLlms && route.includeInMarkdownMirror).toBe(true);
@@ -111,7 +111,7 @@ describe("developer documentation", () => {
 
   it("keeps the enlarged HTML and Markdown route inventory within the bounded Trust collector", async () => {
     const routes = marketingContracts({ schema_version: 1, routes: marketingRoutes.map((route) => ({ url: `https://cadence.example${route.path}`, title: route.title, canonical_url: `https://cadence.example${route.path}`, markdown_url: `https://cadence.example${route.markdownPath}`, include_in_markdown_mirror: true })) });
-    expect(routes).toHaveLength(68);
+    expect(routes).toHaveLength(72);
     const result = await collectRoutes({ origin: "https://cadence.example", routes, fetcher: async (url: URL) => {
       const route = routes.find((entry: { path: string }) => entry.path === url.pathname);
       return new Response(`${route.marker}${route.canonical ? `<link rel="canonical" href="${route.canonical}">` : ""}`, { headers: { "content-type": route.content_type } });

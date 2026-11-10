@@ -1,0 +1,89 @@
+{
+  "operation": "update_day_note",
+  "valid_inputs": [
+    {
+      "name": "multi-line note",
+      "value": {
+        "local_date": "2026-03-08",
+        "note": "Travel day.\nSlept badly.",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "idempotency_key": "day-note-0001"
+      }
+    },
+    {
+      "name": "clear",
+      "value": {
+        "local_date": "2026-03-08",
+        "note": ""
+      }
+    },
+    {
+      "name": "future day",
+      "value": {
+        "local_date": "2027-01-01",
+        "note": "Rest day"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "note too long",
+      "value": {
+        "local_date": "2026-03-08",
+        "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "code": "invalid_input",
+      "path": "$.note"
+    },
+    {
+      "name": "bad date",
+      "value": {
+        "local_date": "2026-3-8",
+        "note": "x"
+      },
+      "code": "invalid_input",
+      "path": "$.local_date"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "saved",
+      "value": {
+        "local_date": "2026-03-08",
+        "day_note": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "local_date": "2026-03-08",
+          "note": "Travel day",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        },
+        "changed": true
+      }
+    },
+    {
+      "name": "cleared empty day",
+      "value": {
+        "local_date": "2026-03-09",
+        "day_note": null,
+        "changed": false
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing changed",
+      "value": {
+        "local_date": "2026-03-08",
+        "day_note": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "local_date": "2026-03-08",
+          "note": "Travel day",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.changed"
+    }
+  ]
+}

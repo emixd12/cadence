@@ -1,6 +1,6 @@
 -- Account sync contract guard (docs/plans/2026-10-27-sync-compatibility.md, Part B).
 -- Synced rows are built with to_jsonb(row), so a new column reaches every client,
--- including older contracts. Each column outside the frozen contract 2 list must be
+-- including older contracts. Each column outside the frozen contract 3 list must be
 -- registered in cadence_private.account_sync_contract_additions with a later contract.
 -- To add a synced column: register it (field and default), raise ACCOUNT_SYNC_CONTRACT
 -- in packages/core/src/resolvers/account-sync.resolver.ts, then extend this file only
@@ -11,6 +11,14 @@ do $$
 declare
   frozen jsonb := $frozen$
 {
+    "day_notes": [
+        "created_at",
+        "id",
+        "local_date",
+        "note",
+        "revision",
+        "updated_at"
+    ],
     "behaviors": [
         "active",
         "archive_notes",
@@ -272,7 +280,8 @@ $frozen$::jsonb;
     "imported_notes": "imported_note", "imported_interventions": "imported_intervention",
     "reminder_deliveries": "reminder_delivery", "note_shortcut_states": "note_shortcut_state",
     "place_label_settings": "place_label_settings", "place_markers": "place_marker",
-    "completion_place_labels": "completion_place_label", "where_suggestion_dismissals": "where_suggestion_dismissal"
+    "completion_place_labels": "completion_place_label", "where_suggestion_dismissals": "where_suggestion_dismissal",
+    "day_notes": "day_note"
   }'::jsonb;
   unregistered text;
   missing_default text;
@@ -284,7 +293,7 @@ begin
     and not (frozen -> c.table_name) ? c.column_name
     and not exists (
       select 1 from cadence_private.account_sync_contract_additions addition
-      where addition.kind = kinds ->> c.table_name and addition.field = c.column_name and addition.contract > 2
+      where addition.kind = kinds ->> c.table_name and addition.field = c.column_name and addition.contract > 3
     );
   if unregistered is not null then
     raise exception 'Synced columns need an account sync contract entry: %', unregistered;
@@ -297,7 +306,7 @@ begin
     raise exception 'Account sync contract fields need a default: %', missing_default;
   end if;
 
-  if cadence_private.account_sync_current_contract() <> 2 then
+  if cadence_private.account_sync_current_contract() <> 3 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -306,6 +315,13 @@ begin
       jsonb_build_object('kind', 'place_marker', 'id', 'x', 'value', '{}'::jsonb)
     )), 1) -> 'entities' <> '[{"id": "profile", "kind": "profile", "value": {"timezone": "UTC"}}]'::jsonb then
     raise exception 'Contract 1 projection no longer hides contract 2 fields and kinds.';
+  end if;
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'profile', 'id', 'profile', 'value', jsonb_build_object('timezone', 'UTC')),
+      jsonb_build_object('kind', 'day_note', 'id', 'x', 'value', '{}'::jsonb)
+    )), 2) -> 'entities' <> '[{"id": "profile", "kind": "profile", "value": {"timezone": "UTC"}}]'::jsonb then
+    raise exception 'Contract 2 projection no longer hides the contract 3 day_note kind.';
   end if;
 end;
 $$;
