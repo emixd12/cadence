@@ -46,10 +46,11 @@ begin
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and (p.proname like 'oauth\_%' or p.proname like 'integration\_%')
-      and (p.prosecdef is distinct from (p.proname <> 'integration_apply_write')
+      -- The product write wrappers run as the grant's user so RLS applies (Ticket 292 adds the day-note one).
+      and (p.prosecdef is distinct from (p.proname not in ('integration_apply_write', 'integration_apply_day_note_write'))
         or p.proconfig is distinct from array['search_path=""'])
   ) then
-    raise exception 'OAuth functions require an empty search_path; only the product write wrapper must be SECURITY INVOKER';
+    raise exception 'OAuth functions require an empty search_path; only the product write wrappers must be SECURITY INVOKER';
   end if;
   if has_function_privilege('authenticated', 'public.oauth_verify_access_token(text, text)', 'EXECUTE')
     or has_function_privilege('anon', 'public.oauth_exchange_authorization_code(text, text, text, text, text, text, text)', 'EXECUTE')
