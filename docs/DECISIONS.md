@@ -1882,6 +1882,34 @@ step 2, drives 0.1.8's own updater to 0.1.9. The owner quits Cadence for the swa
 Platform impact: desktop, Mac 0.1.9 publication. Web, marketing and future mobile: not
 applicable. Messaging impact: none.
 
+## 2026-11-07: Agents also renew sessions, connectors and test-device sign-in
+
+The owner decided on November 7, 2026, extending the 2026-11-06 entry "Agents act as the test
+accounts, end to end". For test accounts A and B only:
+
+1. Agents re-enroll the kept Cadence (Supabase) sessions with `npm run mcp:oauth -- enroll`
+   after `scripts/acceptance/google-signin.mjs`. This replaces "Cadence sign-in from the kept
+   sessions stays as it was".
+2. The owner creates Outlook, iCloud and Hevy test identities and stores them in "Cadence
+   Agents" as `outlook-test-account-a` (username, password, one-time password if 2-step is
+   on), `icloud-test-account-a` (username, app-specific password) and `hevy-test-account-a`
+   (credential: the Hevy API key). Connecting them to Cadence account A is an agent step.
+   Until an item exists, the test-access preflight lists it as an owner step.
+3. Agents complete Cadence for Mac's Google sign-in as account A on test devices, using the
+   vault item. The owner keeps macOS permission prompts and quitting Cadence.
+4. An AgentMail test inbox is a standing approved recipient for automated Sequenzy test sends.
+5. Ticket 284's Cadence QA Chrome restrictions are lifted. Agents use the profile normally and
+   still never touch the owner's own accounts or other Chrome profiles.
+
+The owner still sets each paid test's spend cap, creates vault items, keys and OAuth clients'
+secrets, and decides releases and publication. Ticket 293 encodes these steps in the
+test-access manifest (`.agentic/test-access.json`).
+
+Platform impact: acceptance tooling only; no product change. Web: agents connect A's
+connectors through Cadence's own API. Desktop: test-device sign-in becomes an agent step; the
+owner's Mac keeps its owner steps. Marketing and future mobile: not applicable. Messaging
+impact: none.
+
 ## 2026-11-09: Agent-architecture run (Tickets 286–291)
 
 The owner directed on November 9, 2026 that six agent-architecture actions be carried out

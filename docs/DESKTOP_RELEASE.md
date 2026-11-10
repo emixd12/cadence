@@ -536,6 +536,15 @@ Test devices, such as the test Mac on the last published release, are reached ov
 Tailscale SSH with `scripts/test-device.mjs`; setup and rules are in
 [TEST_DEVICES.md](TEST_DEVICES.md).
 
+Step one of every run is the test-access preflight: `npm run qa:preflight -- --suite
+desktop-owner-mac` on the owner's Mac, `desktop-test-mac` on a test device, and
+`desktop-release` for a notarized release (comma-separate several;
+`docs/qa/agent-secrets.md`, "Test-access preflight"). Exit 10 prints one numbered owner
+list: send it as one message, end the turn and rerun the preflight after the owner
+answers. Sign-in, credential, consent and permission asks come only from that list.
+Agents sign Cadence for Mac in as test account A on test devices (`docs/DECISIONS.md`,
+2026-11-07).
+
 ### Install and readback
 
 1. Build with `dev-build` (above). When it passes, ask the owner to quit Cadence,
@@ -581,7 +590,8 @@ change reaches the Mac only after one of these (`apps/desktop/src/product.tsx`).
 
 ### Where round trip
 
-1. Web, in the in-app browser after the owner signs in: create `Where test 1`–`4` with
+1. Web, in the in-app browser, signed in to the Mac's account (the owner signs in to
+   their own; agents sign in as test account A): create `Where test 1`–`4` with
    Where Not set, Anywhere, Home and A place (with place text). Turn off Browser
    notifications and leave Email reminder off. The "Create behavior" section closes
    after each save, so open it again. Click the checkboxes, because filling them

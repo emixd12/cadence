@@ -7,6 +7,16 @@ step against Cadence's own OAuth and activity records. The procedure, commands,
 owner steps, client quirks and recovery live in the project skill
 `.claude/skills/mcp-acceptance/SKILL.md`.
 
+Step one of every run is the test-access preflight for the suites it reaches:
+`npm run qa:preflight -- --suite <mcp-local|mcp-protocol|mcp-clients|mcp-web>`
+(comma-separate several; `docs/qa/agent-secrets.md`, "Test-access preflight"). It
+re-enrolls A's and B's sessions itself. Exit 10 prints one numbered owner list: send it
+as one message, end the turn and rerun the preflight after the owner answers. Access
+asks (sign-ins, keys, vault items, consent, permissions) come only from that list. The
+owner's other steps (Touch ID for the signing key, deploys and merges, non-test
+accounts, release decisions) and the guided fallback's steps go as one numbered list
+when the task needs them.
+
 | Command | What it does |
 |---|---|
 | `npm run mcp:accept:protocol` | Tier 0: official SDK client with scripted OAuth and consent; every registry tool, isolation, step-up, refresh and revocation (Ticket 249) |

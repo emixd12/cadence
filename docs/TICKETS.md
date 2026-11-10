@@ -17185,3 +17185,48 @@ Platform impact:
 | Future mobile | Deferred: no mobile surface. |
 
 Messaging impact: P-028.
+
+## Ticket 293: Test-access preflight for acceptance runs
+
+Status: implemented November 7, 2026 on branch `accounts-test`; awaiting verification. No live
+probe has run yet; the first live run is the Calendar create-list-delete for A and B.
+Dependencies: Ticket 254 (agent secrets), the Calendar fixture tool, decisions 2026-11-06
+"Agents act as the test accounts, end to end" and 2026-11-07 "Agents also renew sessions,
+connectors and test-device sign-in".
+
+Goal: every acceptance run starts with one preflight that finds each credential and
+authorization the run needs, renews what agents may renew, and asks the owner for the rest in
+one numbered list.
+
+Scope and acceptance:
+
+- Install the generic engine from the `service-connections-bootstrap` skill
+  (`.agentic/scripts/test-access-preflight.mjs`, skills commit `5c4baab`) with the skill's
+  installer. Cadence's own `scripts/cloudflare-api.mjs` and `docs/SERVICE_CONNECTIONS.md`
+  stay as they were.
+- Manifest `.agentic/test-access.json`: 48 requirements across 12 suites, from the test access
+  inventory, with the 2026-11-07 decisions applied.
+- Adapters in `scripts/acceptance/access/`: vault, Keychain, Calendar, Google sign-in, Cadence
+  session, connectors, QA Chrome, test devices, host checks, owner records, and a placeholder
+  for agent steps without a script. They follow the engine's exit codes and never print a value.
+- `npm run qa:preflight -- --suite <suite> --dry-run` lists requirements for every suite
+  without live calls.
+- `docs/qa/agent-secrets.md` documents the preflight; `.env.example` names the adapter
+  variables.
+
+References: `docs/qa/agent-secrets.md`, "Test-access preflight"; the skill's
+`references/test-access-preflight.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: acceptance tooling only; no product code changes. |
+| Desktop | Not applicable: acceptance tooling only; test-device probes read state over SSH. |
+| Marketing | Not applicable: no public surface. |
+| Future mobile | Not applicable: no mobile acceptance exists. |
+
+Messaging impact: none.
+
+Verification: `npm run agents:check`, `npx eslint scripts/acceptance/access .agentic/scripts`,
+`npx vitest run tests/acceptance-access*.test.mjs tests/acceptance-google-calendar-fixtures.test.mjs`.

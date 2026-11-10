@@ -48,6 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) in source on branch `note-add`; not merged or deployed | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, then hosted migrations with owner authorization | TICKETS, Ticket 292; STATUS, "Ticket 292: day notes in progress — November 10, 2026" |
+| Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
 | Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
 | Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
@@ -159,6 +160,23 @@ installed on this machine, so the npm commands ran directly.
 Platform impact: repository guidance, development tooling and web server diagnostics. The
 web response contract is unchanged; desktop, marketing and future mobile are not applicable.
 Messaging impact: none.
+
+## Ticket 293: test-access preflight for acceptance runs — November 7, 2026
+
+**Written on branch `accounts-test` as Ticket 286; renumbered to Ticket 293 and merged to
+`main` on November 10, 2026 during branch consolidation. Awaiting verification. No live
+probe has run.**
+
+- Engine installed from `service-connections-bootstrap` (skills commit `5c4baab`, branch
+  `claude/test-access-preflight`) as `.agentic/scripts/test-access-preflight.mjs`. The skill
+  was deployed to `~/.claude/skills` from the same commit at 2026-11-07 22:06Z.
+- `.agentic/test-access.json`: 48 requirements across 12 suites, with the 2026-11-07 owner
+  decisions applied. `npm run qa:preflight -- --suite <suite> --dry-run` works for every suite.
+- Adapters in `scripts/acceptance/access/`. Google Calendar and Outlook connect, test-Mac sign-in,
+  QA Chrome permission grants and travel settings are agent steps without a script yet; the
+  preflight reports them as check errors for an agent.
+- Platform impact: acceptance tooling only. Web, desktop, marketing and future mobile: not
+  applicable. Messaging impact: none.
 
 ## Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026
 
