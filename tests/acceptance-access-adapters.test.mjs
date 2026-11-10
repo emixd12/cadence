@@ -2,7 +2,7 @@
 // (no network, no Keychain, no browser, no SSH).
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { main as agentStep } from '../scripts/acceptance/access/agent-step.mjs';
 import { classifyPermission, main as browser } from '../scripts/acceptance/access/browser.mjs';
@@ -11,7 +11,7 @@ import { classifyConsent, main as calendar } from '../scripts/acceptance/access/
 import { main as connection } from '../scripts/acceptance/access/connection.mjs';
 import { linkQuery, main as device } from '../scripts/acceptance/access/device.mjs';
 import { classifySignIn, main as google } from '../scripts/acceptance/access/google.mjs';
-import { dotenvCandidates, envFileSets, main as host, profileExpiry } from '../scripts/acceptance/access/host.mjs';
+import { dotenvCandidates, envFileSets, main as host, onPath, profileExpiry } from '../scripts/acceptance/access/host.mjs';
 import { main as keychain } from '../scripts/acceptance/access/keychain.mjs';
 import { signInStop } from '../scripts/acceptance/access/lib.mjs';
 import { main as record } from '../scripts/acceptance/access/record.mjs';
@@ -340,7 +340,9 @@ describe('host.mjs', () => {
   it('checks paths, commands and signing identities', async () => {
     expect(await host(['--path', '~/x', '--path', '/y'], { exists: () => true, out: () => {} })).toBe(0);
     expect(await host(['--path', '~/x'], { exists: () => false, out: () => {} })).toBe(21);
-    expect(await host(['--command', 'docker', '--command', 'psql'], { run: vi.fn((cmd, args) => ({ status: args[3] === 'psql' ? 1 : 0 })), out: () => {} })).toBe(21);
+    expect(await host(['--command', 'docker', '--command', 'psql'], { hasCommand: (name) => name !== 'psql', out: () => {} })).toBe(21);
+    expect(onPath('node', dirname(process.execPath))).toBe(true);
+    expect(onPath('cadence-no-such-command', dirname(process.execPath))).toBe(false);
     expect(await host(['--codesign', 'Developer ID Application: X (T)'], { run: proc(0, '  1) ABC "Developer ID Application: X (T)"\n'), out: () => {} })).toBe(0);
     expect(await host(['--codesign', 'Developer ID Application: X (T)'], { run: proc(0, '0 valid identities found'), out: () => {} })).toBe(21);
     expect(await host([], { out: () => {} })).toBe(2);

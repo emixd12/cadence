@@ -969,7 +969,7 @@ export function summarize(report: Pick<SpikeReport, "briefs" | "contracts">): Sp
 
 /** Markdown tables for docs/qa/2026-11-07-chatgpt-plan-spike.md. Contains no secrets, prompts or output. */
 export function renderMarkdown(report: SpikeReport): string {
-  const cell = (value: unknown) => value === null || value === undefined ? "—" : String(value).replace(/\|/gu, "\\|");
+  const cell = (value: unknown) => value === null || value === undefined ? "—" : String(value).replace(/\\/gu, "\\\\").replace(/\|/gu, "\\|");
   const yes = (value: boolean | null) => value === null ? "—" : value ? "yes" : "no";
   const lines: string[] = [];
   lines.push(`Run: ${report.mode}, ${report.startedAt}, ${report.durationMs ?? "—"} ms, spike ${report.version}.`, "");

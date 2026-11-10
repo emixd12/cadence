@@ -9,13 +9,20 @@
 //                                                    a relative file is looked up in this checkout, then in the main checkout
 //   host.mjs --url <https-url> --expect-status <n>  a public URL answers with that status
 //   host.mjs --ax                                   this Mac lets the agent's process read windows through System Events
-import { existsSync, readFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { PROBE, USAGE, cliMain, finish, parseFlags, runProcess } from './lib.mjs';
 
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
 const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+
+/** True when an executable named `name` is in one of PATH's folders. Runs no shell. */
+export function onPath(name, pathValue = process.env.PATH ?? '') {
+  return String(pathValue).split(delimiter).filter((dir) => isAbsolute(dir)).some((dir) => {
+    try { accessSync(join(dir, name), constants.X_OK); return true; } catch { return false; }
+  });
+}
 
 export const expandPath = (path, home = homedir(), cwd = process.cwd()) =>
   (path.startsWith('~/') ? join(home, path.slice(2)) : isAbsolute(path) ? path : resolve(cwd, path));
@@ -52,7 +59,7 @@ export function profileExpiry(plist) {
 }
 
 export async function main(argv, {
-  run = runProcess, out = (line) => process.stdout.write(`${line}\n`), exists = existsSync, readFile = (path) => readFileSync(path, 'utf8'),
+  run = runProcess, out = (line) => process.stdout.write(`${line}\n`), exists = existsSync, readFile = (path) => readFileSync(path, 'utf8'), hasCommand = onPath,
   fetchImpl = fetch, now = () => Date.now(), home = homedir(), cwd = process.cwd(),
 } = {}) {
   let flags;
@@ -71,7 +78,7 @@ export async function main(argv, {
   }
   if (flags.command.length) {
     if (!flags.command.every((name) => COMMAND_NAME.test(name))) return usage();
-    const missing = flags.command.filter((name) => run('/bin/sh', ['-c', 'command -v "$1" >/dev/null', 'sh', name], { timeoutMs: 10_000 }).status !== 0);
+    const missing = flags.command.filter((name) => !hasCommand(name));
     return missing.length ? finish(out, PROBE.MISSING, { detail: `missing: ${missing.join(' ')}` }) : finish(out, PROBE.PRESENT, { detail: 'all on PATH' });
   }
   if (flags.codesign) {

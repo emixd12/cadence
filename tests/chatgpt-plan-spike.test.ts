@@ -219,6 +219,8 @@ describe("mock-mode spike runs", () => {
     expect(target.state.liveRefreshTokens.size).toBe(0);
     expect(report.redactionTriggered).toBe(false);
     expectNoSecrets(target, JSON.stringify(report), renderMarkdown(report), ...logs);
+    // A backslash before a pipe stays literal: escape backslashes first, then pipes.
+    expect(renderMarkdown({ ...report, catalog: { ...report.catalog, modelKeys: ["a\\|b"] } })).toContain("model fields: a\\\\\\|b;");
     const host = await readFile(join(configDir, "host.json"), "utf8");
     expect(JSON.parse(host)).toEqual({ hostId: expect.stringMatching(/^urn:uuid:[0-9a-f-]{36}$/u), clientId: target.state.issuedClientId });
     expectNoSecrets(target, host);
