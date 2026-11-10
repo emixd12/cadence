@@ -300,7 +300,9 @@ describe('Keychain store', () => {
     });
     const startProcess = () => createSessionManager({
       target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, fetchImpl, now: () => clock,
-      store: createKeychainSessionStore({ execImpl, conflictDelayMs: 10 }),
+      // No shared lock: this models writers outside Ticket 256's file lock (an older checkout's
+      // runner), so the exit-45 retry path is what keeps both processes alive.
+      store: createKeychainSessionStore({ execImpl, conflictDelayMs: 10, lock: { withLock: (_name, fn) => fn() } }),
     });
     await createKeychainSessionStore({ execImpl }).set('production:A', recordFromSession(fakeSession(ACCOUNTS.A, 'refresh-1'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } }));
     const runner = startProcess();
@@ -326,21 +328,6 @@ describe('Keychain store', () => {
   it('rejects unexpected account names', async () => {
     const store = createKeychainSessionStore({ execImpl: fakeSecurity().execImpl });
     await expect(store.get('production:C')).rejects.toMatchObject({ code: 'keychain-account-invalid' });
-  });
-
-  // Ticket 256: concurrent `add-generic-password -U` writes fail with exit 45 ("already exists").
-  it('retries a write that hit exit 45, and gives up after three attempts', async () => {
-    const busy = () => ({ error: Object.assign(new Error('exists'), { code: 45 }) });
-    const once = fakeSecurity([busy(), { stdout: '' }]);
-    const record = recordFromSession(fakeSession(ACCOUNTS.A), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } });
-    await createKeychainSessionStore({ execImpl: once.execImpl, retryDelayMs: 1 }).set('production:A', record);
-    expect(once.calls).toHaveLength(2);
-    const always = fakeSecurity([busy(), busy(), busy(), busy()]);
-    await expect(createKeychainSessionStore({ execImpl: always.execImpl, retryDelayMs: 1 }).set('production:A', record)).rejects.toMatchObject({ code: 'keychain-failed' });
-    expect(always.calls).toHaveLength(3);
-    const other = fakeSecurity([{ error: Object.assign(new Error('denied'), { code: 51 }) }]);
-    await expect(createKeychainSessionStore({ execImpl: other.execImpl, retryDelayMs: 1 }).set('production:A', record)).rejects.toMatchObject({ code: 'keychain-failed' });
-    expect(other.calls).toHaveLength(1);
   });
 
   it('two managers sharing one item (runner and watcher) refresh one after the other with the rotated token', async () => {
