@@ -94,7 +94,7 @@ describe("Travel Settings learned habits (Ticket 217)", () => {
 
     await choose(select("Get-ready time"), "15");
     expect(travel.saveHabits).toHaveBeenLastCalledWith({ expectedUpdatedAt: "2026-10-21T12:00:00.000000Z", change: { kind: "preparation", minutes: 15 } });
-    expect(container.textContent).toContain("Travel habits saved.");
+    expect(container.textContent).toContain("Saved");
     expect(changed).toHaveBeenCalled();
     expect(select("Get-ready time").value).toBe("15");
 
@@ -113,6 +113,9 @@ describe("Travel Settings learned habits (Ticket 217)", () => {
     await act(async () => root.render(<TravelSettingsPanel client={failing} readLocation={async () => ({ state: "denied" as const })} />));
     await choose(select("Arrival buffer"), "20");
     expect(container.textContent).toContain("Travel habits could not save.");
+    // Ticket 303: the choice goes back to its saved value and the line says so.
+    expect(select("Arrival buffer").value).toBe("5");
+    expect(container.textContent).toContain("Your change was undone.");
     expect(container.textContent).toContain("No place has its own travel yet.");
   });
 });

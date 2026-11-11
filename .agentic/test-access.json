@@ -1463,7 +1463,7 @@
     {
       "id": "vault-supabase-access-token",
       "kind": "vault-item",
-      "summary": "Supabase personal access token for agent hosted-migration work, Cadence Agents item cadence-agents (field credential). Account-wide: Supabase tokens cannot be limited to one project.",
+      "summary": "Supabase personal access token for agent hosted-migration work, Cadence Agents item supabase-access-token (field credential). Account-wide: Supabase tokens cannot be limited to one project.",
       "suites": [
         "hosted-migrations"
       ],
@@ -1476,11 +1476,11 @@
           "node",
           "scripts/acceptance/access/vault.mjs",
           "--item",
-          "cadence-agents"
+          "supabase-access-token"
         ],
         "timeout_seconds": 90
       },
-      "owner_step": "Add the cadence-agents item (field credential) with a Supabase personal access token to the Cadence Agents vault; revoke and replace it in the Supabase dashboard when it expires.",
+      "owner_step": "Add the supabase-access-token item (field credential) with a Supabase personal access token to the Cadence Agents vault; revoke and replace it in the Supabase dashboard when it expires.",
       "freshness_seconds": 86400
     }
   ]

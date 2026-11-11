@@ -17,8 +17,9 @@
 // How it works:
 // 1. Reads the service-account token from the macOS Keychain (generic password,
 //    service "cadence-agent-1password", account "service-account-token").
-// 2. Runs `op read` once per item with only that token in op's environment,
-//    so op never falls back to the desktop app or Emi's owner vaults.
+// 2. Runs `op read` once per item with only that token in op's environment and a
+//    private, temporary HOME and config folder, so op never reads the desktop app's
+//    settings, falls back to the desktop app or reaches Emi's owner vaults.
 // 3. Starts <command> with each value in the named environment variable. The
 //    token and every other OP_* variable are removed from the child's environment.
 // 4. Appends one line per access to `<run-dir>/events.jsonl` (with --run) or
@@ -47,8 +48,8 @@
 //
 // Setup (Emi, once): docs/qa/agent-secrets.md.
 import { spawn } from 'node:child_process';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
-import { constants as osConstants } from 'node:os';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync } from 'node:fs';
+import { constants as osConstants, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { isCliEntry } from './cli-entry.mjs';
 import { assertSafe } from './ledger.mjs';
@@ -265,8 +266,23 @@ function pick(env, keys) {
   return out;
 }
 
-function opEnv(env, token) {
-  return { ...pick(env, ['PATH', 'HOME', 'TMPDIR', 'XDG_CONFIG_HOME']), OP_SERVICE_ACCOUNT_TOKEN: token, OP_BIOMETRIC_UNLOCK_ENABLED: 'false' };
+let opHome = null;
+
+/**
+ * A private HOME and config folder for op, made once per process (mode 0700) and removed on
+ * exit. With the real HOME, op reads the 1Password desktop app's settings and can wait on the
+ * app indefinitely, even with a service-account token (observed November 10, 2026).
+ */
+function privateOpHome() {
+  if (!opHome) {
+    opHome = mkdtempSync(join(tmpdir(), 'cadence-agent-op-'));
+    process.once('exit', () => { try { rmSync(opHome, { recursive: true, force: true }); } catch { /* best effort */ } });
+  }
+  return opHome;
+}
+
+export function opEnv(env, token, home = privateOpHome()) {
+  return { ...pick(env, ['PATH', 'TMPDIR']), HOME: home, OP_CONFIG_DIR: home, OP_SERVICE_ACCOUNT_TOKEN: token, OP_BIOMETRIC_UNLOCK_ENABLED: 'false' };
 }
 
 async function readToken(env) {

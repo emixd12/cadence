@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { currentNoteShortcuts, eligibleNoteSources, notePatternKey, noteShortcutRevision, resolveNoteShortcutCommand, resolveNoteSuggestions, validateNoteShortcutState, validateNoteShortcutText } from "@cadence/core/resolvers/note-suggestion.resolver";
-import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
+import { currentNoteShortcuts, eligibleNoteSources, notePatternKey, noteShortcutRevision, noteShortcutsEnabled, resolveNoteShortcutCommand, resolveNoteSuggestions, validateNoteShortcutState, validateNoteShortcutText } from "@cadence/core/resolvers/note-suggestion.resolver";
+import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts, matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutContext, NoteShortcutState, NoteShortcutStore, NoteSource } from "@cadence/core/types/note-shortcut";
 
 const owner = "10000000-0000-4000-8000-000000000001";
@@ -183,7 +183,7 @@ describe("Note shortcut review lifecycle", () => {
 
   it("global off blocks analysis and acceptance but permits off and removal", () => {
     const ctx = acceptedContext(); ctx.globalState!.enabled = false;
-    expect(() => command(ctx, { operation: "analyze" })).toThrow("Enable");
+    expect(() => command(ctx, { operation: "analyze" })).toThrow("turned off");
     expect(command(ctx, { operation: "enable", enabled: false }).enabled).toBe(false);
     expect(command(ctx, { operation: "remove", key: ctx.state!.entries[0].key }).entries[0].text).toBeNull();
   });
@@ -215,7 +215,7 @@ describe("shared shortcut service", () => {
     expect(commit.mock.calls[0][0]).toMatchObject({ expected: ctx, requireEnabled: true, next: { revision: 2 } });
   });
 
-  it("returns accepted shortcuts only within owner/global/Behavior enablement", async () => {
+  it("returns accepted shortcuts only within owner and the retained global switch", async () => {
     const ctx = acceptedContext();
     const store: NoteShortcutStore = { userId: owner, readStates: async () => [ctx.globalState!, ctx.state!], readContext: async () => ctx, commit: vi.fn() };
     expect((await listAcceptedNoteShortcuts(store))[behaviorId]).toHaveLength(1);
@@ -223,7 +223,7 @@ describe("shared shortcut service", () => {
     ctx.globalState!.enabled = false;
     expect(await listAcceptedNoteShortcuts(store)).toEqual({});
     ctx.globalState!.enabled = true; ctx.state!.enabled = false;
-    expect(await listAcceptedNoteShortcuts(store)).toEqual({});
+    expect((await listAcceptedNoteShortcuts(store))[behaviorId]).toHaveLength(1);
     ctx.state!.user_id = foreignId;
     expect(await listAcceptedNoteShortcuts(store)).toEqual({});
     expect(await getNoteShortcutView(store, behaviorId, now)).toMatchObject({ unavailable: true, entries: [] });
@@ -235,5 +235,88 @@ describe("shared shortcut service", () => {
     expect(await getNoteShortcutView(store, behaviorId, now)).toEqual({ state: null, globalEnabled: false, available: false, entries: [], unavailable: true });
     await expect(manageNoteShortcuts(store, { behaviorId, command: { operation: "analyze" }, expectedRevision: noteShortcutRevision(null), now })).rejects.toThrow("Read limit");
     expect(store.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe("Ticket 305: Note shortcuts on by default", () => {
+  const store = (ctx: NoteShortcutContext, commit = vi.fn(async ({ next }: { next: NoteShortcutState }) => next)): NoteShortcutStore => ({
+    userId: owner, readStates: async () => [ctx.globalState, ctx.state].filter((value): value is NoteShortcutState => value !== null),
+    readContext: async () => ctx, commit,
+  });
+
+  it("treats an absent global state as on and keeps a stored off switch", () => {
+    expect(noteShortcutsEnabled(null)).toBe(true);
+    expect(noteShortcutsEnabled(undefined)).toBe(true);
+    expect(noteShortcutsEnabled({ enabled: true })).toBe(true);
+    expect(noteShortcutsEnabled({ enabled: false })).toBe(false);
+  });
+
+  it("matches and accepts without any global or per-Behavior opt-in", () => {
+    const ctx = { ...context(), state: null, globalState: null };
+    const analyzed = command(ctx, { operation: "analyze" });
+    expect(analyzed).toMatchObject({ enabled: true, revision: 1 });
+    expect(analyzed.entries).toHaveLength(1);
+    expect(analyzed.entries[0]).toMatchObject({ status: "proposed", source: "repeated_text" });
+    const off = { ...context(), globalState: null };
+    off.state!.enabled = false; // A stored per-Behavior flag no longer gates.
+    off.state!.entries = suggest(off);
+    expect(command(off, { operation: "accept", key: off.state!.entries[0].key, text: "Did not wear Invisalign" }).entries[0].status).toBe("accepted");
+  });
+
+  it("keeps the retained global switch command and rejects archived Behaviors", () => {
+    const ctx = { ...context(), state: null, globalState: null };
+    const global = resolveNoteShortcutCommand({ context: ctx, userId: owner, behaviorId: null, command: { operation: "enable", enabled: false }, now });
+    expect(global).toMatchObject({ id: "global", enabled: false, revision: 1 });
+    const archived = { ...context(), behavior: { ...context().behavior!, active: false } };
+    expect(() => command(archived, { operation: "analyze" })).toThrow("active Behaviors only");
+  });
+
+  it("reports the view as on for an account that never saved the switch", async () => {
+    const ctx = { ...acceptedContext(), globalState: null };
+    expect((await getNoteShortcutView(store(ctx), behaviorId, now)).globalEnabled).toBe(true);
+    expect((await listAcceptedNoteShortcuts(store(ctx)))[behaviorId]).toHaveLength(1);
+  });
+
+  it("proposes repeated Notes after a save and commits only when the proposals change", async () => {
+    const ctx = { ...context(), state: null, globalState: null };
+    const commit = vi.fn(async ({ next }: { next: NoteShortcutState }) => next);
+    expect(await matchRepeatedNoteShortcuts(store(ctx, commit), behaviorId, now)).toBe(true);
+    expect(commit).toHaveBeenCalledOnce();
+    const committed = commit.mock.calls[0][0] as unknown as { next: NoteShortcutState; requireEnabled: boolean; expected: NoteShortcutContext };
+    expect(committed).toMatchObject({ requireEnabled: true, expected: ctx });
+    expect(committed.next.entries).toEqual([expect.objectContaining({ status: "proposed", text: "Did not wear Invisalign", expires_at: now.add({ hours: 720 }).toString() })]);
+
+    // The same Notes saved again later: no write, and the proposal keeps its first expiry.
+    const later = { ...ctx, state: committed.next };
+    const again = vi.fn();
+    expect(await matchRepeatedNoteShortcuts(store(later, again), behaviorId, now.add({ hours: 24 }))).toBe(false);
+    expect(again).not.toHaveBeenCalled();
+
+    // A fourth matching Note adds evidence; the original proposal time is kept.
+    const grown = { ...later, notes: [...later.notes, note(4)] };
+    const grow = vi.fn(async ({ next }: { next: NoteShortcutState }) => next);
+    expect(await matchRepeatedNoteShortcuts(store(grown, grow), behaviorId, now.add({ hours: 24 }))).toBe(true);
+    const grownEntry = (grow.mock.calls[0][0] as unknown as { next: NoteShortcutState }).next.entries[0];
+    expect(grownEntry.evidence).toHaveLength(4);
+    expect(grownEntry).toMatchObject({ created_at: now.toString(), expires_at: now.add({ hours: 720 }).toString() });
+  });
+
+  it("writes nothing when there is nothing to propose, the switch is off, or the Behavior is archived", async () => {
+    const quiet = vi.fn();
+    expect(await matchRepeatedNoteShortcuts(store({ ...context([note(1), note(2)]), state: null, globalState: null }, quiet), behaviorId, now)).toBe(false);
+    const off = context(); off.globalState!.enabled = false;
+    expect(await matchRepeatedNoteShortcuts(store(off, quiet), behaviorId, now)).toBe(false);
+    const archived = { ...context(), behavior: { ...context().behavior!, active: false } };
+    expect(await matchRepeatedNoteShortcuts(store(archived, quiet), behaviorId, now)).toBe(false);
+    expect(quiet).not.toHaveBeenCalled();
+  });
+
+  it("does not re-propose a dismissed pattern after a save", async () => {
+    const ctx = proposedContext();
+    ctx.state = command(ctx, { operation: "dismiss", key: ctx.state!.entries[0].key });
+    ctx.notes = [...ctx.notes, note(4)];
+    const commit = vi.fn();
+    expect(await matchRepeatedNoteShortcuts(store(ctx, commit), behaviorId, now.add({ hours: 1 }))).toBe(false);
+    expect(commit).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 
 import { RefreshProvider } from "@cadence/ui/runtime";
+import type { NoteShortcutCommand } from "@cadence/core/types/note-shortcut";
 import { NoteShortcutSettings, type NoteShortcutAction } from "../components/note-shortcuts/NoteShortcutControls";
 import { OccurrenceNoteForm } from "../components/timeline/OccurrenceNoteForm";
 import { hasPendingDesktopWrites, hasUnsavedDesktopDrafts } from "../apps/desktop/src/desktop-restart";
@@ -211,9 +212,58 @@ describe("Occurrence Note shortcuts", () => {
 
     try {
       await act(async () => root.render(<NoteShortcutSettings behaviorId="behavior-1" view={{ ...view(), globalEnabled: false }} action={action} />));
-      expect(button(container, "Find repeated Notes")).toBeUndefined();
       expect(button(container, "Edit")).toBeUndefined();
       expect(button(container, "Remove")).toBeDefined();
+      expect(container.textContent).toContain("Note shortcuts are turned off for this account.");
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it("renders no enable switch or find action and needs Accept before a proposal is used", async () => {
+    const commands: NoteShortcutCommand[] = [];
+    const proposed = { ...shortcut("Skipped after travel"), key: "proposal-1", status: "proposed" as const, evidence: [], expires_at: "2026-10-07T00:00:00Z" };
+    const base = view();
+    const pendingView = { ...base, state: { ...base.state, enabled: false, entries: [shortcut(), proposed] }, entries: [shortcut(), proposed] };
+    const action: NoteShortcutAction = async (_behaviorId, command) => {
+      commands.push(command);
+      return { status: "success", message: "Note shortcut accepted." };
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    try {
+      // The stored per-Behavior flag is off: proposals still show, with no switch to turn on.
+      await act(async () => root.render(<NoteShortcutSettings behaviorId="behavior-1" view={pendingView} action={action} />));
+      expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+      expect(button(container, "Find repeated Notes")).toBeUndefined();
+      expect(container.textContent).not.toContain("Enable Note shortcuts");
+      const proposals = container.querySelector('[aria-label="Proposed Note shortcuts"]')!;
+      expect(proposals.textContent).toContain("Skipped after travel");
+      expect([...proposals.querySelectorAll("button")].map((item) => item.textContent)).toEqual(["Accept", "Edit", "Dismiss"]);
+      expect(commands).toEqual([]);
+
+      await act(async () => [...proposals.querySelectorAll("button")].find((item) => item.textContent === "Accept")!.click());
+      expect(commands).toEqual([{ operation: "accept", key: "proposal-1", text: "Skipped after travel" }]);
+      await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Proposed Note shortcuts"] button')].find((item) => item.textContent === "Dismiss")!.click());
+      expect(commands[1]).toEqual({ operation: "dismiss", key: "proposal-1" });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it("offers only accepted shortcuts above an Occurrence Note field", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const proposed = { ...shortcut("Skipped after travel"), key: "proposal-1", status: "proposed" as const };
+
+    try {
+      await act(async () => root.render(
+        <RefreshProvider onRefresh={() => undefined}>
+          <OccurrenceNoteForm occurrenceId="occurrence-1" note="" action={async () => ({ status: "idle", message: "" })} shortcuts={[proposed]} />
+        </RefreshProvider>,
+      ));
+      expect(button(container, "Skipped after travel")).toBeUndefined();
     } finally {
       await act(async () => root.unmount());
     }

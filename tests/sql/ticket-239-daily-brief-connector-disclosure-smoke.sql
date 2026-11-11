@@ -33,6 +33,8 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"22600000-0000-4000-8000-000000000001","role":"authenticated","session_id":"22600000-0000-4000-8000-000000000011"}', true);
 
+-- Tickets 306 and 307 supersede the per-source disclosure: the seven-key save now
+-- stores the one connected-sources choice, and every source it leaves off is excluded.
 do $$
 declare
   preference jsonb;
@@ -40,25 +42,25 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if (preference ->> 'include_outlook_calendar')::boolean or (preference ->> 'include_icloud_calendar')::boolean or (preference ->> 'include_hevy')::boolean then
-    raise exception 'New disclosures must default off: %', preference;
+  if (preference ->> 'use_connected_sources')::boolean or (preference ->> 'include_outlook_calendar')::boolean
+    or (preference ->> 'include_hevy')::boolean then
+    raise exception 'Sources must default off: %', preference;
   end if;
 
-  -- Disabled Daily Brief cannot keep a disclosure; a missing source cannot be disclosed.
+  -- Disabled Daily Brief cannot keep a source; a stale revision is refused.
   perform pg_temp.expect_error($q$select public.save_daily_brief_preferences_v3(false, false, false, false, false, false, true, 0)$q$, '22023');
-  perform pg_temp.expect_error($q$select public.save_daily_brief_preferences_v3(true, false, false, false, false, true, false, 0)$q$, '55000');
   perform pg_temp.expect_error($q$select public.save_daily_brief_preferences_v3(true, false, false, false, false, false, false, 7)$q$, '55000');
 
   preference := public.save_daily_brief_preferences_v3(true, false, false, false, true, false, true, 0);
-  if preference ->> 'revision' <> '1' or preference ->> 'outlook_connection_generation' <> '2'
-    or preference ->> 'outlook_selection_revision' <> '0' or preference ->> 'hevy_connection_generation' <> '1'
-    or (preference ->> 'include_calendar')::boolean
+  if preference ->> 'revision' <> '1' or not (preference ->> 'use_connected_sources')::boolean
+    or preference -> 'excluded_sources' <> '{"google_calendar": true, "outlook_calendar": false, "icloud_calendar": true, "hevy": false}'::jsonb
+    or (preference ->> 'include_outlook_calendar')::boolean or preference ->> 'outlook_connection_generation' is not null
   then
-    raise exception 'Disclosures did not bind their fences: %', preference;
+    raise exception 'The seven-key save did not map to the one choice: %', preference;
   end if;
 
   decision := public.begin_daily_brief('22600000-0000-4000-8000-000000000101', false, 1);
-  if decision ->> 'state' <> 'acquired' then raise exception 'Current disclosure was not admitted: %', decision; end if;
+  if decision ->> 'state' <> 'acquired' then raise exception 'Current choice was not admitted: %', decision; end if;
   lease := (decision ->> 'lease_token')::uuid;
   if not public.finish_daily_brief('22600000-0000-4000-8000-000000000101', lease, false, 1) then
     raise exception 'Failed attempt was not recorded.';
@@ -66,30 +68,10 @@ begin
 end;
 $$;
 
--- Changing the Outlook selection advances its revision and fences new attempts.
+-- A covered source follows its current connection: a changed selection or a
+-- reconnect no longer fences admission. The service fences each run.
 update public.connector_preferences set selected_source_ids = array['calendar-1', 'calendar-2']
 where user_id = '22600000-0000-4000-8000-000000000001' and provider = 'outlook_calendar';
-
-do $$
-begin
-  perform pg_temp.expect_error($q$select public.begin_daily_brief('22600000-0000-4000-8000-000000000102', false, 1)$q$, '55000');
-end;
-$$;
-
--- A fresh grant at the new selection is admitted; a Hevy reconnect then blocks delivery.
-do $$
-declare
-  preference jsonb;
-  decision jsonb;
-begin
-  preference := public.save_daily_brief_preferences_v3(true, false, false, false, true, false, true, 1);
-  if preference ->> 'outlook_selection_revision' <> '1' then raise exception 'Selection fence did not advance: %', preference; end if;
-  decision := public.begin_daily_brief('22600000-0000-4000-8000-000000000103', false, 2);
-  if decision ->> 'state' <> 'acquired' then raise exception 'Fresh disclosure was not admitted: %', decision; end if;
-  perform set_config('ticket239.lease', decision ->> 'lease_token', true);
-end;
-$$;
-
 reset role;
 update public.connector_connections set generation = generation + 1
 where user_id = '22600000-0000-4000-8000-000000000001' and provider = 'hevy';
@@ -98,31 +80,23 @@ set local role authenticated;
 do $$
 declare
   preference jsonb;
+  decision jsonb;
 begin
-  if public.finish_daily_brief('22600000-0000-4000-8000-000000000103', current_setting('ticket239.lease')::uuid, true, 2) then
-    raise exception 'A completed attempt was delivered after the Hevy generation changed.';
+  decision := public.begin_daily_brief('22600000-0000-4000-8000-000000000102', false, 1);
+  if decision ->> 'state' <> 'acquired' then raise exception 'A changed covered source was refused: %', decision; end if;
+  if not public.finish_daily_brief('22600000-0000-4000-8000-000000000102', (decision ->> 'lease_token')::uuid, true, 1) then
+    raise exception 'The stored revision alone no longer matched.';
   end if;
 
-  -- The stale Hevy fence keeps refusing admission until the user allows Hevy again.
-  perform pg_temp.expect_error($q$select public.begin_daily_brief('22600000-0000-4000-8000-000000000104', true, 2)$q$, '55000');
-  preference := public.save_daily_brief_preferences_v3(true, false, false, false, true, false, true, 2);
-  if preference ->> 'hevy_connection_generation' <> '2' or preference ->> 'revision' <> '3' then
-    raise exception 'Allowing Hevy again did not rebind its fence: %', preference;
+  -- Older two-key and original saves exclude every source they leave off.
+  preference := public.save_daily_brief_preferences_v2(true, false, false, false, 1);
+  if (preference ->> 'use_connected_sources')::boolean then
+    raise exception 'An older save kept a source: %', preference;
   end if;
-  if public.begin_daily_brief('22600000-0000-4000-8000-000000000104', false, 3) ->> 'state' <> 'acquired' then
-    raise exception 'A renewed disclosure was not admitted.';
+  preference := public.save_daily_brief_preferences(true, false, 2);
+  if (preference ->> 'use_connected_sources')::boolean or preference ->> 'revision' <> '3' then
+    raise exception 'The original save kept a source: %', preference;
   end if;
-
-  -- An older two- or four-key client revokes every new disclosure.
-  preference := public.save_daily_brief_preferences_v2(true, false, false, false, 3);
-  if (preference ->> 'include_outlook_calendar')::boolean or (preference ->> 'include_hevy')::boolean
-    or preference ->> 'outlook_connection_generation' is not null or preference ->> 'hevy_connection_generation' is not null
-  then
-    raise exception 'An older save kept a new disclosure: %', preference;
-  end if;
-  preference := public.save_daily_brief_preferences_v3(true, false, false, false, false, false, true, 4);
-  preference := public.save_daily_brief_preferences(true, false, 5);
-  if (preference ->> 'include_hevy')::boolean then raise exception 'The original save kept Hevy disclosure: %', preference; end if;
 end;
 $$;
 

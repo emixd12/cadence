@@ -310,9 +310,9 @@ describe("desktop preference and dialog side effects", () => {
     await render(<SettingsScreen currentTimezone={timezone} accountConnected={false} updateTimezoneAction={save} permission="denied" coverage={null} busy={false}
       onRequestPermission={vi.fn()} onReconcile={vi.fn()} onShowOnboarding={vi.fn()} />);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
-    await click(button("Use detected timezone"));
+    await click(button("Use device timezone"));
     expect(field("timezone").value).toBe("Europe/London");
-    expect(container.textContent).not.toContain("Use detected timezone");
+    expect(container.textContent).not.toContain("Use device timezone");
     expect(save).not.toHaveBeenCalled();
   });
 

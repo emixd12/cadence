@@ -1,6 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
 
 import { LEGAL_PAGE_ORDER, LEGAL_PAGES } from "@/components/settings/LegalContent";
+import { SettingsHeadingScope, useSettingsHeading, type SettingsHeadingLevel } from "@/components/settings/settings-heading";
 
 type SettingsPanelProps = Readonly<{
   id?: string;
@@ -8,8 +11,12 @@ type SettingsPanelProps = Readonly<{
   description?: string;
   children: ReactNode;
   className?: string;
-  /** Level 3 is for a source nested inside the connector library. */
-  headingLevel?: 2 | 3;
+  /**
+   * Level 3 is for a source nested inside the connector library. Omit it to follow
+   * the surrounding group, row or drawer. `null` renders no heading: the row or
+   * drawer around the panel shows the title instead (Ticket 301).
+   */
+  headingLevel?: SettingsHeadingLevel | null;
 }>;
 
 export function SettingsPanel({
@@ -18,9 +25,10 @@ export function SettingsPanel({
   description,
   children,
   className = "",
-  headingLevel = 2,
+  headingLevel,
 }: SettingsPanelProps) {
-  const Heading = headingLevel === 3 ? "h3" : "h2";
+  const heading = useSettingsHeading(headingLevel);
+  const nested = headingLevel === 3 || heading.level >= 4;
   return (
     <section
       id={id}
@@ -28,13 +36,15 @@ export function SettingsPanel({
         .filter(Boolean)
         .join(" ")}
     >
-      <Heading className={headingLevel === 3 ? "text-lg font-bold leading-tight" : "text-xl leading-tight"}>{title}</Heading>
+      {heading.show ? <heading.Tag className={nested ? "text-lg font-bold leading-tight" : "text-xl leading-tight"}>{title}</heading.Tag> : null}
       {description ? (
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">
+        <p className={[heading.show ? "mt-3" : "", "max-w-2xl text-sm leading-6 text-muted-readable"].filter(Boolean).join(" ")}>
           {description}
         </p>
       ) : null}
-      <div className="mt-4">{children}</div>
+      <div className={heading.show || description ? "mt-4" : ""}>
+        <SettingsHeadingScope level={heading.childLevel}>{children}</SettingsHeadingScope>
+      </div>
     </section>
   );
 }

@@ -150,13 +150,14 @@ describe("Travel settings as the setup destination", () => {
     await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save }} readLocation={readLocation} />));
     await flush();
     expect(container.querySelector("section#travel h2")?.textContent).toBe("Travel");
-    const home = container.querySelector<HTMLInputElement>("#travel input:not([type])")!;
-    await act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(home, "1 Example Street"); home.dispatchEvent(new Event("input", { bubbles: true })); });
+    // Ticket 303: usual travel saves as it changes and Home saves on blur.
     const mode = container.querySelector<HTMLSelectElement>("#travel select")!;
-    await act(() => { mode.value = "transit"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
-    const saveButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save travel settings")!;
-    await act(async () => saveButton.click());
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, baseLocationText: "1 Example Street", mode: "transit", acceptRoutingDisclosure: false }));
+    await act(async () => { mode.value = "transit"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false, mode: "transit", acceptRoutingDisclosure: false }));
+    const home = container.querySelector<HTMLInputElement>("#travel input:not([type])")!;
+    await act(() => { home.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(home, "1 Example Street"); home.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { home.blur(); });
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false, baseLocationText: "1 Example Street", mode: "transit", acceptRoutingDisclosure: false }));
     expect(readLocation).not.toHaveBeenCalledWith(true);
   });
 });

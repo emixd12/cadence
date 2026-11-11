@@ -217,7 +217,9 @@ In scope:
 - Optional desktop Google account linking and synchronization under Tickets 116–122
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
-  Tickets 233–241, each with separate Daily Brief disclosure
+  Tickets 233–241. One Daily Brief choice covers every connected source, including
+  one connected later, with per-source exclusions under Advanced (Ticket 306).
+  Daily Brief reads Google Calendar through the Timeline connection (Ticket 307)
 - Remote MCP server, Cadence-owned OAuth server, consent and Connected apps
   settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
   full tracking-data read plus scoped, user-confirmed writes (Occurrence status
@@ -233,6 +235,11 @@ In scope:
   ChatGPT tokens stay in the Mac's Keychain. No fallback to Cadence's OpenAI key when the
   plan cannot run a brief; Cadence picks the model from the user's ChatGPT catalog. No
   DevKit code or components
+- Settings regroup and simplification under Tickets 301–309 (`docs/DECISIONS.md`,
+  2026-11-10): four Settings groups with state rows; auto-save; drag-to-reorder Categories;
+  Note shortcuts on by default; one Daily Brief choice for every connected source, which
+  replaces the separate per-source disclosures when Tickets 306 and 307 land; and Home from
+  the current location
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:

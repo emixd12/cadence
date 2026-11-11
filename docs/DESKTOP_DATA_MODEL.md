@@ -1,5 +1,13 @@
 # Desktop data model
 
+Schema version 22 turns Note shortcuts on by default (Ticket 305). Migration
+`0022_note_shortcuts_on_by_default.sql` sets a stored global `enabled = 0` to 1 once,
+matching hosted `20261110170000_turn_on_note_shortcuts_once.sql`, and leaves `revision`
+and `updated_at` unchanged so a linked Mac and the hosted row converge without a
+conflict. The native commit treats an absent global row as on and no longer checks the
+per-Behavior flag. Rust tests `note_shortcuts_are_on_by_default_and_keep_the_global_switch`
+and `note_shortcut_default_on_migration_turns_a_stored_off_switch_on_once` cover it.
+
 Schema version 21 adds day notes (Ticket 292). Migration `0021_day_notes.sql` mirrors
 hosted `day_notes`: one row per profile and local date, a nullable note of 1–2,000
 non-blank characters, a revision of at least 1, and a cascade from `profiles`. The
@@ -73,6 +81,9 @@ name uniqueness. Migration 0011 preserves IDs and distinguishes legacy duplicate
 `manageCategories` validates the expected category snapshot and performs assignment
 clearing, configuration events, category tombstones, revisions, and outbox writes
 in one transaction. Description fields survive backup upgrades and synchronization.
+Ticket 304's move-to-position uses the same command: the shared planner renumbers
+`sort_order` for the whole list, and the changed rows are written with their outbox
+records in that one transaction, so a move syncs like other category changes.
 Older hosted category writes without the description field are rejected.
 
 Schema version 10 adds the durable pre-attempt account snapshot to
@@ -532,7 +543,8 @@ Account snapshots include `note_shortcut_state` entities. Whole-row conflicts
 use existing explicit conflict review; deletion cannot silently resurrect text.
 Older clients that cannot understand the entity fail sync and request an update.
 Old Note-save payloads remain valid and cannot clear exclusions. Empty pre-feature
-state means disabled, never implied consent. Account switching cannot reuse another
+state meant disabled before Ticket 305; it now means the deterministic feature is on.
+It never implies cloud consent. Account switching cannot reuse another
 owner's state. Offline restart preserves accepted text, dismissals, and settings.
 Normal and reviewed sync unions exclusion IDs without merging shortcut entries or
 settings. A selected state deletion becomes a disabled, entry-free exclusion marker

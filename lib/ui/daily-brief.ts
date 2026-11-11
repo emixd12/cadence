@@ -1,6 +1,7 @@
 import type {
   DailyBriefResponse,
   DailyBriefSettings,
+  DailyBriefSourceFlags,
 } from "@cadence/core/types/daily-brief";
 import type { TimelineView } from "@cadence/core/types/timeline";
 
@@ -31,15 +32,13 @@ export type DailyBriefClient = Readonly<{
  */
 export type DailyBriefRequestInput = Readonly<{ installationId: string; retry: boolean; travelConclusions?: string }>;
 
+/** Ticket 306: the one connected-sources choice, per-source exclusions, and the reminder-history and Notes choices. */
 export type DailyBriefPreferenceInput = Readonly<{
   enabled: boolean;
-  includeCalendar: boolean;
-  includeReminderHistory?: boolean;
-  includeNotes?: boolean;
-  /** Sent only with all four keys above, to servers that report `connectorSources` (Ticket 239). */
-  includeOutlookCalendar?: boolean;
-  includeIcloudCalendar?: boolean;
-  includeHevy?: boolean;
+  useConnectedSources: boolean;
+  excludedSources: DailyBriefSourceFlags;
+  includeReminderHistory: boolean;
+  includeNotes: boolean;
 }>;
 
 export class DailyBriefRequestError extends Error {

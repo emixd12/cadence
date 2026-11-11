@@ -241,7 +241,8 @@ export function DesktopApp({
           sidebarOpen ? "lg:pl-64" : "lg:pl-16",
         ].join(" ")}
       >
-        {conflictCount > 0 ? <div className="sticky top-16 z-20 flex justify-end border-b border-line bg-background p-2 lg:top-0">
+        {/* A fixed 4rem tall cue, so Settings can place its sticky section index below it (Ticket 302). */}
+        {conflictCount > 0 ? <div className="sticky top-16 z-20 flex h-16 items-center justify-end border-b border-line bg-background px-2 lg:top-0">
           <button type="button" onClick={() => navigate("settings", "account-conflicts")} className="border border-accent bg-background px-4 py-3 text-sm text-accent focus:outline-none focus:ring-2 focus:ring-foreground focus:ring-offset-2">
             Review {conflictCount} sync conflict{conflictCount === 1 ? "" : "s"}
           </button>

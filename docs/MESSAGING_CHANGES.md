@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-033` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-037` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -102,6 +102,10 @@ Status values:
 | [P-030](#p-030-daily-brief-disclosure-on-a-mac-using-a-chatgpt-plan) | Daily Brief disclosure on a Mac using a ChatGPT plan | logged | 294, 299 | In-app copy (Mac) |
 | [P-031](#p-031-user-guide-for-using-a-chatgpt-plan) | User guide for using a ChatGPT plan | logged | 294, 299 | User guide |
 | [P-032](#p-032-marketing-claim-use-your-chatgpt-plan) | Marketing claim "Use your ChatGPT plan" | logged | 294, 299, 300 | Marketing |
+| [P-033](#p-033-settings-groups-trust-links-delete-account-link-and-auto-save) | Settings groups, Trust links, Delete account link and auto-save | logged | 301, 302, 303, 309 | In-app copy, user guide |
+| [P-034](#p-034-note-shortcuts-on-for-everyone) | Note shortcuts on for everyone | logged | 305 | In-app copy, user guide, Privacy |
+| [P-035](#p-035-one-daily-brief-choice-for-connected-sources-and-one-google-calendar-connection) | One Daily Brief choice for connected sources, and one Google Calendar connection | logged | 306, 307 | Privacy and Terms, in-app copy, user guide, marketing, provider submissions |
+| [P-036](#p-036-home-from-the-current-location) | Home from the current location | logged | 308 | Privacy, in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1105,4 +1109,183 @@ cite has not changed.
   ChatGPT plan option.
 - **Update needed:** after release, add "Use your ChatGPT plan" for Cadence for Mac, naming it
   Mac only and following OpenAI's brand guidelines. No claim before release.
+## P-033: Settings groups, Trust links, Delete account link and auto-save
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. Settings
+  becomes four groups (General, Connections, Planning, Account and data). The Trust and
+  legal section becomes one line of Privacy, Terms and Trust links at the end of the page.
+  Delete account becomes a plain link at the end of the page that opens the same form.
+  Most settings save as they change, so **Save travel settings** goes away; **Save
+  timezone** stays. Settings wording is rewritten to be clear and warm.
+- **Affected:** Tickets 301, 302, 303 and 309. Files: `app/(app)/settings/page.tsx`,
+  `components/settings/*`, `apps/desktop/src/settings-screen.tsx`.
+- **Surfaces:** in-app copy, user guide.
+- **Conflicting current text:** `docs/user-guide/privacy-and-account.md`: "Under **Trust
+  and legal**, choose **Privacy**, **Terms**, or **Trust**." and "In **Delete account**,
+  choose **Open Export**." `docs/user-guide/travel.md`: "Select Save travel settings after
+  changing Home or usual travel." `docs/user-guide/timeline.md`: "Settings lists every
+  read-only source under **Connected sources**".
+- **Update needed:** rewrite those user guide steps for the groups, the links line, the
+  Delete account link and auto-save. Review each rewritten in-app sentence from Ticket 309
+  that states what Cadence does with data.
+- **Ticket 309 additions (November 10, 2026).** Ticket 309 rewrote Settings wording but left
+  every sentence that states what Cadence sends, stores or shares. These kept sentences need
+  plainer wording in Ticket 246. The before-and-after list is
+  `docs/qa/2026-11-10-settings-wording.md`.
+  - `components/settings/ConnectorLibrary.tsx`, Connected sources: "Optional read-only
+    context from other services. Sources never change Behaviors, Occurrences, statuses,
+    Notes, or tracked time." "Context" is vague; name what shows (events, workout times).
+  - `components/settings/GoogleCalendarPanel.tsx`: the description "Read-only context from
+    the Google account used for Cadence. …"; the connected line "Cadence reads selected
+    calendars only. Disconnecting removes this Calendar connection …"; both disconnect
+    results, including "Google could not confirm grant revocation; remove Cadence in Google
+    account permissions if needed"; and the wrong-account paragraph ("Removing Cadence
+    Calendar access there affects the entire Calendar project …"). "Grant", "revocation"
+    and "Calendar project" are jargon.
+  - `components/settings/OutlookCalendarPanel.tsx`: the description "Read-only calendar
+    context from a personal, work, or school Microsoft account. …"; the permission
+    disclosure "Microsoft asks you to allow reading your calendars, which covers event
+    details. …"; the connected line "… Disconnecting deletes Cadence's saved Microsoft
+    access; Microsoft keeps the permission until you remove it there."; the disconnect
+    result "Cadence deleted its saved Microsoft access."
+  - `components/settings/IcloudCalendarPanel.tsx`: the description "Read-only calendar
+    context from your Apple Account. …"; `ICLOUD_CUSTODY_COPY`, which says twice that Apple
+    does not limit the password to Calendar; the connected line "… Disconnecting deletes
+    Cadence's saved copy; Apple keeps the app-specific password active …"; the disconnect
+    result "Cadence deleted its saved Apple Account email and app-specific password."
+  - `components/settings/HevyPanel.tsx`: the description "Provider responses can contain
+    exercises, titles, notes, sets and weights; Cadence discards these details." Ticket 309
+    names "provider responses" as jargon; a plainer form is "Hevy also sends exercises,
+    titles, notes, sets and weights. Cadence does not keep them." The intake sentence
+    "Cadence stores it encrypted on its server, never on this device, and scans at most 500
+    workouts across your full history, even for today." is one long sentence. The connected
+    line "Disconnecting deletes Cadence's saved key. …" and the disconnect result "Cadence
+    deleted its saved API key."
+  - `lib/ui/connectors.ts`, `CONNECTOR_REVOCATION_COPY`: the Microsoft, Hevy and Apple
+    removal steps, also shown in Delete account.
+  - `components/settings/ConnectedAppsPanel.tsx`: "AI clients with access to this Cadence
+    account. Disconnect stops their access immediately." The section is "Connected apps"
+    and each item says "Verified client" or "Unverified client", as the consent screen
+    (`components/oauth/ConsentForm.tsx`) does. Choose one name, app or client, in Settings
+    and consent text together.
+  - `components/settings/TravelSettingsPanel.tsx`: the Travel estimates disclosure ("While
+    this is on, Cadence sends trip start and end points …"); "Cadence saves only the places
+    you enter and the travel habits you tell it. Device positions and route results stay
+    temporary …"; "A current position is available. Cadence did not save it." The Home help
+    text and the Home lookup message stay with P-036.
+  - `components/briefing/DailyBriefSettingsPanel.tsx`: each source's "Sends …" line; the
+    coverage line "Only timing is sent, never event titles, …"; the reminder history and
+    Notes disclosures; the closing paragraph "Cadence sends today's Behavior schedule and
+    completion history, including findings calculated from it, to OpenAI. …"; the panel
+    description "Cadence can prepare one read-only briefing …", which repeats the drawer's
+    purpose line; and the Mac line "Hosted context does not include unsynchronized or
+    local-only desktop data." ("hosted context" is jargon).
+  - `components/settings/AccountDeletionPanel.tsx`: "Account deletion removes the
+    signed-in Cadence account and its hosted behavior records. This cannot be undone."
+    ("hosted behavior records" is jargon) and "Deletion also removes Cadence's saved access
+    for connected sources. …"
+  - `apps/desktop/src/settings-screen.tsx`, Local profile: "Tracking data uses this Mac's
+    SQLite database as an offline working copy. Account changes synchronize while Cadence
+    runs with connectivity. Native reminders stay on this Mac, and desktop email delivery
+    remains inactive." and "Tracking data stays on this Mac. No cloud account or email
+    delivery is connected." `SETTINGS_ACCOUNT_PURPOSE`: "Optional. Link this Mac to your
+    Cadence account to synchronize tracking data and connect sources." "SQLite", "working
+    copy" and "connectivity" are jargon.
+  - `apps/desktop/src/account/account-panel.tsx`: "SQLite is this Mac's offline working
+    copy. Account changes synchronize while Cadence runs with connectivity."; "Your local
+    data has not been uploaded or replaced. …"; "Disconnecting does not delete hosted
+    account data."
+  - `apps/desktop/src/local-database-controls.tsx`: "Cadence stores the live database in its
+    macOS Application Support folder."
+  - User guide text that Ticket 309's renamed labels make stale:
+    `docs/user-guide/reminders-and-timezone.md` ("**Detected _timezone_**", "**Use detected
+    timezone**"; timezone options now read as places, such as "New York"),
+    `docs/user-guide/timeline.md` ("**Show Calendar context on Timeline**", "**Show
+    all-day events**", "**Refresh Calendar**", and "choose calendars in Connectors"),
+    `docs/user-guide/desktop-local.md` ("**Request notification permission**", "**Refresh
+    reminder coverage**", "**Apply conflict decisions**", "**Discard drafts and restart**").
+    The new labels are "Your device is set to …", **Use device timezone**, **Show Google
+    Calendar events on Timeline**, **Show all-day Google Calendar events**, **Refresh Google
+    Calendar**, Connected sources, **Allow notifications**, **Check reminders**, **Apply
+    choices** and **Discard changes and restart**. The Mac's section is now
+    **Notifications**, not Native notifications.
+- **Status:** logged.
+
+## P-034: Note shortcuts on for everyone
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. Note
+  shortcuts are on by default. A Behavior no longer needs its own switch, repeated Notes
+  are matched without a request, and Settings shows no Note shortcuts control. The stored
+  switch stays so the control can return.
+- **Affected:** Ticket 305. Files: `components/note-shortcuts/NoteShortcutControls.tsx`,
+  `packages/core/src/types/note-shortcut.ts`, `docs/PRODUCT_SPEC.md` ("Recurring Note
+  shortcuts contract"), `docs/UI_SPEC.md` ("Note shortcut controls").
+- **Surfaces:** in-app copy, user guide, Privacy.
+- **Conflicting current text:** `docs/user-guide/timeline.md`, "Use a Note shortcut": "Open
+  **Settings** and enable **Note shortcuts**. Open an active Behavior's **Details and
+  Settings**, enable its Note shortcuts, then choose **Find repeated". `docs/user-guide/desktop-local.md`,
+  "Note shortcuts": "Settings controls the global **Note shortcuts** setting." Privacy text
+  on Note shortcuts was not checked.
+- **Update needed:** rewrite both user guide sections. Check whether the Privacy page
+  describes Note shortcuts as opt-in and correct it if so.
+- **Status:** logged.
+
+## P-035: One Daily Brief choice for connected sources, and one Google Calendar connection
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. One Daily
+  Brief choice covers every connected source, with a per-source list under Advanced. Daily
+  Brief reads Google Calendar through the Timeline connection, and the separate **Google
+  Calendar for Daily Brief** connection is retired.
+- **Affected:** Tickets 306 and 307. Files: `components/briefing/DailyBriefSettingsPanel.tsx`,
+  `components/settings/GoogleCalendarPanel.tsx`, `components/settings/LegalContent.tsx`.
+  Related legal entry: L-021. Related: P-010 and P-012 (Google verification).
+- **Surfaces:** Privacy and Terms, in-app copy, user guide, marketing, provider submissions.
+- **Conflicting current text:** Privacy: "Google Calendar, Outlook Calendar, iCloud Calendar
+  and Hevy each need a separate Daily Brief choice. Connecting a source or displaying it on
+  Timeline does not grant model access." and "Daily Brief reads Calendar only through that
+  connection, never through the Timeline connection". Terms: "Separate choices control
+  optional Calendar timing, reminder delivery counts, and selected Notes." In-app: "Calendar
+  timing, recorded workouts and the sources above are optional, and each needs its own
+  choice here." `docs/user-guide/timeline.md`: "Outlook Calendar, iCloud Calendar and Hevy
+  each need their own choice" and the section "Calendar for Daily Brief".
+  `apps/marketing/src/data/faq.ts`, `new-connector-model-choice`: "No. Google Calendar,
+  Outlook Calendar, iCloud Calendar and Hevy each need a separate default-off Daily Bri…".
+  `tests/legal-content.test.tsx` asserts parts of the Privacy text.
+- **Update needed:** rewrite each passage for one choice and one Google connection. Say
+  that a source connected later is covered by the choice already made. Update the Google
+  verification narrative before any submission.
+- **Status:** logged.
+
+## P-036: Home from the current location
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. A button
+  beside Home reads the device position once, sends it to Google to get an address, and
+  fills the Home field for the user to confirm. The position is not stored.
+- **Affected:** Ticket 308. Files: `components/settings/TravelSettingsPanel.tsx`,
+  `lib/services/travel-provider.ts`, `docs/COSTS.md`.
+- **Surfaces:** Privacy, in-app copy, user guide.
+- **Conflicting current text:** Privacy: "Cadence reads the device location only while
+  Cadence is open in the foreground: during an explicit permission check, during a travel
+  refresh, and once when the Timeline opens with a current estimate". In-app: "Use a full
+  address. Trips home and Behaviors set to Home use it." `docs/user-guide/travel.md`:
+  "**Home (optional)**: a full address."
+- **Update needed:** add the Home button to the list of location reads and to what is sent
+  to Google Maps Platform. Rewrite the Home help text and the user guide line.
+- **Status:** logged.
+
+## P-037: Daily Brief text in Mac builds released before Ticket 307
+
+- **Change:** implemented November 10, 2026 on web and in the Mac source (Ticket 307).
+  Daily Brief reads Google Calendar through the Timeline connection once hosted migration
+  `20261110160000` runs. Installed Cadence for Mac builds released before this change
+  (0.1.9 and earlier) still render the old Daily Brief Settings copy from their own bundle.
+- **Affected:** Tickets 306 and 307. Files: the Daily Brief Settings copy shipped in
+  published Mac builds. Related: P-035 and L-021.
+- **Surfaces:** in-app copy on installed Mac builds; desktop release notes.
+- **Conflicting current text:** published Mac builds say "Your Timeline Google Calendar
+  connection is never used", which becomes false after the migration, and still offer the
+  separate Google Calendar for Daily Brief connection, which the server now refuses.
+- **Update needed:** ship a Mac release with the new panel, and decide whether the release
+  notes or an in-app notice should tell users of older builds. Until then the older text
+  stays on those Macs.
 - **Status:** logged.

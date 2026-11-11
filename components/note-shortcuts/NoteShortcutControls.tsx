@@ -63,7 +63,8 @@ export function NoteShortcutSettings({
   }
 
   const accepted = currentView.entries.filter((entry) => entry.status === "accepted");
-  const canUseSuggestions = Boolean(currentView.globalEnabled && currentView.available && currentView.state?.enabled);
+  // Ticket 305: on for every active Behavior unless the retained account switch is off.
+  const canUseSuggestions = Boolean(currentView.globalEnabled && currentView.available);
   const proposed = canUseSuggestions
     ? currentView.entries.filter((entry) => entry.status === "proposed")
     : [];
@@ -74,26 +75,12 @@ export function NoteShortcutSettings({
       <h3 id={`note-shortcuts-${behaviorId}`} className="text-lg leading-tight">Note shortcuts</h3>
       {currentView.unavailable ? <p role="status" className="mt-2 text-sm leading-6">Note shortcuts are temporarily unavailable. You can still write and save Notes. Refresh to try again.</p> : null}
       <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-readable">
-        Matching uses repeated Notes for this Behavior and runs only when you ask.
+        When you save the same Note on three Occurrences of this Behavior, Cadence suggests it here. Accept a suggestion to show it above the Note field.
       </p>
       <p role={result.status === "error" ? "alert" : "status"} aria-live={result.status === "error" ? "assertive" : "polite"} className="mt-2 text-sm leading-6">
         {pending ? "Saving Note shortcuts…" : result.message}
       </p>
-      {currentView.available ? <label className="mt-4 flex min-h-11 items-center gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={currentView.state?.enabled ?? false}
-          disabled={pending}
-          onChange={(event) => run({ operation: "enable", enabled: event.currentTarget.checked })}
-        />
-        Enable Note shortcuts for this Behavior
-      </label> : null}
-      {canUseSuggestions ? (
-        <button type="button" disabled={pending} onClick={() => run({ operation: "analyze" })} className="product-action product-action-primary mt-3 min-h-11 py-2 text-sm">
-          Find repeated Notes
-        </button>
-      ) : null}
-      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">Enable Note shortcuts in Settings before finding repeated Notes.</p> : null}
+      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">Note shortcuts are turned off for this account. Your Notes and accepted shortcuts stay saved.</p> : null}
       {proposed.length > 0 ? <div className="mt-4 grid gap-3" aria-label="Proposed Note shortcuts">
         <h4 className="text-sm font-bold">Proposed</h4>
         {proposed.map((entry) => <ShortcutEditor key={entry.key} entry={entry} pending={pending} editing={editing === entry.key}
@@ -148,6 +135,8 @@ function ShortcutEditor({ entry, accepted = false, editable = true, pending, edi
   </div>;
 }
 
+// Not rendered since Ticket 305: Note shortcuts are on by default and Settings shows no
+// control. The stored account switch and this control stay so the switch can return.
 export function GlobalNoteShortcutControl({ view, action }: Readonly<{ view: NoteShortcutView; action: NoteShortcutAction }>) {
   const [currentView, setCurrentView] = useState(view);
   const [result, setResult] = useState<NoteShortcutActionState>({ status: "idle", message: "" });
