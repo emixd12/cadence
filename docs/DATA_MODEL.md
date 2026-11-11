@@ -2251,7 +2251,8 @@ removes that filter and adds sync contract 4:
   of an existing kind that a contract adds. Its one row is
   `(4, 'note_shortcut_state', 'day_notes')`. Only the migration owner writes it;
   `authenticated` can read it.
-- `account_sync_current_contract()` is the highest contract in either registry, now 4.
+- `account_sync_current_contract()` is the highest contract in either registry: 4 from
+  this migration, 5 from Ticket 320's `20261111160000`.
 - `project_account_sync_snapshot` also drops a registered row for contracts below
   its contract, so reads, apply comparisons, receipts and fingerprints for
   contracts 1–3 still leave it out.
@@ -2401,6 +2402,28 @@ nothing. Malformed input raises SQLSTATE `22023`; no path uses `40001`.
 `apply_occurrence_status_transition` is unchanged and still rejects `derived`.
 Fixture: `tests/sql/ticket-314-connector-completion-smoke.sql`. Repositories:
 `lib/db/sourceLinks.repo.ts` and `lib/db/sourceMatches.repo.ts`.
+
+### Account sync contract 5 (Ticket 320)
+
+Migration `20261111160000_account_sync_connector_completion.sql` registers
+`behavior_source_link` and `occurrence_source_match` as whole kinds at contract 5 in
+`cadence_private.account_sync_contract_additions`, so contracts 1–4 neither receive nor
+write them. `cadence_private.account_sync_snapshot()` adds each with only the fields a
+Mac shows:
+
+- `behavior_source_link`: `id`, `behavior_id`, `source`, `selector_kind`, `enabled`,
+  `created_at`, `updated_at`. Never `selector_keys` or `account_digest`.
+- `occurrence_source_match`: `id`, `occurrence_id`, `behavior_id`, `source`,
+  `activity_start_at`, `activity_end_at`, `role`, `state`, `created_at`, `updated_at`.
+  Never `activity_ref`, `activity_revision`, the scheduled window, `link_id` or the
+  status event references.
+
+Both kinds are read-only through account sync. They are not in
+`apply_account_sync_plan`'s writable list, so every contract's write to them is
+rejected; the link form and the connector functions stay their only writers. The
+client planner lets the hosted row win, sends no hosted write for them, and drops a row
+whose Behavior or Occurrence leaves the merge, as the hosted cascade does. Fixture:
+`tests/sql/ticket-320-connector-completion-sync.sql`.
 
 ## Advisor day-context reads (Ticket 146)
 

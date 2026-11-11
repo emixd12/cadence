@@ -167,7 +167,7 @@ $$;
 reset role;
 do $$
 begin
-  assert cadence_private.account_sync_current_contract() = 4, 'The current sync contract is not 4';
+  assert cadence_private.account_sync_current_contract() >= 4, 'The current sync contract is below 4';
   if has_table_privilege('authenticated', 'cadence_private.account_sync_contract_rows', 'insert') then
     raise exception 'authenticated can register sync contract rows';
   end if;

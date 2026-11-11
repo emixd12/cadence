@@ -595,3 +595,45 @@ impl StoredRow for DayNote {
     const JSON_COLUMNS: &'static [&'static str] = &[];
     const BOOL_COLUMNS: &'static [&'static str] = &[];
 }
+
+/// Ticket 320: a read-only copy of a hosted source link. Account sync is its only writer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct BehaviorSourceLink {
+    pub id: String,
+    pub user_id: String,
+    pub behavior_id: String,
+    pub source: String,
+    pub selector_kind: String,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+impl StoredRow for BehaviorSourceLink {
+    const TABLE: &'static str = "behavior_source_links";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &["enabled"];
+}
+
+/// Ticket 320: a read-only copy of a hosted source match: one recorded workout's
+/// times on one Occurrence. Account sync is its only writer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct OccurrenceSourceMatch {
+    pub id: String,
+    pub user_id: String,
+    pub occurrence_id: String,
+    pub behavior_id: String,
+    pub source: String,
+    pub activity_start_at: String,
+    pub activity_end_at: String,
+    pub role: String,
+    pub state: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+impl StoredRow for OccurrenceSourceMatch {
+    const TABLE: &'static str = "occurrence_source_matches";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}

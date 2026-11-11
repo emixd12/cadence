@@ -54,7 +54,10 @@ pub fn read_history(db: &Connection, profile_id: &str, occurrence_ids: &[String]
             row.id.clone(),
         )
     });
-    Ok(json!({"statusEvents":events,"timeSessions":sessions}))
+    // Ticket 320: synced workout times for the Timeline row; read-only copies of hosted records.
+    let mut matches = history_rows::<OccurrenceSourceMatch>(db, profile_id, &ids)?;
+    matches.sort_by_key(|row| (db::instant_key(&row.activity_start_at).unwrap_or_default(), row.id.clone()));
+    Ok(json!({"statusEvents":events,"timeSessions":sessions,"sourceMatches":matches}))
 }
 
 fn history_rows<T: StoredRow>(db: &Connection, profile_id: &str, ids: &[String]) -> Result<Vec<T>> {

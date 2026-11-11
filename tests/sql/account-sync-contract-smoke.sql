@@ -11,6 +11,36 @@ do $$
 declare
   frozen jsonb := $frozen$
 {
+    "behavior_source_links": [
+        "account_digest",
+        "behavior_id",
+        "created_at",
+        "enabled",
+        "id",
+        "selector_keys",
+        "selector_kind",
+        "source",
+        "updated_at"
+    ],
+    "occurrence_source_matches": [
+        "activity_end_at",
+        "activity_ref",
+        "activity_revision",
+        "activity_start_at",
+        "applied_event_id",
+        "behavior_id",
+        "created_at",
+        "id",
+        "link_id",
+        "occurrence_id",
+        "reverted_event_id",
+        "role",
+        "scheduled_end_at",
+        "scheduled_start_at",
+        "source",
+        "state",
+        "updated_at"
+    ],
     "day_notes": [
         "created_at",
         "id",
@@ -281,7 +311,8 @@ $frozen$::jsonb;
     "reminder_deliveries": "reminder_delivery", "note_shortcut_states": "note_shortcut_state",
     "place_label_settings": "place_label_settings", "place_markers": "place_marker",
     "completion_place_labels": "completion_place_label", "where_suggestion_dismissals": "where_suggestion_dismissal",
-    "day_notes": "day_note"
+    "day_notes": "day_note", "behavior_source_links": "behavior_source_link",
+    "occurrence_source_matches": "occurrence_source_match"
   }'::jsonb;
   unregistered text;
   missing_default text;
@@ -307,7 +338,8 @@ begin
   end if;
 
   -- Contract 4 adds no column or kind; it adds the day-note Note shortcut row (Ticket 292).
-  if cadence_private.account_sync_current_contract() <> 4 then
+  -- Contract 5 adds the read-only connector completion kinds (Ticket 320).
+  if cadence_private.account_sync_current_contract() <> 5 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(

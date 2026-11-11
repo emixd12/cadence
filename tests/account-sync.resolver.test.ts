@@ -995,3 +995,72 @@ describe("day note synchronization (Ticket 292)", () => {
     expect(() => plan(empty, snapshot([{ kind: "day_note", id: "d1", value: { id: "d1", note: "x" } }]), empty)).toThrow("Update Cadence before synchronizing day notes.");
   });
 });
+
+describe("connector completion records (Ticket 320, contract 5)", () => {
+  const behaviorId = "66666666-6666-4666-8666-666666666666";
+  const occurrenceId = "77777777-7777-4777-8777-777777777777";
+  const linkId = "88888888-8888-4888-8888-888888888888";
+  const matchId = "99999999-9999-4999-8999-999999999999";
+  const parents: AccountSyncEntity[] = [
+    { kind: "behavior", id: behaviorId, value: { id: behaviorId, title: "Gym" } },
+    { kind: "occurrence", id: occurrenceId, value: { id: occurrenceId, behavior_id: behaviorId, status: "unresolved", scheduled_for: "2026-11-09T23:00:00Z" } },
+  ];
+  const link = (enabled = true): AccountSyncEntity => ({ kind: "behavior_source_link", id: linkId, value: {
+    id: linkId, behavior_id: behaviorId, source: "hevy", selector_kind: "any", enabled,
+    created_at: "2026-11-09T12:00:00Z", updated_at: enabled ? "2026-11-09T12:00:00Z" : "2026-11-10T12:00:00Z",
+  } });
+  const match = (state = "active"): AccountSyncEntity => ({ kind: "occurrence_source_match", id: matchId, value: {
+    id: matchId, occurrence_id: occurrenceId, behavior_id: behaviorId, source: "hevy",
+    activity_start_at: "2026-11-09T22:05:00Z", activity_end_at: "2026-11-09T22:50:00Z", role: "attached", state,
+    created_at: "2026-11-09T23:00:00Z", updated_at: state === "active" ? "2026-11-09T23:00:00Z" : "2026-11-10T23:00:00Z",
+  } });
+  const keys = (writes: readonly { kind: string; id: string; operation: string }[]) => writes.map(({ kind, id, operation }) => `${operation}:${kind}:${id}`);
+
+  it("copies hosted records to the Mac and never writes them to the hosted account", () => {
+    const base = snapshot(parents), hosted = snapshot([...parents, link(), match()]);
+    const result = plan(base, base, hosted);
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.localWrites)).toEqual([`upsert:behavior_source_link:${linkId}`, `upsert:occurrence_source_match:${matchId}`]);
+    expect(result.hostedWrites).toEqual([]);
+  });
+
+  it("lets the hosted row win over a differing or missing local copy, without a conflict", () => {
+    const base = snapshot([...parents, link(), match()]);
+    const changed = plan(base, snapshot([...parents, link(false), match()]), snapshot([...parents, link(), match("removed")]));
+    expect(changed.conflicts).toEqual([]);
+    expect(changed.hostedWrites).toEqual([]);
+    expect(changed.localWrites).toMatchObject([
+      { kind: "behavior_source_link", operation: "upsert", value: { enabled: true } },
+      { kind: "occurrence_source_match", operation: "upsert", value: { state: "removed" } },
+    ]);
+    const missing = plan(base, snapshot(parents), base);
+    expect(missing.hostedWrites).toEqual([]);
+    expect(keys(missing.localWrites)).toEqual([`upsert:behavior_source_link:${linkId}`, `upsert:occurrence_source_match:${matchId}`]);
+    const removedHosted = plan(base, base, snapshot(parents));
+    expect(keys(removedHosted.localWrites)).toEqual([`delete:behavior_source_link:${linkId}`, `delete:occurrence_source_match:${matchId}`]);
+    expect(removedHosted.hostedWrites).toEqual([]);
+  });
+
+  it("drops a match whose Occurrence the Mac deleted, as the hosted cascade does", () => {
+    const base = snapshot([...parents, match()]);
+    const local = snapshot([parents[0]!]);
+    const result = plan(base, local, base);
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.hostedWrites)).toEqual([`delete:occurrence:${occurrenceId}`]);
+    expect(result.localWrites).toEqual([]);
+    expect(result.mergedEntities.some(({ kind }) => kind === "occurrence_source_match")).toBe(false);
+  });
+
+  it("orders connector deletes before their parents' deletes", () => {
+    const base = snapshot([...parents, match()]);
+    const result = plan(base, base, snapshot([parents[0]!]));
+    expect(keys(result.localWrites)).toEqual([`delete:occurrence_source_match:${matchId}`, `delete:occurrence:${occurrenceId}`]);
+  });
+
+  it("rejects a record with fields a Mac must not hold", () => {
+    const leaky: AccountSyncEntity = { ...link(), value: { ...(link().value as Record<string, Json>), selector_keys: ["a".repeat(64)] } };
+    expect(() => plan(snapshot(parents), snapshot(parents), snapshot([...parents, leaky]))).toThrow("Update Cadence before synchronizing connector completions.");
+    const reversed: AccountSyncEntity = { ...match(), value: { ...(match().value as Record<string, Json>), activity_end_at: "2026-11-09T22:00:00Z" } };
+    expect(() => plan(snapshot(parents), snapshot(parents), snapshot([...parents, reversed]))).toThrow("The synced connector completion is invalid.");
+  });
+});

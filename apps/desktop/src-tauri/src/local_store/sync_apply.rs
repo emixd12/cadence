@@ -29,6 +29,8 @@ pub enum AccountSyncEntityKind {
     CompletionPlaceLabel,
     WhereSuggestionDismissal,
     DayNote,
+    BehaviorSourceLink,
+    OccurrenceSourceMatch,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -75,6 +77,8 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::CompletionPlaceLabel => { decode_row::<CompletionPlaceLabel>(value)?; }
             AccountSyncEntityKind::WhereSuggestionDismissal => { decode_row::<WhereSuggestionDismissal>(value)?; }
             AccountSyncEntityKind::DayNote => { decode_row::<DayNote>(value)?; }
+            AccountSyncEntityKind::BehaviorSourceLink => { decode_row::<BehaviorSourceLink>(value)?; }
+            AccountSyncEntityKind::OccurrenceSourceMatch => { decode_row::<OccurrenceSourceMatch>(value)?; }
         }
     }
     Ok(())
@@ -236,6 +240,12 @@ fn apply_mode(
                 row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)?
             }
             AccountSyncEntityKind::DayNote => row_write::<DayNote>(db, profile, write, false, false)?,
+            AccountSyncEntityKind::BehaviorSourceLink => {
+                row_write::<BehaviorSourceLink>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::OccurrenceSourceMatch => {
+                row_write::<OccurrenceSourceMatch>(db, profile, write, false, false)?
+            }
         }
     }
     Ok(())
@@ -454,6 +464,12 @@ fn validate_write(
         AccountSyncEntityKind::DayNote => {
             validate_row_write::<DayNote>(db, profile, write, false, false)
         }
+        AccountSyncEntityKind::BehaviorSourceLink => {
+            validate_row_write::<BehaviorSourceLink>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::OccurrenceSourceMatch => {
+            validate_row_write::<OccurrenceSourceMatch>(db, profile, write, false, false)
+        }
     }
 }
 
@@ -650,6 +666,8 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         | AccountSyncEntityKind::CompletionPlaceLabel
         | AccountSyncEntityKind::WhereSuggestionDismissal => 11,
         AccountSyncEntityKind::DayNote => 12,
+        // Ticket 320: read-only connector rows follow their Behavior and Occurrence.
+        AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch => 13,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first
@@ -660,9 +678,11 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         if replacement {
             (write.operation == AccountSyncOperation::Upsert) as u8
         } else if write.operation == AccountSyncOperation::Delete
-            && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery | AccountSyncEntityKind::DayNote)
+            && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery | AccountSyncEntityKind::DayNote
+                | AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch)
         {
             // A merged same-date day note also leaves its unique date before the replacement row arrives.
+            // Connector rows leave before the Occurrence or Behavior whose cascade would remove them.
             // Validated disposable rows must leave their unique schedule slot before replacement.
             0
         } else {
@@ -1380,6 +1400,82 @@ mod tests {
         )
         .unwrap();
         assert!(db::by_id::<NoteShortcutState>(&connection, &profile, "global").is_err());
+    }
+
+    #[test]
+    fn account_sync_round_trips_read_only_connector_records() {
+        let (_directory, mut connection, profile, category) = database();
+        let graph = complete_graph(&profile, category, '3');
+        insert_complete_graph(&connection, &profile, &graph);
+        let link = BehaviorSourceLink {
+            id: "30000000-0000-4000-8000-000000000101".into(),
+            user_id: profile.clone(),
+            behavior_id: graph.behavior.id.clone(),
+            source: "hevy".into(),
+            selector_kind: "any".into(),
+            enabled: true,
+            created_at: "2026-09-01T12:00:00.000000Z".into(),
+            updated_at: "2026-09-01T12:00:00.000000Z".into(),
+        };
+        let matched = OccurrenceSourceMatch {
+            id: "30000000-0000-4000-8000-000000000102".into(),
+            user_id: profile.clone(),
+            occurrence_id: graph.occurrence.id.clone(),
+            behavior_id: graph.behavior.id.clone(),
+            source: "hevy".into(),
+            activity_start_at: "2026-09-01T11:05:00.000000Z".into(),
+            activity_end_at: "2026-09-01T11:50:00.000000Z".into(),
+            role: "completion".into(),
+            state: "active".into(),
+            created_at: "2026-09-01T12:00:00.000000Z".into(),
+            updated_at: "2026-09-01T12:00:00.000000Z".into(),
+        };
+        let synced = |row: Value| {
+            let mut value = row;
+            value.as_object_mut().unwrap().remove("user_id");
+            value
+        };
+        // The match is listed first; apply order still writes the link and parents first.
+        execute(
+            &mut connection,
+            Request::ApplyAccountSync {
+                profile_id: profile.clone(),
+                writes: vec![
+                    AccountSyncWrite {
+                        kind: AccountSyncEntityKind::OccurrenceSourceMatch,
+                        id: matched.id.clone(),
+                        operation: AccountSyncOperation::Upsert,
+                        expected: None,
+                        value: Some(synced(normalized(&matched).unwrap())),
+                    },
+                    AccountSyncWrite {
+                        kind: AccountSyncEntityKind::BehaviorSourceLink,
+                        id: link.id.clone(),
+                        operation: AccountSyncOperation::Upsert,
+                        expected: None,
+                        value: Some(synced(normalized(&link).unwrap())),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+        assert_eq!(db::by_id::<BehaviorSourceLink>(&connection, &profile, &link.id).unwrap(), link);
+        assert_eq!(db::by_id::<OccurrenceSourceMatch>(&connection, &profile, &matched.id).unwrap(), matched);
+        // A field a Mac must not hold is refused.
+        let mut leaky = synced(normalized(&link).unwrap());
+        leaky.as_object_mut().unwrap().insert("selector_keys".into(), json!(["a"]));
+        assert!(validate_snapshot(&profile, &[AccountSyncEntity {
+            kind: AccountSyncEntityKind::BehaviorSourceLink,
+            id: link.id.clone(),
+            value: leaky,
+        }])
+        .is_err());
+        // Deleting the Behavior removes both, as the hosted cascade does.
+        connection
+            .execute("DELETE FROM behaviors WHERE user_id=?1 AND id=?2", params![profile, graph.behavior.id])
+            .unwrap();
+        assert!(db::by_id::<BehaviorSourceLink>(&connection, &profile, &link.id).is_err());
+        assert!(db::by_id::<OccurrenceSourceMatch>(&connection, &profile, &matched.id).is_err());
     }
 
     #[test]

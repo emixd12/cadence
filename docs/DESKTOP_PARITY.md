@@ -340,8 +340,11 @@ mode only:
   Occurrence, the "From Hevy" label read from the synced status event, and a reconcile
   call through the hosted broker. Published 0.1.9 stops syncing on that collision, so a
   Mac build with Ticket 319 ships before the hosted feature turns on.
-- Ticket 320: source links and source matches sync at a new account sync contract, so
-  the Mac shows workout times offline. Until then the Mac shows the label only.
+- Ticket 320: source links and source matches sync read-only at account sync contract
+  5 into SQLite schema 24, so a linked Mac lists workout times offline, as the web row
+  does. Implemented in source (`apps/desktop/src/local-timeline.service.ts`,
+  `apps/desktop/src-tauri/migrations/0024_connector_completion_records.sql`); not in a
+  published Mac build. Older Macs (contract 4 and below) receive neither kind.
 - A Mac schedules Behavior reminders locally and learns of a connector completion when
   it syncs. A reminder can still fire for a logged workout while Cadence for Mac is
   closed.
