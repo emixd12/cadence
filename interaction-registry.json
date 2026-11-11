@@ -12398,8 +12398,8 @@
           "control": "Cancel"
         }
       ],
-      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant. The first click asks \"Disconnect Google Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
-      "success_result": "Fences reads for the selected purpose, deletes its credentials, and attempts provider revocation. Standard disconnect clears the Timeline cache; agent disconnect invalidates agent reads only.",
+      "availability": "Available for an existing Timeline connection; the UI explains other-device effects. The first click asks \"Disconnect Google Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
+      "success_result": "Fences reads, deletes the credentials, attempts provider revocation and clears the Timeline cache. Daily Brief stops reading Google Calendar because it uses this connection (Ticket 307).",
       "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",

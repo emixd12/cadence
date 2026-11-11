@@ -1124,9 +1124,9 @@ scrolls; on small screens it sits below the app header.
 - Travel, Daily Brief and Categories keep their title, one-line purpose and
   state in view. One button below them opens the controls: "Set up Travel" while
   off and "Travel settings" while on; "Set up Daily Brief" and "Daily Brief
-  settings"; "Edit categories" with the category count as state. The separate
-  Google Calendar for Daily Brief panel sits inside the Daily Brief drawer until
-  Ticket 307 removes it.
+  settings"; "Edit N categories" with the category count as state. Daily Brief
+  has no separate Google Calendar panel: it reads the Timeline connection
+  (Ticket 307).
 - While a panel loads, its row or drawer says "Checking…". On a failed read it
   says "Status unavailable" and opens. A row or drawer whose state needs action
   opens by itself; the person can close it again. Each state comes from one pure

@@ -1037,10 +1037,11 @@ old consent form. Expired, consumed, or invalid requests require a new client
 connection. A failed Disconnect remains visible with a reload/retry instruction.
 No hosted actions or live Google-provider acceptance follow from local tests.
 
-## Connect Calendar for Daily Brief (Ticket 187)
+## Calendar for Daily Brief (Tickets 187, 306 and 307)
 
-Open Settings → Google Calendar for Daily Brief → Connect Google Calendar.
-Approve read-only consent using the same Google account as Cadence. Select calendars and save.
-Enable Daily Brief, then enable its Calendar control. Calendar selection changes require renewed disclosure.
-Desktop completes consent in the system browser and receives a purpose-bound callback.
-Disconnect affects that purpose across the account's devices. Timeline consent and sign-in remain separate.
+Daily Brief has no Google Calendar connection of its own since Ticket 307. Connect Google
+Calendar once under Settings → Connections → Connected sources and choose its calendars;
+the choices save as they change (Ticket 303). Then open Settings → Planning → Daily Brief,
+turn on Daily Brief and **Plan around my connected sources** (Ticket 306). Exclude a source
+under **Advanced: choose sources**. Disconnecting Google Calendar stops both Timeline and
+Daily Brief reads across the account's devices.
