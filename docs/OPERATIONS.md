@@ -448,6 +448,10 @@ from a fresh clone.
 GitHub deletes the head branch after a PR merges (repository setting, turned on
 November 10, 2026).
 
+Branch protection on `main` also blocks a merge while the PR has an open code-scanning
+alert or an unresolved review thread, even when `verify` passes. Fix the alert
+and resolve the threads before merging (seen on PR #210, November 11, 2026).
+
 Tests: `tests/git-freshness.test.ts` runs the real hook and command against
 throwaway repositories.
 
