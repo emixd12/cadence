@@ -12,6 +12,8 @@ import type { Profile } from "../../../lib/types/database";
 import { createLocalBehaviorStore, withNativeReminderSummary } from "./local-behavior.service";
 import { localCommand } from "./local-store";
 import { saveLocalDayNote } from "./local-day-note.service";
+import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
+import { matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 
 export function createLocalOccurrenceActions(profileId: string, refresh: () => void) {
   const statusAction: OccurrenceFormAction = async (_previous, form) => {
@@ -27,12 +29,16 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
   };
   const noteAction: OccurrenceFormAction = async (_previous, form) => {
     try {
-      await saveLocalOccurrenceNote(profileId, {
+      const occurrence = await saveLocalOccurrenceNote(profileId, {
         occurrenceId: parseOccurrenceId(form.get("occurrence_id")),
         expectedNote: parseOccurrenceNote(form.get("expected_note"), true),
         note: parseOccurrenceNote(form.get("note")),
         ...(form.get("used_shortcut") === "true" ? { usedShortcut: true } : {}),
       });
+      // Ticket 305: propose repeated Notes after the save; a failure never fails the Note.
+      try {
+        await matchRepeatedNoteShortcuts(createLocalNoteShortcutStore(profileId), occurrence.behavior_id, Temporal.Now.instant());
+      } catch { /* The next save tries again. */ }
       return { status: "success", message: "Note saved." };
     } catch (error) { return { status: "error", message: localErrorMessage(error) }; }
   };

@@ -2107,7 +2107,14 @@ or the exact Behavior UUID text with that owned `behavior_id`. Composite ownersh
 foreign keys and RLS reject foreign Behaviors; account/Behavior deletion cascades.
 Fields are `enabled boolean`, `entries jsonb`, `excluded_occurrence_ids jsonb`,
 `revision integer`, and `updated_at timestamptz`. Global arrays must be empty.
-Absent state means disabled. Arrays, enum values, IDs, lengths, and ownership
+Since Ticket 305 an absent global state means on, and only a stored global
+`enabled = false` turns the feature off. Behavior rows keep `enabled` for storage
+and synchronization, but it no longer gates matching or quick-fill. Migration
+`20261110153050_allow_default_on_note_shortcuts.sql` replaces only the enablement
+gate of `commit_note_shortcut_state`; `20261110153051_turn_on_note_shortcuts_once.sql`
+sets every stored global `enabled = false` to true once, leaving `revision` and
+`updated_at` unchanged so it converges with desktop SQLite migration 0022 without a
+sync conflict. Arrays, enum values, IDs, lengths, and ownership
 are validated at storage boundaries. Mutations compare the captured state and
 commit atomically; concurrent changes fail rather than overwrite. Rendered management
 actions also carry a content fingerprint, because equal integer revisions from
@@ -2132,12 +2139,13 @@ Normal and reviewed account synchronization retains the sorted union of exclusio
 IDs from the common baseline and both copies. It changes no winning shortcut text,
 status, suppression key, or setting. If review selects deletion while the owned
 Behavior survives, synchronization writes a disabled state with no entries and
-the retained IDs. Deleting the Behavior may cascade the state. An explicit
+the retained IDs; since Ticket 305 that flag no longer gates. Deleting the Behavior may cascade the state. An explicit
 first-link local-dataset discard does not retain exclusions from that discarded
 copy. A union above 100,000 IDs fails instead of truncating.
 
-Analysis reads current owned sources. Before proposal persistence, compare source
-Notes, current state, global enablement, and Behavior lifecycle again atomically.
+Analysis runs after an in-app Note save and reads current owned sources. Before
+proposal persistence, compare source Notes, current state, global enablement, and
+Behavior lifecycle again atomically. It writes only when the current entries change.
 No stale result may revive removed text or overwrite an accepted edit. No raw
 Note text enters logs or monitoring. Cloud consent is separate, device-specific,
 and never a synchronized state field. Provider analysis remains disabled until

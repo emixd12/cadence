@@ -1150,11 +1150,14 @@ archiving rules are added.
 
 ## Note shortcut controls (Tickets 126–128)
 
-Existing Behavior settings contain a Note shortcuts section with its persisted
-opt-in, Find repeated Notes action, proposed text with Accept/Edit/Dismiss, and
-accepted text with Edit/Remove. Global Settings contains the feature off control.
-Explain that matching uses repeated Notes for this Behavior and runs only on request.
-Show insufficient evidence and request errors without blocking ordinary Note entry.
+Existing Behavior settings contain a Note shortcuts section with proposed text
+(Accept/Edit/Dismiss) and accepted text (Edit/Remove). Since Ticket 305 it has no
+enable switch and no Find repeated Notes action, and Settings has no Note shortcuts
+control on web or Mac. The section explains that saving the same Note on three
+Occurrences of the Behavior produces a suggestion, and that accepting it puts it above
+the Note field. If the retained account switch is stored off, the section says Note
+shortcuts are turned off and keeps Remove available. Show request errors without
+blocking ordinary Note entry; a failed match after a save never fails the save.
 If shortcut reads fail, show an unavailable notice and disable those controls.
 Keep the tracking screen and ordinary Note entry usable; mutation failures remain errors.
 

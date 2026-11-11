@@ -881,9 +881,9 @@ archiving rules are added.
 
 ## Note shortcuts (Tickets 126–128)
 
-Enable Note shortcuts in Settings, then opt in inside one Behavior's settings.
-Choose Find repeated Notes. Review each proposed text, optionally edit it, then
-Accept or Dismiss. Only accepted text becomes a quick-fill button. Edit/Remove
+Note shortcuts are on by default (Ticket 305). After the same Note is saved on
+three Occurrences of one Behavior, its Behavior settings show the text as a
+proposal. Review each proposed text, optionally edit it, then Accept or Dismiss. Only accepted text becomes a quick-fill button. Edit/Remove
 remains available in Behavior settings. Remove erases shortcut text and suppresses
 that pattern for 90 days; it leaves saved Notes unchanged.
 
@@ -891,8 +891,9 @@ Open any supported Occurrence Note form. Select a shortcut to fill an empty
 draft or append a new line. Review the draft and choose Save note. Cancel leaves
 historical Notes unchanged. A stale save retains the existing conflict behavior;
 a shortcut inserted during a pending save remains in the draft afterward.
-Global off hides quick-fill/proposals and stops analysis. Re-enabling retains
-accepted text. Offline desktop follows the same flow with local data. Linking an
+Settings has no Note shortcuts control. A stored account off switch, kept so the
+control can return, hides quick-fill/proposals and stops analysis; turning it back
+on retains accepted text. Offline desktop follows the same flow with local data. Linking an
 account synchronizes shortcut state but never grants cloud analysis consent.
 
 ### Desktop repair and update review (Tickets 129–131)

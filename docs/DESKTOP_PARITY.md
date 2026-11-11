@@ -96,9 +96,10 @@ are implemented. The registry is authoritative.
 - Settings supports explicit timezone choice and local timezone detection.
   Timezone changes preserve historical occurrences and append configuration
   history. Desktop adapts first-run setup and notification settings locally.
-- Note shortcuts use the shared review controls. Global and Behavior settings,
-  accepted quick-fill buttons, and local deterministic matching stay available
-  offline. Linking synchronizes shortcut state without enabling cloud analysis.
+- Note shortcuts use the shared review controls. Since Ticket 305 they are on by
+  default with no Settings or per-Behavior switch; matching runs after each Note save
+  in the local Note action. Proposals, accepted quick-fill buttons, and local
+  deterministic matching stay available offline. Linking synchronizes shortcut state without enabling cloud analysis.
 
 See `docs/PRODUCT_SPEC.md`, `docs/RECURRENCE_RULES.md`,
 `docs/DATETIME_STRATEGY.md`, and `docs/EXPORT_FORMATS.md` for exact semantics.

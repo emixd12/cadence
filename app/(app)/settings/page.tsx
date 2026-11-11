@@ -17,13 +17,10 @@ import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
 import { disconnectAppAction } from "./actions";
-import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
-import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import { getCategorySettings } from "@/lib/services/category.service";
 import { changeCategoryAction } from "./actions";
 import { getSettingsPageData } from "@/lib/services/settings.service";
@@ -51,9 +48,8 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, noteShortcutView, connectedApps] = await Promise.all([
+  const [categorySettings, connectedApps] = await Promise.all([
     getCategorySettings(),
-    getNoteShortcutViewForCurrentUser(null),
     getConnectedApps(),
   ]);
 
@@ -80,8 +76,6 @@ async function SettingsContent() {
       <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
 
       <CategoryPanel {...categorySettings} action={changeCategoryAction} />
-
-      <GlobalNoteShortcutControl view={noteShortcutView} action={manageNoteShortcutAction} />
 
       <TrustAndLegalPanel />
 

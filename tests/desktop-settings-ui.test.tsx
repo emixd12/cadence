@@ -102,6 +102,12 @@ describe("native Settings coverage", () => {
     expect(settings({ accountConnected: true }).html).toContain("Account changes synchronize");
     expect(settings({ accountConnected: false }).html).toContain("No cloud account");
   });
+
+  it("shows no Note shortcuts control (Ticket 305: on by default)", () => {
+    const { html } = settings({ accountConnected: true });
+    expect(html).not.toContain("Note shortcuts");
+    expect(html).not.toContain('id="note-shortcuts"');
+  });
 });
 
 describe("native setup guide", () => {

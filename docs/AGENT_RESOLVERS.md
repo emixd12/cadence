@@ -278,6 +278,10 @@ normalization, repeated-text matching, evidence thresholds, expiry, suppression,
 and review transitions. `tests/note-suggestion.resolver.test.ts` pairs its boundary
 checks. Shared `services/note-shortcut.service` orchestrates the owner-scoped
 `NoteShortcutStore`; web and desktop adapters perform atomic reads and CAS writes.
+Since Ticket 305 `noteShortcutsEnabled` owns the default-on rule (an absent global
+state is on; the per-Behavior flag never gates), and the shared service's
+`matchRepeatedNoteShortcuts` runs the same analysis after a Note save, writing only
+when current entries change. Native and SQL commit gates mirror that rule.
 UI, API, repositories, and native code must not independently derive patterns.
 No network, storage, environment, clock reads, or UI may enter this resolver.
 

@@ -1364,11 +1364,6 @@
       "reason": "Behavior shortcut commands need isolated owner, revision, suppression, and sync verification."
     },
     {
-      "id": "INT-SETTINGS-014",
-      "classification": "destructive_serial_only",
-      "reason": "Global shortcut settings need isolated owner and stale-revision verification."
-    },
-    {
       "id": "INT-CALENDAR-001",
       "classification": "external_provider",
       "reason": "Calendar provider consent and external reads require separate synthetic provider authorization."
