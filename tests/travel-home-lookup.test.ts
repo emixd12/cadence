@@ -333,7 +333,7 @@ describe("Home lookup client and rate limit repository", () => {
 describe("Home lookup rate limit migration", () => {
   it("widens the launch rate limit to travel_home_lookup at five per hour and keeps the other actions", async () => {
     const { readFileSync } = await import("node:fs");
-    const sql = readFileSync("supabase/migrations/20261110160800_travel_home_lookup_rate_limit.sql", "utf8").toLowerCase();
+    const sql = readFileSync("supabase/migrations/20261110155000_travel_home_lookup_rate_limit.sql", "utf8").toLowerCase();
     expect(sql).toContain("check (action in ('export_download', 'push_subscription_registration', 'travel_home_lookup'))");
     expect(sql).toContain("limit_count := 6;");
     expect(sql).toMatch(/if p_action = 'travel_home_lookup' then\s+limit_count := 5;\s+window_seconds := 3600;/);

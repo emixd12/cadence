@@ -1848,7 +1848,7 @@ Do not log Notes, shortcut text, evidence hashes, provider payloads, or account 
 Record aggregate synthetic checks and sanitized failures only.
 
 Ticket 305 adds `20261110153050_allow_default_on_note_shortcuts.sql` (commit gate
-only) and `20261110153051_turn_on_note_shortcuts_once.sql` (a once-only data change
+only) and `20261110170000_turn_on_note_shortcuts_once.sql` (a once-only data change
 that turns stored global off switches on; not additive), plus SQLite migration 0022.
 Web code that matches after a save needs the first migration on the hosted database
 before it deploys. Fixture: `tests/sql/ticket-305-note-shortcuts-default-on.sql`.

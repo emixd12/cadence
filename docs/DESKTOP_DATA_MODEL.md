@@ -2,7 +2,7 @@
 
 Schema version 22 turns Note shortcuts on by default (Ticket 305). Migration
 `0022_note_shortcuts_on_by_default.sql` sets a stored global `enabled = 0` to 1 once,
-matching hosted `20261110153051_turn_on_note_shortcuts_once.sql`, and leaves `revision`
+matching hosted `20261110170000_turn_on_note_shortcuts_once.sql`, and leaves `revision`
 and `updated_at` unchanged so a linked Mac and the hosted row converge without a
 conflict. The native commit treats an absent global row as on and no longer checks the
 per-Behavior flag. Rust tests `note_shortcuts_are_on_by_default_and_keep_the_global_switch`

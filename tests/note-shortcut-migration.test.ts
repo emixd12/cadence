@@ -41,7 +41,7 @@ describe("Ticket 305 Note shortcuts on by default", () => {
     "utf8",
   );
   const gate = read("20261110153050_allow_default_on_note_shortcuts.sql");
-  const flip = read("20261110153051_turn_on_note_shortcuts_once.sql");
+  const flip = read("20261110170000_turn_on_note_shortcuts_once.sql");
   const desktop = readFileSync(
     new URL("../apps/desktop/src-tauri/migrations/0022_note_shortcuts_on_by_default.sql", import.meta.url),
     "utf8",

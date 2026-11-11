@@ -2120,7 +2120,7 @@ Since Ticket 305 an absent global state means on, and only a stored global
 `enabled = false` turns the feature off. Behavior rows keep `enabled` for storage
 and synchronization, but it no longer gates matching or quick-fill. Migration
 `20261110153050_allow_default_on_note_shortcuts.sql` replaces only the enablement
-gate of `commit_note_shortcut_state`; `20261110153051_turn_on_note_shortcuts_once.sql`
+gate of `commit_note_shortcut_state`; `20261110170000_turn_on_note_shortcuts_once.sql`
 sets every stored global `enabled = false` to true once, leaving `revision` and
 `updated_at` unchanged so it converges with desktop SQLite migration 0022 without a
 sync conflict. Arrays, enum values, IDs, lengths, and ownership

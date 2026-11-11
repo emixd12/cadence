@@ -1034,7 +1034,7 @@ stored global switch remains so the control can return: an absent switch means o
 and a stored off value hides quick-fill and proposals and rejects new analysis while
 removals remain available. Off preserves accepted shortcuts and historical Notes.
 Accounts and local Mac profiles that had turned the switch off are turned on once
-(hosted migration `20261110153051_turn_on_note_shortcuts_once.sql`, SQLite migration
+(hosted migration `20261110170000_turn_on_note_shortcuts_once.sql`, SQLite migration
 0022; P-034). The per-Behavior `enabled` field persists and synchronizes but no
 longer gates anything. Neither is provider consent. Matching runs only after a Note
 save in the app; MCP Note writes, imports, opening a Note, schedules and background

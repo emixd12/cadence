@@ -92,7 +92,7 @@ $$;
 
 reset role;
 
--- Mirrors supabase/migrations/20261110153051_turn_on_note_shortcuts_once.sql
+-- Mirrors supabase/migrations/20261110170000_turn_on_note_shortcuts_once.sql
 -- (tests/note-shortcut-migration.test.ts pins that file to this statement).
 update public.note_shortcut_states
 set enabled = true
