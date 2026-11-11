@@ -24,6 +24,12 @@ config. Local `db reset` therefore did not run there, even though Docker Desktop
 running (CLI at `~/.docker/bin/docker`, context `desktop-linux`; that directory may be
 missing from an agent shell's PATH). Agents replayed the migrations in a throwaway
 `supabase/postgres` container under Docker Desktop instead, and CI runs the real CLI.
+The registry tarball for 2.105.0 has the same bytes and the same invalid signature. For
+hosted read-only commands, an agent ran an ad-hoc signed copy outside the repository:
+`npm pack @supabase/cli-darwin-arm64@2.105.0` into the scratchpad, `codesign --force -s -`
+on that copy, then `npm run agent:secret -- --env SUPABASE_ACCESS_TOKEN=supabase-access-token
+-- <copy> migration list`. A new worktree also needs the gitignored link files in
+`supabase/.temp/` (copy them from a linked checkout).
 
 Examples:
 
