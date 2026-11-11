@@ -1,5 +1,6 @@
 import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
+import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import type { CalendarConnectionView } from "@/lib/types/google-calendar";
 
@@ -131,4 +132,17 @@ export function connectorUnavailableSectionState(reason: "local" | "build" | nul
 export function categoriesSectionState(count: number): SettingsSectionState {
   if (count === 0) return state("No categories", false);
   return state(`${count} ${count === 1 ? "category" : "categories"}`, true);
+}
+
+/**
+ * Ticket 292: the day-note shortcut pool, on by default like Behavior pools (Ticket 305).
+ * Suggestions wait for Accept, so they are counted but never force the drawer open.
+ */
+export function dayNoteShortcutsSectionState(view: NoteShortcutView): SettingsSectionState {
+  if (view.unavailable) return SETTINGS_SECTION_UNAVAILABLE;
+  if (!view.globalEnabled) return state("Off for this account", false);
+  const suggested = view.entries.filter((entry) => entry.status === "proposed").length;
+  const accepted = view.entries.filter((entry) => entry.status === "accepted").length;
+  const parts = [suggested ? `${suggested} suggested` : null, accepted ? `${accepted} accepted` : null].filter(Boolean);
+  return state(parts.length ? `On · ${parts.join(" · ")}` : "On", true);
 }

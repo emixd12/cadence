@@ -30,6 +30,8 @@ localDescribe("integration reads with two isolated accounts", () => {
   let behaviorB: string;
   let occurrenceA: string;
   let occurrenceB: string;
+  let dayNoteA: string;
+  let dayNoteB: string;
   let today: string;
   let beforeA: unknown;
 
@@ -66,10 +68,14 @@ localDescribe("integration reads with two isolated accounts", () => {
         status: "completed", completed_at: "2000-01-02T15:00:00Z", status_marked_at: "2000-01-02T15:00:00Z", note: `Private note ${label}`,
       }).select("id").single();
       if (history.error) throw history.error;
-      return { context, behaviorId: behavior.id, occurrenceId: history.data!.id };
+      const dayNote = await context.supabase.rpc("save_day_note", {
+        target_local_date: "2000-01-02", expected_note: null as unknown as string, next_note: `Private day ${label}`,
+      }).single();
+      if (dayNote.error) throw dayNote.error;
+      return { context, behaviorId: behavior.id, occurrenceId: history.data!.id, dayNoteId: (dayNote.data as { id: string }).id };
     }
-    const first = await setup("A"); a = first.context; behaviorA = first.behaviorId; occurrenceA = first.occurrenceId;
-    const second = await setup("B"); b = second.context; behaviorB = second.behaviorId; occurrenceB = second.occurrenceId;
+    const first = await setup("A"); a = first.context; behaviorA = first.behaviorId; occurrenceA = first.occurrenceId; dayNoteA = first.dayNoteId;
+    const second = await setup("B"); b = second.context; behaviorB = second.behaviorId; occurrenceB = second.occurrenceId; dayNoteB = second.dayNoteId;
     today = Temporal.Instant.from(a.now.toISOString()).toZonedDateTimeISO("America/New_York").toPlainDate().toString();
     beforeA = (await a.supabase.from("behaviors").select("*").eq("id", behaviorA).single()).data;
   }, 60_000);
@@ -94,7 +100,7 @@ localDescribe("integration reads with two isolated accounts", () => {
       expect(result.ok, `${name}: ${JSON.stringify(result)}`).toBe(true);
       if (result.ok) expect(validateOperationOutput(name, result.value).ok).toBe(true);
       const serialized = JSON.stringify(result);
-      for (const privateValue of [b.userId, behaviorB, occurrenceB, "Private note B"]) expect(serialized).not.toContain(privateValue);
+      for (const privateValue of [b.userId, behaviorB, occurrenceB, "Private note B", dayNoteB, "Private day B"]) expect(serialized).not.toContain(privateValue);
     }
     const after = await a.supabase.from("behaviors").select("*").eq("id", behaviorA).single();
     expect(after.data).toEqual(beforeA);
@@ -105,9 +111,19 @@ localDescribe("integration reads with two isolated accounts", () => {
   it("refuses direct reads and fetches for the other account", async () => {
     for (const [name, input] of [
       ["get_behavior", { behavior_id: behaviorB }], ["get_occurrence", { occurrence_id: occurrenceB }],
-      ["fetch", { id: `behavior:${behaviorB}` }], ["fetch", { id: `occurrence:${occurrenceB}` }],
+      ["fetch", { id: `behavior:${behaviorB}` }], ["fetch", { id: `occurrence:${occurrenceB}` }], ["fetch", { id: `day_note:${dayNoteB}` }],
     ] as const) expect(await readOperationHandlers[name](a, input)).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(await readOperationHandlers.list_behaviors(a, { category_id: randomUUID() })).toMatchObject({ ok: true, value: { behaviors: [] } });
+  });
+
+  it("searches and fetches only the grant user's day notes", async () => {
+    const found = await readOperationHandlers.search(a, { query: "Private day" });
+    expect(found).toMatchObject({ ok: true, value: { results: [{ id: `day_note:${dayNoteA}`, title: "Day note for 2000-01-02" }] } });
+    if (found.ok) expect(found.value.results).toHaveLength(1);
+    const fetched = await readOperationHandlers.fetch(a, { id: `day_note:${dayNoteA}` });
+    expect(fetched).toMatchObject({ ok: true, value: { metadata: { kind: "day_note", local_date: "2000-01-02" } } });
+    if (fetched.ok) expect(JSON.parse(fetched.value.text)).toMatchObject({ id: dayNoteA, note: "Private day A" });
+    expect(JSON.stringify(fetched)).not.toContain("Private day B");
   });
 
   it("keeps pairwise references client-specific and both accounts readable", async () => {

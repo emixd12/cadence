@@ -319,12 +319,13 @@
       "exportName": "NoteShortcutSettings",
       "usageNames": [
         "NoteShortcutSettings",
-        "GlobalNoteShortcutControl"
+        "GlobalNoteShortcutControl",
+        "DayNoteShortcutSettings"
       ],
       "benchAnchor": "design-system#ds-module-note-shortcut-controls",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Behavior-scoped review controls and the global Note shortcuts setting."
+      "notes": "Behavior-scoped review controls, the retained global Note shortcuts setting (not rendered since Ticket 305), and the day-note shortcut pool in its Settings drawer (Ticket 292)."
     },
     {
       "id": "module.needs-decision-dialog",

@@ -10,7 +10,7 @@ function registeredContracts(): number[] {
   const contracts: number[] = [];
   for (const file of readdirSync(migrations).filter((name) => name.endsWith(".sql")).sort()) {
     const sql = readFileSync(join(migrations, file), "utf8");
-    for (const insert of sql.matchAll(/insert into cadence_private\.account_sync_contract_additions[^;]*;/g)) {
+    for (const insert of sql.matchAll(/insert into cadence_private\.account_sync_contract_(?:additions|rows)[^;]*;/g)) {
       for (const row of insert[0].matchAll(/\(\s*(\d+)\s*,\s*'[a-z_]+'/g)) contracts.push(Number(row[1]));
     }
   }

@@ -109,6 +109,11 @@ are implemented. The registry is authoritative.
   default with no Settings or per-Behavior switch; matching runs after each Note save
   in the local Note action. Proposals, accepted quick-fill buttons, and local
   deterministic matching stay available offline. Linking synchronizes shortcut state without enabling cloud analysis.
+- Day note shortcuts (Ticket 292) use the shared `DayNoteShortcutSettings` in a Day note
+  shortcuts drawer in General, after Categories, as on web. They follow Ticket 305: on by
+  default, matched after each day note save, and gated only by the stored account switch.
+  Accepted ones appear as chips only in the day-note editor. Matching reads local day
+  notes in SQLite schema 23. Linking synchronizes the pool under account sync contract 4.
 
 See `docs/PRODUCT_SPEC.md`, `docs/RECURRENCE_RULES.md`,
 `docs/DATETIME_STRATEGY.md`, and `docs/EXPORT_FORMATS.md` for exact semantics.

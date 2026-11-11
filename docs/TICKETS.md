@@ -17158,8 +17158,10 @@ Scope and acceptance:
   date. It opens the shared `NoteEditor`, the same editor Occurrence notes use, with
   the same compare-and-set, shortcut chips and unsaved-draft handling.
 - Note shortcuts: a `day_notes` pool learns only from repeated day notes, appears only
-  in the day-note editor, and follows the global Note shortcuts switch. Settings
-  manages it. Evidence and exclusion IDs in this pool are day-note IDs.
+  in the day-note editor, and follows the global Note shortcuts switch. Like Behavior
+  pools it is on by default and matched after each save (Ticket 305). Settings reviews it
+  in a Day note shortcuts drawer in General. Evidence and exclusion IDs in this pool are
+  day-note IDs.
 - Desktop: SQLite migration, DataStore methods and native store commands for local
   day notes; account sync adds the `day_note` kind under sync contract 3.
 - MCP: `list_day_notes` (read) and `update_day_note` (write, `cadence.occurrences.write`),

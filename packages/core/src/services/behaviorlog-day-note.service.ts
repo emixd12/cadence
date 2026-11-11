@@ -1,0 +1,89 @@
+import type { DayNoteDataStore } from "../data-store";
+import {
+  behaviorLogDayNoteDateRange,
+  planBehaviorLogDayNoteWrites,
+  previewBehaviorLogDayNoteOutcome,
+  readBehaviorLogDayNoteReviews,
+  unavailableBehaviorLogDayNoteOutcome,
+  type BehaviorLogDayNoteMode,
+  type BehaviorLogDayNoteOutcome,
+  type BehaviorLogDayNotePlan,
+} from "../resolvers/behaviorlog-day-note.resolver";
+
+type BundleFile = Readonly<{ path: string; content: string }>;
+
+/** `replaceDifferent: false` keeps a different saved note (retried restore). */
+export type BehaviorLogDayNoteOptions = Readonly<{ replaceDifferent?: boolean }>;
+
+/**
+ * Ticket 292: plans day-note writes for a BehaviorLog import or restore against
+ * the saved notes. Returns null when the bundle has no Cadence day notes.
+ */
+export async function planBehaviorLogDayNotes(
+  store: Pick<DayNoteDataStore, "listDayNotes">,
+  files: readonly BundleFile[],
+  mode: BehaviorLogDayNoteMode,
+  options: BehaviorLogDayNoteOptions = {},
+): Promise<BehaviorLogDayNotePlan | null> {
+  const read = readBehaviorLogDayNoteReviews(files);
+  if (!read.reviews.length && !read.skipped.length) return null;
+  const range = behaviorLogDayNoteDateRange(read);
+  const existing = range ? await store.listDayNotes(range) : [];
+  return planBehaviorLogDayNoteWrites({ read, existing, mode, replaceDifferent: options.replaceDifferent });
+}
+
+export async function previewBehaviorLogDayNotes(
+  store: Pick<DayNoteDataStore, "listDayNotes">,
+  files: readonly BundleFile[],
+  mode: BehaviorLogDayNoteMode,
+): Promise<BehaviorLogDayNoteOutcome | null> {
+  let plan: BehaviorLogDayNotePlan | null;
+  try {
+    plan = await planBehaviorLogDayNotes(store, files, mode);
+  } catch {
+    return unavailableBehaviorLogDayNoteOutcome(mode);
+  }
+  return plan ? previewBehaviorLogDayNoteOutcome(plan) : null;
+}
+
+/**
+ * Saves planned day notes after the main import or restore commits. Each save
+ * compares and sets the stored note, so a note changed since the plan is
+ * reported as a conflict instead of being overwritten. A failed save is
+ * reported by date; it does not undo the committed import. This function never
+ * throws: a failed read of the saved notes returns an unavailable outcome, so the
+ * caller can still report the committed import or restore as applied.
+ */
+export async function applyBehaviorLogDayNotes(
+  store: DayNoteDataStore,
+  files: readonly BundleFile[],
+  mode: BehaviorLogDayNoteMode,
+  options: BehaviorLogDayNoteOptions = {},
+): Promise<BehaviorLogDayNoteOutcome | null> {
+  let plan: BehaviorLogDayNotePlan | null;
+  try {
+    plan = await planBehaviorLogDayNotes(store, files, mode, options);
+  } catch {
+    return unavailableBehaviorLogDayNoteOutcome(mode);
+  }
+  if (!plan) return null;
+  const outcome = { mode, unavailable: false, saved: { create: 0, replace: 0 }, kept: 0, conflictDates: [] as string[], failedDates: [] as string[], skippedCount: plan.skipped.length };
+  for (const action of plan.actions) {
+    if (action.action === "keep") {
+      outcome.kept++;
+      continue;
+    }
+    if (action.action === "conflict") {
+      outcome.conflictDates.push(action.localDate);
+      continue;
+    }
+    try {
+      const record = await store.saveDayNote({ localDate: action.localDate, expectedNote: action.existingNote, note: action.note });
+      if (record) outcome.saved[action.action]++;
+      else outcome.conflictDates.push(action.localDate);
+    } catch {
+      outcome.failedDates.push(action.localDate);
+    }
+  }
+  return outcome;
+}

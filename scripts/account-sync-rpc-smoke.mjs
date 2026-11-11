@@ -91,7 +91,19 @@ try {
   assert(!(await readSnapshot(clients[0])).entities.some((row) => row.kind === "day_note"), "contract 2 omits day notes");
   assert(!(await readSnapshot(clients[1], 3)).entities.some((row) => row.kind === "day_note"), "day notes stay with their owner");
   assert(c3.fingerprint === entityDigest(c3.entities), "contract 3 fingerprint covers its projection");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 4 }), "unknown read contract");
+  // Contract 4 adds the day_notes Note shortcut state (Ticket 292); contracts 1-3 never see it.
+  const dayPoolContext = await applied(clients[0].rpc("read_day_note_shortcut_context"));
+  await applied(clients[0].rpc("commit_note_shortcut_state", { expected_context: dayPoolContext, require_enabled: false, next_state: {
+    id: "day_notes", user_id: users[0].id, behavior_id: null, enabled: true, entries: [], excluded_occurrence_ids: [],
+    revision: 1, updated_at: "2026-09-01T06:05:00.000Z" } }));
+  const isDayPool = (row) => row.kind === "note_shortcut_state" && row.id === "day_notes";
+  const c4 = await readSnapshot(clients[0], 4);
+  assert(c4.entities.some((row) => isDayPool(row) && row.value.enabled === true && row.value.behavior_id === null), "contract 4 shows the day-note shortcut pool");
+  for (const contract of [null, 1, 2, 3]) assert(!(await readSnapshot(clients[0], contract)).entities.some(isDayPool), `contract ${contract ?? 1} omits the day-note shortcut pool`);
+  assert((await readSnapshot(clients[0], 3)).fingerprint === c3.fingerprint, "the day-note shortcut pool leaves the contract 3 fingerprint unchanged");
+  assert(!(await readSnapshot(clients[1], 4)).entities.some(isDayPool), "the day-note shortcut pool stays with its owner");
+  assert(c4.fingerprint === entityDigest(c4.entities), "contract 4 fingerprint covers its projection");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 5 }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
@@ -99,7 +111,7 @@ try {
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: { ...c1Value, travel_place_modes: [] } }], "c1a1".repeat(16)) }),
     "contract 1 cannot write a later field");
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c4c4".repeat(16)), contract: 4 } }), "unknown apply contract");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c5c5".repeat(16)), contract: 5 } }), "unknown apply contract");
   const c1Result = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
   assert(c1Result.fingerprint === entityDigest(c1Merged) && c1Result.snapshot.entities.length === legacy.entities.length, "contract 1 apply returns its projection");
@@ -278,7 +290,7 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection and preserving writes, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection and preserving writes, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }

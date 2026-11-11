@@ -127,6 +127,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "note_shortcuts_on_by_default",
         include_str!("../../migrations/0022_note_shortcuts_on_by_default.sql"),
     ),
+    (
+        23,
+        "day_note_shortcut_pool",
+        include_str!("../../migrations/0023_day_note_shortcut_pool.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {
@@ -621,9 +626,12 @@ pub fn owned<T: StoredRow>(db: &Connection, profile_id: &str) -> Result<Vec<T>> 
     )
 }
 
+/// The day-note Note shortcuts pool (Ticket 292); its exclusions are day-note IDs.
+pub const DAY_NOTE_SHORTCUT_POOL_ID: &str = "day_notes";
+
 /// Rows whose ID is a fixed or derived name rather than a UUID.
 pub fn named_row_id(table: &str, id: &str) -> bool {
-    (table == "note_shortcut_states" && id == "global")
+    (table == "note_shortcut_states" && (id == "global" || id == DAY_NOTE_SHORTCUT_POOL_ID))
         || (table == "place_label_settings" && id == "place_labels")
         || (table == "place_markers" && valid_place_ref(id))
 }
@@ -842,6 +850,10 @@ fn validate_note_shortcut_state(value: &Value) -> Result<()> {
                 .is_none_or(|rows| !rows.is_empty())
         {
             return Err("Global Note shortcut state cannot contain Behavior data.".into());
+        }
+    } else if id == DAY_NOTE_SHORTCUT_POOL_ID {
+        if !object["behavior_id"].is_null() {
+            return Err("The day note shortcut state cannot belong to a Behavior.".into());
         }
     } else if behavior_id != Some(id) {
         return Err("A Note shortcut state must match its Behavior.".into());

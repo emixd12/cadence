@@ -476,6 +476,8 @@ pub enum Request {
         local_date: String,
         expected_note: Option<String>,
         note: Option<String>,
+        #[serde(default)]
+        used_shortcut: Option<bool>,
     },
     CommitNoteShortcutState {
         profile_id: String,
@@ -907,8 +909,18 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             local_date,
             expected_note,
             note,
+            used_shortcut,
             ..
-        } => day_note::save(db, profile_id, now, new_id, local_date, expected_note, note),
+        } => day_note::save(
+            db,
+            profile_id,
+            now,
+            new_id,
+            local_date,
+            expected_note,
+            note,
+            used_shortcut == &Some(true),
+        ),
         Request::CommitNoteShortcutState {
             profile_id,
             now,

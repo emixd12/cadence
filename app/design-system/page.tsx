@@ -42,7 +42,9 @@ import {
   ScreenContentLoading,
   ScreenFrame,
 } from "@/components/layout/ScreenFrame";
-import { NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUTS_PURPOSE, DayNoteShortcutSettings, NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { SettingsDrawer } from "@/components/settings/SettingsSections";
+import { dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
 import {
   AccountDeletionPanel,
   type DeleteAccountAction,
@@ -1333,6 +1335,14 @@ const noteShortcutViewFixture: NoteShortcutView = {
   available: true,
   entries: noteShortcutFixture,
 };
+const dayNoteShortcutViewFixture: NoteShortcutView = {
+  ...noteShortcutViewFixture,
+  state: { ...noteShortcutViewFixture.state!, id: "day_notes", behavior_id: null },
+  entries: [
+    { ...noteShortcutFixture[0], key: "travel-day-shortcut", text: "Travel day." },
+    { ...noteShortcutFixture[0], key: "rest-day-proposal", text: "Rest day.", status: "proposed", expires_at: "2026-10-07T00:00:00Z" },
+  ],
+};
 const noteShortcutAction: NoteShortcutAction = async () => ({
   status: "success",
   message: "Note shortcut saved.",
@@ -1812,6 +1822,10 @@ const previewFactories: Record<
   "module.note-shortcut-controls": () => (
       <ProductPreview>
         <NoteShortcutSettings behaviorId="bench-behavior" view={noteShortcutViewFixture} action={noteShortcutAction} />
+        <SettingsDrawer title="Day note shortcuts" description={DAY_NOTE_SHORTCUTS_PURPOSE} label="Day note shortcuts"
+          state={dayNoteShortcutsSectionState(dayNoteShortcutViewFixture)}>
+          <DayNoteShortcutSettings view={dayNoteShortcutViewFixture} action={noteShortcutAction} />
+        </SettingsDrawer>
       </ProductPreview>
     ),
   "module.needs-decision-dialog": () => (

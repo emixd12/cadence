@@ -1871,7 +1871,9 @@ Plan: `docs/plans/2026-10-27-sync-compatibility.md`. Applied to hosted on Octobe
 2026.
 
 - `cadence_private.account_sync_contract_additions(contract, kind, field,
-  default_value)` lists what each contract after 1 adds. A row with no `field`
+  default_value)` lists what each contract after 1 adds. Contract 4 adds one row
+  of an existing kind instead, in `cadence_private.account_sync_contract_rows`
+  (see "Day-note shortcut pool (Ticket 292)"). A row with no `field`
   adds a whole entity kind. Each added field has a `default_value`, which is used
   when no stored value exists. Contract 1 is the desktop 0.1.5 shape (SQLite
   schema 18). Contract 2 adds five Ticket 217 travel-habit profile keys and the
@@ -2215,6 +2217,51 @@ deletes day notes. A day note has no status, Behavior or Occurrence reference an
 never feeds adherence, Needs decision, reminders or analytics. Migration:
 `20261110120000_day_notes.sql`; local check `tests/sql/ticket-292-day-notes.sql`.
 Desktop mirrors the table in SQLite (`docs/DESKTOP_DATA_MODEL.md`).
+
+### Day-note shortcut pool (Ticket 292)
+
+Migration `20261111120000_day_note_shortcut_pool.sql` lets `note_shortcut_states`
+hold one more row per user: `id = 'day_notes'` with a null `behavior_id`. RLS and
+grants are unchanged. The row uses the same entry, bound and expiry rules as a
+Behavior pool, but its evidence `occurrence_id` values and `excluded_occurrence_ids`
+are day-note IDs; the field names stay so storage, validators and sync keep one
+shape. `public.read_day_note_shortcut_context()` returns the owner's non-empty day
+notes (`behavior_id` and `scheduled_for` null), an empty `importedOccurrenceIds`
+list, and a `dayPool` object with the owner and profile timezone for the 90-day
+window. Day-note import and restore write no provenance mappings, so imported day
+notes count as evidence like typed ones. `public.commit_note_shortcut_state` accepts the
+`day_notes` target with that six-key context. It replaces Ticket 305's definition
+(`20261110153050`) and keeps its rule for the day pool: on by default, and only a stored
+global off switch rejects matching, accept and edit; the pool's own `enabled` flag does not
+gate. Ticket 305's one-time turn-on (`20261110170000`) touches only `id = 'global'`
+and runs before this migration, so no day-pool row exists for it to change. `public.save_day_note_with_shortcut` saves a
+shortcut-assisted day note through `save_day_note` and adds its ID to the pool's
+exclusions in one transaction. Behavior contexts never return day notes, and
+Occurrence notes never read the day pool. Local check
+`tests/sql/ticket-292-day-note-shortcuts.sql`.
+
+Account sync contracts 1–3 never carry the day pool. Shipped Mac builds reject a
+Note shortcut state whose ID is not `global` or a Behavior UUID. Migration
+`20261111120000` first filtered `id <> 'day_notes'` out of the `note_shortcut_state`
+union in `cadence_private.account_sync_snapshot()`. Migration
+`20261111130000_account_sync_day_note_shortcut_pool.sql` (Ticket 292's desktop slice)
+removes that filter and adds sync contract 4:
+
+- `cadence_private.account_sync_contract_rows(contract, kind, id)` lists single rows
+  of an existing kind that a contract adds. Its one row is
+  `(4, 'note_shortcut_state', 'day_notes')`. Only the migration owner writes it;
+  `authenticated` can read it.
+- `account_sync_current_contract()` is the highest contract in either registry, now 4.
+- `project_account_sync_snapshot` also drops a registered row for contracts below
+  its contract, so reads, apply comparisons, receipts and fingerprints for
+  contracts 1–3 still leave it out.
+- `apply_account_sync_plan` rejects any write to a registered row from a lower
+  contract, and accepts the `day_notes` Note shortcut state ID only from contract 4.
+  That write must keep a null `behavior_id`.
+
+The Mac app mirrors the row in SQLite schema 23 (`docs/DESKTOP_DATA_MODEL.md`).
+Local checks `tests/sql/ticket-292-day-note-shortcut-sync.sql` and the account-sync
+contract fixtures.
 
 ## Google Calendar connector (Ticket 134)
 
