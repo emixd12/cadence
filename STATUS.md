@@ -123,9 +123,12 @@ acceptance has not run.
   `dpl_bBUrdzM6kWmewcW7W8YsHXvXom5M` (marketing at `58efe857`; the value had named a
   November 8 deployment) and redeployed the app; production is Ready. This ledger PR's
   merge stales it again.
-- **Not run:** repo `npm run supabase -- db reset`. The pinned CLI binary fails macOS
-  code-signature validation and is killed (exit 137), and Docker is not installed on this
-  Mac. CI and throwaway-container replays of all 112 migrations cover it.
+- **Not run:** repo `npm run supabase -- db reset`, because the pinned CLI binary fails
+  macOS code-signature validation and macOS kills it (exit 137) before it reaches Docker.
+  Docker Desktop 29.9.3 is installed and running (context `desktop-linux`, CLI at
+  `~/.docker/bin/docker`, not on the agent shell's PATH); earlier agents used it to replay
+  all 112 migrations in a throwaway `supabase/postgres` 17.6 container, and CI runs the real
+  CLI. `dagger check` was not run for this ledger PR; the agent ran the npm checks instead.
 - **Follow-ups logged** in `docs/FUTURE_UPDATES.md`: re-import after a failed day-note
   step, and shortcut evidence limited to past and current days.
 
