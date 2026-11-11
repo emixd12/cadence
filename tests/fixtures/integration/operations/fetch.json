@@ -12,6 +12,12 @@
       "value": {
         "id": "occurrence:00000005-1111-4111-8111-000000000005"
       }
+    },
+    {
+      "name": "day note id",
+      "value": {
+        "id": "day_note:00000009-1111-4111-8111-000000000009"
+      }
     }
   ],
   "invalid_inputs": [
@@ -19,6 +25,14 @@
       "name": "bare uuid",
       "value": {
         "id": "00000001-1111-4111-8111-000000000001"
+      },
+      "code": "invalid_input",
+      "path": "$.id"
+    },
+    {
+      "name": "unknown record kind",
+      "value": {
+        "id": "calendar:00000001-1111-4111-8111-000000000001"
       },
       "code": "invalid_input",
       "path": "$.id"
@@ -39,6 +53,19 @@
           "status": "completed"
         }
       }
+    },
+    {
+      "name": "day note",
+      "value": {
+        "id": "day_note:00000009-1111-4111-8111-000000000009",
+        "title": "Day note for 2026-10-18",
+        "text": "{\n  \"id\": \"00000009-1111-4111-8111-000000000009\",\n  \"local_date\": \"2026-10-18\",\n  \"note\": \"Travel day\",\n  \"revision\": \"2026-10-18T22:00:00Z\",\n  \"updated_at\": \"2026-10-18T22:00:00Z\"\n}",
+        "url": "https://app.cadence-me.com/timeline",
+        "metadata": {
+          "kind": "day_note",
+          "local_date": "2026-10-18"
+        }
+      }
     }
   ],
   "invalid_outputs": [
@@ -55,6 +82,21 @@
       },
       "code": "internal_error",
       "path": "$.text"
+    },
+    {
+      "name": "unknown kind",
+      "value": {
+        "id": "day_note:00000009-1111-4111-8111-000000000009",
+        "title": "Day note for 2026-10-18",
+        "text": "Travel day",
+        "url": "https://app.cadence-me.com/timeline",
+        "metadata": {
+          "kind": "calendar",
+          "local_date": "2026-10-18"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.metadata.kind"
     }
   ]
 }

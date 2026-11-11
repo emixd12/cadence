@@ -8,13 +8,13 @@ import type { Occurrence } from "@/lib/types/database";
 
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), occurrences: vi.fn(), categories: vi.fn(), occurrence: vi.fn(),
-  events: vi.fn(), sessions: vi.fn(), references: vi.fn(), fresh: vi.fn(), sync: vi.fn(), dayNotes: vi.fn(),
+  events: vi.fn(), sessions: vi.fn(), references: vi.fn(), fresh: vi.fn(), sync: vi.fn(), dayNotes: vi.fn(), dayNote: vi.fn(),
 }));
-vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes }));
+vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes, listAllDayNotes: () => mocks.dayNotes() }));
 vi.mock("@/lib/services/behavior.service", () => ({ getBehaviorReadDataForUser: mocks.account }));
 vi.mock("@/lib/services/occurrence.service", () => ({ ensureUserOccurrencesFresh: mocks.fresh }));
 vi.mock("@/lib/services/occurrence-sync-state.service", () => ({ readOccurrenceSyncState: mocks.sync }));
-vi.mock("@/lib/db/integration-read.repo", () => ({ readIntegrationOccurrences: mocks.occurrences, readIntegrationCategories: mocks.categories }));
+vi.mock("@/lib/db/integration-read.repo", () => ({ readIntegrationOccurrences: mocks.occurrences, readIntegrationCategories: mocks.categories, readIntegrationDayNote: mocks.dayNote }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ getOccurrenceById: mocks.occurrence }));
 vi.mock("@/lib/db/occurrenceStatusEvents.repo", () => ({ listOccurrenceStatusEventsByOccurrenceIds: mocks.events }));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionsForOccurrence: mocks.sessions }));
@@ -64,6 +64,7 @@ beforeEach(() => {
     { id: id(60), user_id: id(1), local_date: "2026-03-08", note: "Travel day", revision: 2, created_at: at, updated_at: at },
     { id: id(61), user_id: id(1), local_date: "2026-03-07", note: null, revision: 3, created_at: at, updated_at: at },
   ]);
+  mocks.dayNote.mockImplementation(async (_client, _user, noteId) => ((await mocks.dayNotes()) as { id: string }[]).find((row) => row.id === noteId) ?? null);
   mocks.sync.mockResolvedValue({ stale: false, timezone: "America/New_York", last_synced_local_date: "2026-03-08", synced_through_local_date: "2026-04-07" });
 });
 
@@ -228,5 +229,20 @@ describe("integration read handlers", () => {
     const fetched = await readOperationHandlers.fetch(context, { id: `behavior:${id(10)}` });
     expect(fetched.ok).toBe(true);
     if (fetched.ok) expect(JSON.parse(fetched.value.text)).toMatchObject({ title: "Walk", location_text: "Park", archive_notes: [{ note: "Winter rest" }] });
+  });
+
+  it("searches and fetches day notes as their own record kind, never cleared ones", async () => {
+    const search = await readOperationHandlers.search(context, { query: "travel" });
+    expect(search).toEqual({ ok: true, value: { results: [{ id: `day_note:${id(60)}`, title: "Day note for 2026-03-08", url: "https://app.cadence-me.com/timeline" }] } });
+    mocks.account.mockClear();
+    const fetched = await readOperationHandlers.fetch(context, { id: `day_note:${id(60)}` });
+    expect(fetched).toMatchObject({ ok: true, value: { id: `day_note:${id(60)}`, metadata: { kind: "day_note", local_date: "2026-03-08" } } });
+    if (fetched.ok) {
+      expect(fetched.value.metadata).not.toHaveProperty("behavior_id");
+      expect(JSON.parse(fetched.value.text)).toEqual({ id: id(60), local_date: "2026-03-08", note: "Travel day", revision: at, updated_at: at });
+    }
+    expect(mocks.account).not.toHaveBeenCalled();
+    expect(await readOperationHandlers.fetch(context, { id: `day_note:${id(61)}` })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(await readOperationHandlers.fetch(context, { id: `day_note:${id(99)}` })).toMatchObject({ ok: false, error: { code: "not_found" } });
   });
 });

@@ -1379,6 +1379,11 @@
       "reason": "Open Export is a plain link; Export page load is covered by the Export interactions."
     },
     {
+      "id": "INT-SETTINGS-018",
+      "classification": "destructive_serial_only",
+      "reason": "Day note shortcut review needs isolated owner and stale-revision verification."
+    },
+    {
       "id": "INT-CALENDAR-001",
       "classification": "external_provider",
       "reason": "Calendar provider consent and external reads require separate synthetic provider authorization."

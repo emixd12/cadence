@@ -126,7 +126,7 @@ fn apply_mode(
         db::valid_id(&write.id).or_else(|error| {
             if (matches!(write.kind, AccountSyncEntityKind::Profile) && write.id == "profile")
                 || (matches!(write.kind, AccountSyncEntityKind::NoteShortcutState)
-                    && write.id == "global")
+                    && (write.id == "global" || write.id == db::DAY_NOTE_SHORTCUT_POOL_ID))
                 || (matches!(write.kind, AccountSyncEntityKind::PlaceLabelSettings)
                     && write.id == "place_labels")
                 || (matches!(write.kind, AccountSyncEntityKind::PlaceMarker)
@@ -1380,6 +1380,56 @@ mod tests {
         )
         .unwrap();
         assert!(db::by_id::<NoteShortcutState>(&connection, &profile, "global").is_err());
+    }
+
+    #[test]
+    fn account_sync_round_trips_the_day_note_shortcut_pool() {
+        let (_directory, mut connection, profile, _category) = database();
+        let state = NoteShortcutState {
+            id: "day_notes".into(),
+            user_id: profile.clone(),
+            behavior_id: None,
+            enabled: true,
+            entries: vec![],
+            excluded_occurrence_ids: vec!["00000000-0000-4000-8000-000000000292".into()],
+            revision: 1,
+            updated_at: "2026-11-11T00:00:00.000000Z".into(),
+        };
+        let value = normalized(&state).unwrap();
+        let upsert = |expected: Option<Value>, value: Value| Request::ApplyAccountSync {
+            profile_id: profile.clone(),
+            writes: vec![AccountSyncWrite {
+                kind: AccountSyncEntityKind::NoteShortcutState,
+                id: "day_notes".into(),
+                operation: AccountSyncOperation::Upsert,
+                expected,
+                value: Some(value),
+            }],
+        };
+        execute(&mut connection, upsert(None, value.clone())).unwrap();
+        assert_eq!(
+            db::by_id::<NoteShortcutState>(&connection, &profile, "day_notes").unwrap(),
+            state
+        );
+        let mut tied = value.clone();
+        tied["behavior_id"] = json!("00000000-0000-4000-8000-000000000001");
+        tied["revision"] = json!(2);
+        assert!(execute(&mut connection, upsert(Some(value.clone()), tied)).is_err());
+        execute(
+            &mut connection,
+            Request::ApplyAccountSync {
+                profile_id: profile.clone(),
+                writes: vec![AccountSyncWrite {
+                    kind: AccountSyncEntityKind::NoteShortcutState,
+                    id: "day_notes".into(),
+                    operation: AccountSyncOperation::Delete,
+                    expected: Some(value),
+                    value: None,
+                }],
+            },
+        )
+        .unwrap();
+        assert!(db::by_id::<NoteShortcutState>(&connection, &profile, "day_notes").is_err());
     }
 
     #[test]

@@ -306,7 +306,8 @@ begin
     raise exception 'Account sync contract fields need a default: %', missing_default;
   end if;
 
-  if cadence_private.account_sync_current_contract() <> 3 then
+  -- Contract 4 adds no column or kind; it adds the day-note Note shortcut row (Ticket 292).
+  if cadence_private.account_sync_current_contract() <> 4 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -322,6 +323,19 @@ begin
       jsonb_build_object('kind', 'day_note', 'id', 'x', 'value', '{}'::jsonb)
     )), 2) -> 'entities' <> '[{"id": "profile", "kind": "profile", "value": {"timezone": "UTC"}}]'::jsonb then
     raise exception 'Contract 2 projection no longer hides the contract 3 day_note kind.';
+  end if;
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'note_shortcut_state', 'id', 'day_notes', 'value', '{}'::jsonb),
+      jsonb_build_object('kind', 'note_shortcut_state', 'id', 'global', 'value', '{}'::jsonb)
+    )), 3) -> 'entities' <> '[{"id": "global", "kind": "note_shortcut_state", "value": {}}]'::jsonb then
+    raise exception 'Contract 3 projection no longer hides the contract 4 day-note shortcut row.';
+  end if;
+  if jsonb_array_length(cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'note_shortcut_state', 'id', 'day_notes', 'value', '{}'::jsonb)
+    )), 4) -> 'entities') <> 1 then
+    raise exception 'Contract 4 projection hides the day-note shortcut row.';
   end if;
 end;
 $$;

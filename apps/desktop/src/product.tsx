@@ -19,7 +19,7 @@ import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPerm
 import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
-import { connectorUnavailableSectionState } from "@/lib/ui/settings-sections";
+import { connectorUnavailableSectionState, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
 import { desktopAccountSectionState } from "./account/account-section-state";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
@@ -35,7 +35,8 @@ import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
-import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DayNoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { SettingsScreen } from "./settings-screen";
 import { LocalExportScreen } from "./export-screen";
 import { hasPendingLocalCommands, localCommand } from "./local-store";
@@ -67,7 +68,7 @@ import { completedFirstLinkState, finishFirstAccountLink, finishReviewedFirstAcc
 
 type Bundle = { timeline: Awaited<ReturnType<typeof loadLocalTimeline>>;
   behaviors: Awaited<ReturnType<typeof getLocalBehaviorsPageData>>; hasImportRuns: boolean;
-  shortcuts: { accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
+  shortcuts: { day: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
 type SyncCompletion = Readonly<{ status: SyncStatus; localCurrent: boolean }>;
 const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "behaviors", "export", "settings"];
 
@@ -168,9 +169,10 @@ export function Product() {
           await archiveLifecycle.current;
           const timeline = await loadLocalTimeline(parameters.current.days, now);
           if (!mounted.current || current !== revision.current) continue;
-          const [behaviors, imports, accepted, behaviorViews] = await Promise.all([
+          const [behaviors, imports, day, accepted, behaviorViews] = await Promise.all([
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
             localCommand("readImportRuns", { profileId: timeline.profile.id, limit: 1 }),
+            getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), DAY_NOTE_SHORTCUT_POOL_ID, now),
             listAcceptedNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id)),
             Promise.all(timeline.behaviors.map(async (behavior) => [behavior.id, await getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), behavior.id, now)] as const)),
           ]);
@@ -187,7 +189,7 @@ export function Product() {
             if (mounted.current && current === revision.current && activation.current?.requestKey === requestedActivation.requestKey) setNotificationTarget(target);
           }
           if (mounted.current && current === revision.current) {
-            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { accepted, views: Object.fromEntries(behaviorViews) } });
+            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { day, accepted, views: Object.fromEntries(behaviorViews) } });
             setError("");
             successful = true;
             if (syncAfterRefresh.current) {
@@ -607,6 +609,8 @@ export function Product() {
           syncStatus, conflictCount: conflictReview?.conflicts.length ?? 0, firstLinkPending: Boolean(firstLink && !firstLink.complete) })}
         categoryCount={bundle.timeline.categories.length}
         onOpenExport={() => navigate("export")}
+        dayNoteShortcutControls={<DayNoteShortcutSettings view={bundle.shortcuts.day} action={noteShortcutAction} />}
+        dayNoteShortcutState={dayNoteShortcutsSectionState(bundle.shortcuts.day)}
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}

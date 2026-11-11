@@ -4,20 +4,13 @@ import { useRef, useState, useTransition, type KeyboardEvent, type PointerEvent 
 import { GripVertical } from "lucide-react";
 import { DesktopDraftGuard, DesktopFormDraftGuard } from "@/lib/desktop-draft";
 import { useSettingsHeading, type SettingsHeadingLevel } from "@/components/settings/settings-heading";
+import { CATEGORY_PANEL_PURPOSE, drawerLabel } from "@/lib/ui/settings-sections";
 import { categoryAssignmentSnapshot, type CategoryAssignment, categorySnapshot, CATEGORY_NAME_LIMIT, CATEGORY_DESCRIPTION_LIMIT,
   type ManagedCategory, type CategoryAction } from "@cadence/core/services/category.service";
 
 /** A local order shown while a move saves. It applies only while the categories still match `base`. */
 type OrderDraft = { base: string; ids: readonly string[] };
 type Drag = { id: string; pointerId: number; from: number };
-
-export const CATEGORY_PANEL_PURPOSE = "Group Behaviors your way. A category’s description shows in Behavior forms and exports.";
-
-/** The button that opens the category list (Ticket 304). */
-export function drawerLabel(count: number) {
-  if (count === 0) return "Add a category";
-  return count === 1 ? "Edit 1 category" : `Edit ${count} categories`;
-}
 
 /**
  * Ticket 304: a closed list with drag reordering. Standalone, the panel shows its title,

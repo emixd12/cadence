@@ -271,6 +271,14 @@ normalization, the character limit, read ranges, and Timeline attachment.
 UI, MCP handlers and repositories must not normalize or validate day notes
 themselves. The resolver has no I/O or clock access.
 
+`packages/core/src/resolvers/behaviorlog-day-note.resolver.ts` reads Cadence
+day-note `review` records from a BehaviorLog bundle and plans restore and import
+writes: import reports a different saved note as a conflict, restore replaces it.
+Shared `services/behaviorlog-day-note.service.ts` saves the plan through the
+`DayNoteDataStore` after the main import or restore commits; web and desktop
+import and restore services call it. Paired checks live in
+`tests/behaviorlog-day-note.resolver.test.ts`; rules in `docs/EXPORT_FORMATS.md`.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,
@@ -284,6 +292,12 @@ state is on; the per-Behavior flag never gates), and the shared service's
 when current entries change. Native and SQL commit gates mirror that rule.
 UI, API, repositories, and native code must not independently derive patterns.
 No network, storage, environment, clock reads, or UI may enter this resolver.
+The same resolver owns the day-note pool (Ticket 292, pool ID `day_notes`): its
+context carries `dayPool` (owner and timezone) instead of a Behavior, and it reads
+only day notes. It follows the same Ticket 305 gate: only a stored global off switch
+blocks it, and `matchRepeatedNoteShortcuts` accepts `day_notes` after a day-note save.
+`tests/day-note-shortcuts.test.ts` and `tests/local-day-note-shortcuts.test.ts` pair its
+window, threshold, expiry, limit, exclusion and default-on checks.
 
 ## Day-progress contract ownership (Tickets 132–137)
 

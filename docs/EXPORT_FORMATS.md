@@ -103,8 +103,20 @@ notes inside the export range, oldest date first. BehaviorLog writes each one to
 `summary_markdown` set to the note, and the `app.cadence` extension
 `{ "day_note": true, "updated_at_utc": … }`. The manifest lists the file with
 `#/$defs/Review`. JSONL, CSV and Markdown do not include day notes. The Mac app export includes the same
-records. Restore and import of these review records into day notes are still open in
-Ticket 292; until then an import keeps them out of Cadence data.
+records.
+
+Restore and import read these review records back into day notes on web and on the Mac
+app. Only reviews with the `app.cadence` extension `day_note: true`, `review_role:
+"user"`, one date and non-empty text count; other reviews stay outside Cadence data.
+Text uses day-note normalization and the 2,000-character limit. A date with two
+different day-note reviews is skipped. Preview reports how many day notes will be added
+or replaced. Day notes are saved after the main import or restore commits, one
+compare-and-set save per date, so they are not part of the import's database transaction.
+Import never overwrites a different saved note: it names those dates in the preview and
+the result and leaves the note unchanged. Restore replaces a different note on each date
+the bundle covers. Neither clears notes on dates the bundle does not cover, because an
+export can cover a date range or leave notes out. A save that fails is reported by date
+and does not undo the committed import. Applying the same bundle again changes nothing.
 
 Behavior definition and configuration history has a separate privacy posture
 from occurrence notes. Full JSON and BehaviorLog exports include full prior and

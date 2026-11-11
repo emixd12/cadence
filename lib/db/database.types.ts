@@ -2387,6 +2387,7 @@ export type Database = {
       }
       read_daily_brief_preferences: { Args: never; Returns: Json }
       read_daily_brief_tip_history: { Args: never; Returns: Json }
+      read_day_note_shortcut_context: { Args: never; Returns: Json }
       read_note_shortcut_context: {
         Args: { target_behavior_id: string }
         Returns: Json
@@ -2462,6 +2463,29 @@ export type Database = {
           expected_note: string
           next_note: string
           target_local_date: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          local_date: string
+          note: string | null
+          revision: number
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "day_notes"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      save_day_note_with_shortcut: {
+        Args: {
+          expected_note: string
+          next_note: string
+          target_local_date: string
+          used_shortcut: boolean
         }
         Returns: {
           created_at: string

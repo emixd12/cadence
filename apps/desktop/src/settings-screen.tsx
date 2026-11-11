@@ -5,12 +5,16 @@ import {
   TimezonePanel,
   type TimezoneUpdateAction,
 } from "@/components/settings/TimezonePanel";
-import { CATEGORY_PANEL_PURPOSE, drawerLabel } from "@/components/settings/CategoryPanel";
+import {
+  CATEGORY_PANEL_PURPOSE,
+  DAY_NOTE_SHORTCUTS_PURPOSE,
+  SETTINGS_DAILY_BRIEF_PURPOSE,
+  SETTINGS_TRAVEL_PURPOSE,
+  drawerLabel,
+} from "@/lib/ui/settings-sections";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import {
   DESKTOP_SETTINGS_GROUPS,
-  SETTINGS_DAILY_BRIEF_PURPOSE,
-  SETTINGS_TRAVEL_PURPOSE,
   SettingsDrawer,
   SettingsExportEntry,
   SettingsGroup,
@@ -51,6 +55,9 @@ export type SettingsScreenProps = Readonly<{
   categoryControls?: ReactNode;
   /** Shown as the Categories drawer state; omit to render `categoryControls` on its own. */
   categoryCount?: number;
+  /** Ticket 292: reviews the day-note shortcut pool in a General drawer. */
+  dayNoteShortcutControls?: ReactNode;
+  dayNoteShortcutState?: SettingsSectionState;
   /** The Cadence account drawer's state line (`desktopAccountSectionState`). */
   accountState?: SettingsSectionState;
   /** A fixed Daily Brief state when its panel cannot load, such as on a local Mac. */
@@ -92,6 +99,8 @@ export function SettingsScreen({
   travelControls,
   categoryControls,
   categoryCount,
+  dayNoteShortcutControls,
+  dayNoteShortcutState,
   accountState,
   dailyBriefState,
   shellCue = false,
@@ -144,6 +153,16 @@ export function SettingsScreen({
               {categoryControls}
             </SettingsDrawer>
           ) : categoryControls}
+          {dayNoteShortcutControls ? (
+            <SettingsDrawer
+              title="Day note shortcuts"
+              description={DAY_NOTE_SHORTCUTS_PURPOSE}
+              label="Day note shortcuts"
+              state={dayNoteShortcutState}
+            >
+              {dayNoteShortcutControls}
+            </SettingsDrawer>
+          ) : null}
         </SettingsGroup>
 
         <SettingsGroup id="settings-connections">{calendarControls}</SettingsGroup>

@@ -26,6 +26,12 @@ describe("local day notes", () => {
     expect(localCommand.mock.calls[0][1]).not.toHaveProperty("usedShortcut");
   });
 
+  it("asks the native store to exclude a shortcut-assisted day note from the day-note pool", async () => {
+    localCommand.mockResolvedValue(row("Travel day"));
+    await saveLocalDayNote("profile-1", { localDate: "2026-11-10", expectedNote: "", note: "Travel day", usedShortcut: true }, now);
+    expect(localCommand).toHaveBeenCalledWith("saveDayNote", expect.objectContaining({ note: "Travel day", usedShortcut: true }));
+  });
+
   it("reports a conflict when the native store returns no row", async () => {
     localCommand.mockResolvedValue(null);
     await expect(saveLocalDayNote("profile-1", { localDate: "2026-11-10", expectedNote: "Old", note: "New" }, now))

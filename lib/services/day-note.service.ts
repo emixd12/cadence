@@ -5,18 +5,26 @@ import { requireCurrentUserId } from "@/lib/auth/current-user";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createDayNoteStore } from "@/lib/db/dayNotes.repo";
 import { createClient } from "@/lib/supabase/server";
+import { matchRepeatedNotesAfterNoteSave } from "@/lib/services/note-shortcut.service";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 
 const SIGN_IN_MESSAGE = "Sign in again before saving day notes.";
 
 export async function saveDayNoteFromFormData(formData: FormData): Promise<DayNoteSaveResult> {
   const supabase = await createClient();
   const userId = await requireCurrentUserId(SIGN_IN_MESSAGE);
-  return saveDayNoteForUser(supabase, userId, {
+  const result = await saveDayNoteForUser(supabase, userId, {
     localDate: formData.get("local_date"),
     expectedNote: formData.get("expected_note"),
     note: formData.get("note"),
     usedShortcut: formData.get("used_shortcut") === "true",
   });
+  // Ticket 305 applied to day notes (Ticket 292): propose repeated day notes after an
+  // in-app save. A failure never fails the saved day note.
+  if (result.changed && result.note !== null) {
+    await matchRepeatedNotesAfterNoteSave(supabase, userId, DAY_NOTE_SHORTCUT_POOL_ID);
+  }
+  return result;
 }
 
 export async function saveDayNoteForUser(

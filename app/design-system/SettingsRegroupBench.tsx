@@ -6,9 +6,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ScreenFrame } from "@/components/layout/ScreenFrame";
 import { ConnectorLibrary } from "@/components/settings/ConnectorLibrary";
 import { SettingsPanel, SettingsPanelGrid } from "@/components/settings/SettingsPanels";
-import { SETTINGS_DAILY_BRIEF_PURPOSE, SETTINGS_TRAVEL_PURPOSE, SettingsDrawer, SettingsExportEntry, SettingsGroup, SettingsPageEnd,
-  SettingsSections } from "@/components/settings/SettingsSections";
-import { categoriesSectionState } from "@/lib/ui/settings-sections";
+import { SettingsDrawer, SettingsExportEntry, SettingsGroup, SettingsPageEnd, SettingsSections } from "@/components/settings/SettingsSections";
+import { SETTINGS_DAILY_BRIEF_PURPOSE, SETTINGS_TRAVEL_PURPOSE, categoriesSectionState } from "@/lib/ui/settings-sections";
 import { settingsFixtureCategories, settingsFixtureDailyBriefState, settingsFixturePanels, type SettingsFixturePanels,
   type SettingsFixtureState } from "./SettingsRegroupFixtures";
 

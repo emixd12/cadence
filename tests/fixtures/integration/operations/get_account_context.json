@@ -34,7 +34,7 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.1.0",
+        "contract_version": "1.2.0",
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"
@@ -54,7 +54,7 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.1.0",
+        "contract_version": "1.2.0",
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"
@@ -75,7 +75,7 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.1.0",
+        "contract_version": "1.2.0",
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"

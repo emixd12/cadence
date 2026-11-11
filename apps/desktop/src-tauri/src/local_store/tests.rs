@@ -2357,3 +2357,114 @@ fn day_notes_save_edit_clear_and_reject_stale_writes() {
     assert_eq!(read.as_array().unwrap().len(), 1);
     assert!(read[0]["note"].is_null());
 }
+
+#[test]
+fn day_note_shortcut_pool_reads_day_notes_commits_and_excludes_shortcut_saves() {
+    let mut fixture = Fixture::new();
+    let save = |date: &str, new_id: u32, expected: Value, note: Value, used_shortcut: bool| {
+        json!({"operation":"saveDayNote","newId":id(new_id),"localDate":date,"expectedNote":expected,"note":note,"usedShortcut":used_shortcut})
+    };
+    fixture.run(save("2026-08-28", 910, Value::Null, json!("Travel day"), false), 401).unwrap();
+    fixture.run(save("2026-08-29", 911, Value::Null, json!("Travel day"), false), 402).unwrap();
+    fixture.run(save("2026-08-30", 912, Value::Null, json!("Travel day"), false), 403).unwrap();
+    fixture.run(save("2026-08-30", 912, json!("Travel day"), Value::Null, false), 404).unwrap();
+
+    // The pool reads only non-empty day notes, with null Behavior fields, and the profile timezone.
+    let context = note_shortcut::read_context(&fixture.db, &fixture.profile, Some("day_notes")).unwrap();
+    let encoded = json!(context);
+    assert_eq!(encoded["behavior"], Value::Null);
+    assert_eq!(encoded["dayPool"]["user_id"], json!(fixture.profile));
+    assert!(encoded["dayPool"]["timezone"].is_string());
+    assert_eq!(encoded["notes"].as_array().unwrap().len(), 2);
+    assert!(encoded["notes"].as_array().unwrap().iter().all(|note| note["behavior_id"].is_null() && note["scheduled_for"].is_null()));
+    // The Behavior and global contexts never carry a dayPool key.
+    assert!(json!(note_shortcut::read_context(&fixture.db, &fixture.profile, None).unwrap()).get("dayPool").is_none());
+
+    // Ticket 305: no global row and a pool flag of false still allow matching.
+    let day_state = NoteShortcutState {
+        id: "day_notes".into(),
+        user_id: fixture.profile.clone(),
+        behavior_id: None,
+        enabled: false,
+        entries: vec![],
+        excluded_occurrence_ids: vec![],
+        revision: 1,
+        updated_at: NOW.into(),
+    };
+    fixture.run(json!({"operation":"commitNoteShortcutState","expected":context,"next":day_state,"requireEnabled":true}),405).unwrap();
+    // A stored global off switch rejects matching and acceptance for the day pool too.
+    let global_context = note_shortcut::read_context(&fixture.db, &fixture.profile, None).unwrap();
+    let off = NoteShortcutState { id: "global".into(), ..day_state.clone() };
+    fixture.run(json!({"operation":"commitNoteShortcutState","expected":global_context,"next":off,"requireEnabled":false}),406).unwrap();
+    let current = note_shortcut::read_context(&fixture.db, &fixture.profile, Some("day_notes")).unwrap();
+    let mut second = day_state.clone();
+    second.revision = 2;
+    assert!(fixture.run(json!({"operation":"commitNoteShortcutState","expected":current,"next":second,"requireEnabled":true}),411).unwrap_err().contains("turned off"));
+    let mut tied = day_state.clone();
+    tied.behavior_id = Some(id(1));
+    tied.revision = 2;
+    let current = note_shortcut::read_context(&fixture.db, &fixture.profile, Some("day_notes")).unwrap();
+    assert!(fixture.run(json!({"operation":"commitNoteShortcutState","expected":current,"next":tied,"requireEnabled":false}),407).is_err());
+    assert!(fixture.db.execute(
+        "INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES('day_note',?1,NULL,0,'[]','[]',0,?2)",
+        params![fixture.profile, NOW],
+    ).is_err());
+
+    // A shortcut-assisted save records the day note's exclusion with the note.
+    let saved = fixture.run(save("2026-08-31", 913, Value::Null, json!("Travel day"), true), 408).unwrap();
+    let state = db::by_id::<NoteShortcutState>(&fixture.db, &fixture.profile, "day_notes").unwrap();
+    assert_eq!(state.excluded_occurrence_ids, vec![saved["id"].as_str().unwrap().to_string()]);
+    assert_eq!(state.revision, 2);
+    // A stale shortcut save writes neither the note nor an exclusion; a shortcut clear is rejected.
+    assert!(fixture.run(save("2026-08-28", 914, json!("Other"), json!("Travel day"), true), 409).unwrap().is_null());
+    assert!(fixture.run(save("2026-08-31", 913, json!("Travel day"), Value::Null, true), 410).is_err());
+    assert_eq!(db::by_id::<NoteShortcutState>(&fixture.db, &fixture.profile, "day_notes").unwrap(), state);
+    // Behavior pools are unaffected.
+    assert_eq!(fixture.db.query_row("SELECT count(*) FROM note_shortcut_states WHERE user_id=?1 AND id<>'global'", [&fixture.profile], |row| row.get::<_, i64>(0)).unwrap(), 1);
+
+    let reopened = db::open(&fixture.directory.join("data.sqlite3")).unwrap();
+    assert_eq!(db::by_id::<NoteShortcutState>(&reopened, &fixture.profile, "day_notes").unwrap(), state);
+}
+
+#[test]
+fn day_note_shortcut_pool_migration_keeps_existing_shortcut_states() {
+    // Upgrade from schema 22 (Ticket 305) with a stored global switch, a Behavior pool and day notes.
+    let mut fixture = Fixture::at_schema(22);
+    fixture.create();
+    fixture.occurrence();
+    fixture.db.execute(
+        "INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES('global',?1,NULL,1,'[]','[]',3,?2)",
+        params![fixture.profile, NOW],
+    ).unwrap();
+    fixture.db.execute(
+        "INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES(?2,?1,?2,0,'[]',?3,2,?4)",
+        params![fixture.profile, id(1), json!([id(10)]).to_string(), NOW],
+    ).unwrap();
+    fixture.db.execute(
+        "INSERT INTO day_notes(id,user_id,local_date,note,revision,created_at,updated_at) VALUES(?2,?1,'2026-08-30','Travel day',1,?3,?3)",
+        params![fixture.profile, id(920), NOW],
+    ).unwrap();
+    // Schema 22 rejects the day pool row, as shipped builds do.
+    assert!(fixture.db.execute(
+        "INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES('day_notes',?1,NULL,0,'[]','[]',0,?2)",
+        params![fixture.profile, NOW],
+    ).is_err());
+    let revision_before: i64 = fixture.db.query_row("SELECT revision FROM local_data_revision WHERE user_id=?1", [&fixture.profile], |row| row.get(0)).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    let global = db::by_id::<NoteShortcutState>(&fixture.db, &fixture.profile, "global").unwrap();
+    assert!(global.enabled);
+    assert_eq!(global.revision, 3);
+    let behavior_pool = db::by_id::<NoteShortcutState>(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert_eq!((behavior_pool.enabled, behavior_pool.revision, behavior_pool.excluded_occurrence_ids.clone()), (false, 2, vec![id(10)]));
+    assert_eq!(fixture.count("day_notes"), 1);
+    fixture.db.execute(
+        "INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES('day_notes',?1,NULL,0,'[]','[]',0,?2)",
+        params![fixture.profile, NOW],
+    ).unwrap();
+    // The rebuilt table keeps its data-revision triggers.
+    let revision_after: i64 = fixture.db.query_row("SELECT revision FROM local_data_revision WHERE user_id=?1", [&fixture.profile], |row| row.get(0)).unwrap();
+    assert_eq!(revision_after, revision_before + 1);
+    let foreign_keys: Vec<(String, i64)> = fixture.db.prepare("PRAGMA foreign_key_check").unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?))).unwrap().collect::<std::result::Result<_, _>>().unwrap();
+    assert!(foreign_keys.is_empty());
+}
