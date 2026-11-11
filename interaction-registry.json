@@ -289,7 +289,6 @@
         "INT-NOTIFICATION-001",
         "INT-TIMELINE-011",
         "INT-BEHAVIOR-029",
-        "INT-SETTINGS-014",
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
         "INT-CALENDAR-003",
@@ -734,11 +733,10 @@
     {
       "path": "components/note-shortcuts/NoteShortcutControls.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 18,
+      "interaction_marker_count": 14,
       "interaction_ids": [
         "INT-TIMELINE-011",
-        "INT-BEHAVIOR-029",
-        "INT-SETTINGS-014"
+        "INT-BEHAVIOR-029"
       ]
     },
     {
@@ -11653,22 +11651,14 @@
         "J06",
         "J10"
       ],
-      "intent": "Enable one Behavior's Note shortcuts and explicitly find, accept, edit, dismiss, or remove repeated-Note text.",
+      "intent": "Review repeated-Note text that Cadence proposed after Note saves: accept, edit, dismiss, or remove it. Note shortcuts are on by default (Ticket 305); there is no per-Behavior or Settings switch and no request to find repeated Notes.",
       "triggers": [
-        {
-          "kind": "change",
-          "control": "Enable Note shortcuts for this Behavior"
-        },
-        {
-          "kind": "activate",
-          "control": "Find repeated Notes"
-        },
         {
           "kind": "activate",
           "control": "Accept, Edit, Dismiss, or Remove Note shortcut"
         }
       ],
-      "availability": "Available in Behavior Details and Settings. Analysis needs an active Behavior and global/Behavior enablement; retained shortcut removal remains available when archived or off.",
+      "availability": "Available in Behavior Details and Settings. Proposals appear after the same Note is saved on three eligible Occurrences of an active Behavior; they need Accept before reaching a Note field. Retained shortcut removal remains available when archived or when the retained account switch is stored off.",
       "success_result": "Persists the reviewed shortcut state for one Behavior and announces the result without changing historical Notes.",
       "failure_result": "Shows the service error and retains the visible editor draft.",
       "effects": [
@@ -11721,93 +11711,6 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Marketing does not manage account data."
-        },
-        "mobile": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Future mobile remains deferred."
-        }
-      }
-    },
-    {
-      "id": "INT-SETTINGS-014",
-      "name": "Enable Note shortcuts globally",
-      "user_guidance": {
-        "audience": "user",
-        "references": [
-          "docs/user-guide/timeline.md#use-a-note-shortcut"
-        ]
-      },
-      "status": "implemented",
-      "surfaces": [
-        "settings"
-      ],
-      "routes": [
-        "/settings#note-shortcuts"
-      ],
-      "journeys": [
-        "J14"
-      ],
-      "intent": "Enable or turn off recurring Note shortcuts for the account or local desktop profile.",
-      "triggers": [
-        {
-          "kind": "change",
-          "control": "Enable Note shortcuts"
-        }
-      ],
-      "availability": "Available in Settings.",
-      "success_result": "Persists the global setting, hides or restores quick-fill and proposals, and keeps accepted shortcuts and saved Notes.",
-      "failure_result": "Shows the service error and keeps the prior setting visible.",
-      "effects": [
-        "database_write",
-        "ui_state"
-      ],
-      "risk": "moderate",
-      "confirmation": "none",
-      "implementation": [
-        "components/note-shortcuts/NoteShortcutControls.tsx#GlobalNoteShortcutControl",
-        "apps/desktop/src/settings-screen.tsx#SettingsScreen",
-        "apps/desktop/src/product.tsx#Product"
-      ],
-      "test_coverage": {
-        "level": "direct",
-        "references": [
-          "tests/occurrence-note-shortcuts-ui.test.tsx",
-          "tests/note-suggestion.resolver.test.ts",
-          "tests/desktop-store-contract.test.ts"
-        ],
-        "notes": "Mounted UI checks cover draft preservation and off controls; shared resolver and real SQLite/Postgres contracts cover ownership, revisions, lifecycle, and atomic saves."
-      },
-      "platforms": {
-        "web": {
-          "applicability": "applicable",
-          "status": "implemented",
-          "implementation": [
-            "components/note-shortcuts/NoteShortcutControls.tsx#GlobalNoteShortcutControl"
-          ],
-          "evidence": [
-            "tests/occurrence-note-shortcuts-ui.test.tsx",
-            "tests/note-suggestion.resolver.test.ts",
-            "docs/qa/2026-09-07-note-shortcuts.md"
-          ]
-        },
-        "desktop": {
-          "applicability": "applicable",
-          "status": "implemented",
-          "implementation": [
-            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
-            "apps/desktop/src/product.tsx#Product"
-          ],
-          "evidence": [
-            "tests/occurrence-note-shortcuts-ui.test.tsx",
-            "tests/note-suggestion.resolver.test.ts",
-            "tests/desktop-store-contract.test.ts"
-          ]
-        },
-        "marketing": {
-          "applicability": "not_applicable",
-          "status": "not_applicable",
-          "reason": "Marketing does not alter authenticated settings."
         },
         "mobile": {
           "applicability": "deferred",

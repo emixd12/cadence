@@ -613,7 +613,7 @@ function BehaviorRecord({
           noteAction={noteAction}
           stopTimeTrackingAction={stopTimeTrackingAction}
           resetTimeTrackingAction={resetTimeTrackingAction}
-          shortcuts={noteShortcutView?.globalEnabled && noteShortcutView.available && noteShortcutView.state?.enabled
+          shortcuts={noteShortcutView?.globalEnabled && noteShortcutView.available
             ? noteShortcutView.entries.filter((entry) => entry.status === "accepted")
             : []}
         />

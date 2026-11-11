@@ -240,18 +240,26 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       userId: profile.id, timezone: profile.timezone, values: VALUES, recordedAt: NOW.toString(),
     });
     const occurrences = (await loadLocalTimeline(7, NOW)).timeline.daySections.flatMap((day) => day.occurrences);
-    for (const [index, occurrence] of occurrences.slice(0, 3).entries()) {
-      await saveLocalOccurrenceNote(profile.id, { occurrenceId: occurrence.id, expectedNote: "", note: "Wore aligners overnight" }, NOW.add({ seconds: index + 1 }));
+    // Ticket 305: no opt-in. Saving the same Note three times through the app's Note
+    // action proposes it without a request.
+    let tick = 0;
+    vi.spyOn(Temporal.Now, "instant").mockImplementation(() => NOW.add({ hours: 48, seconds: ++tick }));
+    const noteActions = createLocalOccurrenceActions(profile.id, () => undefined);
+    for (const occurrence of occurrences.slice(0, 3)) {
+      const saveForm = new FormData();
+      saveForm.set("occurrence_id", occurrence.id);
+      saveForm.set("expected_note", "");
+      saveForm.set("note", "Wore aligners overnight");
+      expect(await noteActions.noteAction({ status: "idle", message: "" }, saveForm)).toMatchObject({ status: "success" });
     }
     const store = createLocalNoteShortcutStore(profile.id);
-    const analysisNow = NOW.add({ hours: 48 });
+    vi.mocked(Temporal.Now.instant).mockRestore();
+    const analysisNow = NOW.add({ hours: 49 });
     let view = await getNoteShortcutView(store, null, analysisNow);
-    await manageNoteShortcuts(store, { behaviorId: null, command: { operation: "enable", enabled: true }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
+    expect(view).toMatchObject({ state: null, globalEnabled: true });
     view = await getNoteShortcutView(store, behavior.id, analysisNow);
-    await manageNoteShortcuts(store, { behaviorId: behavior.id, command: { operation: "enable", enabled: true }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
-    view = await getNoteShortcutView(store, behavior.id, analysisNow);
-    const analyzed = await manageNoteShortcuts(store, { behaviorId: behavior.id, command: { operation: "analyze" }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
-    expect(analyzed.entries).toHaveLength(1);
+    const analyzed = view.state!;
+    expect(analyzed.entries).toMatchObject([{ status: "proposed", text: "Wore aligners overnight" }]);
     const accepted = await manageNoteShortcuts(store, { behaviorId: behavior.id,
       command: { operation: "accept", key: analyzed.entries[0].key, text: "Private accepted shortcut" },
       expectedRevision: noteShortcutRevision(analyzed), now: analysisNow.add({ seconds: 1 }) });

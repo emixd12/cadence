@@ -128,7 +128,9 @@ These controls introduce no routes and do not change Timeline.
 
 ## Note shortcut operations (Tickets 126–128)
 
-Existing Behaviors and Settings surfaces own shortcut management and opt-in.
+Existing Behaviors surfaces own shortcut review. Since Ticket 305 there is no opt-in
+and no Settings control or `/settings#note-shortcuts` anchor; the Timeline and
+Behaviors Note save actions run matching after each save.
 Timeline and Behaviors reuse the existing guarded Note save action for insertion
 provenance. No new navigation route is added. Authenticated actions call a shared
 shortcut service, which calls owner-scoped repositories. A desktop-callable cloud

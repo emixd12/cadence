@@ -989,8 +989,10 @@ archiving rules are added.
 
 ## Recurring Note shortcuts contract (Tickets 126–128)
 
-The deterministic feature is optional and defaults off globally and for each
-Behavior. Explicit **Find repeated Notes** analyzes only one owner's current,
+The deterministic feature is on for every account and every active Behavior
+(Ticket 305, `docs/DECISIONS.md` 2026-11-10). No Behavior needs its own switch.
+After an in-app Note save on Timeline, Needs decision or Behaviors review, matching
+runs for that Note's Behavior without a request. It analyzes only one owner's current,
 nonblank Occurrence Notes for one active Behavior, across all three statuses.
 Use the latest 100 eligible Occurrences in the 90 local calendar days ending
 today (today minus 89 days). Sort local date descending, scheduled instant
@@ -1008,7 +1010,9 @@ latest supporting date descending, then pattern key ascending. Reject control
 characters and instruction-like prompt text. This conservative rule preserves
 negation and never infers advice, diagnoses, or status changes.
 
-Proposals expire after 30 elapsed days and disappear immediately when their
+Proposals expire 30 elapsed days after they first appear; a proposal that later
+matching still supports keeps its first proposal time. Matching writes only when the
+current entries change. Proposals disappear immediately when their
 exact source Note hashes no longer support three eligible Occurrences. Accepted
 shortcuts have no expiry and fresh analysis never edits them. Accept permits
 editing before saving; later editing retains the original pattern key.
@@ -1024,11 +1028,17 @@ excluded future evidence. Edits, removal, off controls, and synchronization neve
 clear this exclusion. Cancelled/failed saves create no exclusion. Exclusions
 retain IDs only, with a 100,000-ID ceiling that fails instead of truncating.
 
-Global off dominates every Behavior setting, hides quick-fill and proposals,
-and rejects new analysis. Settings and removals remain available. Off preserves
-accepted shortcuts and historical Notes. Both settings persist and synchronize;
-neither is provider consent. There is no automatic analysis on opening/saving a
-Note, schedule, background worker, or automatic Note submission.
+A proposal still needs **Accept** before it appears above a Note field, and
+**Dismiss** still hides it. Settings shows no Note shortcuts control. The account's
+stored global switch remains so the control can return: an absent switch means on,
+and a stored off value hides quick-fill and proposals and rejects new analysis while
+removals remain available. Off preserves accepted shortcuts and historical Notes.
+Accounts and local Mac profiles that had turned the switch off are turned on once
+(hosted migration `20261110153051_turn_on_note_shortcuts_once.sql`, SQLite migration
+0022; P-034). The per-Behavior `enabled` field persists and synchronizes but no
+longer gates anything. Neither is provider consent. Matching runs only after a Note
+save in the app; MCP Note writes, imports, opening a Note, schedules and background
+workers do not run it, and nothing submits a Note automatically.
 
 Ticket 128 requires a separate explicit device-specific cloud consent with a
 versioned privacy notice, global and per-Behavior checks, current account identity,

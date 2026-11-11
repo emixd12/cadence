@@ -584,6 +584,8 @@ shared pure matching. Accepted shortcuts, suppression keys, settings, and reuse
 exclusions persist through restart and protected backup/restore. They synchronize
 as `note_shortcut_state` entities with the existing conflict review and atomic apply.
 Unknown entity kinds make old clients fail safely and require an update.
+Since Ticket 305 the local Note action runs matching after each save, and desktop
+Settings shows no Note shortcuts control.
 
 Account linking never enables cloud analysis. Provider consent is device-specific
 and separate from synchronized feature preferences. Account-free and offline

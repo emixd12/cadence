@@ -122,6 +122,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "day_notes",
         include_str!("../../migrations/0021_day_notes.sql"),
     ),
+    (
+        22,
+        "note_shortcuts_on_by_default",
+        include_str!("../../migrations/0022_note_shortcuts_on_by_default.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {
