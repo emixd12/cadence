@@ -116,6 +116,17 @@ export function dailyBriefSectionState(load: SettingsSectionLoad<DailyBriefSetti
   return attention ? state("On · A source needs your choice", true, true) : state("On", true);
 }
 
+/**
+ * A source this runtime cannot connect (Ticket 302). On the Mac, `local` means it
+ * needs a linked Cadence account and `build` means this build has no hosted broker.
+ * Neither needs action, so the row stays closed.
+ */
+export function connectorUnavailableSectionState(reason: "local" | "build" | null): SettingsSectionState {
+  if (reason === "local") return state("Link a Cadence account", false);
+  if (reason === "build") return state("Unavailable in this build", false);
+  return state("Unavailable", false);
+}
+
 /** Categories load with the page, so their count is always known. */
 export function categoriesSectionState(count: number): SettingsSectionState {
   if (count === 0) return state("No categories", false);

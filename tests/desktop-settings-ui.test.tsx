@@ -103,6 +103,16 @@ describe("native Settings coverage", () => {
     expect(settings({ accountConnected: false }).html).toContain("No cloud account");
   });
 
+  it("renders the web groups and the Mac group in order (Ticket 302)", () => {
+    const { html } = settings();
+    const titles = [...html.matchAll(/<h2 id="settings-[a-z]+-title"[^>]*>([^<]+)<\/h2>/g)].map((match) => match[1]);
+    expect(titles).toEqual(["General", "Connections", "Planning", "Account and data", "This Mac"]);
+    expect(html.indexOf("Local profile")).toBeLessThan(html.indexOf("Native notifications"));
+    expect(html.indexOf("Native notifications")).toBeLessThan(html.indexOf('id="settings-connections"'));
+    expect(html.indexOf("Open Export")).toBeLessThan(html.indexOf("Show setup guide"));
+    expect(html.indexOf('id="settings-mac"')).toBeLessThan(html.indexOf("Show setup guide"));
+  });
+
   it("shows no Note shortcuts control (Ticket 305: on by default)", () => {
     const { html } = settings({ accountConnected: true });
     expect(html).not.toContain("Note shortcuts");

@@ -203,7 +203,10 @@
         "INT-SETTINGS-010",
         "INT-SETTINGS-011",
         "INT-SETTINGS-012",
-        "INT-SETTINGS-013"
+        "INT-SETTINGS-013",
+        "INT-SETTINGS-015",
+        "INT-SETTINGS-016",
+        "INT-SETTINGS-017"
       ]
     },
     {
@@ -698,7 +701,7 @@
     {
       "path": "components/settings/SettingsSections.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 6,
+      "interaction_marker_count": 8,
       "interaction_ids": [
         "INT-SETTINGS-005",
         "INT-SETTINGS-015",
@@ -10216,7 +10219,7 @@
         }
       ],
       "availability": "Shown persistently while one or more first-link or later synchronization conflicts pause reconciliation. Matching hosted Sent/local Cancelled reminders with valid evidence and compatible initial manual status marks reconcile automatically; other reminder conflicts and conflicting user edits still require review.",
-      "success_result": "Opens Settings at the conflict review and keeps both copies unchanged.",
+      "success_result": "Opens Settings with the Cadence account drawer open at the conflict review and keeps both copies unchanged.",
       "failure_result": "The cue remains available until review opens or the account disconnects.",
       "effects": [
         "navigation"
@@ -10225,7 +10228,8 @@
       "confirmation": "none",
       "implementation": [
         "apps/desktop/src/desktop-app.tsx",
-        "apps/desktop/src/product.tsx"
+        "apps/desktop/src/product.tsx",
+        "apps/desktop/src/desktop-navigation.ts"
       ],
       "test_coverage": {
         "level": "direct",
@@ -10244,10 +10248,13 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "apps/desktop/src/desktop-app.tsx"
+            "apps/desktop/src/desktop-app.tsx",
+            "apps/desktop/src/desktop-navigation.ts",
+            "apps/desktop/src/account/account-section-state.ts"
           ],
           "evidence": [
-            "tests/desktop-account-sync-ui.test.tsx"
+            "tests/desktop-account-sync-ui.test.tsx",
+            "tests/desktop-settings-groups.dom.test.tsx"
           ]
         },
         "marketing": {
@@ -11773,9 +11780,13 @@
         {
           "kind": "activate",
           "control": "Account"
+        },
+        {
+          "kind": "activate",
+          "control": "Mac (desktop only)"
         }
       ],
-      "availability": "Always available; the index stays in view below the app header while Settings scrolls.",
+      "availability": "Always available; the index stays in view below the app header while Settings scrolls. On the Mac it has a fifth link, Mac, and sits below the sync-conflict cue while that cue shows.",
       "success_result": "The group title lands below the app header and index.",
       "failure_result": "Normal in-page navigation applies.",
       "effects": [
@@ -11786,12 +11797,14 @@
       "confirmation": "none",
       "implementation": [
         "components/settings/SettingsSections.tsx#SettingsSectionIndex",
-        "components/settings/SettingsSections.tsx#useOpenAnchorTarget"
+        "components/settings/SettingsSections.tsx#useOpenAnchorTarget",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/settings-sections.dom.test.tsx"
+          "tests/settings-sections.dom.test.tsx",
+          "tests/desktop-settings-groups.dom.test.tsx"
         ],
         "notes": "Renders the four index links in order and checks anchor placement handling."
       },
@@ -11808,8 +11821,16 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+            "components/settings/SettingsSections.tsx#SettingsSectionIndex",
+            "components/settings/SettingsSections.tsx#DESKTOP_SETTINGS_GROUPS"
+          ],
+          "evidence": [
+            "tests/desktop-settings-groups.dom.test.tsx"
+          ],
+          "reason": "Ticket 302: the same index with a fifth link to the Mac group (#settings-mac). While the sync-conflict cue shows, the index and anchors sit 4rem lower so the cue stays visible."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11849,7 +11870,7 @@
         "J20",
         "J21"
       ],
-      "intent": "See a section's state without opening it, then open its existing controls: a connected source, Travel, Daily Brief, Categories, or Delete account.",
+      "intent": "See a section's state without opening it, then open its existing controls: a connected source, Travel, Daily Brief, Categories, Delete account, or, on the Mac, the Cadence account.",
       "triggers": [
         {
           "kind": "activate",
@@ -11869,6 +11890,10 @@
         },
         {
           "kind": "activate",
+          "control": "Link a Cadence account / Account settings (desktop only)"
+        },
+        {
+          "kind": "activate",
           "control": "Delete account"
         },
         {
@@ -11876,8 +11901,8 @@
           "control": "Link to an anchor inside a row or drawer (opens it on arrival)"
         }
       ],
-      "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, or Status unavailable after a failed read) opens by itself once.",
-      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On).",
+      "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, Status unavailable after a failed read, or on the Mac a sync conflict, a first-link choice or a revoked session) opens by itself once.",
+      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
       "failure_result": "A failed status read shows Status unavailable and opens the panel, which shows its own error.",
       "effects": [
         "ui_state"
@@ -11890,15 +11915,21 @@
         "components/settings/SettingsSections.tsx#SettingsPageEnd",
         "components/settings/SettingsSections.tsx#useOpenAnchorTarget",
         "components/settings/ConnectorLibrary.tsx#ConnectorLibrary",
-        "lib/ui/settings-sections.ts"
+        "lib/ui/settings-sections.ts",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+        "apps/desktop/src/account/account-section-state.ts",
+        "apps/desktop/src/desktop-navigation.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/settings-sections.dom.test.tsx",
-          "tests/settings-sections.test.ts"
+          "tests/settings-sections.test.ts",
+          "tests/desktop-settings-groups.dom.test.tsx",
+          "tests/desktop-account-section-state.test.ts",
+          "tests/desktop-navigation.test.ts"
         ],
-        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links."
+        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
       },
       "platforms": {
         "web": {
@@ -11916,8 +11947,24 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+            "apps/desktop/src/product.tsx#Product",
+            "apps/desktop/src/account/account-section-state.ts",
+            "apps/desktop/src/desktop-navigation.ts",
+            "components/settings/SettingsSections.tsx#SettingsRow",
+            "components/settings/SettingsSections.tsx#SettingsDrawer",
+            "components/settings/SettingsSections.tsx#revealSettingsTarget",
+            "components/settings/ConnectorLibrary.tsx#ConnectorUnavailable"
+          ],
+          "evidence": [
+            "tests/desktop-settings-groups.dom.test.tsx",
+            "tests/desktop-account-section-state.test.ts",
+            "tests/settings-sections.test.ts",
+            "tests/desktop-navigation.test.ts"
+          ],
+          "reason": "Ticket 302: the same source rows and the Travel, Daily Brief and Categories drawers, plus a Cadence account drawer in General. On a local Mac each source that needs an account shows Link a Cadence account as row state. A sync conflict opens the account drawer. In-app navigation to an anchor inside a row or drawer opens it. Delete account stays web-only."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11960,7 +12007,7 @@
         }
       ],
       "availability": "Always available in the Account and data group.",
-      "success_result": "Navigate to /export.",
+      "success_result": "Web navigates to /export; the Mac switches to its Export screen.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
         "navigation"
@@ -11968,12 +12015,14 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/SettingsSections.tsx#SettingsExportEntry"
+        "components/settings/SettingsSections.tsx#SettingsExportEntry",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/settings-sections.dom.test.tsx"
+          "tests/settings-sections.dom.test.tsx",
+          "tests/desktop-settings-groups.dom.test.tsx"
         ],
         "notes": "Renders the Export entry text and its /export link."
       },
@@ -11990,8 +12039,16 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+            "components/settings/SettingsSections.tsx#SettingsExportEntry",
+            "apps/desktop/src/product.tsx#Product"
+          ],
+          "evidence": [
+            "tests/desktop-settings-groups.dom.test.tsx"
+          ],
+          "reason": "Ticket 302: the same entry in Account and data; Open Export is a button that opens the Mac's Export screen."
         },
         "marketing": {
           "applicability": "not_applicable",

@@ -9,6 +9,7 @@ import {
   SETTINGS_SECTION_UNAVAILABLE,
   categoriesSectionState,
   connectorSectionState,
+  connectorUnavailableSectionState,
   dailyBriefSectionState,
   googleCalendarSectionState,
   isSettingsSectionChecking,
@@ -140,5 +141,14 @@ describe("categoriesSectionState", () => {
   });
   it("keeps the checking state distinct", () => {
     expect(SETTINGS_SECTION_CHECKING.text).toBe("Checking…");
+  });
+});
+
+describe("connectorUnavailableSectionState (Ticket 302)", () => {
+  it("names why a source cannot connect, without needing action", () => {
+    expect(connectorUnavailableSectionState("local")).toEqual({ text: "Link a Cadence account", attention: false, on: false });
+    expect(connectorUnavailableSectionState("build")).toEqual({ text: "Unavailable in this build", attention: false, on: false });
+    expect(connectorUnavailableSectionState(null)).toEqual({ text: "Unavailable", attention: false, on: false });
+    expect(isSettingsSectionChecking(connectorUnavailableSectionState("local"))).toBe(false);
   });
 });

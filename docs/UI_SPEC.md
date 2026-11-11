@@ -1140,11 +1140,35 @@ scrolls; on small screens it sits below the app header.
   finish loading, until the reader scrolls, types or taps.
 - Body text keeps its size. There is no horizontal scroll at 390 px.
 - Web Settings shows no Note shortcuts control (Ticket 305 turns the feature on by
-  default). Desktop Settings keeps its current single stack until Ticket 302.
+  default).
+
+Desktop layout (Ticket 302). Mac Settings uses the same groups, index, rows and
+drawers, with shared sections in the same group and order as web, and adds a
+fifth group, This Mac (index link "Mac"), after Account and data.
+
+- General: Local profile, then a Cadence account drawer (linked account,
+  synchronization, conflict review, disconnect), Timezone, Native notifications
+  with Reminder coverage where web shows Notifications, and Categories.
+- Connections: Connected sources as closed rows. Connected apps stays web-only.
+- Planning: Travel and Daily Brief drawers.
+- Account and data: the Export entry; **Open Export** opens the Mac's Export screen.
+- This Mac: Local database, App updates and Setup guide.
+- On a local Mac each source that needs an account is a closed row whose state is
+  "Link a Cadence account" ("Unavailable in this build" when the build has no
+  hosted broker). Daily Brief shows the same state. The Cadence account drawer
+  shows "Not linked" and opens with **Link a Cadence account**.
+- The account drawer's state comes from `desktopAccountSectionState`
+  (`apps/desktop/src/account/account-section-state.ts`). A sync conflict, a
+  first-link choice, a revoked session, a required update or a sign-in error
+  opens it by itself. While the shell's conflict cue shows, the section index and
+  anchors sit 4rem lower so the cue stays visible.
+- In-app navigation to an anchor inside a row or drawer (the conflict cue's
+  `account-conflicts`, Timeline's `travel`) opens it and holds it in place.
+- Legal links and Delete account stay web-only.
 
 Desktop Settings additionally shows linked-account synchronization state,
 conflict count and review, and disconnect choices. A conflict also exposes one
-persistent shell cue that opens Settings. Conflict rows show the Mac and account
+persistent shell cue that opens Settings with the Cadence account drawer open. Conflict rows show the Mac and account
 values with radio controls for Use account version and Use this Mac version.
 Keep both appears only when the resolver proves a complete identity-preserving
 duplicate; no current conflict class qualifies. Disconnect offers Keep a local

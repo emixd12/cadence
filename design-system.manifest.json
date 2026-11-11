@@ -398,7 +398,7 @@
       "benchAnchor": "design-system#ds-module-settings-sections",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 301 web Settings frame: sticky four-link section index, four groups with text-2xl level-2 titles, the Account and data Export entry, and the end-of-page Privacy/Terms/Trust links with the Delete account disclosure. Anchor links open their row or drawer (useOpenAnchorTarget). Full-page view: /design-system?preview=settings-regroup."
+      "notes": "Ticket 301 web Settings frame: sticky four-link section index, four groups with text-2xl level-2 titles, the Account and data Export entry, and the end-of-page Privacy/Terms/Trust links with the Delete account disclosure. Anchor links open their row or drawer (useOpenAnchorTarget). Full-page view: /design-system?preview=settings-regroup. Ticket 302: Mac Settings (apps/desktop/src/settings-screen.tsx) passes DESKTOP_SETTINGS_GROUPS for a fifth group, This Mac, and shellCue to sit below the sync-conflict cue; its Open Export is a button; in-app anchors use revealSettingsTarget."
     },
     {
       "id": "module.settings-row",
@@ -427,7 +427,7 @@
       "benchAnchor": "design-system#ds-module-settings-drawer",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 301 drawer for Travel, Daily Brief and Categories: title, state and purpose stay in view; one disclosure action opens the controls (setup label while off). Bench states: off, on, needs action."
+      "notes": "Ticket 301 drawer for Travel, Daily Brief and Categories: title, state and purpose stay in view; one disclosure action opens the controls (setup label while off). Bench states: off, on, needs action. Ticket 302: the Mac also uses it for the Cadence account drawer."
     },
     {
       "id": "module.trust-and-legal-panel",

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 
 // Ticket 301: one heading per Settings section. A group, row or drawer sets the
 // level its contents start at. A row or drawer that already shows the section
@@ -60,4 +60,9 @@ export function SettingsSectionHeading({ id, children }: Readonly<{ id?: string;
 export function SettingsItemHeading({ className, children }: Readonly<{ className: string; children: ReactNode }>) {
   const heading = useSettingsHeading();
   return <heading.Tag className={className}>{children}</heading.Tag>;
+}
+
+/** A part inside a section, one level below the section's heading (Reminder coverage, Storage recovery). */
+export function SettingsPartHeading({ className, children }: Readonly<{ className: string; children: ReactNode }>) {
+  return createElement(settingsHeadingTag(useSettingsHeading().childLevel), { className }, children);
 }

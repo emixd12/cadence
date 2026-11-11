@@ -19,6 +19,8 @@ import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPerm
 import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
+import { connectorUnavailableSectionState } from "@/lib/ui/settings-sections";
+import { desktopAccountSectionState } from "./account/account-section-state";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
@@ -600,23 +602,30 @@ export function Product() {
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
+        shellCue={(conflictReview?.conflicts.length ?? 0) > 0}
+        accountState={desktopAccountSectionState({ known: accountKnown, account, configured: readDesktopAuthConfig() !== null, connected: syncReady,
+          syncStatus, conflictCount: conflictReview?.conflicts.length ?? 0, firstLinkPending: Boolean(firstLink && !firstLink.complete) })}
+        categoryCount={bundle.timeline.categories.length}
+        onOpenExport={() => navigate("export")}
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
-        calendarControls={<ConnectorLibrary sources={[
+        calendarControls={<ConnectorLibrary rows sources={[
           { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} nested />
-            : <ConnectorUnavailable id="google_calendar" reason={calendar.label} /> },
+            : <ConnectorUnavailable id="google_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)}
+              reason={connectors.unavailableReason ? connectorUnavailableReason("Google Calendar", connectors.unavailableReason) : calendar.label} /> },
           { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
             refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")}
             callbackMessage={connectors.outlookMessage} refreshVersion={connectors.panelVersion} />
-            : <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="outlook_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
           { id: "icloud_calendar", content: connectors.icloudCoordinator ? <IcloudCalendarPanel key={`icloud-${accountUserId}`} coordinator={connectors.icloudCoordinator}
             refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")} />
-            : <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="icloud_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
           { id: "hevy", content: connectors.hevyCoordinator ? <HevyPanel key={`hevy-${accountUserId}`} coordinator={connectors.hevyCoordinator}
             localDate={calendarRange.startLocalDate} timezone={profile?.timezone ?? "America/New_York"} refreshVersion={connectors.panelVersion} />
-            : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="hevy" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
+        dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
         dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
           leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}
