@@ -596,3 +596,22 @@ part of L-002.
   November 10, 2026: "One choice should cover every connected source".
 - **Status:** open.
 - **Next action:** read the three policies when convenient and record the clauses.
+
+## L-022: Storing a reverse-geocoded address as Home
+
+- **Question:** Do Google Maps Platform terms allow Cadence to store, as the user's Home
+  text, an address that Google's reverse geocoding returned, once the user saves it?
+- **Affected:** Ticket 308. Related messaging entry: P-036. Files:
+  `lib/services/travel-home-lookup.service.ts`, `lib/services/travel-provider.ts`
+  (`reverseGeocodeGooglePosition`), `components/settings/HomeCurrentLocation.tsx`.
+  The device position is used for the one request and never stored; the returned
+  address fills the Home field, and the user may edit it before it saves.
+- **Provider, clause, source and check date:** Google Maps Platform Terms of Service and
+  Service Specific Terms (Geocoding API caching and storage rules). Not read; logged on
+  November 10, 2026 during Ticket 308.
+- **Current reading:** none. The point to read is whether user-saved text that began as
+  a geocoding result counts as stored Google Maps Content.
+- **Risk level:** low to medium.
+- **Owner decision or risk acceptance:** none.
+- **Status:** open.
+- **Next action:** read the caching and storage clauses when convenient and record them.
