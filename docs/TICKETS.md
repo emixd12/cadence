@@ -16932,8 +16932,9 @@ Verification: `npm run agents:check`, `npm run interactions:check`,
 
 ## Ticket 288: Daily Brief token usage and failure reasons
 
-Status: complete in source November 9, 2026. No live provider measurement was made;
-the token figures in `docs/COSTS.md` stay assumed.
+Status: complete. Implemented November 9, 2026; measured November 11, 2026 from two
+production `daily_brief.model` events (mean 8,683 input and 481 output tokens, about
+US$0.0023 per brief). `docs/COSTS.md` now uses the measured figures.
 Dependencies: Tickets 146–148 (Daily Brief), 161 and 176–177 (workbench), 188
 (estimate call).
 
@@ -16982,7 +16983,9 @@ lint, agents, interactions and resolvers checks; full `npm run test`.
 ## Ticket 289: Consolidated Daily Brief prompt candidate
 
 Status: candidate implemented November 9, 2026. Not promoted. The owner comparison is
-pending and follows Ticket 184's rules.
+prepared (November 11, `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner
+comparison") on reserved cases H1–H10 and S1; its paid runs wait for the owner's spend
+cap. The decision follows Ticket 184's rules.
 Dependencies: Ticket 184 (recipes 1.1 and 1.2), Ticket 219 (travel policy), Ticket 239
 (connector sources policy).
 
@@ -17026,6 +17029,8 @@ Verification: `tests/daily-brief-instructions.test.ts` and `tests/daily-brief-co
 ## Ticket 290: Model, reasoning effort and prompt variant as workbench candidates
 
 Status: implemented November 9, 2026 with provider-free verification. No live model run.
+The effort and model comparisons (E1, M1) are prepared with Ticket 289's on November 11 and
+wait for the owner's spend cap and model choice.
 Dependencies: Tickets 288 and 289.
 
 Goal: let the development briefing workbench compare a different model, reasoning effort or
@@ -17072,8 +17077,10 @@ design-system checks; full `npm run test`.
 
 ## Ticket 291: Skill-rule scenarios for MCP client acceptance
 
-Status: implemented and unit-tested with fakes on November 9, 2026. No local-stack or
-live run yet.
+Status: implemented November 9, 2026. First local-stack run with a real client passed
+on November 11, 2026: all three scenarios with `claude-code` on test account A
+(`docs/qa/mcp-server.md`, "First local run"). The production run with the API clients
+remains and needs a spend cap for the QA keys.
 Dependencies: Tickets 251 and 256; the published skills in `integrations/skills/`.
 
 Goal: check, with real headless clients, that a model following a published Cadence

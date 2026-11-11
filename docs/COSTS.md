@@ -60,7 +60,7 @@ implement most of it in source; it is not deployed yet.
 | --- | --- | --- | --- | --- |
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
-| Daily Brief model | US$0.06 | US$0.13 | US$0.25 | Live |
+| Daily Brief model | US$0.03 | US$0.07 | US$0.14 | Live; measured on two production briefs, November 11, 2026 |
 | Duration estimate model, incremental | US$0.015 | US$0.030 | US$0.060 | Opt-in recipe 1.1/1.2 candidates only; excluded from the production-default totals |
 | Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
@@ -74,17 +74,17 @@ implement most of it in source; it is not deployed yet.
 | --- | --- | --- | --- |
 | Fixed share | US$0.54 | US$0.54 | US$0.54 |
 | Travel (transit / driving) | US$0.23 / US$0.37 | US$1.30 / US$2.14 | US$3.45 / US$5.73 |
-| Daily Brief | US$0.06 | US$0.13 | US$0.25 |
-| **Total before payment fees** | **US$0.83–0.97** | **US$1.97–2.81** | **US$4.24–6.52** |
+| Daily Brief | US$0.03 | US$0.07 | US$0.14 |
+| **Total before payment fees** | **US$0.80–0.94** | **US$1.91–2.75** | **US$4.13–6.41** |
 
-The paid weather plan adds US$0.29 per user at 100 users: totals become US$1.12–1.26
-(light), US$2.26–3.10 (typical) and US$4.53–6.81 (heavy). The free testing API adds
+The paid weather plan adds US$0.29 per user at 100 users: totals become US$1.09–1.23
+(light), US$2.20–3.04 (typical) and US$4.42–6.70 (heavy). The free testing API adds
 nothing.
 
 If the description-estimate candidate is promoted, the assumed extra model call
 below adds US$0.015 / US$0.030 / US$0.060 respectively. Before planned weather and
-payment fees, the corresponding scenario totals are about US$0.85–0.99,
-US$2.00–2.84 and US$4.30–6.58. The production default remains recipe 1.0.
+payment fees, the corresponding scenario totals are about US$0.82–0.96,
+US$1.94–2.78 and US$4.19–6.47. The production default remains recipe 1.0.
 
 Typical users fit under US$5. Heavy drivers do not, unless a per-user travel
 limit applies (see proposals). Payment processing would take more on top of
@@ -387,19 +387,41 @@ admissions on September 22–25.
 
 Provider: OpenAI `gpt-5.6-luna` (`lib/services/daily-brief-openai.ts`), with
 `max_output_tokens: 2000` and low reasoning effort. Price: US$0.20 per million
-input tokens and US$1.20 per million output tokens, recorded 2026-09-07 in
-`docs/qa/2026-09-07-note-suggestion-provider-evaluation.md`.
+input tokens, US$0.02 per million cached input tokens and US$1.20 per million output
+tokens ([OpenAI model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
+checked November 11, 2026; input and output unchanged since 2026-09-07).
 
 | Assumption | Light | Typical | Heavy |
 | --- | --- | --- | --- |
-| Briefs per month | 15 | 30 | 60 (two devices) |
-| Input tokens per brief | 12,000 (assumed) | 12,000 (assumed) | 12,000 (assumed) |
-| Output tokens per brief, including reasoning | 1,500 (assumed) | 1,500 (assumed) | 1,500 (assumed) |
-| **Monthly cost** | **US$0.06** | **US$0.13** | **US$0.25** |
+| Briefs per month | 15 (assumed) | 30 (assumed) | 60, two devices (assumed) |
+| Input tokens per brief | 8,700 (measured) | 8,700 (measured) | 8,700 (measured) |
+| Output tokens per brief, including reasoning | 480 (measured) | 480 (measured) | 480 (measured) |
+| **Monthly cost** | **US$0.03** | **US$0.07** | **US$0.14** |
 
-About US$0.004 per brief. The database allows one completed attempt per
-installation per day. The token figures above stay assumed until someone measures
-them.
+About US$0.0023 per brief. The database allows one completed attempt per
+installation per day. The briefs per month stay assumed.
+
+### Production measurement, November 11, 2026
+
+Source: the production `daily_brief.model` performance events
+(`CADENCE_PERF_LOG=1` is on in Production) in the Vercel runtime logs, read for the
+last 23 hours on November 11, 2026. Vercel Pro keeps runtime logs for one day, so
+earlier briefs since Ticket 288 shipped could not be read. Two briefs succeeded in
+that window; no failed brief was logged. Both were production recipe 1.0, so each
+made one model call (`usage_calls` 1) and no duration-estimate call.
+
+| Brief (UTC) | Input | Cached input | Output | Of which reasoning | Duration | Cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-11 05:15 | 8,260 | 0 | 585 | 417 | 7.9 s | US$0.00235 |
+| 2026-11-11 05:48 | 9,106 | 0 | 376 | 209 | 5.8 s | US$0.00227 |
+| Mean | 8,683 | 0 | 481 | 313 | 6.8 s | US$0.00231 |
+
+The earlier assumption (12,000 input and 1,500 output tokens, US$0.004 per brief)
+was high by about 40% on input and three times on output. Two samples from one
+or two accounts are a small base: an account with more Behaviors, connected
+calendars or travel facts sends more input. No input was cached. To widen the sample,
+read the same events again within a day of new briefs, or save workbench runs
+(`.local/briefing-bench/`), which carry the same counts.
 
 Ticket 288 records usage per model call. The OpenAI adapter reads the Responses API
 `usage` object (`input_tokens`, `input_tokens_details.cached_tokens`,
@@ -421,9 +443,8 @@ How to measure now:
   prints totals across all attempts and counts failure reasons.
 
 Multiply measured input and output tokens by the provider rates above. Cached input
-tokens are part of `input_tokens`; this file does not yet record a cached-input
-price, so treat them at the full input rate until someone checks it. Reasoning
-tokens are part of `output_tokens`.
+tokens are part of `input_tokens`; bill them at the cached-input rate and the rest at
+the input rate. Reasoning tokens are part of `output_tokens`.
 
 ### Ticket 290 workbench candidate models
 
@@ -554,8 +575,6 @@ arrives, fees reduce the US$5:
 
 - Keep an account-wide Google Cloud budget alert.
 - Record Sequenzy's plan and per-email price.
-- Measure Daily Brief token usage from the `daily_brief.model` performance events or
-  workbench runs (recorded since Ticket 288) and replace the assumptions.
 
 ## Change log
 
@@ -600,6 +619,10 @@ arrives, fees reduce the US$5:
 - 2026-11-10: Ticket 308 in source. Use my current location makes one reverse-geocoding call
   (Geocoding SKU, US$0.005) per lookup, rate-limited to five an hour per account and reserved
   against the US$5 monthly travel ceiling. One-time cost; totals are unchanged.
+- 2026-11-11: Ticket 288 measured. Two production briefs averaged 8,683 input and 481
+  output tokens, about US$0.0023 each. Daily Brief falls to US$0.03 / US$0.07 / US$0.14
+  a month and the per-user totals drop by US$0.03–0.11. Recorded the US$0.02 cached-input
+  price.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

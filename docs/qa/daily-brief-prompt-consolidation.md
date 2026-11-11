@@ -259,6 +259,53 @@ For recipe 1.0 the consolidated choice sends the layered text, and the run recor
 The consolidated variant is not promoted. Promoting it needs an owner decision and a
 separate ticket.
 
+## Prepared owner comparison — November 11, 2026
+
+Prepared, not run. The model calls bill Cadence's OpenAI key, and no spend cap is set for
+this test, so the runs wait for the owner's cap (asked November 11). The owner reads the
+results and decides; agents do not promote or reject a candidate.
+
+Cases: profile `daily-brief-balanced@1` reserved cases H1–H10 and sequence S1
+(`docs/plans/2026-09-28-briefing-owner-review.md`), clock `2026-11-01T12:00:00Z`. None of
+them has run on any candidate yet (checked against `.local/briefing-bench/v1/synthetic`
+and the QA records). Running them exposes them: if the owner then tunes the prompt from
+these results, Ticket 184's rule needs new reserved cases before the next evaluation.
+
+Each comparison changes one thing. Candidate 3 (`advisor-analysis-3`, recipe
+`daily_brief@1.2`) is the base because it is the Ticket 184 candidate in line for
+promotion. Production (recipe 1.0) receives the layered text with either choice.
+
+| ID | Ticket | A | B | Runs | Calls |
+|---|---|---|---|---|---|
+| P1 | 289 | `advisor-analysis-3`, layered, low | same, consolidated | H1–H10, twice | 40 |
+| P2 | 289 | `advisor-analysis-3`, layered, low | same, consolidated | S1, seven days, once | 14 |
+| P3 | 289 | `advisor-analysis-2` (1.1), layered, low | same, consolidated | H1–H10, once | 20 |
+| E1 | 290 | P1's A runs, reused | `advisor-analysis-3`, layered, medium | H1–H10, twice | 20 |
+| M1 | 290 | P1's A runs, reused | another model, layered, low | H1–H10, twice | 20, only if the owner names a model |
+
+Synthetic fixtures carry no Behavior descriptions, so no duration-estimate call runs.
+At the measured US$0.0023 per brief (`docs/COSTS.md`, "Production measurement"), P1–E1
+cost about US$0.25; medium effort adds reasoning tokens, so allow up to US$0.60. M1
+depends on the model's price. The requested cap is US$2. The workbench call budget
+(`CADENCE_BRIEFING_BENCH_CALL_LIMIT`, at most 100 per server process) covers P1–P3 and E1
+(94 calls) in one process; M1 runs in a second one.
+
+What the owner reads for each case, side by side in the workbench (or the review packet):
+
+1. Both briefs in full, against the case purpose in the profile table (for example H4:
+   hostile Note text stays untrusted; H10: the overnight interval).
+2. Validator result and any failure reason. A `provider_incomplete_max_output_tokens`
+   on medium effort means the 2,000-token limit was reached, not a quality verdict.
+3. Token usage per run, to see the cost of each choice.
+4. For S1, repetition and reading burden across the seven days, counted as one sequence.
+5. The five ambiguities above, which the consolidated text resolves by keeping the later
+   layer. The cases that reach them: H1 and H9 (quiet days), H7 (no feasible time) and
+   any travel or connector context.
+
+Decisions for the owner after reading: promote the consolidated prompt (a separate
+ticket), keep layered, or revise and re-reserve cases; and whether any effort or model
+change is worth a production ticket. Production stays pinned until then.
+
 ## Verification
 
 - `npx vitest run tests/daily-brief-instructions.test.ts tests/daily-brief-consumer.test.ts`:

@@ -95,10 +95,40 @@ accept any write the model tries.
   `node .claude/skills/mcp-acceptance/local-stack.mjs tier1 --name <stack> --scenario skill-check-in-unconfirmed --client claude-code`.
   The API clients and the claude.ai connector need production, as for the other
   scenarios.
-- Status: unit-tested with the runner's fakes only
-  (`tests/acceptance-client-prompts.test.mjs`, `tests/acceptance-client-runners.test.mjs`).
-  No local-stack or live run has been done yet, so no real model has been checked
-  against these scenarios.
+- Status: unit-tested with the runner's fakes
+  (`tests/acceptance-client-prompts.test.mjs`, `tests/acceptance-client-runners.test.mjs`),
+  and passed once on the local stack with a real client on November 11, 2026 (below).
+  No production run yet.
+
+#### First local run — November 11, 2026
+
+Stack `cadence-accept-291` (DB base 56470, app port 4453) at `origin/main` `1232f7cd`,
+test account A, client `claude-code` on the owner's subscription (model
+`claude-opus-5-5`; no API charge). One run per scenario; each printed `PASS (exit 0)`.
+
+| Run | Scenario | Client tool calls (all succeeded) | Watcher | Checks |
+|---|---|---|---|---|
+| `local-291-t1-1111t193138` | `skill-check-in-unconfirmed` | `get_account_context`, `get_timeline` | 2 reads, no write `tool.call` | read succeeded; no write attempted; no server write |
+| `local-291-t1-1111t193212` | `skill-routine-unconfirmed` | `get_account_context`, `list_behaviors` | 2 reads, no write `tool.call` | no write attempted; no server write; no Behavior with the test title |
+| `local-291-t1-1111t193226` | `skill-routine-confirmed` | `get_account_context`, `list_behaviors`, `create_behavior`, `archive_behavior` | 4 calls matched 4 client calls; writes `create_behavior` 1, `archive_behavior` 1 | write counts exact; writes within the confirmed set; one Behavior with the test title, archived; schedule daily at exact 18:00 |
+
+`check` then reported 0 active of 3 grants and 0 active token families; `down` removed
+the stack. Evidence is in `.intent/acceptance/<run>/` (local, not committed). The
+Inspector skips these scenarios by design and was not started. The API clients and the
+claude.ai connector need production, so the production run stays a follow-up; it calls
+paid models on the QA keys (`docs/COSTS.md`, "QA-only acceptance model calls") and needs
+a spend cap.
+
+Two setup defects found and handled in this run:
+
+- `local-stack.mjs` did nothing, silently, when the checkout path contained a space
+  (`Coding Projects`): its entry check compared a plain path with a URL-encoded one.
+  Fixed with `fileURLToPath`.
+- Homebrew's Supabase CLI is now 3.1.0, which rejects the repository's `[inbucket]`
+  config section, and the npm-installed 2.105.0 binary in a fresh worktree fails its
+  code signature, so macOS kills it. The run used ad-hoc signed copies of the
+  worktree's `supabase` and `supabase-go` binaries outside the repository, passed
+  through `CADENCE_SUPABASE_CLI`. See the skill's "Local rehearsal" note.
 
 ## Bounded hosted isolation preparation — Ticket 232 (October 28)
 

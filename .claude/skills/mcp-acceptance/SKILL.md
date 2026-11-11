@@ -195,8 +195,14 @@ after `scripts/acceptance/google-signin.mjs` for that slot.
 
 ### Local rehearsal (Tier 0 and Tier 1)
 
-Needs Docker, the Homebrew Supabase CLI (`/opt/homebrew/bin/supabase`), `psql`,
-`openssl`, a worktree with `npm ci` done and no `.env.local`. Run every command from
+Needs Docker, a Supabase CLI 2.x, `psql`,
+`openssl`, a worktree with `npm ci` done and no `.env.local`. The default CLI is
+Homebrew's (`/opt/homebrew/bin/supabase`); version 3 rejects the repository's
+`[inbucket]` config. Point `CADENCE_SUPABASE_CLI` at a 2.x binary instead. The
+worktree's `node_modules/@supabase/cli-darwin-arm64/bin/supabase` is one, but if
+macOS kills it (exit 137, `codesign -vv` reports an invalid signature), copy it and
+its `supabase-go` sibling into one folder outside the repository, run
+`codesign -s - -f` on both and use the copy (November 11, 2026). Run every command from
 the worktree root. Each command loads the stack's `runner.env` itself, so it works
 in a fresh shell (Bash-tool agents get one per call); there is nothing to source.
 
