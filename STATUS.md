@@ -59,6 +59,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
+| Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Notarized 0.1.10 (owner's instruction); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
@@ -88,6 +89,27 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Updater signing key rotated — November 11, 2026
+
+macOS reset the owner's login password on November 9 and set the old login keychain aside;
+it does not unlock. The Developer ID private key, the notarization password and the updater
+key's password were in it. Decision: `docs/DECISIONS.md`, 2026-11-11.
+
+- **Done on the owner's Mac:** the Developer ID G2 intermediate and a new Developer ID
+  Application certificate (expires December 11, 2027) in the login keychain;
+  profile `Cadence_Desktop_Developer_ID_2026-11.provisionprofile` (team HK26VT477G,
+  `app.cadence.desktop`, new certificate only, entitlements cover `Entitlements.plist`); a
+  new notarization password; a new updater key in `Cadence Release/updater-2026-11/`.
+- **Verified:** a test file signed with the Keychain password verified with Minisign against
+  the new public key. `build-env.sh check` from the new `acceptance-0.1.10` wrapper passed
+  against commit `ac526471`; it does not contact Apple.
+- **Changed outside the repo:** `dev-signed-env.sh` now reads the 2026-11 profile and the new
+  public key (backup `dev-signed-env.sh.bak-2026-11-11`); the `acceptance-0.1.10` wrapper
+  reads the release worktree from `CADENCE_RELEASE_REPO`.
+- **Not done:** notarized 0.1.10; hand install on the owner's Mac and the test Mac; checking
+  that Keychain sessions and location permission survive the new certificate; owner attaching
+  both key files to the 1Password item.
 
 ## Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026
 
