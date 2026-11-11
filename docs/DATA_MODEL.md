@@ -2769,7 +2769,39 @@ checks, concurrency, exact replay, rollback, ownership, and web/desktop row
 compatibility. Use only an isolated loopback database and the local integration
 test environment documented in `docs/SUPABASE_WORKFLOW.md`.
 
-## Agent Calendar grant (Ticket 187)
+## Agent Calendar grant (Ticket 187, retired by Ticket 307)
+
+Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
+standard Timeline connection (`google_calendar_connections` and
+`google_calendar_preferences`) and its selected calendars. Migration
+`20261110160000_daily_brief_google_calendar_timeline.sql` (not additive):
+
+- refuses to run while `cadence_calendar_agent_private.credentials` holds a row; the
+  retirement route revokes each token at Google and deletes it first
+  (`docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)");
+- stores the one connected-sources choice for every Daily Brief preference row through
+  the private `map_daily_brief_google_calendar_to_timeline()` (not granted to any
+  role). A row from before Ticket 306 is mapped as that migration derives it, except
+  that Google Calendar stays allowed only if the account allowed Calendar timing and
+  its Timeline connection is connected. A stored choice that covers Google Calendar
+  without a connected Timeline connection gets Google Calendar excluded. Every
+  per-source `include_*` column is set false and its fence null. Each changed row
+  bumps its revision and loses its `daily_brief_runs`;
+- deletes every row in `cadence_calendar_agent_private.attempts`,
+  `google_calendar_agent_preferences` and `google_calendar_agent_connections`. The
+  empty tables remain until a cleanup ticket drops them;
+- revokes `service_role` execute on the five `calendar_agent_*` functions;
+- makes `read_daily_brief_preferences` also return `google_calendar_source:
+  "timeline"`. The app reads no Google Calendar for Daily Brief without it;
+- makes `save_daily_brief_preferences_v3` (and so v2 and the original save) store the
+  one choice through v4, excluding every source the caller leaves off.
+
+`tests/sql/ticket-307-daily-brief-google-calendar-timeline.sql` replaces
+`tests/sql/google-calendar-agent-contract.sql`. It verifies the mapping, the empty and
+unreachable grant, the read marker and the older-client save. The rollback note is
+in the migration header.
+
+Ticket 187 record:
 
 Migration `20261022180000_separate_agent_calendar_grant.sql` adds independent owner-scoped
 `google_calendar_agent_connections` and `google_calendar_agent_preferences` tables.
@@ -2783,7 +2815,7 @@ Standard ciphertext retains its existing format. Tokens and selections are never
 Daily Brief SQL admission, completion and preference fences now reference the agent tables.
 The migration clears existing Calendar disclosure, increments its preference revision, and removes affected outstanding brief attempts.
 Behavior-only preferences and attempts remain unchanged. Fresh agent consent and model disclosure are required.
-`tests/sql/google-calendar-agent-contract.sql` verifies grant isolation, RLS, replay and disconnect boundaries.
+`tests/sql/google-calendar-agent-contract.sql` verified grant isolation, RLS, replay and disconnect boundaries until Ticket 307.
 
 The migration was written October 12, 2026 as `20261012213059_…` and never applied to hosted.
 On October 22 it was renamed to sort after hosted migrations already applied through `20261019025157`.

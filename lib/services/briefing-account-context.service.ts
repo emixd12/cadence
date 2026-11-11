@@ -26,7 +26,7 @@ import { readAdvisorAnalysisRevision, readAdvisorAnalysisSnapshot } from "@/lib/
 import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
 
 import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefConnectedSource } from "@cadence/core/types/daily-brief";
-import { dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
+import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 import { readAdvisorCadenceRevision, readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import {
   listDailyBriefBehaviorDescriptions,
@@ -132,8 +132,9 @@ export async function prepareAccountBriefingContexts(
     const behaviorIds = await listDailyBriefBehaviorIds(caller.client, caller.user.id, signal);
     signal.throwIfAborted();
     let calendar: AdvisorAuthorizationFence["calendar"] = null;
-    if (allowed("googleCalendar")) {
-      const connection = await getCalendarConnection(caller, "agent");
+    // Ticket 307: Google Calendar is the Timeline connection and its selected calendars.
+    if (allowed("googleCalendar") && dailyBriefReadsGoogleCalendar(preferences)) {
+      const connection = await getCalendarConnection(caller);
       signal.throwIfAborted();
       if (connection.status === "connected" && connection.preferences.selectedCalendarIds.length > 0) {
         calendar = {
@@ -411,6 +412,7 @@ function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTrav
 
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {
   return left.enabled === right.enabled && left.revision === right.revision && left.useConnectedSources === right.useConnectedSources &&
+    left.googleCalendarSource === right.googleCalendarSource &&
     left.includeReminderHistory === right.includeReminderHistory && left.includeNotes === right.includeNotes &&
     DAILY_BRIEF_CONNECTED_SOURCES.every((source) => left.excludedSources[source] === right.excludedSources[source]);
 }

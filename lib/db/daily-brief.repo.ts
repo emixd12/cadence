@@ -11,6 +11,11 @@ export type DailyBriefPreferences = {
    */
   useConnectedSources: boolean;
   excludedSources: DailyBriefSourceFlags;
+  /**
+   * Ticket 307: "timeline" once the hosted migration moved Google Calendar to the
+   * Timeline connection. Null before it, when no Google Calendar is read.
+   */
+  googleCalendarSource: "timeline" | null;
   /** Separate choice for reminder delivery history (Ticket 172). */
   includeReminderHistory: boolean;
   /** Separate choice for Notes on Not Completed occurrences (Ticket 172). */
@@ -225,6 +230,7 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
     || (record.include_reminder_history !== undefined && typeof record.include_reminder_history !== "boolean")
     || (record.include_notes !== undefined && typeof record.include_notes !== "boolean")
     || DAILY_BRIEF_CONNECTED_SOURCES.some((source) => record[ALLOWED_SOURCE_KEYS[source]] !== undefined && typeof record[ALLOWED_SOURCE_KEYS[source]] !== "boolean")
+    || (record.google_calendar_source !== undefined && record.google_calendar_source !== "timeline")
   ) {
     throw new Error("Daily Brief preferences returned an invalid result.");
   }
@@ -239,6 +245,7 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
   return {
     enabled,
     ...choice,
+    googleCalendarSource: record.google_calendar_source === "timeline" ? "timeline" : null,
     // Absent before migration 20260926170000; absence never allows a source.
     includeReminderHistory: record.include_reminder_history === true,
     includeNotes: record.include_notes === true,

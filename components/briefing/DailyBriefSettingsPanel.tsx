@@ -15,7 +15,8 @@ import { SettingsPanel } from "@/components/settings/SettingsPanels";
 const SOURCES = [
   {
     key: "googleCalendar", id: "daily-brief-google-disclosure", title: "Google Calendar", calendar: true,
-    detail: "Sends today’s event times, timezone, availability and your response for the calendars selected in Google Calendar for Daily Brief. Event titles, descriptions, locations and attendees are not sent. Your Timeline Google Calendar connection is never used.",
+    // Ticket 307: the Timeline connection and its selected calendars.
+    detail: "Sends today’s event times, timezone, availability and your response for the calendars you selected for Timeline. Event titles, descriptions, locations and attendees are not sent.",
   },
   {
     key: "outlookCalendar", id: "daily-brief-outlook-disclosure", title: "Outlook Calendar", calendar: true,

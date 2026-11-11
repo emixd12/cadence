@@ -49,3 +49,11 @@ export function dailyBriefChoiceFromAllowed(enabled: boolean, allowed: DailyBrie
     excludedSources: useConnectedSources ? dailyBriefSourceFlags((source) => !allowed[source]) : NO_DAILY_BRIEF_SOURCES,
   };
 }
+
+/**
+ * Ticket 307: the brief reads Google Calendar only through the Timeline connection,
+ * and only once the hosted migration reports it; before that no Google Calendar is read.
+ */
+export function dailyBriefReadsGoogleCalendar(preferences: Readonly<{ googleCalendarSource: "timeline" | null }>): boolean {
+  return preferences.googleCalendarSource === "timeline";
+}

@@ -29,12 +29,10 @@ const coordinator: GoogleCalendarCoordinator = {
   disconnect: async () => ({ view: { ...connection, status: "disconnected" }, revocationFailed: false }),
 };
 export function CalendarSettingsBench() {
-  const [mode, setMode] = useState("standard");
   const [status, setStatus] = useState<CalendarConnectionView["status"]>("connected");
   const fixtureCoordinator = useMemo(() => ({ ...coordinator, getConnection: async () => ({ ...connection, status }) }), [status]);
-  return <><label className="mb-4 grid gap-2 text-sm">Connection purpose<select className="min-h-11 border border-line bg-background" value={mode} onChange={event => setMode(event.target.value)}><option value="standard">Timeline</option><option value="agent">Daily Brief</option></select></label>
-    <label className="mb-4 grid gap-2 text-sm">Connection state<select className="min-h-11 border border-line bg-background" value={status} onChange={event => setStatus(event.target.value as CalendarConnectionView["status"])}><option value="connected">Connected</option><option value="disconnected">Disconnected</option><option value="not_configured">Not configured</option><option value="reconnect_required">Reconnect required</option></select></label>
-    <GoogleCalendarPanel key={`${mode}-${status}`} agent={mode === "agent"} coordinator={fixtureCoordinator} refreshRange={snapshot.requestedRange} /></>;
+  return <><label className="mb-4 grid gap-2 text-sm">Connection state<select className="min-h-11 border border-line bg-background" value={status} onChange={event => setStatus(event.target.value as CalendarConnectionView["status"])}><option value="connected">Connected</option><option value="disconnected">Disconnected</option><option value="not_configured">Not configured</option><option value="reconnect_required">Reconnect required</option></select></label>
+    <GoogleCalendarPanel key={status} coordinator={fixtureCoordinator} refreshRange={snapshot.requestedRange} /></>;
 }
 const googleTimed = snapshot.events[0]!;
 const googleFull: NormalizedExternalEvent = { ...googleTimed, title: "Afternoon appointment", location: "Synthetic destination",

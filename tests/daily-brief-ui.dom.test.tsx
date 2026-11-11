@@ -155,7 +155,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
     expect(container.querySelector("#daily-brief-sources-coverage")?.textContent).toBe("Covers Google Calendar, iCloud Calendar and Hevy, and any source you connect later. Only timing is sent, never event titles, descriptions, locations, attendees or workout details.");
     expect(container.querySelector("details")?.open).toBe(false);
     const google = container.querySelector("#daily-brief-google-disclosure")?.textContent ?? "";
-    expect(google).toContain("Sends today’s event times, timezone, availability and your response for the calendars selected in Google Calendar for Daily Brief.");
+    expect(google).toContain("Sends today’s event times, timezone, availability and your response for the calendars you selected for Timeline.");
     expect(google).toContain("Event titles, descriptions, locations and attendees are not sent.");
     expect(google).toContain("Daily Brief uses it.");
     expect(container.querySelector("#daily-brief-outlook-disclosure")?.textContent).toBe("Sends today’s event times, availability and your response for the selected Outlook calendars. Event titles and details are not sent.");

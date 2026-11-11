@@ -16,7 +16,7 @@ import { getDailyBriefSettings } from "./daily-brief.service";
 import { briefingAccountRef, prepareAccountBriefingContexts, workbenchBehaviorRef } from "./briefing-account-context.service";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { createHash, randomUUID } from "node:crypto";
-import { dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
+import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 import { briefingBenchBudget, type BriefingBenchReservation } from "./briefing-bench-budget";
 import type { BriefingAnalysisLaneId, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
@@ -217,7 +217,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           source: account ? { mode: "account", accountRef: ownerRef!, preferenceRevision: preferences!.revision }
             : { mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
           capture: account ? {
-            calendarGrantPurpose: "agent",
+            calendarGrantPurpose: "timeline",
             historyDays: [...new Set(configs.map(config => config.scope.historyDays))],
             includeCalendar: configs.some(config => config.scope.includeCalendar) && !!account.calendar,
             calendarDisclosed: !!account.calendar,
@@ -441,8 +441,8 @@ export async function assertSavedCaseAuthorized(caller: CalendarCaller, preferen
       (saved.capture.includeReminders && !current.includeReminderHistory) ||
       (saved.capture.includeNotes && !current.includeNotes)) throw new DailyBriefError("access_denied");
   if (saved.capture.includeCalendar) {
-    if (saved.capture.calendarGrantPurpose !== "agent") throw new DailyBriefError("review_only");
-    const connection = await getCalendarConnection(caller, "agent");
+    if (saved.capture.calendarGrantPurpose !== "timeline" || !dailyBriefReadsGoogleCalendar(current)) throw new DailyBriefError("review_only");
+    const connection = await getCalendarConnection(caller);
     if (connection.status !== "connected") throw new DailyBriefError("access_denied");
     const contexts = saved.inputs?.contexts;
     if (!contexts?.length || contexts.some(context => !context.connectors.some(connector =>

@@ -1061,13 +1061,28 @@ recaps and routine diagnostic prose remain prohibited. A marking pattern cannot
 prove availability or override Calendar evidence, duration or planner constraints.
 Consent, explicit comparison runs, read-only authority and duration controls remain.
 
-## Separate Calendar consent for Daily Brief (Ticket 187)
+## Daily Brief reads Google Calendar through the Timeline connection (Ticket 307)
 
-Timeline Calendar and Daily Brief Calendar use independent read-only Google grants and selections.
-Settings exposes **Google Calendar for Daily Brief** before the Daily Brief disclosure controls.
-Connecting this grant does not enable model sharing. The user must enable Calendar separately in Daily Brief settings.
-Missing agent configuration or denied agent consent cannot authorize use of the Timeline grant.
-Web and linked desktop share this contract. Marketing has no authenticated consent control; native mobile remains deferred.
+A person connects Google Calendar once. Daily Brief reads Google Calendar timing
+through the Timeline connection and its selected calendars. The one connected-sources
+choice of Ticket 306 covers Google Calendar like any other source, and **Advanced:
+choose sources** can exclude it. Settings no longer shows **Google Calendar for Daily
+Brief** on web or desktop.
+
+- What is sent does not change: today's event times, timezone, availability and
+  response for the selected calendars. Titles, descriptions, locations and
+  attendees are never sent. Timeline display choices (showing Calendar on Timeline,
+  hiding a selected calendar, all-day events) do not change what Daily Brief reads.
+- The separate Daily Brief grant of Ticket 187 is retired. Each grant is revoked at
+  Google, then a migration deletes its stored credentials, selections and attempts
+  (`docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)").
+- An account that had allowed Calendar timing keeps it allowed only if its Timeline
+  connection is connected; otherwise Google Calendar starts excluded.
+- Until that migration runs, the brief reads no Google Calendar at all.
+
+This supersedes "Separate Calendar consent for Daily Brief (Ticket 187)". Web: this
+ticket. Desktop: the linked Mac loses the same panel; no local data changes.
+Marketing: P-035 logs the Privacy and FAQ text. Future mobile: mobile web inherits it.
 
 ## One Daily Brief choice for connected sources (Ticket 306)
 

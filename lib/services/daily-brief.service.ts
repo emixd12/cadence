@@ -1,8 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefConnectedSource, type DailyBriefResponse, type DailyBriefSettings, type DailyBriefSourceStatus } from "@cadence/core/types/daily-brief";
-import { dailyBriefChoiceFromAllowed, dailyBriefSourceFlags, dailyBriefSourcesUsed } from "@cadence/core/services/daily-brief-sources";
+import { dailyBriefChoiceFromAllowed, dailyBriefReadsGoogleCalendar, dailyBriefSourceFlags, dailyBriefSourcesUsed } from "@cadence/core/services/daily-brief-sources";
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
-import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput } from "@/lib/db/daily-brief.repo";
+import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
@@ -43,7 +43,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
   const preferences = await readDailyBriefPreferences(caller.client);
   const [timezone, sourceStatus] = await Promise.all([
     readAdvisorProfileTimezone(caller.client, caller.user.id),
-    readDailyBriefSourceStatus(caller),
+    readDailyBriefSourceStatus(caller, preferences),
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
   return { accountRef: briefingAccountRef(caller.user.id), available: !!process.env.OPENAI_API_KEY,
@@ -105,13 +105,14 @@ function parseDailyBriefSettingsInput(value: unknown): DailyBriefPreferenceInput
 }
 
 /**
- * Whether each source has something to read now. Ticket 187: Google Calendar is
- * the separate agent grant. A failed status read reports the source as not connected.
+ * Whether each source has something to read now. Ticket 307: Google Calendar is the
+ * Timeline connection and its selected calendars, once the hosted migration reports
+ * it. A failed status read reports the source as not connected.
  */
-export async function readDailyBriefSourceStatus(caller: CalendarCaller): Promise<Record<DailyBriefConnectedSource, DailyBriefSourceStatus>> {
+export async function readDailyBriefSourceStatus(caller: CalendarCaller, preferences: Pick<DailyBriefPreferences, "googleCalendarSource">): Promise<Record<DailyBriefConnectedSource, DailyBriefSourceStatus>> {
   const read = <T,>(operation: () => Promise<T>) => Promise.resolve().then(operation).catch(() => null);
   const [google, outlook, icloud, hevy] = await Promise.all([
-    read(() => getCalendarConnection(caller, "agent")),
+    dailyBriefReadsGoogleCalendar(preferences) ? read(() => getCalendarConnection(caller)) : null,
     read(() => getOutlookCalendarConnection(caller)),
     read(() => getIcloudCalendarConnection(caller)),
     read(() => getHevyConnection(caller)),

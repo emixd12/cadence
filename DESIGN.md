@@ -790,12 +790,11 @@ have separate text. Controls preserve 44px targets and semantic live feedback.
 
 The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.
 
-## Agent Calendar settings — Ticket 187
+## Agent Calendar settings — Ticket 187 (retired by Ticket 307)
 
-Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief grant.
-Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
-It omits Timeline display controls and explains the separate model-data disclosure.
-`CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.
+`GoogleCalendarPanel` has no agent mode. Daily Brief reads the Timeline connection, so
+web and linked desktop Settings show one Google Calendar panel, inside Connected
+sources. `CalendarSettingsBench` provides connection-state fixtures only.
 
 ## Daily Brief recipe 1.1 bubble — Ticket 184
 

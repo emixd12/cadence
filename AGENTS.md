@@ -218,7 +218,8 @@ In scope:
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241. One Daily Brief choice covers every connected source, including
-  one connected later, with per-source exclusions under Advanced (Ticket 306)
+  one connected later, with per-source exclusions under Advanced (Ticket 306).
+  Daily Brief reads Google Calendar through the Timeline connection (Ticket 307)
 - Remote MCP server, Cadence-owned OAuth server, consent and Connected apps
   settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
   full tracking-data read plus scoped, user-confirmed writes (Occurrence status

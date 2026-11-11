@@ -7,7 +7,7 @@ import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
 import { CalendarConnectionError, calendarGoogleSubject, type CalendarIdentityUser, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
-import { dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
+import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 
 export type CalendarCaller = { client: AppSupabaseClient; user: User };
 /** Calendar reads need only the account id and its Google identity, so the leave reminder job's caller (Ticket 276) fits. */
@@ -22,32 +22,29 @@ export async function getCalendarConnection(caller: CalendarReadCaller, grantPur
     : { accountId: caller.user.id, status: "disconnected", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
 }
 export async function startCalendarConnection(caller: CalendarCaller, target: "web" | "desktop", clientState = "", requestOrigin?: string, grantPurpose: CalendarPurpose = "standard") {
-  const settings = config(requestOrigin, grantPurpose);
+  // Ticket 307: the separate Daily Brief grant is retired; no new one starts.
+  if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
+  const settings = config(requestOrigin);
   const googleSubject = calendarGoogleSubject(caller.user);
   if (target === "desktop" && !/^[a-zA-Z0-9_-]{32,128}$/.test(clientState)) throw new CalendarConnectionError("invalid_request");
-  const existing = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
+  const existing = await readCalendarConnection(caller.client, caller.user.id);
   const generation = existing?.generation ?? 0;
   const flow = createCalendarAuthorization(settings, googleSubject);
-  if (grantPurpose === "agent") {
-    flow.state = `a_${flow.state}`;
-    const url = new URL(flow.url); url.searchParams.set("state", flow.state); flow.url = url.toString();
-  }
   const stateHash = hashCalendarState(flow.state);
-  await beginCalendarAttempt({ ...(grantPurpose === "agent" ? { grantPurpose, oauthClientId: settings.clientId } : {}), userId: caller.user.id, googleSubject, generation, stateHash, target, clientState,
+  await beginCalendarAttempt({ userId: caller.user.id, googleSubject, generation, stateHash, target, clientState,
     sealedVerifier: sealCalendarSecret(settings, flow.verifier, { purpose: "verifier", userId: caller.user.id, googleSubject, generation, stateHash }) });
   return { url: flow.url };
 }
 export async function finishCalendarConnection(input: { state: string; code: string | null; denied: boolean; cookieUser: User | null; requestOrigin?: string }): Promise<string> {
-  const grantPurpose = input.state.length === 45 && input.state.startsWith("a_") ? "agent" : "standard";
-  const settings = config(input.requestOrigin, grantPurpose);
-  const resultKey = grantPurpose === "agent" ? "agentCalendar" : "calendar";
-  const fallback = new URL(`/settings?${resultKey}=error`, settings.callbackUrl).toString();
-  if (!/^(?:a_)?[a-zA-Z0-9_-]{43}$/.test(input.state)) return fallback;
-  const attempt = await consumeCalendarAttempt(hashCalendarState(input.state), grantPurpose);
+  const settings = config(input.requestOrigin);
+  // Ticket 307: a late callback for the retired Daily Brief grant ("a_" state) installs nothing.
+  if (input.state.length === 45 && input.state.startsWith("a_")) return new URL("/settings?agentCalendar=error", settings.callbackUrl).toString();
+  const fallback = new URL("/settings?calendar=error", settings.callbackUrl).toString();
+  if (!/^[a-zA-Z0-9_-]{43}$/.test(input.state)) return fallback;
+  const attempt = await consumeCalendarAttempt(hashCalendarState(input.state));
   if (!attempt) return fallback;
   let result = "error";
   try {
-    if (grantPurpose === "agent" && attempt.oauthClientId !== settings.clientId) throw new CalendarConnectionError("connection_changed");
     if (attempt.target === "web" && input.cookieUser?.id !== attempt.userId) throw new CalendarConnectionError("unauthenticated");
     const user = await readCalendarCallbackUser(attempt.userId);
     if (calendarGoogleSubject(user) !== attempt.googleSubject) throw new CalendarConnectionError("same_account_required");
@@ -62,8 +59,8 @@ export async function finishCalendarConnection(input: { state: string; code: str
   } catch (error) {
     if (error instanceof CalendarConnectionError && (attempt.target === "web" || error.code === "same_account_required")) result = error.code;
   }
-  if (attempt.target === "desktop") return `cadence://calendar/callback?${new URLSearchParams({ state: attempt.clientState, result, ...(grantPurpose === "agent" ? { purpose: "agent" } : {}) })}`;
-  return new URL(`/settings?${resultKey}=${encodeURIComponent(result)}`, settings.callbackUrl).toString();
+  if (attempt.target === "desktop") return `cadence://calendar/callback?${new URLSearchParams({ state: attempt.clientState, result })}`;
+  return new URL(`/settings?calendar=${encodeURIComponent(result)}`, settings.callbackUrl).toString();
 }
 async function connected(caller: CalendarReadCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnection> {
   const settings = config(undefined, grantPurpose);
@@ -98,12 +95,14 @@ async function listCalendarsWithToken(accessToken: string, connection: CalendarC
   }
 }
 export async function listCalendarCalendars(caller: CalendarCaller, grantPurpose: CalendarPurpose = "standard") {
+  if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const connection = await connected(caller, grantPurpose);
   const calendars = await listCalendarsWithToken(await accessToken(connection), connection);
   await assertCurrent(caller, connection);
   return { calendars };
 }
 export async function updateCalendarPreferences(caller: CalendarCaller, raw: unknown, grantPurpose: CalendarPurpose = "standard") {
+  if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const connection = await connected(caller, grantPurpose);
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new CalendarConnectionError("invalid_request");
   const value = raw as Record<string, unknown>;
@@ -147,7 +146,8 @@ export async function getCalendarEventsForAdvisor(
     signal?: AbortSignal;
   }> = {},
 ): Promise<AdvisorCalendarRead> {
-  return readAuthorizedCalendarRange(caller, start, end, options, false, "agent");
+  // Ticket 307: Daily Brief reads the Timeline connection's selected calendars.
+  return readAuthorizedCalendarRange(caller, start, end, options, false, "standard");
 }
 
 /** Development-only Retrospective reads. Live authorization never uses the evaluation clock. */
@@ -158,14 +158,14 @@ export async function getCalendarEventsForWorkbenchHistory(
   if (process.env.NODE_ENV !== "development") throw new CalendarConnectionError("permission_denied");
   options.signal?.throwIfAborted();
   const preference = await readDailyBriefPreferences(caller.client, options.signal);
-  if (!dailyBriefSourceAllowed(preference, "googleCalendar")) throw new CalendarConnectionError("permission_denied");
-  const connection = await getCalendarConnection(caller, "agent");
+  if (!dailyBriefSourceAllowed(preference, "googleCalendar") || !dailyBriefReadsGoogleCalendar(preference)) throw new CalendarConnectionError("permission_denied");
+  const connection = await getCalendarConnection(caller);
   if (connection.status !== "connected") throw new CalendarConnectionError("connection_changed");
   const result = await readAuthorizedCalendarRange(caller, start, end, {
     authorizedCalendarIds: connection.preferences.selectedCalendarIds,
     expectedConnectionGeneration: connection.generation, expectedSelectionRevision: connection.selectionRevision,
     authorizationScope: `briefing-history:${preference.revision}`, signal: options.signal,
-  }, true, "agent");
+  }, true, "standard");
   const current = await readDailyBriefPreferences(caller.client, options.signal);
   options.signal?.throwIfAborted();
   if (JSON.stringify(current) !== JSON.stringify(preference)) throw new CalendarConnectionError("connection_changed");
@@ -225,6 +225,8 @@ async function readAuthorizedCalendarRange(
   return { connection, result };
 }
 export async function disconnectCalendar(caller: CalendarCaller, grantPurpose: CalendarPurpose = "standard") {
+  // Ticket 307: the retirement job revokes the Daily Brief grants.
+  if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
   let revocationFailed = false;
   if (connection) {
@@ -238,13 +240,22 @@ export async function disconnectCalendar(caller: CalendarCaller, grantPurpose: C
   return { ...await getCalendarConnection(caller, grantPurpose), revocationFailed };
 }
 
+/** Ticket 307: older desktop builds still ask for the retired Daily Brief grant; it reads as not configured. */
+export function retiredAgentCalendarConnection(caller: CalendarReadCaller): CalendarConnectionView {
+  return { accountId: caller.user.id, status: "not_configured", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
+}
+
 // Capture only the revocation work; failed Auth deletion must leave the connection intact.
 export async function prepareCalendarRevocation(caller: CalendarCaller): Promise<(() => Promise<void>) | null> {
   const work: Array<() => Promise<void>> = [];
   for (const grantPurpose of ["standard", "agent"] as const) {
     const settings = readCalendarOAuthConfig(process.env, undefined, grantPurpose);
     if (!settings) continue;
-    const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
+    // Ticket 307: the Daily Brief grant tables go with the hosted migration. Before it, a
+    // remaining grant is revoked here; after it, the read fails and nothing remains to revoke.
+    const connection = grantPurpose === "agent"
+      ? await readCalendarConnection(caller.client, caller.user.id, grantPurpose).catch(() => null)
+      : await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
     if (!connection || connection.status !== "connected") continue;
     if (connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
     const sealed = await readCalendarCredential(connection);

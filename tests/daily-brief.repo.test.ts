@@ -31,6 +31,7 @@ describe("Daily Brief repository", () => {
       enabled: true,
       useConnectedSources: true,
       excludedSources: { googleCalendar: false, outlookCalendar: true, icloudCalendar: true, hevy: false },
+      googleCalendarSource: null,
       revision: 3,
       includeReminderHistory: false,
       includeNotes: false,
@@ -50,6 +51,12 @@ describe("Daily Brief repository", () => {
     await expect(read({ enabled: true, revision: 2, include_calendar: false })).resolves.toMatchObject({
       useConnectedSources: false, excludedSources: noneExcluded,
     });
+  });
+
+  it("reports Google Calendar through the Timeline connection only after the Ticket 307 migration", async () => {
+    const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
+    await expect(read({ ...preferences, google_calendar_source: "timeline" })).resolves.toMatchObject({ googleCalendarSource: "timeline" });
+    await expect(read({ ...preferences, google_calendar_source: "agent" })).rejects.toThrow("invalid result");
   });
 
   it("rejects a malformed or disabled choice", async () => {

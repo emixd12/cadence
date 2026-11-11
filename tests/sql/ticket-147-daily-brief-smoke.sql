@@ -28,7 +28,7 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null,"include_outlook_calendar":false,"outlook_connection_generation":null,"outlook_selection_revision":null,"include_icloud_calendar":false,"icloud_connection_generation":null,"icloud_selection_revision":null,"include_hevy":false,"hevy_connection_generation":null,"use_connected_sources":false,"excluded_sources":{"google_calendar":false,"outlook_calendar":false,"icloud_calendar":false,"hevy":false}}'::jsonb then
+  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null,"include_outlook_calendar":false,"outlook_connection_generation":null,"outlook_selection_revision":null,"include_icloud_calendar":false,"icloud_connection_generation":null,"icloud_selection_revision":null,"include_hevy":false,"hevy_connection_generation":null,"use_connected_sources":false,"excluded_sources":{"google_calendar":false,"outlook_calendar":false,"icloud_calendar":false,"hevy":false},"google_calendar_source":"timeline"}'::jsonb then
     raise exception 'Daily Brief defaults changed: %', preference;
   end if;
 
@@ -179,53 +179,26 @@ begin
 end;
 $$;
 
-reset role;
-
-insert into public.google_calendar_agent_connections (
-  user_id, google_subject, generation, status
-)
-values (
-  '14700000-0000-4000-8000-000000000001', 'ticket-147-calendar', 7, 'connected'
-);
-insert into public.google_calendar_agent_preferences (user_id)
-values ('14700000-0000-4000-8000-000000000001');
-
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"14700000-0000-4000-8000-000000000001","role":"authenticated","session_id":"14700000-0000-4000-8000-000000000011"}',
-  true
-);
-
+-- Tickets 306 and 307: an original save with Calendar on stores the one choice
+-- covering Google Calendar, read through the Timeline connection. A covered Calendar
+-- follows its current selection; the service fences each run on what it read.
 do $$
 declare
   preference jsonb;
-begin
-  preference := public.save_daily_brief_preferences(true, true, 2);
-  if preference ->> 'calendar_connection_generation' <> '7'
-    or preference ->> 'calendar_selection_revision' <> '0' then
-    raise exception 'Calendar disclosure fence was not captured: %', preference;
-  end if;
-end;
-$$;
-
-update public.google_calendar_agent_preferences
-set selected_calendar_ids = array['changed-selection']
-where user_id = '14700000-0000-4000-8000-000000000001';
-
--- Ticket 306: a covered Calendar follows its current selection; the service
--- fences each run on the selection it read at the start.
-do $$
-declare
   decision jsonb;
 begin
+  preference := public.save_daily_brief_preferences(true, true, 2);
+  if not (preference ->> 'use_connected_sources')::boolean or (preference -> 'excluded_sources' ->> 'google_calendar')::boolean
+    or preference ->> 'calendar_connection_generation' is not null then
+    raise exception 'The original Calendar save did not map to the one choice: %', preference;
+  end if;
   decision := public.begin_daily_brief(
     '14700000-0000-4000-8000-000000000201',
     false,
     3
   );
   if decision ->> 'state' <> 'acquired' then
-    raise exception 'A reselected covered Calendar was refused: %', decision;
+    raise exception 'A covered Calendar was refused: %', decision;
   end if;
   perform public.save_daily_brief_preferences(true, false, 3);
 end;

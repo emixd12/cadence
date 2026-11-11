@@ -219,6 +219,17 @@ describe("one Daily Brief choice for every connected source (Ticket 306)", () =>
     expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { icloudCalendar: "ready" }, includeIcloudCalendar: true });
   });
 
+  it("reads Google Calendar status from the Timeline connection only after the Ticket 307 migration", async () => {
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, allow: ["googleCalendar"] }));
+    expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { googleCalendar: "ready" }, includeCalendar: true });
+    expect(mocks.calendar).toHaveBeenLastCalledWith(caller);
+    mocks.calendar.mockClear();
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, allow: ["googleCalendar"], googleCalendarSource: null }));
+    expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { googleCalendar: "not_connected" }, includeCalendar: false });
+    expect(mocks.calendar).not.toHaveBeenCalled();
+  });
+
   it("reports a calendar with nothing selected, an unreadable status, and nothing used while the choice is off", async () => {
     mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: [] } });
     mocks.hevy.mockRejectedValue(new Error("status unavailable"));

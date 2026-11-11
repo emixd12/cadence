@@ -477,6 +477,15 @@ describe("account briefing context", () => {
     expect(mocks.contexts).toHaveBeenLastCalledWith(expect.objectContaining({ includeGoogleCalendar: true,
       authorization: expect.objectContaining({ calendar: { calendarIds: ["calendar-1"], connectionGeneration: 4, selectionRevision: 5 } }) }));
     expect(prepared.calendar).toEqual({ calendarIds: ["calendar-1"], connectionGeneration: 4, selectionRevision: 5 });
+    // Ticket 307: the Timeline connection, never the retired Daily Brief grant.
+    expect(mocks.calendar).toHaveBeenLastCalledWith(caller);
+
+    // Before the hosted migration reports the Timeline source, no Google Calendar is read.
+    mocks.calendar.mockClear();
+    mocks.preferences.mockResolvedValue(dailyBriefPreferences({ allow: ["googleCalendar"], googleCalendarSource: null }));
+    await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now });
+    expect(mocks.contexts).toHaveBeenLastCalledWith(expect.objectContaining({ includeGoogleCalendar: false }));
+    expect(mocks.calendar).not.toHaveBeenCalled();
   });
 
   it("rechecks preferences, owner scope, source revision, timezone, Calendar selection, and expiry", async () => {
