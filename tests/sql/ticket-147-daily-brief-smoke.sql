@@ -28,7 +28,7 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null,"include_outlook_calendar":false,"outlook_connection_generation":null,"outlook_selection_revision":null,"include_icloud_calendar":false,"icloud_connection_generation":null,"icloud_selection_revision":null,"include_hevy":false,"hevy_connection_generation":null}'::jsonb then
+  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null,"include_outlook_calendar":false,"outlook_connection_generation":null,"outlook_selection_revision":null,"include_icloud_calendar":false,"icloud_connection_generation":null,"icloud_selection_revision":null,"include_hevy":false,"hevy_connection_generation":null,"use_connected_sources":false,"excluded_sources":{"google_calendar":false,"outlook_calendar":false,"icloud_calendar":false,"hevy":false}}'::jsonb then
     raise exception 'Daily Brief defaults changed: %', preference;
   end if;
 
@@ -213,18 +213,20 @@ update public.google_calendar_agent_preferences
 set selected_calendar_ids = array['changed-selection']
 where user_id = '14700000-0000-4000-8000-000000000001';
 
+-- Ticket 306: a covered Calendar follows its current selection; the service
+-- fences each run on the selection it read at the start.
 do $$
+declare
+  decision jsonb;
 begin
-  begin
-    perform public.begin_daily_brief(
-      '14700000-0000-4000-8000-000000000201',
-      false,
-      3
-    );
-    raise exception 'Stale Calendar disclosure fence was accepted.';
-  exception when sqlstate '55000' then
-    null;
-  end;
+  decision := public.begin_daily_brief(
+    '14700000-0000-4000-8000-000000000201',
+    false,
+    3
+  );
+  if decision ->> 'state' <> 'acquired' then
+    raise exception 'A reselected covered Calendar was refused: %', decision;
+  end if;
   perform public.save_daily_brief_preferences(true, false, 3);
 end;
 $$;

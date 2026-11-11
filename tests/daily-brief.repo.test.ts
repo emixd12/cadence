@@ -9,13 +9,17 @@ import {
   saveDailyBriefPreferences,
 } from "@/lib/db/daily-brief.repo";
 
+const excluded = { google_calendar: false, outlook_calendar: true, icloud_calendar: true, hevy: false };
 const preferences = {
   enabled: true,
-  include_calendar: true,
+  include_calendar: false,
   revision: 3,
-  calendar_connection_generation: 7,
-  calendar_selection_revision: 11,
+  calendar_connection_generation: null,
+  calendar_selection_revision: null,
+  use_connected_sources: true,
+  excluded_sources: excluded,
 };
+const noneExcluded = { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: false };
 
 describe("Daily Brief repository", () => {
   it("normalizes preferences and forwards abort signals", async () => {
@@ -25,66 +29,57 @@ describe("Daily Brief repository", () => {
 
     await expect(readDailyBriefPreferences({ rpc } as never, signal)).resolves.toEqual({
       enabled: true,
-      includeCalendar: true,
+      useConnectedSources: true,
+      excludedSources: { googleCalendar: false, outlookCalendar: true, icloudCalendar: true, hevy: false },
       revision: 3,
-      calendarConnectionGeneration: 7,
-      calendarSelectionRevision: 11,
       includeReminderHistory: false,
       includeNotes: false,
-      includeOutlookCalendar: false,
-      outlookConnectionGeneration: null,
-      outlookSelectionRevision: null,
-      includeIcloudCalendar: false,
-      icloudConnectionGeneration: null,
-      icloudSelectionRevision: null,
-      includeHevy: false,
-      hevyConnectionGeneration: null,
     });
     expect(rpc).toHaveBeenCalledWith("read_daily_brief_preferences");
     expect(abortSignal).toHaveBeenCalledWith(signal);
   });
 
-  it("reads connector disclosures with their bound fences and rejects a disclosure without one (Ticket 239)", async () => {
+  it("derives the one choice from per-source allowances on servers before Ticket 306", async () => {
     const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
-    await expect(read({
-      ...preferences, include_outlook_calendar: true, outlook_connection_generation: 4, outlook_selection_revision: 5,
-      include_icloud_calendar: false, icloud_connection_generation: null, icloud_selection_revision: null,
-      include_hevy: true, hevy_connection_generation: 2,
-    })).resolves.toMatchObject({
-      includeCalendar: true, includeOutlookCalendar: true, outlookConnectionGeneration: 4, outlookSelectionRevision: 5,
-      includeIcloudCalendar: false, includeHevy: true, hevyConnectionGeneration: 2,
+    const legacy = { enabled: true, revision: 2, include_calendar: true, calendar_connection_generation: 7, calendar_selection_revision: 11,
+      include_outlook_calendar: false, include_icloud_calendar: false, include_hevy: true, hevy_connection_generation: 2 };
+    await expect(read(legacy)).resolves.toMatchObject({
+      useConnectedSources: true, excludedSources: { googleCalendar: false, outlookCalendar: true, icloudCalendar: true, hevy: false },
     });
-    await expect(read({ ...preferences, include_hevy: true, hevy_connection_generation: null })).rejects.toThrow("invalid result");
-    await expect(read({ ...preferences, include_outlook_calendar: true, outlook_connection_generation: 4 })).rejects.toThrow("invalid result");
-    await expect(read({ ...preferences, include_hevy: false, hevy_connection_generation: 2 })).rejects.toThrow("invalid result");
-    await expect(read({ ...preferences, include_hevy: "true", hevy_connection_generation: 2 })).rejects.toThrow("invalid result");
+    // Nothing allowed: the choice starts off and nothing is excluded, as for a new account.
+    await expect(read({ enabled: true, revision: 2, include_calendar: false })).resolves.toMatchObject({
+      useConnectedSources: false, excludedSources: noneExcluded,
+    });
   });
 
-  it("saves only the requested controls and expected revision", async () => {
+  it("rejects a malformed or disabled choice", async () => {
+    const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
+    await expect(read({ ...preferences, use_connected_sources: "true" })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, excluded_sources: { ...excluded, hevy: null } })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, excluded_sources: { ...excluded, strava: false } })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, excluded_sources: undefined })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, enabled: false })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, include_hevy: "true" })).rejects.toThrow("invalid result");
+  });
+
+  it("saves the one choice, each exclusion and the expected revision", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: preferences, error: null });
     await saveDailyBriefPreferences(
       { rpc } as never,
-      { enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: true },
+      { enabled: true, useConnectedSources: true, excludedSources: { ...noneExcluded, outlookCalendar: true }, includeReminderHistory: false, includeNotes: true },
       2,
     );
-    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences_v3", {
+    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences_v4", {
       p_enabled: true,
-      p_include_calendar: true,
+      p_use_connected_sources: true,
+      p_exclude_google_calendar: false,
+      p_exclude_outlook_calendar: true,
+      p_exclude_icloud_calendar: false,
+      p_exclude_hevy: false,
       p_include_reminder_history: false,
       p_include_notes: true,
-      p_include_outlook_calendar: false,
-      p_include_icloud_calendar: false,
-      p_include_hevy: false,
       p_expected_revision: 2,
     });
-    await saveDailyBriefPreferences(
-      { rpc } as never,
-      { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, includeOutlookCalendar: true, includeHevy: true },
-      3,
-    );
-    expect(rpc).toHaveBeenLastCalledWith("save_daily_brief_preferences_v3", expect.objectContaining({
-      p_include_calendar: false, p_include_outlook_calendar: true, p_include_icloud_calendar: false, p_include_hevy: true, p_expected_revision: 3,
-    }));
   });
 
   it("normalizes acquisition and bounds completion with the supplied signal", async () => {
@@ -160,7 +155,7 @@ describe("Daily Brief repository", () => {
     rpc.mockClear();
     await expect(saveDailyBriefPreferences(
       { rpc } as never,
-      { enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false },
+      { enabled: true, useConnectedSources: true, excludedSources: noneExcluded, includeReminderHistory: false, includeNotes: false },
       2,
     )).rejects.toMatchObject({ code: "context_changed" });
     expect(rpc).toHaveBeenCalledTimes(1);

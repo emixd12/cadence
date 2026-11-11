@@ -1,32 +1,25 @@
+import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefConnectedSource, type DailyBriefSourceFlags } from "@cadence/core/types/daily-brief";
+import { dailyBriefChoiceFromAllowed, dailyBriefSourceFlags } from "@cadence/core/services/daily-brief-sources";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 
 export type DailyBriefPreferences = {
   enabled: boolean;
-  includeCalendar: boolean;
-  /** Separate disclosure for reminder delivery history (Ticket 172). */
+  /**
+   * Ticket 306: one choice covers every connected source, including one connected
+   * later, except the sources excluded under Advanced. Which sources a brief reads
+   * also depends on each connection (`dailyBriefSourcesUsed`).
+   */
+  useConnectedSources: boolean;
+  excludedSources: DailyBriefSourceFlags;
+  /** Separate choice for reminder delivery history (Ticket 172). */
   includeReminderHistory: boolean;
-  /** Separate disclosure for Notes on Not Completed occurrences (Ticket 172). */
+  /** Separate choice for Notes on Not Completed occurrences (Ticket 172). */
   includeNotes: boolean;
   revision: number;
-  calendarConnectionGeneration: number | null;
-  calendarSelectionRevision: number | null;
-  /**
-   * Separate connector disclosures (Ticket 239). `includeCalendar` stays Google
-   * only. Each binds the connection generation, and calendars also the
-   * selection revision, current when it was granted.
-   */
-  includeOutlookCalendar: boolean;
-  outlookConnectionGeneration: number | null;
-  outlookSelectionRevision: number | null;
-  includeIcloudCalendar: boolean;
-  icloudConnectionGeneration: number | null;
-  icloudSelectionRevision: number | null;
-  includeHevy: boolean;
-  hevyConnectionGeneration: number | null;
 };
 
-export type DailyBriefPreferenceInput = Pick<DailyBriefPreferences, "enabled" | "includeCalendar" | "includeReminderHistory" | "includeNotes">
-  & Partial<Pick<DailyBriefPreferences, "includeOutlookCalendar" | "includeIcloudCalendar" | "includeHevy">>;
+export type DailyBriefPreferenceInput = Pick<DailyBriefPreferences,
+  "enabled" | "useConnectedSources" | "excludedSources" | "includeReminderHistory" | "includeNotes">;
 
 export type DailyBriefBeginResult =
   | { state: "acquired"; leaseToken: string; localDate: string }
@@ -70,17 +63,17 @@ export async function saveDailyBriefPreferences(
   expectedRevision: number,
   signal?: AbortSignal,
 ): Promise<DailyBriefPreferences> {
-  // Omitted connector disclosures save as off; a save never grants one silently.
   const request = client.rpc(
-    "save_daily_brief_preferences_v3",
+    "save_daily_brief_preferences_v4",
     {
       p_enabled: input.enabled,
-      p_include_calendar: input.includeCalendar,
+      p_use_connected_sources: input.useConnectedSources,
+      p_exclude_google_calendar: input.excludedSources.googleCalendar,
+      p_exclude_outlook_calendar: input.excludedSources.outlookCalendar,
+      p_exclude_icloud_calendar: input.excludedSources.icloudCalendar,
+      p_exclude_hevy: input.excludedSources.hevy,
       p_include_reminder_history: input.includeReminderHistory,
       p_include_notes: input.includeNotes,
-      p_include_outlook_calendar: input.includeOutlookCalendar === true,
-      p_include_icloud_calendar: input.includeIcloudCalendar === true,
-      p_include_hevy: input.includeHevy === true,
       p_expected_revision: expectedRevision,
     },
   );
@@ -216,55 +209,57 @@ export async function listBriefingWorkbenchBehaviors(client: AppSupabaseClient, 
   return data ?? [];
 }
 
+const EXCLUDED_SOURCE_KEYS = {
+  googleCalendar: "google_calendar", outlookCalendar: "outlook_calendar", icloudCalendar: "icloud_calendar", hevy: "hevy",
+} as const satisfies Record<DailyBriefConnectedSource, string>;
+const ALLOWED_SOURCE_KEYS = {
+  googleCalendar: "include_calendar", outlookCalendar: "include_outlook_calendar", icloudCalendar: "include_icloud_calendar", hevy: "include_hevy",
+} as const satisfies Record<DailyBriefConnectedSource, string>;
+
 function parsePreferences(value: unknown): DailyBriefPreferences {
   const record = asRecord(value, "preferences");
   if (
     typeof record.enabled !== "boolean"
-    || typeof record.include_calendar !== "boolean"
     || !Number.isSafeInteger(record.revision)
     || (record.revision as number) < 0
-    || (record.calendar_connection_generation !== null && !Number.isSafeInteger(record.calendar_connection_generation))
-    || (record.calendar_selection_revision !== null && !Number.isSafeInteger(record.calendar_selection_revision))
-    || (record.include_calendar && (record.calendar_connection_generation === null || record.calendar_selection_revision === null))
     || (record.include_reminder_history !== undefined && typeof record.include_reminder_history !== "boolean")
     || (record.include_notes !== undefined && typeof record.include_notes !== "boolean")
-    || (!record.include_calendar && (record.calendar_connection_generation !== null || record.calendar_selection_revision !== null))
-    || !connectorFenceValid(record, "include_outlook_calendar", ["outlook_connection_generation", "outlook_selection_revision"])
-    || !connectorFenceValid(record, "include_icloud_calendar", ["icloud_connection_generation", "icloud_selection_revision"])
-    || !connectorFenceValid(record, "include_hevy", ["hevy_connection_generation"])
+    || DAILY_BRIEF_CONNECTED_SOURCES.some((source) => record[ALLOWED_SOURCE_KEYS[source]] !== undefined && typeof record[ALLOWED_SOURCE_KEYS[source]] !== "boolean")
   ) {
     throw new Error("Daily Brief preferences returned an invalid result.");
   }
-  const fence = (key: string) => (record[key] ?? null) as number | null;
+  const enabled = record.enabled;
+  // Absent before migration 20261110150000: derive the choice from what was allowed.
+  const choice = record.use_connected_sources === undefined && record.excluded_sources === undefined
+    ? dailyBriefChoiceFromAllowed(enabled, dailyBriefSourceFlags((source) => record[ALLOWED_SOURCE_KEYS[source]] === true))
+    : parseSourceChoice(record);
+  if (!enabled && (choice.useConnectedSources || DAILY_BRIEF_CONNECTED_SOURCES.some((source) => choice.excludedSources[source]))) {
+    throw new Error("Daily Brief preferences returned an invalid result.");
+  }
   return {
-    enabled: record.enabled,
-    includeCalendar: record.include_calendar,
-    // Absent before migration 20260926170000; absence never grants disclosure.
+    enabled,
+    ...choice,
+    // Absent before migration 20260926170000; absence never allows a source.
     includeReminderHistory: record.include_reminder_history === true,
     includeNotes: record.include_notes === true,
     revision: record.revision as number,
-    calendarConnectionGeneration: record.calendar_connection_generation as number | null,
-    calendarSelectionRevision: record.calendar_selection_revision as number | null,
-    // Absent before migration 20261019041000; absence never grants disclosure.
-    includeOutlookCalendar: record.include_outlook_calendar === true,
-    outlookConnectionGeneration: record.include_outlook_calendar === true ? fence("outlook_connection_generation") : null,
-    outlookSelectionRevision: record.include_outlook_calendar === true ? fence("outlook_selection_revision") : null,
-    includeIcloudCalendar: record.include_icloud_calendar === true,
-    icloudConnectionGeneration: record.include_icloud_calendar === true ? fence("icloud_connection_generation") : null,
-    icloudSelectionRevision: record.include_icloud_calendar === true ? fence("icloud_selection_revision") : null,
-    includeHevy: record.include_hevy === true,
-    hevyConnectionGeneration: record.include_hevy === true ? fence("hevy_connection_generation") : null,
   };
 }
 
-/** A missing key is off. A present disclosure must carry every bound fence value. */
-function connectorFenceValid(record: JsonRecord, flag: string, fences: readonly string[]): boolean {
-  const value = record[flag];
-  if (value === undefined) return fences.every((key) => record[key] === undefined || record[key] === null);
-  if (typeof value !== "boolean") return false;
-  return fences.every((key) => value
-    ? Number.isSafeInteger(record[key]) && (record[key] as number) >= 0
-    : record[key] === undefined || record[key] === null);
+function parseSourceChoice(record: JsonRecord): Pick<DailyBriefPreferences, "useConnectedSources" | "excludedSources"> {
+  const excluded = record.excluded_sources;
+  if (typeof record.use_connected_sources !== "boolean" || !excluded || typeof excluded !== "object" || Array.isArray(excluded)) {
+    throw new Error("Daily Brief preferences returned an invalid result.");
+  }
+  const flags = excluded as JsonRecord;
+  if (Object.keys(flags).length !== DAILY_BRIEF_CONNECTED_SOURCES.length ||
+      DAILY_BRIEF_CONNECTED_SOURCES.some((source) => typeof flags[EXCLUDED_SOURCE_KEYS[source]] !== "boolean")) {
+    throw new Error("Daily Brief preferences returned an invalid result.");
+  }
+  return {
+    useConnectedSources: record.use_connected_sources,
+    excludedSources: dailyBriefSourceFlags((source) => flags[EXCLUDED_SOURCE_KEYS[source]] === true),
+  };
 }
 
 function parseBeginResult(value: unknown): DailyBriefBeginResult {

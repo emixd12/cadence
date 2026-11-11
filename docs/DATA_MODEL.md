@@ -2352,6 +2352,33 @@ Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
 - `read_daily_brief_preferences` returns the new keys. The repository treats a
   missing key as off and rejects a disclosure without its fence.
 
+Migration `20261110150000_daily_brief_connected_sources.sql` (Ticket 306, additive):
+
+- `daily_brief_preferences` adds nullable `use_connected_sources`,
+  `exclude_google_calendar`, `exclude_outlook_calendar`, `exclude_icloud_calendar`
+  and `exclude_hevy`. A check constraint keeps all five null or all set; another
+  requires every one false while Daily Brief is off. Null means the row predates
+  the one choice. No existing row is rewritten.
+- `read_daily_brief_preferences` keeps every earlier key and adds
+  `use_connected_sources` and `excluded_sources` (`google_calendar`,
+  `outlook_calendar`, `icloud_calendar`, `hevy`). For a null row it derives them:
+  the choice is on when Daily Brief is on and at least one source was allowed; then
+  every source that was not allowed is excluded. With nothing allowed the choice is
+  off and nothing is excluded.
+- `save_daily_brief_preferences_v4(enabled, use_connected_sources, four exclusions,
+  include_reminder_history, include_notes, expected_revision)` stores the choice,
+  sets the per-source `include_*` columns false and their fences null, bumps the
+  revision and deletes the owner's `daily_brief_runs` (and tip deliveries when
+  Daily Brief turns off). Disabled with any other value on raises `22023`; a stale
+  revision raises `55000`. It does not require a source to be connected: a source
+  connected later is covered. Granted to `authenticated` only.
+- `daily_brief_calendar_fence_is_current` keeps its signature and now checks only
+  the caller. Covered sources follow their current connection, so `begin_daily_brief`
+  and `finish_daily_brief` fence on the stored revision; the service fences each
+  run on the connection and selection it read at the start.
+- The per-source `include_*` columns and `save_daily_brief_preferences_v3` remain
+  for clients built before this migration.
+
 Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
 
 - `daily_brief_preferences` adds `include_reminder_history` and `include_notes`

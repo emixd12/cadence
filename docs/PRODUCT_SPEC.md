@@ -583,9 +583,9 @@ Decision D4 adds event location reads from Outlook and iCloud for routing under 
 New provider identities bind to the current Cadence account and need not match
 the Google sign-in identity. One account per provider. Credentials stay sealed on
 the server. Desktop uses hosted brokers and stores no provider credential.
-Account-free desktop mode offers no connector. Each source reaches Daily Brief
-only after its own default-off disclosure; the existing Calendar disclosure stays
-Google-only.
+Account-free desktop mode offers no connector. A source reaches Daily Brief only
+while the one connected-sources choice is on and the source is not excluded
+(Ticket 306, "One Daily Brief choice for connected sources").
 
 iCloud uses a user-generated app-specific password over CalDAV. Apple does not
 limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
@@ -1068,3 +1068,36 @@ Settings exposes **Google Calendar for Daily Brief** before the Daily Brief disc
 Connecting this grant does not enable model sharing. The user must enable Calendar separately in Daily Brief settings.
 Missing agent configuration or denied agent consent cannot authorize use of the Timeline grant.
 Web and linked desktop share this contract. Marketing has no authenticated consent control; native mobile remains deferred.
+
+## One Daily Brief choice for connected sources (Ticket 306)
+
+Owner decision, 2026-11-10: one choice covers every connected source. Daily Brief
+settings show **Daily Brief** (on or off) and **Plan around my connected sources**
+(one choice, off by default). A line under the choice names the connected sources
+it covers. **Advanced: choose sources** lists each connected source with its own
+checkbox, plus the reminder-history and Notes choices. Each keeps its statement of
+what is sent.
+
+- A source connected after the choice is covered by it. Its row under Advanced
+  says that Daily Brief uses it. Reconnecting or reselecting a covered source does
+  not ask again.
+- A source excluded under Advanced is never read or sent. The server is the
+  authority: it reads only sources the choice covers and that have something to
+  read (a connection, and for calendars at least one selected calendar).
+- Turning Daily Brief off withdraws every source choice, reminder history and
+  Notes.
+- Existing accounts keep exactly what they allowed. The choice is on when Daily
+  Brief was on and at least one source was allowed; every source that was not
+  allowed starts excluded. An account that allowed no source starts with the
+  choice off and nothing excluded, like a new account. The hosted migration derives
+  this when the preferences are read; it rewrites no row.
+- Clients built before Ticket 306 still send per-source keys. The server maps their
+  saves the same way, so every source they leave off is excluded and an older save
+  never adds a source. Each per-source flag it returns reports whether the brief
+  uses that source now.
+- Each run fences every source it reads on the connection and selection it read
+  at the start; a change during the run withholds the output.
+
+What each source sends, the model and the prompt are unchanged. Web: this ticket.
+Desktop: the same shared panel on a linked, online Mac. Marketing: P-035 logs the
+FAQ answer. Future mobile: mobile web inherits it; native mobile is deferred.

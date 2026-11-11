@@ -1,7 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
-import type { DailyBriefResponse, DailyBriefSettings } from "@cadence/core/types/daily-brief";
+import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefConnectedSource, type DailyBriefResponse, type DailyBriefSettings, type DailyBriefSourceStatus } from "@cadence/core/types/daily-brief";
+import { dailyBriefChoiceFromAllowed, dailyBriefSourceFlags, dailyBriefSourcesUsed } from "@cadence/core/services/daily-brief-sources";
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
-import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
+import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
@@ -18,11 +19,14 @@ import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
 export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
 
-const SETTINGS_KEY_SETS = [
+/** Per-source key sets sent by clients built before Ticket 306. */
+const LEGACY_SETTINGS_KEY_SETS = [
   "enabled,includeCalendar",
   "enabled,includeCalendar,includeNotes,includeReminderHistory",
   "enabled,includeCalendar,includeHevy,includeIcloudCalendar,includeNotes,includeOutlookCalendar,includeReminderHistory",
 ];
+const SETTINGS_KEYS = "enabled,excludedSources,includeNotes,includeReminderHistory,useConnectedSources";
+const EXCLUDED_SOURCE_KEYS = [...DAILY_BRIEF_CONNECTED_SOURCES].sort().join();
 
 /** Phase diagnostics record span, duration and error code only; never prompts, facts or output. */
 const phase = <T,>(span: string, operation: () => Promise<T>) => measurePerformanceSpan({ span: `daily_brief.${span}` }, operation);
@@ -37,80 +41,87 @@ export function dailyBriefUsageCounts(usage: readonly DailyBriefCallUsage[]): Pe
 
 export async function getDailyBriefSettings(caller: CalendarCaller): Promise<DailyBriefSettings> {
   const preferences = await readDailyBriefPreferences(caller.client);
-  const timezone = await readAdvisorProfileTimezone(caller.client, caller.user.id);
+  const [timezone, sourceStatus] = await Promise.all([
+    readAdvisorProfileTimezone(caller.client, caller.user.id),
+    readDailyBriefSourceStatus(caller),
+  ]);
+  const used = dailyBriefSourcesUsed(preferences, sourceStatus);
   return { accountRef: briefingAccountRef(caller.user.id), available: !!process.env.OPENAI_API_KEY,
-    configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled, includeCalendar: preferences.includeCalendar,
+    configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled,
+    useConnectedSources: preferences.useConnectedSources, excludedSources: preferences.excludedSources, sourceStatus,
     includeReminderHistory: preferences.includeReminderHistory, includeNotes: preferences.includeNotes, revision: preferences.revision,
     optionalSources: dailyBriefOptionalSources(),
-    includeOutlookCalendar: preferences.includeOutlookCalendar, includeIcloudCalendar: preferences.includeIcloudCalendar,
-    includeHevy: preferences.includeHevy, ...await dailyBriefConnectorState(caller, preferences),
+    // Clients built before Ticket 306 show these as per-source checkboxes: each reports whether the brief uses the source now.
+    includeCalendar: used.googleCalendar, includeOutlookCalendar: used.outlookCalendar, includeIcloudCalendar: used.icloudCalendar, includeHevy: used.hevy,
+    connectorSources: { outlookCalendar: sourceStatus.outlookCalendar === "ready", icloudCalendar: sourceStatus.icloudCalendar === "ready", hevy: sourceStatus.hevy === "ready" },
+    connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: null },
     timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString() };
 }
 
 /**
- * Accepts exactly the original two controls, the four current controls, or the
- * four plus the three connector disclosures (Ticket 239). Older clients that
- * send two or four controls revoke every disclosure they omit, so an update
- * never grants a source silently. Turning Daily Brief off requires every
- * disclosure off.
+ * Accepts the Ticket 306 shape: the one connected-sources choice, per-source
+ * exclusions, and the reminder-history and Notes choices. Older clients send two,
+ * four or seven per-source keys; their saves map to the one choice, and every
+ * source they leave off starts excluded, so an older save never adds a source.
+ * Turning Daily Brief off requires every other choice off.
  */
 export async function updateDailyBriefSettings(caller: CalendarCaller, value: unknown): Promise<DailyBriefSettings> {
-  const keys = record(value) ? Object.keys(value).sort().join() : "";
-  if (!record(value) || !SETTINGS_KEY_SETS.includes(keys) || Object.values(value).some((item) => typeof item !== "boolean") ||
-      (!value.enabled && Object.entries(value).some(([key, item]) => key !== "enabled" && item === true))) {
-    throw new DailyBriefError("invalid_request");
-  }
-  const input = {
-    enabled: value.enabled as boolean, includeCalendar: value.includeCalendar as boolean,
-    includeReminderHistory: value.includeReminderHistory === true, includeNotes: value.includeNotes === true,
-    includeOutlookCalendar: value.includeOutlookCalendar === true, includeIcloudCalendar: value.includeIcloudCalendar === true,
-    includeHevy: value.includeHevy === true,
-  };
+  const input = parseDailyBriefSettingsInput(value);
+  if (!input) throw new DailyBriefError("invalid_request");
   if (input.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
-  // Ticket 187: Daily Brief reads Calendar only through the separate agent grant.
-  if (input.includeCalendar && (await getCalendarConnection(caller, "agent")).status !== "connected") throw new DailyBriefError("calendar_unavailable");
-  if (input.includeOutlookCalendar) {
-    const outlook = await getOutlookCalendarConnection(caller);
-    if (outlook.status !== "connected" || outlook.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
-  }
-  if (input.includeIcloudCalendar) {
-    const icloud = await getIcloudCalendarConnection(caller);
-    if (icloud.status !== "connected" || icloud.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
-  }
-  if (input.includeHevy && (await getHevyConnection(caller)).status !== "connected") throw new DailyBriefError("source_unavailable");
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
 }
 
-/**
- * Connected sources Settings may offer, and why a disclosed source cannot be used
- * (Ticket 239 recovery). `changed` means the source is usable but was reconnected
- * or reselected after the user allowed it, so the stored fence no longer matches
- * and the brief refuses to start until the user allows it again. A failed status
- * read offers nothing and reports a disclosed source as unavailable.
- */
-async function dailyBriefConnectorState(caller: CalendarCaller, preferences: DailyBriefPreferences): Promise<Pick<DailyBriefSettings, "connectorSources" | "connectorAttention">> {
-  const [outlook, icloud, hevy] = await Promise.all([
-    Promise.resolve().then(() => getOutlookCalendarConnection(caller)).catch(() => null),
-    Promise.resolve().then(() => getIcloudCalendarConnection(caller)).catch(() => null),
-    Promise.resolve().then(() => getHevyConnection(caller)).catch(() => null),
-  ]);
-  const outlookConnected = outlook?.status === "connected";
-  const outlookSelected = outlookConnected && outlook.preferences.selectedSourceIds.length > 0;
-  const icloudConnected = icloud?.status === "connected";
-  const icloudSelected = icloudConnected && icloud.preferences.selectedSourceIds.length > 0;
-  const hevyConnected = hevy?.status === "connected";
+function parseDailyBriefSettingsInput(value: unknown): DailyBriefPreferenceInput | null {
+  if (!record(value)) return null;
+  const keys = Object.keys(value).sort().join();
+  if (keys === SETTINGS_KEYS) {
+    const excluded = value.excludedSources;
+    if (!record(excluded) || Object.keys(excluded).sort().join() !== EXCLUDED_SOURCE_KEYS ||
+        Object.values(excluded).some((item) => typeof item !== "boolean") ||
+        [value.enabled, value.useConnectedSources, value.includeReminderHistory, value.includeNotes].some((item) => typeof item !== "boolean")) return null;
+    const input: DailyBriefPreferenceInput = {
+      enabled: value.enabled as boolean, useConnectedSources: value.useConnectedSources as boolean,
+      excludedSources: dailyBriefSourceFlags((source) => excluded[source] === true),
+      includeReminderHistory: value.includeReminderHistory as boolean, includeNotes: value.includeNotes as boolean,
+    };
+    if (!input.enabled && (input.useConnectedSources || input.includeReminderHistory || input.includeNotes ||
+        DAILY_BRIEF_CONNECTED_SOURCES.some((source) => input.excludedSources[source]))) return null;
+    return input;
+  }
+  if (!LEGACY_SETTINGS_KEY_SETS.includes(keys) || Object.values(value).some((item) => typeof item !== "boolean") ||
+      (!value.enabled && Object.entries(value).some(([key, item]) => key !== "enabled" && item === true))) return null;
+  const enabled = value.enabled as boolean;
   return {
-    connectorSources: { outlookCalendar: outlookSelected, icloudCalendar: icloudSelected, hevy: hevyConnected },
-    connectorAttention: {
-      outlookCalendar: !preferences.includeOutlookCalendar ? null : !outlookConnected ? "unavailable" : !outlookSelected ? "no_calendars"
-        : outlook.generation !== preferences.outlookConnectionGeneration || outlook.selectionRevision !== preferences.outlookSelectionRevision ? "changed" : null,
-      icloudCalendar: !preferences.includeIcloudCalendar ? null : !icloudConnected ? "unavailable" : !icloudSelected ? "no_calendars"
-        : icloud.generation !== preferences.icloudConnectionGeneration || icloud.selectionRevision !== preferences.icloudSelectionRevision ? "changed" : null,
-      hevy: !preferences.includeHevy ? null : !hevyConnected ? "unavailable"
-        : hevy.generation !== preferences.hevyConnectionGeneration ? "changed" : null,
-    },
+    enabled,
+    ...dailyBriefChoiceFromAllowed(enabled, {
+      googleCalendar: value.includeCalendar === true, outlookCalendar: value.includeOutlookCalendar === true,
+      icloudCalendar: value.includeIcloudCalendar === true, hevy: value.includeHevy === true,
+    }),
+    includeReminderHistory: value.includeReminderHistory === true, includeNotes: value.includeNotes === true,
+  };
+}
+
+/**
+ * Whether each source has something to read now. Ticket 187: Google Calendar is
+ * the separate agent grant. A failed status read reports the source as not connected.
+ */
+export async function readDailyBriefSourceStatus(caller: CalendarCaller): Promise<Record<DailyBriefConnectedSource, DailyBriefSourceStatus>> {
+  const read = <T,>(operation: () => Promise<T>) => Promise.resolve().then(operation).catch(() => null);
+  const [google, outlook, icloud, hevy] = await Promise.all([
+    read(() => getCalendarConnection(caller, "agent")),
+    read(() => getOutlookCalendarConnection(caller)),
+    read(() => getIcloudCalendarConnection(caller)),
+    read(() => getHevyConnection(caller)),
+  ]);
+  const calendar = (connected: boolean, selected: number) => !connected ? "not_connected" : selected > 0 ? "ready" : "no_calendars";
+  return {
+    googleCalendar: calendar(google?.status === "connected", google?.preferences.selectedCalendarIds.length ?? 0),
+    outlookCalendar: calendar(outlook?.status === "connected", outlook?.preferences.selectedSourceIds.length ?? 0),
+    icloudCalendar: calendar(icloud?.status === "connected", icloud?.preferences.selectedSourceIds.length ?? 0),
+    hevy: hevy?.status === "connected" ? "ready" : "not_connected",
   };
 }
 

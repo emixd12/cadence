@@ -7,6 +7,7 @@ import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
 import { CalendarConnectionError, calendarGoogleSubject, type CalendarIdentityUser, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
+import { dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 
 export type CalendarCaller = { client: AppSupabaseClient; user: User };
 /** Calendar reads need only the account id and its Google identity, so the leave reminder job's caller (Ticket 276) fits. */
@@ -157,11 +158,9 @@ export async function getCalendarEventsForWorkbenchHistory(
   if (process.env.NODE_ENV !== "development") throw new CalendarConnectionError("permission_denied");
   options.signal?.throwIfAborted();
   const preference = await readDailyBriefPreferences(caller.client, options.signal);
-  if (!preference.enabled || !preference.includeCalendar) throw new CalendarConnectionError("permission_denied");
+  if (!dailyBriefSourceAllowed(preference, "googleCalendar")) throw new CalendarConnectionError("permission_denied");
   const connection = await getCalendarConnection(caller, "agent");
-  if (connection.status !== "connected" || connection.generation !== preference.calendarConnectionGeneration || connection.selectionRevision !== preference.calendarSelectionRevision) {
-    throw new CalendarConnectionError("connection_changed");
-  }
+  if (connection.status !== "connected") throw new CalendarConnectionError("connection_changed");
   const result = await readAuthorizedCalendarRange(caller, start, end, {
     authorizedCalendarIds: connection.preferences.selectedCalendarIds,
     expectedConnectionGeneration: connection.generation, expectedSelectionRevision: connection.selectionRevision,

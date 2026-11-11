@@ -157,7 +157,7 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
   const retained = await store.listCases(partition);
   const days: BriefingHistoryDay[] = [];
   let selected: { contexts: AdvisorDayContextV1[]; analysisSource: BriefingAnalysisSource | null; history: BenchCaseHistory } | null = null;
-  const calendarRequested = !!(caller && capture && input.includePastCalendar && capture.preferences.includeCalendar && input.configs.some(config => config.scope.includeCalendar));
+  const calendarRequested = !!(caller && capture && input.includePastCalendar && !!capture.calendar && input.configs.some(config => config.scope.includeCalendar));
   const calendars = calendarRequested ? await readPastCalendars(caller!, start, end, timezone, signal) : new Map<string, AdvisorCalendarConnector>();
   for (let date = start; Temporal.PlainDate.compare(date, end) <= 0; date = date.add({ days: 1 })) {
     signal.throwIfAborted();
@@ -165,7 +165,7 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
     let coverage = sourceCoverage(date, historyDays, rows, input, calendars.get(date.toString()), !!analysisRows);
     const targetCount = rows?.occurrences.filter(row => row.local_date === date.toString()).length;
     const available = !rows || (!!targetCount && targetCount <= ADVISOR_DAY_CONTEXT_LIMITS.occurrences);
-    const contexts = !available ? [] : rows && capture && caller ? retrospectiveContexts(rows, date, logical, timezone, historyDays, caller, capture.preferences.revision, calendarRequested, capture.preferences, calendars.get(date.toString()))
+    const contexts = !available ? [] : rows && capture && caller ? retrospectiveContexts(rows, date, logical, timezone, historyDays, caller, capture.preferences.revision, calendarRequested, capture.calendar, calendars.get(date.toString()))
       : historyDays.map(days => historicalFixture(input.fixtureId ?? "sparse", { ...input.configs[0],
         scope: { ...input.configs[0].scope, historyDays: days },
         context: { ...input.configs[0].context, includeHistoricalCompletionTimes: true } }, date, timezone, logical));
@@ -208,7 +208,7 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
         : { mode: "synthetic", fixtureId: input.fixtureId ?? "sparse", fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: input.analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
       evidenceType: caller ? "retrospective" : "synthetic", history: selected.history, localDate: first.localDate, timezone, capturedAt: first.capturedAt, expiresAt: first.expiresAt,
       capture: { calendarGrantPurpose: "agent", historyDays, includeCalendar: caller ? calendarRequested : input.configs.some(config => config.scope.includeCalendar),
-        calendarDisclosed: capture?.preferences.includeCalendar ?? true, includeRecordedElapsedDurations: input.configs.some(config => config.context.includeRecordedElapsedDurations),
+        calendarDisclosed: capture ? !!capture.calendar : true, includeRecordedElapsedDurations: input.configs.some(config => config.context.includeRecordedElapsedDurations),
         includeHistoricalCompletionTimes: input.configs.some(config => config.context.includeHistoricalCompletionTimes), analysis: input.configs.some(config => config.analysis.lanes.length > 0),
         includeReminders: false, remindersDisclosed: capture?.preferences.includeReminderHistory ?? false, includeNotes: false, notesDisclosed: capture?.preferences.includeNotes ?? false },
       inputs, behaviorTitles: [...titles].map(([ref, title]) => ({ ref, title })) };
@@ -312,7 +312,7 @@ function sourceCoverage(date: Temporal.PlainDate, historyDays: readonly number[]
 }
 
 function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logical: Temporal.Instant, timezone: string, windows: readonly number[], caller: CalendarCaller,
-  grantGeneration: number, includeCalendar: boolean, preferences: { calendarConnectionGeneration: number | null; calendarSelectionRevision: number | null }, calendar?: AdvisorCalendarConnector): AdvisorDayContextV1[] {
+  grantGeneration: number, includeCalendar: boolean, fence: Readonly<{ connectionGeneration: number; selectionRevision: number }> | null, calendar?: AdvisorCalendarConnector): AdvisorDayContextV1[] {
   const ref = ownerRef(caller);
   const byId = new Map(rows.behaviors.map(behavior => [behavior.id, behavior]));
   const unknownAverage = { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0 as const, requiredSampleCount: 3 as const, lookbackDays: 90 as const };
@@ -326,7 +326,7 @@ function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logi
         historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0, lookbackDays: 90 as const } } };
   });
   const connectors: AdvisorDayContextV1["connectors"] = includeCalendar ? [calendar ? { ...calendar, fetchedAt: calendar.fetchedAt ? logical.toString() : null }
-    : projectUnavailableAdvisorCalendar({ connectionGeneration: preferences.calendarConnectionGeneration!, selectionRevision: preferences.calendarSelectionRevision!,
+    : projectUnavailableAdvisorCalendar({ connectionGeneration: fence!.connectionGeneration, selectionRevision: fence!.selectionRevision,
       failure: { code: "provider_unavailable", retryable: false, retryAfterSeconds: null } })] : [{ source: "google_calendar", state: "not_requested" }];
   const start = date.toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant(), end = date.add({ days: 1 }).toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant();
   const expiry = logical.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs });

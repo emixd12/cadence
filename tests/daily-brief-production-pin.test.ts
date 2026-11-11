@@ -32,7 +32,8 @@ import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-openai";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
-const prefs = { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, revision: 1, calendarConnectionGeneration: null, calendarSelectionRevision: null };
+import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
+const prefs = dailyBriefPreferences({ revision: 1 });
 const preset = (version: "1.1" | "1.2") => BRIEFING_PRESETS.find((item) => item.config.recipe.version === version)!.config;
 
 beforeEach(() => {

@@ -66,17 +66,31 @@ begin
 end;
 $$;
 
--- Changing the Outlook selection advances its revision and fences new attempts.
+-- Ticket 306: a covered source follows its current connection, so a changed
+-- Outlook selection no longer fences admission. The service fences each run on
+-- the connection and selection it read at the start.
 update public.connector_preferences set selected_source_ids = array['calendar-1', 'calendar-2']
 where user_id = '22600000-0000-4000-8000-000000000001' and provider = 'outlook_calendar';
 
 do $$
+declare
+  decision jsonb;
+  preference jsonb;
 begin
-  perform pg_temp.expect_error($q$select public.begin_daily_brief('22600000-0000-4000-8000-000000000102', false, 1)$q$, '55000');
+  decision := public.begin_daily_brief('22600000-0000-4000-8000-000000000102', false, 1);
+  if decision ->> 'state' <> 'acquired' then raise exception 'A reselected covered source was refused: %', decision; end if;
+  perform public.finish_daily_brief('22600000-0000-4000-8000-000000000102', (decision ->> 'lease_token')::uuid, false, 1);
+  -- The per-source allowances map to the one choice: allowed sources covered, the rest excluded.
+  preference := public.read_daily_brief_preferences();
+  if not (preference ->> 'use_connected_sources')::boolean
+    or preference -> 'excluded_sources' <> '{"google_calendar": true, "outlook_calendar": false, "icloud_calendar": true, "hevy": false}'::jsonb
+  then
+    raise exception 'Allowances did not map to the one choice: %', preference;
+  end if;
 end;
 $$;
 
--- A fresh grant at the new selection is admitted; a Hevy reconnect then blocks delivery.
+-- A fresh grant at the new selection is admitted.
 do $$
 declare
   preference jsonb;
@@ -99,12 +113,11 @@ do $$
 declare
   preference jsonb;
 begin
-  if public.finish_daily_brief('22600000-0000-4000-8000-000000000103', current_setting('ticket239.lease')::uuid, true, 2) then
-    raise exception 'A completed attempt was delivered after the Hevy generation changed.';
+  -- Ticket 306: the service, not this fence, refuses delivery after a connection changes mid-run.
+  if not public.finish_daily_brief('22600000-0000-4000-8000-000000000103', current_setting('ticket239.lease')::uuid, true, 2) then
+    raise exception 'The stored revision alone no longer matched.';
   end if;
 
-  -- The stale Hevy fence keeps refusing admission until the user allows Hevy again.
-  perform pg_temp.expect_error($q$select public.begin_daily_brief('22600000-0000-4000-8000-000000000104', true, 2)$q$, '55000');
   preference := public.save_daily_brief_preferences_v3(true, false, false, false, true, false, true, 2);
   if preference ->> 'hevy_connection_generation' <> '2' or preference ->> 'revision' <> '3' then
     raise exception 'Allowing Hevy again did not rebind its fence: %', preference;

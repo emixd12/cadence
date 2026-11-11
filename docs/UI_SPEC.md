@@ -1273,6 +1273,27 @@ A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
 
+## Daily Brief source choice (Ticket 306)
+
+`DailyBriefSettingsPanel` shows, in order:
+
+1. **Daily Brief**, a native checkbox.
+2. **Plan around my connected sources**, a native checkbox, off by default and
+   disabled while Daily Brief is off. With nothing connected it cannot be turned on;
+   a choice already on stays enabled so it can be turned off. A line under it
+   (`daily-brief-sources-coverage`) names the connected sources it covers and says a
+   later source is covered, or says that nothing is connected yet or that every
+   connected source is excluded.
+3. **Advanced: choose sources**, a closed native `details` disclosure. It lists each
+   connected source (Google Calendar, Outlook Calendar, iCloud Calendar, Hevy) as a
+   checkbox, checked unless excluded and disabled while the one choice is off. Each
+   row keeps its `aria-describedby` statement of what is sent and adds "Daily Brief
+   uses it." while it is used, or a no-selected-calendars note. The reminder-history
+   and Notes checkboxes follow when the server offers them.
+
+The OpenAI paragraph and the desktop hosted-context line stay below. All controls
+keep 44px targets and wrap at 390px.
+
 ## Daily Brief Calendar connection (Ticket 187)
 
 Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.

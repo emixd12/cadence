@@ -47,10 +47,8 @@ do $$ begin
  if public.calendar_read_credential('18700000-0000-4000-8000-000000000001','agent-one',1) <> 'standard-token' then raise exception 'agent disconnect changed standard'; end if;
  if public.calendar_agent_install_credential('18700000-0000-4000-8000-000000000001','agent-one',0,repeat('b',64),'late','agent-client') then raise exception 'late agent callback resurrected'; end if;
 end $$;
-reset role;
-do $$ begin
- if cadence_advisor_private.daily_brief_calendar_fence_is_current('18700000-0000-4000-8000-000000000001',true,1,0) then raise exception 'disconnected agent fence accepted standard grant'; end if;
-end $$;
+-- Ticket 306: the stored fence no longer reads the grant; the service reads the
+-- current agent connection for each run, and a disconnected grant has no credential.
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"18700000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 do $$ begin

@@ -56,32 +56,16 @@ update public.google_calendar_agent_preferences
 set selection_revision = selection_revision + 1
 where user_id = '92700000-0000-4000-8000-000000000001';
 
+-- Ticket 306: a covered Calendar follows its current selection and connection,
+-- so these changes no longer refuse admission; the service fences each run.
 set local role authenticated;
-do $$
-begin
-  begin
-    perform public.begin_daily_brief('92700000-0000-4000-8000-000000000101', false, 3);
-    raise exception 'Changed Calendar selection was admitted.';
-  exception when sqlstate '55000' then null;
-  end;
-  perform public.save_daily_brief_preferences(true, true, 3);
-end;
-$$;
+select public.save_daily_brief_preferences(true, true, 3);
 reset role;
 update public.google_calendar_agent_connections
 set generation = generation + 1
 where user_id = '92700000-0000-4000-8000-000000000001';
 
 set local role authenticated;
-do $$
-begin
-  begin
-    perform public.begin_daily_brief('92700000-0000-4000-8000-000000000101', false, 4);
-    raise exception 'Changed Calendar connection was admitted.';
-  exception when sqlstate '55000' then null;
-  end;
-end;
-$$;
 reset role;
 
 do $$
