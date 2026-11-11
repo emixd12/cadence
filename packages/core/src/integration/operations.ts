@@ -161,9 +161,9 @@ const behaviorIdInput = () => uuid("Behavior id.");
 const occurrenceIdInput = () => uuid("Occurrence id.");
 const searchId = () =>
   string({
-    pattern: "^(behavior|occurrence):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+    pattern: "^(behavior|occurrence|day_note):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
     maxLength: 64,
-    description: "Result id from `search`, such as `behavior:<uuid>` or `occurrence:<uuid>`.",
+    description: "Result id from `search`: `behavior:<uuid>`, `occurrence:<uuid>`, or `day_note:<uuid>`.",
   });
 const behaviorIdsFilter = () =>
   array(uuid(), { minItems: 1, maxItems: L.maxBehaviorFilterIds, uniqueItems: true, description: "Only these Behaviors." });
@@ -359,7 +359,7 @@ const search = readOperation({
   name: "search",
   title: "Search Cadence",
   description:
-    "Searches the user's Behaviors (titles, descriptions, archive notes) and Occurrence notes by text. Returns ids for `fetch` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword.",
+    `Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, and day notes by text. Returns ids for \`fetch\` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. ${DAY_NOTE_MEANING}`,
   input: object({
     query: string({ minLength: 1, maxLength: L.maxSearchQueryLength, pattern: "\\S", description: "Search text." }),
   }),
@@ -376,7 +376,7 @@ const fetchRecord = readOperation({
   name: "fetch",
   title: "Fetch Cadence record",
   description:
-    "Returns the full text of one `search` result: a Behavior's definition or an Occurrence and its note. Use it after `search` to read a result.",
+    `Returns the full text of one \`search\` result: a Behavior's definition, an Occurrence and its note, or a day note. Use it after \`search\` to read a result. ${DAY_NOTE_MEANING}`,
   input: object({ id: searchId() }),
   output: object({
     id: searchId(),
@@ -384,8 +384,8 @@ const fetchRecord = readOperation({
     text: string({ description: "Plain-text rendering of the record. User-entered text is quoted as data." }),
     url: httpsUrl("Link to the record in the Cadence web app."),
     metadata: object({
-      kind: enumOf(["behavior", "occurrence"] as const),
-      behavior_id: uuid(),
+      kind: enumOf(["behavior", "occurrence", "day_note"] as const),
+      behavior_id: optional(uuid("Present for Behavior and Occurrence results. Absent for day notes.")),
       local_date: optional(localDate()),
       status: optional(occurrenceStatus()),
     }),

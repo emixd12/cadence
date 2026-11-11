@@ -1,6 +1,6 @@
 import type { AppSupabaseClient } from "./behaviors.repo";
 import { readAllPostgrestRows } from "./paginated-read";
-import type { Category, Occurrence } from "@/lib/types/database";
+import type { Category, DayNote, Occurrence } from "@/lib/types/database";
 
 /** Full pagination avoids silently inheriting PostgREST's 1,000-row response cap. */
 export function readIntegrationOccurrences(supabase: AppSupabaseClient, userId: string, range?: {
@@ -22,4 +22,10 @@ export function readIntegrationCategories(supabase: AppSupabaseClient, userId: s
     createQuery: () => supabase.from("categories").select("*").eq("user_id", userId)
       .order("sort_order").order("name").order("id"),
   });
+}
+
+export async function readIntegrationDayNote(supabase: AppSupabaseClient, userId: string, id: string): Promise<DayNote | null> {
+  const { data, error } = await supabase.from("day_notes").select("*").eq("user_id", userId).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return (data as DayNote | null) ?? null;
 }
