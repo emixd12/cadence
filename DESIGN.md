@@ -555,8 +555,11 @@ Desktop retains the same section with a locally prepared summary.
 
 ## Category controls (Tickets 123–124)
 
-CategoryPanel uses native inputs, a textarea, explicit deletion acknowledgement,
-and Move up / Move down text actions. BehaviorList uses native Category and Sort
+CategoryPanel keeps its title and purpose above a native `<details>` drawer
+(`product-disclosure-trigger`, "Edit N categories"). Inside, each category is one
+bordered line: a 44 px `GripVertical` drag handle (`touch-none`, `cursor-grab`), the
+name, and a secondary **Edit** action. The dragged line takes `bg-surface`. The form keeps
+native inputs, a textarea and explicit deletion acknowledgement (Ticket 304). BehaviorList uses native Category and Sort
 selects with matching counts and Clear filters. Hidden rows retain mounted drafts.
 
 

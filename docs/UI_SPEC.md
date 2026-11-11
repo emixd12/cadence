@@ -849,7 +849,20 @@ Ticket 123 implements category create, rename, optional
 plain-text description, reorder, and confirmed delete controls to Settings on
 web and desktop. Deletion shows the affected Behavior count and moves those
 Behaviors to No category while preserving their history. Reuse native fields
-and existing text actions; use Move up / Move down for category order.
+and existing text actions.
+
+Ticket 304 puts the list in a closed drawer. The Categories title and its one-line
+purpose stay in view; an **Edit N categories** button below them opens the list
+(**Edit 1 category** for one, **Add a category** when there are none). Each category is
+one line: a drag handle labelled "Reorder <name>", the name, and **Edit**. **Edit** opens
+the unchanged name, description and delete form under its line. Dragging the handle
+with a mouse or touch moves the category, and the new order saves on drop. Arrow Up and
+Arrow Down on a focused handle move it one place and save each move. The status line
+announces each move ("Fitness moved to position 2 of 8."). Handles are absent with one
+category and inactive while a draft is open or a save runs. The service checks each
+move against the same expected category snapshot as other category edits; a stale
+snapshot is refused, the list reloads in its stored order, and the refusal is shown.
+Move up / Move down are removed.
 
 Ticket 124 implements compact Category and Sort selects to
 Behaviors. Category offers All categories, No category, and owned categories.

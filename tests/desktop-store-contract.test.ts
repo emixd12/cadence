@@ -102,6 +102,28 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     expect((await localCommand("readCategories", { profileId: profile.id })).some((row) => row.id === category.id)).toBe(false);
   });
 
+  it("moves a category to a position in one write and refuses a stale snapshot", async () => {
+    const profile = await localCommand("readProfile", {});
+    const action = createLocalCategoryAction(() => undefined);
+    const before = await localCommand("readCategories", { profileId: profile.id });
+    const last = before.at(-1)!;
+    const move = (expected: string) => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries({ intent: "move", category_id: last.id, position: "1", expected })) form.set(key, value);
+      return action({ status: "idle", message: "" }, form);
+    };
+    expect((await move(categorySnapshot(before))).status).toBe("success");
+    await stop(); await start();
+    const after = await localCommand("readCategories", { profileId: profile.id });
+    const ids = before.map((row) => row.id).filter((id) => id !== last.id);
+    ids.splice(1, 0, last.id);
+    expect([...after].sort((a, b) => a.sort_order - b.sort_order).map((row) => row.id)).toEqual(ids);
+    expect(after.map((row) => row.sort_order).sort((a, b) => a - b)).toEqual(before.map((_, index) => index));
+    const refused = await move(categorySnapshot(before));
+    expect(refused).toMatchObject({ status: "error", message: expect.stringMatching(/Categories changed/) });
+    expect(await localCommand("readCategories", { profileId: profile.id })).toEqual(after);
+  });
+
   it("satisfies the shared BehaviorDataStore transaction and history contract", async () => {
     const profile = await localCommand("readProfile", {});
     await exerciseBehaviorStoreContract({

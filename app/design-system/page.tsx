@@ -1946,7 +1946,8 @@ const previewFactories: Record<
       </ProductPreview>
     ),
   "module.category-panel": () => (
-    <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
+    <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" },
+      { id: "fitness", name: "Fitness", description: null, sort_order: 1, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
       action={async () => { "use server"; return { status: "error", message: "Preview only. Your draft remains available." }; }} /></ProductPreview>
   ),
   "flow.consent-form": () => <ProductPreview><ConsentBench /></ProductPreview>,
