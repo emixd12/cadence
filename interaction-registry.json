@@ -327,7 +327,8 @@
         "INT-PLACE-007",
         "INT-TRAVEL-011",
         "INT-TRAVEL-012",
-        "INT-TRAVEL-013"
+        "INT-TRAVEL-013",
+        "INT-TRAVEL-014"
       ]
     },
     {
@@ -898,7 +899,16 @@
         "INT-PLACE-006",
         "INT-TRAVEL-006",
         "INT-TRAVEL-007",
-        "INT-TRAVEL-013"
+        "INT-TRAVEL-013",
+        "INT-TRAVEL-014"
+      ]
+    },
+    {
+      "path": "components/settings/HomeCurrentLocation.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TRAVEL-014"
       ]
     },
     {
@@ -14918,6 +14928,100 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred; mobile web inherits the shared Settings section, checked at 390 px."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-014",
+      "name": "Set Home from the current location",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#set-up-travel"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings",
+        "/settings#travel"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Fill the Home field with a street address from this device's position, then check or edit it and save Home as usual (Ticket 308).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Use my current location"
+        }
+      ],
+      "availability": "Settings, Travel, beside Home, on web and on a linked Mac, once Travel estimates is on with its disclosure accepted. Until then one line says to turn on Travel estimates first. Hidden on a Mac in local mode, which keeps typing only. Five lookups per account per hour, inside the monthly travel spend ceiling.",
+      "success_result": "Reads the device position once, asking for permission if needed, sends it to Cadence's server for one Google reverse-geocoding request, and fills Home with the returned street address. Nothing saves until the person saves Travel settings. The position is not stored, logged, synced, exported or returned.",
+      "failure_result": "Shows one plain message for a denied, unavailable or inaccurate position, no street address, too many lookups, an unavailable lookup or no internet. Home keeps its text and typing always works.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "permission_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HomeCurrentLocation.tsx",
+        "components/settings/TravelSettingsPanel.tsx",
+        "lib/ui/home-lookup.ts",
+        "app/api/travel/home-lookup/route.ts",
+        "lib/services/travel-home-lookup.service.ts",
+        "lib/services/travel-provider.ts",
+        "lib/db/launchRateLimits.repo.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx",
+          "tests/travel-home-lookup.test.ts"
+        ],
+        "notes": "Provider-free tests with a fake provider: success, no result, rate limit, spend ceiling and no logged position. Hosted acceptance within the owner's travel spend cap and installed Mac acceptance remain open."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HomeCurrentLocation.tsx",
+            "app/api/travel/home-lookup/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/travel-home-lookup.test.ts"
+          ],
+          "reason": "Shared Settings section; the hosted endpoint runs as the signed-in user. Hosted acceptance remains open."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HomeCurrentLocation.tsx",
+            "apps/desktop/src/home-lookup.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/travel-home-lookup.test.ts"
+          ],
+          "reason": "Same component with the Mac's foreground location read and the hosted endpoint through the account's bearer token, on a linked Mac. Local mode keeps typing only. Installed dev-signed acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; mobile web inherits the shared Settings section, with the button wrapping below Home at 390 px."
         }
       }
     },

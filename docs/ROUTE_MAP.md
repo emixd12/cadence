@@ -306,6 +306,19 @@ account's reminder rows (decision D15). Both methods accept the web session or a
 Mac's bearer token, with the same native-origin CORS as the other travel routes, and run
 under RLS as that user. Neither calls a provider.
 
+`POST /api/travel/home-lookup` (Ticket 308) serves **Use my current location** beside Home.
+It accepts the web session or a linked Mac's bearer token, with the same native-origin CORS,
+and returns `503 provider_clearance_required` or `not_configured` before reading the body.
+The body is exactly `{ latitude, longitude, accuracyMeters }`, at most 1,000 bytes; the
+position never goes in a URL. It calls `travel-home-lookup.service.ts`, which requires Travel
+estimates on with the disclosure accepted (409 `travel_off`), rejects an accuracy above 100 m
+(422 `inaccurate_position`), consumes the account's `travel_home_lookup` rate limit (five an
+hour, 429 `rate_limited` with `Retry-After`), reserves US$0.005 through
+`reserve_travel_provider_spend` (429 `quota_exceeded`), and makes one Google reverse-geocoding
+request. The `no-store` response is `{ address }`, a street address or `null`. It saves
+nothing: the person edits the field and saves Home through `PUT /api/travel/settings`. The
+position is not stored, logged, synced, exported or returned, and errors carry codes only.
+
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 
 `GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical

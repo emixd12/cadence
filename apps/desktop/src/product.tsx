@@ -11,6 +11,7 @@ import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
+import { createDesktopHomeLookupClient } from "./home-lookup";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
@@ -339,6 +340,8 @@ export function Product() {
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
   // Ticket 279: the account's leave reminder switch lives on the hosted server, so only a linked Mac shows it.
   const leaveReminderClient = useMemo(() => calendarClient && accountUserId ? createDesktopLeaveReminderClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 308: Home from the Mac's position needs the hosted lookup, so only a linked Mac offers it.
+  const homeLookupClient = useMemo(() => calendarClient && accountUserId ? createDesktopHomeLookupClient(calendarClient) : null, [calendarClient, accountUserId]);
   const leaveReminders = useDesktopLeaveReminders({ native: isTauri(), accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
     // "error" and "waiting" keep what is scheduled; only a read session or a signed-out Mac reconciles.
     accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient,
@@ -618,7 +621,7 @@ export function Product() {
         ]} />}
         dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
-          leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} />}
+          leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}
