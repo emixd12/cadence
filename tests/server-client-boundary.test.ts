@@ -20,8 +20,22 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-function isClientModule(source: string): boolean {
-  return /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*["']use client["']/.test(source);
+/** Skips leading whitespace and comments with a linear scan, then checks the directive. */
+export function isClientModule(source: string): boolean {
+  let index = 0;
+  while (index < source.length) {
+    if (/\s/.test(source[index])) index += 1;
+    else if (source.startsWith("//", index)) {
+      const end = source.indexOf("\n", index);
+      if (end === -1) return false;
+      index = end + 1;
+    } else if (source.startsWith("/*", index)) {
+      const end = source.indexOf("*/", index + 2);
+      if (end === -1) return false;
+      index = end + 2;
+    } else break;
+  }
+  return source.startsWith('"use client"', index) || source.startsWith("'use client'", index);
 }
 
 function resolveImport(specifier: string, from: string): string | null {
@@ -67,6 +81,13 @@ export function serverImportsOfClientValues(files: readonly string[]): string[] 
 describe("server and client module boundary", () => {
   it("keeps server modules under app/ from reading values exported by client modules", () => {
     expect(serverImportsOfClientValues(sourceFiles(path.join(root, "app")))).toEqual([]);
+  });
+
+  it("finds the directive after leading block and line comments", () => {
+    expect(isClientModule('/* licence */\n// note\n"use client";\nexport const A = 1;\n')).toBe(true);
+    expect(isClientModule("// note\n/* a */ /* b */\n'use client';\n")).toBe(true);
+    expect(isClientModule('/* licence */\nimport x from "y";\n"use client";\n')).toBe(false);
+    expect(isClientModule("/*" + "*//*".repeat(10_000))).toBe(false);
   });
 
   it("flags a server page that calls a helper from a client module", () => {
