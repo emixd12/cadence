@@ -5,14 +5,15 @@ import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/trav
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
-export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note"] as const;
+export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note", "behavior_source_link", "occurrence_source_match"] as const;
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
  * `cadence_private.account_sync_contract_additions` or `account_sync_contract_rows`
  * entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
+ * Contract 5 adds the read-only connector completion kinds (Ticket 320).
  */
-export const ACCOUNT_SYNC_CONTRACT = 4;
+export const ACCOUNT_SYNC_CONTRACT = 5;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -30,6 +31,13 @@ export type NoteShortcutExclusionPolicy = "preserve" | "discard_local";
 const PLACE_LABEL_KINDS = new Set<AccountSyncEntityKind>(["place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"]);
 const PLACE_LABEL_RECORDED_AT: Readonly<Record<string, string>> = { place_label_settings: "updated_at", place_marker: "recorded_at", completion_place_label: "recorded_at", where_suggestion_dismissal: "dismissed_at" };
 const HISTORY = new Set<AccountSyncEntityKind>(["definition_event", "configuration_event", "status_event", "mapping"]);
+/**
+ * Ticket 320 (D28): hosted connector completion records. Only the hosted link form and the
+ * connector database functions write them, so the hosted row always wins, the plan never
+ * writes them to the hosted account, and a row whose Behavior or Occurrence leaves the
+ * merge is dropped, as the hosted cascade drops it.
+ */
+const READ_ONLY_KINDS = new Set<AccountSyncEntityKind>(["behavior_source_link", "occurrence_source_match"]);
 const PROTECTED_DELETE = new Set<AccountSyncEntityKind>(["behavior", "import_run", "imported_note", "imported_intervention", "reminder_delivery", "time_session"]);
 // Sync strips source ownership; this placeholder only enables shared state validation.
 const SYNC_NOTE_SHORTCUT_OWNER_ID = "00000000-0000-4000-8000-000000000000";
@@ -60,6 +68,7 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
     const dayNoteMerge = dayNoteMerges.get(key);
     if (dayNoteMerge !== undefined) { if (dayNoteMerge) mergedEntities.push(dayNoteMerge); continue; }
     const base = baseline.get(key) ?? null, left = local.get(key) ?? null, right = hosted.get(key) ?? null;
+    if (READ_ONLY_KINDS.has((base ?? left ?? right)!.kind)) { if (right) mergedEntities.push(right); continue; }
     if (base?.kind === "occurrence" && (!left || !right) && protectedOccurrences.has(base.id)) {
       const retained = left ?? right;
       if (retained && (!same(retained, base) || !baselineProtectedOccurrences.has(base.id))) conflicts.push(conflict(base, left, right, "delete_vs_update"));
@@ -86,9 +95,9 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
   const retained = retainPlaceLabelInvariants(reconcileOccurrenceReminders(
     retainReminderProcessingClaims(retainNoteShortcutExclusions(coalesceGeneratedOccurrences(mergedEntities, baseline, local, hosted), exclusionSources(input.noteShortcutExclusionPolicy, baseline, local, hosted)), baseline, local, hosted),
   ));
-  const merged = prepare({ entities: retained }), mergedRows = [...merged.values()].sort(compareEntity), mergedFingerprint = fingerprint(mergedRows);
+  const merged = prepare({ entities: withoutOrphanReadOnlyRows(retained) }), mergedRows = [...merged.values()].sort(compareEntity), mergedFingerprint = fingerprint(mergedRows);
   validateInputGraphs(false, merged);
-  return { localWrites: writesBetween(local, merged), hostedWrites: writesBetween(hosted, merged), conflicts: [], mergedEntities: mergedRows, fingerprints: { ...fingerprints, merged: mergedFingerprint }, idempotencyKey: sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${mergedFingerprint}`) };
+  return { localWrites: writesBetween(local, merged), hostedWrites: writesBetween(hosted, merged).filter(({ kind }) => !READ_ONLY_KINDS.has(kind)), conflicts: [], mergedEntities: mergedRows, fingerprints: { ...fingerprints, merged: mergedFingerprint }, idempotencyKey: sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${mergedFingerprint}`) };
 }
 
 export function canKeepBothAccountSyncConflict(_conflict: AccountSyncConflict): boolean {
@@ -257,10 +266,21 @@ function writesBetween(previous: Map<string, AccountSyncEntity>, next: Map<strin
 function writeOrder(write: AccountSyncWrite): number {
   // A merged same-date day note replaces a local row; its delete must precede the upsert.
   if (write.operation === "delete" && write.kind === "day_note") return -1;
+  // Connector rows follow the parents they reference and leave before them.
+  if (READ_ONLY_KINDS.has(write.kind)) return 0.5;
   if (write.operation !== "delete") return 0;
   if (write.kind === "reminder_delivery") return 1;
   if (write.kind === "occurrence") return 2;
   return 1;
+}
+
+function withoutOrphanReadOnlyRows(entities: readonly AccountSyncEntity[]): AccountSyncEntity[] {
+  const present = new Set(entities.map(entityKey));
+  return entities.filter((entity) => !READ_ONLY_KINDS.has(entity.kind)
+    || dependencies(entity).every(([fieldName, parentKind]) => {
+      const parentId = field(entity.value, fieldName);
+      return parentId !== null && present.has(`${parentKind}:${parentId}`);
+    }));
 }
 
 function reconcileOccurrenceReminders(entities: readonly AccountSyncEntity[]): AccountSyncEntity[] {
@@ -377,6 +397,8 @@ function dependencies(entity: AccountSyncEntity): readonly (readonly [string, Ac
     // A label's ID is its occurrence ID; a dismissal's ID is its Behavior ID.
     case "completion_place_label": return [["id", "occurrence"], ["behavior_id", "behavior"]];
     case "where_suggestion_dismissal": return [["id", "behavior"]];
+    case "behavior_source_link": return [["behavior_id", "behavior"]];
+    case "occurrence_source_match": return [["behavior_id", "behavior"], ["occurrence_id", "occurrence"]];
     default: return [];
   }
 }
@@ -436,6 +458,7 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
   }
   if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
   if (entity.kind === "day_note") validateDayNoteRow(entity.id, value);
+  if (READ_ONLY_KINDS.has(entity.kind)) validateConnectorRow(entity.kind, entity.id, value);
   return { kind: entity.kind, id: entity.id, value };
 }
 
@@ -509,6 +532,31 @@ function retainPlaceLabelInvariants(entities: readonly AccountSyncEntity[]): Acc
 }
 
 const DAY_NOTE_FIELDS = ["id", "local_date", "note", "revision", "created_at", "updated_at"] as const;
+
+const CONNECTOR_ROW_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  behavior_source_link: ["id", "behavior_id", "source", "selector_kind", "enabled", "created_at", "updated_at"],
+  occurrence_source_match: ["id", "occurrence_id", "behavior_id", "source", "activity_start_at", "activity_end_at", "role", "state", "created_at", "updated_at"],
+};
+const SYNC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Ticket 320: the synced shape is exact, so routine digests and activity references never reach a Mac. */
+function validateConnectorRow(kind: AccountSyncEntityKind, id: string, value: Json): void {
+  const fields = CONNECTOR_ROW_FIELDS[kind]!;
+  const instant = (item: Json | undefined) => { try { return typeof item === "string" && Boolean(Temporal.Instant.from(item)); } catch { return false; } };
+  if (!value || Array.isArray(value) || typeof value !== "object" || value.id !== id || !SYNC_UUID.test(id)
+    || Object.keys(value).length !== fields.length || !fields.every((name) => name in value)) {
+    throw new Error("Update Cadence before synchronizing connector completions.");
+  }
+  const valid = value.source === "hevy" && typeof value.behavior_id === "string" && SYNC_UUID.test(value.behavior_id)
+    && instant(value.created_at) && instant(value.updated_at)
+    && (kind === "behavior_source_link"
+      ? (value.selector_kind === "any" || value.selector_kind === "provider_keys") && typeof value.enabled === "boolean"
+      : typeof value.occurrence_id === "string" && SYNC_UUID.test(value.occurrence_id)
+        && instant(value.activity_start_at) && instant(value.activity_end_at)
+        && Temporal.Instant.compare(Temporal.Instant.from(value.activity_end_at as string), Temporal.Instant.from(value.activity_start_at as string)) > 0
+        && (value.role === "completion" || value.role === "attached") && (value.state === "active" || value.state === "removed"));
+  if (!valid) throw new Error("The synced connector completion is invalid.");
+}
 
 /** Mirrors the hosted and SQLite day_notes checks (Ticket 292). */
 function validateDayNoteRow(id: string, value: Json): void {

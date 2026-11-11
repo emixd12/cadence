@@ -15,6 +15,12 @@ import type { DayNoteRecord } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcutContext, NoteShortcutState } from "@cadence/core/types/note-shortcut";
 import type { TravelHabits, TravelSettings } from "@cadence/core/types/travel";
 
+/** Ticket 320: a read-only copy of a hosted source match, received through account sync. */
+export type OccurrenceSourceMatchRecord = {
+  id: string; user_id: string; occurrence_id: string; behavior_id: string; source: string;
+  activity_start_at: string; activity_end_at: string; role: string; state: string; created_at: string; updated_at: string;
+};
+
 export type LocalBehaviorGraph = {
   behavior: Behavior;
   schedules: BehaviorSchedule[];
@@ -110,7 +116,7 @@ export type LocalCommandMap = {
   };
   readOccurrenceHistory: {
     input: Owned & { occurrenceIds: string[] };
-    result: { statusEvents: OccurrenceStatusEventRecord[]; timeSessions: OccurrenceTimeSession[] };
+    result: { statusEvents: OccurrenceStatusEventRecord[]; timeSessions: OccurrenceTimeSession[]; sourceMatches?: OccurrenceSourceMatchRecord[] };
   };
   readSyncState: { input: Owned; result: OccurrenceSyncState };
   createBehaviorGraph: {

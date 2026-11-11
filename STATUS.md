@@ -48,7 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (sync contract 5, not required for the first release); Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 implemented in source on branch `claude/ticket-320-mac-source-sync` (contract 5, SQLite schema 24): hosted push of `20261111160000` with its merge, installed acceptance on a dev-signed build; Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -89,6 +89,24 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 320: connector records sync to the Mac — November 11, 2026
+
+**On branch `claude/ticket-320-mac-source-sync`. Not merged, not pushed to hosted, not in
+a Mac build.**
+
+- Account sync contract 5 (hosted `20261111160000`) adds `behavior_source_link` and
+  `occurrence_source_match` as read-only kinds, with only the fields a Mac shows: no
+  routine digests, account digest or activity references. Contracts 1–4 receive neither.
+- The planner (`account-sync.resolver.ts`) lets the hosted row win, never writes them to
+  the hosted account, and drops a row whose Behavior or Occurrence leaves the merge.
+- SQLite schema 24 (`0024_connector_completion_records.sql`) stores them; account sync is
+  the only writer. The Mac Timeline row lists workout times, as the web row does.
+- Verification: a clean local stack replayed all 115 migrations; the new fixture
+  `ticket-320-connector-completion-sync.sql`, the account-sync contract fixtures and the
+  Ticket 292 sync fixture pass. Planner, desktop adapter and Mac Timeline tests pass; 132
+  Rust tests pass.
+- Not verified: an installed dev-signed Mac build syncing a real account; the hosted push.
 
 ## Ticket 325 started: release credential backup and restore — November 11, 2026
 

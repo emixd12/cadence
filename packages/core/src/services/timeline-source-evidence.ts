@@ -7,8 +7,8 @@ import type { TimelineOccurrenceView, TimelineSourceEvidence, TimelineView } fro
  * Ticket 317 (web) and Ticket 319 (Mac): what a connected service contributed to a
  * Timeline row. "From <source>" shows only while the connector's own status event is
  * the Occurrence's latest and the Occurrence is Completed. Attached workouts are
- * listed whoever marked the row. The Mac has no synced matches until Ticket 320, so
- * it passes none and shows the label alone.
+ * listed whoever marked the row. A linked Mac passes the matches it received through
+ * account sync contract 5 (Ticket 320); a Mac in local mode has none.
  */
 
 export const CONNECTOR_SOURCE_LABELS: Readonly<Record<string, string>> = Object.freeze({ hevy: "Hevy" });

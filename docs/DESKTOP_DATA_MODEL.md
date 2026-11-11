@@ -24,6 +24,19 @@ write that row, so older Mac builds keep syncing and cannot change it. A linked 
 and the web then share one day-pool state. Exclusion IDs are unioned like a Behavior
 pool's.
 
+Schema version 24 adds read-only copies of the hosted connector completion records
+(Ticket 320, D28). Migration `0024_connector_completion_records.sql` creates
+`behavior_source_links` and `occurrence_source_matches` with only the synced fields
+(see `docs/DATA_MODEL.md`, "Account sync contract 5"): no routine digests, account
+digest or activity references. Rows cascade with their Behavior or Occurrence, as the
+hosted rows do. Account sync contract 5 is their only writer; no native command writes
+them. Their deletes apply before an Occurrence or Behavior delete, so a cascade never
+removes a row the plan still expects. `readImportSnapshot` returns them as
+`sourceLinks` and `sourceMatches`, so the planner sees them unchanged, and
+`readOccurrenceHistory` returns `sourceMatches` for the Timeline row's workout times.
+Rust test `account_sync_round_trips_read_only_connector_records` covers apply, field
+rejection and the cascade.
+
 Schema version 22 turns Note shortcuts on by default (Ticket 305). Migration
 `0022_note_shortcuts_on_by_default.sql` sets a stored global `enabled = 0` to 1 once,
 matching hosted `20261110170000_turn_on_note_shortcuts_once.sql`, and leaves `revision`

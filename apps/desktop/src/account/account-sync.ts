@@ -33,7 +33,11 @@ export type AccountSyncReadOperations = {
   readHosted: () => Promise<unknown>;
 };
 type HostedApplyResult = { fingerprint: string; snapshot: HostedEnvelope };
-type AccountSyncPortabilitySnapshot = PortabilitySnapshot & { noteShortcutStates?: NoteShortcutState[] };
+// Ticket 320: read-only copies of hosted connector records, kept so the plan sees them unchanged.
+type ConnectorRecordRow = Readonly<Record<string, unknown> & { id: string }>;
+type AccountSyncPortabilitySnapshot = PortabilitySnapshot & {
+  noteShortcutStates?: NoteShortcutState[]; sourceLinks?: ConnectorRecordRow[]; sourceMatches?: ConnectorRecordRow[];
+};
 
 export async function readAccountSyncInputs(profileId: string, client: SupabaseClient, operations: Partial<AccountSyncReadOperations> = {}): Promise<AccountSyncInputs> {
   const controller = new AbortController();
@@ -204,6 +208,8 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
   add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
   add(entities, "day_note", snapshot.dayNotes ?? []);
+  add(entities, "behavior_source_link", snapshot.sourceLinks ?? []);
+  add(entities, "occurrence_source_match", snapshot.sourceMatches ?? []);
   return entities;
 }
 

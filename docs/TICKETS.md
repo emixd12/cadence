@@ -18325,7 +18325,7 @@ build with one forced collision (`desktop-acceptance` skill) and
 
 ## Ticket 320: Sync links and matches to the Mac
 
-Status: not started. Not required for the first release. Deferred from the November 10, 2026 run: it needs account sync contract 5 (contract 4 carries day notes, Ticket 292), a SQLite migration, native store and sync-apply changes and installed acceptance.
+Status: implemented in source November 11, 2026 (branch `claude/ticket-320-mac-source-sync`). Hosted migration `20261111160000` (contract 5) and SQLite schema 24; not pushed to hosted and not in a Mac build. Installed acceptance on a dev-signed build is open. Not required for the first release.
 Dependencies: Tickets 314 and 319.
 
 Goal: show link state and workout timing on the Mac, offline.

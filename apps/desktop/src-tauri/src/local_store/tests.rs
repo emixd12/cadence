@@ -1604,6 +1604,8 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
     // Canonicalize configuration history up front; the full migrate below re-runs 0017 as a no-op.
     fixture.db.execute_batch(db::MIGRATIONS[16].2).unwrap();
     let before = import::snapshot(&fixture.db, &fixture.profile).unwrap();
+    // Ticket 320: the local sync snapshot always carries the read-only connector records.
+    assert!(before["sourceLinks"].is_array() && before["sourceMatches"].is_array());
     let outbox = |db: &Connection| -> String {
         db.query_row("SELECT json_group_array(json_array(sequence,mutation_id,user_id,operation,request_json,result_json,created_at,synced_at)) FROM (SELECT * FROM mutation_outbox ORDER BY sequence)", [], |row| row.get(0)).unwrap()
     };

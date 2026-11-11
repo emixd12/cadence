@@ -88,8 +88,22 @@ pub fn snapshot(db: &Connection, profile_id: &str) -> Result<Value> {
         "placeLabelSettings":db::owned::<PlaceLabelSettings>(db,profile_id)?,"placeMarkers":db::owned::<PlaceMarker>(db,profile_id)?,
         "completionPlaceLabels":db::owned::<CompletionPlaceLabel>(db,profile_id)?,
         "whereSuggestionDismissals":db::owned::<WhereSuggestionDismissal>(db,profile_id)?,
-        "dayNotes":super::day_note::owned_if_present(db,profile_id)?
+        "dayNotes":super::day_note::owned_if_present(db,profile_id)?,
+        "sourceLinks":owned_if_table::<BehaviorSourceLink>(db,profile_id)?,
+        "sourceMatches":owned_if_table::<OccurrenceSourceMatch>(db,profile_id)?
     }))
+}
+
+/// Ticket 320: rows of a table a migration added later; an older schema has none.
+fn owned_if_table<T: StoredRow>(db: &Connection, profile_id: &str) -> Result<Vec<T>> {
+    let present: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?1)",
+            params![T::TABLE],
+            |row| row.get(0),
+        )
+        .map_err(error)?;
+    if present { db::owned::<T>(db, profile_id) } else { Ok(vec![]) }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

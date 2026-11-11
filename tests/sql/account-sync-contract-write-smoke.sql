@@ -66,7 +66,7 @@ begin
       where entity ->> 'kind' in ('place_label_settings', 'place_marker', 'completion_place_label', 'where_suggestion_dismissal')) then
     raise exception 'The legacy projection contains a newer entity kind';
   end if;
-  foreach invalid_contract in array array[null::integer, 0, 5] loop
+  foreach invalid_contract in array array[null::integer, 0, 6] loop
     begin
       perform public.read_account_sync_snapshot(invalid_contract);
       raise exception 'An invalid read contract was accepted: %', invalid_contract;
@@ -132,11 +132,11 @@ end;
 $$;
 reset role;
 
--- Contract 5 exists only inside this rolled-back test transaction. A prior build
+-- Contract 6 exists only inside this rolled-back test transaction. A prior build
 -- must be able to insert, edit and delete a Category without seeing its new field.
 alter table public.categories add column contract_probe text not null default 'new-row default';
 insert into cadence_private.account_sync_contract_additions (contract, kind, field, default_value)
-values (5, 'category', 'contract_probe', '"new-row default"');
+values (6, 'category', 'contract_probe', '"new-row default"');
 
 set local role authenticated;
 do $$

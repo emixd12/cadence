@@ -31,12 +31,15 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
   const dayNoteRange = timelineDayNoteRange(view);
   const dayNotes = dayNoteRange ? await localCommand("readDayNotes", { profileId, startLocalDate: dayNoteRange.from, endLocalDate: dayNoteRange.to }) : [];
   // Ticket 319: the Mac labels a connector completion from the synced status event's
-  // provenance. Matches do not sync until Ticket 320, so it lists no workout times.
+  // provenance.
   const latestEvents = new Map<string, { statusSemantics: string; sourceCaptureMethod: string; reasonCode: string | null }>();
   for (const event of [...history.statusEvents].sort((left, right) => Temporal.Instant.compare(left.recorded_at, right.recorded_at)
     || Temporal.Instant.compare(left.created_at, right.created_at) || left.id.localeCompare(right.id))) {
     latestEvents.set(event.occurrence_id, { statusSemantics: event.status_semantics, sourceCaptureMethod: event.source_capture_method, reasonCode: event.reason_code });
   }
-  const evidence = resolveTimelineSourceEvidence({ timezone: profile.timezone, occurrences, latestEvents, matches: [] });
+  // Ticket 320: a linked Mac also lists the synced workout times.
+  const matches = (history.sourceMatches ?? []).map((match) => ({ occurrenceId: match.occurrence_id, source: match.source, state: match.state,
+    activityStartAt: match.activity_start_at, activityEndAt: match.activity_end_at }));
+  const evidence = resolveTimelineSourceEvidence({ timezone: profile.timezone, occurrences, latestEvents, matches });
   return { profile, behaviors, categories, timeline: attachTimelineSourceEvidence(attachTimelineDayNotes(view, dayNotes), evidence) };
 }
