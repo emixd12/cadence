@@ -82,6 +82,18 @@ The owner wants the Daily Brief to read day notes (Ticket 292) as part of a late
 Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
 before any day note reaches a provider.
 
+## Day note follow-ups
+
+Found during Ticket 292 review and acceptance on November 11, 2026. Neither is scheduled.
+
+- **Re-import after a failed day-note step.** When the day-note step of a web BehaviorLog
+  import fails after the product records are written, a second import of the same file may
+  offer no apply action, because the product records already match. The file still holds
+  the day notes. Rare; not verified at runtime.
+- **Shortcut evidence from future days.** Only day notes dated today or earlier count
+  toward a Day note shortcuts suggestion. A note saved on a future day does not count until
+  that day arrives. Decide whether future-dated notes should count.
+
 ## Public product surfaces
 
 Cadence's public-product direction is documented in
