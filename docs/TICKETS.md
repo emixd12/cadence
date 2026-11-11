@@ -18325,7 +18325,7 @@ build with one forced collision (`desktop-acceptance` skill) and
 
 ## Ticket 320: Sync links and matches to the Mac
 
-Status: implemented November 11, 2026 (PR #216). Hosted migration `20261111160000` (contract 5) applied November 11; SQLite schema 24 not yet in a Mac build. Installed acceptance on a dev-signed build is open. Not required for the first release.
+Status: implemented and merged November 11, 2026 (PR #216). Hosted migration `20261111160000` (contract 5) applied and read back November 11; SQLite schema 24 is in the Mac 0.1.10 release branch, not yet in a published build. Installed acceptance on a dev-signed build is open. Not required for the first release.
 Dependencies: Tickets 314 and 319.
 
 Goal: show link state and workout timing on the Mac, offline.
@@ -18429,7 +18429,7 @@ Verification: export and completion-timing tests with a connector-completed fixt
 
 ## Ticket 323: Connector completion release acceptance
 
-Status: blocked. Needs Ticket 311's live result, Ticket 319 in a published Mac build with Ticket 319 (owner instruction), Ticket 241's release steps 6–7 and the hosted migrations.
+Status: blocked. Ticket 311 is complete and the hosted migrations are applied. Needs published Mac 0.1.10, whose release branch contains Tickets 319 and 320 (owner instruction to publish), and Ticket 241's release steps 6–7 and installed connector acceptance.
 Dependencies: Tickets 311–319, 321 and 322; Ticket 241's release steps 6–7 and installed
 connector acceptance.
 

@@ -48,7 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merging with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build; Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (its release branch contains 319 and 320; owner instruction to notarize and publish) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -92,8 +92,8 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 ## Ticket 320: connector records sync to the Mac — November 11, 2026
 
-**PR #216, merging November 11 after its checks passed. Hosted `20261111160000` applied before
-the merge. Not in a Mac build.**
+**PR #216 merged November 11 by the owner. Hosted `20261111160000` applied before the merge.
+In the Mac 0.1.10 release branch; not yet in a published build.**
 
 - Account sync contract 5 (hosted `20261111160000`) adds `behavior_source_link` and
   `occurrence_source_match` as read-only kinds, with only the fields a Mac shows: no
@@ -111,7 +111,20 @@ the merge. Not in a Mac build.**
   kinds without digests or activity references; `apply_account_sync_plan`'s writable list
   has neither; `account_sync_snapshot()` executes for `authenticated` only; hosted
   migration history equals git (115 rows).
+- Second readback after the merge (another agent, read-only SQL): contract additions list
+  both kinds at 5; the current contract is 5; projecting a synthetic snapshot keeps both
+  kinds at contract 5 and drops them at 1–4; RLS is on for `behavior_source_links` and
+  `occurrence_source_matches`, with no `anon` or `PUBLIC` table grants; hosted migration
+  history still equals git (117 rows).
+- The pinned CLI 2.105.0 binary fails `codesign -v` straight from the npm registry, so
+  macOS kills it. An ad-hoc signed copy outside the repository ran `migration list`
+  (`docs/SUPABASE_WORKFLOW.md`, "Installed pathway").
 - Not verified: an installed dev-signed Mac build syncing a real account.
+- Ticket 323 waits on: (1) Mac 0.1.10 notarized and published by owner instruction; the
+  release branch contains Tickets 319 and 320 (mac-release track); (2) Ticket 241's
+  release steps 6–7 and installed connector acceptance (connector acceptance track);
+  (3) the acceptance matrix in plan Task 14 as test account A; (4) the owner's instruction
+  to set `CADENCE_CONNECTOR_COMPLETION` in production. Ticket 324 waits on 323.
 
 ## Ticket 325 started: release credential backup and restore — November 11, 2026
 
