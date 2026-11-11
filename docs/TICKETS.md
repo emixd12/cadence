@@ -17940,7 +17940,7 @@ before-and-after list.
 Decision: `docs/DECISIONS.md`, 2026-11-10, D28. Plan:
 `docs/plans/2026-11-10-connector-completion-architecture.md`. Ticket 309 + n is the plan's
 Task n. Each ticket below states its status, scope and acceptance; the plan's task holds
-the files, interfaces and tests. Read both. Tickets 301–309 come before this section.
+the files, interfaces and tests. Read both.
 
 Order: 310 first. 311 and 312 follow it. 313 follows 312; 314 follows 313; 315 follows
 311 and 312; 316 follows 314 and 315. 317, 321 and 322 follow 316; 318 follows 317. 319
@@ -18222,8 +18222,9 @@ Scope and acceptance:
 - A connector-completed row shows "From Hevy" while the connector's event is the latest.
   A row lists each attached workout's start and end time. The existing status buttons
   change the status; add no new control, route, modal or settings page.
-- The Hevy panel shows the last successful check time. No notification announces a
-  connector completion (D28.6).
+- The Hevy panel shows the last successful check time. The Hevy source row in Settings
+  (Ticket 301) keeps its state text. No notification announces a connector completion
+  (D28.6).
 - Update `interaction-registry.json`, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md` and
   `DESIGN.md`. Mobile-responsive.
 
@@ -18320,7 +18321,7 @@ build with one forced collision (`desktop-acceptance` skill) and
 
 ## Ticket 320: Sync links and matches to the Mac
 
-Status: not started. Deferred from the November 10, 2026 run: it needs account sync contract 5 (contract 4 carries day notes, Ticket 292), a SQLite migration, native store and sync-apply changes and installed acceptance.
+Status: not started. Not required for the first release. Deferred from the November 10, 2026 run: it needs account sync contract 5 (contract 4 carries day notes, Ticket 292), a SQLite migration, native store and sync-apply changes and installed acceptance.
 Dependencies: Tickets 314 and 319.
 
 Goal: show link state and workout timing on the Mac, offline.

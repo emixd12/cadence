@@ -243,13 +243,14 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
   above 500 workouts, so Ticket 311 picks the read strategy.
 - Tickets 311–324 are not started. Ticket 311 needs an owner step only if the `connectors`
   preflight lists one.
-- ID gaps on purpose: P-033 to P-037 and L-020 to L-022 belong to Tickets 301–309 on draft
-  PR #205.
-- Checks: `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck` and
-  `build` pass. `npm run test` ran under Node 26: 5,428 passed and 16 failed in five
-  files. Four of those files assert Node 24, which `engines` requires, and
-  `tests/acceptance-web-client.test.mjs` timed out closing its browser. A rerun of the
-  five files under Node 24 had not finished when this entry was written.
+- Merged with `main` three times on November 11, after PR #205, PR #209 and PR #211. This
+  entry's IDs follow the Tickets 301–309 work's: P-038 after P-037, L-023 after L-022.
+  Ticket 292 took account sync contract 4, SQLite `0023` and MCP contract 1.2.0; Tickets
+  319, 320 and 322 name no contract number, so they take the next free ones.
+- Checks: `agents:check`, `interactions:check`, `resolvers:check`, `lint` and `typecheck`
+  pass under Node 24 after each merge. `build` passed before the merges. The full test
+  suite last ran before them, under Node 26: 5,428 passed, 16 failed in five files (four
+  assert Node 24; `tests/acceptance-web-client.test.mjs` timed out in `afterAll`).
 - Not verified: Hevy's change feed, workout order and terms (Ticket 311, L-023). The
   5-minute minimum and the job's check counts are estimates.
 - Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only, Tickets

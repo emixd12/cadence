@@ -75,7 +75,7 @@ Each item was rechecked against `main` or the provider.
 | F4 | Matching runs "whenever Cadence already reads Hevy: the Timeline, Daily Brief, and linked desktop". | The Timeline read is a `GET` that the client caches for five minutes. Daily Brief is specified as read-only. | A write must not ride on a cached `GET` or inside the briefing pipeline. Reconcile gets its own `POST` (Task 7). |
 | F5 | "There is no background polling"; a cron job "is a bigger scope change". | `main` runs a five-minute job that acts as each user under RLS with a minted five-minute token on its own channel (Ticket 276, `lib/supabase/integration-token.ts`, `app/api/travel/leave-reminders/process/route.ts`). That job's caller already reads connector credentials (`lib/services/connector-credentials.ts:28`). | The job is an established pattern, not new infrastructure. It needs its own token channel and a cost entry (Task 12). |
 | F6 | The events feed "can replace the 500-workout scan" (framed as an optimization). | Above 500 workouts the adapter returns `incomplete_pagination` without reading a page (`lib/services/hevy-provider.ts:140`). | Long-time Hevy users are the target users, and they exceed 500 workouts. Under the current read the feature never works for them. The live check (Task 2) decides the read strategy and gates Tasks 6, 7 and 12. |
-| F7 | "The new tickets start at 292." | `main` now ends at Ticket 300. The unmerged branch `claude/determined-fermi-78a61d` already defines Tickets 301–309. | The tickets are 310–324, the first free numbers on November 10 after checking every branch. |
+| F7 | "The new tickets start at 292." | `main` ended at Ticket 300 on November 10, and another branch already held Tickets 301–309 (merged later as PR #205). | The tickets are 310–324, the first free numbers on November 10 after checking every branch. |
 | F8 | "The opt-in is the 'explicit user action'." | The playbook sets a higher bar for any write phase: named operations, a distinct grant, preview, explicit human approval, stale-source revalidation, conflict handling, idempotency, audit history, revocation fencing and atomic apply (`docs/INTEGRATION_PLAYBOOK.md:133`). The November 7 session asked the owner this question. The reviewed session turned it into a default. | A standing grant with no approval per write is an exception to that rule. The owner decides it (D28.1), and Task 1 records it. |
 | F9 | A `MESSAGING_CHANGES.md` entry covers the stored data. | Cadence stores no Hevy data on the server today. Snapshots live in client memory and a disposable desktop cache. | Link and match rows make workout times and routine identifiers durable hosted data. Disconnect, reconnect with another Hevy account, account deletion, export and sync each need a rule (section 3, "Lifecycle"). |
 | F10 | Not considered. | `resolveCompletionTiming` treats `status_marked_at` as the user's marking time and feeds Daily Brief context (`lib/services/advisor-day-context.service.ts:424`). | A connector write at job time would be counted as a user habit. Task 13 excludes connector marks from marking patterns. |
@@ -157,9 +157,8 @@ Each capability has one data model, shared by every service that offers it.
 | Completion (new) | Recorded activity that may complete a linked Behavior | Hevy | Connector completion |
 
 Outlook, iCloud and Hevy already share one connection layer. Google Calendar predates
-it and keeps its own. Tickets 306 and 307, filed on the unmerged branch
-`claude/determined-fermi-78a61d`, unify what the user sees: one Daily Brief choice for
-every connected source, and one Google Calendar connection.
+it and keeps its own. Tickets 306 and 307, implemented November 10, 2026 (PR #205), unify what the user sees:
+one Daily Brief choice for every connected source, and one Google Calendar connection.
 
 **Alternative considered: one data model for every connector.** Every connector would
 produce the same record: source, start, end, a kind (planned or recorded) and optional
@@ -849,9 +848,8 @@ Occurrence is resolved; one nightly check; the 24-a-day ceiling; doubling after 
 **Decisions:** Marking patterns exclude Occurrences whose current status came from a
 connector. Confirm BehaviorLog and JSON exports emit the D28.7 values and `reason_code`
 unchanged. MCP `get_occurrence` already returns status history; document the new
-values. Daily Brief gets timing facts only under the Daily Brief choice that covers Hevy
-(one per source today; a single choice if Ticket 306 merges), in a
-later ticket.
+values. Daily Brief gets timing facts only under the one Daily Brief choice for
+connected sources (Ticket 306), in a later ticket.
 
 **Verification:** Export and completion-timing tests pass with a connector-completed fixture.
 

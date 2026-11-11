@@ -603,8 +603,9 @@ The owner rejected one data model for every connector (D28.2).
 - **Read schedule:** the foreground reconcile and a hosted job on a per-account schedule
   (D28.5). This replaces "manual and existing foreground refresh only" for completion
   sources.
-- **Onward disclosure:** unchanged. Daily Brief disclosure stays separate; timing facts
-  in Daily Brief are not in these tickets.
+- **Onward disclosure:** unchanged by these tickets. The Daily Brief choice for
+  connected sources (Ticket 306) still decides what reaches the model. Completion timing
+  facts in Daily Brief are not in these tickets.
 - **Explicit exclusions:** provider writes, exercise or set data, filling tracked time,
   completing an Occurrence on another day, a second completion source, webhook intake,
   and notifications about connector completions.
