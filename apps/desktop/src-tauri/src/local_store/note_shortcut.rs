@@ -13,10 +13,12 @@ const CONTEXT_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 pub struct NoteSource {
     pub id: String,
     pub user_id: String,
-    pub behavior_id: String,
+    /// Null for a day note in the day-note pool.
+    pub behavior_id: Option<String>,
     pub note: Option<String>,
     pub local_date: String,
-    pub scheduled_for: String,
+    /// Null for a day note in the day-note pool.
+    pub scheduled_for: Option<String>,
 }
 impl StoredRow for NoteSource {
     const TABLE: &'static str = "occurrences";
@@ -33,6 +35,14 @@ pub struct NoteShortcutBehavior {
     pub timezone: String,
 }
 
+/// Present only in the day-note pool context: the owner's timezone for the 90-day window.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DayNoteShortcutPool {
+    pub user_id: String,
+    pub timezone: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NoteShortcutContext {
@@ -41,6 +51,8 @@ pub struct NoteShortcutContext {
     pub behavior: Option<NoteShortcutBehavior>,
     pub notes: Vec<NoteSource>,
     pub imported_occurrence_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day_pool: Option<DayNoteShortcutPool>,
 }
 
 pub fn read_states(db: &Connection, profile_id: &str) -> Result<Vec<NoteShortcutState>> {
@@ -66,6 +78,9 @@ pub fn read_context(
     profile_id: &str,
     behavior_id: Option<&str>,
 ) -> Result<NoteShortcutContext> {
+    if behavior_id == Some(db::DAY_NOTE_SHORTCUT_POOL_ID) {
+        return read_day_pool_context(db, profile_id);
+    }
     let state_id = behavior_id.unwrap_or("global");
     if let Some(id) = behavior_id {
         db::valid_id(id)?;
@@ -79,6 +94,7 @@ pub fn read_context(
             behavior: None,
             notes: vec![],
             imported_occurrence_ids: vec![],
+            day_pool: None,
         });
     };
     let behavior = db::read::<Behavior>(
@@ -128,6 +144,35 @@ pub fn read_context(
         behavior,
         notes,
         imported_occurrence_ids,
+        day_pool: None,
+    })
+}
+
+/// The day-note pool reads only non-empty day notes, like hosted
+/// `read_day_note_shortcut_context`. Imported day notes count like typed ones.
+fn read_day_pool_context(db: &Connection, profile_id: &str) -> Result<NoteShortcutContext> {
+    let timezone: String = db
+        .query_row(
+            "SELECT timezone FROM profiles WHERE id=?1",
+            [profile_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Profile not found.".to_string())?;
+    let notes = db::read::<NoteSource>(
+        db,
+        "SELECT id,user_id,NULL AS behavior_id,note,local_date,NULL AS scheduled_for FROM day_notes WHERE user_id=?1 AND note IS NOT NULL AND length(trim(note)) > 0 ORDER BY local_date DESC,id",
+        &[profile_id.to_string().into()],
+    )?;
+    checked_context(NoteShortcutContext {
+        state: read_state(db, profile_id, db::DAY_NOTE_SHORTCUT_POOL_ID)?,
+        global_state: read_state(db, profile_id, "global")?,
+        behavior: None,
+        notes,
+        imported_occurrence_ids: vec![],
+        day_pool: Some(DayNoteShortcutPool {
+            user_id: profile_id.into(),
+            timezone,
+        }),
     })
 }
 
@@ -150,8 +195,14 @@ pub fn commit(
     next: &NoteShortcutState,
     require_enabled: bool,
 ) -> Result<Value> {
+    let day_pool = next.id == db::DAY_NOTE_SHORTCUT_POOL_ID;
     let behavior_id = next.behavior_id.as_deref();
-    let current = read_context(db, profile_id, behavior_id)?;
+    let pool_id = if day_pool {
+        Some(db::DAY_NOTE_SHORTCUT_POOL_ID)
+    } else {
+        behavior_id
+    };
+    let current = read_context(db, profile_id, pool_id)?;
     if &current != expected {
         return Err("Note shortcut sources or settings changed. Refresh and try again.".into());
     }
@@ -160,10 +211,20 @@ pub fn commit(
         return Err("The Note shortcut update time is invalid.".into());
     }
     let expected_revision = current.state.as_ref().map_or(0, |state| state.revision);
-    if next.revision != expected_revision + 1 || next.id != behavior_id.unwrap_or("global") {
+    if next.revision != expected_revision + 1 || next.id != pool_id.unwrap_or("global") {
         return Err("The Note shortcut revision is stale.".into());
     }
-    if let Some(behavior_id) = behavior_id {
+    if day_pool {
+        if require_enabled
+            && (!current.state.as_ref().is_some_and(|state| state.enabled)
+                || !current
+                    .global_state
+                    .as_ref()
+                    .is_some_and(|state| state.enabled))
+        {
+            return Err("Enable Note shortcuts globally and for day notes first.".into());
+        }
+    } else if let Some(behavior_id) = behavior_id {
         let behavior = current.behavior.as_ref().ok_or("Behavior not found.")?;
         if behavior.id != behavior_id || behavior.user_id != profile_id {
             return Err("Behavior not found.".into());

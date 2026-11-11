@@ -290,6 +290,7 @@
         "INT-TIMELINE-011",
         "INT-BEHAVIOR-029",
         "INT-SETTINGS-014",
+        "INT-SETTINGS-015",
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
         "INT-CALENDAR-003",
@@ -11603,7 +11604,7 @@
             "tests/local-day-note.service.test.ts",
             "tests/day-note-ui.test.tsx"
           ],
-          "reason": "Shared DayNoteControl and NoteEditor; the native store saves through SQLite migration 0021 with compare-and-set (Rust test day_notes_save_edit_clear_and_reject_stale_writes). Installed-app acceptance is recorded separately."
+          "reason": "Shared DayNoteControl and NoteEditor; the native store saves through SQLite migration 0021 with compare-and-set (Rust test day_notes_save_edit_clear_and_reject_stale_writes). A save from an accepted day note shortcut also records its exclusion in the day-note pool (SQLite 0022). Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11846,7 +11847,8 @@
       "implementation": [
         "components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings",
         "app/(app)/settings/page.tsx",
-        "app/(app)/note-shortcuts/actions.ts#manageNoteShortcutAction"
+        "app/(app)/note-shortcuts/actions.ts#manageNoteShortcutAction",
+        "apps/desktop/src/product.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -11870,9 +11872,18 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Ticket 292 desktop slice: the SQLite migration, native store, DataStore methods and account sync for the day-note pool land in a separate task. The shared DayNoteShortcutSettings takes a callback for that wiring."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-note-shortcut.service.ts",
+            "components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings"
+          ],
+          "evidence": [
+            "tests/local-day-note-shortcuts.test.ts",
+            "tests/day-note-shortcuts-ui.test.tsx"
+          ],
+          "reason": "Shared DayNoteShortcutSettings with a local callback; the native store reads day notes and commits the pool through SQLite migration 0022 (Rust test day_note_shortcut_pool_reads_day_notes_commits_and_excludes_shortcut_saves). Account sync contract 4 carries the pool. Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",

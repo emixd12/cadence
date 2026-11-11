@@ -99,6 +99,10 @@ are implemented. The registry is authoritative.
 - Note shortcuts use the shared review controls. Global and Behavior settings,
   accepted quick-fill buttons, and local deterministic matching stay available
   offline. Linking synchronizes shortcut state without enabling cloud analysis.
+- Day note shortcuts (Ticket 292) use the shared `DayNoteShortcutSettings` section
+  under the global control in Settings, and accepted ones appear as chips only in
+  the day-note editor. Matching reads local day notes in SQLite schema 22. Linking
+  synchronizes the pool under account sync contract 4.
 
 See `docs/PRODUCT_SPEC.md`, `docs/RECURRENCE_RULES.md`,
 `docs/DATETIME_STRATEGY.md`, and `docs/EXPORT_FORMATS.md` for exact semantics.

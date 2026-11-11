@@ -50,6 +50,7 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
     try {
       const result = await saveLocalDayNote(profileId, {
         localDate: form.get("local_date"), expectedNote: form.get("expected_note"), note: form.get("note"),
+        ...(form.get("used_shortcut") === "true" ? { usedShortcut: true } : {}),
       }, Temporal.Now.instant());
       return { status: "success", message: result.note === null ? "Day note cleared." : "Day note saved." };
     } catch (error) { return { status: "error", message: localErrorMessage(error) }; }

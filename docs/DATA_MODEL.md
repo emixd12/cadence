@@ -1864,7 +1864,9 @@ Plan: `docs/plans/2026-10-27-sync-compatibility.md`. Applied to hosted on Octobe
 2026.
 
 - `cadence_private.account_sync_contract_additions(contract, kind, field,
-  default_value)` lists what each contract after 1 adds. A row with no `field`
+  default_value)` lists what each contract after 1 adds. Contract 4 adds one row
+  of an existing kind instead, in `cadence_private.account_sync_contract_rows`
+  (see "Day-note shortcut pool (Ticket 292)"). A row with no `field`
   adds a whole entity kind. Each added field has a `default_value`, which is used
   when no stored value exists. Contract 1 is the desktop 0.1.5 shape (SQLite
   schema 18). Contract 2 adds five Ticket 217 travel-habit profile keys and the
@@ -2219,12 +2221,27 @@ Occurrence notes never read the day pool. Local check
 `tests/sql/ticket-292-day-note-shortcuts.sql`.
 
 Account sync contracts 1–3 never carry the day pool. Shipped Mac builds reject a
-Note shortcut state whose ID is not `global` or a Behavior UUID, so the same
-migration filters `id <> 'day_notes'` out of the `note_shortcut_state` union in
-`cadence_private.account_sync_snapshot()`. Every snapshot read, apply comparison
-and fingerprint goes through that function, and hosted sync writes of the
-`day_notes` ID already fail its UUID check. Ticket 292's desktop slice adds the
-SQLite mirror and removes the filter under a new sync contract.
+Note shortcut state whose ID is not `global` or a Behavior UUID. Migration
+`20261111120000` first filtered `id <> 'day_notes'` out of the `note_shortcut_state`
+union in `cadence_private.account_sync_snapshot()`. Migration
+`20261111130000_account_sync_day_note_shortcut_pool.sql` (Ticket 292's desktop slice)
+removes that filter and adds sync contract 4:
+
+- `cadence_private.account_sync_contract_rows(contract, kind, id)` lists single rows
+  of an existing kind that a contract adds. Its one row is
+  `(4, 'note_shortcut_state', 'day_notes')`. Only the migration owner writes it;
+  `authenticated` can read it.
+- `account_sync_current_contract()` is the highest contract in either registry, now 4.
+- `project_account_sync_snapshot` also drops a registered row for contracts below
+  its contract, so reads, apply comparisons, receipts and fingerprints for
+  contracts 1–3 still leave it out.
+- `apply_account_sync_plan` rejects any write to a registered row from a lower
+  contract, and accepts the `day_notes` Note shortcut state ID only from contract 4.
+  That write must keep a null `behavior_id`.
+
+The Mac app mirrors the row in SQLite schema 22 (`docs/DESKTOP_DATA_MODEL.md`).
+Local checks `tests/sql/ticket-292-day-note-shortcut-sync.sql` and the account-sync
+contract fixtures.
 
 ## Google Calendar connector (Ticket 134)
 

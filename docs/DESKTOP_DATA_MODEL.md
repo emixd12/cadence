@@ -1,5 +1,27 @@
 # Desktop data model
 
+Schema version 22 adds the day-note Note shortcuts pool (Ticket 292). Migration
+`0022_day_note_shortcut_pool.sql` rebuilds `note_shortcut_states` so it also accepts
+`id = 'day_notes'` with a null `behavior_id`, mirroring hosted
+`20261111120000_day_note_shortcut_pool.sql`; existing rows and the data-revision
+triggers carry over. `readNoteShortcutContext` with `behaviorId: "day_notes"` returns
+the profile's non-empty day notes (null `behavior_id` and `scheduled_for`), no
+imported IDs, and a `dayPool` object with the profile timezone. `commitNoteShortcutState`
+accepts that pool and, for find, accept and edit, requires the global and day-pool
+switches. `saveDayNote` with `usedShortcut: true` saves the note and adds its day-note ID
+to the pool's exclusions in the same transaction; a stale save writes neither, and a
+shortcut clear is rejected. Rust tests
+`day_note_shortcut_pool_reads_day_notes_commits_and_excludes_shortcut_saves`,
+`day_note_shortcut_pool_migration_keeps_existing_shortcut_states` and
+`account_sync_round_trips_the_day_note_shortcut_pool` cover it.
+
+Account sync contract 4 (hosted migration
+`20261111130000_account_sync_day_note_shortcut_pool.sql`) carries the pool as the
+`note_shortcut_state` entity with ID `day_notes`. Contracts 1–3 neither receive nor
+write that row, so older Mac builds keep syncing and cannot change it. A linked Mac
+and the web then share one day-pool state. Exclusion IDs are unioned like a Behavior
+pool's.
+
 Schema version 21 adds day notes (Ticket 292). Migration `0021_day_notes.sql` mirrors
 hosted `day_notes`: one row per profile and local date, a nullable note of 1–2,000
 non-blank characters, a revision of at least 1, and a cascade from `profiles`. The

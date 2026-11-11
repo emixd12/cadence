@@ -3,7 +3,7 @@
 -- Ticket 292: the day-note Note shortcuts pool. Owner-only reads, writes only
 -- through the guarded RPCs, the full-context compare-and-set, the global and pool
 -- switches, shortcut exclusions recorded with the save, no cross-account
--- access, and no 'day_notes' state in any account sync snapshot. Synthetic local fixtures only; all changes roll back.
+-- access, and no 'day_notes' state in sync contracts 1-3 (contract 4 carries it). Synthetic local fixtures only; all changes roll back.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data) values
@@ -97,13 +97,19 @@ begin
   assert result_value ->> 'id' = 'day_notes' and result_value ->> 'enabled' = 'true',
     'Day pool enable failed';
 
-  -- Sync contracts 1-3 never receive the day pool; every other entity is unchanged.
+  -- The full snapshot gains only the day pool row. Sync contracts 1-3 never receive
+  -- it (migration 20261111130000); contract 4 does.
   snapshot_value := cadence_private.account_sync_snapshot();
   assert (select jsonb_agg(distinct entity ->> 'kind' order by entity ->> 'kind')
     from jsonb_array_elements(snapshot_value -> 'entities') entity) = kinds_before,
     'Snapshot kinds changed';
-  assert jsonb_array_length(snapshot_value -> 'entities') = count_before,
+  assert jsonb_array_length(snapshot_value -> 'entities') = count_before + 1,
     'Snapshot entity count changed';
+  assert exists (select 1 from jsonb_array_elements(public.read_account_sync_snapshot(4) -> 'entities') entity
+    where entity ->> 'kind' = 'note_shortcut_state' and entity ->> 'id' = 'day_notes'),
+    'Contract 4 snapshot lacks the day pool';
+  assert jsonb_array_length(public.read_account_sync_snapshot(3) -> 'entities') = count_before,
+    'Contract 3 snapshot entity count changed';
   assert exists (select 1 from jsonb_array_elements(snapshot_value -> 'entities') entity
     where entity ->> 'kind' = 'note_shortcut_state' and entity ->> 'id' = 'global'),
     'Snapshot lost the global Note shortcut state';

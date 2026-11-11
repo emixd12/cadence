@@ -32,7 +32,9 @@ import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
-import { GlobalNoteShortcutControl, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DayNoteShortcutSettings, GlobalNoteShortcutControl, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { isDayNoteShortcutPool } from "@cadence/core/resolvers/note-suggestion.resolver";
 import { SettingsScreen } from "./settings-screen";
 import { LocalExportScreen } from "./export-screen";
 import { hasPendingLocalCommands, localCommand } from "./local-store";
@@ -64,7 +66,7 @@ import { completedFirstLinkState, finishFirstAccountLink, finishReviewedFirstAcc
 
 type Bundle = { timeline: Awaited<ReturnType<typeof loadLocalTimeline>>;
   behaviors: Awaited<ReturnType<typeof getLocalBehaviorsPageData>>; hasImportRuns: boolean;
-  shortcuts: { global: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
+  shortcuts: { global: NoteShortcutView; day: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
 type SyncCompletion = Readonly<{ status: SyncStatus; localCurrent: boolean }>;
 const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "behaviors", "export", "settings"];
 
@@ -165,10 +167,11 @@ export function Product() {
           await archiveLifecycle.current;
           const timeline = await loadLocalTimeline(parameters.current.days, now);
           if (!mounted.current || current !== revision.current) continue;
-          const [behaviors, imports, global, accepted, behaviorViews] = await Promise.all([
+          const [behaviors, imports, global, day, accepted, behaviorViews] = await Promise.all([
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
             localCommand("readImportRuns", { profileId: timeline.profile.id, limit: 1 }),
             getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), null, now),
+            getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), DAY_NOTE_SHORTCUT_POOL_ID, now),
             listAcceptedNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id)),
             Promise.all(timeline.behaviors.map(async (behavior) => [behavior.id, await getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), behavior.id, now)] as const)),
           ]);
@@ -185,7 +188,7 @@ export function Product() {
             if (mounted.current && current === revision.current && activation.current?.requestKey === requestedActivation.requestKey) setNotificationTarget(target);
           }
           if (mounted.current && current === revision.current) {
-            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { global, accepted, views: Object.fromEntries(behaviorViews) } });
+            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { global, day, accepted, views: Object.fromEntries(behaviorViews) } });
             setError("");
             successful = true;
             if (syncAfterRefresh.current) {
@@ -509,7 +512,7 @@ export function Product() {
       await manageNoteShortcuts(store, { behaviorId, command, expectedRevision, now });
       const view = await getNoteShortcutView(store, behaviorId, now);
       refresh();
-      return { status: "success", message: noteShortcutMessage(command.operation, view), view };
+      return { status: "success", message: noteShortcutMessage(command.operation, view, isDayNoteShortcutPool(behaviorId)), view };
     } catch (failure) {
       return { status: "error", message: localErrorMessage(failure) };
     }
@@ -598,7 +601,9 @@ export function Product() {
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
-        noteShortcutControls={<GlobalNoteShortcutControl view={bundle.shortcuts.global} action={noteShortcutAction} />}
+        noteShortcutControls={<GlobalNoteShortcutControl view={bundle.shortcuts.global} action={noteShortcutAction}>
+          <DayNoteShortcutSettings view={bundle.shortcuts.day} action={noteShortcutAction} />
+        </GlobalNoteShortcutControl>}
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
@@ -631,7 +636,10 @@ export function Product() {
   </DesktopApp></DevelopmentBuildProvider>;
 }
 
-function noteShortcutMessage(operation: string, view: NoteShortcutView): string {
+function noteShortcutMessage(operation: string, view: NoteShortcutView, dayPool: boolean): string {
+  if (operation === "analyze" && dayPool) return view.entries.some((entry) => entry.status === "proposed")
+    ? "Repeated day notes checked."
+    : "No new shortcuts found. Matching needs the same day note on three days in the last 90 days.";
   if (operation === "analyze") return view.entries.some((entry) => entry.status === "proposed")
     ? "Repeated Notes checked."
     : "No new shortcuts found. Matching needs the same Note on three eligible Occurrences.";
