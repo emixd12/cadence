@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-033` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-037` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -102,6 +102,10 @@ Status values:
 | [P-030](#p-030-daily-brief-disclosure-on-a-mac-using-a-chatgpt-plan) | Daily Brief disclosure on a Mac using a ChatGPT plan | logged | 294, 299 | In-app copy (Mac) |
 | [P-031](#p-031-user-guide-for-using-a-chatgpt-plan) | User guide for using a ChatGPT plan | logged | 294, 299 | User guide |
 | [P-032](#p-032-marketing-claim-use-your-chatgpt-plan) | Marketing claim "Use your ChatGPT plan" | logged | 294, 299, 300 | Marketing |
+| [P-033](#p-033-settings-groups-trust-links-delete-account-link-and-auto-save) | Settings groups, Trust links, Delete account link and auto-save | logged | 301, 302, 303, 309 | In-app copy, user guide |
+| [P-034](#p-034-note-shortcuts-on-for-everyone) | Note shortcuts on for everyone | logged | 305 | In-app copy, user guide, Privacy |
+| [P-035](#p-035-one-daily-brief-choice-for-connected-sources-and-one-google-calendar-connection) | One Daily Brief choice for connected sources, and one Google Calendar connection | logged | 306, 307 | Privacy and Terms, in-app copy, user guide, marketing, provider submissions |
+| [P-036](#p-036-home-from-the-current-location) | Home from the current location | logged | 308 | Privacy, in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1105,4 +1109,85 @@ cite has not changed.
   ChatGPT plan option.
 - **Update needed:** after release, add "Use your ChatGPT plan" for Cadence for Mac, naming it
   Mac only and following OpenAI's brand guidelines. No claim before release.
+## P-033: Settings groups, Trust links, Delete account link and auto-save
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. Settings
+  becomes four groups (General, Connections, Planning, Account and data). The Trust and
+  legal section becomes one line of Privacy, Terms and Trust links at the end of the page.
+  Delete account becomes a plain link at the end of the page that opens the same form.
+  Most settings save as they change, so **Save travel settings** goes away; **Save
+  timezone** stays. Settings wording is rewritten to be clear and warm.
+- **Affected:** Tickets 301, 302, 303 and 309. Files: `app/(app)/settings/page.tsx`,
+  `components/settings/*`, `apps/desktop/src/settings-screen.tsx`.
+- **Surfaces:** in-app copy, user guide.
+- **Conflicting current text:** `docs/user-guide/privacy-and-account.md`: "Under **Trust
+  and legal**, choose **Privacy**, **Terms**, or **Trust**." and "In **Delete account**,
+  choose **Open Export**." `docs/user-guide/travel.md`: "Select Save travel settings after
+  changing Home or usual travel." `docs/user-guide/timeline.md`: "Settings lists every
+  read-only source under **Connected sources**".
+- **Update needed:** rewrite those user guide steps for the groups, the links line, the
+  Delete account link and auto-save. Review each rewritten in-app sentence from Ticket 309
+  that states what Cadence does with data.
+- **Status:** logged.
+
+## P-034: Note shortcuts on for everyone
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. Note
+  shortcuts are on by default. A Behavior no longer needs its own switch, repeated Notes
+  are matched without a request, and Settings shows no Note shortcuts control. The stored
+  switch stays so the control can return.
+- **Affected:** Ticket 305. Files: `components/note-shortcuts/NoteShortcutControls.tsx`,
+  `packages/core/src/types/note-shortcut.ts`, `docs/PRODUCT_SPEC.md` ("Recurring Note
+  shortcuts contract"), `docs/UI_SPEC.md` ("Note shortcut controls").
+- **Surfaces:** in-app copy, user guide, Privacy.
+- **Conflicting current text:** `docs/user-guide/timeline.md`, "Use a Note shortcut": "Open
+  **Settings** and enable **Note shortcuts**. Open an active Behavior's **Details and
+  Settings**, enable its Note shortcuts, then choose **Find repeated". `docs/user-guide/desktop-local.md`,
+  "Note shortcuts": "Settings controls the global **Note shortcuts** setting." Privacy text
+  on Note shortcuts was not checked.
+- **Update needed:** rewrite both user guide sections. Check whether the Privacy page
+  describes Note shortcuts as opt-in and correct it if so.
+- **Status:** logged.
+
+## P-035: One Daily Brief choice for connected sources, and one Google Calendar connection
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. One Daily
+  Brief choice covers every connected source, with a per-source list under Advanced. Daily
+  Brief reads Google Calendar through the Timeline connection, and the separate **Google
+  Calendar for Daily Brief** connection is retired.
+- **Affected:** Tickets 306 and 307. Files: `components/briefing/DailyBriefSettingsPanel.tsx`,
+  `components/settings/GoogleCalendarPanel.tsx`, `components/settings/LegalContent.tsx`.
+  Related legal entry: L-021. Related: P-010 and P-012 (Google verification).
+- **Surfaces:** Privacy and Terms, in-app copy, user guide, marketing, provider submissions.
+- **Conflicting current text:** Privacy: "Google Calendar, Outlook Calendar, iCloud Calendar
+  and Hevy each need a separate Daily Brief choice. Connecting a source or displaying it on
+  Timeline does not grant model access." and "Daily Brief reads Calendar only through that
+  connection, never through the Timeline connection". Terms: "Separate choices control
+  optional Calendar timing, reminder delivery counts, and selected Notes." In-app: "Calendar
+  timing, recorded workouts and the sources above are optional, and each needs its own
+  choice here." `docs/user-guide/timeline.md`: "Outlook Calendar, iCloud Calendar and Hevy
+  each need their own choice" and the section "Calendar for Daily Brief".
+  `apps/marketing/src/data/faq.ts`, `new-connector-model-choice`: "No. Google Calendar,
+  Outlook Calendar, iCloud Calendar and Hevy each need a separate default-off Daily Bri…".
+  `tests/legal-content.test.tsx` asserts parts of the Privacy text.
+- **Update needed:** rewrite each passage for one choice and one Google connection. Say
+  that a source connected later is covered by the choice already made. Update the Google
+  verification narrative before any submission.
+- **Status:** logged.
+
+## P-036: Home from the current location
+
+- **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. A button
+  beside Home reads the device position once, sends it to Google to get an address, and
+  fills the Home field for the user to confirm. The position is not stored.
+- **Affected:** Ticket 308. Files: `components/settings/TravelSettingsPanel.tsx`,
+  `lib/services/travel-provider.ts`, `docs/COSTS.md`.
+- **Surfaces:** Privacy, in-app copy, user guide.
+- **Conflicting current text:** Privacy: "Cadence reads the device location only while
+  Cadence is open in the foreground: during an explicit permission check, during a travel
+  refresh, and once when the Timeline opens with a current estimate". In-app: "Use a full
+  address. Trips home and Behaviors set to Home use it." `docs/user-guide/travel.md`:
+  "**Home (optional)**: a full address."
+- **Update needed:** add the Home button to the list of location reads and to what is sent
+  to Google Maps Platform. Rewrite the Home help text and the user guide line.
 - **Status:** logged.

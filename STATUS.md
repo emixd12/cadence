@@ -47,6 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 301–309: Settings regroup and simplification | Filed November 10; none started. Mock in the design-system bench | Owner confirms three agent proposals (auto-save exceptions, Trust links placement, later-connected sources); then Ticket 301 | TICKETS, Tickets 301–309; STATUS, "Settings regroup: evaluation, mock and Tickets 301–309 — November 10, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -85,6 +86,35 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Settings regroup: evaluation, mock and Tickets 301–309 — November 10, 2026
+
+Owner direction: `docs/DECISIONS.md`, 2026-11-10. Branch `claude/determined-fermi-78a61d`,
+opened as a draft pull request on November 10.
+
+- **Evaluation, November 9.** The web Settings page was measured from the real components
+  on synthetic data in headless Chrome: 6,470 px, 1,265 visible words and 59 controls for a
+  new account at 1280×800; 8,402 px with every source connected. The production page was not
+  checked: no kept test-account session was available on this Mac.
+- **Mock.** `/design-system?preview=settings-regroup` shows four groups, a section index,
+  source rows with state and provider icons, drawers for Categories, Travel and Daily Brief,
+  a drag-to-reorder Categories sketch and a one-choice Daily Brief sketch. A new account
+  measures 2,537 px, 182 words and 20 controls. `/settings` is unchanged.
+- **Files.** `app/design-system/SettingsRegroupBench.tsx`, `SettingsRegroupFixtures.tsx`,
+  `settings-regroup-bench.module.css`, `app/design-system/page.tsx`,
+  `interaction-registry.json` (bench file excluded), three provider icons and
+  `public/brand/connector-icons-source.md`.
+- **Tickets 301–309 filed, none started.** The branch was rebased onto `main` on November 10,
+  after the consolidation merge that holds Tickets 292–300.
+- **Logged.** `docs/LEGAL.md` L-020 (provider marks) and L-021 (one Daily Brief choice, one
+  Google connection). `docs/MESSAGING_CHANGES.md` P-033 to P-036.
+- **Verification, November 10, after the rebase.** `agents:check`, `interactions:check`,
+  `resolvers:check`, `design-system:check`, lint, typecheck and build pass. `npm run test`:
+  5,428 pass and 16 fail in 5 files this branch does not change. Four files require Node 24
+  (this Mac runs Node 26.13). `tests/acceptance-web-client.test.mjs` passes its 71 tests and
+  then times out in its `afterAll` hook, also when run alone. Dagger did not run: Docker is
+  not installed here.
+- **Not verified.** Safari, an iPhone, a screen reader and the Mac app.
 
 ## Branch consolidation into main — November 10, 2026
 

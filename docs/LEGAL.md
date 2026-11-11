@@ -17,7 +17,7 @@ Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHAN
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-020` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-022` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -67,6 +67,8 @@ Risk levels:
 | [L-017](#l-017-chatgpt-plan-usage-in-a-paid-or-hosted-app) | ChatGPT plan usage in a paid or hosted app | open | medium | 294–300 |
 | [L-018](#l-018-sign-in-with-chatgpt-devkit-licence) | Sign in with ChatGPT DevKit licence | open | low | 295, 297, 299 |
 | [L-019](#l-019-openai-brand-guidelines-for-the-chatgpt-button) | OpenAI brand guidelines for the ChatGPT button | open | low | 299 |
+| [L-020](#l-020-provider-marks-as-connected-source-icons) | Provider marks as connected-source icons | open | low | 301, 302 |
+| [L-021](#l-021-one-daily-brief-choice-for-every-connected-source) | One Daily Brief choice for every connected source | open | medium | 306, 307 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -544,3 +546,53 @@ part of L-002.
 - **Status:** open.
 - **Next action:** Ticket 299 reads the guidelines before building the card and records the
   clauses it follows.
+## L-020: Provider marks as connected-source icons
+
+- **Question:** May Cadence show the Microsoft Outlook, Apple iCloud and Hevy marks, and
+  the Google Calendar mark, beside each connected source in Settings?
+- **Affected:** Tickets 301 and 302. Files: `public/brand/outlook-calendar.svg`, `public/brand/icloud-calendar.png`,
+  `public/brand/hevy.png`, `public/brand/connector-icons-source.md`,
+  `app/design-system/SettingsRegroupBench.tsx`. Only the development bench uses the
+  three new files today. `public/brand/google-calendar.svg` is already in product use.
+- **Provider, clause, source and check date:** Microsoft trademark and brand guidelines;
+  Apple, "Guidelines for Using Apple Trademarks and Copyrights"
+  (https://www.apple.com/legal/intellectual-property/guidelinesfor3rdparties.html); Hevy
+  press page (https://www.hevyapp.com/press/); Google brand terms. None read. A search on
+  November 10, 2026 returned Apple's line that use of Apple trademarks "may be
+  prohibited, unless expressly authorized".
+- **Current reading:** none. The files are unchanged provider assets, used only to name
+  the source the user connects. Apple's general rule is the most restrictive of the four.
+- **Risk level:** low.
+- **Owner decision or risk acceptance:** none on the terms question. Owner instruction,
+  November 10, 2026: "Yes source official icons", and "we are not concerned with legal
+  issues during development, we simply log finding in the legal surface for later
+  review".
+- **Status:** open.
+- **Next action:** read each provider's brand terms before public launch and record the
+  clause. Replace a mark with plain text if its terms do not allow this use.
+
+## L-021: One Daily Brief choice for every connected source
+
+- **Question:** Do the providers' terms allow one Daily Brief choice to cover every
+  connected source, and allow Daily Brief to read Google Calendar through the Timeline
+  Calendar connection instead of its own?
+- **Affected:** Tickets 306 and 307. Related messaging entry: P-035.
+  Today: a separate default-off disclosure per source (Ticket 239,
+  `docs/INTEGRATION_PLAYBOOK.md`) and a separate Google Calendar grant for Daily Brief
+  (Ticket 187, `docs/DATA_MODEL.md`, "Agent Calendar grant"). Files:
+  `components/briefing/DailyBriefSettingsPanel.tsx`,
+  `components/settings/GoogleCalendarPanel.tsx`. Related: L-001 and L-016.
+- **Provider, clause, source and check date:** Google API Services User Data Policy,
+  Limited Use (https://developers.google.com/terms/api-services-user-data-policy);
+  Microsoft Graph and Hevy API terms. None read in full. A search on November 10, 2026
+  returned Google's rule that an app must "notify users and prompt them to consent" before
+  using Google user data "in a new way or for a different purpose than originally
+  disclosed".
+- **Current reading:** none. Two points need a reading: whether a source connected after
+  the choice was made may be sent to the model without a new prompt, and whether the
+  Timeline Calendar grant's disclosed purpose covers model input.
+- **Risk level:** medium.
+- **Owner decision or risk acceptance:** none on the terms question. Owner decision,
+  November 10, 2026: "One choice should cover every connected source".
+- **Status:** open.
+- **Next action:** read the three policies when convenient and record the clauses.
