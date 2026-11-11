@@ -68,12 +68,23 @@ export function classifyDevice(command, result) {
   return null;
 }
 
+const seenLine = (result) => result.status === 0 && !/^no match$/m.test(result.stdout) && result.stdout.trim() !== '';
+
+// Turns an AX `read` of the Settings window into a find-like result for the notification grant.
+export function notificationsAllowed(result) {
+  if (result.status !== 0) return result;
+  const lines = result.stdout.split('\n');
+  const allowed = lines.some((line, index) => /Notifications: Enabled on this device/.test(line)
+    || (/^AXStaticText: macOS permission\b/.test(line) && /^AXStaticText: Allowed\b/.test(lines[index + 1] ?? '')));
+  return { ...result, stdout: allowed ? 'AXStaticText: notifications allowed\n' : 'no match\n' };
+}
+
 export function classifyAppPermissions(notifications, location) {
   for (const result of [notifications, location]) {
     const failure = deviceFailure(result);
     if (failure) return failure;
   }
-  const seen = (result) => result.status === 0 && !/^no match$/m.test(result.stdout) && result.stdout.trim() !== '';
+  const seen = seenLine;
   if (seen(notifications) && seen(location)) return { code: PROBE.PRESENT, detail: 'notifications and location allowed' };
   return { code: PROBE.MISSING, detail: 'not shown as allowed (open Cadence Settings on the device first)' };
 }
@@ -101,8 +112,20 @@ export async function main(argv, { run = runProcess, out = (line) => process.std
     return finish(out, code, { detail });
   }
   if (command === 'app-permissions') {
-    const find = (pattern) => run(process.execPath, [TEST_DEVICE, 'ax', flags.device, 'find', pattern], { timeoutMs: 90_000 });
-    const { code, detail } = classifyAppPermissions(find('Notifications: Enabled on this device'), find('Device location: allowed'));
+    const ax = (...args) => run(process.execPath, [TEST_DEVICE, 'ax', flags.device, ...args], { timeoutMs: 90_000 });
+    // Settings before the regroup (0.1.9) shows "Notifications: Enabled on this device."; from
+    // 0.1.10 the Notifications group shows "macOS permission" then "Allowed", and the location
+    // line sits inside the collapsed Travel settings drawer, which the probe opens and closes.
+    const notifications = notificationsAllowed(ax('read', '600'));
+    let location = ax('find', 'Device location: allowed');
+    if (!deviceFailure(location) && !seenLine(location)) {
+      const opened = ax('press', 'AXDisclosureTriangle', 'Travel settings');
+      if (opened.status === 0) {
+        location = ax('find', 'Device location: allowed');
+        ax('press', 'AXDisclosureTriangle', 'Travel settings');
+      }
+    }
+    const { code, detail } = classifyAppPermissions(notifications, location);
     return finish(out, code, { detail });
   }
   const remote = {
