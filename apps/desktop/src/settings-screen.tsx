@@ -5,13 +5,16 @@ import {
   TimezonePanel,
   type TimezoneUpdateAction,
 } from "@/components/settings/TimezonePanel";
-import { CATEGORY_PANEL_PURPOSE, drawerLabel } from "@/components/settings/CategoryPanel";
-import { DAY_NOTE_SHORTCUTS_PURPOSE } from "@/components/note-shortcuts/NoteShortcutControls";
+import {
+  CATEGORY_PANEL_PURPOSE,
+  DAY_NOTE_SHORTCUTS_PURPOSE,
+  SETTINGS_DAILY_BRIEF_PURPOSE,
+  SETTINGS_TRAVEL_PURPOSE,
+  drawerLabel,
+} from "@/lib/ui/settings-sections";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import {
   DESKTOP_SETTINGS_GROUPS,
-  SETTINGS_DAILY_BRIEF_PURPOSE,
-  SETTINGS_TRAVEL_PURPOSE,
   SettingsDrawer,
   SettingsExportEntry,
   SettingsGroup,

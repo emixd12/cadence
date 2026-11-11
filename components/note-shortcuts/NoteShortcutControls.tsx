@@ -36,9 +36,6 @@ const BEHAVIOR_SHORTCUT_COPY: NoteShortcutCopy = {
   empty: "",
 };
 
-/** Ticket 292: the day-note pool. One line for its Settings drawer. */
-export const DAY_NOTE_SHORTCUTS_PURPOSE = "Suggests a shortcut when you save the same day note on three days.";
-
 const DAY_NOTE_SHORTCUT_COPY: NoteShortcutCopy = {
   title: "Day note shortcuts",
   description: "When you save the same day note on three days in the last 90 days, Cadence suggests it here. Accept a suggestion to show it above the day note field.",

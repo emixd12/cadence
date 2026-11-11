@@ -7,12 +7,11 @@ import { RefreshProvider } from "@cadence/ui/runtime";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcut, NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import {
-  DAY_NOTE_SHORTCUTS_PURPOSE,
   DayNoteShortcutSettings,
   type NoteShortcutAction,
 } from "../components/note-shortcuts/NoteShortcutControls";
 import { SettingsDrawer, SettingsGroup, SettingsSections } from "../components/settings/SettingsSections";
-import { dayNoteShortcutsSectionState } from "../lib/ui/settings-sections";
+import { DAY_NOTE_SHORTCUTS_PURPOSE, dayNoteShortcutsSectionState } from "../lib/ui/settings-sections";
 import { DayNoteControl } from "../components/timeline/DayNoteControl";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });

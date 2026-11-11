@@ -223,9 +223,6 @@ export function SettingsSourceIcon({ src }: Readonly<{ src: string }>) {
   return <img src={src} alt="" width={20} height={20} className="mt-1 h-5 w-5 shrink-0" />;
 }
 
-export const SETTINGS_TRAVEL_PURPOSE = "Know when to leave for events and Behaviors that have a place.";
-export const SETTINGS_DAILY_BRIEF_PURPOSE = "A short briefing the first time you open Timeline each day.";
-
 /** Account and data: the way to Export from Settings. The Mac passes `onOpen` to switch to its Export screen. */
 export function SettingsExportEntry({ onOpen }: Readonly<{ onOpen?: () => void }>) {
   return (
