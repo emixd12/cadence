@@ -2233,6 +2233,13 @@ retry and 45 seconds of provider work. Geocoding and driving refinement also con
 provider billable calls; the request counter is not a monetary spending cap.
 Configure provider quotas and a reviewed budget before enabling the gate.
 
+Ticket 308's Home lookup (`POST /api/travel/home-lookup`) uses the same clearance and
+credentials. Locally the Geocoding v3 key serves reverse geocoding unchanged. Hosted calls
+use Geocoding v4 `GeocodeLocation`, which has its own Google quota; check that quota and that
+the `cadence-travel` token's `cloud-platform` scope is accepted before the first hosted
+lookup (not verified on November 10, 2026). Each lookup reserves US$0.005 under the monthly
+travel ceiling after a five-per-hour account limit. No new environment variable.
+
 Rollback first removes the clearance flag. Foreground clients clear transient evidence
 when they refresh, lose focus, go offline or reach their five-minute expiry.
 User-authored locations and tracking remain intact. Do not roll back the additive

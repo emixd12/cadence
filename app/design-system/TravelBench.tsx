@@ -12,6 +12,7 @@ import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { TravelHabitsSection } from "@/components/settings/TravelHabitsSection";
 import { LeaveReminderSetting } from "@/components/settings/LeaveReminderSetting";
 import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
+import type { HomeLookupClient } from "@/lib/ui/home-lookup";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { TravelLeaveQuestion } from "@/components/timeline/TravelLeaveQuestion";
 import { TravelModeChoice } from "@/components/timeline/TravelModeChoice";
@@ -48,12 +49,14 @@ function benchReminderClient(initialEnabled: boolean): LeaveReminderClient {
   return { load: async () => ({ enabled }), save: async (next) => ({ enabled: (enabled = next) }) };
 }
 const panelReminders = benchReminderClient(false);
+/** Ticket 308: a bench-only Home lookup; no position or request leaves this page. */
+const benchHomeLookup: HomeLookupClient = { lookup: async () => ({ kind: "address", address: "10 Bench Road, Springfield" }) };
 export function TravelSettingsBench() {
   return <div className="grid gap-8">
     {/* The complete panel: setup, How you travel with the leave reminder switch, and Completion places (Tickets 215–217, 279). */}
     <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} readPermission={async () => "denied"}
-      leaveReminderClient={panelReminders} readDeviceNotifications={async () => "blocked"} /></PlaceLabelBench>
-    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} readPermission={async () => "prompt"} openLocationSettings={benchOnly} desktop />
+      leaveReminderClient={panelReminders} readDeviceNotifications={async () => "blocked"} homeLookupClient={benchHomeLookup} /></PlaceLabelBench>
+    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} readPermission={async () => "prompt"} openLocationSettings={benchOnly} desktop homeLookupClient={benchHomeLookup} />
   </div>;
 }
 

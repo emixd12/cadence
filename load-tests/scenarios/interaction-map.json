@@ -1544,6 +1544,11 @@
       "reason": "The leave reminder switch writes one owner row under RLS; turning it off deletes that account's reminder rows, so it stays out of concurrent load."
     },
     {
+      "id": "INT-TRAVEL-014",
+      "classification": "external_provider",
+      "reason": "The Home lookup makes one paid Google reverse-geocoding request from a device position; live provider load is not authorized."
+    },
+    {
       "id": "INT-CALENDAR-012",
       "classification": "external_provider",
       "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."

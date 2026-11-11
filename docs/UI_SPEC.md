@@ -338,6 +338,17 @@ storage note follow. No separate consent checkbox, "saved base" wording, map-app
 selector or permission-check button. The section carries the `travel` anchor
 that first-run setup opens (Ticket 212).
 
+Ticket 308 puts **Use my current location** beside the Home field; it wraps below the field
+on narrow screens. It is offered once Travel estimates is on with its disclosure accepted;
+until then one muted line reads "To use your current location, turn on Travel estimates
+first." One click reads the device position once, asking for permission if needed, and the
+server turns it into a street address that fills the field. The button reads "Finding your
+address…" while it works. The person checks or edits the address, then saves it as before.
+Each outcome shows one plain status line: filled, location access off, no position shared,
+position not precise enough, no street address found, too many lookups, lookup unavailable,
+or offline. Typing an address always works. The Mac shows the button only when linked to an
+account; local mode keeps typing only.
+
 Ticket 165 adds device-location guidance below the state line. It appears only while
 travel is on and device location is not allowed, not yet allowed or timed out, and
 not during the toggle's own first request. Desktop names System Settings › Privacy &

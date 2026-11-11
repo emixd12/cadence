@@ -1572,7 +1572,7 @@ native notification state, and the hosted-only leave reminder tables (Ticket 275
 ```sql
 create table launch_rate_limits (
   user_id uuid not null references auth.users(id) on delete cascade,
-  action text not null check (action in ('export_download')),
+  action text not null check (action in ('export_download', 'push_subscription_registration', 'travel_home_lookup')),
   window_started_at timestamptz not null,
   attempt_count integer not null check (attempt_count > 0),
   updated_at timestamptz not null default now(),
@@ -1590,6 +1590,11 @@ Ticket 067 defines `export_download` as six attempts in one 60-second window
 per account across application instances and export formats. A denied attempt
 does not start export reads or return a partial artifact. Account deletion
 removes the counter through the Auth user cascade.
+
+Ticket 308 adds `travel_home_lookup`: five Home lookups from the current location per
+account in one 3,600-second window. The other actions keep six attempts per 60 seconds. The
+counter stores no position, address or request body. A denied attempt makes no spend
+reservation and no provider call.
 
 ### `push_subscriptions`
 
@@ -1925,6 +1930,8 @@ returns `allowed`, `limit_count`, `remaining`, `reset_at`, and
 The function does not bypass product-row RLS, read exports, or mutate user
 content. It writes only the caller's `launch_rate_limits` row. The export
 service consumes the decision after authentication and before export reads.
+Ticket 308 lets the Home lookup service consume `travel_home_lookup` (five per hour) after
+it checks Travel estimates and before it reserves travel spend.
 
 ### `public.get_export_page_read_bundle(range_start_local_date date, range_end_local_date date)`
 

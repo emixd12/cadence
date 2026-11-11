@@ -11,6 +11,8 @@ import { clearTravelLeaveMemory } from "@/lib/ui/travel-habits";
 import type { LeaveReminderDeviceNotifications } from "@cadence/core/services/departure-phrases";
 import { readWebDeviceNotifications, webLeaveReminderClient, type LeaveReminderClient } from "@/lib/ui/leave-reminders";
 import { LeaveReminderSetting } from "./LeaveReminderSetting";
+import { HomeCurrentLocation } from "./HomeCurrentLocation";
+import { webHomeLookupClient, type HomeLookupClient } from "@/lib/ui/home-lookup";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -24,8 +26,10 @@ const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
  * foreground location in the same click; Home and usual travel save together.
  */
 export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false,
-  leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "" }: Readonly<{
+  leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "", homeLookupClient = webHomeLookupClient }: Readonly<{
   client?: TravelSettingsClient;
+  /** Ticket 308: the hosted Home lookup. Null keeps typing only, as on a Mac in local mode. */
+  homeLookupClient?: HomeLookupClient | null;
   /** Ticket 279: the hosted leave reminder switch. Null hides it, as on an unlinked Mac. */
   leaveReminderClient?: LeaveReminderClient | null;
   /** Ticket 279: this device's notification state. Web reads the browser with `vapidPublicKey`. */
@@ -133,7 +137,8 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
           <p id={`${id}-disclosure`} className="text-muted-readable">While this is on, Cadence sends trip start and end points, your usual travel and times to Google Maps as you use the app. Trip points can be your current position, Home, Behavior places and Calendar event locations. Google processes requests under its own terms. Turning this on asks for device location.</p>
           {!settings.enabled && !mode ? <p className="text-muted-readable">Choose your usual travel to turn on estimates.</p> : null}
         </div>
-        <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 border-0 border-b border-line bg-background" autoComplete="off" /><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
+        <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><HomeCurrentLocation client={homeLookupClient} travelOn={settings.enabled && Boolean(settings.routingConsentAt)} readLocation={readLocation}
+          onAddress={(address) => setHome(address.slice(0, 500))} onLocationRead={refreshPermission}><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 flex-1 basis-64 border-0 border-b border-line bg-background" autoComplete="off" /></HomeCurrentLocation><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
         <div className="grid gap-1 sm:max-w-xs"><label htmlFor={`${id}-mode`}>Usual travel</label><select id={`${id}-mode`} value={mode} onChange={(event) => setMode(event.target.value as TravelMode | "")} className="min-h-11 min-w-0 border-0 border-b border-line bg-background">{mode ? null : <option value="">Choose</option>}{TRAVEL_MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         <button type="button" onClick={() => { void save(settings.enabled); }} disabled={!changed} className="product-action product-action-primary min-h-11 w-fit">{pending ? "Saving…" : "Save travel settings"}</button>
         <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>

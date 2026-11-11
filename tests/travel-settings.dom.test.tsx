@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { dismissTravelLeaveQuestion, resetTravelHabitMemoryForTest, travelLeaveQuestionDismissed } from "@/lib/ui/travel-habits";
 import type { TravelSettings } from "@cadence/core/types/travel";
@@ -10,6 +10,8 @@ import { validateExternalEventSnapshot } from "@cadence/core/services/external-e
 import snapshotFixture from "./fixtures/external-event-snapshot.valid.json";
 import { LEAVE_REMINDER_SWITCH, type LeaveReminderDeviceNotifications } from "@cadence/core/services/departure-phrases";
 import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
+import type { HomeLookupClient, HomeLookupResult } from "@/lib/ui/home-lookup";
+import { HOME_LOOKUP_LABEL, HOME_LOOKUP_MESSAGES, HOME_LOOKUP_TRAVEL_FIRST } from "@/components/settings/HomeCurrentLocation";
 
 it("turns travel on in one click: consent and a foreground location request, no separate checkbox (Ticket 215)", async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -138,12 +140,12 @@ it("keeps journey corrections transient and builds a source-location search link
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 
-async function renderPanel(options: Pick<ComponentProps<typeof TravelSettingsPanel>, "readLocation" | "readPermission" | "desktop" | "openLocationSettings"> & { save?: () => Promise<TravelSettings>; settings?: TravelSettings }) {
+async function renderPanel(options: Pick<ComponentProps<typeof TravelSettingsPanel>, "readLocation" | "readPermission" | "desktop" | "openLocationSettings" | "homeLookupClient"> & { save?: () => Promise<TravelSettings>; settings?: TravelSettings }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const settings: TravelSettings = options.settings ?? { enabled: false, baseLocationText: null, mode: "walking", navigationPreference: "google_maps", routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container);
-  await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save: options.save ?? (async () => settings) }} readLocation={options.readLocation} readPermission={options.readPermission} openLocationSettings={options.openLocationSettings} desktop={options.desktop} />));
+  await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save: options.save ?? (async () => settings) }} readLocation={options.readLocation} readPermission={options.readPermission} openLocationSettings={options.openLocationSettings} desktop={options.desktop} homeLookupClient={options.homeLookupClient} />));
   return { container, unmount: async () => { await act(() => root.unmount()); container.remove(); } };
 }
 function mockPermissions(state: PermissionState | null, userAgent = "Mozilla/5.0 (Macintosh) Chrome/140") {
@@ -443,4 +445,91 @@ it("names the Mac's start and System Settings on a linked Mac, and hides the swi
     expect(unlinked.box()).toBeUndefined();
     expect(unlinked.container.textContent).not.toContain("Remind me when it is time to get ready to leave.");
   } finally { await unlinked.unmount(); }
+});
+
+describe("Use my current location for Home (Ticket 308)", () => {
+  const travelOn: TravelSettings = { enabled: true, baseLocationText: null, mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  const here = { state: "available" as const, latitude: 41.8781136, longitude: -87.6297982, accuracyMeters: 18, sampledAt: Date.now() };
+  const lookupButton = (container: HTMLElement) => [...container.querySelectorAll("button")].find((button) => button.textContent === HOME_LOOKUP_LABEL);
+  const homeInput = (container: HTMLElement) => container.querySelector<HTMLInputElement>("input:not([type])")!;
+  const lookupClient = (result: HomeLookupResult): HomeLookupClient & { lookup: ReturnType<typeof vi.fn> } => ({ lookup: vi.fn(async () => result) });
+
+  it("explains that Travel estimates comes first until the disclosure is accepted", async () => {
+    mockPermissions(null);
+    const client = lookupClient({ kind: "address", address: "1 Example Street" });
+    const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => here), homeLookupClient: client });
+    try {
+      expect(lookupButton(container)).toBeUndefined();
+      expect(container.textContent).toContain(HOME_LOOKUP_TRAVEL_FIRST);
+      expect(homeInput(container).disabled).toBe(false);
+    } finally { await unmount(); }
+  });
+
+  it("reads the position once, fills Home from the lookup and waits for the person to save", async () => {
+    mockPermissions("granted");
+    const readLocation = vi.fn(async () => here);
+    const save = vi.fn(async () => travelOn);
+    const client = lookupClient({ kind: "address", address: "1 Example Street, Chicago, IL 60601, USA" });
+    const { container, unmount } = await renderPanel({ readLocation, save, settings: travelOn, homeLookupClient: client });
+    try {
+      expect(container.textContent).not.toContain(HOME_LOOKUP_TRAVEL_FIRST);
+      await act(async () => lookupButton(container)!.click());
+      expect(readLocation).toHaveBeenCalledTimes(1);
+      expect(readLocation).toHaveBeenCalledWith(true);
+      expect(client.lookup).toHaveBeenCalledWith({ latitude: here.latitude, longitude: here.longitude, accuracyMeters: here.accuracyMeters });
+      expect(homeInput(container).value).toBe("1 Example Street, Chicago, IL 60601, USA");
+      expect(container.textContent).toContain(HOME_LOOKUP_MESSAGES.filled);
+      expect(container.textContent).not.toContain("41.8781136");
+      expect(save).not.toHaveBeenCalled();
+      // The person can edit the address before it saves.
+      const home = homeInput(container);
+      await act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(home, "1 Example Street, Apt 2, Chicago"); home.dispatchEvent(new Event("input", { bubbles: true })); });
+      const saveButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save travel settings")!;
+      await act(async () => saveButton.click());
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ baseLocationText: "1 Example Street, Apt 2, Chicago" }));
+      expect(JSON.stringify(save.mock.calls)).not.toContain("41.8781136");
+    } finally { await unmount(); }
+  });
+
+  it.each([
+    ["denied", { state: "denied" as const, reason: "permission_denied" }, HOME_LOOKUP_MESSAGES.denied],
+    ["unavailable", { state: "unavailable" as const, reason: "timeout" }, HOME_LOOKUP_MESSAGES.unavailable],
+    ["inaccurate", { state: "inaccurate" as const }, HOME_LOOKUP_MESSAGES.inaccurate],
+  ])("shows one plain message for a %s position and keeps typing available", async (_name, position, copy) => {
+    mockPermissions(null);
+    const client = lookupClient({ kind: "address", address: "unused" });
+    const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => position), settings: travelOn, homeLookupClient: client });
+    try {
+      await act(async () => lookupButton(container)!.click());
+      expect(client.lookup).not.toHaveBeenCalled();
+      const statuses = [...container.querySelectorAll('[role="status"]')].map((node) => node.textContent);
+      expect(statuses.filter((text) => text === copy)).toHaveLength(1);
+      expect(homeInput(container).value).toBe("");
+      expect(homeInput(container).disabled).toBe(false);
+    } finally { await unmount(); }
+  });
+
+  it.each([
+    ["no address", { kind: "no_result" as const }, HOME_LOOKUP_MESSAGES.no_result],
+    ["the rate limit", { kind: "rate_limited" as const }, HOME_LOOKUP_MESSAGES.rate_limited],
+    ["an unavailable lookup", { kind: "unavailable" as const }, HOME_LOOKUP_MESSAGES.lookup_unavailable],
+  ])("leaves Home unchanged after %s", async (_name, result, copy) => {
+    mockPermissions(null);
+    const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => here), settings: { ...travelOn, baseLocationText: "10 Typed Road" }, homeLookupClient: lookupClient(result) });
+    try {
+      await act(async () => lookupButton(container)!.click());
+      expect(container.textContent).toContain(copy);
+      expect(homeInput(container).value).toBe("10 Typed Road");
+    } finally { await unmount(); }
+  });
+
+  it("keeps typing only without a lookup client, as on a Mac in local mode", async () => {
+    mockPermissions(null);
+    const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => here), settings: travelOn, homeLookupClient: null, desktop: true });
+    try {
+      expect(lookupButton(container)).toBeUndefined();
+      expect(container.textContent).not.toContain(HOME_LOOKUP_TRAVEL_FIRST);
+      expect(homeInput(container).disabled).toBe(false);
+    } finally { await unmount(); }
+  });
 });
