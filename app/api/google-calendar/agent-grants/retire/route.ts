@@ -10,9 +10,11 @@ import {
 import { retireDailyBriefCalendarGrants } from "@/lib/services/google-calendar-agent-retirement.service";
 
 // Ticket 307: one-off retirement of the Daily Brief Google Calendar grants. The operator
-// calls it with `Authorization: Bearer $CRON_SECRET` before pushing migration
-// 20261110160000 (docs/OPERATIONS.md, "Retiring the Daily Brief Calendar grant").
-// It is not scheduled. Each call handles up to 100 grants and is safe to repeat.
+// calls it with `Authorization: Bearer $GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` before pushing
+// migration 20261110160000 (docs/OPERATIONS.md, "Retiring the Daily Brief Calendar grant").
+// It has its own secret, not CRON_SECRET, so the caller gets no access to the cron routes,
+// and the secret is deleted once retirement finishes. It is not scheduled. Each call
+// handles up to 100 grants and is safe to repeat.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,13 +23,13 @@ const ROUTE = "/api/google-calendar/agent-grants/retire";
 const RATE_LIMIT_SCOPE = "agent-calendar-retirement-auth";
 
 export async function POST(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret) return jsonError("Calendar grant retirement is not configured.", 503);
+  const retireSecret = process.env.GOOGLE_CALENDAR_AGENT_RETIRE_SECRET?.trim();
+  if (!retireSecret) return jsonError("Calendar grant retirement is not configured.", 503);
 
   const rateLimitKey = buildAuthFailureRateLimitKey(RATE_LIMIT_SCOPE, request.headers);
   const rateLimit = agentCalendarRetirementAuthFailureLimiter.check(rateLimitKey);
   if (!rateLimit.allowed) return jsonError("Too many failed attempts. Try again later.", 429, rateLimit.retryAfterSeconds);
-  if (!secretMatches(readBearer(request), cronSecret)) {
+  if (!secretMatches(readBearer(request), retireSecret)) {
     const failure = agentCalendarRetirementAuthFailureLimiter.recordFailure(rateLimitKey);
     reportMonitoringEvent({ name: "agent_calendar_retirement_unauthorized", severity: "warning", context: { route: ROUTE } });
     return failure.allowed

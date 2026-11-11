@@ -2019,9 +2019,10 @@ against the hosted project without asking each time, when every condition holds:
 Anything else still needs the owner's yes: destructive or data-changing migrations,
 `--include-seed`, Auth or project settings, Dashboard edits, and any other Supabase project.
 
-Credential: agents use the `cadence-agents` item in the Cadence Agents vault, a Supabase
+Credential: agents use the `supabase-access-token` item in the Cadence Agents vault, a Supabase
 personal access token, through `npm run agent:secret -- --env
-SUPABASE_ACCESS_TOKEN=cadence-agents -- npm run supabase -- db push`. Supabase tokens reach
+SUPABASE_ACCESS_TOKEN=supabase-access-token -- npm run supabase -- db push`. (The item was
+first titled `cadence-agents`; the owner asked on November 11, 2026 for a more specific name.) Supabase tokens reach
 the whole account, not one project, so this decision, not the token, limits agents to the
 Cadence project. The preflight requirement is `vault-supabase-access-token` (suite
 `hosted-migrations`). The owner's own CLI login stays the owner's credential.

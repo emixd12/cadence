@@ -2418,17 +2418,24 @@ Hosted runbook, in this order:
    nothing from a late agent callback, and answers older desktop builds' agent
    requests as `not_configured`. Keep `GOOGLE_CALENDAR_AGENT_PROJECT_ID`,
    `GOOGLE_CALENDAR_AGENT_CLIENT_ID` and `GOOGLE_CALENDAR_AGENT_CLIENT_SECRET` set:
-   step 3 needs them to open and revoke the stored tokens.
+   step 3 needs them to open and revoke the stored tokens. Before the merge, the owner
+   sets a new random `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` in Production (Sensitive) and
+   stores the same value in the vault item `google-calendar-agent-retire-secret`, so the
+   deploy carries it.
 3. Revoke the grants at Google. Call the one-off route until it reports
    `"remaining": 0`. Each call handles up to 100 grants and is safe to repeat:
    ```bash
-   curl -sS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+   curl -sS -X POST -H "Authorization: Bearer $GOOGLE_CALENDAR_AGENT_RETIRE_SECRET" \
      https://<production-host>/api/google-calendar/agent-grants/retire
    ```
    The response holds counts only: `revoked`, `unrevocable` (a token Cadence cannot
    open, removed without revocation), `failed` (Google did not confirm; the credential
    stays for the next call) and `remaining`. `not_configured` means the agent client
-   or sealing key is missing; restore them and call again. Never print `CRON_SECRET`.
+   or sealing key is missing; restore them and call again. `503` means
+   `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` is unset in Production. The route has its own
+   secret, not `CRON_SECRET`, so the caller gets no access to the cron routes. Agents read it
+   from the Cadence Agents vault item `google-calendar-agent-retire-secret` through
+   `npm run agent:secret`. Never print it.
 4. Push `20261110160000_daily_brief_google_calendar_timeline.sql`. It refuses to run
    while any Daily Brief credential remains (`55000`), so step 3 must finish first.
    It maps preferences, deletes every attempt, selection and connection row of the
@@ -2438,7 +2445,9 @@ Hosted runbook, in this order:
 5. Read back as a test account: `GET /api/advisor/preferences` reports
    `sourceStatus.googleCalendar` from the Timeline connection, and a brief with
    Google covered carries the Calendar connector.
-6. After step 4, remove the three agent environment values. A later cleanup ticket
+6. After step 4, remove the three agent environment values and
+   `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` from Vercel, and delete the vault item
+   `google-calendar-agent-retire-secret`. A later cleanup ticket
    may drop the empty tables, the retirement route and the agent repository branches.
 
 Rollback: revoked tokens cannot be restored, so a restored grant needs new consent.
