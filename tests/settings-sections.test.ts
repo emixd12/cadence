@@ -115,6 +115,16 @@ describe("dailyBriefSectionState", () => {
     const older = brief({ enabled: true, includeOutlookCalendar: true, connectorSources: { outlookCalendar: false, icloudCalendar: false, hevy: false } });
     expect(dailyBriefSectionState(loaded(older)).attention).toBe(true);
   });
+  it("counts the sources one choice covers and never needs a new choice (Ticket 306)", () => {
+    const status = { googleCalendar: "ready", outlookCalendar: "no_calendars", icloudCalendar: "ready", hevy: "ready" } as const;
+    const none = { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: false };
+    expect(dailyBriefSectionState(loaded(brief({ enabled: true, useConnectedSources: true, excludedSources: { ...none, hevy: true }, sourceStatus: status }))))
+      .toEqual({ text: "On · Plans around 2 sources", attention: false, on: true });
+    expect(dailyBriefSectionState(loaded(brief({ enabled: true, useConnectedSources: false, excludedSources: none, sourceStatus: status }))))
+      .toEqual({ text: "On", attention: false, on: true });
+    expect(dailyBriefSectionState(loaded(brief({ enabled: false, useConnectedSources: true, excludedSources: none, sourceStatus: status }))))
+      .toEqual({ text: "Off", attention: false, on: false });
+  });
   it("ignores attention on a source that is not allowed", () => {
     const settings = brief({ enabled: true, includeHevy: false, connectorSources: { outlookCalendar: false, icloudCalendar: false, hevy: true },
       connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: "changed" } });

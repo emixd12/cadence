@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -24,7 +25,8 @@ vi.mock("@/lib/services/google-calendar-request", () => ({ authenticateCalendarR
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.preferences, listDailyBriefBehaviorIds: mocks.behaviorIds, listBriefingWorkbenchBehaviors: vi.fn(), DailyBriefStorageError: class extends Error {} }));
 
 const origin = "http://127.0.0.1:4321";
-const preferences = { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, revision: 3, calendarConnectionGeneration: null, calendarSelectionRevision: null };
+const preferences = dailyBriefPreferences();
+const calendarFence = { calendarIds: ["work"], connectionGeneration: 3, selectionRevision: 4 };
 
 it('keeps the overnight fixture across the target midnight when shifting dates', () => {
   const context = historicalFixture('overnight', DEFAULT_BRIEFING_CONFIG, Temporal.PlainDate.from('2026-09-20'),
@@ -122,9 +124,9 @@ it("reruns frozen synthetic history on the selected logical day through the exis
 });
 
 it("reruns explicit unknown account sources without creating new source facts", async () => {
-  const disclosed = { ...preferences, includeCalendar: true, calendarConnectionGeneration: 3, calendarSelectionRevision: 4 };
+  const disclosed = dailyBriefPreferences({ allow: ["googleCalendar"] });
   mocks.preferences.mockResolvedValue(disclosed);
-  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed,
+  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed, calendar: calendarFence,
     assertCurrent: mocks.current, configurationRefs: { [workbenchBehaviorRef("owner", "owned")]: "old_capture_ref" } }));
   const selected = { ...config(), scope: { ...config().scope, includeCalendar: true }, context: { ...config().context, includeCompletionHistory: true } };
   const body = await (await inspectBriefingHistory(post(account({ configs: [selected], saveLocalDate: "2026-11-01" })), store)).json();
@@ -193,8 +195,8 @@ it("inspects retained retrospective analysis with a half-open lookback and no in
 });
 
 it("requires a separate past Calendar choice and preserves its live read time in retrospective coverage", async () => {
-  const disclosed = { ...preferences, includeCalendar: true, calendarConnectionGeneration: 3, calendarSelectionRevision: 4 };
-  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed,
+  const disclosed = dailyBriefPreferences({ allow: ["googleCalendar"] });
+  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed, calendar: calendarFence,
     assertCurrent: mocks.current, configurationRefs: { [workbenchBehaviorRef("owner", "owned")]: "old_capture_ref" } }));
   const snapshot = structuredClone(calendarSnapshot);
   snapshot.requestedRange.endLocalDate = "2026-11-02"; snapshot.coverage[0].endLocalDate = "2026-11-02";
@@ -213,8 +215,8 @@ it("requires a separate past Calendar choice and preserves its live read time in
 });
 
 it("never expands a returned Calendar range into complete coverage for an unfetched day", async () => {
-  const disclosed = { ...preferences, includeCalendar: true, calendarConnectionGeneration: 3, calendarSelectionRevision: 4 };
-  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed,
+  const disclosed = dailyBriefPreferences({ allow: ["googleCalendar"] });
+  mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed, calendar: calendarFence,
     assertCurrent: mocks.current, configurationRefs: { [workbenchBehaviorRef("owner", "owned")]: "old_capture_ref" } }));
   mocks.occurrences.mockResolvedValue([occurrence("day-one", "2026-11-01"), occurrence("day-two", "2026-11-02")]);
   const snapshot = structuredClone(calendarSnapshot);

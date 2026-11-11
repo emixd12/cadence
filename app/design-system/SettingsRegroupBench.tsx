@@ -88,7 +88,7 @@ function CurrentSettings({ panels }: Readonly<{ panels: SettingsFixturePanels }>
           {[panels.google, panels.outlook, panels.icloud, panels.hevy].map((panel, index) => <li key={index} className="min-w-0 pt-4 last:pb-0">{panel}</li>)}
         </ul>
       </SettingsPanel>
-      {panels.travel}{panels.briefCalendar}{panels.dailyBrief}{panels.connectedApps}{panels.categories}{panels.noteShortcuts}{panels.trust}{panels.deleteAccount}
+      {panels.travel}{panels.dailyBrief}{panels.connectedApps}{panels.categories}{panels.noteShortcuts}{panels.trust}{panels.deleteAccount}
     </SettingsPanelGrid>
   );
 }

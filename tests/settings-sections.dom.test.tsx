@@ -241,6 +241,7 @@ describe("Settings page frame", () => {
     const page = readFileSync("app/(app)/settings/page.tsx", "utf8");
     expect(page).not.toContain("GlobalNoteShortcutControl");
     expect(page).not.toContain("TrustAndLegalPanel");
-    expect(page).toContain("<WebGoogleCalendarPanel timezone={settings.timezone} agent />");
+    // Ticket 307: Daily Brief reads Google Calendar through the Timeline connection.
+    expect(page).not.toContain("WebGoogleCalendarPanel");
   });
 });

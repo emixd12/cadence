@@ -854,7 +854,7 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 12,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
@@ -886,7 +886,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 13,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -12049,9 +12049,9 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -12094,11 +12094,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -12145,9 +12140,9 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -12190,11 +12185,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -12226,7 +12216,7 @@
         }
       ],
       "availability": "Connected accounts can refresh calendar discovery, including without selected calendars. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state. Agent mode refreshes calendar discovery only; event reads remain behind Daily Brief authorization.",
+      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state.",
       "failure_result": "A failed or incomplete read preserves the last complete stale snapshot.",
       "effects": [
         "network_request",
@@ -12241,10 +12231,10 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-client.test.tsx",
-          "tests/google-calendar-agent.test.ts",
+          "tests/google-calendar-agent-retirement.test.ts",
           "tests/google-calendar-panel.dom.test.tsx"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -12287,11 +12277,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -12338,9 +12323,9 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -12383,11 +12368,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -13687,11 +13667,23 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Google Calendar timing, reminder delivery history, Notes on Not Completed occurrences, and each separately connected Outlook Calendar, iCloud Calendar, or Hevy workout-timing source may inform it.",
+      "intent": "Turn the Daily Brief on or off, make one choice that covers every connected source (including one connected later), and under Advanced exclude a connected Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy workout-timing source, or choose reminder delivery history and Notes on Not Completed occurrences.",
       "triggers": [
         {
           "kind": "change",
-          "control": "Enable Daily Brief or Include calendars selected in Google Calendar for Daily Brief"
+          "control": "Daily Brief"
+        },
+        {
+          "kind": "change",
+          "control": "Plan around my connected sources"
+        },
+        {
+          "kind": "activate",
+          "control": "Advanced: choose sources"
+        },
+        {
+          "kind": "change",
+          "control": "Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy under Advanced"
         },
         {
           "kind": "change",
@@ -13700,18 +13692,10 @@
         {
           "kind": "change",
           "control": "Include Notes on Not Completed occurrences"
-        },
-        {
-          "kind": "change",
-          "control": "Include selected Outlook Calendar timing, Include selected iCloud Calendar timing, or Include today's recorded Hevy workout times"
-        },
-        {
-          "kind": "activate",
-          "control": "Allow Outlook Calendar again, Allow iCloud Calendar again, or Allow Hevy again"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 240 adds its adapter. Google Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one. Google Calendar disclosure binds the agent grant generation and selection revision.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. Plan around my connected sources needs Daily Brief on and cannot be turned on while nothing is connected. Advanced lists only connected sources; a source row is disabled while the one choice is off. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Google Calendar is the Timeline connection and its selected calendars (Ticket 307).",
+      "success_result": "Saves the declared preference fields (Ticket 306: enabled, the one connected-sources choice, four per-source exclusions, reminder history and Notes) and withdraws any current Daily Brief presentation. Turning Daily Brief off withdraws every choice and deletes tip repetition metadata. A source connected after the choice is covered and its Advanced row says Daily Brief uses it; reconnecting or reselecting a covered source asks nothing. The server never reads an excluded source. Older per-source clients' saves map to the one choice and exclude every source they leave off. Each run fences the sources it reads on the connection and selection read at its start.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -13729,9 +13713,11 @@
         "level": "direct",
         "references": [
           "tests/daily-brief-ui.dom.test.tsx",
-          "tests/daily-brief.service.test.ts"
+          "tests/daily-brief.service.test.ts",
+          "tests/daily-brief-sources.test.ts",
+          "tests/briefing-account-context.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, revocation on disable, per-source changed/no-calendar/unavailable copy, Allow again renewing only its source, and unrelated saves revoking sources that need attention; service coverage verifies two-, four-, and seven-field saves, connected-source checks, and generation/selection renewal state; SQL smoke verifies admission after renewal."
+        "notes": "DOM coverage verifies the one choice, its coverage line, Advanced rows with each statement of what is sent, a later-connected source shown as used, exclusion and restore of one source, disabled rows while the choice is off, and withdrawal on disable; service coverage verifies the new shape, older two-, four- and seven-field saves mapped to exclusions, and per-source status; SQL smoke (tests/sql/ticket-306-daily-brief-connected-sources-smoke.sql) verifies the migration mapping, v4 save, withdrawal and admission for a later-connected source."
       },
       "platforms": {
         "web": {

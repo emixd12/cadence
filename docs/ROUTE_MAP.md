@@ -411,11 +411,18 @@ read uses a separate development adapter with live authorization. No new hosted 
 production route, migration or production tip-history write is introduced.
 `POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
 
-## Calendar purpose routing (Ticket 187)
+## Calendar purpose routing (Tickets 187 and 307)
 
-`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
-Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
-`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
-The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
-Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
-Desktop Keychain entries isolate pending standard and agent consent.
+Ticket 307 retires the separate Daily Brief grant. Daily Brief reads the Timeline
+connection's selected calendars inside its authorized briefing services.
+`purpose=agent` stays parseable for desktop builds released before Ticket 307:
+`GET /api/google-calendar/connection?purpose=agent` returns a `not_configured` view,
+and every other agent request fails with `not_configured`. Absent purpose or
+`purpose=standard` keeps Timeline behavior; other values fail validation.
+`/api/google-calendar/events` remains standard-only. A late agent consent callback
+(`a_` state) installs nothing and returns `agentCalendar=error`. Desktop ignores
+callbacks that name a purpose.
+
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/google-calendar/agent-grants/retire` | POST | One-off, unscheduled operator route (Ticket 307). Validates `CRON_SECRET` only and rate-limits auth failures. It calls `google-calendar-agent-retirement.service.ts`, which revokes up to 100 Daily Brief grants at Google per call and then deletes their credentials. Responses carry counts only. Run it before migration `20261110160000`; see `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)". |

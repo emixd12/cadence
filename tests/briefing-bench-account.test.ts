@@ -18,10 +18,11 @@ vi.mock("@/lib/services/daily-brief.service", () => ({ getDailyBriefSettings: vi
 vi.mock("@/lib/services/briefing-account-context.service", () => ({ prepareAccountBriefingContexts: mocks.capture,
   briefingAccountRef: (userId: string) => `account_reference_${userId}`, workbenchBehaviorRef: (_userId: string, id: string) => `behavior_${id}` }));
 
+import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 const origin = "http://127.0.0.1:4321";
 const ACCOUNT = "account_reference_owner";
 const CASE = "case-0000-account";
-const preferences = { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, revision: 4, calendarConnectionGeneration: null, calendarSelectionRevision: null };
+const preferences = dailyBriefPreferences({ revision: 4 });
 function config(tone: BriefingConfig["tone"] = "calm", historyDays = 90): BriefingConfig {
   return structuredClone({ ...DEFAULT_BRIEFING_CONFIG, tone, scope: { ...DEFAULT_BRIEFING_CONFIG.scope, historyDays } });
 }
@@ -57,10 +58,10 @@ async function capture() {
 }
 
 async function captureWithCalendar() {
-  const disclosed = { ...preferences, includeCalendar: true, calendarConnectionGeneration: 4, calendarSelectionRevision: 5 };
+  const disclosed = dailyBriefPreferences({ revision: 4, allow: ["googleCalendar"] });
   mocks.preferences.mockResolvedValue(disclosed);
   mocks.calendar.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 5 });
-  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences: disclosed, analysisSource: null,
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences: disclosed, analysisSource: null, calendar: { calendarIds: ["work"], connectionGeneration: 4, selectionRevision: 5 },
     contexts: input.historyDays.map((days: number) => {
       const context = briefingFixture("sparse", config("calm", days));
       return { ...context, connectors: context.connectors.map(connector => ({ ...connector, connectionGeneration: 4, selectionRevision: 5 })) };
@@ -172,11 +173,12 @@ it.each(["unchanged", "selection", "connection", "reauthorized", "missing captur
   expect(saved.case.capture.includeCalendar).toBe(true);
   if (change === "selection" || change === "reauthorized") mocks.calendar.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 6 });
   if (change === "connection") mocks.calendar.mockResolvedValue({ status: "connected", generation: 5, selectionRevision: 5 });
-  if (change === "reauthorized") mocks.preferences.mockResolvedValue({ ...preferences, revision: 5, includeCalendar: true, calendarConnectionGeneration: 4, calendarSelectionRevision: 6 });
+  if (change === "reauthorized") mocks.preferences.mockResolvedValue(dailyBriefPreferences({ revision: 5, allow: ["googleCalendar"] }));
   if (change === "missing capture") vi.spyOn(store, "readCase").mockResolvedValue({ ...saved, case: { ...saved.case, inputs: undefined } });
   const replay = await runBriefingComparison(post("/api/dev/briefing-comparison", { mode: "saved", accountRef: ACCOUNT, configs: [config("warm", 30)],
     review: { caseId: CASE, candidates: [candidate("cand-calendar-001", "candidate")] } }), generate, store);
-  expect(replay.status).toBe(change === "unchanged" ? 200 : change === "reauthorized" || change === "missing capture" ? 409 : 403);
+  // Ticket 306: the choice covers the current connection, so a changed connection or selection no longer matches the captured Calendar.
+  expect(replay.status).toBe(change === "unchanged" ? 200 : 409);
   expect(generate).toHaveBeenCalledTimes(change === "unchanged" ? 3 : 2);
 });
 
@@ -188,9 +190,9 @@ it("withholds saved output when Calendar selection changes during generation", a
   });
   const response = await runBriefingComparison(post("/api/dev/briefing-comparison", { mode: "saved", accountRef: ACCOUNT, configs: [config("warm", 30), config("calm", 30)],
     review: { caseId: CASE, candidates: [candidate("cand-calendar-002", "candidate"), candidate("cand-calendar-003", "candidate")] } }), generate, store);
-  expect(response.status).toBe(403);
+  expect(response.status).toBe(409);
   expect(generate).toHaveBeenCalledTimes(3);
   const saved = await store.readCase(`account-${ACCOUNT}`, CASE);
-  expect(saved.runs.at(-1)).toMatchObject({ state: "error", error: "access_denied", validation: "withheld" });
+  expect(saved.runs.at(-1)).toMatchObject({ state: "error", error: "context_changed", validation: "withheld" });
   expect(saved.runs.at(-1)).not.toHaveProperty("briefing");
 });

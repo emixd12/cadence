@@ -35,7 +35,7 @@ import type { SettingsSectionState } from "@/lib/ui/settings-sections";
 export type SettingsFixtureState = "fresh" | "connected" | "attention";
 
 export type SettingsFixturePanels = Readonly<Record<
-  "profile" | "timezone" | "notifications" | "google" | "outlook" | "icloud" | "hevy" | "travel" | "briefCalendar"
+  "profile" | "timezone" | "notifications" | "google" | "outlook" | "icloud" | "hevy" | "travel"
   | "dailyBrief" | "connectedApps" | "categories" | "noteShortcuts" | "trust" | "deleteAccount", ReactNode>>;
 
 const range = { startLocalDate: "2026-11-09", endLocalDate: "2026-11-16", timezone: "America/New_York" };
@@ -141,7 +141,6 @@ export function settingsFixturePanels(state: SettingsFixtureState): SettingsFixt
         leaveReminderClient={{ load: async () => ({ enabled: connected }), save: refuse }}
         readDeviceNotifications={async () => (connected ? "enabled" : "not_enabled")} />
     </PlaceLabelProvider>,
-    briefCalendar: <GoogleCalendarPanel agent coordinator={googleCoordinator(connected, true)} refreshRange={range} />,
     dailyBrief: <DailyBriefSettingsPanel client={dailyBriefClient(connected)} />,
     connectedApps: <ConnectedAppsPanel view={connectedApps(connected)} timezone="America/New_York" action={async () => ({ status: "error", message: "Preview only. No account access changed." })} />,
     categories: <CategoryPanel categories={settingsFixtureCategories} assignments={[]} action={idle} />,

@@ -4,13 +4,13 @@ import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { GoogleCalendarPanel } from "./GoogleCalendarPanel";
-import { calendarRangeForToday, webAgentGoogleCalendarCoordinator, webGoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
+import { calendarRangeForToday, webGoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 
-export function WebGoogleCalendarPanel({ timezone, agent = false, nested = false }: Readonly<{ timezone: string; agent?: boolean; nested?: boolean }>) {
+export function WebGoogleCalendarPanel({ timezone, nested = false }: Readonly<{ timezone: string; nested?: boolean }>) {
   const refreshRange = useMemo(() => calendarRangeForToday(timezone), [timezone]);
   const searchParams = useSearchParams();
-  const result = searchParams?.get(agent ? "agentCalendar" : "calendar");
-  return <GoogleCalendarPanel agent={agent} coordinator={agent ? webAgentGoogleCalendarCoordinator : webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={calendarCallbackMessage(result)} wrongAccount={result === "same_account_required"} nested={nested} />;
+  const result = searchParams?.get("calendar");
+  return <GoogleCalendarPanel coordinator={webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={calendarCallbackMessage(result)} wrongAccount={result === "same_account_required"} nested={nested} />;
 }
 
 export function calendarCallbackMessage(code: string | null): string | undefined {

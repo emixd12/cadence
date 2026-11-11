@@ -51,7 +51,8 @@ export type BenchCaseSource =
   | Readonly<{ mode: "account"; accountRef: string; preferenceRevision: number }>;
 
 export type BenchCaseCapture = Readonly<{
-  calendarGrantPurpose?: "agent";
+  /** Ticket 307: "timeline" reads the Timeline connection; earlier "agent" captures are review-only. */
+  calendarGrantPurpose?: "agent" | "timeline";
   historyDays: readonly number[];
   /** Captured flags record what was read; disclosed flags record Settings at capture time. */
   includeCalendar: boolean;

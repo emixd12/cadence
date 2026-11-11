@@ -18,12 +18,10 @@ import {
   SettingsPageEnd,
   SettingsSections,
 } from "@/components/settings/SettingsSections";
-import { SettingsHeadingScope } from "@/components/settings/settings-heading";
 import { CATEGORY_PANEL_PURPOSE, CategoryPanel, drawerLabel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
-import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { getCategorySettings } from "@/lib/services/category.service";
@@ -100,10 +98,6 @@ async function SettingsContent() {
           setupLabel="Set up Daily Brief"
         >
           <DailyBriefSettingsPanel />
-          {/* The separate Daily Brief Google Calendar grant stays until Ticket 307 removes it. */}
-          <SettingsHeadingScope level={4}>
-            <WebGoogleCalendarPanel timezone={settings.timezone} agent />
-          </SettingsHeadingScope>
         </SettingsDrawer>
       </SettingsGroup>
 

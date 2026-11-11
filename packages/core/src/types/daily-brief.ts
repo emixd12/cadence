@@ -33,10 +33,32 @@ export type DailyBriefing = Readonly<{
 
 export type DailyBriefSourceAttention = "changed" | "no_calendars" | "unavailable";
 
+/** Ticket 306: the connected sources one Daily Brief choice covers. */
+export const DAILY_BRIEF_CONNECTED_SOURCES = ["googleCalendar", "outlookCalendar", "icloudCalendar", "hevy"] as const;
+export type DailyBriefConnectedSource = (typeof DAILY_BRIEF_CONNECTED_SOURCES)[number];
+export type DailyBriefSourceFlags = Readonly<Record<DailyBriefConnectedSource, boolean>>;
+/**
+ * `ready`: connected with something to read (calendars also need a selected calendar).
+ * `no_calendars`: a connected calendar with no selected calendar. `not_connected`: nothing to read.
+ */
+export type DailyBriefSourceStatus = "ready" | "no_calendars" | "not_connected";
+
 export type DailyBriefSettings = Readonly<{
   accountRef: string;
   available: boolean;
   enabled: boolean;
+  /**
+   * Ticket 306: one choice covers every connected source, including one connected
+   * later, except those excluded under Advanced. Absent from older servers.
+   */
+  useConnectedSources?: boolean;
+  excludedSources?: DailyBriefSourceFlags;
+  /** Whether each source has something to read now. Absent from older servers. */
+  sourceStatus?: Readonly<Record<DailyBriefConnectedSource, DailyBriefSourceStatus>>;
+  /**
+   * Since Ticket 306 this and the three connector flags below report whether the brief
+   * uses the source now, for clients built before the one choice.
+   */
   includeCalendar: boolean;
   /** Optional sources (Ticket 172); absent from older servers and treated as false. */
   includeReminderHistory?: boolean;

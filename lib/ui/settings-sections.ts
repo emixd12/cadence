@@ -1,4 +1,4 @@
-import type { DailyBriefSettings } from "@cadence/core/types/daily-brief";
+import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import type { CalendarConnectionView } from "@/lib/types/google-calendar";
@@ -91,9 +91,10 @@ const DAILY_BRIEF_SOURCES = [
 ] as const;
 
 /**
- * Daily Brief needs action when a source it is allowed to use cannot be used now.
- * Same rule as the panel: the server's reported reason, or, from a server that
- * reports none, an allowed source it no longer offers.
+ * Ticket 306: one choice covers every connected source, so a covered source follows its
+ * current connection and needs no new choice; the state counts the sources the brief uses.
+ * A server from before the one choice (no `useConnectedSources`) keeps the earlier rule:
+ * action is needed when an allowed source cannot be used now.
  */
 export function dailyBriefSectionState(load: SettingsSectionLoad<DailyBriefSettings>): SettingsSectionState {
   if (load.phase === "loading") return SETTINGS_SECTION_CHECKING;
@@ -101,6 +102,12 @@ export function dailyBriefSectionState(load: SettingsSectionLoad<DailyBriefSetti
   const settings = load.value;
   if (!settings.available) return state("Unavailable", false);
   if (!settings.enabled) return state("Off", false);
+  if (settings.useConnectedSources !== undefined) {
+    if (!settings.useConnectedSources || !settings.sourceStatus) return state("On", true);
+    const used = DAILY_BRIEF_CONNECTED_SOURCES.filter((source) =>
+      settings.sourceStatus?.[source] === "ready" && settings.excludedSources?.[source] !== true).length;
+    return state(used === 0 ? "On" : `On · Plans around ${used} ${used === 1 ? "source" : "sources"}`, true);
+  }
   const attention = DAILY_BRIEF_SOURCES.some((source) => {
     if (settings[source.include] !== true) return false;
     const reported = settings.connectorAttention?.[source.offer];
