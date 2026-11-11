@@ -47,7 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 310–324: connector completion (D28) | 310 complete November 10, 2026 (documents only); 311–324 not started; no code | Ticket 311: live Hevy check with test account A's key (`connectors` preflight). Ticket 312 can start in parallel. A Mac build with Ticket 319 ships before the feature turns on | TICKETS, Tickets 310–324; STATUS, "Tickets 310–324: connector completion filed — November 10, 2026" |
+| Tickets 310–324: connector completion (D28) | 310, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`; 311 blocked on owner steps; 320, 323 and 324 not started | Owner: the `connectors` preflight steps (service-account token, Hevy test key); a yes for migration `20261110210000` (service-role grant). Then Ticket 311, hosted pushes, a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Tickets 312–322: connector completion implemented in source — November 10, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -86,6 +86,40 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 312–322: connector completion implemented in source — November 10, 2026
+
+**On branch `claude/pr-206-tickets-c4834e`, stacked on PR #206. Off in production: every
+path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
+
+- Complete: 312 (recorded-activity contract `1.1.0`, `RECORDED_ACTIVITY_MIN_MATCH_SECONDS`),
+  313 (`activity-match.resolver.ts`, `resolveConnectorStatusEvent`, timing classifier) and
+  322 (connector marks excluded from marking patterns; export and MCP provenance documented).
+- Implemented: 314 (three tables, three security-definer writers, migration
+  `20261110200000`), 315 (routine list and match read with routine digests), 316
+  (completion-source port, reconcile and link services, `/api/connectors/...` routes), 317
+  (Complete from Hevy on web Behaviors, "From Hevy" row line, Hevy panel last check), 318
+  (timing statistics), 319 (sync convergence of a connector mark and the user's first mark,
+  Mac label from the synced event, Mac reconcile after its Hevy refresh) and 321 (schedule
+  resolver, `connector_completion` token channel, job route at minutes 7, 22, 37, 52).
+- Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 4, a SQLite
+  migration, native changes and installed acceptance. 323 needs 311, a published Mac build
+  with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
+- Hosted: no migration pushed. `20261110200000` fits the standing approval once a push can
+  run; the `cadence-agents` token needs the vault service-account token first.
+  `20261110210000` grants `service_role` a column read and needs the owner's yes.
+- Owner steps from `npm run qa:preflight -- --suite connectors` (exit 10): store the Cadence
+  Agents service-account token (`docs/qa/agent-secrets.md`, steps 4–5); then the vault items
+  it lists, of which Ticket 311 needs `hevy-test-account-a`.
+- Verification: clean local stack replayed all 107 migrations; SQL fixtures for Tickets 314,
+  321, 292 and 275 pass. New and changed Vitest files pass under Node 24. Dagger: agents,
+  interactions, resolvers, lint, typecheck, build, desktop-build, marketing and public-trust
+  pass after the fixes recorded in the PR; `test` results are in the PR.
+- Not verified: live Hevy (change feed, ordering, `routine_id` behavior); the job end to end
+  with a minted token; deployed web; any installed Mac build; Vercel usage.
+- Platform impact: web, Tickets 314–318, 321, 322. Desktop: 319 in source, linked mode only;
+  320 deferred. Marketing: none (P-042). Future mobile: deferred. Messaging impact: P-038 to
+  P-041 apply; P-043 logged for the new in-app copy.
 
 ## Tickets 310–324: connector completion filed — November 10, 2026
 
