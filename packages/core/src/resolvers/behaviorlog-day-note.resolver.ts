@@ -47,6 +47,9 @@ export type BehaviorLogDayNotePlan = Readonly<{
 }>;
 
 export type BehaviorLogDayNoteOutcome = Readonly<{
+  mode: BehaviorLogDayNoteMode;
+  /** True when the saved day notes could not be read, so no day note was planned or saved. */
+  unavailable: boolean;
   saved: { create: number; replace: number };
   kept: number;
   /** Dates whose stored note differs from the bundle and was left unchanged. */
@@ -129,6 +132,8 @@ export function behaviorLogDayNoteDateRange(read: BehaviorLogDayNoteRead): { fro
 /** Outcome before any save: what the preview tells the user. */
 export function previewBehaviorLogDayNoteOutcome(plan: BehaviorLogDayNotePlan): BehaviorLogDayNoteOutcome {
   return {
+    mode: plan.mode,
+    unavailable: false,
     saved: {
       create: plan.actions.filter((action) => action.action === "create").length,
       replace: plan.actions.filter((action) => action.action === "replace").length,
@@ -140,6 +145,11 @@ export function previewBehaviorLogDayNoteOutcome(plan: BehaviorLogDayNotePlan): 
   };
 }
 
+/** Outcome when the saved day notes could not be read. */
+export function unavailableBehaviorLogDayNoteOutcome(mode: BehaviorLogDayNoteMode): BehaviorLogDayNoteOutcome {
+  return { mode, unavailable: true, saved: { create: 0, replace: 0 }, kept: 0, conflictDates: [], failedDates: [], skippedCount: 0 };
+}
+
 /** One plain sentence group for the import or restore message; null when nothing applies. */
 export function describeBehaviorLogDayNoteOutcome(
   outcome: BehaviorLogDayNoteOutcome,
@@ -147,6 +157,14 @@ export function describeBehaviorLogDayNoteOutcome(
 ): string | null {
   const parts: string[] = [];
   const preview = phase === "preview";
+  const action = outcome.mode === "restore" ? "restore" : "import";
+  if (outcome.unavailable) {
+    return preview
+      ? `Day notes could not be checked. Preview the bundle again to include them.`
+      : outcome.mode === "restore"
+        ? "Day notes could not be restored. Your other data was restored. Apply this restore again to add the day notes."
+        : "Day notes could not be imported. Your other data was imported. Preview and apply the bundle again to add the day notes.";
+  }
   if (outcome.saved.create) parts.push(`${outcome.saved.create} ${preview ? "to add" : "added"}`);
   if (outcome.saved.replace) parts.push(`${outcome.saved.replace} ${preview ? "to replace" : "replaced"}`);
   if (outcome.kept) parts.push(`${outcome.kept} already saved`);
@@ -154,7 +172,7 @@ export function describeBehaviorLogDayNoteOutcome(
   if (parts.length) sentences.push(`Day notes: ${parts.join(", ")}.`);
   if (outcome.conflictDates.length) {
     sentences.push(
-      `${countDays(outcome.conflictDates.length)} already ${outcome.conflictDates.length === 1 ? "has" : "have"} a different day note, ${preview ? "which this import will not change" : "which this import did not change"}: ${outcome.conflictDates.join(", ")}.`,
+      `${countDays(outcome.conflictDates.length)} already ${outcome.conflictDates.length === 1 ? "has" : "have"} a different day note, ${preview ? `which this ${action} will not change` : `which this ${action} did not change`}: ${outcome.conflictDates.join(", ")}.`,
     );
   }
   if (outcome.failedDates.length) {

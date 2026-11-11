@@ -4,6 +4,7 @@ import {
   planBehaviorLogDayNoteWrites,
   previewBehaviorLogDayNoteOutcome,
   readBehaviorLogDayNoteReviews,
+  unavailableBehaviorLogDayNoteOutcome,
   type BehaviorLogDayNoteMode,
   type BehaviorLogDayNoteOutcome,
   type BehaviorLogDayNotePlan,
@@ -32,7 +33,12 @@ export async function previewBehaviorLogDayNotes(
   files: readonly BundleFile[],
   mode: BehaviorLogDayNoteMode,
 ): Promise<BehaviorLogDayNoteOutcome | null> {
-  const plan = await planBehaviorLogDayNotes(store, files, mode);
+  let plan: BehaviorLogDayNotePlan | null;
+  try {
+    plan = await planBehaviorLogDayNotes(store, files, mode);
+  } catch {
+    return unavailableBehaviorLogDayNoteOutcome(mode);
+  }
   return plan ? previewBehaviorLogDayNoteOutcome(plan) : null;
 }
 
@@ -40,16 +46,23 @@ export async function previewBehaviorLogDayNotes(
  * Saves planned day notes after the main import or restore commits. Each save
  * compares and sets the stored note, so a note changed since the plan is
  * reported as a conflict instead of being overwritten. A failed save is
- * reported by date; it does not undo the committed import.
+ * reported by date; it does not undo the committed import. This function never
+ * throws: a failed read of the saved notes returns an unavailable outcome, so the
+ * caller can still report the committed import or restore as applied.
  */
 export async function applyBehaviorLogDayNotes(
   store: DayNoteDataStore,
   files: readonly BundleFile[],
   mode: BehaviorLogDayNoteMode,
 ): Promise<BehaviorLogDayNoteOutcome | null> {
-  const plan = await planBehaviorLogDayNotes(store, files, mode);
+  let plan: BehaviorLogDayNotePlan | null;
+  try {
+    plan = await planBehaviorLogDayNotes(store, files, mode);
+  } catch {
+    return unavailableBehaviorLogDayNoteOutcome(mode);
+  }
   if (!plan) return null;
-  const outcome = { saved: { create: 0, replace: 0 }, kept: 0, conflictDates: [] as string[], failedDates: [] as string[], skippedCount: plan.skipped.length };
+  const outcome = { mode, unavailable: false, saved: { create: 0, replace: 0 }, kept: 0, conflictDates: [] as string[], failedDates: [] as string[], skippedCount: plan.skipped.length };
   for (const action of plan.actions) {
     if (action.action === "keep") {
       outcome.kept++;

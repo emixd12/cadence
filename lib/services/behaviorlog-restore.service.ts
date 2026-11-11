@@ -299,7 +299,7 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
     await repairUserOccurrenceReminderGraphBestEffort(supabase, userId, {
       operation: "behaviorlog_restore",
     });
-    return createAlreadyAppliedRestoreState({
+    return createAlreadyAppliedRestoreState(supabase, userId, {
       bundle,
       previewRun,
       appliedRun: alreadyAppliedRun,
@@ -334,7 +334,7 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
       await repairUserOccurrenceReminderGraphBestEffort(supabase, userId, {
         operation: "behaviorlog_restore",
       });
-      return createAlreadyAppliedRestoreState({
+      return createAlreadyAppliedRestoreState(supabase, userId, {
         bundle,
         previewRun,
         appliedRun: concurrentlyAppliedRun,
@@ -442,7 +442,7 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
         await repairUserOccurrenceReminderGraphBestEffort(supabase, userId, {
           operation: "behaviorlog_restore",
         });
-        return createAlreadyAppliedRestoreState({
+        return createAlreadyAppliedRestoreState(supabase, userId, {
           bundle,
           previewRun,
           appliedRun: committedRun,
@@ -526,16 +526,24 @@ function toRestorePreviewSnapshot(
   };
 }
 
-function createAlreadyAppliedRestoreState(input: {
-  bundle: BehaviorLogRestoreUploadBundle;
-  previewRun: BehaviorLogImportRun;
-  appliedRun: BehaviorLogImportRun;
-}): BehaviorLogRestoreActionState {
+// A retried restore still saves day notes: an earlier attempt may have
+// committed the product restore before its day-note step ran. The step is
+// idempotent and never throws.
+async function createAlreadyAppliedRestoreState(
+  supabase: AppSupabaseClient,
+  userId: string,
+  input: {
+    bundle: BehaviorLogRestoreUploadBundle;
+    previewRun: BehaviorLogImportRun;
+    appliedRun: BehaviorLogImportRun;
+  },
+): Promise<BehaviorLogRestoreActionState> {
   const appliedSummary = readObject(input.appliedRun.dry_run_summary);
+  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), input.bundle.files, "restore");
 
   return {
     status: "applied",
-    message: "This accepted BehaviorLog restore was already applied.",
+    message: withBehaviorLogDayNoteMessage("This accepted BehaviorLog restore was already applied.", dayNotes, "applied"),
     upload: {
       fileName: input.bundle.fileName,
       fileSize: input.bundle.fileSize,

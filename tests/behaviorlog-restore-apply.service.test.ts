@@ -18,6 +18,7 @@ import type {
   ExportBehaviorInput,
   ExportBehaviorConfigurationEventInput,
   ExportCategoryInput,
+  ExportDayNoteInput,
   ExportOccurrenceInput,
   ExportStatusEventInput,
   ExportTimeSessionInput,
@@ -25,6 +26,10 @@ import type {
 import { DEFAULT_TIMEZONE } from "../lib/types/recurrence";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
+const DAY_NOTE: ExportDayNoteInput = {
+  id: "60000000-0000-4000-8000-000000000001", localDate: "2026-06-07", note: "Sick",
+  createdAt: "2026-06-07T12:00:00Z", updatedAt: "2026-06-07T12:00:00Z",
+};
 const NOW = Temporal.Instant.from("2026-06-08T16:00:00Z");
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -122,6 +127,12 @@ const mocks = vi.hoisted(() => ({
   listBehaviorLogExistingRecords: vi.fn(),
   markOccurrenceSyncStale: vi.fn(),
   repairUserOccurrenceReminderGraphBestEffort: vi.fn(),
+  listDayNotes: vi.fn(),
+  saveDayNote: vi.fn(),
+}));
+
+vi.mock("@/lib/db/dayNotes.repo", () => ({
+  createDayNoteStore: () => ({ listDayNotes: mocks.listDayNotes, saveDayNote: mocks.saveDayNote }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -189,6 +200,41 @@ describe("BehaviorLog restore apply service", () => {
     mocks.bindBehaviorLogRestoreApplyPayload.mockResolvedValue(
       "a".repeat(64),
     );
+    mocks.listDayNotes.mockResolvedValue([]);
+    mocks.saveDayNote.mockImplementation(async (input: { localDate: string; note: string | null }) => ({
+      id: "day-note-1", user_id: USER_ID, local_date: input.localDate, note: input.note, revision: 1,
+      created_at: NOW.toString(), updated_at: NOW.toString(),
+    }));
+  });
+
+  it("saves day notes when a retried restore was already applied", async () => {
+    const zip = createStoredZip(bundleFiles({ dayNotes: [DAY_NOTE] }));
+    const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
+    mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
+    mocks.getAppliedBehaviorLogRestoreRunByAcceptedPreview.mockResolvedValue(restoreAppliedRun(preview));
+
+    const result = await applyBehaviorLogRestoreUploadFromFormData(restoreApplyFormData(zip, preview));
+
+    expect(result.status).toBe("applied");
+    expect(result.message).toBe("This accepted BehaviorLog restore was already applied. Day notes: 1 added.");
+    expect(mocks.saveDayNote).toHaveBeenCalledWith({ localDate: "2026-06-07", expectedNote: null, note: "Sick" });
+    expect(mocks.createBehaviorLogImportRun).not.toHaveBeenCalled();
+  });
+
+  it("reports the committed restore as applied when saved day notes cannot be read", async () => {
+    const zip = createStoredZip(bundleFiles({ dayNotes: [DAY_NOTE] }));
+    const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
+    mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
+    mocks.getAppliedBehaviorLogRestoreRunByAcceptedPreview.mockResolvedValue(restoreAppliedRun(preview));
+    mocks.listDayNotes.mockRejectedValue(new Error("network down"));
+
+    const result = await applyBehaviorLogRestoreUploadFromFormData(restoreApplyFormData(zip, preview));
+
+    expect(result.status).toBe("applied");
+    expect(result.message).toBe(
+      "This accepted BehaviorLog restore was already applied. Day notes could not be restored. Your other data was restored. Apply this restore again to add the day notes.",
+    );
+    expect(mocks.saveDayNote).not.toHaveBeenCalled();
   });
 
   it("derives account-scoped ids for create actions even when external ids are UUID-shaped", () => {
@@ -1467,7 +1513,7 @@ function existingRecordsFromRestorePayload(payload: RestorePayloadForTest) {
 }
 
 function bundleFiles(
-  input: { timeSessions?: ExportTimeSessionInput[]; nativeReminders?: boolean } = {},
+  input: { timeSessions?: ExportTimeSessionInput[]; nativeReminders?: boolean; dayNotes?: ExportDayNoteInput[] } = {},
 ) {
   const categories: ExportCategoryInput[] = [
     {
@@ -1560,6 +1606,7 @@ function bundleFiles(
     timezone: DEFAULT_TIMEZONE,
     range: "30",
     includeTimeTracking: Boolean(input.timeSessions),
+    ...(input.dayNotes ? { includeNotes: true, dayNotes: input.dayNotes } : {}),
   }).behaviorLog.files;
 }
 

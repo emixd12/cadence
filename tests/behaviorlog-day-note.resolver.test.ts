@@ -157,7 +157,7 @@ describe("restoring and importing day notes", () => {
 
     expect(target.notes()).toEqual(Object.fromEntries(bundle.jsonBackup.day_notes!.map((note) => [note.local_date, note.note])));
     expect(target.notes()).toEqual({ "2026-06-07": "Sick\nStayed in", "2026-06-08": "Travel day" });
-    expect(outcome).toEqual({ saved: { create: 1, replace: 1 }, kept: 0, conflictDates: [], failedDates: [], skippedCount: 0 });
+    expect(outcome).toEqual({ mode: "restore", unavailable: false, saved: { create: 1, replace: 1 }, kept: 0, conflictDates: [], failedDates: [], skippedCount: 0 });
 
     const again = await applyBehaviorLogDayNotes(target.store, bundle.behaviorLog.files, "restore");
     expect(again).toMatchObject({ saved: { create: 0, replace: 0 }, kept: 2 });
@@ -188,8 +188,38 @@ describe("restoring and importing day notes", () => {
       },
     };
     expect(await applyBehaviorLogDayNotes(store, bundle.behaviorLog.files, "import")).toEqual({
+      mode: "import", unavailable: false,
       saved: { create: 0, replace: 0 }, kept: 0, conflictDates: ["2026-06-07"], failedDates: ["2026-06-08"], skippedCount: 0,
     });
+  });
+
+  it("uses restore wording when a restore save finds a changed note", async () => {
+    const bundle = exportBundle(exported);
+    const target = memoryStore();
+    const store: DayNoteDataStore = { listDayNotes: target.store.listDayNotes, saveDayNote: async () => null };
+    const outcome = await applyBehaviorLogDayNotes(store, bundle.behaviorLog.files, "restore");
+    expect(describeBehaviorLogDayNoteOutcome(outcome!, "applied")).toBe(
+      "2 days already have a different day note, which this restore did not change: 2026-06-07, 2026-06-08.",
+    );
+  });
+
+  it("never throws when the saved day notes cannot be read", async () => {
+    const bundle = exportBundle(exported);
+    const store: DayNoteDataStore = {
+      listDayNotes: async () => { throw new Error("network down"); },
+      saveDayNote: async () => { throw new Error("must not save"); },
+    };
+    const restored = await applyBehaviorLogDayNotes(store, bundle.behaviorLog.files, "restore");
+    const imported = await applyBehaviorLogDayNotes(store, bundle.behaviorLog.files, "import");
+    const previewed = await previewBehaviorLogDayNotes(store, bundle.behaviorLog.files, "import");
+    expect(restored).toMatchObject({ mode: "restore", unavailable: true, saved: { create: 0, replace: 0 } });
+    expect(withBehaviorLogDayNoteMessage("BehaviorLog restore applied.", restored, "applied")).toBe(
+      "BehaviorLog restore applied. Day notes could not be restored. Your other data was restored. Apply this restore again to add the day notes.",
+    );
+    expect(withBehaviorLogDayNoteMessage("BehaviorLog import applied.", imported, "applied")).toBe(
+      "BehaviorLog import applied. Day notes could not be imported. Your other data was imported. Preview and apply the bundle again to add the day notes.",
+    );
+    expect(describeBehaviorLogDayNoteOutcome(previewed!, "preview")).toBe("Day notes could not be checked. Preview the bundle again to include them.");
   });
 
   it("does nothing when the export left notes out", async () => {
