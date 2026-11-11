@@ -110,6 +110,20 @@ export type ReconcileOptions = Readonly<{
 
 const ZERO: ReconcileCounts = { completed: 0, attached: 0, removed: 0, reverted: 0, skipped: 0, refused: 0, deferred: 0 };
 
+export type ConnectorCompletionStatus = Readonly<{ available: boolean; lastReconciledAt: string | null }>;
+
+/** Safety rule 6: the Hevy panel shows the last successful check beside the connection state. */
+export async function getConnectorCompletionStatus(
+  caller: ConnectorCaller,
+  source: unknown,
+  options: Readonly<{ env?: Readonly<Record<string, string | undefined>>; store?: Pick<ConnectorCompletionStore, "readState"> }> = {},
+): Promise<ConnectorCompletionStatus> {
+  const port = completionSource(source);
+  if (!connectorCompletionEnabled(options.env)) return { available: false, lastReconciledAt: null };
+  const state = await (options.store ?? createConnectorCompletionStore(caller)).readState(port.source);
+  return { available: true, lastReconciledAt: state?.lastReconciledAt ?? null };
+}
+
 /** `POST /api/connectors/completions/reconcile` accepts exactly `{ source }`. */
 export function parseReconcileBody(body: unknown): RecordedActivitySourceV1_1 {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new ConnectorError("invalid_request");

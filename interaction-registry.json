@@ -1072,6 +1072,14 @@
       "interaction_ids": [
         "INT-TIMELINE-012"
       ]
+    },
+    {
+      "path": "components/behaviors/SourceLinkSettings.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 10,
+      "interaction_ids": [
+        "INT-BEHAVIOR-032"
+      ]
     }
   ],
   "interactions": [
@@ -16729,6 +16737,82 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-032",
+      "name": "Link a Behavior to Hevy for connector completion",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Let workouts recorded in Hevy mark this Behavior Completed on their day (D28).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Complete from Hevy: Off, Chosen routines, Any workout, then Save Hevy link"
+        }
+      ],
+      "availability": "Web, on an active Behavior's settings, only while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected. Off by default.",
+      "success_result": "The link is saved against the connected Hevy account. Matching workouts from today and the 30 prior days complete Unresolved Occurrences of this Behavior on their days, labeled From Hevy. Turning the link off stops new matches; past completions stay.",
+      "failure_result": "A routine already linked to another Behavior, or a second any-workout link, is refused and names the Behavior that holds it. Other failures leave the stored link unchanged.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/SourceLinkSettings.tsx",
+        "app/api/connectors/links/route.ts",
+        "lib/services/source-links.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-completion-ui.dom.test.tsx",
+          "tests/connector-completion.service.test.ts"
+        ],
+        "notes": "Synthetic UI, service and SQL checks; live Hevy and deployed acceptance remain in Ticket 323. The SQL fixture tests/sql/ticket-314-connector-completion-smoke.sql covers the database limits."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/SourceLinkSettings.tsx"
+          ],
+          "evidence": [
+            "tests/connector-completion-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Ticket 319 gives the Mac the label and the reconcile trigger only; links are edited on the web until a follow-up."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
         }
       }
     }

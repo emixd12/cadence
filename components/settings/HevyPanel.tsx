@@ -22,6 +22,7 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
   const [apiKey, setApiKey] = useState("");
   const [pending, setPending] = useState<"connect" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [completion, setCompletion] = useState<Readonly<{ available: boolean; lastReconciledAt: string | null }> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -30,6 +31,13 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
     return () => { active = false; };
   }, [coordinator, refreshVersion]);
   useEffect(() => () => setApiKey(""), []);
+  // Ticket 317: the last successful completion check, so a silent failure is visible.
+  useEffect(() => {
+    let active = true;
+    if (connection?.status !== "connected" || !coordinator.completionStatus) return;
+    void coordinator.completionStatus().then((value) => { if (active) setCompletion(value); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [connection?.status, coordinator, refreshVersion]);
 
   const connect = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,6 +94,11 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
           </button>
         </form> : null}
         {status === "connected" ? <>
+          {completion?.available ? <p className="text-muted-readable" data-completion-check>
+            {completion.lastReconciledAt
+              ? `Last checked for completed Behaviors ${formatCheckTime(completion.lastReconciledAt, timezone)}.`
+              : "Not checked for completed Behaviors yet."}
+          </p> : null}
           <p className="text-muted-readable">Disconnecting deletes Cadence&apos;s saved key. Hevy keeps the key active until you remove or regenerate it there.</p>
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
             <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Hevy…" : "Refresh Hevy"}</button>
@@ -116,4 +129,9 @@ export function hevyErrorMessage(code: string, fallback: string): string {
   if (code === "not_configured") return "Hevy connection is not configured for this Cadence deployment.";
   if (code === "unauthenticated") return "Sign in to Cadence again to manage Hevy.";
   return fallback;
+}
+
+export function formatCheckTime(instant: string, timezone: string): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    .format(new Date(instant));
 }

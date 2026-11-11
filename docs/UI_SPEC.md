@@ -774,6 +774,34 @@ The Reminder editor should use the same unframed form-section treatment as the
 Recurrence editor. Use a plain section heading and smaller subsection heading
 text for options such as Reminder offset.
 
+## Connector completion (Tickets 317–319, D28)
+
+Shown only while `CADENCE_CONNECTOR_COMPLETION` is on.
+
+- **Behavior settings (web):** "Complete from Hevy" appears under an active Behavior's
+  settings, beside Note shortcuts, only when Hevy is connected. Off by default. Options in
+  order: Off, Chosen routines (routine checkboxes read live from Hevy, titles never
+  stored), Any workout. A routine linked to another Behavior is disabled and names it.
+  Any workout is disabled while another Behavior holds it, with "One Behavior can use any
+  workout." With routines chosen and another Behavior on any workout, the section says a
+  workout from these routines also counts for that Behavior. When Hevy's list was read
+  completely and a linked routine is missing, it says "1 linked routine is no longer in
+  Hevy." Past 200 routines it says "Showing the first 200 routines from Hevy." A link
+  saved for another Hevy account says to save it again. Save Hevy link saves only the
+  link. The Mac does not edit links yet.
+- **Timeline rows (web and Mac):** a Completed row whose latest status event is the
+  connector's shows a muted line under the title: "From Hevy", or "From Hevy · 2
+  workouts". Expanded, any row with attached workouts lists each workout's start and end
+  time, with or without the label. Changing the status with the existing buttons removes
+  the label at once. No new control, route, modal or settings page. The Mac shows the
+  label without workout times until Ticket 320.
+- **Hevy panel:** beside the connection state, "Last checked for completed Behaviors
+  <date, time>." or "Not checked for completed Behaviors yet." No notification announces
+  a connector completion (D28.6).
+- **Behaviors review (web):** a linked Behavior with matched workouts shows "Timing: On
+  schedule 6 of 9. Usually 40 min later." beside the existing counts. No streaks, scores
+  or charts.
+
 ## Behaviors screen
 
 Behaviors is the primary behavior object surface. It combines recurring

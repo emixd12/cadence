@@ -1,4 +1,8 @@
 import { assembleAnalyticsView } from "@cadence/core/services/analytics";
+import { resolveConnectorTimingSummaries } from "@cadence/core/resolvers/analytics.resolver";
+import type { AnalyticsConnectorTiming } from "@cadence/core/types/analytics";
+import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
+import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
 import { Temporal } from "@js-temporal/polyfill";
 
 import type {
@@ -89,12 +93,43 @@ export async function getAnalyticsPageDataForUser(
     throughStartedAt: now.toString(),
   });
 
-  return assembleAnalyticsView({
+  const view = assembleAnalyticsView({
     behaviors, occurrences, needsDecisionOccurrences, timeSessions, now, timezone,
     rangeDays: dateRange.rangeDays,
     selectedBehaviorId: options.selectedBehaviorId,
     selectedDayLocalDate: options.selectedDayLocalDate,
   });
+  return attachConnectorTiming(view, await readConnectorTiming(supabase, userId, occurrences));
+}
+
+/**
+ * Ticket 318: timing statistics for linked Behaviors from source matches. Read only
+ * while `CADENCE_CONNECTOR_COMPLETION` is on. A failed read shows no timing.
+ */
+async function readConnectorTiming(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly { id: string; behavior_id: string; status: string }[],
+): Promise<Map<string, AnalyticsConnectorTiming>> {
+  if (!connectorCompletionEnabled()) return new Map();
+  const completed = occurrences.filter((occurrence) => occurrence.status === "completed");
+  if (completed.length === 0) return new Map();
+  try {
+    const matches = await listSourceMatchesForOccurrences(supabase, userId, completed.map((occurrence) => occurrence.id));
+    return resolveConnectorTimingSummaries({
+      occurrences: completed.map((occurrence) => ({ id: occurrence.id, behaviorId: occurrence.behavior_id, status: occurrence.status })),
+      matches: matches.map((match) => ({ occurrenceId: match.occurrence_id, state: match.state, activityRef: match.activity_ref,
+        activityStartAt: match.activity_start_at, scheduledStartAt: match.scheduled_start_at, scheduledEndAt: match.scheduled_end_at })),
+    });
+  } catch {
+    return new Map();
+  }
+}
+
+function attachConnectorTiming(view: AnalyticsView, timing: Map<string, AnalyticsConnectorTiming>): AnalyticsView {
+  if (timing.size === 0) return view;
+  return { ...view, behaviorSummaries: view.behaviorSummaries.map((summary) =>
+    timing.has(summary.behaviorId) ? { ...summary, connectorTiming: timing.get(summary.behaviorId)! } : summary) };
 }
 
 async function requireUserId(supabase: AppSupabaseClient): Promise<string> {

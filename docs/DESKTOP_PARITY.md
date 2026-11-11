@@ -314,9 +314,12 @@ scans at most 500 workouts globally even for today; count stability is not an
 atomic snapshot. Each source requires its own default-off Daily Brief disclosure.
 Source timing never automatically completes a Behavior.
 
-Decision D28 (November 10, 2026) plans connector completion under Tickets 310–324. It
-is not implemented, and the sentence above describes the Mac until it ships. Planned
-Mac impact, linked mode only:
+Decision D28 (November 10, 2026) plans connector completion under Tickets 310–324. Ticket
+319's sync rule, label and reconcile call are implemented in source
+(`packages/core/src/resolvers/account-sync.resolver.ts`, `apps/desktop/src/local-timeline.service.ts`,
+`apps/desktop/src/calendar/use-connectors.ts`) but not in a published Mac build, and the
+hosted feature is off, so the sentence above still describes the Mac. Mac impact, linked
+mode only:
 
 - Ticket 319: a sync merge rule for a connector completion and a manual mark on the same
   Occurrence, the "From Hevy" label read from the synced status event, and a reconcile

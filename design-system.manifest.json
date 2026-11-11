@@ -327,6 +327,20 @@
       "notes": "Behavior-scoped review controls and the global Note shortcuts setting."
     },
     {
+      "id": "module.source-link-settings",
+      "name": "SourceLinkSettings",
+      "kind": "module",
+      "source": "components/behaviors/SourceLinkSettings.tsx",
+      "exportName": "SourceLinkSettings",
+      "usageNames": [
+        "SourceLinkSettings"
+      ],
+      "benchAnchor": "design-system#ds-module-source-link-settings",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 317: Complete from Hevy on a web Behavior's settings. Routine picker first, Any workout fallback, holder names, stale-routine count and fenced state."
+    },
+    {
       "id": "module.needs-decision-dialog",
       "name": "NeedsDecisionDialog",
       "kind": "module",

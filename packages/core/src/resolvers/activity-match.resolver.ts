@@ -449,7 +449,7 @@ export function classifyConnectorTiming(input: Readonly<{
 
 /** Rule 9: an Occurrence's timing comes from its active match nearest the scheduled start. */
 export function selectTimingMatch<T extends Readonly<{
-  state: SourceMatchState;
+  state: string;
   activityStartAt: string;
   scheduledStartAt: string;
   activityRef: string;

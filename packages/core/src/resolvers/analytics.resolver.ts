@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import type {
+  AnalyticsConnectorTiming,
   AnalyticsAdherence,
   AnalyticsAverageTrackedTime,
   AnalyticsBehaviorDayCell,
@@ -20,6 +21,7 @@ import type {
   AnalyticsView,
 } from "../types/analytics";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
+import { classifyConnectorTiming, selectTimingMatch } from "./activity-match.resolver";
 import {
   formatRecordedDuration,
   resolveOccurrenceTimeTracking,
@@ -760,4 +762,62 @@ function formatDateLabel(date: Temporal.PlainDate): string {
 
 function formatShortDateLabel(date: Temporal.PlainDate): string {
   return `${SHORT_WEEKDAY_LABELS[date.dayOfWeek - 1]} ${date.month}/${date.day}`;
+}
+
+export type ConnectorTimingOccurrenceInput = Readonly<{ id: string; behaviorId: string; status: string }>;
+export type ConnectorTimingMatchInput = Readonly<{
+  occurrenceId: string;
+  state: string;
+  activityRef: string;
+  activityStartAt: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string | null;
+}>;
+
+/**
+ * Ticket 318: whether linked Behaviors happen when scheduled. Only Occurrences that
+ * are Completed now count, including ones the user marked with an attached activity.
+ * Each contributes its active match nearest the scheduled start. No streaks or
+ * scores; adherence is unchanged.
+ */
+export function resolveConnectorTimingSummaries(input: Readonly<{
+  occurrences: readonly ConnectorTimingOccurrenceInput[];
+  matches: readonly ConnectorTimingMatchInput[];
+}>): Map<string, AnalyticsConnectorTiming> {
+  const byOccurrence = new Map<string, ConnectorTimingMatchInput[]>();
+  for (const match of input.matches) byOccurrence.set(match.occurrenceId, [...(byOccurrence.get(match.occurrenceId) ?? []), match]);
+  const samples = new Map<string, { offsets: number[]; onTime: number }>();
+  for (const occurrence of input.occurrences) {
+    if (occurrence.status !== "completed") continue;
+    const chosen = selectTimingMatch(byOccurrence.get(occurrence.id) ?? []);
+    if (!chosen) continue;
+    const timing = classifyConnectorTiming(chosen);
+    const entry = samples.get(occurrence.behaviorId) ?? { offsets: [], onTime: 0 };
+    entry.offsets.push(timing.offsetMinutes);
+    if (timing.onTime) entry.onTime += 1;
+    samples.set(occurrence.behaviorId, entry);
+  }
+  const result = new Map<string, AnalyticsConnectorTiming>();
+  for (const [behaviorId, entry] of samples) {
+    const sorted = [...entry.offsets].sort((left, right) => left - right);
+    const middle = Math.floor(sorted.length / 2);
+    const median = Math.round(sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2);
+    result.set(behaviorId, {
+      matchedCount: sorted.length,
+      onTimeCount: entry.onTime,
+      medianOffsetMinutes: median,
+      label: connectorTimingLabel(entry.onTime, sorted.length, median),
+    });
+  }
+  return result;
+}
+
+/** "On schedule 6 of 9. Usually 40 min later." */
+export function connectorTimingLabel(onTime: number, matched: number, medianOffsetMinutes: number): string {
+  const absolute = Math.abs(medianOffsetMinutes);
+  const amount = absolute >= 60
+    ? `${Math.floor(absolute / 60)} h${absolute % 60 ? ` ${absolute % 60} min` : ""}`
+    : `${absolute} min`;
+  const usually = absolute === 0 ? "Usually at the scheduled time." : `Usually ${amount} ${medianOffsetMinutes > 0 ? "later" : "earlier"}.`;
+  return `On schedule ${onTime} of ${matched}. ${usually}`;
 }
