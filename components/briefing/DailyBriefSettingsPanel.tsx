@@ -48,7 +48,7 @@ function names(titles: readonly string[]): string {
 function coverageLine(settings: DailyBriefSettings): string {
   const excluded = settings.excludedSources ?? NO_DAILY_BRIEF_SOURCES;
   const connected = SOURCES.filter((source) => statusOf(settings, source.key) !== "not_connected");
-  if (!connected.length) return "Nothing is connected yet. Connect a calendar or Hevy in Connectors, and this choice covers it.";
+  if (!connected.length) return "Nothing is connected yet. Connect a calendar or Hevy in Connected sources, and this choice covers it.";
   const covered = connected.filter((source) => !excluded[source.key]);
   if (!covered.length) return "Every connected source is excluded under Advanced. A source you connect later is covered.";
   return `Covers ${names(covered.map((source) => source.title))}, and any source you connect later. Only timing is sent, never event titles, descriptions, locations, attendees or workout details.`;
@@ -59,7 +59,7 @@ function sourceState(settings: DailyBriefSettings, source: (typeof SOURCES)[numb
   const excluded = settings.excludedSources?.[source.key] === true;
   if (!settings.enabled || settings.useConnectedSources !== true || excluded) return "";
   return statusOf(settings, source.key) === "no_calendars"
-    ? ` No ${source.title} calendars are selected, so the brief cannot use it. Choose calendars in Connectors.`
+    ? ` No ${source.title} calendars are selected, so the brief cannot use it. Choose calendars in Connected sources.`
     : " Daily Brief uses it.";
 }
 
@@ -77,13 +77,13 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
     void resolvedClient.preferences(controller.signal).then((value) => {
       if (!controller.signal.aborted) setSettings(value);
     }).catch(() => {
-      if (!controller.signal.aborted) setError("Daily Brief settings are unavailable.");
+      if (!controller.signal.aborted) setError("Daily Brief settings could not load. Reload Settings to try again.");
     });
     return () => controller.abort();
   }, [resolvedClient]);
 
   if (!resolvedClient || (desktop && !navigator.onLine)) {
-    return <SettingsPanel title="Daily Brief" description="Daily Brief is available only to linked, online desktop accounts. Local tracking remains available offline."><p className="sr-only">Daily Brief is unavailable.</p></SettingsPanel>;
+    return <SettingsPanel title="Daily Brief" description="Daily Brief needs a linked Cadence account and an internet connection. Tracking works offline."><p className="sr-only">Daily Brief is unavailable.</p></SettingsPanel>;
   }
 
   const save = (change: SourceChange) => {
@@ -105,7 +105,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       localStorage.setItem("cadence.daily-brief.settings-revision.v1", `${updated.accountRef}:${updated.revision}`);
       window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: updated }));
     }).catch(() => {
-      setError("Cadence could not save Daily Brief settings.");
+      setError("Daily Brief settings could not save. Try again.");
     }).finally(() => setSaving(false));
   };
 
@@ -115,7 +115,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
 
   return (
     <SettingsPanel title="Daily Brief" description="Cadence can prepare one read-only briefing when you first open Timeline each day.">
-      {!settings ? <p role="status" className="text-sm text-muted-readable">{error || "Loading Daily Brief settings…"}</p> : !settings.available ? <p className="text-sm leading-6 text-muted-readable">Daily Brief is unavailable because this Cadence server has no configured model.</p> : <div className="grid gap-3 text-sm leading-6">
+      {!settings ? <p role="status" className="text-sm text-muted-readable">{error || "Loading Daily Brief settings…"}</p> : !settings.available ? <p className="text-sm leading-6 text-muted-readable">This Cadence server does not offer Daily Brief.</p> : <div className="grid gap-3 text-sm leading-6">
         <label className="flex min-h-11 items-center gap-3">
           <input type="checkbox" checked={settings.enabled} disabled={saving} onChange={(event) => save({ enabled: event.target.checked })} />
           <span>Daily Brief</span>
@@ -149,7 +149,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
             {settings.optionalSources?.notes ? <div>
               <label className="flex min-h-11 items-center gap-3">
                 <input type="checkbox" checked={settings.includeNotes === true} disabled={!settings.enabled || saving} aria-describedby="daily-brief-notes-disclosure" onChange={(event) => save({ includeNotes: event.target.checked })} />
-                <span>Include Notes on Not Completed occurrences</span>
+                <span>Include Notes on Not Completed Occurrences</span>
               </label>
               <p id="daily-brief-notes-disclosure" className="max-w-2xl pl-7 text-muted-readable">Lets a tip name a recurring obstacle. When a Notes pattern is selected as the tip, Cadence sends up to 12 Notes, the first 280 characters of each, from Not Completed occurrences in the last 90 days. Other Notes are never sent.</p>
             </div> : null}

@@ -109,8 +109,8 @@ export function AccountDeletionPanel({
             className="min-h-11 max-w-md border border-line bg-background px-3 py-2 text-base"
           />
           <p className="text-sm leading-6 text-muted-readable">
-            Deletion unlocks after the export acknowledgement and typed
-            confirmation match.
+            Delete account turns on after you check the box and type the
+            confirmation.
           </p>
 
           <button
@@ -118,7 +118,7 @@ export function AccountDeletionPanel({
             disabled={isPending || !canSubmit}
             className="product-action product-action-danger min-h-11 w-fit py-2 text-sm"
           >
-            {isPending ? "Deleting..." : "Delete account"}
+            {isPending ? "Deleting…" : "Delete account"}
           </button>
 
           {state.message ? (

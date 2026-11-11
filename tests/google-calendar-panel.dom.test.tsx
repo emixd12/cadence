@@ -136,18 +136,18 @@ describe("GoogleCalendarPanel", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("Google Calendar is not connected."));
 
     await act(() => button("Connect Google Calendar").click());
-    expect(container.textContent).toContain("Continue in the browser to connect Calendar.");
+    expect(container.textContent).toContain("Continue in your browser to connect Google Calendar.");
 
     await act(() => root.render(<GoogleCalendarPanel coordinator={adapter} refreshRange={range} refreshVersion={1} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Google Calendar is not connected."));
-    expect(container.textContent).not.toContain("Continue in the browser to connect Calendar.");
+    expect(container.textContent).not.toContain("Continue in your browser to connect Google Calendar.");
 
     await act(() => button("Connect Google Calendar").click());
     getConnection.mockResolvedValue(connection());
     await act(() => root.render(<GoogleCalendarPanel coordinator={adapter} refreshRange={range} refreshVersion={2} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Google Calendar connected."));
     expect(container.textContent).toContain("Work");
-    expect(container.textContent).not.toContain("Continue in the browser to connect Calendar.");
+    expect(container.textContent).not.toContain("Continue in your browser to connect Google Calendar.");
   });
 
   it("saves each display and selection change as it happens, then reloads the list (Ticket 303)", async () => {
@@ -155,7 +155,7 @@ describe("GoogleCalendarPanel", () => {
     await render(adapter);
     expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save Calendar settings")).toBe(false);
 
-    await act(async () => checkbox("Show Calendar context").click());
+    await act(async () => checkbox("Show Google Calendar events").click());
     expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: false });
     await act(async () => checkbox("Visible on Timeline").click());
     expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: false, hiddenCalendarIds: ["work"] });
@@ -174,16 +174,16 @@ describe("GoogleCalendarPanel", () => {
     const adapter = coordinator();
     vi.mocked(adapter.savePreferences).mockImplementationOnce((preferences) => new Promise((resolve) => { finish = () => resolve(connection(preferences)); }));
     await render(adapter);
-    await act(async () => checkbox("Show Calendar context").click());
+    await act(async () => checkbox("Show Google Calendar events").click());
     expect(statusLines()).toEqual([SETTINGS_SAVING]);
-    expect(checkbox("Show Calendar context").disabled).toBe(false);
-    await act(async () => checkbox("Show all-day events").click());
-    await act(async () => checkbox("Show Calendar context").click());
+    expect(checkbox("Show Google Calendar events").disabled).toBe(false);
+    await act(async () => checkbox("Show all-day Google Calendar events").click());
+    await act(async () => checkbox("Show Google Calendar events").click());
     expect(adapter.savePreferences).toHaveBeenCalledTimes(1);
     await act(async () => { finish(); });
     expect(adapter.savePreferences).toHaveBeenCalledTimes(2);
     expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: true, showAllDay: false });
-    expect(checkbox("Show all-day events").checked).toBe(false);
+    expect(checkbox("Show all-day Google Calendar events").checked).toBe(false);
     expect(statusLines()).toEqual([SETTINGS_SAVED]);
   });
 
@@ -192,7 +192,7 @@ describe("GoogleCalendarPanel", () => {
     await render(adapter);
     await act(async () => checkbox("Personal").click());
     expect(checkbox("Personal").checked).toBe(false);
-    expect(statusLines()).toEqual([`Calendar settings could not save. Try again. ${SETTINGS_UNDONE}`]);
+    expect(statusLines()).toEqual([`Google Calendar settings could not save. Try again. ${SETTINGS_UNDONE}`]);
     expect(container.textContent).not.toContain("private provider detail");
   });
 
@@ -200,12 +200,12 @@ describe("GoogleCalendarPanel", () => {
     const adapter = coordinator();
     await render(adapter);
 
-    await act(() => button("Refresh Calendar").click());
+    await act(() => button("Refresh Google Calendar").click());
     await vi.waitFor(() => expect(adapter.refreshEvents).toHaveBeenCalledWith(
       { startLocalDate: "2026-09-16", endLocalDate: "2026-09-23" },
       { force: true },
     ));
-    expect(container.textContent).toContain("No Calendar events in this range. Calendar current.");
+    expect(container.textContent).toContain("No Google Calendar events to show. Calendar current.");
 
     await act(() => button("Disconnect Google Calendar").click());
     expect(adapter.disconnect).not.toHaveBeenCalled();
@@ -257,23 +257,23 @@ describe("GoogleCalendarPanel", () => {
   it("reloads discovery without saved calendars", async () => {
     const adapter = coordinator({ getConnection: vi.fn(async () => connection({ ...defaults(), selectedCalendarIds: [] })) });
     await render(adapter);
-    await act(() => button("Refresh Calendar").click());
+    await act(() => button("Refresh Google Calendar").click());
     expect(adapter.listCalendars).toHaveBeenCalledTimes(2);
     expect(adapter.refreshEvents).not.toHaveBeenCalled();
     expect(checkbox("Personal").checked).toBe(false);
-    expect(container.textContent).toContain("Calendar list refreshed. Select calendars to show events.");
+    expect(container.textContent).toContain("Calendar list updated. Choose calendars to show their events.");
   });
 
   it("retains selections and reports discovery failures, including after a successful save", async () => {
     const adapter = coordinator();
     await render(adapter);
     vi.mocked(adapter.listCalendars).mockRejectedValue(new Error("private provider detail"));
-    await act(() => button("Refresh Calendar").click());
+    await act(() => button("Refresh Google Calendar").click());
     expect(checkbox("Work").checked).toBe(true);
     expect(adapter.refreshEvents).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Calendar refresh did not finish.");
-    await act(async () => checkbox("Show all-day events").click());
-    expect(container.textContent).toContain("Saved. The calendar list could not reload; try Refresh Calendar.");
+    expect(container.textContent).toContain("Google Calendar did not refresh.");
+    await act(async () => checkbox("Show all-day Google Calendar events").click());
+    expect(container.textContent).toContain("Saved. The calendar list did not reload. Try Refresh Google Calendar.");
     expect(container.textContent).not.toContain("private provider detail");
   });
 
@@ -286,7 +286,7 @@ describe("GoogleCalendarPanel", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("needs reconnection"));
 
     await act(() => button("Reconnect Google Calendar").click());
-    await vi.waitFor(() => expect(container.textContent).toContain("Calendar connection could not start."));
+    await vi.waitFor(() => expect(container.textContent).toContain("Google Calendar could not start connecting. Try again."));
     expect(container.textContent).not.toContain("raw OAuth provider detail");
   });
 });

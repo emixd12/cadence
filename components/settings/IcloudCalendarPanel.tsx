@@ -55,7 +55,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     },
     settled: async () => {
       try { setCalendars(await coordinator.listCalendars()); setMessage(SETTINGS_SAVED); }
-      catch { setMessage(`${SETTINGS_SAVED}. The calendar list could not reload; try Refresh iCloud Calendar.`); }
+      catch { setMessage(`${SETTINGS_SAVED}. The calendar list did not reload. Try Refresh iCloud Calendar.`); }
     },
   });
   const cancelAutosave = autosave.cancel;
@@ -72,9 +72,9 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
       savedPreferences.current = view.preferences;
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
-        catch (error) { if (active) setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud calendar list could not load.")); }
+        catch (error) { if (active) setMessage(icloudErrorMessage(connectorErrorCode(error), "Your iCloud calendars could not load. Try Refresh iCloud Calendar.")); }
       } else setCalendars([]);
-    }).catch(() => { if (active) { setLoadFailed(true); setMessage("iCloud Calendar status is unavailable. Other sources and tracking are unaffected."); } });
+    }).catch(() => { if (active) { setLoadFailed(true); setMessage("Cadence could not check iCloud Calendar. Other sources and tracking still work."); } });
     return () => { active = false; };
   }, [cancelAutosave, coordinator, refreshVersion]);
 
@@ -92,7 +92,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
       setConnection(view); setPreferences(view.preferences);
       savedPreferences.current = view.preferences;
       try { setCalendars(await coordinator.listCalendars()); setMessage("iCloud Calendar connected. Choose the calendars Cadence can show."); }
-      catch { setCalendars([]); setMessage("iCloud Calendar connected. The calendar list could not load; try Refresh iCloud Calendar."); }
+      catch { setCalendars([]); setMessage("iCloud Calendar connected. The calendar list did not load. Try Refresh iCloud Calendar."); }
     } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar could not connect. Try again.")); }
     finally { setPending(null); }
   };
@@ -101,20 +101,20 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     try {
       setCalendars(await coordinator.listCalendars());
       if (!connection?.preferences.selectedSourceIds.length) {
-        setMessage("iCloud calendar list refreshed. Select calendars to show events.");
+        setMessage("Calendar list updated. Choose calendars to show their events.");
         return;
       }
       const snapshot = await coordinator.refreshEvents(refreshRange, { force: true });
       setMessage(snapshot.completeness !== "complete"
         ? "iCloud Calendar refresh was incomplete. Some events may be missing from the Timeline."
-        : snapshot.freshness.state === "stale" ? "iCloud Calendar refresh was incomplete. The Timeline keeps the last complete read."
-        : snapshot.events.length ? "iCloud Calendar refreshed." : "No iCloud Calendar events in this range.");
+        : snapshot.freshness.state === "stale" ? "iCloud Calendar refresh was incomplete. Timeline shows the last full refresh."
+        : snapshot.events.length ? "iCloud Calendar refreshed." : "No iCloud Calendar events to show.");
     } catch (error) {
       if (["reconnect_required", "permission_denied"].includes(connectorErrorCode(error))) {
         setConnection((view) => view ? { ...view, status: "reconnect_required" } : view);
         setCalendars([]);
       }
-      setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar refresh did not finish. Try again; saved settings, other sources, and tracking are unchanged."));
+      setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar did not refresh. Try again. Your settings, other sources and tracking are unchanged."));
     } finally { setPending(null); }
   };
   const disconnect = async () => {
@@ -124,7 +124,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
       setConnection(result.view); setPreferences(result.view.preferences); setCalendars([]);
       savedPreferences.current = result.view.preferences;
       setMessage(`iCloud Calendar disconnected. Cadence deleted its saved Apple Account email and app-specific password. ${CONNECTOR_REVOCATION_COPY[result.revocation]}`);
-    } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar disconnect could not finish.")); }
+    } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar did not disconnect. Try again.")); }
     finally { setPending(null); }
   };
 
@@ -140,7 +140,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     autosave.change(value);
   };
   const busy = pending !== null || autosave.saving;
-  const disconnectAction = <SettingsDisconnect label="Disconnect iCloud Calendar" question="Disconnect iCloud Calendar?" pendingLabel="Disconnecting iCloud…"
+  const disconnectAction = <SettingsDisconnect label="Disconnect iCloud Calendar" question="Disconnect iCloud Calendar?" pendingLabel="Disconnecting iCloud Calendar…"
     pending={pending === "disconnect"} disabled={busy} onConfirm={() => { void disconnect(); }} />;
 
   return (
@@ -150,7 +150,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
         <DesktopDraftGuard pending={autosave.saving} />
         <SettingsLiveLine text={message} className="text-muted-readable" />
         {message ? null : <p className="text-muted-readable">{icloudStatusLabel(status)}</p>}
-        {status === "not_configured" ? <p className="text-muted-readable">iCloud Calendar connection is not configured for this Cadence deployment.</p> : null}
+        {status === "not_configured" ? <p className="text-muted-readable">This Cadence server cannot connect iCloud Calendar.</p> : null}
         {needsLogin ? <form onSubmit={connect} className="grid gap-3 border-t border-line pt-4" aria-describedby={custodyId}>
           {/* An opened form keeps its explicit action; a typed draft holds a desktop restart. */}
           <DesktopDraftGuard dirty={Boolean(appleId || appPassword)} onDiscard={clearCredentials} />
@@ -165,21 +165,21 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
             onChange={(event) => setAppPassword(event.target.value)} disabled={pending !== null}
             className="min-h-11 min-w-0 w-full max-w-md border border-line bg-background px-3 py-2" />
           <button type="submit" disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">
-            {pending === "connect" ? "Connecting iCloud…" : status === "reconnect_required" ? "Reconnect iCloud Calendar" : "Connect iCloud Calendar"}
+            {pending === "connect" ? "Connecting iCloud Calendar…" : status === "reconnect_required" ? "Reconnect iCloud Calendar" : "Connect iCloud Calendar"}
           </button>
         </form> : null}
         {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting deletes Cadence&apos;s saved copy; Apple keeps the app-specific password active until you remove it at account.apple.com.</p> : null}
         {status === "reconnect_required" ? disconnectAction : null}
         {canManage && shared ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
-            <legend className="font-bold text-foreground">iCloud display</legend>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={shared.visible} onChange={(event) => updateShared({ ...shared, visible: event.target.checked })} />Show iCloud context on Timeline</label>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={shared.showAllDay} onChange={(event) => updateShared({ ...shared, showAllDay: event.target.checked })} />Show all-day iCloud events</label>
+            <legend className="font-bold text-foreground">Timeline display</legend>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={shared.visible} onChange={(event) => updateShared({ ...shared, visible: event.target.checked })} />Show iCloud Calendar events on Timeline</label>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={shared.showAllDay} onChange={(event) => updateShared({ ...shared, showAllDay: event.target.checked })} />Show all-day iCloud Calendar events</label>
           </fieldset>
           <CalendarSelector calendars={calendars?.map((calendar) => ({ id: calendar.id, name: calendar.name, primary: calendar.isDefault })) ?? null}
             preferences={shared} onChange={updateShared} disabled={pending !== null} refreshLabel="Refresh iCloud Calendar" />
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
-            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing iCloud…" : "Refresh iCloud Calendar"}</button>
+            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing iCloud Calendar…" : "Refresh iCloud Calendar"}</button>
             {disconnectAction}
           </div>
         </> : null}
@@ -189,11 +189,11 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
 }
 
 function icloudStatusLabel(status: ConnectorConnectionView["status"] | "loading"): string {
-  if (status === "loading") return "Loading iCloud Calendar connection.";
+  if (status === "loading") return "Checking iCloud Calendar…";
   if (status === "connected") return "iCloud Calendar connected.";
   if (status === "reconnect_required") return "iCloud Calendar needs a current app-specific password.";
   if (status === "disconnected") return "iCloud Calendar is not connected.";
-  return "iCloud Calendar connection is not configured.";
+  return "This Cadence server cannot connect iCloud Calendar.";
 }
 
 export function icloudErrorMessage(code: string, fallback: string): string {
@@ -201,10 +201,10 @@ export function icloudErrorMessage(code: string, fallback: string): string {
   if (code === "reconnect_required") return "Apple did not accept these values. Check the email, create a new app-specific password at account.apple.com, and enter it again.";
   if (code === "wrong_account") return "This is a different Apple Account from the connected one. Disconnect iCloud Calendar first, then connect the other account.";
   if (code === "permission_denied") return "Apple refused access to iCloud Calendar for this account.";
-  if (code === "timeout") return "iCloud did not respond in time. Try again; other sources and tracking are unchanged.";
+  if (code === "timeout") return "iCloud did not respond in time. Try again. Other sources and tracking are unchanged.";
   if (code === "rate_limited") return "Apple asked Cadence to wait before reading again. Try again later.";
-  if (code === "incomplete_pagination") return "iCloud returned only part of a calendar, so Cadence did not treat it as complete.";
-  if (code === "not_configured") return "iCloud Calendar connection is not configured for this Cadence deployment.";
+  if (code === "incomplete_pagination") return "iCloud sent only part of a calendar, so some events may be missing.";
+  if (code === "not_configured") return "This Cadence server cannot connect iCloud Calendar.";
   if (code === "unauthenticated") return "Sign in to Cadence again to manage iCloud Calendar.";
   return fallback;
 }

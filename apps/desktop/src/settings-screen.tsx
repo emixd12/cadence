@@ -16,6 +16,7 @@ import {
   SettingsGroup,
   SettingsSections,
 } from "@/components/settings/SettingsSections";
+import { timezonePlaceLabel } from "@/lib/ui/timezone-labels";
 import { SettingsPartHeading, useSettingsHeading } from "@/components/settings/settings-heading";
 import { categoriesSectionState, type SettingsSectionState } from "@/lib/ui/settings-sections";
 import { DesktopScreenFrame } from "./desktop-screen-frame";
@@ -63,13 +64,13 @@ export type SettingsScreenProps = Readonly<{
 export const SETTINGS_ACCOUNT_PURPOSE = "Optional. Link this Mac to your Cadence account to synchronize tracking data and connect sources.";
 
 const PERMISSION_LABELS: Record<NativeNotificationPermission, string> = {
-  checking: "Checking macOS permission",
-  notDetermined: "Not requested",
+  checking: "Checking…",
+  notDetermined: "Not asked yet",
   authorized: "Allowed",
-  provisional: "Provisional permission",
-  denied: "Denied",
-  unknown: "Not verified",
-  unavailable: "Unavailable",
+  provisional: "Allowed quietly",
+  denied: "Not allowed",
+  unknown: "Unknown",
+  unavailable: "Not available here",
 };
 
 export function SettingsScreen({
@@ -180,7 +181,7 @@ export function SettingsScreen({
           {updates}
           <SettingsPanel
             title="Setup guide"
-            description="Review the Behavior, notification, timezone, and optional import steps. The guide opens existing controls without changing tracking data."
+            description="Go through the Behavior, notification, timezone and import steps again. The guide only opens controls; it changes nothing by itself."
           >
             <button
               type="button"
@@ -223,7 +224,7 @@ function NativeNotifications({
       aria-busy={busy}
       className="bg-background py-4 first:pt-0 last:pb-0"
     >
-      <heading.Tag className="text-xl leading-tight">Native notifications</heading.Tag>
+      <heading.Tag className="text-xl leading-tight">Notifications</heading.Tag>
       <dl className="mt-4 grid gap-3 text-sm leading-6">
         <div>
           <dt className="text-foreground">macOS permission</dt>
@@ -239,20 +240,20 @@ function NativeNotifications({
           onClick={onRequestPermission}
           className="product-action product-action-primary mt-4 min-h-11 w-fit py-2 text-sm"
         >
-          Request notification permission
+          Allow notifications
         </button>
       ) : null}
       {permission === "denied" ? (
         <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">
-          Allow notifications for Cadence in macOS System Settings, then
-          refresh reminder coverage. Tracking still works without
-          notification permission.
+          Turn on notifications for Cadence in System Settings ›
+          Notifications, then choose Check reminders. Tracking works without
+          notifications.
         </p>
       ) : null}
       {permission === "unavailable" ? (
         <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">
-          Native notifications are unavailable in this runtime. Open the
-          installed macOS app to check permission.
+          Notifications are not available here. Open Cadence for Mac to
+          check them.
         </p>
       ) : null}
 
@@ -267,47 +268,47 @@ function NativeNotifications({
           ].join(" ")}
         >
           {busy
-            ? "Checking reminder coverage…"
+            ? "Checking reminders…"
             : status === "complete"
-              ? "All eligible reminders in the target window are scheduled."
+              ? "Every reminder for the next 30 days is scheduled."
               : status === "limited"
-                ? "Limited reminder coverage. The verified horizon is shorter than the target."
-                : "Reminder coverage is not verified."}
+                ? "macOS kept fewer reminders than Cadence scheduled. Reminders are set only through the date below."
+                : "Cadence has not confirmed which reminders are scheduled."}
         </p>
         <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm leading-6 sm:grid-cols-2">
           <CoverageValue
-            label="Verified through"
+            label="Scheduled through"
             value={verified ? coverage!.scheduledThrough : null}
             timezone={currentTimezone}
-            unavailable="Not verified"
+            unavailable="Not confirmed"
           />
           <CoverageValue
-            label="30-day target through"
+            label="30-day goal"
             value={coverage?.targetThrough ?? null}
             timezone={currentTimezone}
             unavailable="Not available yet"
           />
           <div>
-            <dt>Retained reminders</dt>
+            <dt>Reminders macOS kept</dt>
             <dd className="text-muted-readable">
-              {verified ? coverage!.scheduledCount : "Not verified"}
+              {verified ? coverage!.scheduledCount : "Not confirmed"}
             </dd>
           </div>
           <div>
-            <dt>Eligible reminders</dt>
+            <dt>Reminders to schedule</dt>
             <dd className="text-muted-readable">
               {coverage?.expectedCount ?? "Not available yet"}
             </dd>
           </div>
           <CoverageValue
-            label="Last readback check"
+            label="Last checked"
             value={coverage?.checkedAt ?? null}
             timezone={currentTimezone}
             unavailable="Not checked"
           />
           {status === "limited" ? (
             <CoverageValue
-              label="First unverified reminder"
+              label="First reminder not scheduled"
               value={coverage!.firstUnscheduledAt}
               timezone={currentTimezone}
               unavailable="Not available"
@@ -315,14 +316,13 @@ function NativeNotifications({
           ) : null}
         </dl>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">
-          Cadence targets 30 days and schedules the nearest eligible
-          reminders first. macOS may retain fewer requests. Later reminders
-          do not extend coverage past a missing reminder. Open Cadence to
-          refresh the verified horizon.
+          Cadence schedules up to 30 days of reminders, nearest first. macOS
+          may keep fewer. Scheduled through stops at the first reminder macOS
+          did not keep. Opening Cadence checks again.
         </p>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">
-          Times use {currentTimezone}. Scheduling does not prove delivery;
-          macOS controls notification presentation.
+          Times use {timezonePlaceLabel(currentTimezone)} time. macOS decides
+          whether and how each scheduled reminder shows.
         </p>
         <button
           type="button"
@@ -334,7 +334,7 @@ function NativeNotifications({
           onClick={onReconcile}
           className="product-action product-action-secondary mt-4 min-h-11 w-fit py-2 text-sm"
         >
-          {busy ? "Refreshing reminders…" : "Refresh reminder coverage"}
+          {busy ? "Checking reminders…" : "Check reminders"}
         </button>
       </div>
       {error ? (

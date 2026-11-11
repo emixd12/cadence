@@ -26,7 +26,7 @@ const UNAVAILABLE_ROW: SettingsSectionState = connectorUnavailableSectionState(n
 
 /** Desktop copy when a source needs a linked Cadence account or a broker-enabled build. */
 export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
-  return reason === "build" ? `${name} is unavailable in this build.` : `Link a Cadence account on this Mac to connect ${name}.`;
+  return reason === "build" ? `This version of Cadence cannot connect ${name}.` : `Link a Cadence account on this Mac to connect ${name}.`;
 }
 
 // Ticket 238. One sparse list of read-only sources. Every source connects,
@@ -36,10 +36,10 @@ export function connectorUnavailableReason(name: string, reason: "local" | "buil
 export function ConnectorLibrary({ sources, rows = false }: Readonly<{ sources: readonly ConnectorLibrarySource[]; rows?: boolean }>) {
   const ordered = SOURCE_ORDER.flatMap((id) => sources.filter((source) => source.id === id));
   const unavailable = (source: ConnectorLibrarySource) =>
-    <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? `${SOURCE_DETAILS[source.id].name} is unavailable in this build.`} />;
+    <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? `This version of Cadence cannot connect ${SOURCE_DETAILS[source.id].name}.`} />;
   return (
     <SettingsPanel title="Connected sources"
-      description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source connects and fails separately.">
+      description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source works on its own.">
       {rows ? <div className="grid min-w-0 divide-y divide-line border-t border-line">
         {ordered.map((source) => {
           const details = SOURCE_DETAILS[source.id];

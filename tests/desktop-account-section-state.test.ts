@@ -15,7 +15,7 @@ describe("desktopAccountSectionState (Ticket 302)", () => {
 
   it("shows a local Mac as not linked, or unavailable when sign-in is not configured", () => {
     expect(desktopAccountSectionState(input())).toEqual({ text: "Not linked", attention: false, on: false });
-    expect(desktopAccountSectionState(input({ configured: false }))).toEqual({ text: "Unavailable in this build", attention: false, on: false });
+    expect(desktopAccountSectionState(input({ configured: false }))).toEqual({ text: "Not in this version", attention: false, on: false });
     expect(desktopAccountSectionState(input({ account: { status: "waiting" } }))).toEqual({ text: "Waiting for sign-in", attention: false, on: false });
   });
 

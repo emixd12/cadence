@@ -188,7 +188,7 @@ name tags. Expanding reveals a searchable, scroll-bounded native checkbox list;
 selected entries retain per-calendar Timeline visibility. Escape closes the list
 and returns focus to its summary. Each display and selection change saves as it
 changes, then the calendar list reloads (Ticket 303); there is no Save button.
-Refresh Calendar reloads discovery even without saved selections.
+Refresh Google Calendar reloads discovery even without saved selections.
 Display names prefer Google's per-user override and retain stable calendar IDs.
 The panel shows a factual unavailable state when the deployment lacks Calendar
 OAuth configuration. Desktop shows an unavailable build state when it lacks a
@@ -1150,14 +1150,15 @@ drawers, with shared sections in the same group and order as web, and adds a
 fifth group, This Mac (index link "Mac"), after Account and data.
 
 - General: Local profile, then a Cadence account drawer (linked account,
-  synchronization, conflict review, disconnect), Timezone, Native notifications
-  with Reminder coverage where web shows Notifications, and Categories.
+  synchronization, conflict review, disconnect), Timezone, Notifications
+  (macOS notifications with Reminder coverage) where web shows Notifications, and
+  Categories.
 - Connections: Connected sources as closed rows. Connected apps stays web-only.
 - Planning: Travel and Daily Brief drawers.
 - Account and data: the Export entry; **Open Export** opens the Mac's Export screen.
 - This Mac: Local database, App updates and Setup guide.
 - On a local Mac each source that needs an account is a closed row whose state is
-  "Link a Cadence account" ("Unavailable in this build" when the build has no
+  "Link a Cadence account" ("Not in this version" when the build has no
   hosted broker). Daily Brief shows the same state. The Cadence account drawer
   shows "Not linked" and opens with **Link a Cadence account**.
 - The account drawer's state comes from `desktopAccountSectionState`
@@ -1182,7 +1183,7 @@ on web and on the Mac, which shares these panels:
   change was undone." Travel's main block, How you travel and Completion places are
   separate sections; the leave reminder switch and the Home marker report to the line
   of the section they sit in. Turning Travel estimates on carries the device location
-  outcome in the same line ("Saved. Location denied. …"), so nothing is announced
+  outcome in the same line ("Saved. Location access is off. …"), so nothing is announced
   twice.
 - A control stays enabled while it saves, so focus stays on it. Saves run one at a
   time from the latest saved revision; calendar choices made during a save collapse
@@ -1209,7 +1210,7 @@ disconnect without blocking local tracking.
 
 The public `/trust` page keeps durable product commitments separate from current verification evidence. It always shows all nine checks with text and symbols, exact UTC timestamps, scope, limits, and immutable evidence links. Passed requires a valid, fresh snapshot for the current source commit and both deployments. Feed failures show a validated cached copy as Stale, or Unavailable when no validated copy exists.
 
-Timezone detection should use the browser/OS timezone exposed by `Intl.DateTimeFormat().resolvedOptions().timeZone`; do not request geolocation or location permission. Settings should present one native select of IANA timezones whose selected value is the stored timezone; the select is the only "current timezone" display, with no separate stored or browser-detected value rows. When the detected browser timezone differs from the current selection, show a single quiet Detected line with an inline Use detected timezone action; when they match or detection is unavailable, show nothing. If the browser cannot enumerate timezones, fall back to manual IANA timezone entry. Before submit, Settings should state that saving a timezone updates the profile and active behavior schedules, then resyncs future unresolved occurrences while preserving past and resolved history.
+Timezone detection should use the browser/OS timezone exposed by `Intl.DateTimeFormat().resolvedOptions().timeZone`; do not request geolocation or location permission. Settings should present one native select of IANA timezones whose selected value is the stored timezone; the select is the only "current timezone" display, with no separate stored or browser-detected value rows. Each option reads as a place ("New York") grouped by region, and its value stays the IANA name (Ticket 309). When the detected browser timezone differs from the current selection, show a single quiet "Your device is set to {place}." line with an inline Use device timezone action; when they match or detection is unavailable, show nothing. If the browser cannot enumerate timezones, fall back to manual IANA timezone entry. Before submit, Settings should state that saving a timezone updates the profile and active behavior schedules, then resyncs future unresolved occurrences while preserving past and resolved history.
 
 Do not include a test notification button in v1.
 
@@ -1353,7 +1354,7 @@ with none, with its reason as the indented evidence line.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):
-"Include reminder delivery history" and "Include Notes on Not Completed occurrences".
+"Include reminder delivery history" and "Include Notes on Not Completed Occurrences".
 
 The workbench adds an Analysis scenario select, an Analysis lanes fieldset per
 configuration (lane checkboxes with their questions, "Allow one pattern tip", and

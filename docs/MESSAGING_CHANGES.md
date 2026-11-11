@@ -1128,6 +1128,87 @@ cite has not changed.
 - **Update needed:** rewrite those user guide steps for the groups, the links line, the
   Delete account link and auto-save. Review each rewritten in-app sentence from Ticket 309
   that states what Cadence does with data.
+- **Ticket 309 additions (November 10, 2026).** Ticket 309 rewrote Settings wording but left
+  every sentence that states what Cadence sends, stores or shares. These kept sentences need
+  plainer wording in Ticket 246. The before-and-after list is
+  `docs/qa/2026-11-10-settings-wording.md`.
+  - `components/settings/ConnectorLibrary.tsx`, Connected sources: "Optional read-only
+    context from other services. Sources never change Behaviors, Occurrences, statuses,
+    Notes, or tracked time." "Context" is vague; name what shows (events, workout times).
+  - `components/settings/GoogleCalendarPanel.tsx`: the description "Read-only context from
+    the Google account used for Cadence. …"; the connected line "Cadence reads selected
+    calendars only. Disconnecting removes this Calendar connection …"; both disconnect
+    results, including "Google could not confirm grant revocation; remove Cadence in Google
+    account permissions if needed"; and the wrong-account paragraph ("Removing Cadence
+    Calendar access there affects the entire Calendar project …"). "Grant", "revocation"
+    and "Calendar project" are jargon.
+  - `components/settings/OutlookCalendarPanel.tsx`: the description "Read-only calendar
+    context from a personal, work, or school Microsoft account. …"; the permission
+    disclosure "Microsoft asks you to allow reading your calendars, which covers event
+    details. …"; the connected line "… Disconnecting deletes Cadence's saved Microsoft
+    access; Microsoft keeps the permission until you remove it there."; the disconnect
+    result "Cadence deleted its saved Microsoft access."
+  - `components/settings/IcloudCalendarPanel.tsx`: the description "Read-only calendar
+    context from your Apple Account. …"; `ICLOUD_CUSTODY_COPY`, which says twice that Apple
+    does not limit the password to Calendar; the connected line "… Disconnecting deletes
+    Cadence's saved copy; Apple keeps the app-specific password active …"; the disconnect
+    result "Cadence deleted its saved Apple Account email and app-specific password."
+  - `components/settings/HevyPanel.tsx`: the description "Provider responses can contain
+    exercises, titles, notes, sets and weights; Cadence discards these details." Ticket 309
+    names "provider responses" as jargon; a plainer form is "Hevy also sends exercises,
+    titles, notes, sets and weights. Cadence does not keep them." The intake sentence
+    "Cadence stores it encrypted on its server, never on this device, and scans at most 500
+    workouts across your full history, even for today." is one long sentence. The connected
+    line "Disconnecting deletes Cadence's saved key. …" and the disconnect result "Cadence
+    deleted its saved API key."
+  - `lib/ui/connectors.ts`, `CONNECTOR_REVOCATION_COPY`: the Microsoft, Hevy and Apple
+    removal steps, also shown in Delete account.
+  - `components/settings/ConnectedAppsPanel.tsx`: "AI clients with access to this Cadence
+    account. Disconnect stops their access immediately." The section is "Connected apps"
+    and each item says "Verified client" or "Unverified client", as the consent screen
+    (`components/oauth/ConsentForm.tsx`) does. Choose one name, app or client, in Settings
+    and consent text together.
+  - `components/settings/TravelSettingsPanel.tsx`: the Travel estimates disclosure ("While
+    this is on, Cadence sends trip start and end points …"); "Cadence saves only the places
+    you enter and the travel habits you tell it. Device positions and route results stay
+    temporary …"; "A current position is available. Cadence did not save it." The Home help
+    text and the Home lookup message stay with P-036.
+  - `components/briefing/DailyBriefSettingsPanel.tsx`: each source's "Sends …" line; the
+    coverage line "Only timing is sent, never event titles, …"; the reminder history and
+    Notes disclosures; the closing paragraph "Cadence sends today's Behavior schedule and
+    completion history, including findings calculated from it, to OpenAI. …"; the panel
+    description "Cadence can prepare one read-only briefing …", which repeats the drawer's
+    purpose line; and the Mac line "Hosted context does not include unsynchronized or
+    local-only desktop data." ("hosted context" is jargon).
+  - `components/settings/AccountDeletionPanel.tsx`: "Account deletion removes the
+    signed-in Cadence account and its hosted behavior records. This cannot be undone."
+    ("hosted behavior records" is jargon) and "Deletion also removes Cadence's saved access
+    for connected sources. …"
+  - `apps/desktop/src/settings-screen.tsx`, Local profile: "Tracking data uses this Mac's
+    SQLite database as an offline working copy. Account changes synchronize while Cadence
+    runs with connectivity. Native reminders stay on this Mac, and desktop email delivery
+    remains inactive." and "Tracking data stays on this Mac. No cloud account or email
+    delivery is connected." `SETTINGS_ACCOUNT_PURPOSE`: "Optional. Link this Mac to your
+    Cadence account to synchronize tracking data and connect sources." "SQLite", "working
+    copy" and "connectivity" are jargon.
+  - `apps/desktop/src/account/account-panel.tsx`: "SQLite is this Mac's offline working
+    copy. Account changes synchronize while Cadence runs with connectivity."; "Your local
+    data has not been uploaded or replaced. …"; "Disconnecting does not delete hosted
+    account data."
+  - `apps/desktop/src/local-database-controls.tsx`: "Cadence stores the live database in its
+    macOS Application Support folder."
+  - User guide text that Ticket 309's renamed labels make stale:
+    `docs/user-guide/reminders-and-timezone.md` ("**Detected _timezone_**", "**Use detected
+    timezone**"; timezone options now read as places, such as "New York"),
+    `docs/user-guide/timeline.md` ("**Show Calendar context on Timeline**", "**Show
+    all-day events**", "**Refresh Calendar**", and "choose calendars in Connectors"),
+    `docs/user-guide/desktop-local.md` ("**Request notification permission**", "**Refresh
+    reminder coverage**", "**Apply conflict decisions**", "**Discard drafts and restart**").
+    The new labels are "Your device is set to …", **Use device timezone**, **Show Google
+    Calendar events on Timeline**, **Show all-day Google Calendar events**, **Refresh Google
+    Calendar**, Connected sources, **Allow notifications**, **Check reminders**, **Apply
+    choices** and **Discard changes and restart**. The Mac's section is now
+    **Notifications**, not Native notifications.
 - **Status:** logged.
 
 ## P-034: Note shortcuts on for everyone

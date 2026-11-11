@@ -83,7 +83,7 @@ function CurrentSettings({ panels }: Readonly<{ panels: SettingsFixturePanels }>
     <SettingsPanelGrid>
       {panels.profile}{panels.timezone}{panels.notifications}
       <SettingsPanel title="Connected sources"
-        description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source connects and fails separately.">
+        description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source works on its own.">
         <ul className="grid min-w-0 divide-y divide-line border-t border-line">
           {[panels.google, panels.outlook, panels.icloud, panels.hevy].map((panel, index) => <li key={index} className="min-w-0 pt-4 last:pb-0">{panel}</li>)}
         </ul>

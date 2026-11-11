@@ -41,10 +41,10 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const savedPreferences = useRef<CalendarPreferences | null>(null);
   const autosave = useAutosave((next: CalendarPreferences) => coordinator.savePreferences(next), {
     saved: (view, latest) => { savedPreferences.current = view.preferences; setConnection(view); if (latest) setPreferences(view.preferences); },
-    failed: () => { setPreferences(savedPreferences.current); setMessage(settingsSaveFailed("Calendar settings could not save. Try again.")); },
+    failed: () => { setPreferences(savedPreferences.current); setMessage(settingsSaveFailed("Google Calendar settings could not save. Try again.")); },
     settled: async () => {
       try { setCalendars(await coordinator.listCalendars()); setMessage(SETTINGS_SAVED); }
-      catch { setMessage(`${SETTINGS_SAVED}. The calendar list could not reload; try Refresh Calendar.`); }
+      catch { setMessage(`${SETTINGS_SAVED}. The calendar list did not reload. Try Refresh Google Calendar.`); }
     },
   });
   const cancelAutosave = autosave.cancel;
@@ -61,16 +61,16 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
       savedPreferences.current = view.preferences;
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
-        catch { if (active) setMessage("Calendar list could not load."); }
+        catch { if (active) setMessage("Your Google calendars could not load. Try Refresh Google Calendar."); }
       } else setCalendars([]);
-    }).catch(() => { if (active) { setLoadFailed(true); setMessage("Calendar status is unavailable."); } });
+    }).catch(() => { if (active) { setLoadFailed(true); setMessage("Cadence could not check Google Calendar. Reload Settings to try again."); } });
     return () => { active = false; };
   }, [callbackMessage, cancelAutosave, coordinator, refreshVersion]);
 
   const connect = async () => {
     setPending("connect"); setMessage(null);
-    try { await coordinator.beginConnect(); setMessage("Continue in the browser to connect Calendar."); }
-    catch { setMessage("Calendar connection could not start."); }
+    try { await coordinator.beginConnect(); setMessage("Continue in your browser to connect Google Calendar."); }
+    catch { setMessage("Google Calendar could not start connecting. Try again."); }
     finally { setPending(null); }
   };
   const change = (next: CalendarPreferences) => {
@@ -82,12 +82,12 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
     try {
       setCalendars(await coordinator.listCalendars());
       if (!connection?.preferences.selectedCalendarIds.length) {
-        setMessage("Calendar list refreshed. Select calendars to show events.");
+        setMessage("Calendar list updated. Choose calendars to show their events.");
         return;
       }
       const snapshot = await coordinator.refreshEvents(refreshRange, { force: true });
-      setMessage(snapshot.events.length ? `Calendar refreshed. ${snapshot.freshness.label}.` : `No Calendar events in this range. ${snapshot.freshness.label}.`);
-    } catch { setMessage("Calendar refresh did not finish. Try again; saved settings and existing timeline context are unchanged."); }
+      setMessage(snapshot.events.length ? `Google Calendar refreshed. ${snapshot.freshness.label}.` : `No Google Calendar events to show. ${snapshot.freshness.label}.`);
+    } catch { setMessage("Google Calendar did not refresh. Try again. Your settings and Timeline are unchanged."); }
     finally { setPending(null); }
   };
   const disconnect = async () => {
@@ -99,7 +99,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
       setMessage(result.revocationFailed
         ? "Calendar disconnected here. Google could not confirm grant revocation; remove Cadence in Google account permissions if needed."
         : "Calendar disconnected here. Other devices stop refreshing after they receive this account change.");
-    } catch { setMessage("Calendar disconnect could not finish."); }
+    } catch { setMessage("Google Calendar did not disconnect. Try again."); }
     finally { setPending(null); }
   };
 
@@ -120,19 +120,19 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
           {" "}Removing Cadence Calendar access there affects the entire Calendar project and can disconnect other Cadence accounts or devices using that Google account.
           {" "}Cadence does not revoke a wrong-account grant automatically.
         </p> : null}
-        {status === "not_configured" ? <p className="text-muted-readable">Calendar connection is not configured for this Cadence deployment.</p> : null}
+        {status === "not_configured" ? <p className="text-muted-readable">This Cadence server cannot connect Google Calendar.</p> : null}
         {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting removes this Calendar connection for this Cadence account. Other devices stop refreshing after they receive this account change.</p> : null}
-        {status !== "connected" && status !== "not_configured" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "connect" ? "Opening Calendar connection…" : connectLabel}</button> : null}
+        {status !== "connected" && status !== "not_configured" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "connect" ? "Opening Google Calendar…" : connectLabel}</button> : null}
         {canManage ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
-            <legend className="font-bold text-foreground">Calendar display</legend>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.visible} onChange={(event) => change({ ...preferences, visible: event.target.checked })} />Show Calendar context on Timeline</label>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.showAllDay} onChange={(event) => change({ ...preferences, showAllDay: event.target.checked })} />Show all-day events</label>
+            <legend className="font-bold text-foreground">Timeline display</legend>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.visible} onChange={(event) => change({ ...preferences, visible: event.target.checked })} />Show Google Calendar events on Timeline</label>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.showAllDay} onChange={(event) => change({ ...preferences, showAllDay: event.target.checked })} />Show all-day Google Calendar events</label>
           </fieldset>
           <CalendarSelector calendars={calendars} preferences={preferences} onChange={change} disabled={pending !== null} />
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
-            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Calendar…" : "Refresh Calendar"}</button>
-            <SettingsDisconnect label="Disconnect Google Calendar" question="Disconnect Google Calendar?" pendingLabel="Disconnecting Calendar…"
+            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Google Calendar…" : "Refresh Google Calendar"}</button>
+            <SettingsDisconnect label="Disconnect Google Calendar" question="Disconnect Google Calendar?" pendingLabel="Disconnecting Google Calendar…"
               pending={pending === "disconnect"} disabled={busy} onConfirm={() => { void disconnect(); }} />
           </div>
         </> : null}
@@ -144,7 +144,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
 /** Shared calendar choice field; Outlook reuses it with its own selection keys mapped in. */
 export type CalendarChoiceEntry = Pick<CalendarListEntry, "id" | "name" | "primary">;
 
-export function CalendarSelector({ calendars, preferences, onChange, disabled, refreshLabel = "Refresh Calendar" }: Readonly<{
+export function CalendarSelector({ calendars, preferences, onChange, disabled, refreshLabel = "Refresh Google Calendar" }: Readonly<{
   calendars: readonly CalendarChoiceEntry[] | null;
   refreshLabel?: string;
   preferences: CalendarPreferences;
@@ -177,7 +177,7 @@ export function CalendarSelector({ calendars, preferences, onChange, disabled, r
         <input id={searchId} type="search" value={query} onChange={(event) => setQuery(event.target.value)} className="min-h-11 min-w-0 w-full border border-line bg-background px-3 py-2" />
         <div className="max-h-64 overflow-y-auto overscroll-contain divide-y divide-line">
           {calendars === null ? <p className="text-muted-readable">Calendar list is not loaded. Try {refreshLabel}.</p>
-            : calendars.length === 0 ? <p className="text-muted-readable">No readable calendars are available.</p>
+            : calendars.length === 0 ? <p className="text-muted-readable">This account has no calendars to show.</p>
             : matches.length === 0 ? <p className="text-muted-readable">No calendars match your search.</p>
             : matches.map((calendar) => <CalendarChoice key={calendar.id} calendar={calendar} preferences={preferences} onChange={onChange} />)}
         </div>
@@ -205,10 +205,10 @@ function CalendarChoice({ calendar, preferences, onChange }: Readonly<{
 }
 
 function statusLabel(status: CalendarConnectionView["status"] | "loading"): string {
-  if (status === "loading") return "Loading Calendar connection.";
+  if (status === "loading") return "Checking Google Calendar…";
   if (status === "connected") return "Google Calendar connected.";
   if (status === "reconnect_required") return "Google Calendar needs reconnection.";
   if (status === "disconnected") return "Google Calendar is not connected.";
-  if (status === "unavailable") return "Calendar is unavailable.";
-  return "Calendar connection is not configured.";
+  if (status === "unavailable") return "Google Calendar is not available right now.";
+  return "This Cadence server cannot connect Google Calendar.";
 }

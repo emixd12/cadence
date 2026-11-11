@@ -6,12 +6,12 @@ import { shouldRetryAccountSync } from "../apps/desktop/src/sync-engine";
 
 describe("AccountSyncPanel", () => {
   it.each([
-    [{ state: "offline" } as const, "Offline. Local changes will synchronize when Cadence reconnects."],
-    [{ state: "syncing" } as const, "Synchronizing account data"],
+    [{ state: "offline" } as const, "Offline. Changes on this Mac sync when Cadence is back online."],
+    [{ state: "syncing" } as const, "Syncing…"],
     [{ state: "current", completedAt: "2026-09-01T12:00:00Z" } as const, "Account data is current."],
     [{ state: "failed", message: "Try again." } as const, "Try again."],
-    [{ state: "conflict", count: 2 } as const, "2 synchronization conflicts require review."],
-    [{ state: "revoked" } as const, "expired or was revoked"],
+    [{ state: "conflict", count: 2 } as const, "2 sync conflicts to review."],
+    [{ state: "revoked" } as const, "signed out of your Cadence account"],
   ])("shows the %s state", (status, message) => {
     const html = renderToStaticMarkup(<AccountSyncPanel status={status} busy={false} onSync={() => undefined} onReconnect={() => undefined} />);
     expect(html).toMatch(new RegExp(message));
