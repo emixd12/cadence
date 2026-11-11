@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SettingsSectionHeading } from "@/components/settings/settings-heading";
 
 import {
   getBrowserPushSupport,
@@ -137,7 +138,7 @@ export function NotificationPermissionPanel({
       id="notifications"
       className="scroll-mt-20 bg-background py-4 first:pt-0 last:pb-0"
     >
-      <h2 className="text-xl leading-tight">Notifications</h2>
+      <SettingsSectionHeading>Notifications</SettingsSectionHeading>
       <dl className="mt-4 grid gap-3 text-sm leading-6 text-muted-readable">
         <div>
           <dt className="font-bold text-foreground">Browser notifications</dt>

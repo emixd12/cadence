@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from "react";
 import { GripVertical } from "lucide-react";
 import { DesktopDraftGuard, DesktopFormDraftGuard } from "@/lib/desktop-draft";
+import { useSettingsHeading, type SettingsHeadingLevel } from "@/components/settings/settings-heading";
 import { categoryAssignmentSnapshot, type CategoryAssignment, categorySnapshot, CATEGORY_NAME_LIMIT, CATEGORY_DESCRIPTION_LIMIT,
   type ManagedCategory, type CategoryAction } from "@cadence/core/services/category.service";
 
@@ -10,18 +11,27 @@ import { categoryAssignmentSnapshot, type CategoryAssignment, categorySnapshot, 
 type OrderDraft = { base: string; ids: readonly string[] };
 type Drag = { id: string; pointerId: number; from: number };
 
+export const CATEGORY_PANEL_PURPOSE = "Organize Behaviors with your own categories. Descriptions provide context in forms and exports.";
+
+/** The button that opens the category list (Ticket 304). */
 export function drawerLabel(count: number) {
   if (count === 0) return "Add a category";
   return count === 1 ? "Edit 1 category" : `Edit ${count} categories`;
 }
 
-export function CategoryPanel({ categories, assignments, action, headingLevel = 2 }: Readonly<{
+/**
+ * Ticket 304: a closed list with drag reordering. Standalone, the panel shows its title,
+ * purpose and its own open button. Inside a Settings drawer that already shows the title
+ * (Ticket 301), it renders only the list.
+ */
+export function CategoryPanel({ categories, assignments, action, headingLevel }: Readonly<{
   categories: ManagedCategory[];
   assignments: readonly CategoryAssignment[];
   action: CategoryAction;
-  headingLevel?: 2 | 3;
+  /** Omit to follow the surrounding group or drawer; `null` when a drawer shows the title. */
+  headingLevel?: SettingsHeadingLevel | null;
 }>) {
-  const Heading = headingLevel === 3 ? "h3" : "h2";
+  const heading = useSettingsHeading(headingLevel);
   const [editor, setEditor] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState({ status: "idle", message: "" });
@@ -103,16 +113,7 @@ export function CategoryPanel({ categories, assignments, action, headingLevel = 
   }
 
   const status = pending && !announcement ? "Saving categories…" : result.message || announcement;
-  return <section id="categories" data-settings-drawer className="bg-background py-4" aria-labelledby="categories-title" aria-busy={pending}>
-    <DesktopDraftGuard pending={pending} />
-    <Heading id="categories-title" className="text-xl leading-tight">Categories</Heading>
-    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Organize Behaviors with your own categories. Descriptions provide context in forms and exports.</p>
-    <details data-settings-row className="mt-1">
-      <summary className="product-disclosure-trigger flex min-h-11 w-fit items-center text-sm">
-        <span aria-hidden="true" className="product-disclosure-indicator" />
-        <span className="product-disclosure-trigger-label">{drawerLabel(categories.length)}</span>
-      </summary>
-      <div className="pt-2">
+  const content = <>
         {categories.length > 1 ? <p id="category-reorder-hint" className="text-sm leading-6 text-muted-readable">Drag a handle to reorder, or focus it and press the arrow keys.</p> : null}
         <p role={result.status === "error" ? "alert" : "status"} className="min-h-6 text-sm leading-6">{status}</p>
         {categories.length > 0 ? <ul ref={list} className="mt-2 divide-y divide-line border-y border-line">
@@ -137,7 +138,23 @@ export function CategoryPanel({ categories, assignments, action, headingLevel = 
         </ul> : <p className="my-4 text-sm text-muted-readable">No categories yet. Behaviors can also use No category.</p>}
         {editor === "new" ? <CategoryEditor categories={categories} assignments={[]} pending={pending} submit={submit} cancel={() => setEditor(null)} /> :
           <button type="button" className="product-action product-action-primary mt-4 min-h-11 text-sm" disabled={pending || editor !== null || drag !== null} onClick={() => setEditor("new")}>Add category</button>}
-      </div>
+  </>;
+  if (!heading.show) {
+    return <section id="categories" aria-label="Categories" aria-busy={pending}>
+      <DesktopDraftGuard pending={pending} />
+      {content}
+    </section>;
+  }
+  return <section id="categories" data-settings-drawer className="bg-background py-4" aria-labelledby="categories-title" aria-busy={pending}>
+    <DesktopDraftGuard pending={pending} />
+    <heading.Tag id="categories-title" className="text-xl leading-tight">Categories</heading.Tag>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">{CATEGORY_PANEL_PURPOSE}</p>
+    <details data-settings-row className="mt-1">
+      <summary className="product-disclosure-trigger flex min-h-11 w-fit items-center text-sm">
+        <span aria-hidden="true" className="product-disclosure-indicator" />
+        <span className="product-disclosure-trigger-label">{drawerLabel(categories.length)}</span>
+      </summary>
+      <div className="pt-2">{content}</div>
     </details>
   </section>;
 }

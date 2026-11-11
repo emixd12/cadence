@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { SettingsRow, SettingsSourceIcon } from "@/components/settings/SettingsSections";
 import type { ConnectorProvider } from "@/lib/types/connectors";
+import type { SettingsSectionState } from "@/lib/ui/settings-sections";
 
 export type ConnectorLibrarySourceId = "google_calendar" | ConnectorProvider;
 
@@ -13,12 +15,14 @@ export type ConnectorLibrarySource = Readonly<{
 }>;
 
 const SOURCE_ORDER: readonly ConnectorLibrarySourceId[] = ["google_calendar", "outlook_calendar", "icloud_calendar", "hevy"];
-const SOURCE_DETAILS: Readonly<Record<ConnectorLibrarySourceId, Readonly<{ name: string; kind: string }>>> = {
-  google_calendar: { name: "Google Calendar", kind: "Calendar" },
-  outlook_calendar: { name: "Outlook Calendar", kind: "Calendar" },
-  icloud_calendar: { name: "iCloud Calendar", kind: "Calendar" },
-  hevy: { name: "Hevy", kind: "Recorded activity" },
+/** Each icon is the provider's own asset, bundled unchanged (`public/brand/connector-icons-source.md`). */
+const SOURCE_DETAILS: Readonly<Record<ConnectorLibrarySourceId, Readonly<{ name: string; kind: string; icon: string }>>> = {
+  google_calendar: { name: "Google Calendar", kind: "Calendar", icon: "/brand/google-calendar.svg" },
+  outlook_calendar: { name: "Outlook Calendar", kind: "Calendar", icon: "/brand/outlook-calendar.svg" },
+  icloud_calendar: { name: "iCloud Calendar", kind: "Calendar", icon: "/brand/icloud-calendar.png" },
+  hevy: { name: "Hevy", kind: "Recorded activity", icon: "/brand/hevy.png" },
 };
+const UNAVAILABLE_ROW: SettingsSectionState = { text: "Unavailable", attention: false, on: false };
 
 /** Desktop copy when a source needs a linked Cadence account or a broker-enabled build. */
 export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
@@ -27,16 +31,26 @@ export function connectorUnavailableReason(name: string, reason: "local" | "buil
 
 // Ticket 238. One sparse list of read-only sources. Every source connects,
 // refreshes, fails, and disconnects on its own; tracking never depends on them.
-export function ConnectorLibrary({ sources }: Readonly<{ sources: readonly ConnectorLibrarySource[] }>) {
+// Ticket 301: `rows` shows each source as one closed row with its provider icon,
+// name, kind and state; the source panel reports the state and opens on action.
+export function ConnectorLibrary({ sources, rows = false }: Readonly<{ sources: readonly ConnectorLibrarySource[]; rows?: boolean }>) {
   const ordered = SOURCE_ORDER.flatMap((id) => sources.filter((source) => source.id === id));
+  const unavailable = (source: ConnectorLibrarySource) =>
+    <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? `${SOURCE_DETAILS[source.id].name} is unavailable in this build.`} />;
   return (
     <SettingsPanel title="Connected sources"
       description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source connects and fails separately.">
-      <ul className="grid min-w-0 divide-y divide-line border-t border-line">
+      {rows ? <div className="grid min-w-0 divide-y divide-line border-t border-line">
+        {ordered.map((source) => {
+          const details = SOURCE_DETAILS[source.id];
+          return <SettingsRow key={source.id} title={details.name} kind={details.kind} icon={<SettingsSourceIcon src={details.icon} />}
+            state={source.content ? undefined : UNAVAILABLE_ROW}>{source.content ?? unavailable(source)}</SettingsRow>;
+        })}
+      </div> : <ul className="grid min-w-0 divide-y divide-line border-t border-line">
         {ordered.map((source) => <li key={source.id} className="min-w-0 pt-4 last:pb-0">
-          {source.content ?? <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? `${SOURCE_DETAILS[source.id].name} is unavailable in this build.`} />}
+          {source.content ?? unavailable(source)}
         </li>)}
-      </ul>
+      </ul>}
     </SettingsPanel>
   );
 }

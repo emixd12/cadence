@@ -696,6 +696,17 @@
       ]
     },
     {
+      "path": "components/settings/SettingsSections.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-SETTINGS-005",
+        "INT-SETTINGS-015",
+        "INT-SETTINGS-016",
+        "INT-SETTINGS-017"
+      ]
+    },
+    {
       "path": "components/settings/SettingsPanels.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 1,
@@ -1059,9 +1070,9 @@
     {
       "path": "app/design-system/SettingsRegroupBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 34,
+      "interaction_marker_count": 28,
       "interaction_ids": [],
-      "reason": "Development-only Settings regroup proposal bench (usability evaluation, 2026-11-09 and 2026-11-10): layout, account-state and category-option toggles, a four-link section index, native disclosure rows around the existing Settings panels on synthetic clients, and non-saving sketches of Categories and Daily Brief controls. No provider call, account access or product write; /settings is unchanged."
+      "reason": "Development-only Settings regroup bench (usability evaluation, 2026-11-09 and 2026-11-10): layout and account-state toggles over the real Ticket 301 Settings groups, index, rows and drawers on synthetic clients, plus non-saving sketches of the Categories list (Ticket 304) and Daily Brief controls (Tickets 306-307). No provider call, account access or product write."
     },
     {
       "path": "app/design-system/TravelBench.tsx",
@@ -8996,7 +9007,7 @@
           "result": "Navigate to /trust."
         }
       ],
-      "availability": "Always available in Settings.",
+      "availability": "Always available as one line of links at the end of Settings (Ticket 301).",
       "success_result": "Opens the selected public account-information page.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -9005,23 +9016,27 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsPageEnd",
         "components/settings/SettingsPanels.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/settings-sections.dom.test.tsx",
           "tests/settings-interactions-ui.test.tsx"
         ],
-        "notes": "The Settings UI test renders the Trust, Privacy, and Terms destinations."
+        "notes": "The Settings sections DOM test renders the end-of-page Privacy, Terms and Trust links; the interaction test still renders the bench-only TrustAndLegalPanel."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsPageEnd",
             "components/settings/SettingsPanels.tsx"
           ],
           "evidence": [
+            "tests/settings-sections.dom.test.tsx",
             "tests/settings-interactions-ui.test.tsx"
           ]
         },
@@ -9071,7 +9086,7 @@
           "control": "Open Export"
         }
       ],
-      "availability": "Always available in Delete account guidance.",
+      "availability": "Always available in Delete account guidance. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Navigates to /export.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -9143,7 +9158,7 @@
           "control": "I downloaded an export or do not need one checkbox"
         }
       ],
-      "availability": "Always available in the Delete account form.",
+      "availability": "Always available in the Delete account form. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Satisfies one required client and server deletion gate; it performs no deletion by itself.",
       "failure_result": "Delete account remains disabled or server submission is rejected when absent.",
       "effects": [
@@ -9216,7 +9231,7 @@
           "control": "Delete account confirmation field"
         }
       ],
-      "availability": "Always available in the Delete account form.",
+      "availability": "Always available in the Delete account form. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Satisfies the typed gate when the trimmed value exactly matches the required label.",
       "failure_result": "Delete account remains disabled or server submission is rejected for a mismatch.",
       "effects": [
@@ -9291,7 +9306,7 @@
           "control": "Delete account"
         }
       ],
-      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion.",
+      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation and global sign-out to clear the current browser session and redirects to the public login confirmation.",
       "failure_result": "A validation, service-role verification, or user-deletion failure shows a specific recoverable error and preserves both account and session. A post-deletion sign-out error cannot restore the deleted account and does not block the success redirect.",
       "effects": [
@@ -11716,6 +11731,277 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-015",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "name": "Jump to a Settings group from the section index",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#open-trust-privacy-or-terms-from-settings"
+        ]
+      },
+      "routes": [
+        "/settings#settings-general",
+        "/settings#settings-connections",
+        "/settings#settings-planning",
+        "/settings#settings-account"
+      ],
+      "journeys": [
+        "J21"
+      ],
+      "intent": "Move to General, Connections, Planning, or Account and data without scrolling the whole page.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "General"
+        },
+        {
+          "kind": "activate",
+          "control": "Connections"
+        },
+        {
+          "kind": "activate",
+          "control": "Planning"
+        },
+        {
+          "kind": "activate",
+          "control": "Account"
+        }
+      ],
+      "availability": "Always available; the index stays in view below the app header while Settings scrolls.",
+      "success_result": "The group title lands below the app header and index.",
+      "failure_result": "Normal in-page navigation applies.",
+      "effects": [
+        "navigation",
+        "focus_navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsSectionIndex",
+        "components/settings/SettingsSections.tsx#useOpenAnchorTarget"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/settings-sections.dom.test.tsx"
+        ],
+        "notes": "Renders the four index links in order and checks anchor placement handling."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsSectionIndex"
+          ],
+          "evidence": [
+            "tests/settings-sections.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-016",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "name": "Open or close a Settings source row or drawer",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#outlook-icloud-hevy-and-daily-brief-data"
+        ]
+      },
+      "routes": [
+        "/settings#connector-google_calendar",
+        "/settings#connector-outlook_calendar",
+        "/settings#connector-icloud_calendar",
+        "/settings#connector-hevy",
+        "/settings#travel",
+        "/settings#categories",
+        "/settings#delete-account"
+      ],
+      "journeys": [
+        "J20",
+        "J21"
+      ],
+      "intent": "See a section's state without opening it, then open its existing controls: a connected source, Travel, Daily Brief, Categories, or Delete account.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Source row summary (Google Calendar, Outlook Calendar, iCloud Calendar, Hevy)"
+        },
+        {
+          "kind": "activate",
+          "control": "Set up Travel / Travel settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Set up Daily Brief / Daily Brief settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Edit categories"
+        },
+        {
+          "kind": "activate",
+          "control": "Delete account"
+        },
+        {
+          "kind": "activate",
+          "control": "Link to an anchor inside a row or drawer (opens it on arrival)"
+        }
+      ],
+      "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, or Status unavailable after a failed read) opens by itself once.",
+      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On).",
+      "failure_result": "A failed status read shows Status unavailable and opens the panel, which shows its own error.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsRow",
+        "components/settings/SettingsSections.tsx#SettingsDrawer",
+        "components/settings/SettingsSections.tsx#SettingsPageEnd",
+        "components/settings/SettingsSections.tsx#useOpenAnchorTarget",
+        "components/settings/ConnectorLibrary.tsx#ConnectorLibrary",
+        "lib/ui/settings-sections.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/settings-sections.dom.test.tsx",
+          "tests/settings-sections.test.ts"
+        ],
+        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsRow",
+            "components/settings/SettingsSections.tsx#SettingsDrawer",
+            "components/settings/ConnectorLibrary.tsx#ConnectorLibrary"
+          ],
+          "evidence": [
+            "tests/settings-sections.dom.test.tsx",
+            "tests/settings-sections.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-017",
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "export_import"
+      ],
+      "name": "Open Export from Account and data",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/data-portability.md#choose-export-options"
+        ]
+      },
+      "routes": [
+        "/settings#settings-account",
+        "/export"
+      ],
+      "journeys": [
+        "J15"
+      ],
+      "intent": "Go from Settings to Export to download history as JSONL, CSV, full JSON, or a BehaviorLog bundle.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Open Export"
+        }
+      ],
+      "availability": "Always available in the Account and data group.",
+      "success_result": "Navigate to /export.",
+      "failure_result": "Normal navigation failure behavior applies.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsExportEntry"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/settings-sections.dom.test.tsx"
+        ],
+        "notes": "Renders the Export entry text and its /export link."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsExportEntry"
+          ],
+          "evidence": [
+            "tests/settings-sections.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-302-mac-settings-adopts-the-groups"
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
         }
       }
     },

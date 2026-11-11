@@ -3,6 +3,8 @@
 import { useEffect, useId, useState } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { googleCalendarSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type {
   CalendarConnectionView,
   CalendarListEntry,
@@ -30,19 +32,23 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const [preferences, setPreferences] = useState<CalendarPreferences | null>(null);
   const [pending, setPending] = useState<"connect" | "save" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(() => callbackMessage ?? null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Ticket 301: the Timeline connection's row shows this state; the Daily Brief grant is not a row.
+  useReportSettingsSection(agent ? null : googleCalendarSectionState(settingsSectionLoad(connection, loadFailed)));
 
   useEffect(() => {
     let active = true;
     void coordinator.getConnection().then(async (view) => {
       if (!active) return;
       setMessage(callbackMessage ?? null);
+      setLoadFailed(false);
       setConnection(view);
       setPreferences(view.preferences);
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
         catch { if (active) setMessage("Calendar list could not load."); }
       } else setCalendars([]);
-    }).catch(() => active && setMessage("Calendar status is unavailable."));
+    }).catch(() => { if (active) { setLoadFailed(true); setMessage("Calendar status is unavailable."); } });
     return () => { active = false; };
   }, [callbackMessage, coordinator, refreshVersion]);
 

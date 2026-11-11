@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
+import { useReportSettingsSection } from "./SettingsSections";
+import { settingsSectionLoad, travelSectionState } from "@/lib/ui/settings-sections";
 import { CompletionPlacesSection, PlaceMarkerControl } from "@/components/travel/PlaceLabels";
 import { readBrowserForegroundLocation, readBrowserLocationPermission, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
@@ -53,6 +55,9 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   const [permission, setPermission] = useState<DeviceLocationPermission | null>(null);
   const sequence = useRef(0);
   const [locationReason, setLocationReason] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Ticket 301: the Travel drawer shows this state while closed.
+  useReportSettingsSection(travelSectionState(settingsSectionLoad(settings, loadFailed)));
   const locationSequence = useRef(0);
   const permissionSequence = useRef(0);
   const refreshPermission = () => {
@@ -74,8 +79,8 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   useEffect(() => {
     const current = ++sequence.current;
     void client.load().then((value) => {
-      if (current === sequence.current) adopt(value);
-    }).catch(() => { if (current === sequence.current) setMessage("Travel settings could not load."); });
+      if (current === sequence.current) { setLoadFailed(false); adopt(value); }
+    }).catch(() => { if (current === sequence.current) { setLoadFailed(true); setMessage("Travel settings could not load."); } });
     // The cleanup deliberately invalidates every pending load/save/location result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => { sequence.current++; };

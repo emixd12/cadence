@@ -383,6 +383,53 @@
       "notes": ""
     },
     {
+      "id": "module.settings-sections",
+      "name": "SettingsSections",
+      "kind": "module",
+      "source": "components/settings/SettingsSections.tsx",
+      "exportName": "SettingsSections",
+      "usageNames": [
+        "SettingsSections",
+        "SettingsGroup",
+        "SettingsSectionIndex",
+        "SettingsPageEnd",
+        "SettingsExportEntry"
+      ],
+      "benchAnchor": "design-system#ds-module-settings-sections",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 301 web Settings frame: sticky four-link section index, four groups with text-2xl level-2 titles, the Account and data Export entry, and the end-of-page Privacy/Terms/Trust links with the Delete account disclosure. Anchor links open their row or drawer (useOpenAnchorTarget). Full-page view: /design-system?preview=settings-regroup."
+    },
+    {
+      "id": "module.settings-row",
+      "name": "SettingsRow",
+      "kind": "module",
+      "source": "components/settings/SettingsSections.tsx",
+      "exportName": "SettingsRow",
+      "usageNames": [
+        "SettingsRow",
+        "SettingsSourceIcon"
+      ],
+      "benchAnchor": "design-system#ds-module-settings-row",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 301 closed disclosure row for one connected source: provider icon, name, kind and state line from lib/ui/settings-sections.ts. Opens by itself when the state needs action; the panel inside drops its heading. Bench states: checking, needs reconnection, connected, not connected, status unavailable."
+    },
+    {
+      "id": "module.settings-drawer",
+      "name": "SettingsDrawer",
+      "kind": "module",
+      "source": "components/settings/SettingsSections.tsx",
+      "exportName": "SettingsDrawer",
+      "usageNames": [
+        "SettingsDrawer"
+      ],
+      "benchAnchor": "design-system#ds-module-settings-drawer",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 301 drawer for Travel, Daily Brief and Categories: title, state and purpose stay in view; one disclosure action opens the controls (setup label while off). Bench states: off, on, needs action."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",
@@ -394,7 +441,7 @@
       "benchAnchor": "design-system#ds-module-trust-and-legal-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Settings link panel for public Terms, Privacy, and Trust routes."
+      "notes": "Legacy Settings link panel for public Terms, Privacy, and Trust routes. Since Ticket 301 web Settings uses the one-line links in SettingsPageEnd; this panel stays for the bench and legal-content tests."
     },
     {
       "id": "module.trust-evidence-panel",

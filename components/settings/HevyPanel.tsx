@@ -3,6 +3,8 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import { CONNECTOR_REVOCATION_COPY, connectorErrorCode, type HevyCoordinator } from "@/lib/ui/connectors";
 
@@ -22,11 +24,13 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
   const [apiKey, setApiKey] = useState("");
   const [pending, setPending] = useState<"connect" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useReportSettingsSection(connectorSectionState(settingsSectionLoad(connection, loadFailed)));
 
   useEffect(() => {
     let active = true;
-    void coordinator.getConnection().then((view) => { if (active) { setConnection(view); setMessage(null); } })
-      .catch(() => { if (active) setMessage("Hevy status is unavailable. Other sources and tracking are unaffected."); });
+    void coordinator.getConnection().then((view) => { if (active) { setConnection(view); setLoadFailed(false); setMessage(null); } })
+      .catch(() => { if (active) { setLoadFailed(true); setMessage("Hevy status is unavailable. Other sources and tracking are unaffected."); } });
     return () => { active = false; };
   }, [coordinator, refreshVersion]);
   useEffect(() => () => setApiKey(""), []);
