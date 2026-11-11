@@ -80,7 +80,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket 232: MCP production acceptance | Live acceptance complete October 31 | One Trust marketing-ID refresh and a Trust Preview → Production run after the record merges; done or not: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
 | Ticket 259: consent offers write permissions | Merged October 31 as PR #175 | TICKETS says live ChatGPT write acceptance remains; the entry records a Tier 2 ChatGPT web run that completed the write: unclear — see source | TICKETS, Ticket 259; STATUS, "Ticket 259: consent offers advertised write permissions — October 31, 2026" |
 | MCP acceptance tooling, Tickets 247–258 | Entry: complete except Ticket 253 (on hold); TICKETS still lists 252 in review and 256 planned | Reconcile 252 and 256; consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Tickets 252–256 |
-| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Locally verified and independently approved | Live providers, installed desktop and release (241); live Hevy Pro (236); iCloud live acceptance (240); 242 cross-tenant and installed desktop not exercised | TICKETS, Tickets 236, 240, 241, 242 |
+| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy passed on production web November 11; Outlook production OAuth settings checked | Owner creates vault items `outlook-test-account-a` and `icloud-test-account-a`, then agents run iCloud (240), Outlook (242) and the rest of 241 step 6; 242 cross-tenant needs a work or school account outside the home tenant; installed desktop waits on the 0.1.10 install on the test Mac; 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "Connector production acceptance — November 11, 2026" |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
 | Google Calendar Timeline (grouped): Tickets 133–137, 141, 150 | In progress; reconciled October 27: still open | Post-approval web and native consent smoke checks; 137 provider-failure, Workspace and installed fixture cases; 150 live custom-name check | TICKETS, Tickets 137, 141, 150 |
@@ -89,6 +89,28 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Connector production acceptance — November 11, 2026
+
+Run `conn-accept-20261111`, as test account A on production. Evidence:
+`docs/qa/2026-11-11-connector-acceptance.md`.
+
+- **Hevy (236): passed on web.** A complete 31-day read (5/5 pages, counts equal), timing
+  fields only, range validation, a new private test workout on Timeline at 1280 and 390 px
+  without its title, Settings panel, disconnect (reads fenced with 409) and reconnect.
+  The agent added one workout, "Cadence test (connector acceptance)", to the owner's Hevy
+  account (additions only, decision 2026-11-11); the owner may delete it.
+- **Outlook (242):** production OAuth settings checked (authority `common`,
+  `Calendars.Read`, PKCE S256, production callback). Connect not run.
+- **iCloud (240):** not run.
+- **241 step 6:** Hevy done; Outlook and iCloud wait on the vault items
+  `outlook-test-account-a` and `icloud-test-account-a` (preflight exit 10, owner steps).
+  Step 7 copy is already live on the FAQ and Privacy pages; owner review in the messaging
+  track.
+- **Waiting:** installed desktop checks for all three wait on the 0.1.10 install on the
+  test Mac (mac-release). Cross-tenant Outlook consent needs a work or school account in a
+  tenant other than the app's home tenant.
+- **Defects:** none found.
 
 ## Ticket 320: connector records sync to the Mac — November 11, 2026
 
