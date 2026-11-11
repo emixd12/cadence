@@ -2080,13 +2080,18 @@ words:
 - Legal questions: "we are not concerned with legal issues during development, we simply
   log finding in the legal surface for later review". This restates the 2026-11-04 rule.
 
-Proposed by the agent and shown in the mock; the owner has not confirmed them in words:
+Proposed by the agent and shown in the mock. The owner confirmed all three on November 10,
+when asked before Tickets 301–309 started ("Confirm all three"):
 
 - Auto-save with three exceptions (Ticket 303). The owner said auto-save "has become pretty
   standard across the board".
 - Trust and legal as one line of links at the end of Settings (Ticket 301). The owner said
   the section "probably belongs outside of settings".
 - A source connected after the Daily Brief choice is covered by that choice (Ticket 306).
+
+The same day the owner authorized pushing Ticket 307's non-additive hosted migration after
+the pull request merges ("Push after merge"). It revokes the Daily Brief Google Calendar
+grants at Google and deletes their stored credentials and selections.
 
 This supersedes, when each ticket lands: the per-Behavior opt-in and on-request matching in
 "2026-09-07: Recurring Note shortcuts contract"; the separate default-off Daily Brief

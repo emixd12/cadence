@@ -17557,7 +17557,7 @@ Scope and acceptance:
 - One heading per section: `SettingsPanel` gains a no-heading mode, and the Categories and
   Delete account panels accept a heading level.
 - The Trust and legal section goes. One line of Privacy, Terms and Trust links sits at the
-  end of the page. Confirm this placement with the owner before building it.
+  end of the page. The owner confirmed this placement on November 10.
 - Delete account is a plain link at the end of the page. It opens the existing form
   unchanged: export acknowledgement and typed confirmation stay.
 - Account and data has an Export entry: "Download your history as JSONL, CSV, full JSON, or
@@ -17634,8 +17634,8 @@ dev-signed build checked in local mode and linked mode (`docs/DESKTOP_RELEASE.md
 
 ## Ticket 303: Settings save as they change
 
-Status: filed November 10, 2026. Not started. The three exceptions below are the agent's
-proposal; confirm them with the owner before building.
+Status: filed November 10, 2026. Not started. The owner confirmed the three exceptions below
+on November 10.
 Dependencies: none. Easier after Ticket 301.
 
 Goal: a person never wonders whether a setting was saved.
@@ -17779,7 +17779,7 @@ Scope and acceptance:
 - **Advanced: choose sources** lists each connected source with its own checkbox, plus the
   existing reminder-history and Notes choices. Each keeps its statement of what is sent.
 - A source connected later is covered by the choice already made, and its row says that
-  Daily Brief uses it. This rule is the agent's proposal; confirm it with the owner.
+  Daily Brief uses it. The owner confirmed this rule on November 10.
 - Existing accounts keep exactly what they allowed: the one choice is on when at least one
   connected source was allowed, and every source that was not allowed starts excluded under
   Advanced.
