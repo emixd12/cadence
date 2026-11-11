@@ -82,6 +82,28 @@ describe("export download response", () => {
     expect(response.headers.get("retry-after")).toBe("300");
   });
 
+  it("logs unexpected failures without the raw error message", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      vi.mocked(getExportDownload).mockRejectedValueOnce(new Error("Invalid configuration schedule_graph."));
+      const response = await exportDownloadResponse(exportRequest(), "behaviorlog");
+      expect(response.status).toBe(500);
+      expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toEqual({
+        source: "cadence", name: "export_download_failed", severity: "error",
+        context: { route: "/api/export/json", method: "GET", format: "behaviorlog",
+          failure: "Invalid configuration schedule_graph.", error_name: "Error" },
+      });
+
+      vi.mocked(getExportDownload).mockRejectedValueOnce(new Error("duplicate key: note 'Private note'"));
+      await exportDownloadResponse(exportRequest(), "json");
+      const logged = String(log.mock.calls.at(-1)?.[0]);
+      expect(logged).not.toContain("Private note");
+      expect(JSON.parse(logged).context.failure).toBeNull();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("passes time tracking only for the exact opt-in parameter", async () => {
     vi.mocked(getExportDownload).mockRejectedValue(new ExportAuthError());
 

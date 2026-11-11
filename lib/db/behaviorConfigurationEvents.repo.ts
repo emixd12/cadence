@@ -1,4 +1,7 @@
-import { toBehaviorConfigurationEventPlanPayload } from "@cadence/core/services/configuration-payload";
+import {
+  toBehaviorConfigurationEventPlanPayload,
+  toStoredConfigurationSnapshot,
+} from "@cadence/core/services/configuration-payload";
 export { toBehaviorConfigurationEventPlanPayload } from "@cadence/core/services/configuration-payload";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import {
@@ -106,7 +109,19 @@ export async function listBehaviorConfigurationEvents(
           throw new Error(HISTORY_EXPORT_CEILING_ERROR);
         }
 
-        events.push(...page);
+        // Rows synchronized from Cadence for Mac may hold camelCase snapshots (defect D2).
+        events.push(
+          ...page.map((event) => ({
+            ...event,
+            previous_configuration:
+              event.previous_configuration === null
+                ? null
+                : toStoredConfigurationSnapshot(event.previous_configuration),
+            next_configuration: toStoredConfigurationSnapshot(
+              event.next_configuration,
+            ),
+          })),
+        );
 
         const last = page.at(-1);
 
