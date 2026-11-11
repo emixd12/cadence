@@ -48,7 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`; 311 blocked on owner steps; 320, 323 and 324 not started | Owner: the `hevy-test-account-a` vault item (Hevy Pro test account and API key); the service-account token is stored and the preflight's agent steps pass (November 11). Migration `20261110210000` approved November 10. Then Ticket 311, hosted pushes, a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Tickets 312–322: connector completion implemented in source — November 10, 2026" |
+| Tickets 310–324: connector completion (D28) | 310, 311, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`, reading Hevy by events cursor (strategy A); 320, 323 and 324 not started | Merge PR #207 with both hosted migration pushes (`20261110210000` approved); a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Ticket 311: Hevy read strategy decided — November 11, 2026" |
 | Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -88,6 +88,27 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 311: Hevy read strategy decided — November 11, 2026
+
+**On branch `claude/pr-206-tickets-c4834e` (PR #207).**
+
+- The owner decided not to buy a Hevy test account; Hevy testing uses the owner's own Pro
+  account through vault item `hevy-owner`, additions only (`docs/DECISIONS.md`,
+  2026-11-11). The preflight requirement `vault-hevy-a` and the Hevy connector step now
+  read `hevy-owner`.
+- Live results in `docs/qa/2026-11-hevy-change-feed.md`. The events feed keys on
+  `updated_at`, inclusively, and reports new, back-dated and edited workouts;
+  `/v1/workouts` is ordered by `created_at`, not start time; no 429. Strategy A, events
+  cursor. Two private test workouts were added through the API; nothing was edited or
+  deleted.
+- `docs/LEGAL.md` L-023: Hevy's terms (effective June 23, 2019) have no API or automated
+  access clause; risk low.
+- Implemented the same day: Tickets 315, 316 and 321 read changes since a stored cursor
+  (`connector_completion_state.read_cursor`, no migration) and fall back to the full read
+  for a new link or connection; the job runs the full schedule. Next: merge PR #207.
+- Not verified: a `deleted` event, a routine rename or deletion, histories above 500
+  workouts.
 
 ## Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026
 

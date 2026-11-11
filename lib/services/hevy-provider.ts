@@ -51,11 +51,20 @@ export type HevyCall =
   | Readonly<{ kind: "user_info" }>
   | Readonly<{ kind: "workout_count" }>
   | Readonly<{ kind: "workouts"; page: number }>
-  | Readonly<{ kind: "routines"; page: number }>;
+  | Readonly<{ kind: "routines"; page: number }>
+  | Readonly<{ kind: "workout_events"; page: number; since: string }>;
 
 /** Hevy returns routines 10 per page; the link form reads at most 20 pages (200 routines). */
 export const HEVY_ROUTINE_PAGE_SIZE = 10;
 export const HEVY_ROUTINE_MAX_PAGES = 20;
+/**
+ * Ticket 311 chose strategy A: `/v1/workouts/events?since=` keys on `updated_at`,
+ * inclusively, newest first. One change read takes at most 20 pages (200 events);
+ * past that the caller falls back to the full read.
+ */
+export const HEVY_EVENT_PAGE_SIZE = 10;
+export const HEVY_EVENT_MAX_PAGES = 20;
+const HEVY_SINCE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u;
 
 export type HevyRequestOptions = Readonly<{
   fetch?: HevyFetch;
@@ -92,6 +101,12 @@ const API_KEY = /^[A-Za-z0-9._~-]{1,256}$/;
 export function hevyRequestUrl(call: HevyCall): string {
   if (call.kind === "user_info") return `${HEVY_API_ORIGIN}/v1/user/info`;
   if (call.kind === "workout_count") return `${HEVY_API_ORIGIN}/v1/workouts/count`;
+  if (call.kind === "workout_events") {
+    if (!Number.isSafeInteger(call.page) || call.page < 1 || call.page > HEVY_EVENT_MAX_PAGES || !HEVY_SINCE.test(call.since)) {
+      throw new RangeError("Hevy event page or since is outside the allowed bound.");
+    }
+    return `${HEVY_API_ORIGIN}/v1/workouts/events?page=${call.page}&pageSize=${HEVY_EVENT_PAGE_SIZE}&since=${encodeURIComponent(call.since)}`;
+  }
   if (call.kind === "routines") {
     if (!Number.isSafeInteger(call.page) || call.page < 1 || call.page > HEVY_ROUTINE_MAX_PAGES) {
       throw new RangeError("Hevy routine page is outside the allowed bound.");
@@ -111,6 +126,14 @@ export function isAllowedHevyRequest(method: string, url: string): boolean {
   try { parsed = new URL(url); } catch { return false; }
   if (parsed.origin !== HEVY_API_ORIGIN || parsed.username || parsed.password || parsed.hash) return false;
   if (parsed.pathname === "/v1/user/info" || parsed.pathname === "/v1/workouts/count") return parsed.search === "";
+  if (parsed.pathname === "/v1/workouts/events") {
+    const eventKeys = [...parsed.searchParams.keys()];
+    const eventPage = parsed.searchParams.get("page") ?? "";
+    return eventKeys.length === 3 && eventKeys[0] === "page" && eventKeys[1] === "pageSize" && eventKeys[2] === "since"
+      && /^[1-9]\d{0,1}$/.test(eventPage) && Number(eventPage) <= HEVY_EVENT_MAX_PAGES
+      && parsed.searchParams.get("pageSize") === String(HEVY_EVENT_PAGE_SIZE)
+      && HEVY_SINCE.test(parsed.searchParams.get("since") ?? "");
+  }
   const bounds = parsed.pathname === "/v1/workouts"
     ? { maxPages: RECORDED_ACTIVITY_MAX_PAGES, pageSize: RECORDED_ACTIVITY_PAGE_SIZE }
     : parsed.pathname === "/v1/routines"
@@ -227,6 +250,94 @@ export async function listHevyRoutines(
     return { routines: [...routines].map(([selectorKey, title]) => ({ selectorKey, title })), complete: false };
   } finally {
     session.close();
+  }
+}
+
+export type HevyMatchChanges = Readonly<{
+  /** Updated workouts inside the range, as contract 1.1 activities with selector keys. */
+  activities: readonly RecordedActivityV1_1[];
+  /** Activity IDs (`hevy/<digest>`) of workouts Hevy reports deleted. */
+  deletedActivityRefs: readonly string[];
+  /** The newest `updated_at` or `deleted_at` seen, or null when no event arrived. */
+  newestChangeAt: string | null;
+  /** False when the events ran past 20 pages; the caller then reads in full. */
+  complete: boolean;
+  /** When the read started, on Cadence's clock. */
+  fetchedAt: string;
+}>;
+
+/**
+ * Ticket 311 strategy A: the workouts changed since a cursor. New, back-dated and
+ * edited workouts arrive as `updated` events and deletions as `deleted` events, so a
+ * quiet account costs one page whatever its history. Keeps only identity, timing and
+ * the routine digest, like the full match read.
+ */
+export async function readHevyMatchChanges(input: HevyMatchReadInput & Readonly<{ since: string }>): Promise<HevyMatchChanges> {
+  if (!/^[a-f0-9]{64}$/u.test(input.accountDigest)) throw new RangeError("Hevy match read requires the account digest.");
+  if (!HEVY_SINCE.test(input.since)) throw new RangeError("Hevy change read requires a UTC since instant.");
+  const session = new HevySession(input.apiKey, input);
+  const fetchedAt = Temporal.Instant.fromEpochMilliseconds(session.startedAt).toString();
+  const activities = new Map<string, RecordedActivityV1_1>();
+  const deleted = new Set<string>();
+  let newest: Temporal.Instant | null = null;
+  const note = (value: unknown) => {
+    const at = instantOrNull(value);
+    if (at && (!newest || Temporal.Instant.compare(at, newest) > 0)) newest = at;
+  };
+  try {
+    for (let page = 1; page <= HEVY_EVENT_MAX_PAGES; page += 1) {
+      const body = record(await session.get({ kind: "workout_events", page, since: input.since }));
+      const pageCount = body?.page_count;
+      if (!body || !Number.isSafeInteger(pageCount) || (pageCount as number) < 0 || !Array.isArray(body.events)
+        || body.events.length > HEVY_EVENT_PAGE_SIZE) {
+        throw new HevyProviderError(failure("malformed_provider_response", false, null));
+      }
+      if ((pageCount as number) > HEVY_EVENT_MAX_PAGES) {
+        return { activities: [], deletedActivityRefs: [], newestChangeAt: null, complete: false, fetchedAt };
+      }
+      for (const item of body.events) acceptEvent(item);
+      if (page >= (pageCount as number)) break;
+    }
+  } finally {
+    session.close();
+  }
+  return {
+    activities: [...activities.values()].sort((left, right) => left.startAt.localeCompare(right.startAt) || left.id.localeCompare(right.id)),
+    deletedActivityRefs: [...deleted].sort(),
+    newestChangeAt: newest === null ? null : (newest as Temporal.Instant).toString(),
+    complete: true,
+    fetchedAt,
+  };
+
+  function acceptEvent(item: unknown): void {
+    const event = record(item);
+    if (event?.type === "deleted") {
+      if (typeof event.id !== "string" || event.id.length === 0 || event.id.length > 512) {
+        throw new HevyProviderError(failure("malformed_provider_response", false, null));
+      }
+      const id = recordedActivityId({ accountId: input.accountId, providerWorkoutId: event.id });
+      deleted.add(id);
+      activities.delete(id);
+      note(event.deleted_at);
+      return;
+    }
+    const workout = record(event?.workout);
+    if (event?.type !== "updated" || !workout) throw new HevyProviderError(failure("malformed_provider_response", false, null));
+    note(workout.updated_at);
+    const result = normalizeRecordedWorkout({
+      providerWorkoutId: typeof workout.id === "string" ? workout.id : null,
+      startTime: scalar(workout.start_time),
+      endTime: scalar(workout.end_time),
+      updatedAt: scalar(workout.updated_at),
+    }, { accountId: input.accountId, requestedRange: input.range, fetchedAt });
+    if (result.status !== "accepted" || deleted.has(result.activity.id)) return;
+    const routineId = typeof workout.routine_id === "string" && workout.routine_id.length > 0 && workout.routine_id.length <= 512
+      ? workout.routine_id : null;
+    // Events arrive newest first, so the first sighting of a workout is its latest state.
+    if (activities.has(result.activity.id)) return;
+    activities.set(result.activity.id, withSelectorKeys(result.activity, routineId === null ? [] : [recordedActivitySelectorKey({
+      source: RECORDED_ACTIVITY_SOURCE, accountDigest: input.accountDigest, providerKey: routineId,
+    })]));
   }
 }
 

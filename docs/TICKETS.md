@@ -17988,7 +17988,7 @@ Verification: `npm run agents:check` and `npm run interactions:check`.
 
 ## Ticket 311: Live Hevy check for the read strategy
 
-Status: blocked November 11, 2026. The `connectors` preflight's agent steps pass, but the vault has no `hevy-test-account-a` item, so there is no Hevy Pro key for test account A. No live Hevy call has run.
+Status: complete November 11, 2026 on the owner's own Hevy Pro account (`hevy-owner`, `docs/DECISIONS.md`, 2026-11-11). Strategy A, events cursor; results in `docs/qa/2026-11-hevy-change-feed.md`. Not observed: a `deleted` event and a routine rename or deletion, since the owner allowed additions only.
 Dependencies: Ticket 310.
 
 Goal: decide with live evidence how Cadence reads Hevy for matching.
@@ -18136,7 +18136,7 @@ Verification: `npm run supabase -- db reset`, the SQL smoke fixture and
 
 ## Ticket 315: Hevy adapter reads for matching
 
-Status: implemented November 10, 2026 with the existing full-scan read (strategy C). `GET /v1/workouts/events` is not added; Ticket 311 decides it.
+Status: implemented November 10, 2026; on November 11 Ticket 311 chose strategy A, so `GET /v1/workouts/events` (page, `pageSize=10`, a UTC `since`; at most 20 pages) is on the allowlist and `readHevyMatchChanges` reads it. The full match read stays for a new cursor.
 Dependencies: Tickets 311 and 312.
 
 Goal: read what matching needs from Hevy and nothing more.
@@ -18169,7 +18169,7 @@ Verification: `tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts` and
 
 ## Ticket 316: Completion-source port, reconcile service and routes
 
-Status: implemented November 10, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`. The read strategy follows Ticket 311.
+Status: implemented November 10, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`. November 11: reconcile reads changes since `connector_completion_state.read_cursor` (Ticket 311 strategy A). It reads in full when there is no cursor, the cursor is from another connection generation, a link changed after it, or the feed passes 20 pages. It stores the next cursor only after a run that deferred no writes.
 Dependencies: Tickets 314 and 315.
 
 Goal: run reconcile on request through one service.
@@ -18351,7 +18351,7 @@ build and `dagger check --progress=report`.
 
 ## Ticket 321: Background completion job
 
-Status: implemented November 10, 2026, off behind the flag. Migration `20261110210000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026. Read strategy `full_scan` until Ticket 311. Vercel usage not measured; no local-stack job run.
+Status: implemented November 10, 2026, off behind the flag. Migration `20261110210000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. Vercel usage not measured; no local-stack job run.
 Dependencies: Ticket 316. The cadence depends on Ticket 311.
 
 Goal: complete Occurrences and cancel reminders without Cadence being opened.

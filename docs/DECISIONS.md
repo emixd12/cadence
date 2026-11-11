@@ -2173,3 +2173,16 @@ Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only,
 319 and 320; a Mac build with Ticket 319 ships before the feature turns on. Marketing:
 none until release (P-042). Future mobile: deferred; the hosted functions are reusable.
 Messaging impact: P-038 to P-042.
+
+## 2026-11-11: Hevy testing uses the owner's own Pro account
+
+The owner decided on November 11, 2026 not to buy a Hevy Pro test account. Hevy testing,
+including Ticket 311 and later connector acceptance, uses the owner's own Hevy Pro account
+through the vault item `hevy-owner` (API Credential, key in `credential`), which replaces
+`hevy-test-account-a`. Agents may add test workouts to that account but must not edit or
+delete existing workouts or routines. Hevy's website cannot log workouts, so additions go
+through `POST /v1/workouts`; this is a test step, and Cadence's product code still writes
+nothing to Hevy.
+
+Platform impact: test access only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.

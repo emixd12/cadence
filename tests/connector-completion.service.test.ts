@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RecordedActivityV1_1 } from "@cadence/core/types/recorded-activity";
 import type { SourceLinkRow } from "@/lib/db/sourceLinks.repo";
-import type { CompletionSourceEvidence, CompletionSourcePort } from "@/lib/services/completion-sources";
+import { formatCompletionCursor, parseCompletionCursor, type CompletionSourceEvidence, type CompletionSourcePort } from "@/lib/services/completion-sources";
 import {
   RECONCILE_MAX_WRITES,
   parseReconcileBody,
@@ -23,6 +23,8 @@ const LEGS = "a".repeat(64);
 const caller = { client: {} as ConnectorCaller["client"], user: { id: "user-1" } } as ConnectorCaller;
 const BEHAVIOR = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
+const CURSOR = "g1|2026-11-10T20:00:00Z";
+const NEXT_CURSOR = "g1|2026-11-10T22:55:00Z";
 
 function link(overrides: Partial<SourceLinkRow> = {}): SourceLinkRow {
   return {
@@ -51,16 +53,17 @@ function activity(index: number, startAt: string): RecordedActivityV1_1 {
 function evidence(activities: RecordedActivityV1_1[]): CompletionSourceEvidence {
   return {
     activities, complete: true, coverageStartAt: "2026-10-11T04:00:00Z", coverageEndAt: "2026-11-11T05:00:00Z",
-    deletedActivityRefs: [], accountDigest: DIGEST, connectionGeneration: 1,
+    deletedActivityRefs: [], accountDigest: DIGEST, connectionGeneration: 1, nextCursor: NEXT_CURSOR,
   };
 }
 
-function port(read: () => Promise<CompletionSourceEvidence>): CompletionSourcePort & { calls: number } {
+function port(read: () => Promise<CompletionSourceEvidence>): CompletionSourcePort & { calls: number; cursors: (string | null | undefined)[] } {
   const value = {
     source: "hevy" as const,
     minimumDurationSeconds: 300,
     calls: 0,
-    async readEvidence() { value.calls += 1; return read(); },
+    cursors: [] as (string | null | undefined)[],
+    async readEvidence(_caller: ConnectorCaller, options: Readonly<{ cursor?: string | null }>) { value.calls += 1; value.cursors.push(options.cursor); return read(); },
     async listSelectors() { return { selectors: [{ key: LEGS, label: "Legs" }], complete: true, accountDigest: DIGEST }; },
   };
   return value;
@@ -177,6 +180,55 @@ describe("connector completion reconcile (Ticket 316)", () => {
     for (const body of [{}, { source: "strava" }, { source: "hevy", evidence: [] }, [], null]) {
       expect(() => parseReconcileBody(body)).toThrow(ConnectorError);
     }
+  });
+});
+
+describe("read cursor (Ticket 311 strategy A)", () => {
+  it("formats and parses the generation and UTC since, and ignores anything else", () => {
+    expect(formatCompletionCursor(4, "2026-11-10T20:00:00+00:00")).toBe("g4|2026-11-10T20:00:00Z");
+    expect(parseCompletionCursor("g4|2026-11-10T20:00:00.5Z")).toEqual({ generation: 4, since: "2026-11-10T20:00:00.5Z" });
+    for (const bad of [null, "", "g0|2026-11-10T20:00:00Z", "4|2026-11-10T20:00:00Z", "g4|2026-11-10", "g4|2026-11-10T20:00:00+01:00"]) {
+      expect(parseCompletionCursor(bad)).toBeNull();
+    }
+  });
+
+  const state = { lastAttemptedAt: null, lastReconciledAt: "2026-11-10T20:05:00Z", consecutiveFailures: 0, readCursor: CURSOR };
+  function cursorStore(overrides: Partial<ConnectorCompletionStore> = {}) {
+    const outcomes: Array<{ succeeded: boolean; readCursor?: string | null }> = [];
+    const built = store({ occurrences: [occurrence("o1", "2026-11-10", "2026-11-10T23:00:00Z")], readState: async () => state,
+      recordOutcome: async (_source, outcome) => { outcomes.push(outcome); }, ...overrides });
+    return { value: built.value, outcomes };
+  }
+
+  it("passes the stored cursor and stores the next one after a full apply", async () => {
+    const { value, outcomes } = cursorStore();
+    const source = port(async () => evidence([activity(1, "2026-11-10T21:00:00Z")]));
+    await reconcileConnectorCompletions(caller, "hevy", { env: ON, store: value, port: source, now: () => NOW });
+    expect(source.cursors).toEqual([CURSOR]);
+    expect(outcomes).toEqual([{ at: expect.any(String), succeeded: true, readCursor: NEXT_CURSOR }]);
+  });
+
+  it("reads in full when a link changed after the cursor", async () => {
+    const { value } = cursorStore({ listLinks: async () => [link({ updated_at: "2026-11-10T21:30:00Z" })] });
+    const source = port(async () => evidence([]));
+    await reconcileConnectorCompletions(caller, "hevy", { env: ON, store: value, port: source, now: () => NOW });
+    expect(source.cursors).toEqual([null]);
+  });
+
+  it("keeps the cursor when writes were deferred, and on a provider failure", async () => {
+    const days = Array.from({ length: 31 }, (_, index) => Temporal.PlainDate.from("2026-11-10").subtract({ days: index }));
+    const occurrences = days.map((day, index) => occurrence(`o${index}`, day.toString(), `${day.toString()}T23:00:00Z`));
+    const activities = days.flatMap((day, dayIndex) => [12, 14, 16, 18].map((hour, slot) =>
+      activity(dayIndex * 4 + slot + 1, `${day.toString()}T${hour}:00:00Z`)));
+    const deferred = cursorStore({ listOccurrences: async () => occurrences });
+    const result = await reconcileConnectorCompletions(caller, "hevy", { env: ON, store: deferred.value, port: port(async () => evidence(activities)), now: () => NOW });
+    expect(result.counts.deferred).toBeGreaterThan(0);
+    expect(deferred.outcomes).toEqual([{ at: expect.any(String), succeeded: true }]);
+
+    const failed = cursorStore();
+    await reconcileConnectorCompletions(caller, "hevy", { env: ON, store: failed.value,
+      port: port(async () => { throw new ConnectorError("rate_limited"); }), now: () => NOW });
+    expect(failed.outcomes).toEqual([{ at: expect.any(String), succeeded: false }]);
   });
 });
 

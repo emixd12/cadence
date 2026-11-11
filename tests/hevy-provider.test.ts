@@ -9,6 +9,7 @@ import {
   hevyRequestUrl,
   isAllowedHevyRequest,
   listHevyRoutines,
+  readHevyMatchChanges,
   readHevyMatchEvidence,
   readHevyWorkouts,
   verifyHevyApiKey,
@@ -437,5 +438,71 @@ describe("Hevy reads for connector completion (Ticket 315)", () => {
     expect(fake.calls).toHaveLength(20);
     expect(list).toMatchObject({ complete: false });
     expect(list.routines).toHaveLength(200);
+  });
+});
+
+describe("Hevy change read (Ticket 311 strategy A)", () => {
+  const DIGEST = "c".repeat(64);
+  const SINCE = "2026-10-18T12:00:00Z";
+  const eventsFetch = (pagesBody: Record<number, unknown>, calls: string[] = []): HevyFetch => async (url, init) => {
+    calls.push(url);
+    expect(init.method).toBe("GET");
+    expect(isAllowedHevyRequest("GET", url)).toBe(true);
+    const body = pagesBody[Number(new URL(url).searchParams.get("page"))];
+    return body ? Response.json(body) : new Response("not found", { status: 404 });
+  };
+  const changes = (fetch: HevyFetch) => readHevyMatchChanges({ apiKey: KEY, accountId: ACCOUNT, connectionGeneration: 3, range: RANGE,
+    accountDigest: DIGEST, since: SINCE, fetch, clock: () => NOW, random: () => 0 });
+
+  it("allows the events GET only with page, pageSize 10 and a UTC since", () => {
+    expect(hevyRequestUrl({ kind: "workout_events", page: 2, since: SINCE }))
+      .toBe(`${HEVY_API_ORIGIN}/v1/workouts/events?page=2&pageSize=10&since=2026-10-18T12%3A00%3A00Z`);
+    expect(() => hevyRequestUrl({ kind: "workout_events", page: 21, since: SINCE })).toThrow(RangeError);
+    expect(() => hevyRequestUrl({ kind: "workout_events", page: 1, since: "2026-10-18" })).toThrow(RangeError);
+    for (const url of [
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=50&since=2026-10-18T12%3A00%3A00Z`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=21&pageSize=10&since=2026-10-18T12%3A00%3A00Z`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00%2B02%3A00`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00Z&extra=1`,
+    ]) expect(isAllowedHevyRequest("GET", url), url).toBe(false);
+    expect(isAllowedHevyRequest("POST", `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00Z`)).toBe(false);
+  });
+
+  it("returns changed workouts in range with digests, deletions as activity IDs, and nothing raw", async () => {
+    const edited = workout(2, { routine_id: "routine-legs", updated_at: "2026-10-18T15:00:00Z" });
+    const older = workout(2, { routine_id: "routine-old", updated_at: "2026-10-18T13:00:00Z" });
+    const outside = { ...workout(3), start_time: "2026-08-01T12:00:00Z", end_time: "2026-08-01T13:00:00Z" };
+    const calls: string[] = [];
+    const result = await changes(eventsFetch({
+      1: { page: 1, page_count: 2, events: [
+        { type: "updated", workout: edited },
+        { type: "deleted", id: "synthetic-workout-9", deleted_at: "2026-10-18T14:00:00Z" },
+        { type: "updated", workout: older },
+      ] },
+      2: { page: 2, page_count: 2, events: [{ type: "updated", workout: outside }] },
+    }, calls));
+    expect(calls).toHaveLength(2);
+    expect(result.complete).toBe(true);
+    expect(result.newestChangeAt).toBe("2026-10-18T15:00:00Z");
+    expect(result.activities).toHaveLength(1);
+    expect(result.activities[0].selectorKeys).toEqual([recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST, providerKey: "routine-legs" })]);
+    expect(result.deletedActivityRefs).toHaveLength(1);
+    expect(result.deletedActivityRefs[0]).toMatch(/^hevy\/[a-f0-9]{64}$/u);
+    const text = JSON.stringify(result);
+    for (const forbidden of ["routine-legs", "routine-old", "SECRET", "synthetic-workout"]) expect(text).not.toContain(forbidden);
+  });
+
+  it("reports an empty feed as complete and a feed past 20 pages as incomplete without reading it", async () => {
+    expect(await changes(eventsFetch({ 1: { page: 1, page_count: 0, events: [] } })))
+      .toMatchObject({ complete: true, activities: [], deletedActivityRefs: [], newestChangeAt: null });
+    const calls: string[] = [];
+    expect(await changes(eventsFetch({ 1: { page: 1, page_count: 21, events: [] } }, calls))).toMatchObject({ complete: false, activities: [] });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("treats an unknown event shape as malformed", async () => {
+    await expect(changes(eventsFetch({ 1: { page: 1, page_count: 1, events: [{ type: "created", workout: workout(1) }] } })))
+      .rejects.toMatchObject({ failure: { code: "malformed_provider_response" } });
   });
 });

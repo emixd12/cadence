@@ -22,9 +22,11 @@ import {
   HEVY_READ_DEADLINE_MS,
   HevyProviderError,
   listHevyRoutines,
+  readHevyMatchChanges,
   readHevyMatchEvidence,
   readHevyWorkouts,
   verifyHevyApiKey,
+  type HevyMatchChanges,
   type HevyRequestOptions,
   type HevyRoutineList,
 } from "./hevy-provider";
@@ -152,6 +154,48 @@ export async function readHevyMatchEvidenceForCaller(caller: ConnectorCaller,
         throw new ConnectorError("reconnect_required");
       }
       return { snapshot, accountDigest: connection.accountDigest, connectionGeneration: connection.generation };
+    });
+  });
+}
+
+export type HevyMatchChangeRead = HevyMatchChanges & Readonly<{
+  coverageStartAt: string;
+  coverageEndAt: string;
+  accountDigest: string;
+  connectionGeneration: number;
+}>;
+
+/**
+ * Ticket 311 strategy A: the workouts changed since `since`, limited to today and the
+ * 30 prior local dates like the full match read.
+ */
+export async function readHevyMatchChangesForCaller(caller: ConnectorCaller, since: string,
+  options: HevyServiceOptions = {}): Promise<HevyMatchChangeRead> {
+  return withConnectorReadDeadline(options, HEVY_READ_DEADLINE_MS, async (bounded, deadlineAt) => {
+    const clock = bounded.clock ?? Date.now;
+    const timezone = await profileTimezone(caller, bounded.signal);
+    assertConnectorReadActive(bounded, deadlineAt);
+    const today = Temporal.Instant.fromEpochMilliseconds(clock()).toZonedDateTimeISO(timezone).toPlainDate();
+    const start = today.subtract({ days: RECORDED_ACTIVITY_MAX_RANGE_DAYS - 1 });
+    const range = validateRange(start.toString(), today.toString(), timezone, Temporal.Instant.fromEpochMilliseconds(clock()));
+    return withConnectorCredential(caller, "hevy", async (credential, connection) => {
+      assertConnectorReadActive(bounded, deadlineAt);
+      if (credential.provider !== "hevy" || !connection.accountDigest) throw new ConnectorError("reconnect_required");
+      try {
+        const changes = await readHevyMatchChanges({ ...bounded, clock, deadlineMs: deadlineAt - clock(), apiKey: credential.apiKey,
+          accountId: caller.user.id, connectionGeneration: connection.generation, range, accountDigest: connection.accountDigest, since });
+        return {
+          ...changes,
+          coverageStartAt: start.toZonedDateTime({ timeZone: timezone }).toInstant().toString(),
+          coverageEndAt: today.add({ days: 1 }).toZonedDateTime({ timeZone: timezone }).toInstant().toString(),
+          accountDigest: connection.accountDigest,
+          connectionGeneration: connection.generation,
+        };
+      } catch (error) {
+        const mapped = connectorError(error);
+        if (mapped.code === "reconnect_required") await markConnectorReconnectRequired(connection);
+        throw mapped;
+      }
     });
   });
 }

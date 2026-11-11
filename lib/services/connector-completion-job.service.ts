@@ -30,10 +30,10 @@ export const CONNECTOR_COMPLETION_JOB_BATCH_MAX = 100;
 const RUN_BUDGET_MS = 50_000;
 const ACCOUNT_CONCURRENCY = 4;
 /**
- * Ticket 311 decides the read strategy. Until it records a cheap read (strategy A
- * or B), the job keeps only the check before a reminder and the nightly check.
+ * Ticket 311 chose strategy A, an events cursor (`docs/qa/2026-11-hevy-change-feed.md`):
+ * a quiet account costs one Hevy page per check, so the job runs the full D28.5 schedule.
  */
-export const CONNECTOR_COMPLETION_READ_STRATEGY: CompletionReadStrategy = "full_scan";
+export const CONNECTOR_COMPLETION_READ_STRATEGY: CompletionReadStrategy = "cheap";
 
 export type DueCompletionAccount = Readonly<{ userId: string; source: RecordedActivitySourceV1_1; nextCheckAt: string }>;
 

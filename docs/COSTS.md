@@ -633,9 +633,9 @@ Hevy charges nothing per request, so the job's cost is Vercel function time and
 Supabase requests. Not measured: the job is off until Ticket 323, and no deployed
 run exists. Estimates from the schedule rules, not measurements: about 5 checks per
 linked account per day on a workout day, about 12 when the workout is skipped, and 1
-when nothing is scheduled. Until Ticket 311 records a cheap Hevy read, the job keeps
-only the check before a reminder and the nightly check. Each check is one reconcile
-(at most 52 Hevy GETs under the current full scan, under one second of server time
-for a cheap read). The route runs 96 times a day; while the flag is off each run
+when nothing is scheduled. Ticket 311 chose the events cursor, so the job runs the full
+schedule. Each check is one reconcile: usually one Hevy GET, the first page of changes
+since the cursor (at most 20). A new link or connection reads in full once (at most 52
+GETs). Server time is estimated under one second for a change read. The route runs 96 times a day; while the flag is off each run
 returns before any database read. Replace these figures with measured usage after
 Ticket 323's deployed run.

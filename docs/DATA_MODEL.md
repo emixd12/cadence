@@ -2362,8 +2362,9 @@ Migration `20261110200000_connector_completion.sql`. Three hosted tables, each w
   link foreign key sets null on link deletion, so matches stay as history.
 - `connector_completion_state`: primary key `(user_id, source)`. `next_check_at`,
   `last_reconciled_at` (the last successful read), `last_attempted_at`,
-  `read_cursor`, `consecutive_failures`, and `check_count_date` with `check_count`
-  for the 24-a-day ceiling. The owner reads, inserts and updates it.
+  `read_cursor` (`g<connection generation>|<UTC since>`, the Hevy events cursor from
+  Ticket 311; null reads in full), `consecutive_failures`, and `check_count_date` with
+  `check_count` for the 24-a-day ceiling. The owner reads, inserts and updates it.
 
 Write functions. All three are `security definer` with `search_path = ''`, take the
 owner from `auth.uid()`, scope every read and write to that owner, and refuse any

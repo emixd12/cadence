@@ -25,7 +25,7 @@ import {
 import { ConnectorError } from "@/lib/types/connectors";
 import type { Occurrence } from "@/lib/types/database";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
-import { completionSource, type CompletionSourceEvidence, type CompletionSourcePort } from "./completion-sources";
+import { completionSource, parseCompletionCursor, type CompletionSourceEvidence, type CompletionSourcePort } from "./completion-sources";
 import type { ConnectorCaller } from "./connector-credentials";
 
 // Ticket 316 (D28): one reconcile = read, match and apply for one account and one
@@ -77,6 +77,8 @@ export type CompletionState = Readonly<{
   lastReconciledAt: string | null;
   lastAttemptedAt: string | null;
   consecutiveFailures: number;
+  /** Ticket 311 strategy A: where the next change read starts. Null reads in full. */
+  readCursor?: string | null;
 }>;
 
 type ConnectionFence = Readonly<{ status: string; accountDigest: string | null; generation: number }>;
@@ -85,7 +87,8 @@ type ConnectionFence = Readonly<{ status: string; accountDigest: string | null; 
 export type ConnectorCompletionStore = Readonly<{
   readState(source: RecordedActivitySourceV1_1): Promise<CompletionState | null>;
   recordAttempt(source: RecordedActivitySourceV1_1, at: string): Promise<void>;
-  recordOutcome(source: RecordedActivitySourceV1_1, outcome: Readonly<{ at: string; succeeded: boolean }>): Promise<void>;
+  /** `readCursor` is written only when given: undefined keeps the stored cursor. */
+  recordOutcome(source: RecordedActivitySourceV1_1, outcome: Readonly<{ at: string; succeeded: boolean; readCursor?: string | null }>): Promise<void>;
   readConnection(source: RecordedActivitySourceV1_1): Promise<ConnectionFence | null>;
   listLinks(source: RecordedActivitySourceV1_1): Promise<SourceLinkRow[]>;
   listBehaviors(ids: readonly string[]): Promise<ActivityMatchBehavior[]>;
@@ -160,7 +163,7 @@ export async function reconcileConnectorCompletions(
 
   let evidence: CompletionSourceEvidence;
   try {
-    evidence = await port.readEvidence(caller, { deadlineMs: options.deadlineMs, signal: options.signal });
+    evidence = await port.readEvidence(caller, { deadlineMs: options.deadlineMs, signal: options.signal, cursor: readCursorFor(state, links) });
   } catch (error) {
     // A provider failure writes nothing but the failure count.
     await store.recordOutcome(source, { at: clock().toString(), succeeded: false });
@@ -211,9 +214,24 @@ export async function reconcileConnectorCompletions(
   const applied = await applyPlan(store, plan, clock);
   if (applied.reverted.length > 0) await store.repairReminders(applied.reverted, clock());
   const finishedAt = clock().toString();
-  await store.recordOutcome(source, { at: finishedAt, succeeded: true });
+  // A run that deferred writes keeps its cursor, so the next run reads those changes again.
+  await store.recordOutcome(source, applied.counts.deferred === 0
+    ? { at: finishedAt, succeeded: true, readCursor: evidence.nextCursor }
+    : { at: finishedAt, succeeded: true });
   if (applied.counts.completed + applied.counts.attached + applied.counts.removed > 0) store.revalidate();
   return result("reconciled", applied.counts, [...plan.skip.map((entry) => entry.reason), ...applied.codes], finishedAt);
+}
+
+/**
+ * A link saved after the cursor needs its 30-day history, which a change read does not
+ * carry, so that run reads in full and starts a new cursor.
+ */
+function readCursorFor(state: CompletionState | null, links: readonly SourceLinkRow[]): string | null {
+  const cursor = parseCompletionCursor(state?.readCursor ?? null);
+  if (!cursor) return null;
+  const since = Temporal.Instant.from(cursor.since);
+  const changed = links.some((link) => link.enabled && Temporal.Instant.compare(Temporal.Instant.from(link.updated_at), since) >= 0);
+  return changed ? null : state!.readCursor!;
 }
 
 async function applyPlan(store: ConnectorCompletionStore, plan: ActivityMatchPlan, clock: () => Temporal.Instant) {
@@ -309,10 +327,11 @@ export function createConnectorCompletionStore(caller: ConnectorCaller, client: 
   return {
     async readState(source) {
       const { data, error } = await client.from("connector_completion_state")
-        .select("last_reconciled_at,last_attempted_at,consecutive_failures")
+        .select("last_reconciled_at,last_attempted_at,consecutive_failures,read_cursor")
         .eq("user_id", userId).eq("source", source).maybeSingle();
       if (error) throw new ConnectorError("provider_unavailable");
-      return data ? { lastReconciledAt: data.last_reconciled_at, lastAttemptedAt: data.last_attempted_at, consecutiveFailures: data.consecutive_failures } : null;
+      return data ? { lastReconciledAt: data.last_reconciled_at, lastAttemptedAt: data.last_attempted_at,
+        consecutiveFailures: data.consecutive_failures, readCursor: data.read_cursor } : null;
     },
     async recordAttempt(source, at) {
       const existing = await this.readState(source);
@@ -325,7 +344,7 @@ export function createConnectorCompletionStore(caller: ConnectorCaller, client: 
       const current = await this.readState(source);
       const { error } = await client.from("connector_completion_state")
         .update(outcome.succeeded
-          ? { last_reconciled_at: outcome.at, consecutive_failures: 0 }
+          ? { last_reconciled_at: outcome.at, consecutive_failures: 0, ...(outcome.readCursor === undefined ? {} : { read_cursor: outcome.readCursor }) }
           : { consecutive_failures: Math.min(1000, (current?.consecutiveFailures ?? 0) + 1) })
         .eq("user_id", userId).eq("source", source);
       if (error) throw new ConnectorError("provider_unavailable");

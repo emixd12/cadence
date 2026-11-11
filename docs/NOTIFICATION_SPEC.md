@@ -456,8 +456,8 @@ cancelled when the workout is already logged; every 30 minutes for 3 hours after
 scheduled start and then hourly until local midnight, while the Occurrence stays
 Unresolved; and once after local midnight. At most 24 checks per account per day; the
 wait doubles after a failed check, up to 6 hours; `reconnect_required` stops checks.
-Until Ticket 311 records a cheap Hevy read, only the check before a reminder and the
-nightly check run. A Mac schedules its Behavior reminders locally and learns of a
+Ticket 311 chose the events cursor, a cheap Hevy read, so every check in the schedule
+runs. A Mac schedules its Behavior reminders locally and learns of a
 connector completion only when it syncs, so a Mac reminder can still fire for a logged
 workout while Cadence for Mac is closed.
 

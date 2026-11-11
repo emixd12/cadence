@@ -126,9 +126,9 @@ describe("Hevy connection", () => {
 
   it("exposes no workout-writing operation", async () => {
     const service = await import("@/lib/services/hevy.service");
-    // Ticket 315 adds two reads for connector completion; neither writes to Hevy.
+    // Tickets 311 and 315 add three reads for connector completion; none writes to Hevy.
     expect(Object.keys(service).sort()).toEqual(["applyHevyActivityRefresh", "connectHevy", "disconnectHevy", "getHevyActivities", "getHevyConnection",
-      "listHevyRoutinesForCaller", "readHevyMatchEvidenceForCaller"]);
+      "listHevyRoutinesForCaller", "readHevyMatchChangesForCaller", "readHevyMatchEvidenceForCaller"]);
     const connection = await import("@/app/api/hevy/connection/route");
     const activities = await import("@/app/api/hevy/activities/route");
     expect(Object.keys(connection).sort()).toEqual(["DELETE", "GET", "OPTIONS", "POST"]);
