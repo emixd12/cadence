@@ -97,10 +97,10 @@ requests only Calendar-list and event read-only scopes. A different identity,
 denied consent, expired attempt, or revoked credential returns a factual state
 without changing local Cadence data.
 
-After connection, the user selects readable calendars, controls Timeline and
-all-day visibility, and chooses **Save Calendar settings**. The user can choose
+After connection, the user selects readable calendars and controls Timeline and
+all-day visibility; each change saves as it happens (Ticket 303). The user can choose
 **Refresh Calendar**, **Reconnect Google Calendar**, or **Disconnect Google
-Calendar**. Disconnect removes the live server credential before attempting
+Calendar**, which asks once more before it acts. Disconnect removes the live server credential before attempting
 Google grant revocation. A revocation failure tells the user to remove Cadence
 from Google Account permissions. Other devices stop refreshing after they next
 read the changed connection.
@@ -881,9 +881,9 @@ archiving rules are added.
 
 ## Note shortcuts (Tickets 126–128)
 
-Enable Note shortcuts in Settings, then opt in inside one Behavior's settings.
-Choose Find repeated Notes. Review each proposed text, optionally edit it, then
-Accept or Dismiss. Only accepted text becomes a quick-fill button. Edit/Remove
+Note shortcuts are on by default (Ticket 305). After the same Note is saved on
+three Occurrences of one Behavior, its Behavior settings show the text as a
+proposal. Review each proposed text, optionally edit it, then Accept or Dismiss. Only accepted text becomes a quick-fill button. Edit/Remove
 remains available in Behavior settings. Remove erases shortcut text and suppresses
 that pattern for 90 days; it leaves saved Notes unchanged.
 
@@ -891,8 +891,9 @@ Open any supported Occurrence Note form. Select a shortcut to fill an empty
 draft or append a new line. Review the draft and choose Save note. Cancel leaves
 historical Notes unchanged. A stale save retains the existing conflict behavior;
 a shortcut inserted during a pending save remains in the draft afterward.
-Global off hides quick-fill/proposals and stops analysis. Re-enabling retains
-accepted text. Offline desktop follows the same flow with local data. Linking an
+Settings has no Note shortcuts control. A stored account off switch, kept so the
+control can return, hides quick-fill/proposals and stops analysis; turning it back
+on retains accepted text. Offline desktop follows the same flow with local data. Linking an
 account synchronizes shortcut state but never grants cloud analysis consent.
 
 ### Desktop repair and update review (Tickets 129–131)
@@ -958,8 +959,9 @@ Ticket 268 ships; until then they request as described above.
 
 Travel Settings supersedes steps 1–2 above with three inputs:
 
-1. The user chooses usual travel (walking, cycling, transit or driving) and may
-   enter Home. Save travel settings stores both.
+1. The user chooses usual travel (walking, cycling, transit or driving), which saves
+   at once, and may enter Home, which saves on Enter or when the field loses focus
+   (Ticket 303).
 2. The user turns on Travel estimates beside the Google Maps disclosure. That click
    records routing consent and asks for foreground device location. Denied or
    unavailable location leaves Home or the previous stop as the origin. Turning
@@ -1035,10 +1037,11 @@ old consent form. Expired, consumed, or invalid requests require a new client
 connection. A failed Disconnect remains visible with a reload/retry instruction.
 No hosted actions or live Google-provider acceptance follow from local tests.
 
-## Connect Calendar for Daily Brief (Ticket 187)
+## Calendar for Daily Brief (Tickets 187, 306 and 307)
 
-Open Settings → Google Calendar for Daily Brief → Connect Google Calendar.
-Approve read-only consent using the same Google account as Cadence. Select calendars and save.
-Enable Daily Brief, then enable its Calendar control. Calendar selection changes require renewed disclosure.
-Desktop completes consent in the system browser and receives a purpose-bound callback.
-Disconnect affects that purpose across the account's devices. Timeline consent and sign-in remain separate.
+Daily Brief has no Google Calendar connection of its own since Ticket 307. Connect Google
+Calendar once under Settings → Connections → Connected sources and choose its calendars;
+the choices save as they change (Ticket 303). Then open Settings → Planning → Daily Brief,
+turn on Daily Brief and **Plan around my connected sources** (Ticket 306). Exclude a source
+under **Advanced: choose sources**. Disconnecting Google Calendar stops both Timeline and
+Daily Brief reads across the account's devices.

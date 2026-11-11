@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireCurrentUserId } from "@/lib/auth/current-user";
+import { matchRepeatedNotesAfterNoteSave } from "@/lib/services/note-shortcut.service";
 import {
   getBehaviorById,
   listBehaviorScheduleSlots,
@@ -103,6 +104,10 @@ vi.mock("@/lib/services/behavior-lifecycle.service", () => ({
 
 vi.mock("@/lib/monitoring/privacy-safe-events", () => ({
   reportMonitoringError: vi.fn(),
+}));
+
+vi.mock("@/lib/services/note-shortcut.service", () => ({
+  matchRepeatedNotesAfterNoteSave: vi.fn(),
 }));
 
 vi.mock(
@@ -1361,6 +1366,8 @@ describe("updateOccurrenceNoteFromFormData", () => {
       note: "Wore aligners overnight",
       ...(used ? { usedShortcut: true } : {}),
     });
+    // Ticket 305: repeated Notes are matched after every in-app save.
+    expect(matchRepeatedNotesAfterNoteSave).toHaveBeenCalledWith(SUPABASE, "user-1", "behavior-1");
   });
 });
 

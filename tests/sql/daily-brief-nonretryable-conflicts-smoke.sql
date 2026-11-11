@@ -43,45 +43,11 @@ begin
 end;
 $$;
 
-reset role;
-insert into public.google_calendar_agent_connections (user_id, google_subject, generation, status)
-values ('92700000-0000-4000-8000-000000000001', 'daily-brief-conflicts', 1, 'connected');
-insert into public.google_calendar_agent_preferences (user_id)
-values ('92700000-0000-4000-8000-000000000001');
-
+-- Tickets 306 and 307: Calendar is covered by the one choice and read through the
+-- Timeline connection, so connection or selection changes no longer refuse admission.
 set local role authenticated;
 select public.save_daily_brief_preferences(true, true, 2);
-reset role;
-update public.google_calendar_agent_preferences
-set selection_revision = selection_revision + 1
-where user_id = '92700000-0000-4000-8000-000000000001';
-
-set local role authenticated;
-do $$
-begin
-  begin
-    perform public.begin_daily_brief('92700000-0000-4000-8000-000000000101', false, 3);
-    raise exception 'Changed Calendar selection was admitted.';
-  exception when sqlstate '55000' then null;
-  end;
-  perform public.save_daily_brief_preferences(true, true, 3);
-end;
-$$;
-reset role;
-update public.google_calendar_agent_connections
-set generation = generation + 1
-where user_id = '92700000-0000-4000-8000-000000000001';
-
-set local role authenticated;
-do $$
-begin
-  begin
-    perform public.begin_daily_brief('92700000-0000-4000-8000-000000000101', false, 4);
-    raise exception 'Changed Calendar connection was admitted.';
-  exception when sqlstate '55000' then null;
-  end;
-end;
-$$;
+select public.save_daily_brief_preferences(true, true, 3);
 reset role;
 
 do $$

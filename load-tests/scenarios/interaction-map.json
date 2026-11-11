@@ -1364,9 +1364,19 @@
       "reason": "Behavior shortcut commands need isolated owner, revision, suppression, and sync verification."
     },
     {
-      "id": "INT-SETTINGS-014",
-      "classification": "destructive_serial_only",
-      "reason": "Global shortcut settings need isolated owner and stale-revision verification."
+      "id": "INT-SETTINGS-015",
+      "classification": "browser_only",
+      "reason": "Jumping between Settings groups is in-page anchor navigation in a rendered document."
+    },
+    {
+      "id": "INT-SETTINGS-016",
+      "classification": "browser_only",
+      "reason": "Opening a Settings row or drawer is native disclosure state in a rendered document; the panels inside keep their own entries."
+    },
+    {
+      "id": "INT-SETTINGS-017",
+      "classification": "not_load_bearing",
+      "reason": "Open Export is a plain link; Export page load is covered by the Export interactions."
     },
     {
       "id": "INT-CALENDAR-001",
@@ -1542,6 +1552,11 @@
       "id": "INT-TRAVEL-013",
       "classification": "destructive_serial_only",
       "reason": "The leave reminder switch writes one owner row under RLS; turning it off deletes that account's reminder rows, so it stays out of concurrent load."
+    },
+    {
+      "id": "INT-TRAVEL-014",
+      "classification": "external_provider",
+      "reason": "The Home lookup makes one paid Google reverse-geocoding request from a device position; live provider load is not authorized."
     },
     {
       "id": "INT-CALENDAR-012",

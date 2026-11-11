@@ -21,7 +21,7 @@ function browser() {
   });
   return { scrollTo, scrollIntoView, disconnect, getElementById,
     frame: () => { const next = callback; callback = undefined; next?.(); },
-    mountAnchor: () => { getElementById.mockReturnValue({ scrollIntoView }); mutation?.(); },
+    mountAnchor: () => { getElementById.mockReturnValue({ scrollIntoView, closest: () => null }); mutation?.(); },
   };
 }
 

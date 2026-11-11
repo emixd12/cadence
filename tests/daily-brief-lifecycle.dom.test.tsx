@@ -374,11 +374,13 @@ it("signals whole-day travel only after a brief is ready", async () => {
     expect(listener).toHaveBeenCalledOnce();
   } finally { window.removeEventListener("cadence:brief-travel", listener); }
 });
-it("drops pending output when a connector disclosure is withdrawn in Settings (Ticket 239)", async () => {
+it("drops pending output when a connected source is excluded in Settings (Tickets 239 and 306)", async () => {
   const { DailyBriefSettingsPanel } = await import("@/components/briefing/DailyBriefSettingsPanel");
   let complete!: (value: DailyBriefResponse) => void;
+  const none = { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: false };
   const settings = { accountRef: "owner", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York",
-    includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: true, connectorSources: { outlookCalendar: false, icloudCalendar: false, hevy: true } };
+    useConnectedSources: true, excludedSources: none,
+    sourceStatus: { googleCalendar: "not_connected", outlookCalendar: "not_connected", icloudCalendar: "not_connected", hevy: "ready" } as const };
   const updatePreferences = vi.fn(async (input: object) => ({ ...settings, ...input, revision: 2 }));
   const adapter: DailyBriefClient = { preferences: async () => settings, updatePreferences,
     requestBrief: () => new Promise((resolve) => { complete = resolve; }) };
@@ -386,8 +388,8 @@ it("drops pending output when a connector disclosure is withdrawn in Settings (T
   const hevy = container.querySelector<HTMLInputElement>('input[aria-describedby="daily-brief-hevy-disclosure"]')!;
   expect(hevy.checked).toBe(true);
   await act(() => hevy.click());
-  expect(updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false,
-    includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false });
+  expect(updatePreferences).toHaveBeenCalledWith({ enabled: true, useConnectedSources: true, excludedSources: { ...none, hevy: true },
+    includeReminderHistory: false, includeNotes: false });
   await act(async () => { await Promise.resolve(); });
   await act(() => complete(ready("Advice prepared with workout timing")));
   expect(container.textContent).not.toContain("Advice prepared with workout timing");

@@ -195,7 +195,7 @@ export function DesktopOnboardingGuide({
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-base leading-6">
                       {item.key === "notifications"
-                        ? "Native notifications"
+                        ? "Notifications"
                         : item.label}
                     </span>
                     <span className="inline-flex items-center gap-1 text-sm leading-5 text-muted-readable">

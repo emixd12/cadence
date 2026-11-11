@@ -77,14 +77,14 @@ describe("desktop authentication", () => {
 
   it("keeps local mode visible and hands a successful session to the next step", () => {
     const local = renderToStaticMarkup(<AccountPanel state={{ status: "local" }} configured connected={false} busy={false} onSignIn={() => {}} onCancel={() => {}} />);
-    expect(local).toContain("Local tracking remains available without an account");
+    expect(local).toContain("Tracking works without an account");
     const linked = renderToStaticMarkup(<AccountPanel state={{ status: "linked", userId: "hosted", email: "owner@example.test" }} configured connected={false} busy={false} onSignIn={() => {}} onCancel={() => {}} />);
     expect(linked).toContain("Your local data has not been uploaded or replaced");
   });
 
   it("shows the account working-copy contract only after the baseline is connected", () => {
     const html = renderToStaticMarkup(<AccountPanel state={{ status: "error", message: "Session revoked." }} configured connected busy={false} onSignIn={() => {}} onCancel={() => {}} />);
-    expect(html).toContain("This Mac remains connected");
+    expect(html).toContain("This Mac is linked to your Cadence account.");
     expect(html).toContain("offline working copy");
     expect(html).not.toContain("No cloud account");
   });

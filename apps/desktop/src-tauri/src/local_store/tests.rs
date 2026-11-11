@@ -706,6 +706,64 @@ fn note_shortcuts_commit_with_notes_atomically_and_survive_restart() {
 }
 
 #[test]
+fn note_shortcuts_are_on_by_default_and_keep_the_global_switch() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    fixture.occurrence();
+    let owner = fixture.profile.clone();
+    let behavior_state = |enabled: bool, revision: i64| NoteShortcutState {
+        id: id(1),
+        user_id: owner.clone(),
+        behavior_id: Some(id(1)),
+        enabled,
+        entries: vec![],
+        excluded_occurrence_ids: vec![],
+        revision,
+        updated_at: NOW.into(),
+    };
+    // Ticket 305: no global row and a per-Behavior flag of false still allow matching.
+    let context = note_shortcut::read_context(&fixture.db, &fixture.profile, Some(&id(1))).unwrap();
+    assert!(context.global_state.is_none());
+    let first = behavior_state(false, 1);
+    fixture.run(json!({"operation":"commitNoteShortcutState","expected":context,"next":first,"requireEnabled":true}),102).unwrap();
+
+    // A stored global off switch is still honoured for matching, but not for removal.
+    let global_context = note_shortcut::read_context(&fixture.db, &fixture.profile, None).unwrap();
+    let off = NoteShortcutState { id: "global".into(), behavior_id: None, ..behavior_state(false, 1) };
+    fixture.run(json!({"operation":"commitNoteShortcutState","expected":global_context,"next":off,"requireEnabled":false}),103).unwrap();
+    let context = note_shortcut::read_context(&fixture.db, &fixture.profile, Some(&id(1))).unwrap();
+    let second = behavior_state(true, 2);
+    assert!(fixture.run(json!({"operation":"commitNoteShortcutState","expected":context,"next":second,"requireEnabled":true}),104).unwrap_err().contains("turned off"));
+    fixture.run(json!({"operation":"commitNoteShortcutState","expected":context,"next":second,"requireEnabled":false}),105).unwrap();
+
+    // Archived Behaviors still reject matching.
+    fixture.db.execute("UPDATE behaviors SET active=0 WHERE user_id=?1 AND id=?2", params![fixture.profile, id(1)]).unwrap();
+    let context = note_shortcut::read_context(&fixture.db, &fixture.profile, Some(&id(1))).unwrap();
+    assert!(fixture.run(json!({"operation":"commitNoteShortcutState","expected":context,"next":behavior_state(true, 3),"requireEnabled":true}),106).unwrap_err().contains("active Behaviors only"));
+}
+
+#[test]
+fn note_shortcut_default_on_migration_turns_a_stored_off_switch_on_once() {
+    let mut fixture = Fixture::at_schema(21);
+    fixture.create();
+    fixture.occurrence();
+    let profile = fixture.profile.clone();
+    fixture.db.execute("INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES('global',?1,NULL,0,'[]','[]',4,'2026-10-01T12:00:00Z')", params![profile]).unwrap();
+    fixture.db.execute("INSERT INTO note_shortcut_states(id,user_id,behavior_id,enabled,entries,excluded_occurrence_ids,revision,updated_at) VALUES(?2,?1,?2,0,'[]','[]',2,'2026-10-01T12:00:00Z')", params![profile, id(1)]).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    let global: NoteShortcutState = db::by_id(&fixture.db, &profile, "global").unwrap();
+    assert!(global.enabled);
+    assert_eq!((global.revision, global.updated_at.as_str()), (4, "2026-10-01T12:00:00Z"));
+    let behavior: NoteShortcutState = db::by_id(&fixture.db, &profile, &id(1)).unwrap();
+    assert!(!behavior.enabled);
+    assert_eq!(behavior.revision, 2);
+    // Applied once: a later stored off value survives reopening.
+    fixture.db.execute("UPDATE note_shortcut_states SET enabled=0 WHERE user_id=?1 AND id='global'", params![profile]).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert!(!db::by_id::<NoteShortcutState>(&fixture.db, &profile, "global").unwrap().enabled);
+}
+
+#[test]
 fn shortcut_note_save_creates_disabled_state_when_settings_changed() {
     let mut fixture = Fixture::new();
     fixture.create();

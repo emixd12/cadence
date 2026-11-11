@@ -186,8 +186,9 @@ calendar selection, visibility, refresh, reconnect, and disconnect controls.
 Calendar selection uses one collapsed multi-select field with wrapping selected
 name tags. Expanding reveals a searchable, scroll-bounded native checkbox list;
 selected entries retain per-calendar Timeline visibility. Escape closes the list
-and returns focus to its summary. Changes remain drafts until Save Calendar
-settings. Refresh Calendar reloads discovery even without saved selections.
+and returns focus to its summary. Each display and selection change saves as it
+changes, then the calendar list reloads (Ticket 303); there is no Save button.
+Refresh Google Calendar reloads discovery even without saved selections.
 Display names prefer Google's per-user override and retain stable calendar IDs.
 The panel shows a factual unavailable state when the deployment lacks Calendar
 OAuth configuration. Desktop shows an unavailable build state when it lacks a
@@ -338,6 +339,17 @@ storage note follow. No separate consent checkbox, "saved base" wording, map-app
 selector or permission-check button. The section carries the `travel` anchor
 that first-run setup opens (Ticket 212).
 
+Ticket 308 puts **Use my current location** beside the Home field; it wraps below the field
+on narrow screens. It is offered once Travel estimates is on with its disclosure accepted;
+until then one muted line reads "To use your current location, turn on Travel estimates
+first." One click reads the device position once, asking for permission if needed, and the
+server turns it into a street address that fills the field. The button reads "Finding your
+address…" while it works. The person checks or edits the address, then saves it as before.
+Each outcome shows one plain status line: filled, location access off, no position shared,
+position not precise enough, no street address found, too many lookups, lookup unavailable,
+or offline. Typing an address always works. The Mac shows the button only when linked to an
+account; local mode keeps typing only.
+
 Ticket 165 adds device-location guidance below the state line. It appears only while
 travel is on and device location is not allowed, not yet allowed or timed out, and
 not during the toggle's own first request. Desktop names System Settings › Privacy &
@@ -380,9 +392,11 @@ Home Behavior.
 Installed acceptance remains in `qa/travel-release.md`.
 
 Travel Settings is one panel (combined October 23, 2026 for the travel release
-train). The setup block comes first: the toggle and its disclosure, Home with its
-marker line, usual travel, Save travel settings, the storage notes, then the device
-location line and Ticket 165's guidance. How you travel (Ticket 217) and Completion
+train). The setup block comes first: usual travel, then the toggle and its
+disclosure (the toggle needs usual travel, so the choice sits above it), Home with
+its marker line, the section's result line, the storage notes, then the device
+location line and Ticket 165's guidance. Usual travel and the toggle save when they
+change; Home saves on blur or Enter (Ticket 303). There is no Save travel settings. How you travel (Ticket 217) and Completion
 places (Ticket 216) follow as subsections, each under a rule with a bold heading and
 one muted description. At 390 px every control stacks in one column.
 
@@ -849,7 +863,20 @@ Ticket 123 implements category create, rename, optional
 plain-text description, reorder, and confirmed delete controls to Settings on
 web and desktop. Deletion shows the affected Behavior count and moves those
 Behaviors to No category while preserving their history. Reuse native fields
-and existing text actions; use Move up / Move down for category order.
+and existing text actions.
+
+Ticket 304 puts the list in a closed drawer. The Categories title and its one-line
+purpose stay in view; an **Edit N categories** button below them opens the list
+(**Edit 1 category** for one, **Add a category** when there are none). Each category is
+one line: a drag handle labelled "Reorder <name>", the name, and **Edit**. **Edit** opens
+the unchanged name, description and delete form under its line. Dragging the handle
+with a mouse or touch moves the category, and the new order saves on drop. Arrow Up and
+Arrow Down on a focused handle move it one place and save each move. The status line
+announces each move ("Fitness moved to position 2 of 8."). Handles are absent with one
+category and inactive while a draft is open or a save runs. The service checks each
+move against the same expected category snapshot as other category edits; a stale
+snapshot is refused, the list reloads in its stored order, and the refusal is shown.
+Move up / Move down are removed.
 
 Ticket 124 implements compact Category and Sort selects to
 Behaviors. Category offers All categories, No category, and owned categories.
@@ -1083,9 +1110,97 @@ Show:
 - Trust, Privacy, and Terms links for public-product account context
 - Account deletion with export acknowledgement and typed confirmation
 
+Web layout (Ticket 301, `docs/DECISIONS.md`, 2026-11-10). Settings has four
+groups, in this order, each with a `text-2xl` title: General (Profile, Timezone,
+Notifications, Categories), Connections (Connected sources, Connected apps),
+Planning (Travel, Daily Brief) and Account and data (Export). A four-link section
+index (General, Connections, Planning, Account) stays in view while the page
+scrolls; on small screens it sits below the app header.
+
+- Each connected source is one closed row: the provider's icon, its name, its
+  kind and its state ("Not connected", "Connected · 3 calendars", "Connected · No
+  calendars chosen", "Needs reconnection", "Not available here"). Opening the
+  row shows the existing source panel.
+- Travel, Daily Brief and Categories keep their title, one-line purpose and
+  state in view. One button below them opens the controls: "Set up Travel" while
+  off and "Travel settings" while on; "Set up Daily Brief" and "Daily Brief
+  settings"; "Edit N categories" with the category count as state. Daily Brief
+  has no separate Google Calendar panel: it reads the Timeline connection
+  (Ticket 307).
+- While a panel loads, its row or drawer says "Checking…". On a failed read it
+  says "Status unavailable" and opens. A row or drawer whose state needs action
+  opens by itself; the person can close it again. Each state comes from one pure
+  function in `lib/ui/settings-sections.ts`.
+- Each section has one heading: a row or drawer that shows the title hides the
+  panel's own heading.
+- Account and data has one Export entry: "Download your history as JSONL, CSV,
+  full JSON, or a BehaviorLog bundle." with **Open Export**.
+- The page ends with one line of Privacy, Terms and Trust links, then Delete
+  account as a plain link. It opens the existing deletion form unchanged.
+- Links to `#timezone`, `#notifications`, `#travel`, `#categories`,
+  `#connected-apps`, `#connector-*` and `#delete-account` open their row or
+  drawer and land below the header and index, and stay there while panels above
+  finish loading, until the reader scrolls, types or taps.
+- Body text keeps its size. There is no horizontal scroll at 390 px.
+- Web Settings shows no Note shortcuts control (Ticket 305 turns the feature on by
+  default).
+
+Desktop layout (Ticket 302). Mac Settings uses the same groups, index, rows and
+drawers, with shared sections in the same group and order as web, and adds a
+fifth group, This Mac (index link "Mac"), after Account and data.
+
+- General: Local profile, then a Cadence account drawer (linked account,
+  synchronization, conflict review, disconnect), Timezone, Notifications
+  (macOS notifications with Reminder coverage) where web shows Notifications, and
+  Categories.
+- Connections: Connected sources as closed rows. Connected apps stays web-only.
+- Planning: Travel and Daily Brief drawers.
+- Account and data: the Export entry; **Open Export** opens the Mac's Export screen.
+- This Mac: Local database, App updates and Setup guide.
+- On a local Mac each source that needs an account is a closed row whose state is
+  "Link a Cadence account" ("Not in this version" when the build has no
+  hosted broker). Daily Brief shows the same state. The Cadence account drawer
+  shows "Not linked" and opens with **Link a Cadence account**.
+- The account drawer's state comes from `desktopAccountSectionState`
+  (`apps/desktop/src/account/account-section-state.ts`). A sync conflict, a
+  first-link choice, a revoked session, a required update or a sign-in error
+  opens it by itself. While the shell's conflict cue shows, the section index and
+  anchors sit 4rem lower so the cue stays visible.
+- In-app navigation to an anchor inside a row or drawer (the conflict cue's
+  `account-conflicts`, Timeline's `travel`) opens it and holds it in place.
+- Legal links and Delete account stay web-only.
+
+Saving (Ticket 303, `docs/DECISIONS.md`, 2026-11-10). Settings save as they change,
+on web and on the Mac, which shares these panels:
+
+- Every checkbox and select saves when it changes. A text field saves on blur or
+  Enter, and only when its text changed: Home, including after **Use my current
+  location** fills it. The fill moves focus to Home so the person can check the
+  address first.
+- Each section has one result line, its only live region (`role="status"`, visually
+  hidden while empty): "Saving…", then "Saved", or one specific error that says what
+  to do. A failed save puts the control back to its saved value and ends with "Your
+  change was undone." Travel's main block, How you travel and Completion places are
+  separate sections; the leave reminder switch and the Home marker report to the line
+  of the section they sit in. Turning Travel estimates on carries the device location
+  outcome in the same line ("Saved. Location access is off. …"), so nothing is announced
+  twice.
+- A control stays enabled while it saves, so focus stays on it. Saves run one at a
+  time from the latest saved revision; calendar choices made during a save collapse
+  into one save of the newest choice, then the calendar list reloads.
+- Three kinds of control keep an explicit action: Timezone, because it reschedules
+  future Occurrences; forms the person opens (the category editor, iCloud credentials,
+  the Hevy key); and Connect, Disconnect and Delete account.
+- Disconnect in every source panel asks first, in place: "Disconnect Google
+  Calendar?" with a destructive **Disconnect** and **Cancel**. Focus moves to Cancel
+  and returns to the button after Cancel. The trigger uses the destructive style, as
+  Connected apps does.
+- On the Mac, a save in progress and an unsaved Home or credentials draft hold an
+  app restart through the existing desktop draft guards.
+
 Desktop Settings additionally shows linked-account synchronization state,
 conflict count and review, and disconnect choices. A conflict also exposes one
-persistent shell cue that opens Settings. Conflict rows show the Mac and account
+persistent shell cue that opens Settings with the Cadence account drawer open. Conflict rows show the Mac and account
 values with radio controls for Use account version and Use this Mac version.
 Keep both appears only when the resolver proves a complete identity-preserving
 duplicate; no current conflict class qualifies. Disconnect offers Keep a local
@@ -1095,7 +1210,7 @@ disconnect without blocking local tracking.
 
 The public `/trust` page keeps durable product commitments separate from current verification evidence. It always shows all nine checks with text and symbols, exact UTC timestamps, scope, limits, and immutable evidence links. Passed requires a valid, fresh snapshot for the current source commit and both deployments. Feed failures show a validated cached copy as Stale, or Unavailable when no validated copy exists.
 
-Timezone detection should use the browser/OS timezone exposed by `Intl.DateTimeFormat().resolvedOptions().timeZone`; do not request geolocation or location permission. Settings should present one native select of IANA timezones whose selected value is the stored timezone; the select is the only "current timezone" display, with no separate stored or browser-detected value rows. When the detected browser timezone differs from the current selection, show a single quiet Detected line with an inline Use detected timezone action; when they match or detection is unavailable, show nothing. If the browser cannot enumerate timezones, fall back to manual IANA timezone entry. Before submit, Settings should state that saving a timezone updates the profile and active behavior schedules, then resyncs future unresolved occurrences while preserving past and resolved history.
+Timezone detection should use the browser/OS timezone exposed by `Intl.DateTimeFormat().resolvedOptions().timeZone`; do not request geolocation or location permission. Settings should present one native select of IANA timezones whose selected value is the stored timezone; the select is the only "current timezone" display, with no separate stored or browser-detected value rows. Each option reads as a place ("New York") grouped by region, and its value stays the IANA name (Ticket 309). When the detected browser timezone differs from the current selection, show a single quiet "Your device is set to {place}." line with an inline Use device timezone action; when they match or detection is unavailable, show nothing. If the browser cannot enumerate timezones, fall back to manual IANA timezone entry. Before submit, Settings should state that saving a timezone updates the profile and active behavior schedules, then resyncs future unresolved occurrences while preserving past and resolved history.
 
 Do not include a test notification button in v1.
 
@@ -1150,11 +1265,14 @@ archiving rules are added.
 
 ## Note shortcut controls (Tickets 126–128)
 
-Existing Behavior settings contain a Note shortcuts section with its persisted
-opt-in, Find repeated Notes action, proposed text with Accept/Edit/Dismiss, and
-accepted text with Edit/Remove. Global Settings contains the feature off control.
-Explain that matching uses repeated Notes for this Behavior and runs only on request.
-Show insufficient evidence and request errors without blocking ordinary Note entry.
+Existing Behavior settings contain a Note shortcuts section with proposed text
+(Accept/Edit/Dismiss) and accepted text (Edit/Remove). Since Ticket 305 it has no
+enable switch and no Find repeated Notes action, and Settings has no Note shortcuts
+control on web or Mac. The section explains that saving the same Note on three
+Occurrences of the Behavior produces a suggestion, and that accepting it puts it above
+the Note field. If the retained account switch is stored off, the section says Note
+shortcuts are turned off and keeps Remove available. Show request errors without
+blocking ordinary Note entry; a failed match after a save never fails the save.
 If shortcut reads fail, show an unavailable notice and disable those controls.
 Keep the tracking screen and ordinary Note entry usable; mutation failures remain errors.
 
@@ -1236,7 +1354,7 @@ with none, with its reason as the indented evidence line.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):
-"Include reminder delivery history" and "Include Notes on Not Completed occurrences".
+"Include reminder delivery history" and "Include Notes on Not Completed Occurrences".
 
 The workbench adds an Analysis scenario select, an Analysis lanes fieldset per
 configuration (lane checkboxes with their questions, "Allow one pattern tip", and
@@ -1273,11 +1391,32 @@ A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
 
-## Daily Brief Calendar connection (Ticket 187)
+## Daily Brief source choice (Ticket 306)
 
-Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.
-Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
-Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
-Explain that model sharing requires the separate Daily Brief control after connection and selection.
-Under that Daily Brief control, a disclosure line (`daily-brief-calendar-disclosure`) names what is sent: today's event times, timezone, availability and response, never titles, descriptions, locations or attendees, and never the Timeline connection.
-The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.
+`DailyBriefSettingsPanel` shows, in order:
+
+1. **Daily Brief**, a native checkbox.
+2. **Plan around my connected sources**, a native checkbox, off by default and
+   disabled while Daily Brief is off. With nothing connected it cannot be turned on;
+   a choice already on stays enabled so it can be turned off. A line under it
+   (`daily-brief-sources-coverage`) names the connected sources it covers and says a
+   later source is covered, or says that nothing is connected yet or that every
+   connected source is excluded.
+3. **Advanced: choose sources**, a closed native `details` disclosure. It lists each
+   connected source (Google Calendar, Outlook Calendar, iCloud Calendar, Hevy) as a
+   checkbox, checked unless excluded and disabled while the one choice is off. Each
+   row keeps its `aria-describedby` statement of what is sent and adds "Daily Brief
+   uses it." while it is used, or a no-selected-calendars note. The reminder-history
+   and Notes checkboxes follow when the server offers them.
+
+The OpenAI paragraph and the desktop hosted-context line stay below. All controls
+keep 44px targets and wrap at 390px.
+
+## Daily Brief Calendar connection (Ticket 187, retired by Ticket 307)
+
+Settings no longer shows **Google Calendar for Daily Brief** on web or desktop, and
+`GoogleCalendarPanel` has no agent mode. Google Calendar for Daily Brief is the
+Timeline connection's Google Calendar row under **Advanced: choose sources**. Its
+statement (`daily-brief-google-disclosure`) names what is sent: today's event times,
+timezone, availability and response for the calendars selected for Timeline, never
+titles, descriptions, locations or attendees.

@@ -2019,9 +2019,10 @@ against the hosted project without asking each time, when every condition holds:
 Anything else still needs the owner's yes: destructive or data-changing migrations,
 `--include-seed`, Auth or project settings, Dashboard edits, and any other Supabase project.
 
-Credential: agents use the `cadence-agents` item in the Cadence Agents vault, a Supabase
+Credential: agents use the `supabase-access-token` item in the Cadence Agents vault, a Supabase
 personal access token, through `npm run agent:secret -- --env
-SUPABASE_ACCESS_TOKEN=cadence-agents -- npm run supabase -- db push`. Supabase tokens reach
+SUPABASE_ACCESS_TOKEN=supabase-access-token -- npm run supabase -- db push`. (The item was
+first titled `cadence-agents`; the owner asked on November 11, 2026 for a more specific name.) Supabase tokens reach
 the whole account, not one project, so this decision, not the token, limits agents to the
 Cadence project. The preflight requirement is `vault-supabase-access-token` (suite
 `hosted-migrations`). The owner's own CLI login stays the owner's credential.
@@ -2054,6 +2055,55 @@ hold workflow logic. Details: `docs/OPERATIONS.md`, "Branches and worktrees". Ru
 
 Platform impact: agent tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-10: Settings regroup and simplification (Tickets 301–309)
+
+A usability evaluation of web Settings on November 9, 2026 measured a new account's page at
+6,470 px, 1,265 visible words and 59 controls at 1280×800, in one stack of 12 sections with
+no index. The owner reviewed a mock in the design-system bench
+(`/design-system?preview=settings-regroup`) on November 9 and 10 and decided, in the owner's
+words:
+
+- Rows: "They should start collapsed."
+- Body text: "I want to keep the old body text size".
+- Delete account: "should be something that only someone determined to find should find, of
+  course making sure we follow the standards for such a feature."
+- Source icons: "Yes source official icons".
+- Note shortcuts: "should simply be enabled by default" and "individual behaviors should not
+  have to authorize the feature individually". Then: "Lets remove the settings switch
+  entirely in the UI, but it should remain something we can expose later".
+- Categories: option C (a closed list), plus "the ability for users to drag to rearrange the
+  order of their Categories". The section title stays outside the drawer, with an open
+  button below it. Travel and Daily Brief: "Yes lets have those follow the same pattern".
+- Daily Brief sources: "One choice should cover every connected source". Per-source choices
+  move under Advanced.
+- Home: "we should let the user use their current location for easy setting".
+- Wording: "Across the board, we should prioritize clear and delightful language."
+- Legal questions: "we are not concerned with legal issues during development, we simply
+  log finding in the legal surface for later review". This restates the 2026-11-04 rule.
+
+Proposed by the agent and shown in the mock. The owner confirmed all three on November 10,
+when asked before Tickets 301–309 started ("Confirm all three"):
+
+- Auto-save with three exceptions (Ticket 303). The owner said auto-save "has become pretty
+  standard across the board".
+- Trust and legal as one line of links at the end of Settings (Ticket 301). The owner said
+  the section "probably belongs outside of settings".
+- A source connected after the Daily Brief choice is covered by that choice (Ticket 306).
+
+The same day the owner authorized pushing Ticket 307's non-additive hosted migration after
+the pull request merges ("Push after merge"). It revokes the Daily Brief Google Calendar
+grants at Google and deletes their stored credentials and selections.
+
+This supersedes, when each ticket lands: the per-Behavior opt-in and on-request matching in
+"2026-09-07: Recurring Note shortcuts contract"; the separate default-off Daily Brief
+disclosure per source (Ticket 239, `docs/INTEGRATION_PLAYBOOK.md`); and the separate Daily
+Brief Google Calendar grant (Ticket 187). Legal entries L-020 and L-021 and messaging
+entries P-033 to P-036 are logged and hold nothing.
+
+Platform impact: web in Tickets 301 and 303–309; desktop in Ticket 302 and in each ticket's
+table; marketing only through P-035; future mobile inherits the web page at 390 px.
+Messaging impact: P-033, P-034, P-035, P-036.
 
 ## 2026-11-10: Connector completion, starting with Hevy (D28)
 

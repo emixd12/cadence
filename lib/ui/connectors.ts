@@ -342,10 +342,10 @@ export function outlookCallbackMessage(code: string | null | undefined): string 
   if (code === "cancelled" || code === "consent_denied") return "Outlook Calendar permission was not granted. You can try again.";
   if (code === "admin_approval_required") return "Your organization must approve Cadence before Outlook Calendar can connect.";
   if (code === "wrong_account") return "Another Microsoft account is still connected. Disconnect Outlook Calendar first, then connect the other account.";
-  if (code === "expired_attempt") return "That Outlook Calendar connection expired. Start the connection again.";
+  if (code === "expired_attempt") return "That Outlook Calendar connection timed out. Connect Outlook Calendar again.";
   if (code === "unauthenticated") return "Sign in to the same Cadence account and connect Outlook Calendar again.";
-  if (code === "not_configured") return "Outlook Calendar connection is not configured for this Cadence deployment.";
-  if (code === "error" || code === "invalid_request" || code === "provider_unavailable") return "Outlook Calendar connection could not complete. Try connecting again.";
+  if (code === "not_configured") return "This Cadence server cannot connect Outlook Calendar.";
+  if (code === "error" || code === "invalid_request" || code === "provider_unavailable") return "Outlook Calendar did not connect. Try again.";
   return undefined;
 }
 

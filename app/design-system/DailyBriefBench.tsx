@@ -60,7 +60,7 @@ async function fetchAccount(signal: AbortSignal): Promise<Account> {
   return body;
 }
 
-import type { DailyBriefClient } from "@/lib/ui/daily-brief";
+import type { DailyBriefClient, DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
@@ -71,12 +71,18 @@ import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchGeneration, BenchProposal } from "@/lib/services/briefing-bench-store";
 import type { DailyBriefCallUsage } from "@/lib/services/daily-brief-consumer";
 
+function benchDailyBriefSettings(input: DailyBriefPreferenceInput, revision: number): DailyBriefSettings {
+  return { accountRef: "bench-account", available: true, revision, localDate: "2026-09-20", timezone: "America/New_York", ...input,
+    sourceStatus: { googleCalendar: "ready", outlookCalendar: "no_calendars", icloudCalendar: "not_connected", hevy: "ready" },
+    includeCalendar: input.useConnectedSources && !input.excludedSources.googleCalendar, includeOutlookCalendar: false, includeIcloudCalendar: false,
+    includeHevy: input.useConnectedSources && !input.excludedSources.hevy };
+}
+
 const client: DailyBriefClient = {
-  // Ticket 239 states: Outlook allowed but reselected since (Allow again), Hevy disclosed while disconnected, iCloud not offered.
-  preferences: async () => ({ accountRef: "bench-account", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York",
-    includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true, connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: false },
-    connectorAttention: { outlookCalendar: "changed", icloudCalendar: null, hevy: "unavailable" } }),
-  updatePreferences: async (input) => ({ accountRef: "bench-account", available: true, revision: 2, localDate: "2026-09-20", timezone: "America/New_York", ...input }),
+  // Ticket 306 states: the one choice on, Hevy excluded, Outlook with no selected calendar, iCloud not connected.
+  preferences: async () => benchDailyBriefSettings({ enabled: true, useConnectedSources: true,
+    excludedSources: { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: true }, includeReminderHistory: false, includeNotes: false }, 1),
+  updatePreferences: async (input) => benchDailyBriefSettings(input, 2),
   requestBrief: async () => ({ state: "already_attempted" }),
 };
 

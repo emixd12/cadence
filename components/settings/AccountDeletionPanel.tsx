@@ -7,6 +7,7 @@ import {
   type AccountDeletionActionState,
 } from "@/lib/types/account";
 import { CONNECTOR_REVOCATION_COPY } from "@/lib/ui/connectors";
+import { useSettingsHeading, type SettingsHeadingLevel } from "@/components/settings/settings-heading";
 
 export type DeleteAccountAction = (
   state: AccountDeletionActionState,
@@ -17,11 +18,15 @@ export function AccountDeletionPanel({
   confirmationLabel,
   deleteAccountAction,
   initialState = ACCOUNT_DELETION_INITIAL_STATE,
+  headingLevel,
 }: Readonly<{
   confirmationLabel: string;
   deleteAccountAction: DeleteAccountAction;
   initialState?: AccountDeletionActionState;
+  /** Ticket 301: omit to follow the surrounding scope; `null` when the Delete account link above names it. */
+  headingLevel?: SettingsHeadingLevel | null;
 }>) {
+  const heading = useSettingsHeading(headingLevel);
   const [state, formAction, isPending] = useActionState(
     deleteAccountAction,
     initialState,
@@ -40,8 +45,8 @@ export function AccountDeletionPanel({
 
   return (
     <section className="bg-background py-4 first:pt-0 last:pb-0">
-      <h2 className="text-xl leading-tight">Delete account</h2>
-      <div className="mt-4 grid gap-5">
+      {heading.show ? <heading.Tag className="text-xl leading-tight">Delete account</heading.Tag> : null}
+      <div className={heading.show ? "mt-4 grid gap-5" : "grid gap-5"}>
         <div className="grid max-w-2xl gap-3 text-sm leading-6 text-muted-readable">
           <p>
             Account deletion removes the signed-in Cadence account and its
@@ -104,8 +109,8 @@ export function AccountDeletionPanel({
             className="min-h-11 max-w-md border border-line bg-background px-3 py-2 text-base"
           />
           <p className="text-sm leading-6 text-muted-readable">
-            Deletion unlocks after the export acknowledgement and typed
-            confirmation match.
+            Delete account turns on after you check the box and type the
+            confirmation.
           </p>
 
           <button
@@ -113,7 +118,7 @@ export function AccountDeletionPanel({
             disabled={isPending || !canSubmit}
             className="product-action product-action-danger min-h-11 w-fit py-2 text-sm"
           >
-            {isPending ? "Deleting..." : "Delete account"}
+            {isPending ? "Deleting…" : "Delete account"}
           </button>
 
           {state.message ? (

@@ -3,6 +3,11 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { SettingsDisconnect } from "@/components/settings/SettingsDisconnect";
+import { SettingsLiveLine } from "@/components/settings/settings-result";
+import { DesktopDraftGuard } from "@/lib/desktop-draft";
+import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import { CONNECTOR_REVOCATION_COPY, connectorErrorCode, type HevyCoordinator } from "@/lib/ui/connectors";
 
@@ -22,11 +27,13 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
   const [apiKey, setApiKey] = useState("");
   const [pending, setPending] = useState<"connect" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useReportSettingsSection(connectorSectionState(settingsSectionLoad(connection, loadFailed)));
 
   useEffect(() => {
     let active = true;
-    void coordinator.getConnection().then((view) => { if (active) { setConnection(view); setMessage(null); } })
-      .catch(() => { if (active) setMessage("Hevy status is unavailable. Other sources and tracking are unaffected."); });
+    void coordinator.getConnection().then((view) => { if (active) { setConnection(view); setLoadFailed(false); setMessage(null); } })
+      .catch(() => { if (active) { setLoadFailed(true); setMessage("Cadence could not check Hevy. Other sources and tracking still work."); } });
     return () => { active = false; };
   }, [coordinator, refreshVersion]);
   useEffect(() => () => setApiKey(""), []);
@@ -53,7 +60,7 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
       else if (result.snapshot.completeness !== "complete") setMessage("Hevy refresh was incomplete. Some workouts may be missing.");
       else setMessage(`Hevy refreshed. ${result.snapshot.activities.length === 1 ? "1 recorded workout" : `${result.snapshot.activities.length} recorded workouts`} today.`);
     } catch (error) {
-      setMessage(hevyErrorMessage(connectorErrorCode(error), "Hevy refresh did not finish. Try again; other sources and tracking are unchanged."));
+      setMessage(hevyErrorMessage(connectorErrorCode(error), "Hevy did not refresh. Try again. Other sources and tracking are unchanged."));
     } finally { setPending(null); }
   };
   const disconnect = async () => {
@@ -62,7 +69,7 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
       const result = await coordinator.disconnect();
       setConnection(result.view);
       setMessage(`Hevy disconnected. Cadence deleted its saved API key. ${CONNECTOR_REVOCATION_COPY[result.revocation]}`);
-    } catch (error) { setMessage(hevyErrorMessage(connectorErrorCode(error), "Hevy disconnect could not finish.")); }
+    } catch (error) { setMessage(hevyErrorMessage(connectorErrorCode(error), "Hevy did not disconnect. Try again.")); }
     finally { setPending(null); }
   };
 
@@ -73,10 +80,13 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
     <SettingsPanel id="connector-hevy" headingLevel={3} title="Hevy"
       description="Recorded activity. Cadence reads when each workout started and how long it lasted. Provider responses can contain exercises, titles, notes, sets and weights; Cadence discards these details. A workout never completes a Behavior.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
-        <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? hevyStatusLabel(status)}</p>
-        {status === "not_configured" ? <p className="text-muted-readable">Hevy connection is not configured for this Cadence deployment.</p> : null}
+        <SettingsLiveLine text={message} className="text-muted-readable" />
+        {message ? null : <p className="text-muted-readable">{hevyStatusLabel(status)}</p>}
+        {status === "not_configured" ? <p className="text-muted-readable">This Cadence server cannot connect Hevy.</p> : null}
         {needsKey ? <form onSubmit={connect} className="grid gap-3 border-t border-line pt-4">
-          <p className="text-muted-readable">Hevy API access requires Hevy Pro. Create a key in Hevy settings and enter it once. Cadence stores it encrypted on its server, never on this device, and scans at most 500 workouts across your full history, even for today. A larger history shows as incomplete. A complete read means no change was detected during the scan, not an atomic snapshot.</p>
+          {/* An opened form keeps its explicit action; a typed key holds a desktop restart. */}
+          <DesktopDraftGuard dirty={apiKey !== ""} onDiscard={() => setApiKey("")} />
+          <p className="text-muted-readable">Hevy API access requires Hevy Pro. Create a key in Hevy settings and enter it once. Cadence stores it encrypted on its server, never on this device, and scans at most 500 workouts across your full history, even for today. A larger history shows as incomplete. A complete refresh means Hevy reported no changes while Cadence read it.</p>
           <label htmlFor={keyId} className="font-bold text-foreground">Hevy API key</label>
           <input id={keyId} type="password" autoComplete="off" spellCheck={false} autoCapitalize="none" value={apiKey}
             onChange={(event) => setApiKey(event.target.value)} disabled={pending !== null}
@@ -89,7 +99,8 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
           <p className="text-muted-readable">Disconnecting deletes Cadence&apos;s saved key. Hevy keeps the key active until you remove or regenerate it there.</p>
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
             <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Hevy…" : "Refresh Hevy"}</button>
-            <button type="button" onClick={disconnect} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "disconnect" ? "Disconnecting Hevy…" : "Disconnect Hevy"}</button>
+            <SettingsDisconnect label="Disconnect Hevy" question="Disconnect Hevy?" pendingLabel="Disconnecting Hevy…"
+              pending={pending === "disconnect"} disabled={pending !== null} onConfirm={() => { void disconnect(); }} />
           </div>
         </> : null}
       </div>
@@ -98,11 +109,11 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
 }
 
 function hevyStatusLabel(status: ConnectorConnectionView["status"] | "loading"): string {
-  if (status === "loading") return "Loading Hevy connection.";
+  if (status === "loading") return "Checking Hevy…";
   if (status === "connected") return "Hevy connected.";
   if (status === "reconnect_required") return "Hevy needs a current API key.";
   if (status === "disconnected") return "Hevy is not connected.";
-  return "Hevy connection is not configured.";
+  return "This Cadence server cannot connect Hevy.";
 }
 
 export function hevyErrorMessage(code: string, fallback: string): string {
@@ -110,10 +121,10 @@ export function hevyErrorMessage(code: string, fallback: string): string {
   if (code === "reconnect_required") return "Hevy did not accept this key. Check it in Hevy settings and enter it again.";
   if (code === "wrong_account") return "This key belongs to a different Hevy account. Disconnect Hevy first, then connect the other account.";
   if (code === "invalid_request") return "Enter a valid Hevy API key.";
-  if (code === "incomplete_pagination") return "Hevy could not verify a complete list. The scan is limited to 500 workouts; changes during the scan can also make it incomplete.";
-  if (code === "timeout") return "Hevy did not respond in time. Try again; other sources and tracking are unchanged.";
+  if (code === "incomplete_pagination") return "Hevy did not return a complete list. Cadence reads up to 500 workouts, and changes made during a refresh can also leave gaps.";
+  if (code === "timeout") return "Hevy did not respond in time. Try again. Other sources and tracking are unchanged.";
   if (code === "rate_limited") return "Hevy asked Cadence to wait before reading again. Try again later.";
-  if (code === "not_configured") return "Hevy connection is not configured for this Cadence deployment.";
+  if (code === "not_configured") return "This Cadence server cannot connect Hevy.";
   if (code === "unauthenticated") return "Sign in to Cadence again to manage Hevy.";
   return fallback;
 }

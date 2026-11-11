@@ -56,6 +56,7 @@ import {
   readOccurrenceSyncState,
   type OccurrenceSyncCoverageDecision,
 } from "@/lib/services/occurrence-sync-state.service";
+import { matchRepeatedNotesAfterNoteSave } from "@/lib/services/note-shortcut.service";
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -696,7 +697,7 @@ export async function updateOccurrenceNoteFromFormData(
 ): Promise<void> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await updateOccurrenceNote(supabase, userId, {
+  const occurrence = await updateOccurrenceNote(supabase, userId, {
     occurrenceId: getOccurrenceIdFromFormData(formData),
     expectedNote: getExpectedNoteFromFormData(formData),
     note: getNoteFromFormData(formData),
@@ -704,6 +705,7 @@ export async function updateOccurrenceNoteFromFormData(
       ? { usedShortcut: true }
       : {}),
   });
+  await matchRepeatedNotesAfterNoteSave(supabase, userId, occurrence.behavior_id);
 }
 
 export async function updateOccurrenceNote(
