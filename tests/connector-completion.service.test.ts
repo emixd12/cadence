@@ -7,6 +7,7 @@ import type { CompletionSourceEvidence, CompletionSourcePort } from "@/lib/servi
 import {
   RECONCILE_MAX_WRITES,
   parseReconcileBody,
+  rearmConnectorCompletionChecks,
   reconcileConnectorCompletions,
   type ConnectorCompletionStore,
 } from "@/lib/services/connector-completion.service";
@@ -248,3 +249,24 @@ describe("source link service (Ticket 316)", () => {
       .toMatchObject({ available: false, routines: [] });
   });
 });
+
+describe("re-arming background checks (Ticket 321 review)", () => {
+  it("schedules a visit only where none is scheduled", async () => {
+    const calls: Array<[string, ...unknown[]]> = [];
+    const chain = {
+      update(values: unknown) { calls.push(["update", values]); return chain; },
+      eq(column: string, value: unknown) { calls.push(["eq", column, value]); return chain; },
+      is(column: string, value: unknown) { calls.push(["is", column, value]); return Promise.resolve({ error: null }); },
+    };
+    const client = { from(table: string) { calls.push(["from", table]); return chain; } } as unknown as ConnectorCaller["client"];
+    await rearmConnectorCompletionChecks(client, "user-1", "hevy", "2026-11-10T23:00:00Z");
+    expect(calls).toEqual([
+      ["from", "connector_completion_state"],
+      ["update", { next_check_at: "2026-11-10T23:00:00Z" }],
+      ["eq", "user_id", "user-1"],
+      ["eq", "source", "hevy"],
+      ["is", "next_check_at", null],
+    ]);
+  });
+});
+

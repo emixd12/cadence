@@ -54,11 +54,17 @@ export async function connectHevy(caller: ConnectorCaller, body: unknown, option
   const entry = body as Record<string, unknown>;
   const keys = Object.keys(entry);
   if (keys.length !== 1 || keys[0] !== "apiKey" || typeof entry.apiKey !== "string") throw new ConnectorError("invalid_request");
-  return connectDirectCredential(caller, { provider: "hevy", apiKey: entry.apiKey }, async (credential) => {
+  const view = await connectDirectCredential(caller, { provider: "hevy", apiKey: entry.apiKey }, async (credential) => {
     if (credential.provider !== "hevy") throw new ConnectorError("invalid_request");
     try { return await verifyHevyApiKey(credential.apiKey, options); }
     catch (error) { throw connectorError(error); }
   });
+  // Ticket 321: a reconnect resumes background completion checks a disconnect stopped.
+  // Best effort: connecting never fails on this.
+  await import("./connector-completion.service")
+    .then(({ rearmConnectorCompletionChecks }) => rearmConnectorCompletionChecks(caller.client, caller.user.id, "hevy", new Date().toISOString()))
+    .catch(() => undefined);
+  return view;
 }
 
 export function disconnectHevy(caller: ConnectorCaller): Promise<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }> {

@@ -329,6 +329,8 @@ export function createConnectorCompletionStore(caller: ConnectorCaller, client: 
           : { consecutive_failures: Math.min(1000, (current?.consecutiveFailures ?? 0) + 1) })
         .eq("user_id", userId).eq("source", source);
       if (error) throw new ConnectorError("provider_unavailable");
+      // A successful read re-arms background checks that a disconnect stopped.
+      if (outcome.succeeded) await rearmConnectorCompletionChecks(client, userId, source, outcome.at);
     },
     async readConnection(source) {
       const connection = await readConnectorConnection(client, userId, source);
@@ -381,6 +383,23 @@ export function createConnectorCompletionStore(caller: ConnectorCaller, client: 
       }).catch(() => undefined);
     },
   };
+}
+
+/**
+ * Ticket 321: background checks stop (`next_check_at` null) while a source is
+ * disconnected. A reconnect or a successful reconcile schedules the next visit now,
+ * only when no visit is scheduled. Writes nothing when the account has no state row.
+ */
+export async function rearmConnectorCompletionChecks(
+  client: AppSupabaseClient,
+  userId: string,
+  source: RecordedActivitySourceV1_1,
+  at: string,
+): Promise<void> {
+  const { error } = await client.from("connector_completion_state")
+    .update({ next_check_at: at })
+    .eq("user_id", userId).eq("source", source).is("next_check_at", null);
+  if (error) throw new ConnectorError("provider_unavailable");
 }
 
 function compareEvents(left: { recorded_at: string; created_at: string; id: string }, right: { recorded_at: string; created_at: string; id: string }): number {

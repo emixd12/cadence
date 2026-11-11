@@ -314,9 +314,12 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     // Rule 4 and rule 7: one match per activity and Behavior, ever.
     const existing = matchesByActivityBehavior.get(activityBehaviorKey(activity.id, link.behaviorId));
     if (existing) {
+      // Stored timestamps may use another representation of the same instant (+00:00), so
+      // compare instants: an unchanged workout must not spend the run's write budget.
+      const timingChanged = !sameInstant(existing.activityStartAt, activity.startAt)
+        || !sameInstant(existing.activityEndAt, activity.endAt);
       if (existing.state === "active" && !removed.has(existing.id) && existing.occurrenceId === occurrence.id
-        && (existing.activityStartAt !== activity.startAt || existing.activityEndAt !== activity.endAt)
-        && activity.duration.seconds >= input.minimumDurationSeconds) {
+        && timingChanged && activity.duration.seconds >= input.minimumDurationSeconds) {
         plan.attach.push({ ...target, reason: "timing_refresh", matchId: existing.id });
         return;
       }
@@ -389,6 +392,10 @@ function nearestOccurrence(
     distance(left) - distance(right)
     || Temporal.Instant.compare(Temporal.Instant.from(left.scheduledStartAt), Temporal.Instant.from(right.scheduledStartAt))
     || compareText(left.id, right.id))[0];
+}
+
+function sameInstant(left: string, right: string): boolean {
+  return Temporal.Instant.compare(Temporal.Instant.from(left), Temporal.Instant.from(right)) === 0;
 }
 
 function localDateOf(instant: string, timezone: string): string {

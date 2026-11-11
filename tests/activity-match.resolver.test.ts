@@ -354,6 +354,13 @@ describe("activity match resolver: removal", () => {
     expect(plan.attach).toMatchObject([{ reason: "timing_refresh", matchId: "m1", activityStartAt: "2026-11-10T22:10:00Z" }]);
   });
 
+  it("plans no refresh when stored timestamps name the same instants differently", () => {
+    const stored = { ...completion, activityStartAt: "2026-11-10T22:00:00+00:00", activityEndAt: "2026-11-10T22:45:00.000000+00:00" };
+    const plan = run({ occurrences: [completed], evidence: evidence([work]), matches: [stored] });
+    expect(plan.attach).toEqual([]);
+    expect(plan.skip).toContainEqual({ activityRef: work.id, behaviorId: "legday", reason: "already_matched" });
+  });
+
   it("does not complete again in the same run after planning a revert", () => {
     const replacement = activity("w3", "2026-11-10T21:00:00Z", 45, [LEGS]);
     const plan = run({ occurrences: [completed], evidence: evidence([replacement]), matches: [completion] });
