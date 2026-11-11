@@ -334,6 +334,57 @@ Not in the manifest (from the test access inventory), one reason each:
   custody is not documented in the repo, and the owner supplies them with each notarization
   instruction through the per-version `build-env.sh`.
 
+## Cadence Release vault (2026-11-11, Ticket 325)
+
+Release signing secrets have their own vault and service account (`docs/DECISIONS.md`,
+2026-11-11, D29). `agent:secret` never reads this vault. `npm run release:credentials`
+does, and only with the owner's `release-secrets` approval for the run, except for the
+`fingerprint`, `expires`, `key id`, `issuer id` and `complete` fields.
+
+Emi's one-time setup:
+
+1. In the 1Password app, create a vault named **Cadence Release**. Move or rename these
+   items into it:
+   - the Developer ID `.p12` and its passphrase, as **Cadence Developer ID Application**
+     (attachment `identity.p12`, password field `password`, text field `fingerprint` with
+     the identity's SHA-1);
+   - the notarization app-specific password, as **Cadence Apple notarization** (fields
+     `password` and `account`);
+   - **Cadence updater signing key 2026-11** (attachments `cadence-updater.key` and
+     `cadence-updater.key.pub`, fields `password` and `fingerprint`).
+
+   Add a text field `complete` with the value `yes` to each item once its attachments and
+   fields are in place. `verify-backups` reports an item without it as incomplete; agent
+   backups set it last, after every attachment uploads.
+
+   Items with other names or fields are fine to leave. An agent can make new ones with
+   `release:credentials backup` once the service account exists, and you delete the old
+   ones afterwards.
+2. Create a service account that can read and write Cadence Release and nothing else, in
+   your own Terminal:
+
+   ```bash
+   op service-account create "Cadence release" --vault "Cadence Release:read_items,write_items" --expires-in 90d
+   ```
+
+   Not verified on this account: write access for a service account. If 1Password
+   refuses it, create it with `read_items` only; agents then restore and verify, and you
+   create backup items by hand.
+3. Store the token under its own Keychain service:
+
+   ```bash
+   pbpaste | npm run agent:secret -- --store-token --keychain-service cadence-release-1password
+   ```
+
+4. Check it. This lists vault and item names only:
+
+   ```bash
+   npm run release:credentials -- probe vault
+   ```
+
+For each run that reads or writes a secret, say so in chat. The agent records
+`release-secrets` in the run folder (`docs/DESKTOP_RELEASE.md`, "Signing credentials").
+
 ## Security notes
 
 - `-T /usr/bin/security` lets any process running as Emi read the token without a

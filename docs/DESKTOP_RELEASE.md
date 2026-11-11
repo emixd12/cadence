@@ -312,6 +312,80 @@ damage the computer is not an ordinary unidentified-developer warning; stop and
 inspect it. Never disable Gatekeeper globally or remove quarantine to count a
 test as passed. See [Apple's per-app approval instructions](https://support.apple.com/102445).
 
+## Signing credentials
+
+Ticket 325 and `docs/DECISIONS.md`, 2026-11-11 (D29). The non-secret inventory is
+`apps/desktop/release-credentials.json`. Change it in the same commit as any credential.
+
+| Credential | On this Mac | Cadence Release vault item | Expires |
+|---|---|---|---|
+| Developer ID Application identity | Login keychain | Cadence Developer ID Application (`identity.p12`, `password`, `fingerprint` = identity SHA-1) | December 11, 2027 |
+| Developer ID provisioning profile | `Cadence Release/apple/Cadence_Desktop_Developer_ID_2026-11.provisionprofile` | None; download it again from the portal | November 6, 2044 |
+| Notarization: app-specific password, until D29.4 lands | Login keychain, service "Cadence Apple notarization" | Cadence Apple notarization (`password`, `account`) | When revoked |
+| Notarization: App Store Connect API key, after D29.4 | `Cadence Release/apple/notary/AuthKey.p8` and `api-key.json` | Cadence App Store Connect API key (`AuthKey.p8`, `key id`, `issuer id`) | When revoked |
+| Updater signing key | `Cadence Release/updater-2026-11/`; password in the login keychain | Cadence updater signing key 2026-11 (both key files, `password`, `fingerprint`) | Never; losing it forces a hand install |
+| Developer ID G2 intermediate | Login keychain | None; download it from apple.com/certificateauthority | September 17, 2031 |
+
+### Checks
+
+```bash
+npm run release:credentials -- status
+npm run release:credentials -- verify-backups
+```
+
+`status` reads no secret. It fails when the identity is not valid, when the profile does not
+list the installed certificate or does not authorize `Entitlements.plist`, or when a
+notarization or updater credential is missing. It warns 60 days before an expiry.
+`verify-backups` requires each vault item's `complete` marker, which a backup sets after its
+last attachment, and compares its `fingerprint` with this Mac. The
+`desktop-release` preflight runs both.
+
+### After a lost or reset login keychain
+
+macOS sets the old keychain aside as `~/Library/Keychains/old-login.keychain-db` when the
+login password is reset without the old one. To confirm a reset, read
+`passwordLastSetTime` from `dscl . -read /Users/<user> accountPolicyData`. The old keychain
+opens only with the password it had before the reset. Apple cannot recover it.
+
+1. The owner approves `release-secrets` for one run, in chat. The agent records it:
+   `node scripts/acceptance/access/record.mjs record --scope run --run-dir <run-dir> --id release-secrets --source "owner approved in chat"`.
+2. The agent runs `npm run release:credentials -- restore --run <run-dir>`. It imports the
+   identity with access for `codesign` and `security`, adds the keychain passwords and
+   writes the key files. It skips anything already present and never replaces an item.
+3. If the identity is imported but not valid, install the Developer ID G2 intermediate
+   into the **login** keychain. In Keychain Access, select login first: importing with
+   iCloud selected fails with error -25294 ("The specified keychain could not be found").
+4. `status` and `verify-backups` pass. Restore needs the Cadence Release service-account
+   token in the keychain. If the token was lost too, the owner stores it again
+   (`docs/qa/agent-secrets.md`, "Cadence Release vault").
+
+### Renewing the Developer ID certificate
+
+The certificate issued on November 11, 2026 runs 13 months, to December 11, 2027; the one
+from September 2026 ran five years. Plan on the shorter term. Builds signed and notarized
+before expiry keep working.
+
+1. The agent makes a key and a certificate signing request with `openssl` in a private
+   temporary folder.
+2. The agent requests a Developer ID Application certificate (G2 Sub-CA) and a Developer
+   ID profile for `app.cadence.desktop` that lists it. The App Store Connect API is tried
+   first (Ticket 325 spike). Otherwise the agent uses the Apple Developer portal in Chrome,
+   1Password fills the sign-in and the owner approves the two-factor prompt.
+3. The agent builds the `.p12`, imports it, saves the profile next to the old one, updates
+   the inventory and both env files (`dev-signed-env.sh`, the next `build-env.sh`), and runs
+   `backup --only identity` under a new item title. The old item is renamed, not replaced.
+4. Do not revoke the old certificate. Revoking it can make Gatekeeper reject builds
+   already shipped.
+
+### Backups
+
+`npm run release:credentials -- backup --run <run-dir> --only identity|notarization|updater|api-key`
+creates one vault item and refuses if the title exists. `--only identity` runs
+`security export`, which macOS may hold for the owner's login keychain password, and it
+refuses when the keychain holds more than one code-signing identity. `--only api-key` also
+takes `--file <AuthKey.p8> --key-id <id> --issuer <id>` and installs the key with mode 0600.
+Delete the downloaded `.p8` afterwards. Apple offers it for download once.
+
 ## Identity and data
 
 The final product name is **Cadence** and its identifier is
