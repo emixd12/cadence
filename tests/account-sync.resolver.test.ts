@@ -68,6 +68,70 @@ const shortcutState = (excluded: string[], revision: number, entry?: ReturnType<
   },
 });
 
+describe("connector and manual first marks (Ticket 319)", () => {
+  const mark = (id: string, status: string, stamp: string, provenance: "connector" | "manual" | "manual_text"): AccountSyncEntity => ({ kind: "status_event", id, value: {
+    id, occurrence_id: "o", behavior_id: "b", revises_event_id: null, previous_status: "unresolved", status,
+    status_semantics: provenance === "connector" ? "system_rule_declared" : "explicit_user_mark",
+    source_capture_method: provenance === "connector" ? "derived" : provenance === "manual" ? "manual_tap" : "manual_text",
+    source_confidence: "high", reason_code: provenance === "connector" ? "connector:hevy" : null,
+    local_date: "2026-09-16", timezone: "UTC",
+    recorded_at: stamp, effective_at: status === "completed" && provenance === "connector" ? "2026-09-16T00:10:00Z" : stamp, created_at: stamp,
+  } });
+  const projection = (event: AccountSyncEntity): AccountSyncEntity => {
+    const value = event.value as Record<string, string | null>;
+    return { ...occurrence(value.status!), value: {
+      ...(occurrence(value.status!).value as object), status_marked_at: value.recorded_at,
+      completed_at: value.status === "completed" ? value.effective_at : null,
+    } };
+  };
+  const earlier = "2026-09-16T00:30:00Z", later = "2026-09-16T03:30:00Z";
+  const baseline = snapshot([occurrence()]);
+
+  it("converges a connector Completed with a manual Completed and keeps both events", () => {
+    for (const [connectorStamp, manualStamp, winner] of [[earlier, later, "manual"], [later, earlier, "connector"]] as const) {
+      const connector = mark("conn", "completed", connectorStamp, "connector"), manual = mark("user", "completed", manualStamp, "manual");
+      const hosted = snapshot([projection(connector), connector]), local = snapshot([projection(manual), manual]);
+      const result = plan(baseline, local, hosted);
+      expect(result.conflicts).toEqual([]);
+      expect(result.mergedEntities.filter(({ kind }) => kind === "status_event").map(({ id }) => id)).toEqual(["conn", "user"]);
+      const merged = result.mergedEntities.find(({ kind }) => kind === "occurrence")!.value as Record<string, string>;
+      expect(merged.status).toBe("completed");
+      expect(merged.status_marked_at).toBe(`${(winner === "manual" ? manualStamp : connectorStamp).slice(0, -1)}.000000Z`);
+      expect(plan(baseline, hosted, local).mergedEntities).toEqual(result.mergedEntities);
+      const settled = { entities: result.mergedEntities };
+      expect(plan(settled, settled, settled)).toMatchObject({ localWrites: [], hostedWrites: [] });
+    }
+  });
+
+  it("converges a connector Completed with a manual Not Completed to Not Completed", () => {
+    for (const manualStamp of [earlier, later]) {
+      const connector = mark("conn", "completed", manualStamp === earlier ? later : earlier, "connector");
+      const manual = mark("user", "not_completed", manualStamp, "manual_text");
+      const result = plan(baseline, snapshot([projection(manual), manual]), snapshot([projection(connector), connector]));
+      expect(result.conflicts).toEqual([]);
+      expect(result.mergedEntities.find(({ kind }) => kind === "occurrence")!.value).toMatchObject({ status: "not_completed", completed_at: null });
+      expect(result.hostedWrites).toMatchObject([{ kind: "occurrence", value: { status: "not_completed" } }, { kind: "status_event", id: "user" }]);
+      expect(result.mergedEntities.filter(({ kind }) => kind === "status_event").map(({ id }) => id)).toEqual(["conn", "user"]);
+    }
+  });
+
+  it("still fails two connector marks for one Occurrence", () => {
+    const one = mark("conn-1", "completed", earlier, "connector"), two = mark("conn-2", "completed", later, "connector");
+    expect(() => plan(baseline, snapshot([projection(one), one]), snapshot([projection(two), two]))).toThrow("branched status history");
+  });
+
+  it("fails when the connector mark is not a root mark or the projections disagree", () => {
+    const manual = mark("user", "completed", later, "manual");
+    const connector = mark("conn", "completed", earlier, "connector");
+    const notRoot = { ...connector, value: { ...(connector.value as object), revises_event_id: "x" } };
+    expect(() => plan(baseline, snapshot([projection(manual), manual]), snapshot([projection(connector), notRoot]))).toThrow();
+    const wrongProjection = { ...projection(connector), value: { ...(projection(connector).value as object), completed_at: later } };
+    expect(() => plan(baseline, snapshot([projection(manual), manual]), snapshot([wrongProjection, connector]))).toThrow("branched status history");
+    const otherDate = { ...connector, value: { ...(connector.value as object), local_date: "2026-09-17" } };
+    expect(() => plan(baseline, snapshot([projection(manual), manual]), snapshot([projection(connector), otherDate]))).toThrow("branched status history");
+  });
+});
+
 describe("resolveAccountSync", () => {
   it.each(["completed", "not_completed"])("converges compatible initial %s marks without deleting history", (status) => {
     const mark = (id: string, stamp: string): AccountSyncEntity => ({ kind: "status_event", id, value: {

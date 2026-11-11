@@ -247,6 +247,16 @@ Use `status_events` to analyze corrections or logging chronology:
 - `effective_at` is the decision's stated effective time when present.
 - `revises_event_id` links a correction to the latest prior event when known.
 
+Connector completions (Ticket 322, D28.7) export unchanged in Full JSON and in
+BehaviorLog `data/status_events.jsonl`: `status_semantics = system_rule_declared`,
+`source_capture_method = derived`, `source_confidence = high` and
+`reason_code = connector:<source>` (for example `connector:hevy`). `effective_at`
+is the activity's end; `recorded_at` is when Cadence wrote it. BehaviorLog gives such
+an event no `actor`, because the user did not make it. A revert after the activity
+is deleted at the source exports as an Unresolved event with the same values.
+Match timing facts (`occurrence_source_matches`) are not exported. Routine
+identifiers, workout titles and credentials never export.
+
 The additive `status_events` root preserves compatibility for existing readers
 of the unchanged category, behavior, and occurrence snapshot arrays. BehaviorLog
 remains the interoperable and restore-oriented export format; its

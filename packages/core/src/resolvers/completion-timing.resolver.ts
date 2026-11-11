@@ -26,7 +26,9 @@ export type CompletionTimingSummary = Readonly<{
 }>;
 
 /** Current status snapshots already collapse corrections and repeated taps.
- * These are marking patterns, never measurements of actual start/finish time. */
+ * These are marking patterns, never measurements of actual start/finish time.
+ * Ticket 322 (D28): an Occurrence whose current status came from a connector is
+ * excluded, so the patterns stay the user's own marking times. */
 export function resolveCompletionTiming(input: Readonly<{
   behaviorId: string;
   occurrences: readonly CompletionTimingOccurrence[];
@@ -35,6 +37,8 @@ export function resolveCompletionTiming(input: Readonly<{
   historyDays: number;
   complete: boolean;
   sourceAvailable: boolean;
+  /** Occurrences whose current Completed status is a connector completion. */
+  connectorMarkedOccurrenceIds?: ReadonlySet<string>;
 }>): CompletionTimingSummary {
   if (!Number.isInteger(input.historyDays) || input.historyDays < 1 || input.historyDays > 90) {
     throw new RangeError("Completion timing history must span 1 to 90 days.");
@@ -55,6 +59,9 @@ export function resolveCompletionTiming(input: Readonly<{
     if (seen.has(occurrence.id)) { exclusions.duplicateOccurrence++; continue; }
     seen.add(occurrence.id);
     if (occurrence.status !== "completed") { exclusions.notCompleted++; continue; }
+    // A connector completion carries no user marking time; the frozen exclusion
+    // shape (advisor day context) counts it as a missing mark.
+    if (input.connectorMarkedOccurrenceIds?.has(occurrence.id)) { exclusions.missingMark++; continue; }
     if (occurrence.localDate < start || occurrence.localDate >= end) { exclusions.outsideWindow++; continue; }
     if (!occurrence.statusMarkedAt) { exclusions.missingMark++; continue; }
     let mark: Temporal.Instant;

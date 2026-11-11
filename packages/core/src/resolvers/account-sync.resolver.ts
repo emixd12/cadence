@@ -650,6 +650,11 @@ function compatibleInitialMarks(baseline: Map<string, AccountSyncEntity>, local:
   for (const [id, byId] of events) {
     const rows = [...byId.values()], base = baseline.get(`occurrence:${id}`), left = local.get(`occurrence:${id}`), right = hosted.get(`occurrence:${id}`);
     if (rows.length < 2 || !base || !left || !right || field(base.value, "status") !== "unresolved") continue;
+    if (rows.some(isConnectorRootMark)) {
+      const choice = connectorAndManualMark(id, rows, left, right, local, hosted);
+      if (choice) result.set(id, choice);
+      continue;
+    }
     const status = field(left.value, "status"), behaviorId = field(left.value, "behavior_id");
     if (!["completed", "not_completed"].includes(status ?? "") || field(right.value, "status") !== status
       || field(left.value, "id") !== id || field(right.value, "id") !== id
@@ -676,6 +681,68 @@ function compatibleInitialMarks(baseline: Map<string, AccountSyncEntity>, local:
     else if (matches(right, latest)) result.set(id, right);
   }
   return result;
+}
+
+// Ticket 319 (D28): a connector completion on one side and the user's first mark on
+// the other, after an Unresolved baseline, converge. This is a provenance rule, not
+// timestamp arbitration: with different statuses the user's mark wins. Both events
+// stay unchanged. Two connector marks for one Occurrence still fail.
+function isConnectorRootMark(row: AccountSyncEntity): boolean {
+  return field(row.value, "status_semantics") === "system_rule_declared"
+    && field(row.value, "source_capture_method") === "derived"
+    && field(row.value, "source_confidence") === "high"
+    && (field(row.value, "reason_code") ?? "").startsWith("connector:")
+    && field(row.value, "status") === "completed";
+}
+function isManualRootMark(row: AccountSyncEntity): boolean {
+  return field(row.value, "status_semantics") === "explicit_user_mark"
+    && ["manual_tap", "manual_text"].includes(field(row.value, "source_capture_method") ?? "")
+    && field(row.value, "source_confidence") === "high"
+    && ["completed", "not_completed"].includes(field(row.value, "status") ?? "");
+}
+function connectorAndManualMark(
+  id: string,
+  rows: readonly AccountSyncEntity[],
+  left: AccountSyncEntity,
+  right: AccountSyncEntity,
+  local: Map<string, AccountSyncEntity>,
+  hosted: Map<string, AccountSyncEntity>,
+): AccountSyncEntity | null {
+  if (rows.length !== 2) return null;
+  const connector = rows.find(isConnectorRootMark), manual = rows.find(isManualRootMark);
+  if (!connector || !manual || connector === manual) return null;
+  const connectorLocal = local.has(entityKey(connector)), connectorHosted = hosted.has(entityKey(connector));
+  const manualLocal = local.has(entityKey(manual)), manualHosted = hosted.has(entityKey(manual));
+  // Each mark exists on exactly one side, and the two sides differ.
+  if (connectorLocal === connectorHosted || manualLocal === manualHosted || connectorLocal === manualLocal) return null;
+  for (const row of rows) {
+    if (field(row.value, "id") !== row.id || field(row.value, "occurrence_id") !== id
+      || field(row.value, "previous_status") !== "unresolved" || field(row.value, "revises_event_id") !== null) return null;
+  }
+  for (const key of ["behavior_id", "local_date", "timezone"]) {
+    if (field(connector.value, key) !== field(manual.value, key)) return null;
+  }
+  try {
+    for (const row of rows) for (const key of ["recorded_at", "effective_at", "created_at"]) Temporal.Instant.from(field(row.value, key) ?? "");
+  } catch { return null; }
+  const connectorSide = connectorLocal ? left : right, manualSide = connectorLocal ? right : left;
+  if (field(connectorSide.value, "id") !== id || field(manualSide.value, "id") !== id
+    || withoutFields(connectorSide.value, ["status", "completed_at", "status_marked_at", "updated_at"])
+      !== withoutFields(manualSide.value, ["status", "completed_at", "status_marked_at", "updated_at"])) return null;
+  const projects = (occurrence: AccountSyncEntity, event: AccountSyncEntity) => {
+    const status = field(event.value, "status");
+    return field(occurrence.value, "status") === status
+      && field(occurrence.value, "status_marked_at") === field(event.value, "recorded_at")
+      && (status === "completed"
+        ? field(occurrence.value, "completed_at") === field(event.value, "effective_at")
+        : field(occurrence.value, "completed_at") === null && field(occurrence.value, "status_marked_at") === field(event.value, "effective_at"));
+  };
+  if (!projects(connectorSide, connector) || !projects(manualSide, manual)) return null;
+  if (field(connector.value, "status") !== field(manual.value, "status")) return manualSide;
+  // Same status: existing latest-event ordering selects display timestamps only.
+  const ordered = [...rows].sort((a, b) => Temporal.Instant.compare(field(a.value, "recorded_at")!, field(b.value, "recorded_at")!)
+    || Temporal.Instant.compare(field(a.value, "created_at")!, field(b.value, "created_at")!) || compareText(a.id, b.id));
+  return ordered[ordered.length - 1] === connector ? connectorSide : manualSide;
 }
 
 function withoutFields(value: Json, excluded: readonly string[]): string {

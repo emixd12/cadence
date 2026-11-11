@@ -1,5 +1,6 @@
 "use client";
 
+import { SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
 import { RuntimeLink as Link } from "@cadence/ui/runtime";
 import type { CSSProperties, ReactNode } from "react";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
@@ -568,6 +569,7 @@ function BehaviorRecord({
                     whereDraft={whereDraft}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
+                  {reminderRuntime !== "desktop" ? <SourceLinkSettings behaviorId={behavior.id} /> : null}
                   <div className="grid justify-items-end">
                     <BehaviorStateForm
                       behaviorId={behavior.id}
@@ -669,6 +671,9 @@ function BehaviorOutcomeStats({
           label="Average tracked time"
           value={behaviorAnalytics.averageTrackedTime.durationLabel}
         />
+      ) : null}
+      {behaviorAnalytics.connectorTiming ? (
+        <SummaryItem label="Timing" value={behaviorAnalytics.connectorTiming.label} />
       ) : null}
       <SummaryItem
         label="Tracking since"

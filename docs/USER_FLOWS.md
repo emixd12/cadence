@@ -569,6 +569,19 @@ Behavior-specific reminder settings live on the behavior create/edit page.
 
 V1 does not need a test notification button.
 
+## Link a Behavior to Hevy (Tickets 317–319, D28)
+
+1. With Hevy connected in Settings, open a Behavior's settings on /behaviors.
+2. Under "Complete from Hevy", choose Chosen routines and tick routines, or choose Any
+   workout. Select Save Hevy link.
+3. Cadence checks Hevy when the Timeline or the Mac refreshes Hevy, and in the
+   background (Ticket 321). A matching workout of at least 5 minutes marks that day's
+   Unresolved Occurrence Completed, labeled "From Hevy", within today and the 30 prior
+   days. It never changes a status the user set.
+4. To undo a connector completion, use the existing status buttons. Cadence never
+   completes that Occurrence from a workout again.
+5. Choose Off and save to stop new matches. Past completions stay.
+
 ## Behavior review flow
 
 Behavior review on the Behaviors screen defaults to the last 30 days.

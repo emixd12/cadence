@@ -699,3 +699,7 @@ Output:
 | `changed` | yes | boolean |
 
 <!-- END GENERATED: integration contract reference -->
+
+## Connector completion provenance (Ticket 322, D28.7)
+
+A status change written from a connected service's recorded activity appears in `status_history` with `semantics` `system_rule_declared` and `capture_method` `derived`; a revert after the activity is deleted at the source carries the same pair with `status` `unresolved`. Both values were already in the enums, so the tool's schema is unchanged. The user's own marks keep `explicit_user_mark` or `explicit_user_correction` with `manual_tap` or `manual_text`. Clients must not describe a `derived` entry as something the user did.

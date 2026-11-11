@@ -45,6 +45,7 @@ import {
 import { DayNoteShortcutSettings, NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import { SettingsDrawer } from "@/components/settings/SettingsSections";
 import { DAY_NOTE_SHORTCUTS_PURPOSE, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
+import { SourceLinkBench } from "./SourceLinkBench";
 import {
   AccountDeletionPanel,
   type DeleteAccountAction,
@@ -1826,6 +1827,11 @@ const previewFactories: Record<
           state={dayNoteShortcutsSectionState(dayNoteShortcutViewFixture)}>
           <DayNoteShortcutSettings view={dayNoteShortcutViewFixture} action={noteShortcutAction} />
         </SettingsDrawer>
+      </ProductPreview>
+    ),
+  "module.source-link-settings": () => (
+      <ProductPreview>
+        <SourceLinkBench />
       </ProductPreview>
     ),
   "module.needs-decision-dialog": () => (

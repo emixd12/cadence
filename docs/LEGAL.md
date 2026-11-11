@@ -69,7 +69,7 @@ Risk levels:
 | [L-019](#l-019-openai-brand-guidelines-for-the-chatgpt-button) | OpenAI brand guidelines for the ChatGPT button | open | low | 299 |
 | [L-020](#l-020-provider-marks-as-connected-source-icons) | Provider marks as connected-source icons | open | low | 301, 302 |
 | [L-021](#l-021-one-daily-brief-choice-for-every-connected-source) | One Daily Brief choice for every connected source | open | medium | 306, 307 |
-| [L-023](#l-023-hevy-terms-for-background-reads-and-stored-workout-data) | Hevy terms for background reads and stored workout data | open | not assessed | 310, 311, 321, 323 |
+| [L-023](#l-023-hevy-terms-for-background-reads-and-stored-workout-data) | Hevy terms for background reads and stored workout data | open | low | 310, 311, 321, 323 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -633,14 +633,18 @@ part of L-002.
     webhook, and states no rate limit and no rule about stored data.
   - `docs/INTEGRATION_PLAYBOOK.md` (research dated 2026-10-18) records that Hevy asks
     hourly or daily pollers to avoid the top of the hour.
-  - Hevy's terms of service and any developer terms: not read for this entry.
-- **Current reading:** none for the terms of service. The API document does not forbid
-  scheduled reads or stored timing data, and it promises no stability. The planned job
+  - Terms and Conditions of Hevy, `https://www.hevyapp.com/legal/terms-and-conditions/`,
+    effective 23 June 2019 (page modified 2026-07-27), read 2026-11-11. No clause on the API,
+    automated access, bots or third-party apps. Intellectual Property: "Except for a single
+    copy made for personal use only, you may not copy, reproduce" content "from this
+    Application" without written permission. Hevy publishes no separate developer terms.
+- **Current reading:** neither document forbids scheduled reads with the user's own key.
+  The copying clause addresses Hevy's content; Cadence stores only the user's own workout
+  times and routine digests, at the user's direction. The API promises no stability. The planned job
   makes about 5 reads per linked account per day (estimated) and runs off the top of the
   hour.
-- **Risk level:** not assessed; the terms were not read.
+- **Risk level:** low.
 - **Owner decision or risk acceptance:** none.
 - **Status:** open.
-- **Next action:** Ticket 311 reads Hevy's terms of service and any developer terms,
-  records the clauses on automated access, stored data and use of the Hevy name, and
-  updates this entry.
+- **Next action:** recheck the terms and API document before a public listing that names
+  Hevy. Ticket 311 recorded the reading on 2026-11-11.

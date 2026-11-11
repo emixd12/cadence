@@ -1846,6 +1846,39 @@ describe("resolveExportBundle", () => {
     );
   });
 
+  it("exports connector completions with their D28.7 provenance unchanged (Ticket 322)", () => {
+    const connectorEvent = {
+      id: "event-connector",
+      occurrenceId: "occurrence-1",
+      behaviorId: "behavior-brush",
+      previousStatus: "unresolved" as const,
+      status: "completed" as const,
+      statusSemantics: "system_rule_declared" as const,
+      recordedAt: "2026-06-08T14:00:00Z",
+      effectiveAt: "2026-06-08T13:45:00Z",
+      localDate: "2026-06-08",
+      timezone: DEFAULT_TIMEZONE,
+      sourceCaptureMethod: "derived" as const,
+      sourceConfidence: "high" as const,
+      revisesEventId: null,
+      reasonCode: "connector:hevy",
+    };
+    const bundle = resolve({ occurrences: [occurrence({ id: "occurrence-1" })], statusEvents: [connectorEvent] });
+    const files = new Map(bundle.behaviorLog.files.map((file) => [file.path, file]));
+    const [event] = parseJsonl(files.get("data/status_events.jsonl")?.content ?? "");
+    expect(event).toMatchObject({
+      status_semantics: "system_rule_declared",
+      reason_code: "connector:hevy",
+      effective_at_utc: "2026-06-08T13:45:00Z",
+      source: expect.objectContaining({ capture_method: "derived", confidence: "high" }),
+    });
+    // A connector completion is not attributed to the user.
+    expect(event).not.toHaveProperty("actor");
+    expect(bundle.jsonBackup.status_events).toMatchObject([{
+      status_semantics: "system_rule_declared", source_capture_method: "derived", source_confidence: "high", reason_code: "connector:hevy",
+    }]);
+  });
+
   it("emits a BehaviorLog bundle with required files, hashes, status events, and notes", () => {
     const bundle = resolve({
       includeNotes: true,

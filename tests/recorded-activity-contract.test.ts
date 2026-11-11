@@ -8,13 +8,21 @@ import {
   RecordedActivityValidationError,
   normalizeRecordedWorkout,
   recordedActivityId,
+  recordedActivitySelectorKey,
   recordedActivitySnapshotMatchesScope,
   recordedActivitySnapshotScopeKey,
   validateRecordedActivitySnapshot,
+  validateRecordedActivitySnapshotV1_1,
+  withSelectorKeys,
 } from "../packages/core/src/services/recorded-activity-validation";
 import {
   HEVY_WORKOUTS_ADAPTER_VERSION,
+  RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1,
+  RECORDED_ACTIVITY_MAX_SELECTOR_KEYS,
+  RECORDED_ACTIVITY_MIN_MATCH_SECONDS,
   RECORDED_ACTIVITY_SCHEMA_VERSION,
+  RECORDED_ACTIVITY_SCHEMA_VERSION_1_1,
+  RECORDED_ACTIVITY_SOURCES_1_1,
   type RecordedActivitySnapshotScope,
 } from "../packages/core/src/types/recorded-activity";
 
@@ -279,5 +287,110 @@ describe("recorded activity snapshot contract", () => {
       sourceTimezone: { const: "unsupported" },
     });
     expect(Object.keys(schema.$defs.activity.properties)).not.toContain("title");
+  });
+});
+
+describe("recorded activity contract 1.1 (Ticket 312)", () => {
+  const fixture11Url = new URL("./fixtures/recorded-activity-snapshot.1.1.valid.json", import.meta.url);
+  const schema11Url = new URL("../packages/core/src/recorded-activity-1.1.schema.json", import.meta.url);
+  async function fixture11() {
+    return JSON.parse(await readFile(fixture11Url, "utf8"));
+  }
+  function code(run: () => unknown): string | null {
+    try {
+      run();
+      return null;
+    } catch (error) {
+      return (error as RecordedActivityValidationError).code;
+    }
+  }
+
+  it("keeps 1.0.0 byte-for-byte and validates the 1.1.0 fixture", async () => {
+    expect(RECORDED_ACTIVITY_SCHEMA_VERSION).toBe("1.0.0");
+    const original = await readFile(schemaUrl, "utf8");
+    expect(JSON.parse(original).$id).toContain("1.0.0");
+    const snapshot = validateRecordedActivitySnapshotV1_1(await fixture11(), { now });
+    expect(snapshot.schemaVersion).toBe(RECORDED_ACTIVITY_SCHEMA_VERSION_1_1);
+    expect(snapshot.adapterVersion).toBe(RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1.hevy);
+    expect(snapshot.activities.map((activity) => activity.selectorKeys?.length)).toEqual([1, 0, 1]);
+  });
+
+  it("rejects each version under the other validator", async () => {
+    const v10 = await fixture();
+    const v11 = await fixture11();
+    expect(code(() => validateRecordedActivitySnapshot(v11, { now }))).toBe("malformed_provider_response");
+    expect(code(() => validateRecordedActivitySnapshot({ ...v10, schemaVersion: "1.1.0" }, { now })))
+      .toBe("unsupported_schema_version");
+    expect(code(() => validateRecordedActivitySnapshotV1_1({ ...v10, selectorKeysRequested: false }, { now })))
+      .toBe("unsupported_schema_version");
+  });
+
+  it("rejects an unknown source and an adapter version that is not the source's", async () => {
+    const value = await fixture11();
+    expect(code(() => validateRecordedActivitySnapshotV1_1({ ...value, source: "strava" }, { now })))
+      .toBe("unsupported_schema_version");
+    expect(code(() => validateRecordedActivitySnapshotV1_1({ ...value, adapterVersion: HEVY_WORKOUTS_ADAPTER_VERSION }, { now })))
+      .toBe("unsupported_schema_version");
+  });
+
+  it("rejects non-digest, duplicate and too many selector keys", async () => {
+    const value = await fixture11();
+    const [first] = value.activities;
+    const digest = first.selectorKeys[0];
+    const invalid: Array<[unknown, string]> = [
+      [["routine-legs"], "SHA-256 hex digest"],
+      [[digest.toUpperCase()], "SHA-256 hex digest"],
+      [[digest, digest], "must be unique"],
+      [Array.from({ length: 33 }, (_, index) => index.toString(16).padStart(64, "0")), "cannot exceed 32"],
+      ["not-an-array", "must be an array"],
+    ];
+    for (const [selectorKeys, message] of invalid) {
+      expect(() => validateRecordedActivitySnapshotV1_1({ ...value, activities: [{ ...first, selectorKeys }] }, { now }))
+        .toThrow(message);
+    }
+    const max = Array.from({ length: 32 }, (_, index) => index.toString(16).padStart(64, "0"));
+    expect(() => validateRecordedActivitySnapshotV1_1({ ...value, activities: [{ ...first, selectorKeys: max }] }, { now }))
+      .not.toThrow();
+  });
+
+  it("carries selector keys only when the read asked for them", async () => {
+    const value = await fixture11();
+    const [first] = value.activities;
+    const { selectorKeys: _omitted, ...bare } = first;
+    expect(() => validateRecordedActivitySnapshotV1_1({ ...value, activities: [bare] }, { now }))
+      .toThrow("must contain exactly");
+    expect(() => validateRecordedActivitySnapshotV1_1({ ...value, selectorKeysRequested: false }, { now }))
+      .toThrow("must contain exactly");
+    expect(validateRecordedActivitySnapshotV1_1({ ...value, selectorKeysRequested: false, activities: [bare] }, { now })
+      .activities[0]).not.toHaveProperty("selectorKeys");
+    expect(withSelectorKeys(bare, undefined)).not.toHaveProperty("selectorKeys");
+    expect(withSelectorKeys(bare, ["b".repeat(64), "a".repeat(64), "b".repeat(64)]).selectorKeys)
+      .toEqual(["a".repeat(64), "b".repeat(64)]);
+  });
+
+  it("derives selector keys that differ across provider accounts and hide the provider key", () => {
+    const key = recordedActivitySelectorKey({ source: "hevy", accountDigest: "account-a", providerKey: "routine-1" });
+    expect(key).toMatch(/^[0-9a-f]{64}$/u);
+    expect(key).not.toContain("routine-1");
+    expect(recordedActivitySelectorKey({ source: "hevy", accountDigest: "account-b", providerKey: "routine-1" })).not.toBe(key);
+    expect(recordedActivitySelectorKey({ source: "hevy", accountDigest: "account-a", providerKey: "routine-2" })).not.toBe(key);
+    expect(() => recordedActivitySelectorKey({ source: "hevy", accountDigest: "", providerKey: "routine-1" })).toThrow();
+  });
+
+  it("defines the per-source minimum duration beside the contract (D28.8)", () => {
+    expect(RECORDED_ACTIVITY_MIN_MATCH_SECONDS).toEqual({ hevy: 300 });
+    expect(Object.keys(RECORDED_ACTIVITY_MIN_MATCH_SECONDS)).toEqual([...RECORDED_ACTIVITY_SOURCES_1_1]);
+  });
+
+  it("keeps the 1.1 JSON Schema aligned with the runtime contract", async () => {
+    const schema = JSON.parse(await readFile(schema11Url, "utf8"));
+    const value = await fixture11();
+    expect(schema.properties.schemaVersion.const).toBe(RECORDED_ACTIVITY_SCHEMA_VERSION_1_1);
+    expect(schema.properties.source.enum).toEqual([...RECORDED_ACTIVITY_SOURCES_1_1]);
+    expect(schema.properties.adapterVersion.enum).toEqual(Object.values(RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1));
+    expect(new Set(schema.required)).toEqual(new Set(Object.keys(value)));
+    expect(new Set(Object.keys(schema.$defs.activity.properties)))
+      .toEqual(new Set(Object.keys(value.activities[0])));
+    expect(schema.$defs.activity.properties.selectorKeys.maxItems).toBe(RECORDED_ACTIVITY_MAX_SELECTOR_KEYS);
   });
 });

@@ -2331,6 +2331,77 @@ infrastructure backups may retain sealed ciphertext under the existing provider
 retention policy. Local verification: `tests/sql/context-connectors-contract.sql`
 and `tests/connector-lifecycle.test.ts`.
 
+## Connector completion (Ticket 314, D28)
+
+Migration `20261111140000_connector_completion.sql`. Three hosted tables, each with
+`user_id`, RLS and cascade on account deletion. No grant to `anon` or
+`service_role`. Ticket 321 adds the job's account selection separately.
+
+- `behavior_source_links`: one Behavior's opt-in to one completion source. Columns
+  `id`, `user_id`, `behavior_id`, `source` (`hevy`), `selector_kind` (`any` or
+  `provider_keys`), `selector_keys` (account-scoped SHA-256 digests, 1–32 for
+  `provider_keys`, none for `any`), `account_digest`, `enabled`, timestamps. Unique on
+  `(user_id, behavior_id, source)`; a partial unique index allows one enabled `any`
+  link per `(user_id, source)` (D28.4). The owner inserts, updates `selector_kind`,
+  `selector_keys` and `enabled`, and deletes through RLS. A trigger binds
+  `account_digest` to the source's connected account digest, so a client never
+  chooses it, refuses a write while the source is not connected (turning a link off
+  is allowed), and refuses a routine digest that another enabled link of the source
+  already holds (invariant 11). Deleting the Behavior cascades.
+- `occurrence_source_matches`: one recorded activity tied to one Occurrence.
+  `activity_ref` is the contract's opaque account-scoped activity ID, never the raw
+  provider ID. `role` is `completion` (the activity that changed the status, with
+  `applied_event_id`) or `attached` (further evidence on a Completed Occurrence).
+  `state` is `active` or `removed`; `reverted_event_id` records a connector revert.
+  `scheduled_start_at` and `scheduled_end_at` (null for an exact time) are copied from
+  the Occurrence by the database. Unique on `(user_id, source, activity_ref,
+  behavior_id)`: an activity matches a Behavior at most once, ever. A partial unique
+  index allows one `completion` match with a null `reverted_event_id` per Occurrence:
+  that is a standing connector completion, and it keeps standing after the user
+  changes the status. The owner reads it; only the functions below write it. The
+  link foreign key sets null on link deletion, so matches stay as history.
+- `connector_completion_state`: primary key `(user_id, source)`. `next_check_at`,
+  `last_reconciled_at` (the last successful read), `last_attempted_at`,
+  `read_cursor` (`g<connection generation>|<UTC since>`, the Hevy events cursor from
+  Ticket 311; null reads in full), `consecutive_failures`, and `check_count_date` with
+  `check_count` for the 24-a-day ceiling. The owner reads, inserts and updates it.
+
+Write functions. All three are `security definer` with `search_path = ''`, take the
+owner from `auth.uid()`, scope every read and write to that owner, and refuse any
+`cadence_channel` claim other than none or `connector_completion`. Each locks the
+Occurrence. The injected recorded instant must be within five minutes of the
+database clock. Shared preconditions: the link is enabled and owned, its Behavior is
+active and unarchived and owns the Occurrence; the source is `connected` with the
+link's account digest; the activity ended at or before the recorded instant; its
+start is within 48 hours of `scheduled_for`; and the Occurrence's local date is
+today or one of the 30 prior dates in the Behavior's timezone (D28.6). A failed
+precondition returns `{ applied | attached | removed: false, reason }` and writes
+nothing. Malformed input raises SQLSTATE `22023`; no path uses `40001`.
+
+- `apply_connector_completion(link, occurrence, activity_ref, start, end, revision,
+  expected_latest_event_id, recorded_at)`: also requires Unresolved status, the
+  expected latest status event, no match for the activity and Behavior, and no
+  standing connector completion. In one transaction it sets the Occurrence Completed
+  (`completed_at` = activity end, `status_marked_at` = recorded instant), inserts one
+  status event with the D28.7 values (`system_rule_declared`, `derived`, `high`,
+  `reason_code = connector:<source>`, `effective_at` = activity end, revising the
+  prior latest event when one exists), inserts the `completion` match and cancels
+  pending reminders. Callers cannot pass provenance.
+- `attach_source_activity(...)`: also requires Completed status. Inserts an
+  `attached` match. When an active match already exists for the same activity,
+  Behavior and Occurrence and the revision is newer, it refreshes that match's
+  timing facts only. It never changes a status, a status timestamp, a status event
+  or a reminder (invariant 13).
+- `remove_source_match(match, recorded_at)`: marks one match `removed`. When the
+  Occurrence then has no active match, a connector completion stands on it, it is
+  still Completed, and that completion's event is still its latest status event, it
+  writes an Unresolved event with connector provenance, clears the status
+  timestamps and sets `reverted_event_id`. Otherwise no status changes.
+
+`apply_occurrence_status_transition` is unchanged and still rejects `derived`.
+Fixture: `tests/sql/ticket-314-connector-completion-smoke.sql`. Repositories:
+`lib/db/sourceLinks.repo.ts` and `lib/db/sourceMatches.repo.ts`.
+
 ## Advisor day-context reads (Ticket 146)
 
 Migration `20260919010100_add_advisor_cadence_snapshot.sql` adds owner-scoped

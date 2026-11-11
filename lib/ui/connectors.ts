@@ -63,6 +63,10 @@ export type HevyCoordinator = Readonly<{
   connect(apiKey: string): Promise<ConnectorConnectionView>;
   refreshActivities(localDate: string, timezone: string, options?: Readonly<{ force?: boolean }>): Promise<RecordedActivityRefresh>;
   disconnect(): Promise<ConnectorDisconnectResult>;
+  /** Ticket 317: one hosted reconcile; resolves to the number of writes and the last successful check. */
+  reconcileCompletions?(): Promise<Readonly<{ writes: number; lastReconciledAt: string | null; status: string }>>;
+  /** Ticket 317: availability and the last successful completion check. */
+  completionStatus?(): Promise<Readonly<{ available: boolean; lastReconciledAt: string | null }>>;
 }>;
 
 /** Client clocks can trail the server; snapshots fetched within this window still validate. */
@@ -335,6 +339,14 @@ export const webHevyCoordinator: HevyCoordinator = {
     return applied;
   },
   disconnect() { return disconnectWebSource("/api/hevy/connection", HEVY); },
+  async reconcileCompletions() {
+    const result = await request<{ status: string; counts: { completed: number; attached: number; removed: number }; lastReconciledAt: string | null }>(
+      "/api/connectors/completions/reconcile", { method: "POST", body: JSON.stringify({ source: "hevy" }) });
+    return { writes: result.counts.completed + result.counts.attached + result.counts.removed, lastReconciledAt: result.lastReconciledAt, status: result.status };
+  },
+  completionStatus() {
+    return request<{ available: boolean; lastReconciledAt: string | null }>("/api/connectors/completions/status?source=hevy");
+  },
 };
 
 export function outlookCallbackMessage(code: string | null | undefined): string | undefined {
@@ -499,12 +511,16 @@ export function useWebHevyActivityTimeline(input: Readonly<{
   todayLocalDate: string;
   timezone: string;
   coordinator?: HevyCoordinator;
+  /** Ticket 317: called when a reconcile after the refresh wrote anything. */
+  onConnectorWrites?: () => void;
 }>): HevyTimelineState {
   const coordinator = input.coordinator ?? webHevyCoordinator;
   const [state, setState] = useState<HevyTimelineState>({ state: "not_loaded", day: null, error: null });
   const sequence = useRef(0);
   const last = useRef<RecordedActivitySnapshotV1 | null>(null);
   const { todayLocalDate, timezone } = input;
+  const onConnectorWrites = useRef(input.onConnectorWrites);
+  useEffect(() => { onConnectorWrites.current = input.onConnectorWrites; }, [input.onConnectorWrites]);
   const refresh = useCallback(async (force = false): Promise<boolean> => {
     const current = ++sequence.current;
     const isCurrent = () => current === sequence.current && !document.hidden;
@@ -515,6 +531,10 @@ export function useWebHevyActivityTimeline(input: Readonly<{
       last.current = result.snapshot;
       const day = projectRecordedActivityDay({ snapshot: result.snapshot, localDate: todayLocalDate, now: Temporal.Now.instant(), refreshFailed: result.refreshFailures.length > 0 });
       setState({ state: day.state === "incomplete" ? "incomplete" : day.state === "stale" ? "stale" : day.items.length ? "ready" : "empty", day, error: result.refreshFailures[0]?.code ?? null });
+      // Ticket 317: reconcile after the connector refresh; refresh rows when it wrote anything.
+      void Promise.resolve().then(() => coordinator.reconcileCompletions?.()).then((reconcile) => {
+        if (reconcile && reconcile.writes > 0) onConnectorWrites.current?.();
+      }).catch(() => undefined);
       return day.state === "current";
     } catch (error) {
       if (!isCurrent()) return false;

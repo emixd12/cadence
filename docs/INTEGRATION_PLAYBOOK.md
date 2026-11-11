@@ -467,7 +467,7 @@ Research gaps, all **not verified**:
 | Disconnect | Delete the sealed key and caches. Hevy documents no revocation call. Settings tells the user to remove or regenerate the key in Hevy's developer settings. |
 | Account deletion | The confirmation screen gives the same Hevy key instruction before deletion. Deletion removes the sealed key with the account. |
 | Model disclosure | Separate default-off Hevy disclosure. Only the activity projection reaches the model. |
-| Live-access gate | An owner-authorized Hevy Pro test account and key. Not available in this wave. |
+| Live-access gate | The owner's own Hevy Pro account, vault item `hevy-owner`, additions only (`docs/DECISIONS.md`, 2026-11-11). Ticket 311's live results: `docs/qa/2026-11-hevy-change-feed.md`. |
 | Public-approval gate | None documented. Hevy terms review is not verified. |
 
 Decision D28 (November 10, 2026) changes this brief once Tickets 310–324 ship: Cadence

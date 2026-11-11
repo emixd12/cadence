@@ -54,6 +54,10 @@ export class DesktopConnectorBroker {
     return this.transport.request(`/api/hevy/activities?${new URLSearchParams({ start: localDate, end: localDate })}`);
   }
   hevyDisconnect(): Promise<ConnectorDisconnectResult> { return this.disconnect("/api/hevy/connection"); }
+  /** Ticket 319: one hosted reconcile for connector completion; evidence is read on the server. */
+  connectorReconcile(source: "hevy"): Promise<{ status: string; counts: { completed: number; attached: number; removed: number } }> {
+    return this.transport.request("/api/connectors/completions/reconcile", { method: "POST", body: JSON.stringify({ source }) });
+  }
 
   private async disconnect(path: string): Promise<ConnectorDisconnectResult> {
     const result = await this.transport.request<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }>(path, { method: "DELETE" });

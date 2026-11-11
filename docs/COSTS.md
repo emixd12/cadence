@@ -65,6 +65,7 @@ implement most of it in source; it is not deployed yet.
 | Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
+| Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | Off until Ticket 323; 96 runs a day that return at once while off |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
 
 ### Per-user total at 100 users
@@ -625,3 +626,16 @@ Final review-fix verification added two cached-place routes and zero geocodes.
 Total reserved spend is US$0.135; Cloud Monitoring confirms seven geocodes and ten
 routes, all 200. That final request completed in 4.159 s in the browser. Server
 sampling was off, so it is excluded from the server percentiles above.
+
+## Connector completion job (Ticket 321, D28.5)
+
+Hevy charges nothing per request, so the job's cost is Vercel function time and
+Supabase requests. Not measured: the job is off until Ticket 323, and no deployed
+run exists. Estimates from the schedule rules, not measurements: about 5 checks per
+linked account per day on a workout day, about 12 when the workout is skipped, and 1
+when nothing is scheduled. Ticket 311 chose the events cursor, so the job runs the full
+schedule. Each check is one reconcile: usually one Hevy GET, the first page of changes
+since the cursor (at most 20). A new link or connection reads in full once (at most 52
+GETs). Server time is estimated under one second for a change read. The route runs 96 times a day; while the flag is off each run
+returns before any database read. Replace these figures with measured usage after
+Ticket 323's deployed run.

@@ -207,7 +207,8 @@ export function DayProgressTimeline({
   const icloud = useWebIcloudCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
     lastLocalDate: visibleSections.at(-1)?.localDate, timezone: timeline.timezone });
   const icloudActive = liveConnectors && OUTLOOK_ACTIVE.has(icloud.state);
-  const hevy = useWebHevyActivityTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate, timezone: timeline.timezone });
+  const hevy = useWebHevyActivityTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate, timezone: timeline.timezone,
+    onConnectorWrites: runtimeRefresh });
   const outlookActive = liveConnectors && OUTLOOK_ACTIVE.has(outlook.state);
   const googleEvents = useMemo(() => live.snapshot?.events.filter((event) =>
     !live.hiddenCalendarIds.includes(event.calendarId) && (live.showAllDay || event.kind !== "all_day"),

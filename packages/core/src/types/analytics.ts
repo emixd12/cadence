@@ -104,7 +104,17 @@ export type AnalyticsBehaviorSummary = AnalyticsStatusCounts &
     trackingStartLabel: string;
     averageTrackedTime: AnalyticsAverageTrackedTime | null;
     dailyCells: AnalyticsBehaviorDayCell[];
+    /** Ticket 318: timing from connector source matches; absent without matches. */
+    connectorTiming?: AnalyticsConnectorTiming | null;
   };
+
+export type AnalyticsConnectorTiming = Readonly<{
+  matchedCount: number;
+  onTimeCount: number;
+  /** Median of activity start minus scheduled start, in whole minutes. */
+  medianOffsetMinutes: number;
+  label: string;
+}>;
 
 export type AnalyticsCategorySummary = AnalyticsStatusCounts &
   AnalyticsAdherence & {

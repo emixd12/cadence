@@ -1667,6 +1667,11 @@
       "id": "INT-PLACE-008",
       "classification": "browser_only",
       "reason": "Review Where fills an unsaved Behavior form draft."
+    },
+    {
+      "id": "INT-BEHAVIOR-032",
+      "classification": "external_provider",
+      "reason": "The Hevy link form reads routine titles from Hevy and saving binds the link to the connected Hevy account; load tests need separate synthetic provider authorization."
     }
   ]
 }
