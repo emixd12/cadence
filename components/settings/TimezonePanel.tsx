@@ -7,6 +7,7 @@ import {
   type TimezoneActionState,
 } from "@/lib/types/settings";
 import { DesktopDraftGuard } from "@/lib/desktop-draft";
+import { SettingsSectionHeading } from "@/components/settings/settings-heading";
 
 export type TimezoneUpdateAction = (
   state: TimezoneActionState,
@@ -79,7 +80,7 @@ export function TimezonePanel({
       id="timezone"
       className="scroll-mt-20 bg-background py-4 first:pt-0 last:pb-0"
     >
-      <h2 className="text-xl leading-tight">Timezone</h2>
+      <SettingsSectionHeading>Timezone</SettingsSectionHeading>
       <form
         key={savedTimezone}
         action={formAction}

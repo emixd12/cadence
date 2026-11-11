@@ -2,14 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { DesktopDraftGuard, DesktopFormDraftGuard } from "@/lib/desktop-draft";
+import { settingsHeadingTag, useSettingsHeading, type SettingsHeadingLevel } from "@/components/settings/settings-heading";
 import { categoryAssignmentSnapshot, type CategoryAssignment, categorySnapshot, CATEGORY_NAME_LIMIT, CATEGORY_DESCRIPTION_LIMIT,
   type ManagedCategory, type CategoryAction } from "@cadence/core/services/category.service";
 
-export function CategoryPanel({ categories, assignments, action }: Readonly<{
+export const CATEGORY_PANEL_PURPOSE = "Organize Behaviors with your own categories. Descriptions provide context in forms and exports.";
+
+export function CategoryPanel({ categories, assignments, action, headingLevel }: Readonly<{
   categories: ManagedCategory[];
   assignments: readonly CategoryAssignment[];
   action: CategoryAction;
+  /** Ticket 301: omit to follow the surrounding group or drawer; `null` when a drawer shows the title. */
+  headingLevel?: SettingsHeadingLevel | null;
 }>) {
+  const heading = useSettingsHeading(headingLevel);
+  const ItemHeading = settingsHeadingTag(heading.childLevel);
   const [editor, setEditor] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState({ status: "idle", message: "" });
@@ -27,14 +34,16 @@ export function CategoryPanel({ categories, assignments, action }: Readonly<{
     form.set("category_id", id); form.set("intent", intent); form.set("expected", categorySnapshot(categories));
     submit(form);
   }
-  return <section id="categories" className="bg-background py-4" aria-labelledby="categories-title" aria-busy={pending}>
+  return <section id="categories" className={heading.show ? "bg-background py-4" : "bg-background"} aria-labelledby={heading.show ? "categories-title" : undefined}
+    aria-label={heading.show ? undefined : "Categories"} aria-busy={pending}>
     <DesktopDraftGuard pending={pending} />
-    <h2 id="categories-title" className="text-xl leading-tight">Categories</h2>
-    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Organize Behaviors with your own categories. Descriptions provide context in forms and exports.</p>
+    {heading.show ? <heading.Tag id="categories-title" className="text-xl leading-tight">Categories</heading.Tag> : null}
+    {/* A drawer that shows the title also shows this purpose line. */}
+    {heading.show ? <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">{CATEGORY_PANEL_PURPOSE}</p> : null}
     <p role={result.status === "error" ? "alert" : "status"} className="mt-3 text-sm">{pending ? "Saving categories…" : result.message}</p>
     <div className="mt-4 divide-y divide-line">
       {categories.map((category, index) => <div key={category.id} className="py-3">
-        <h3 className="break-words text-lg">{category.name}</h3>
+        <ItemHeading className="break-words text-lg">{category.name}</ItemHeading>
         {category.description ? <p className="mt-2 max-w-2xl whitespace-pre-wrap break-words text-sm text-muted-readable">{category.description}</p> : null}
         <div className="mt-2 flex flex-wrap gap-4 text-sm">
           <button type="button" className="product-action product-action-primary min-h-11 min-w-0 max-w-full break-words text-left" disabled={pending || editor !== null} onClick={() => setEditor(category.id)}>Edit {category.name}</button>

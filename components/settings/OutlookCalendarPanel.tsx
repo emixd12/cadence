@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { CalendarSelector } from "@/components/settings/GoogleCalendarPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView, ConnectorPreferences } from "@/lib/types/connectors";
 import type { CalendarPreferences } from "@/lib/types/google-calendar";
 import {
@@ -30,6 +32,8 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
   const [preferences, setPreferences] = useState<ConnectorPreferences | null>(null);
   const [pending, setPending] = useState<"connect" | "save" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(() => callbackMessage ?? null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useReportSettingsSection(connectorSectionState(settingsSectionLoad(connection, loadFailed)));
 
   useEffect(() => {
     let active = true;
@@ -37,13 +41,14 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
       if (!active) return;
       // A "connected" callback no longer applies once the server reports another state.
       setMessage(view.status !== "connected" && callbackMessage === outlookCallbackMessage("connected") ? null : callbackMessage ?? null);
+      setLoadFailed(false);
       setConnection(view);
       setPreferences(view.preferences);
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
         catch (error) { if (active) { markReconnectIfNeeded(error); setMessage(outlookErrorMessage(connectorErrorCode(error), "Outlook calendar list could not load.")); } }
       } else setCalendars([]);
-    }).catch(() => { if (active) setMessage("Outlook Calendar status is unavailable. Other sources and tracking are unaffected."); });
+    }).catch(() => { if (active) { setLoadFailed(true); setMessage("Outlook Calendar status is unavailable. Other sources and tracking are unaffected."); } });
     return () => { active = false; };
   }, [callbackMessage, coordinator, refreshVersion]);
 

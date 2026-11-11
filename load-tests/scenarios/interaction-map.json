@@ -1369,6 +1369,21 @@
       "reason": "Global shortcut settings need isolated owner and stale-revision verification."
     },
     {
+      "id": "INT-SETTINGS-015",
+      "classification": "browser_only",
+      "reason": "Jumping between Settings groups is in-page anchor navigation in a rendered document."
+    },
+    {
+      "id": "INT-SETTINGS-016",
+      "classification": "browser_only",
+      "reason": "Opening a Settings row or drawer is native disclosure state in a rendered document; the panels inside keep their own entries."
+    },
+    {
+      "id": "INT-SETTINGS-017",
+      "classification": "not_load_bearing",
+      "reason": "Open Export is a plain link; Export page load is covered by the Export interactions."
+    },
+    {
       "id": "INT-CALENDAR-001",
       "classification": "external_provider",
       "reason": "Calendar provider consent and external reads require separate synthetic provider authorization."

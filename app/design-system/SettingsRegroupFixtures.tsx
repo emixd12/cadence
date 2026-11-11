@@ -26,6 +26,7 @@ import type { HevyCoordinator, IcloudCalendarCoordinator, OutlookCalendarCoordin
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import type { PlaceLabelClient } from "@/lib/ui/place-labels";
 import type { TravelSettingsClient } from "@/lib/ui/travel-settings";
+import type { SettingsSectionState } from "@/lib/ui/settings-sections";
 
 // Synthetic Settings data for the regroup proposal bench. Every client answers from
 // memory and refuses to save: no provider, account, network or location read.
@@ -36,10 +37,6 @@ export type SettingsFixtureState = "fresh" | "connected" | "attention";
 export type SettingsFixturePanels = Readonly<Record<
   "profile" | "timezone" | "notifications" | "google" | "outlook" | "icloud" | "hevy" | "travel" | "briefCalendar"
   | "dailyBrief" | "connectedApps" | "categories" | "noteShortcuts" | "trust" | "deleteAccount", ReactNode>>;
-
-/** The status a row heading shows. `attention` marks a state the user must act on. */
-export type SettingsRowStatus = Readonly<{ text: string; attention?: boolean; on: boolean }>;
-export type SettingsFixtureStatus = Readonly<Record<"google" | "outlook" | "icloud" | "hevy" | "travel" | "dailyBrief", SettingsRowStatus>>;
 
 const range = { startLocalDate: "2026-11-09", endLocalDate: "2026-11-16", timezone: "America/New_York" };
 const refuse = async (): Promise<never> => { throw new Error("Bench preview: nothing is saved."); };
@@ -121,18 +118,9 @@ function connectedApps(connected: boolean): ConnectedAppsView {
 export const settingsFixtureCategories = ["Medical", "Grooming", "Fitness", "Food / Drink", "Home", "Measurements", "Admin", "Other"]
   .map((name, index) => ({ id: `category-${index}`, name, description: null, sort_order: index, updated_at: "2026-09-05T00:00:00Z" }));
 
-/** Row statuses the proposal shows on heading rows. An implementation derives them from each client. */
-export function settingsFixtureStatus(state: SettingsFixtureState): SettingsFixtureStatus {
-  const connected = state !== "fresh";
-  const source = (detail: string): SettingsRowStatus => connected ? { text: `Connected · ${detail}`, on: true } : { text: "Not connected", on: false };
-  return {
-    google: source("3 calendars"),
-    outlook: state === "attention" ? { text: "Needs reconnection", attention: true, on: true } : source("1 calendar"),
-    icloud: source("1 calendar"),
-    hevy: connected ? { text: "Connected", on: true } : { text: "Not connected", on: false },
-    travel: connected ? { text: "On · Transit from Home", on: true } : { text: "Off", on: false },
-    dailyBrief: connected ? { text: "On · using your connected sources", on: true } : { text: "Off", on: false },
-  };
+/** The Daily Brief sketch's state line. The real panel reports its own through `dailyBriefSectionState`. */
+export function settingsFixtureDailyBriefState(state: SettingsFixtureState): SettingsSectionState {
+  return state === "fresh" ? { text: "Off", attention: false, on: false } : { text: "On · using your connected sources", attention: false, on: true };
 }
 
 /** The real Settings panels, each fed by a synthetic client for the given account state. */
@@ -159,6 +147,6 @@ export function settingsFixturePanels(state: SettingsFixtureState): SettingsFixt
     categories: <CategoryPanel categories={settingsFixtureCategories} assignments={[]} action={idle} />,
     noteShortcuts: <GlobalNoteShortcutControl view={{ state: null, globalEnabled: true, available: true, entries: [] }} action={idle} />,
     trust: <TrustAndLegalPanel />,
-    deleteAccount: <AccountDeletionPanel confirmationLabel="reader@example.test" deleteAccountAction={idle} />,
+    deleteAccount: <AccountDeletionPanel headingLevel={null} confirmationLabel="reader@example.test" deleteAccountAction={idle} />,
   };
 }

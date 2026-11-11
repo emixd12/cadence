@@ -4,6 +4,8 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { CalendarSelector } from "@/components/settings/GoogleCalendarPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView, ConnectorPreferences } from "@/lib/types/connectors";
 import type { CalendarPreferences } from "@/lib/types/google-calendar";
 import {
@@ -37,19 +39,22 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
   const [appPassword, setAppPassword] = useState("");
   const [pending, setPending] = useState<"connect" | "save" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useReportSettingsSection(connectorSectionState(settingsSectionLoad(connection, loadFailed)));
 
   useEffect(() => {
     let active = true;
     void coordinator.getConnection().then(async (view) => {
       if (!active) return;
       setMessage(null);
+      setLoadFailed(false);
       setConnection(view);
       setPreferences(view.preferences);
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
         catch (error) { if (active) setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud calendar list could not load.")); }
       } else setCalendars([]);
-    }).catch(() => { if (active) setMessage("iCloud Calendar status is unavailable. Other sources and tracking are unaffected."); });
+    }).catch(() => { if (active) { setLoadFailed(true); setMessage("iCloud Calendar status is unavailable. Other sources and tracking are unaffected."); } });
     return () => { active = false; };
   }, [coordinator, refreshVersion]);
 

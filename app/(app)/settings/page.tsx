@@ -8,27 +8,29 @@ import {
 import { AccountDeletionPanel } from "@/components/settings/AccountDeletionPanel";
 import { NotificationPermissionPanel } from "@/components/settings/NotificationPermissionPanel";
 import { TimezonePanel } from "@/components/settings/TimezonePanel";
+import { SettingsProfile } from "@/components/settings/SettingsPanels";
 import {
-  SettingsPanelGrid,
-  SettingsProfile,
-  TrustAndLegalPanel,
-} from "@/components/settings/SettingsPanels";
-import { CategoryPanel } from "@/components/settings/CategoryPanel";
+  SETTINGS_DAILY_BRIEF_PURPOSE,
+  SETTINGS_TRAVEL_PURPOSE,
+  SettingsDrawer,
+  SettingsExportEntry,
+  SettingsGroup,
+  SettingsPageEnd,
+  SettingsSections,
+} from "@/components/settings/SettingsSections";
+import { SettingsHeadingScope } from "@/components/settings/settings-heading";
+import { CATEGORY_PANEL_PURPOSE, CategoryPanel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
-import { disconnectAppAction } from "./actions";
-import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
-import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import { getCategorySettings } from "@/lib/services/category.service";
-import { changeCategoryAction } from "./actions";
 import { getSettingsPageData } from "@/lib/services/settings.service";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
-import { deleteAccountAction, updateTimezoneAction } from "./actions";
+import { categoriesSectionState } from "@/lib/ui/settings-sections";
+import { changeCategoryAction, deleteAccountAction, disconnectAppAction, updateTimezoneAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -51,44 +53,73 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, noteShortcutView, connectedApps] = await Promise.all([
+  const [categorySettings, connectedApps] = await Promise.all([
     getCategorySettings(),
-    getNoteShortcutViewForCurrentUser(null),
     getConnectedApps(),
   ]);
 
+  // Ticket 301: four groups, a sticky index, closed source rows and drawers.
+  // Note shortcuts has no Settings control here (Ticket 305).
   return (
-    <SettingsPanelGrid>
-      <SettingsProfile email={settings.email} />
+    <SettingsSections>
+      <SettingsGroup id="settings-general">
+        <SettingsProfile email={settings.email} />
+        <TimezonePanel
+          currentTimezone={settings.timezone}
+          updateTimezoneAction={updateTimezoneAction}
+        />
+        <NotificationPermissionPanel vapidPublicKey={settings.vapidPublicKey} />
+        <SettingsDrawer
+          title="Categories"
+          description={CATEGORY_PANEL_PURPOSE}
+          label="Edit categories"
+          state={categoriesSectionState(categorySettings.categories.length)}
+        >
+          <CategoryPanel {...categorySettings} action={changeCategoryAction} />
+        </SettingsDrawer>
+      </SettingsGroup>
 
-      <TimezonePanel
-        currentTimezone={settings.timezone}
-        updateTimezoneAction={updateTimezoneAction}
+      <SettingsGroup id="settings-connections">
+        <WebConnectorLibrary timezone={settings.timezone} />
+        <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
+      </SettingsGroup>
+
+      <SettingsGroup id="settings-planning">
+        <SettingsDrawer
+          title="Travel"
+          description={SETTINGS_TRAVEL_PURPOSE}
+          label="Travel settings"
+          setupLabel="Set up Travel"
+        >
+          <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
+        </SettingsDrawer>
+        <SettingsDrawer
+          title="Daily Brief"
+          description={SETTINGS_DAILY_BRIEF_PURPOSE}
+          label="Daily Brief settings"
+          setupLabel="Set up Daily Brief"
+        >
+          <DailyBriefSettingsPanel />
+          {/* The separate Daily Brief Google Calendar grant stays until Ticket 307 removes it. */}
+          <SettingsHeadingScope level={4}>
+            <WebGoogleCalendarPanel timezone={settings.timezone} agent />
+          </SettingsHeadingScope>
+        </SettingsDrawer>
+      </SettingsGroup>
+
+      <SettingsGroup id="settings-account">
+        <SettingsExportEntry />
+      </SettingsGroup>
+
+      <SettingsPageEnd
+        deleteAccount={
+          <AccountDeletionPanel
+            headingLevel={null}
+            confirmationLabel={settings.deleteConfirmationLabel}
+            deleteAccountAction={deleteAccountAction}
+          />
+        }
       />
-
-      <NotificationPermissionPanel
-        vapidPublicKey={settings.vapidPublicKey}
-      />
-
-      <WebConnectorLibrary timezone={settings.timezone} />
-
-      <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
-
-      <WebGoogleCalendarPanel timezone={settings.timezone} agent />
-      <DailyBriefSettingsPanel />
-
-      <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
-
-      <CategoryPanel {...categorySettings} action={changeCategoryAction} />
-
-      <GlobalNoteShortcutControl view={noteShortcutView} action={manageNoteShortcutAction} />
-
-      <TrustAndLegalPanel />
-
-      <AccountDeletionPanel
-        confirmationLabel={settings.deleteConfirmationLabel}
-        deleteAccountAction={deleteAccountAction}
-      />
-    </SettingsPanelGrid>
+    </SettingsSections>
   );
 }

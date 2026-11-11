@@ -5,6 +5,8 @@ import type { DailyBriefSettings } from "@cadence/core/types/daily-brief";
 
 import { DailyBriefRequestError, createWebDailyBriefClient, type DailyBriefClient, type DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { dailyBriefSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 
 /** Ticket 239: each new source has its own default-off disclosure, separate from connecting or showing it on Timeline. */
 const CONNECTOR_DISCLOSURES = [
@@ -55,6 +57,8 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
   const [settings, setSettings] = useState<DailyBriefSettings>();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // Ticket 301: the Daily Brief drawer shows this state while closed. A failed save keeps the loaded settings.
+  useReportSettingsSection(resolvedClient ? dailyBriefSectionState(settingsSectionLoad(settings, error !== "")) : null);
 
   useEffect(() => {
     if (!resolvedClient) return;

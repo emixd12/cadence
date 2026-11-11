@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
 import { GripVertical } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ScreenFrame } from "@/components/layout/ScreenFrame";
+import { ConnectorLibrary } from "@/components/settings/ConnectorLibrary";
 import { SettingsPanel, SettingsPanelGrid } from "@/components/settings/SettingsPanels";
-import { settingsFixtureCategories, settingsFixturePanels, settingsFixtureStatus, type SettingsFixturePanels, type SettingsFixtureState,
-  type SettingsFixtureStatus, type SettingsRowStatus } from "./SettingsRegroupFixtures";
-import styles from "./settings-regroup-bench.module.css";
+import { SETTINGS_DAILY_BRIEF_PURPOSE, SETTINGS_TRAVEL_PURPOSE, SettingsDrawer, SettingsExportEntry, SettingsGroup, SettingsPageEnd,
+  SettingsSections } from "@/components/settings/SettingsSections";
+import { categoriesSectionState } from "@/lib/ui/settings-sections";
+import { settingsFixtureCategories, settingsFixtureDailyBriefState, settingsFixturePanels, type SettingsFixturePanels,
+  type SettingsFixtureState } from "./SettingsRegroupFixtures";
 
-// Settings regroup proposal (usability evaluation, 2026-11-09; second round 2026-11-10).
-// A mock, not product UI: it arranges the real Settings panels in four groups and sketches
-// a drag-to-reorder Categories list and a one-choice Daily Brief. Nothing here is wired to an account, and
-// `/settings` is unchanged.
+// Settings regroup (usability evaluation, 2026-11-09; second round 2026-11-10).
+// "Proposed" renders the Ticket 301 Settings layout from the real components on
+// synthetic data. Two parts stay sketches for later tickets: the drag-to-reorder
+// Categories list (Ticket 304) and the one-choice Daily Brief (Tickets 306–307).
 
 type Layout = "current" | "proposed";
 type RegroupQuery = Readonly<Record<"layout" | "state", string | null>>;
@@ -37,7 +40,7 @@ export function SettingsRegroupBench({ query }: Readonly<{ query: RegroupQuery }
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <a href="/design-system" className="underline underline-offset-4">Back to the design-system bench</a>
           <strong>Settings regroup proposal</strong>
-          <span className="text-neutral-600">Mock. Real panels and sketches, synthetic data, nothing is saved.</span>
+          <span className="text-neutral-600">Real Settings components and two sketches, synthetic data, nothing is saved.</span>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-3">
           <Choice label="Layout" value={layout} onChange={setLayout} options={[["proposed", "Proposed"], ["current", "Current"]]} />
@@ -49,7 +52,7 @@ export function SettingsRegroupBench({ query }: Readonly<{ query: RegroupQuery }
             : "Measuring the preview."}
         </p>
         <details>
-          <summary className="cursor-pointer underline underline-offset-4">What the proposal changes, and what is only a sketch</summary>
+          <summary className="cursor-pointer underline underline-offset-4">What changed, and what is only a sketch</summary>
           <div className="mt-2 grid max-w-3xl gap-2 leading-6 text-neutral-800">
             <ul className="list-disc pl-5">
               <li>Four groups replace the flat list of 12 sections. A four-link index stays in view while the page scrolls.</li>
@@ -61,7 +64,7 @@ export function SettingsRegroupBench({ query }: Readonly<{ query: RegroupQuery }
               <li>Trust and legal becomes one line of links. Delete account is a plain link at the end of the page.</li>
               <li>Body text keeps the current 12px size.</li>
             </ul>
-            <p>Sketches, not real panels: the Categories list and the Daily Brief row. Their controls change nothing outside this page. Daily Brief shows one choice for every connected source and no second Google Calendar connection. Sketch wording is a first draft for the messaging track.</p>
+            <p>Ticket 301 ships the groups, index, rows, drawers, legal links and Delete account link on <code>/settings</code>; Proposed renders those components. Sketches, not real panels: the Categories list (Ticket 304) and the Daily Brief controls (Tickets 306–307). Their controls change nothing outside this page. Daily Brief shows one choice for every connected source and no second Google Calendar connection. Sketch wording is a first draft for the messaging track.</p>
           </div>
         </details>
       </aside>
@@ -90,143 +93,41 @@ function CurrentSettings({ panels }: Readonly<{ panels: SettingsFixturePanels }>
   );
 }
 
-const GROUPS = [
-  { id: "settings-general", label: "General", title: "General" },
-  { id: "settings-connections", label: "Connections", title: "Connections" },
-  { id: "settings-planning", label: "Planning", title: "Planning" },
-  { id: "settings-account", label: "Account", title: "Account and data" },
-] as const;
-type GroupId = (typeof GROUPS)[number]["id"];
-/** Clears the sticky index, and on small screens the app header above it. */
-const ANCHOR_OFFSET = "scroll-mt-32 lg:scroll-mt-16";
-
-/** Each icon is the provider's own asset, bundled unchanged (`public/brand/*-source.md`). */
 const SOURCES = [
-  { key: "google", title: "Google Calendar", kind: "Calendar", icon: "/brand/google-calendar.svg" },
-  { key: "outlook", title: "Outlook Calendar", kind: "Calendar", icon: "/brand/outlook-calendar.svg" },
-  { key: "icloud", title: "iCloud Calendar", kind: "Calendar", icon: "/brand/icloud-calendar.png" },
-  { key: "hevy", title: "Hevy", kind: "Workouts", icon: "/brand/hevy.png" },
+  { key: "google", title: "Google Calendar" },
+  { key: "outlook", title: "Outlook Calendar" },
+  { key: "icloud", title: "iCloud Calendar" },
+  { key: "hevy", title: "Hevy" },
 ] as const;
 
+/** The `/settings` layout (Ticket 301), with the Categories and Daily Brief sketches in place of the real panels. */
 function ProposedSettings({ panels, state }: Readonly<{ panels: SettingsFixturePanels; state: SettingsFixtureState }>) {
-  useOpenAnchorTarget();
-  const status: SettingsFixtureStatus = settingsFixtureStatus(state);
+  const dailyBrief = settingsFixtureDailyBriefState(state);
   return (
-    <div className={["grid min-w-0 grid-cols-1 gap-12", styles.proposal].join(" ")}>
-      <nav aria-label="Settings sections" className="sticky top-16 z-30 -mx-4 -mt-6 border-b border-line bg-background px-4 sm:-mx-6 sm:px-6 lg:top-0 lg:mx-0 lg:px-0">
-        <ul className={["flex gap-x-4 overflow-x-auto whitespace-nowrap sm:gap-x-6", styles.index].join(" ")}>
-          {GROUPS.map((group) => <li key={group.id}>
-            <a href={`#${group.id}`} className="product-action product-action-secondary min-h-11 text-base">{group.label}</a>
-          </li>)}
-        </ul>
-      </nav>
-      <div className="grid max-w-xl gap-12">
-        <Group id="settings-general">
-          {panels.profile}{panels.timezone}{panels.notifications}
-          <CategoriesSketch />
-        </Group>
-        <Group id="settings-connections">
-          <SettingsPanel title="Connected sources"
-            description="Bring your calendar and workouts into your day. Cadence only reads them, and your tracking never depends on them.">
-            <div className="grid min-w-0 divide-y divide-line border-t border-line">
-              {SOURCES.map((source) => <Row key={source.key} title={source.title} kind={source.kind} level={4} status={status[source.key]}
-                icon={<SourceIcon src={source.icon} />}>{panels[source.key]}</Row>)}
-            </div>
-          </SettingsPanel>
-          {panels.connectedApps}
-        </Group>
-        <Group id="settings-planning">
-          <Drawer title="Travel" description="Know when to leave for events and Behaviors that have a place." status={status.travel}
-            label={status.travel.on ? "Travel settings" : "Set up Travel"}>{panels.travel}</Drawer>
-          <Drawer title="Daily Brief" description="A short briefing the first time you open Timeline each day." status={status.dailyBrief}
-            label={status.dailyBrief.on ? "Daily Brief settings" : "Set up Daily Brief"}><DailyBriefSketch state={state} /></Drawer>
-        </Group>
-        <Group id="settings-account">
-          <SettingsPanel title="Export" description="Download your history as JSONL, CSV, full JSON, or a BehaviorLog bundle.">
-            <a href="/export" className="product-action product-action-primary min-h-11 text-sm">Open Export</a>
-          </SettingsPanel>
-        </Group>
-        <footer className="grid gap-2 border-t border-line pt-4 text-sm">
-          <ul className="flex flex-wrap gap-x-6">
-            {[["/privacy", "Privacy"], ["/terms", "Terms"], ["/trust", "Trust"]].map(([href, label]) => <li key={href}>
-              <a href={href} className="product-action product-action-secondary min-h-11">{label}</a>
-            </li>)}
-          </ul>
-          <details data-settings-row suppressHydrationWarning className={ANCHOR_OFFSET}>
-            <summary className="product-disclosure-trigger product-action product-action-secondary min-h-11 w-fit">Delete account</summary>
-            <div className={["pt-2", styles.rowBody].join(" ")}>{panels.deleteAccount}</div>
-          </details>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-function Group({ id, children }: Readonly<{ id: GroupId; children: ReactNode }>) {
-  const group = GROUPS.find((item) => item.id === id)!;
-  return (
-    <section id={id} aria-labelledby={`${id}-title`} className={ANCHOR_OFFSET}>
-      <h2 id={`${id}-title`} className="border-b border-line pb-4 text-2xl leading-tight">{group.title}</h2>
-      <div className="mt-8 grid min-w-0 grid-cols-1 divide-y divide-line">{children}</div>
-    </section>
-  );
-}
-
-function SourceIcon({ src }: Readonly<{ src: string }>) {
-  // The product already serves a bundled provider mark as a plain image (DayProgressTimeline).
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" width={20} height={20} className="mt-1 h-5 w-5 shrink-0" />;
-}
-
-/**
- * A section whose title, purpose and state stay in view. One button below them opens the
- * controls. It starts closed unless its state needs action.
- */
-function Drawer({ id, title, description, status, label, level = 3, children }: Readonly<{
-  id?: string; title: string; description: string; status?: SettingsRowStatus; label: string; level?: 2 | 3; children: ReactNode }>) {
-  const Heading = level === 2 ? "h2" : "h3";
-  return (
-    <section id={id} data-settings-drawer className={["bg-background py-4 first:pt-0 last:pb-0", ANCHOR_OFFSET].join(" ")}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <Heading className="text-xl leading-tight">{title}</Heading>
-        {status ? <span className={["text-sm leading-6", status.attention ? "font-bold text-foreground" : status.on ? "text-foreground" : "text-muted-readable"].join(" ")}>{status.text}</span> : null}
-      </div>
-      <p className="mt-3 text-sm leading-6 text-muted-readable">{description}</p>
-      {/* The browser opens a drawer itself when a link targets an anchor inside it, before hydration. */}
-      <details data-settings-row open={Boolean(status?.attention)} suppressHydrationWarning className={["mt-1", styles.drawer].join(" ")}>
-        <summary className="product-disclosure-trigger flex min-h-11 w-fit items-center text-sm">
-          <span aria-hidden="true" className="product-disclosure-indicator" />
-          <span className="product-disclosure-trigger-label">{label}</span>
-        </summary>
-        <div className={["pb-2 pt-2", styles.rowBody].join(" ")}>{children}</div>
-      </details>
-    </section>
-  );
-}
-
-/**
- * One native disclosure row: title, one line of purpose, and the state on the summary.
- * It starts closed unless its state needs action. The body is the existing panel.
- */
-function Row({ title, kind, status, level = 3, icon, children }: Readonly<{
-  title: string; kind: string; status?: SettingsRowStatus; level?: 3 | 4; icon?: ReactNode; children: ReactNode }>) {
-  const Heading = level === 4 ? "h4" : "h3";
-  return (
-    // The browser opens a row itself when a link targets an anchor inside it, before hydration.
-    <details data-settings-row open={Boolean(status?.attention)} suppressHydrationWarning className={["min-w-0", ANCHOR_OFFSET].join(" ")}>
-      <summary className="product-disclosure-trigger flex min-h-11 items-start gap-2 py-4">
-        <span aria-hidden="true" className="product-disclosure-indicator mt-2" />
-        {icon}
-        <span className="grid min-w-0 flex-1 gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-x-6">
-          <span className="grid min-w-0 gap-1">
-            <Heading className={level === 4 ? "text-lg leading-tight" : "text-xl leading-tight"}>{title}</Heading>
-            <span className="text-sm leading-6 text-muted-readable">{kind}</span>
-          </span>
-          {status ? <span className={["text-sm leading-6", status.attention ? "font-bold text-foreground" : status.on ? "text-foreground" : "text-muted-readable"].join(" ")}>{status.text}</span> : null}
-        </span>
-      </summary>
-      <div className={["pb-6 pl-4", styles.rowBody].join(" ")}>{children}</div>
-    </details>
+    <SettingsSections>
+      <SettingsGroup id="settings-general">
+        {panels.profile}{panels.timezone}{panels.notifications}
+        <CategoriesSketch />
+      </SettingsGroup>
+      <SettingsGroup id="settings-connections">
+        <ConnectorLibrary rows sources={[
+          { id: "google_calendar", content: panels.google },
+          { id: "outlook_calendar", content: panels.outlook },
+          { id: "icloud_calendar", content: panels.icloud },
+          { id: "hevy", content: panels.hevy },
+        ]} />
+        {panels.connectedApps}
+      </SettingsGroup>
+      <SettingsGroup id="settings-planning">
+        <SettingsDrawer title="Travel" description={SETTINGS_TRAVEL_PURPOSE} label="Travel settings" setupLabel="Set up Travel">{panels.travel}</SettingsDrawer>
+        <SettingsDrawer title="Daily Brief" description={SETTINGS_DAILY_BRIEF_PURPOSE} state={dailyBrief}
+          label="Daily Brief settings" setupLabel="Set up Daily Brief"><DailyBriefSketch state={state} /></SettingsDrawer>
+      </SettingsGroup>
+      <SettingsGroup id="settings-account">
+        <SettingsExportEntry />
+      </SettingsGroup>
+      <SettingsPageEnd deleteAccount={panels.deleteAccount} />
+    </SettingsSections>
   );
 }
 
@@ -299,7 +200,9 @@ function CategoriesSketch() {
   };
 
   return (
-    <Drawer id="categories" level={2} title="Categories" description="Group your Behaviors your way." label={`Edit ${order.length} categories`}>
+    <SettingsDrawer title="Categories" description="Group your Behaviors your way." label={`Edit ${order.length} categories`}
+      state={categoriesSectionState(order.length)}>
+      <div id="categories">
       <p id="category-reorder-hint" className="text-sm leading-6 text-muted-readable">Drag a handle to reorder, or focus it and press the arrow keys.</p>
       <p role="status" className="sr-only">{announcement}</p>
       <ul ref={list} className="mt-2 divide-y divide-line border-y border-line">
@@ -320,7 +223,8 @@ function CategoriesSketch() {
       </ul>
       {editing === "new" ? <div className="mt-4"><CategoryFormSketch onClose={() => setEditing(null)} /></div>
         : <button type="button" className="product-action product-action-primary mt-2 min-h-11 text-sm" onClick={() => setEditing("new")}>Add category</button>}
-    </Drawer>
+      </div>
+    </SettingsDrawer>
   );
 }
 
@@ -336,38 +240,6 @@ function CategoryFormSketch({ category, onClose }: Readonly<{ category?: Categor
       </div>
     </form>
   );
-}
-
-/**
- * Opens the row or drawer that holds the linked anchor and scrolls to it. Panels above keep
- * loading for a moment, so the target is brought back into place until the reader scrolls.
- */
-function useOpenAnchorTarget() {
-  useEffect(() => {
-    let settle: ResizeObserver | null = null;
-    const stop = () => { settle?.disconnect(); settle = null; };
-    const reveal = () => {
-      stop();
-      const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
-      if (!target) return;
-      const drawer = target.closest<HTMLElement>("[data-settings-drawer]");
-      const row = target.closest<HTMLDetailsElement>("details[data-settings-row]") ?? drawer?.querySelector<HTMLDetailsElement>("details[data-settings-row]");
-      if (row) row.open = true;
-      const place = drawer ?? row ?? target;
-      place.scrollIntoView();
-      settle = new ResizeObserver(() => place.scrollIntoView());
-      settle.observe(document.body);
-      window.setTimeout(stop, 4000);
-    };
-    reveal();
-    window.addEventListener("hashchange", reveal);
-    for (const type of ["wheel", "touchstart", "keydown", "pointerdown"]) window.addEventListener(type, stop, { passive: true });
-    return () => {
-      stop();
-      window.removeEventListener("hashchange", reveal);
-      for (const type of ["wheel", "touchstart", "keydown", "pointerdown"]) window.removeEventListener(type, stop);
-    };
-  }, []);
 }
 
 function Choice<T extends string>({ label, value, options, onChange, disabled = false }: Readonly<{

@@ -1083,6 +1083,41 @@ Show:
 - Trust, Privacy, and Terms links for public-product account context
 - Account deletion with export acknowledgement and typed confirmation
 
+Web layout (Ticket 301, `docs/DECISIONS.md`, 2026-11-10). Settings has four
+groups, in this order, each with a `text-2xl` title: General (Profile, Timezone,
+Notifications, Categories), Connections (Connected sources, Connected apps),
+Planning (Travel, Daily Brief) and Account and data (Export). A four-link section
+index (General, Connections, Planning, Account) stays in view while the page
+scrolls; on small screens it sits below the app header.
+
+- Each connected source is one closed row: the provider's icon, its name, its
+  kind and its state ("Not connected", "Connected · 3 calendars", "Connected · No
+  calendars chosen", "Needs reconnection", "Not available here"). Opening the
+  row shows the existing source panel.
+- Travel, Daily Brief and Categories keep their title, one-line purpose and
+  state in view. One button below them opens the controls: "Set up Travel" while
+  off and "Travel settings" while on; "Set up Daily Brief" and "Daily Brief
+  settings"; "Edit categories" with the category count as state. The separate
+  Google Calendar for Daily Brief panel sits inside the Daily Brief drawer until
+  Ticket 307 removes it.
+- While a panel loads, its row or drawer says "Checking…". On a failed read it
+  says "Status unavailable" and opens. A row or drawer whose state needs action
+  opens by itself; the person can close it again. Each state comes from one pure
+  function in `lib/ui/settings-sections.ts`.
+- Each section has one heading: a row or drawer that shows the title hides the
+  panel's own heading.
+- Account and data has one Export entry: "Download your history as JSONL, CSV,
+  full JSON, or a BehaviorLog bundle." with **Open Export**.
+- The page ends with one line of Privacy, Terms and Trust links, then Delete
+  account as a plain link. It opens the existing deletion form unchanged.
+- Links to `#timezone`, `#notifications`, `#travel`, `#categories`,
+  `#connected-apps`, `#connector-*` and `#delete-account` open their row or
+  drawer and land below the header and index, and stay there while panels above
+  finish loading, until the reader scrolls, types or taps.
+- Body text keeps its size. There is no horizontal scroll at 390 px.
+- Web Settings shows no Note shortcuts control (Ticket 305 turns the feature on by
+  default). Desktop Settings keeps its current single stack until Ticket 302.
+
 Desktop Settings additionally shows linked-account synchronization state,
 conflict count and review, and disconnect choices. A conflict also exposes one
 persistent shell cue that opens Settings. Conflict rows show the Mac and account
