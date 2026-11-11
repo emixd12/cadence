@@ -50,10 +50,10 @@ describe("day note update planning", () => {
 });
 
 describe("day note expected text", () => {
-  it("normalizes CRLF and lone CR line breaks without trimming", () => {
+  it("turns CRLF into LF, keeps a lone CR and does not trim", () => {
     const plan = (expectedNote: string) => resolveDayNoteUpdate({ localDate: "2026-11-10", expectedNote, note: "x" }).expectedNote;
     expect(plan("line one\r\nline two")).toBe("line one\nline two");
-    expect(plan("line one\rline two")).toBe("line one\nline two");
+    expect(plan("line one\rline two")).toBe("line one\rline two");
     expect(plan("a\r\n\r\nb")).toBe("a\n\nb");
     expect(plan(" kept as sent ")).toBe(" kept as sent ");
     expect(plan("")).toBeNull();
@@ -134,14 +134,18 @@ describe("day note service", () => {
     };
   }
 
-  it.each([
-    ["CRLF", "line one\r\nline two"],
-    ["lone CR", "line one\rline two"],
-  ])("edits a multi-line note when the expected text uses %s line breaks", async (_label, expectedNote) => {
+  it("edits a multi-line note when a browser submits the expected text with CRLF", async () => {
     const { state, store } = compareAndSetStore("line one\nline two");
-    const result = await saveDayNote(store, { localDate: "2026-11-10", expectedNote, note: "line one\r\nline three" });
+    const result = await saveDayNote(store, { localDate: "2026-11-10", expectedNote: "line one\r\nline two", note: "line one\r\nline three" });
     expect(result).toMatchObject({ note: "line one\nline three", changed: true });
     expect(state.saved).toBe("line one\nline three");
+  });
+
+  it("edits a note saved with a lone CR when desktop or MCP sends the saved text", async () => {
+    const { state, store } = compareAndSetStore("First\rSecond");
+    const result = await saveDayNote(store, { localDate: "2026-11-10", expectedNote: "First\rSecond", note: "Third" });
+    expect(result).toMatchObject({ note: "Third", changed: true });
+    expect(state.saved).toBe("Third");
   });
 
   it("clears a multi-line sync-merged note submitted with CRLF line breaks", async () => {

@@ -40,7 +40,7 @@ export function parseDayNoteLocalDate(value: unknown): string {
   }
 }
 
-/** Normalizes like Occurrence notes: CRLF and CR to LF, trimmed, empty becomes null. */
+/** Normalizes like Occurrence notes: CRLF to LF, trimmed, empty becomes null. */
 export function normalizeDayNote(value: string): string | null {
   return resolveNoteUpdate({ note: value }).note;
 }

@@ -102,16 +102,21 @@ export function resolveStatusEvent(
   };
 }
 
-/** Turns CRLF and lone CR line breaks into LF. */
+/**
+ * Turns CRLF line breaks into LF. A lone CR stays, as in the BehaviorLog import
+ * normalizer, so text that was saved with one still round-trips unchanged.
+ */
 export function normalizeNoteLineEndings(value: string): string {
-  return value.replace(/\r\n?/g, "\n");
+  return value.replace(/\r\n/g, "\n");
 }
 
 /**
- * Plans the compare-and-set value for a note save. Browsers submit form text with
- * CRLF line breaks, while saved notes use LF, so only line endings change here.
- * The value is not trimmed: it must equal the saved text, which is already trimmed.
- * Empty text means the caller saw no note.
+ * Plans the compare-and-set value for a note save. No write path stores CRLF:
+ * resolveNoteUpdate and the BehaviorLog import both replace it. So a CRLF in an
+ * expected value can only come from a browser form encoding a saved LF, and turns
+ * back into LF here. A lone CR is the saved text itself (desktop and MCP send the
+ * text they read) and passes through. The value is not trimmed: it must equal the
+ * saved text exactly. Empty text means the caller saw no note.
  */
 export function resolveExpectedNote(value: string): string | null {
   const expected = normalizeNoteLineEndings(value);
