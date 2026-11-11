@@ -49,7 +49,6 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
 | Tickets 310–324: connector completion (D28) | 310 complete November 10, 2026 (documents only); 311–324 not started; no code | Ticket 311: live Hevy check with test account A's key (`connectors` preflight). Ticket 312 can start in parallel. A Mac build with Ticket 319 ships before the feature turns on | TICKETS, Tickets 310–324; STATUS, "Tickets 310–324: connector completion filed — November 10, 2026" |
-| Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -89,6 +88,41 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 292: day notes complete — November 11, 2026
+
+The owner approved closing Ticket 292 on November 11, 2026. Web, hosted and MCP are live;
+production serves `5e5b5cc7`.
+
+- **Acceptance run** `t292-day-notes-20261111` (ledger
+  `.intent/acceptance/t292-day-notes-20261111/ledger.md`):
+  - Passed: 1, 2, 3, 5 (accounts A and B; B sees none of A's day notes through
+    `list_day_notes`, `get_timeline`, `search` or `fetch`), 6, 7, 8, 9 and 10.
+  - 7–9 ran on the test Mac with dev-signed 0.1.10-dev.2 from `main` at `10cb7dfb`: SQLite
+    20→23 with integrity ok and no rows lost; a local day note persists across quit and
+    relaunch; the synced chip works in the Mac editor; day notes and the shortcut pool sync
+    both ways; a concurrent edit goes to conflict review; two new notes for one date merge.
+  - Partial: 4. Export content and import and restore previews verified; the apply steps
+    did not run, because no throwaway test account exists.
+- **Defect D3, fixed:** multi-line notes could not be re-saved on web; every save showed the
+  conflict message. Occurrence notes had the same defect from before Ticket 292. PR #213
+  (`5e5b5cc7`) normalizes CRLF in the expected text before the compare-and-set. The
+  acceptance agent retested on production as account A: multi-line day notes and
+  Occurrence notes save, edit and clear at 1280 and 390 px, a stale save still conflicts,
+  and a chip save on a multi-line day works.
+- **Mac:** no Mac release was published. SQLite `0023`, day-note shortcuts on Mac and sync
+  contract 4 reach users with the next Mac release. Hosted already supports contract 4.
+- **Still open, outside this ticket:** the web export 500 (open-work row; ledger D2) and
+  P-028 in the messaging track.
+- **Follow-ups logged** in `docs/FUTURE_UPDATES.md`, "Day note follow-ups".
+- **Test fixtures left in place:** account A keeps empty day-note rows (there is no delete
+  path) and a `day_notes` shortcut row with 3 dismissed entries. Account B has one cleared
+  row. The test Mac stays on dev build 0.1.10-dev.2 (schema 23), linked as A; its
+  pre-upgrade backup is `backups/pre-0.1.10-dev.2-20261111T171236Z`. Returning it to 0.1.9
+  needs the owner's instruction.
+
+Platform impact: web and hosted live; desktop merged, ships with the next Mac release;
+marketing and future mobile not applicable. Messaging impact: P-028 (open).
 
 ## Updater signing key rotated — November 11, 2026
 
