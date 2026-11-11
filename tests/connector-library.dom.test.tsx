@@ -126,7 +126,12 @@ describe("HevyPanel", () => {
     vi.mocked(coordinator.refreshActivities).mockRejectedValueOnce(new ConnectorClientError("timeout"));
     await act(async () => { button("Refresh Hevy").click(); });
     await vi.waitFor(() => expect(container.textContent).toContain("Hevy did not respond in time. Try again; other sources and tracking are unchanged."));
+    // Ticket 303: Disconnect asks first, in the destructive style.
+    expect(button("Disconnect Hevy").className).toContain("product-action-danger");
     await act(async () => { button("Disconnect Hevy").click(); });
+    expect(coordinator.disconnect).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Disconnect Hevy?");
+    await act(async () => { button("Disconnect").click(); });
     await vi.waitFor(() => expect(container.textContent).toContain("Cadence deleted its saved API key."));
     expect(container.textContent).toContain("remove or regenerate it in Hevy settings");
     expect(container.textContent).not.toMatch(/Cadence revoked|revoked the key/i);
@@ -142,12 +147,16 @@ describe("OutlookCalendarPanel", () => {
     // Ticket 242: the broader Microsoft permission is disclosed alongside what Cadence requests.
     expect(container.querySelector("#outlook-calendar-permission-disclosure")?.textContent).toMatch(/covers event details.*requests only event titles, times/);
     const family = [...container.querySelectorAll("label")].find((label) => label.textContent?.startsWith("Family"))!.querySelector("input")!;
-    await act(() => family.click());
-    await act(async () => { button("Save Outlook settings").click(); });
+    // Ticket 303: the selection saves as it changes; there is no Save button.
+    expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save Outlook settings")).toBe(false);
+    await act(async () => family.click());
     expect(coordinator.savePreferences).toHaveBeenCalledWith({ selectedSourceIds: ["calendar-1", "calendar-2"], hiddenSourceIds: [], visible: true, showAllDay: true });
+    expect(container.textContent).toContain("Saved");
     await act(async () => { button("Refresh Outlook Calendar").click(); });
     await vi.waitFor(() => expect(container.textContent).toContain("Outlook Calendar refreshed."));
     await act(async () => { button("Disconnect Outlook Calendar").click(); });
+    expect(coordinator.disconnect).not.toHaveBeenCalled();
+    await act(async () => { button("Disconnect").click(); });
     await vi.waitFor(() => expect(container.textContent).toContain("Cadence deleted its saved Microsoft access."));
     expect(container.textContent).toContain("My Apps for a work or school account");
     expect(container.textContent).not.toMatch(/Cadence revoked|Microsoft revoked/i);
@@ -183,6 +192,8 @@ describe("OutlookCalendarPanel reconnect recovery", () => {
     await vi.waitFor(() => expect(button("Reconnect Outlook Calendar")).toBeDefined());
     expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save Outlook settings")).toBe(false);
     await act(() => button("Disconnect Outlook Calendar").click());
+    expect(source.disconnect).not.toHaveBeenCalled();
+    await act(() => button("Disconnect").click());
     expect(source.disconnect).toHaveBeenCalled();
     expect(container.textContent).toContain("Cadence deleted its saved Microsoft access");
   });
@@ -282,14 +293,72 @@ describe("IcloudCalendarPanel", () => {
       refreshEvents: vi.fn(async () => { throw new ConnectorClientError("reconnect_required"); }) });
     await act(() => root.render(<IcloudCalendarPanel coordinator={source} refreshRange={range} />));
     const family = [...container.querySelectorAll("label")].find(label => label.textContent?.startsWith("Family"))!.querySelector("input")!;
-    await act(() => family.click());
-    await act(() => button("Save iCloud settings").click());
+    await act(async () => family.click());
     expect(source.savePreferences).toHaveBeenCalledWith(expect.objectContaining({ selectedSourceIds: ["calendar-1", "calendar-2"] }));
     await act(() => button("Refresh iCloud Calendar").click());
     expect(button("Reconnect iCloud Calendar")).toBeDefined();
     await act(() => button("Disconnect iCloud Calendar").click());
+    expect(source.disconnect).not.toHaveBeenCalled();
+    await act(() => button("Disconnect").click());
     expect(container.textContent).toContain("Cadence deleted its saved Apple Account email and app-specific password");
     expect(container.textContent).toContain("Sign-In and Security");
     expect(container.textContent).not.toContain("Cadence revoked");
+  });
+});
+
+// Ticket 303: display and selection choices save as they change; a failed save undoes the change.
+describe("source panels save as they change", () => {
+  const range = { startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" };
+  const liveLines = () => [...container.querySelectorAll('[role="status"]')].map((node) => node.textContent ?? "").filter(Boolean);
+  const checkbox = (label: string) => [...container.querySelectorAll("label")].find((node) => node.textContent?.startsWith(label))!.querySelector("input")!;
+
+  it("puts an Outlook choice back and gives the specific reason when the save fails", async () => {
+    const source = outlookCoordinator({ savePreferences: vi.fn(async () => { throw new ConnectorClientError("timeout"); }) });
+    await act(() => root.render(<OutlookCalendarPanel coordinator={source} refreshRange={range} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Work calendar"));
+    await act(async () => checkbox("Show all-day Outlook events").click());
+    expect(checkbox("Show all-day Outlook events").checked).toBe(true);
+    expect(liveLines()).toEqual(["Outlook did not respond in time. Try again; other sources and tracking are unchanged. Your change was undone."]);
+  });
+
+  it("saves an iCloud display choice, reloads the list and shows one result line", async () => {
+    const source = { ...outlookCoordinator(), getConnection: vi.fn(async () => view("icloud_calendar")), connect: vi.fn(async () => view("icloud_calendar")),
+      savePreferences: vi.fn(async (preferences: ConnectorConnectionView["preferences"]) => view("icloud_calendar", { preferences })),
+      disconnect: vi.fn(async () => ({ view: view("icloud_calendar", { status: "disconnected" }), revocation: "apple_app_specific_password" as const })) };
+    await act(() => root.render(<IcloudCalendarPanel coordinator={source} refreshRange={range} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Family"));
+    expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save iCloud settings")).toBe(false);
+    await act(async () => checkbox("Show iCloud context").click());
+    expect(source.savePreferences).toHaveBeenCalledWith({ selectedSourceIds: ["calendar-1"], hiddenSourceIds: [], visible: false, showAllDay: true });
+    expect(source.listCalendars).toHaveBeenCalledTimes(2);
+    expect(liveLines()).toEqual(["Saved"]);
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+  });
+
+  it("puts an iCloud choice back when the save fails", async () => {
+    const source = { ...outlookCoordinator(), getConnection: vi.fn(async () => view("icloud_calendar")), connect: vi.fn(async () => view("icloud_calendar")),
+      savePreferences: vi.fn(async () => { throw new Error("offline"); }),
+      disconnect: vi.fn(async () => ({ view: view("icloud_calendar", { status: "disconnected" }), revocation: "apple_app_specific_password" as const })) };
+    await act(() => root.render(<IcloudCalendarPanel coordinator={source} refreshRange={range} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Family"));
+    await act(async () => checkbox("Family").click());
+    expect(checkbox("Family").checked).toBe(false);
+    expect(liveLines()).toEqual(["iCloud Calendar settings could not save. Try again. Your change was undone."]);
+  });
+
+  it.each(["Outlook Calendar", "iCloud Calendar"] as const)("asks before disconnecting %s while reconnection is required", async (name) => {
+    const disconnect = vi.fn(async () => ({ view: view(name === "Outlook Calendar" ? "outlook_calendar" : "icloud_calendar", { status: "disconnected" }), revocation: "microsoft_account_permissions" as const }));
+    const provider = name === "Outlook Calendar" ? "outlook_calendar" : "icloud_calendar";
+    const source = { ...outlookCoordinator({ disconnect }), getConnection: vi.fn(async () => view(provider, { status: "reconnect_required" })), connect: vi.fn(async () => view(provider)) };
+    await act(() => root.render(name === "Outlook Calendar" ? <OutlookCalendarPanel coordinator={source} refreshRange={range} /> : <IcloudCalendarPanel coordinator={source} refreshRange={range} />));
+    await vi.waitFor(() => expect(button(`Disconnect ${name}`)).toBeDefined());
+    expect(button(`Disconnect ${name}`).className).toContain("product-action-danger");
+    await act(() => button(`Disconnect ${name}`).click());
+    expect(container.textContent).toContain(`Disconnect ${name}?`);
+    await act(() => button("Cancel").click());
+    expect(disconnect).not.toHaveBeenCalled();
+    await act(() => button(`Disconnect ${name}`).click());
+    await act(async () => button("Disconnect").click());
+    expect(disconnect).toHaveBeenCalledOnce();
   });
 });

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { SettingsDisconnect } from "@/components/settings/SettingsDisconnect";
+import { SETTINGS_SAVED, SETTINGS_SAVING, SettingsLiveLine, settingsSaveFailed, useAutosave } from "@/components/settings/settings-result";
+import { DesktopDraftGuard } from "@/lib/desktop-draft";
 import { googleCalendarSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type {
   CalendarConnectionView,
@@ -29,27 +32,40 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const [connection, setConnection] = useState<CalendarConnectionView | null>(null);
   const [calendars, setCalendars] = useState<readonly CalendarListEntry[] | null>(null);
   const [preferences, setPreferences] = useState<CalendarPreferences | null>(null);
-  const [pending, setPending] = useState<"connect" | "save" | "refresh" | "disconnect" | null>(null);
+  const [pending, setPending] = useState<"connect" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(() => callbackMessage ?? null);
   const [loadFailed, setLoadFailed] = useState(false);
   // Ticket 301: the Timeline connection's row shows this state.
   useReportSettingsSection(googleCalendarSectionState(settingsSectionLoad(connection, loadFailed)));
+  // Ticket 303: display and selection choices save as they change, then the calendar list reloads.
+  const savedPreferences = useRef<CalendarPreferences | null>(null);
+  const autosave = useAutosave((next: CalendarPreferences) => coordinator.savePreferences(next), {
+    saved: (view, latest) => { savedPreferences.current = view.preferences; setConnection(view); if (latest) setPreferences(view.preferences); },
+    failed: () => { setPreferences(savedPreferences.current); setMessage(settingsSaveFailed("Calendar settings could not save. Try again.")); },
+    settled: async () => {
+      try { setCalendars(await coordinator.listCalendars()); setMessage(SETTINGS_SAVED); }
+      catch { setMessage(`${SETTINGS_SAVED}. The calendar list could not reload; try Refresh Calendar.`); }
+    },
+  });
+  const cancelAutosave = autosave.cancel;
 
   useEffect(() => {
     let active = true;
+    cancelAutosave();
     void coordinator.getConnection().then(async (view) => {
       if (!active) return;
       setMessage(callbackMessage ?? null);
       setLoadFailed(false);
       setConnection(view);
       setPreferences(view.preferences);
+      savedPreferences.current = view.preferences;
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
         catch { if (active) setMessage("Calendar list could not load."); }
       } else setCalendars([]);
     }).catch(() => { if (active) { setLoadFailed(true); setMessage("Calendar status is unavailable."); } });
     return () => { active = false; };
-  }, [callbackMessage, coordinator, refreshVersion]);
+  }, [callbackMessage, cancelAutosave, coordinator, refreshVersion]);
 
   const connect = async () => {
     setPending("connect"); setMessage(null);
@@ -57,25 +73,16 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
     catch { setMessage("Calendar connection could not start."); }
     finally { setPending(null); }
   };
-  const save = async () => {
-    if (!preferences) return;
-    setPending("save"); setMessage(null);
-    try {
-      const view = await coordinator.savePreferences(preferences);
-      setConnection(view); setPreferences(view.preferences);
-      try {
-        setCalendars(await coordinator.listCalendars());
-        setMessage("Calendar preferences saved.");
-      } catch { setMessage("Calendar preferences saved. Calendar list could not reload; try Refresh Calendar."); }
-    } catch { setMessage("Calendar preferences could not be saved."); }
-    finally { setPending(null); }
+  const change = (next: CalendarPreferences) => {
+    setPreferences(next); setMessage(SETTINGS_SAVING);
+    autosave.change(next);
   };
   const refresh = async () => {
     setPending("refresh"); setMessage(null);
     try {
       setCalendars(await coordinator.listCalendars());
       if (!connection?.preferences.selectedCalendarIds.length) {
-        setMessage("Calendar list refreshed. Select calendars and save to show events.");
+        setMessage("Calendar list refreshed. Select calendars to show events.");
         return;
       }
       const snapshot = await coordinator.refreshEvents(refreshRange, { force: true });
@@ -88,6 +95,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
     try {
       const result = await coordinator.disconnect();
       setConnection(result.view); setPreferences(result.view.preferences); setCalendars([]);
+      savedPreferences.current = result.view.preferences;
       setMessage(result.revocationFailed
         ? "Calendar disconnected here. Google could not confirm grant revocation; remove Cadence in Google account permissions if needed."
         : "Calendar disconnected here. Other devices stop refreshing after they receive this account change.");
@@ -98,12 +106,15 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const status = connection?.status ?? "loading";
   const canManage = status === "connected" && preferences !== null;
   const connectLabel = status === "reconnect_required" ? "Reconnect Google Calendar" : "Connect Google Calendar";
+  const busy = pending !== null || autosave.saving;
 
   return (
     <SettingsPanel title="Google Calendar" headingLevel={nested ? 3 : 2} id={nested ? "connector-google_calendar" : undefined} description="Read-only context from the Google account used for Cadence. Calendar events never change Behavior status or schedules.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
-        <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? statusLabel(status)}</p>
-        {wrongAccount ? <p role="status" className="text-muted-readable">
+        <DesktopDraftGuard pending={autosave.saving} />
+        <SettingsLiveLine text={message} className="text-muted-readable" />
+        {message ? null : <p className="text-muted-readable">{statusLabel(status)}</p>}
+        {wrongAccount ? <p className="text-muted-readable">
           Use the same Google account as your Cadence account. To remove the unused grant, open{" "}
           <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer" className="underline" onClick={openExternalUrl ? (event) => { event.preventDefault(); void openExternalUrl(event.currentTarget.href).catch(() => setMessage("Google Account connections could not open. Try again.")); } : undefined}>Google Account connections</a>.
           {" "}Removing Cadence Calendar access there affects the entire Calendar project and can disconnect other Cadence accounts or devices using that Google account.
@@ -115,14 +126,14 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
         {canManage ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
             <legend className="font-bold text-foreground">Calendar display</legend>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.visible} onChange={(event) => setPreferences({ ...preferences, visible: event.target.checked })} />Show Calendar context on Timeline</label>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.showAllDay} onChange={(event) => setPreferences({ ...preferences, showAllDay: event.target.checked })} />Show all-day events</label>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.visible} onChange={(event) => change({ ...preferences, visible: event.target.checked })} />Show Calendar context on Timeline</label>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.showAllDay} onChange={(event) => change({ ...preferences, showAllDay: event.target.checked })} />Show all-day events</label>
           </fieldset>
-          <CalendarSelector calendars={calendars} preferences={preferences} onChange={setPreferences} disabled={pending !== null} />
+          <CalendarSelector calendars={calendars} preferences={preferences} onChange={change} disabled={pending !== null} />
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
-            <button type="button" onClick={save} disabled={pending !== null} className="product-action product-action-primary min-h-11 px-3 py-2 text-sm font-bold">{pending === "save" ? "Saving Calendar…" : "Save Calendar settings"}</button>
-            <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Calendar…" : "Refresh Calendar"}</button>
-            <button type="button" onClick={disconnect} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "disconnect" ? "Disconnecting Calendar…" : "Disconnect Google Calendar"}</button>
+            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Calendar…" : "Refresh Calendar"}</button>
+            <SettingsDisconnect label="Disconnect Google Calendar" question="Disconnect Google Calendar?" pendingLabel="Disconnecting Calendar…"
+              pending={pending === "disconnect"} disabled={busy} onConfirm={() => { void disconnect(); }} />
           </div>
         </> : null}
       </div>

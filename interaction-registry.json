@@ -808,7 +808,7 @@
     {
       "path": "components/settings/GoogleCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 24,
+      "interaction_marker_count": 20,
       "interaction_ids": [
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
@@ -901,7 +901,7 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 11,
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
@@ -1016,7 +1016,7 @@
     {
       "path": "components/settings/OutlookCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 15,
+      "interaction_marker_count": 9,
       "interaction_ids": [
         "INT-CALENDAR-008",
         "INT-CALENDAR-009",
@@ -1027,10 +1027,21 @@
     {
       "path": "components/settings/HevyPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 9,
+      "interaction_marker_count": 7,
       "interaction_ids": [
         "INT-CONNECTOR-001",
         "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "components/settings/SettingsDisconnect.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-CALENDAR-004",
+        "INT-CALENDAR-011",
+        "INT-CALENDAR-015",
         "INT-CONNECTOR-003"
       ]
     },
@@ -1044,7 +1055,7 @@
     {
       "path": "components/settings/IcloudCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 20,
+      "interaction_marker_count": 14,
       "interaction_ids": [
         "INT-CALENDAR-012",
         "INT-CALENDAR-013",
@@ -12117,16 +12128,28 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Expand the compact calendar field, search readable calendars, select calendars, and control timed/all-day visibility. Selected names appear as tags; drafts persist until Save.",
+      "intent": "Expand the compact calendar field, search readable calendars, select calendars, and control timed/all-day visibility. Selected names appear as tags. Each change saves as it happens (Ticket 303); there is no Save button.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save Calendar settings"
+          "kind": "change",
+          "control": "Show Calendar context on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
       "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. Agent mode saves a separate selection and omits Timeline visibility controls.",
-      "failure_result": "Invalid or unavailable selections keep a visible error.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "A failed save puts the controls back to their saved values and says so. Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
         "local_preference"
@@ -12134,7 +12157,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/GoogleCalendarPanel.tsx"
+        "components/settings/GoogleCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12149,7 +12173,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/GoogleCalendarPanel.tsx"
+            "components/settings/GoogleCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx"
@@ -12161,7 +12186,8 @@
           "implementation": [
             "components/settings/GoogleCalendarPanel.tsx",
             "apps/desktop/src/calendar/google-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx",
@@ -12184,7 +12210,7 @@
         {
           "id": "standard",
           "label": "Google Calendar",
-          "result": "Uses the standard grant for Timeline context."
+          "result": "Uses the standard grant for Timeline context. Choices save as they change."
         }
       ]
     },
@@ -12305,19 +12331,28 @@
         {
           "kind": "activate",
           "control": "Disconnect Google Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant.",
+      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant. The first click asks \"Disconnect Google Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Fences reads for the selected purpose, deletes its credentials, and attempts provider revocation. Standard disconnect clears the Timeline cache; agent disconnect invalidates agent reads only.",
-      "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted.",
+      "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/GoogleCalendarPanel.tsx"
+        "components/settings/GoogleCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12332,7 +12367,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/GoogleCalendarPanel.tsx"
+            "components/settings/GoogleCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx"
@@ -12344,7 +12380,8 @@
           "implementation": [
             "components/settings/GoogleCalendarPanel.tsx",
             "apps/desktop/src/calendar/google-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx",
@@ -12736,13 +12773,25 @@
       "intent": "Choose which Outlook calendars Cadence may show and how.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save Outlook settings"
+          "kind": "change",
+          "control": "Show Outlook context on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day Outlook events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
-      "availability": "Available while Outlook Calendar is connected.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
-      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "availability": "Available while Outlook Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
         "local_preference"
@@ -12750,7 +12799,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/OutlookCalendarPanel.tsx"
+        "components/settings/OutlookCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12764,7 +12814,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/OutlookCalendarPanel.tsx"
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -12776,7 +12827,8 @@
           "implementation": [
             "components/settings/OutlookCalendarPanel.tsx",
             "apps/desktop/src/calendar/outlook-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -12904,19 +12956,28 @@
         {
           "kind": "activate",
           "control": "Disconnect Outlook Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while Outlook Calendar is connected or requiring reconnection.",
+      "availability": "Available while Outlook Calendar is connected or requiring reconnection. The first click asks \"Disconnect Outlook Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes the sealed credential and that source's cache, fences late responses, and shows the Microsoft account or My Apps removal step.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/OutlookCalendarPanel.tsx"
+        "components/settings/OutlookCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12931,7 +12992,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/OutlookCalendarPanel.tsx"
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx",
@@ -12944,7 +13006,8 @@
           "implementation": [
             "components/settings/OutlookCalendarPanel.tsx",
             "apps/desktop/src/calendar/outlook-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -13159,19 +13222,28 @@
         {
           "kind": "activate",
           "control": "Disconnect Hevy"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while Hevy is connected.",
+      "availability": "Available while Hevy is connected. The first click asks \"Disconnect Hevy?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes the sealed key and that source's cache and shows the Hevy key removal step.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/HevyPanel.tsx"
+        "components/settings/HevyPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13185,7 +13257,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/HevyPanel.tsx"
+            "components/settings/HevyPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -13197,7 +13270,8 @@
           "implementation": [
             "components/settings/HevyPanel.tsx",
             "apps/desktop/src/calendar/hevy.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -13852,16 +13926,24 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Save the optional Home and the usual travel mode (walking, cycling, transit or driving). The travel toggle keeps its state.",
+      "intent": "Set the optional Home and the usual travel mode (walking, cycling, transit or driving). Usual travel comes first, above Travel estimates, which needs it. Each saves on its own; the travel toggle keeps its state (Ticket 303).",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save travel settings"
+          "kind": "change",
+          "control": "Usual travel"
+        },
+        {
+          "kind": "change",
+          "control": "Home (optional)"
+        },
+        {
+          "kind": "keyboard",
+          "control": "Enter in Home (optional)"
         }
       ],
-      "availability": "Existing Settings; enabled after Home or usual travel changes. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
-      "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
-      "failure_result": "Shows an unavailable state and preserves tracking data.",
+      "availability": "Existing Settings. Usual travel saves when it changes; Home saves on blur or Enter when its text changed. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
+      "success_result": "Saves the one changed value on the latest saved revision, shows Saving\u2026 then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
+      "failure_result": "Puts the control back to its saved value and says what to do in the same line: try again, or reload Settings if another device changed it. Tracking data is unchanged.",
       "effects": [
         "ui_state",
         "network_request",
@@ -13871,7 +13953,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/settings/TravelSettingsPanel.tsx"
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13886,7 +13969,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13898,7 +13982,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelSettingsPanel.tsx",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13943,9 +14028,9 @@
           "control": "Travel estimates"
         }
       ],
-      "availability": "Existing Settings after usual travel is chosen; route estimates remain deployment-gated.",
-      "success_result": "Saves the toggle with consent, shows the device location state, and does not save or send the position from this request.",
-      "failure_result": "Shows an unavailable state and preserves tracking data.",
+      "availability": "Existing Settings after usual travel is chosen; usual travel sits above the toggle. Route estimates remain deployment-gated.",
+      "success_result": "Saves the toggle with consent at once and shows Saving\u2026, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
+      "failure_result": "Puts the toggle back to its saved state and says what to do. Tracking data is unchanged.",
       "effects": [
         "ui_state",
         "network_request",
@@ -13956,7 +14041,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/settings/TravelSettingsPanel.tsx"
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13970,7 +14056,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13982,7 +14069,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelSettingsPanel.tsx",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -14600,9 +14688,9 @@
           "control": "Travel to {place}"
         }
       ],
-      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision; there are no separate buffer fields.",
-      "success_result": "Saves the habit, says Travel habits saved, and refreshes estimates once.",
-      "failure_result": "Keeps the stored habits and asks the user to reload Settings when another device changed them.",
+      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision, one save at a time; there are no separate buffer fields.",
+      "success_result": "Saves the habit, shows Saving\u2026 then Saved in How you travel's one result line, and refreshes estimates once.",
+      "failure_result": "Puts the choice back to its stored value, says so, and asks the user to reload Settings when another device changed them.",
       "effects": [
         "ui_state",
         "network_request",
@@ -14614,7 +14702,8 @@
       "implementation": [
         "components/settings/TravelHabitsSection.tsx",
         "components/settings/TravelSettingsPanel.tsx",
-        "app/api/travel/habits/route.ts"
+        "app/api/travel/habits/route.ts",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -14630,7 +14719,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelHabitsSection.tsx",
-            "app/api/travel/habits/route.ts"
+            "app/api/travel/habits/route.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-habits.dom.test.tsx",
@@ -14644,7 +14734,8 @@
           "implementation": [
             "components/settings/TravelHabitsSection.tsx",
             "apps/desktop/src/product.tsx",
-            "apps/desktop/src/local-travel-settings.service.ts"
+            "apps/desktop/src/local-travel-settings.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-habits.dom.test.tsx",
@@ -15038,8 +15129,8 @@
         }
       ],
       "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section. Ticket 283: Outlook and iCloud events get reminders like Google Calendar events, so the readiness list no longer limits sources.",
-      "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
-      "failure_result": "Keeps the stored value and says the reminder setting could not save. A failed load leaves the checkbox unavailable and says so.",
+      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving\u2026, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
+      "failure_result": "Puts the switch back to its stored value and says the reminder setting could not save and the change was undone. A failed load leaves the checkbox unavailable and says so.",
       "effects": [
         "ui_state",
         "network_request",
@@ -15053,7 +15144,8 @@
         "lib/ui/leave-reminders.ts",
         "app/api/travel/leave-reminders/route.ts",
         "lib/services/leave-reminder-settings.service.ts",
-        "lib/db/leave-reminder-settings.repo.ts"
+        "lib/db/leave-reminder-settings.repo.ts",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -15069,7 +15161,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/LeaveReminderSetting.tsx",
-            "app/api/travel/leave-reminders/route.ts"
+            "app/api/travel/leave-reminders/route.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx",
@@ -15085,7 +15178,8 @@
             "apps/desktop/src/leave-reminders.ts",
             "apps/desktop/src/product.tsx",
             "apps/desktop/src/use-leave-reminders.ts",
-            "apps/desktop/src/local-leave-reminder.service.ts"
+            "apps/desktop/src/local-leave-reminder.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx",
@@ -15126,7 +15220,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Fill the Home field with a street address from this device's position, then check or edit it and save Home as usual (Ticket 308).",
+      "intent": "Fill the Home field with a street address from this device's position, then check or edit it; Home saves on blur or Enter as usual (Tickets 308 and 303).",
       "triggers": [
         {
           "kind": "activate",
@@ -15134,8 +15228,8 @@
         }
       ],
       "availability": "Settings, Travel, beside Home, on web and on a linked Mac, once Travel estimates is on with its disclosure accepted. Until then one line says to turn on Travel estimates first. Hidden on a Mac in local mode, which keeps typing only. Five lookups per account per hour, inside the monthly travel spend ceiling.",
-      "success_result": "Reads the device position once, asking for permission if needed, sends it to Cadence's server for one Google reverse-geocoding request, and fills Home with the returned street address. Nothing saves until the person saves Travel settings. The position is not stored, logged, synced, exported or returned.",
-      "failure_result": "Shows one plain message for a denied, unavailable or inaccurate position, no street address, too many lookups, an unavailable lookup or no internet. Home keeps its text and typing always works.",
+      "success_result": "Reads the device position once, asking for permission if needed, sends it to Cadence's server for one Google reverse-geocoding request, fills Home with the returned street address and moves focus to it. Nothing saves on fill; Home saves when the person presses Enter or leaves the field. The position is not stored, logged, synced, exported or returned.",
+      "failure_result": "Shows one plain message in Travel's result line for a denied, unavailable or inaccurate position, no street address, too many lookups, an unavailable lookup or no internet. Home keeps its text and typing always works.",
       "effects": [
         "ui_state",
         "network_request",
@@ -15451,7 +15545,7 @@
         }
       ],
       "availability": "Signed in, under Settings \u2192 Connected apps.",
-      "success_result": "Revoke the owned grant and every token immediately.",
+      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting\u2026, then the result (Ticket 303).",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_revocation"
@@ -15461,7 +15555,8 @@
       "implementation": [
         "components/settings/ConnectedAppsPanel.tsx",
         "app/(app)/settings/actions.ts",
-        "lib/services/oauth-ui.service.ts"
+        "lib/services/oauth-ui.service.ts",
+        "components/settings/settings-result.tsx"
       ],
       "user_guidance": {
         "audience": "user",
@@ -15484,7 +15579,8 @@
           "implementation": [
             "components/settings/ConnectedAppsPanel.tsx",
             "app/(app)/settings/actions.ts",
-            "lib/services/oauth-ui.service.ts"
+            "lib/services/oauth-ui.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/oauth-ui.dom.test.tsx",
@@ -15845,13 +15941,25 @@
       "intent": "Choose which iCloud calendars Cadence may show and how.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save iCloud settings"
+          "kind": "change",
+          "control": "Show iCloud context on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day iCloud events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
-      "availability": "Available while iCloud Calendar is connected.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
-      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "availability": "Available while iCloud Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
         "local_preference"
@@ -15859,7 +15967,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/IcloudCalendarPanel.tsx"
+        "components/settings/IcloudCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -15873,7 +15982,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/IcloudCalendarPanel.tsx"
+            "components/settings/IcloudCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -15885,7 +15995,8 @@
           "implementation": [
             "components/settings/IcloudCalendarPanel.tsx",
             "apps/desktop/src/calendar/icloud-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -16013,19 +16124,28 @@
         {
           "kind": "activate",
           "control": "Disconnect iCloud Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while connected or requiring reconnection.",
+      "availability": "Available while connected or requiring reconnection. The first click asks \"Disconnect iCloud Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes sealed Apple login values and iCloud cache. Explains manual revocation at account.apple.com under Sign-In and Security, App-Specific Passwords.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/IcloudCalendarPanel.tsx"
+        "components/settings/IcloudCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -16040,7 +16160,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/IcloudCalendarPanel.tsx"
+            "components/settings/IcloudCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx",
@@ -16053,7 +16174,8 @@
           "implementation": [
             "components/settings/IcloudCalendarPanel.tsx",
             "apps/desktop/src/calendar/icloud-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"

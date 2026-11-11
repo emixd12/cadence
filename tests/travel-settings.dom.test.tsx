@@ -12,6 +12,7 @@ import { LEAVE_REMINDER_SWITCH, type LeaveReminderDeviceNotifications } from "@c
 import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
 import type { HomeLookupClient, HomeLookupResult } from "@/lib/ui/home-lookup";
 import { HOME_LOOKUP_LABEL, HOME_LOOKUP_MESSAGES, HOME_LOOKUP_TRAVEL_FIRST } from "@/components/settings/HomeCurrentLocation";
+import { SETTINGS_SAVED, SETTINGS_SAVING, SETTINGS_UNDONE } from "@/components/settings/settings-result";
 
 it("turns travel on in one click: consent and a foreground location request, no separate checkbox (Ticket 215)", async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -40,38 +41,98 @@ it("turns travel on in one click: consent and a foreground location request, no 
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 
-it("keeps the toggle off until usual travel is chosen", async () => {
+it("puts usual travel first and keeps the toggle off until it is chosen, which saves at once (Ticket 303)", async () => {
   mockPermissions(null);
   const settings: TravelSettings = { enabled: false, baseLocationText: null, mode: null, navigationPreference: null, routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
-  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), settings });
+  const save = vi.fn(async (request: { mode: TravelSettings["mode"] }) => ({ ...settings, mode: request.mode, updatedAt: "2026-09-22T12:00:00Z" }));
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), settings, save });
   try {
     const toggle = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const mode = container.querySelector<HTMLSelectElement>("select")!;
+    // The choice Travel estimates depends on sits above it.
+    expect(mode.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(toggle.disabled).toBe(true);
     expect(container.textContent).toContain("Choose your usual travel to turn on estimates.");
-    const mode = container.querySelector<HTMLSelectElement>("select")!;
     expect([...mode.options].map((option) => option.textContent)).toEqual(["Choose", "Walking", "Cycling", "Transit", "Driving"]);
-    await act(() => { mode.value = "transit"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { mode.value = "transit"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, mode: "transit", acceptRoutingDisclosure: false, expectedUpdatedAt: settings.updatedAt }));
     expect(toggle.disabled).toBe(false);
+    expect(resultLines(container)).toEqual([SETTINGS_SAVED]);
   } finally { await unmount(); }
 });
 
-it("saves Home and usual travel without changing the toggle", async () => {
+it("saves Home on blur and on Enter, once per change, and usual travel as it changes, without changing the toggle (Ticket 303)", async () => {
   mockPermissions(null);
   const settings: TravelSettings = { enabled: true, baseLocationText: null, mode: "walking", navigationPreference: "google_maps", routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
-  const save = vi.fn(async () => settings);
+  let revision = 0;
+  const save = vi.fn(async (request: { enabled: boolean; baseLocationText: string | null; mode: TravelSettings["mode"] }) => ({ ...settings, ...request, updatedAt: `2026-09-22T12:00:0${++revision}Z` }));
   const readLocation = vi.fn(async () => ({ state: "prompt" as const }));
   const { container, unmount } = await renderPanel({ readLocation, save, settings });
   try {
-    const saveButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save travel settings")!;
-    expect(saveButton.disabled).toBe(true);
+    expect([...container.querySelectorAll("button")].some((button) => button.textContent === "Save travel settings")).toBe(false);
     const home = container.querySelector<HTMLInputElement>("input:not([type])")!;
-    await act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(home, " 1 Example Street "); home.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(() => { home.focus(); typeInto(home, " 1 Example Street "); });
+    expect(save).not.toHaveBeenCalled();
+    await act(async () => { home.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true, baseLocationText: "1 Example Street", mode: "walking", acceptRoutingDisclosure: true }));
+    expect(home.value).toBe("1 Example Street");
+    // Blur after Enter does not save the same text again.
+    await act(async () => { home.blur(); });
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(() => { home.focus(); typeInto(home, "2 Example Street"); });
+    await act(async () => { home.blur(); });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ baseLocationText: "2 Example Street", expectedUpdatedAt: "2026-09-22T12:00:01Z" }));
     const mode = container.querySelector<HTMLSelectElement>("select")!;
-    await act(() => { mode.value = "cycling"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(saveButton.disabled).toBe(false);
-    await act(async () => saveButton.click());
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ enabled: true, baseLocationText: "1 Example Street", mode: "cycling", acceptRoutingDisclosure: true }));
+    await act(async () => { mode.value = "cycling"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true, baseLocationText: "2 Example Street", mode: "cycling", expectedUpdatedAt: "2026-09-22T12:00:02Z" }));
+    expect(resultLines(container)).toEqual([SETTINGS_SAVED]);
     expect(readLocation).not.toHaveBeenCalledWith(true);
+  } finally { await unmount(); }
+});
+
+it("shows Saving… while a change saves, then Saved, in the section's one result line (Ticket 303)", async () => {
+  mockPermissions(null);
+  const settings: TravelSettings = { enabled: true, baseLocationText: null, mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  let finish!: () => void;
+  const save = vi.fn(() => new Promise<TravelSettings>((resolve) => { finish = () => resolve({ ...settings, mode: "driving" }); }));
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), save, settings });
+  try {
+    const mode = container.querySelector<HTMLSelectElement>("select")!;
+    await act(async () => { mode.value = "driving"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    expect(mode.value).toBe("driving");
+    expect(mode.disabled).toBe(false);
+    expect(resultLines(container)).toEqual([SETTINGS_SAVING]);
+    await act(async () => { finish(); });
+    expect(resultLines(container)).toEqual([SETTINGS_SAVED]);
+  } finally { await unmount(); }
+});
+
+it.each([
+  ["usual travel", "Usual travel could not save."],
+  ["Home", "Home could not save."],
+  ["Travel estimates", "Travel estimates could not turn off."],
+] as const)("puts %s back to its saved value when the save fails, and says so (Ticket 303)", async (control, copy) => {
+  mockPermissions(null);
+  const settings: TravelSettings = { enabled: true, baseLocationText: "1 Saved Street", mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  const save = vi.fn(async (): Promise<TravelSettings> => { throw new Error("conflict"); });
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), save, settings });
+  try {
+    const mode = container.querySelector<HTMLSelectElement>("select")!;
+    const home = container.querySelector<HTMLInputElement>("input:not([type])")!;
+    const toggle = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    if (control === "usual travel") await act(async () => { mode.value = "driving"; mode.dispatchEvent(new Event("change", { bubbles: true })); });
+    if (control === "Home") { await act(() => { home.focus(); typeInto(home, "2 Typed Street"); }); await act(async () => { home.blur(); }); }
+    if (control === "Travel estimates") await act(async () => toggle.click());
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(mode.value).toBe("walking");
+    expect(home.value).toBe("1 Saved Street");
+    expect(toggle.checked).toBe(true);
+    const [line] = resultLines(container);
+    expect(line).toContain(copy);
+    expect(line).toContain("reload Settings if another device changed it");
+    expect(line).toContain(SETTINGS_UNDONE);
   } finally { await unmount(); }
 });
 
@@ -140,7 +201,17 @@ it("keeps journey corrections transient and builds a source-location search link
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 
-async function renderPanel(options: Pick<ComponentProps<typeof TravelSettingsPanel>, "readLocation" | "readPermission" | "desktop" | "openLocationSettings" | "homeLookupClient"> & { save?: () => Promise<TravelSettings>; settings?: TravelSettings }) {
+/** The visible text of every live region in the panel. Travel's main section has one; empty regions are skipped. */
+function resultLines(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('[role="status"]')].map((node) => node.textContent ?? "").filter(Boolean);
+}
+function typeInto(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each test passes a save shaped for its own assertions.
+async function renderPanel(options: Pick<ComponentProps<typeof TravelSettingsPanel>, "readLocation" | "readPermission" | "desktop" | "openLocationSettings" | "homeLookupClient"> & { save?: (...args: any[]) => Promise<TravelSettings>; settings?: TravelSettings }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const settings: TravelSettings = options.settings ?? { enabled: false, baseLocationText: null, mode: "walking", navigationPreference: "google_maps", routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
   const container = document.createElement("div"); document.body.append(container);
@@ -234,12 +305,13 @@ it("requests permission inside the toggle click without showing Saving…", asyn
     const toggle = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
     act(() => toggle.click());
     expect(readLocation).toHaveBeenCalledWith(true);
+    await act(async () => { await Promise.resolve(); });
     expect(readLocation.mock.invocationCallOrder.at(-1)!).toBeLessThan(save.mock.invocationCallOrder[0]!);
     await act(async () => { finishSave(); });
-    expect(container.textContent).toContain("Checking device location…");
+    expect(resultLines(container)).toEqual([`${SETTINGS_SAVED}. Checking device location…`]);
     expect(container.textContent).not.toContain("Saving…");
     await act(async () => { finishLocate(); });
-    expect(container.textContent).toContain("Estimates start from Home or your previous stop instead.");
+    expect(resultLines(container)).toEqual(["Location denied. Estimates start from Home or your previous stop instead."]);
   } finally { await unmount(); }
 });
 
@@ -402,6 +474,24 @@ it("puts one off-by-default reminder switch in How you travel and saves it at on
   } finally { await view.unmount(); }
 });
 
+it("shows the reminder switch's new value while it saves and puts it back on failure, in How you travel's one line (Ticket 303)", async () => {
+  let fail!: () => void;
+  const view = await renderReminders({ reminders: { save: vi.fn(() => new Promise<{ enabled: boolean }>((_resolve, reject) => { fail = () => reject(new Error("offline")); })) } });
+  try {
+    // Travel's main section and How you travel each have one live region; the switch shares How you travel's.
+    expect(view.container.querySelectorAll('[role="status"]')).toHaveLength(2);
+    await act(async () => view.box()!.click());
+    expect(view.box()!.checked).toBe(true);
+    expect(view.box()!.disabled).toBe(false);
+    const section = view.box()!.closest("section")!;
+    expect(section.querySelector("h3")!.textContent).toBe("How you travel");
+    expect(section.querySelector('[role="status"]')!.textContent).toBe(SETTINGS_SAVING);
+    await act(async () => { fail(); });
+    expect(view.box()!.checked).toBe(false);
+    expect(resultLines(view.container)).toEqual([`The reminder setting could not save. Try again. ${SETTINGS_UNDONE}`]);
+  } finally { await view.unmount(); }
+});
+
 it("shows what reminders still need: notifications, Home and Travel estimates", async () => {
   const view = await renderReminders({ settings: { ...travelOn, enabled: false, routingConsentAt: null }, notifications: "not_enabled" });
   try {
@@ -465,7 +555,7 @@ describe("Use my current location for Home (Ticket 308)", () => {
     } finally { await unmount(); }
   });
 
-  it("reads the position once, fills Home from the lookup and waits for the person to save", async () => {
+  it("reads the position once, fills Home from the lookup, focuses it and saves only on blur (Ticket 303)", async () => {
     mockPermissions("granted");
     const readLocation = vi.fn(async () => here);
     const save = vi.fn(async () => travelOn);
@@ -481,11 +571,13 @@ describe("Use my current location for Home (Ticket 308)", () => {
       expect(container.textContent).toContain(HOME_LOOKUP_MESSAGES.filled);
       expect(container.textContent).not.toContain("41.8781136");
       expect(save).not.toHaveBeenCalled();
-      // The person can edit the address before it saves.
+      // The field takes focus so the person can check and edit the address before it saves.
       const home = homeInput(container);
-      await act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(home, "1 Example Street, Apt 2, Chicago"); home.dispatchEvent(new Event("input", { bubbles: true })); });
-      const saveButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save travel settings")!;
-      await act(async () => saveButton.click());
+      expect(document.activeElement).toBe(home);
+      await act(() => { typeInto(home, "1 Example Street, Apt 2, Chicago"); });
+      expect(save).not.toHaveBeenCalled();
+      await act(async () => { home.blur(); });
+      expect(save).toHaveBeenCalledTimes(1);
       expect(save).toHaveBeenCalledWith(expect.objectContaining({ baseLocationText: "1 Example Street, Apt 2, Chicago" }));
       expect(JSON.stringify(save.mock.calls)).not.toContain("41.8781136");
     } finally { await unmount(); }

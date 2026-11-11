@@ -97,10 +97,10 @@ requests only Calendar-list and event read-only scopes. A different identity,
 denied consent, expired attempt, or revoked credential returns a factual state
 without changing local Cadence data.
 
-After connection, the user selects readable calendars, controls Timeline and
-all-day visibility, and chooses **Save Calendar settings**. The user can choose
+After connection, the user selects readable calendars and controls Timeline and
+all-day visibility; each change saves as it happens (Ticket 303). The user can choose
 **Refresh Calendar**, **Reconnect Google Calendar**, or **Disconnect Google
-Calendar**. Disconnect removes the live server credential before attempting
+Calendar**, which asks once more before it acts. Disconnect removes the live server credential before attempting
 Google grant revocation. A revocation failure tells the user to remove Cadence
 from Google Account permissions. Other devices stop refreshing after they next
 read the changed connection.
@@ -959,8 +959,9 @@ Ticket 268 ships; until then they request as described above.
 
 Travel Settings supersedes steps 1–2 above with three inputs:
 
-1. The user chooses usual travel (walking, cycling, transit or driving) and may
-   enter Home. Save travel settings stores both.
+1. The user chooses usual travel (walking, cycling, transit or driving), which saves
+   at once, and may enter Home, which saves on Enter or when the field loses focus
+   (Ticket 303).
 2. The user turns on Travel estimates beside the Google Maps disclosure. That click
    records routing consent and asks for foreground device location. Denied or
    unavailable location leaves Home or the previous stop as the origin. Turning

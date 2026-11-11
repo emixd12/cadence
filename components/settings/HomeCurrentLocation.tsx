@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ForegroundLocation } from "@/lib/ui/foreground-location";
 import type { HomeLookupClient, HomeLookupResult } from "@/lib/ui/home-lookup";
+import { SettingsResultLine, useSettingsResult } from "./settings-result";
 
 export const HOME_LOOKUP_LABEL = "Use my current location";
 export const HOME_LOOKUP_TRAVEL_FIRST = "To use your current location, turn on Travel estimates first.";
 
 /** One plain message per outcome. Typing an address always works. */
 export const HOME_LOOKUP_MESSAGES = {
-  filled: "Address filled from your current location. Check it, then save. Cadence did not keep your position.",
+  filled: "Address filled from your current location. Check it; it saves when you press Enter or leave the field. Cadence did not keep your position.",
   denied: "Location access is off. Type your address instead.",
   unavailable: "Your device did not share a position. Try again, or type your address.",
   inaccurate: "Your position is not precise enough for an address. Type your address instead.",
@@ -22,8 +23,9 @@ export const HOME_LOOKUP_MESSAGES = {
 /**
  * Ticket 308: the Home field's row with **Use my current location**. It reads the device
  * position once, asks the hosted lookup for an address and fills the field for the person to
- * check and save. The position lives only in this click's local variables. A null client (a
- * Mac in local mode) keeps typing only.
+ * check. The field saves on Enter or blur (Ticket 303), never on fill. The position lives only
+ * in this click's local variables. A null client (a Mac in local mode) keeps typing only.
+ * Messages go to the Travel result line when there is one.
  */
 export function HomeCurrentLocation({ children, client, travelOn, readLocation, onAddress, onLocationRead }: Readonly<{
   children: ReactNode;
@@ -35,7 +37,8 @@ export function HomeCurrentLocation({ children, client, travelOn, readLocation, 
   onLocationRead?: () => void;
 }>) {
   const [working, setWorking] = useState(false);
-  const [message, setMessage] = useState("");
+  const result = useSettingsResult();
+  const setMessage = (text: string) => { if (text) result.info(text); else result.clear(); };
   const sequence = useRef(0);
   useEffect(() => () => { sequence.current++; }, []);
   const lookup = async () => {
@@ -65,7 +68,7 @@ export function HomeCurrentLocation({ children, client, travelOn, readLocation, 
       </button> : null}
     </div>
     {client && !travelOn ? <p className="text-muted-readable">{HOME_LOOKUP_TRAVEL_FIRST}</p> : null}
-    {client && travelOn && message ? <p role="status">{message}</p> : null}
+    {client && travelOn ? <SettingsResultLine channel={result} /> : null}
   </>;
 }
 

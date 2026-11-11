@@ -430,6 +430,22 @@
       "notes": "Ticket 301 drawer for Travel, Daily Brief and Categories: title, state and purpose stay in view; one disclosure action opens the controls (setup label while off). Bench states: off, on, needs action."
     },
     {
+      "id": "module.settings-saving",
+      "name": "SettingsLiveLine",
+      "kind": "module",
+      "source": "components/settings/settings-result.tsx",
+      "exportName": "SettingsLiveLine",
+      "usageNames": [
+        "SettingsLiveLine",
+        "SettingsResultLine",
+        "SettingsDisconnect"
+      ],
+      "benchAnchor": "design-system#ds-module-settings-saving",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 303 save-as-you-change pieces: each section's one result line (Saving…, Saved, or a specific error ending 'Your change was undone.'; visually hidden while empty) and SettingsDisconnect (components/settings/SettingsDisconnect.tsx), a source's destructive Disconnect that asks in place with Disconnect and Cancel."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",

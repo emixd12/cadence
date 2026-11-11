@@ -4,6 +4,9 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { SettingsDisconnect } from "@/components/settings/SettingsDisconnect";
+import { SettingsLiveLine } from "@/components/settings/settings-result";
+import { DesktopDraftGuard } from "@/lib/desktop-draft";
 import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import { CONNECTOR_REVOCATION_COPY, connectorErrorCode, type HevyCoordinator } from "@/lib/ui/connectors";
@@ -77,9 +80,12 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
     <SettingsPanel id="connector-hevy" headingLevel={3} title="Hevy"
       description="Recorded activity. Cadence reads when each workout started and how long it lasted. Provider responses can contain exercises, titles, notes, sets and weights; Cadence discards these details. A workout never completes a Behavior.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
-        <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? hevyStatusLabel(status)}</p>
+        <SettingsLiveLine text={message} className="text-muted-readable" />
+        {message ? null : <p className="text-muted-readable">{hevyStatusLabel(status)}</p>}
         {status === "not_configured" ? <p className="text-muted-readable">Hevy connection is not configured for this Cadence deployment.</p> : null}
         {needsKey ? <form onSubmit={connect} className="grid gap-3 border-t border-line pt-4">
+          {/* An opened form keeps its explicit action; a typed key holds a desktop restart. */}
+          <DesktopDraftGuard dirty={apiKey !== ""} onDiscard={() => setApiKey("")} />
           <p className="text-muted-readable">Hevy API access requires Hevy Pro. Create a key in Hevy settings and enter it once. Cadence stores it encrypted on its server, never on this device, and scans at most 500 workouts across your full history, even for today. A larger history shows as incomplete. A complete read means no change was detected during the scan, not an atomic snapshot.</p>
           <label htmlFor={keyId} className="font-bold text-foreground">Hevy API key</label>
           <input id={keyId} type="password" autoComplete="off" spellCheck={false} autoCapitalize="none" value={apiKey}
@@ -93,7 +99,8 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
           <p className="text-muted-readable">Disconnecting deletes Cadence&apos;s saved key. Hevy keeps the key active until you remove or regenerate it there.</p>
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
             <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Hevy…" : "Refresh Hevy"}</button>
-            <button type="button" onClick={disconnect} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "disconnect" ? "Disconnecting Hevy…" : "Disconnect Hevy"}</button>
+            <SettingsDisconnect label="Disconnect Hevy" question="Disconnect Hevy?" pendingLabel="Disconnecting Hevy…"
+              pending={pending === "disconnect"} disabled={pending !== null} onConfirm={() => { void disconnect(); }} />
           </div>
         </> : null}
       </div>
