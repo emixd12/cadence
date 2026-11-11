@@ -323,7 +323,19 @@ timestamps must match its own event evidence. Retain every event unchanged;
 use existing latest-event ordering only to select display timestamps for the
 agreed status. Corrections and divergent descendants cannot use this exception.
 After convergence, the shared baseline contains every accepted event, so a later
-one-sided correction does not reopen the original duplicate marks. During the
+one-sided correction does not reopen the original duplicate marks.
+
+Connector completion (Ticket 319, D28) adds one more convergence. After an
+Unresolved baseline, a connector root mark on one side (`system_rule_declared`,
+`derived`, `high`, `reason_code` `connector:<source>`, Completed) and the user's root
+mark on the other (`explicit_user_mark`, `manual_tap` or `manual_text`, `high`)
+converge. Both events are retained unchanged, and each occurrence copy must match its
+own event. With the same status, existing latest-event ordering selects display
+timestamps. With different statuses, the user's mark wins. This is a provenance rule,
+not timestamp arbitration: a connector only fills an Unresolved Occurrence, and the
+user's decision is final (D28.1). Two connector marks for one Occurrence still fail.
+Published 0.1.9 lacks this rule, so a Mac build with it ships before
+`CADENCE_CONNECTOR_COMPLETION` turns on (Ticket 323). During the
 first automatic hydration of an untouched local profile only, the planner may
 preserve a hosted same-status branch when every local event in that branch is
 already one of the hosted events. Divergent statuses and other cross-copy branches
