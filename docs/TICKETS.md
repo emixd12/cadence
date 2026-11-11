@@ -17532,7 +17532,7 @@ do not depend on 301. Ticket 307 follows 306.
 
 ## Ticket 301: Settings groups, section index and state rows (web)
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Not verified: a signed-in check on the hosted page as a test account.
 Dependencies: none.
 
 Goal: a person finds any setting within four groups and sees what is connected or turned
@@ -17596,7 +17596,7 @@ anchor links; `npm run interactions:check`, `npm run design-system:check`; the b
 
 ## Ticket 302: Mac Settings adopts the groups
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Not verified: a dev-signed build in local and linked mode (Cadence for Mac is not installed on the owner's Mac); the Mac's WebKit view.
 Dependencies: Ticket 301.
 
 Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
@@ -17634,7 +17634,7 @@ dev-signed build checked in local mode and linked mode (`docs/DESKTOP_RELEASE.md
 
 ## Ticket 303: Settings save as they change
 
-Status: filed November 10, 2026. Not started. The owner confirmed the three exceptions below
+Status: implemented November 10, 2026 on PR 205. The owner confirmed the three exceptions below
 on November 10.
 Dependencies: none. Easier after Ticket 301.
 
@@ -17679,7 +17679,7 @@ confirmation; `npm run interactions:check`; bench at both widths.
 
 ## Ticket 304: Categories drawer with drag reordering
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Not verified: drag in a real browser at 390 px and on touch hardware.
 Dependencies: Ticket 301 for the drawer; can be built first against the current page.
 
 Goal: a person reorders and edits categories in one compact list.
@@ -17722,7 +17722,7 @@ for mouse, touch and keyboard moves and the announcement; `npm run resolvers:che
 
 ## Ticket 305: Note shortcuts on by default
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Hosted: `20261110153050` relaxes the commit check; `20261110170000` turns stored off switches on once and needs the owner's authorization.
 Dependencies: none.
 
 Goal: repeated Notes are offered as shortcuts without anyone switching the feature on.
@@ -17766,7 +17766,7 @@ DOM tests that no switch renders and proposals still need Accept;
 
 ## Ticket 306: One Daily Brief choice for every connected source
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000`. Not verified: hosted and installed desktop checks.
 Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
 change Daily Brief.
 
@@ -17811,7 +17811,7 @@ later-connected sources; `tests/daily-brief-ui.dom.test.tsx`;
 
 ## Ticket 307: Daily Brief reads Google Calendar through the Timeline connection
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Hosted runbook in `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)"; the owner authorized the push after merge.
 Dependencies: Ticket 306.
 
 Goal: a person connects Google Calendar once.
@@ -17852,7 +17852,7 @@ hosted check as a test account after the migration is authorized.
 
 ## Ticket 308: Set Home from the current location
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000`. Not verified: a hosted lookup within the owner's travel spend cap; iPhone Safari.
 Dependencies: none.
 
 Goal: a person sets Home without typing an address.
@@ -17893,7 +17893,7 @@ account within the travel spend cap the owner sets.
 
 ## Ticket 309: Settings wording pass
 
-Status: filed November 10, 2026. Not started.
+Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`, for the owner to read.
 Dependencies: Ticket 301 for the final section names.
 
 Goal: Settings reads clearly and warmly, and each thing has one name.
