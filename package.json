@@ -84,6 +84,7 @@
     "smoke:account-sync": "node scripts/account-sync-rpc-smoke.mjs",
     "smoke:account-sync:local": "node scripts/account-sync-rpc-smoke.mjs --local",
     "desktop:release:acceptance": "node scripts/desktop-release-acceptance.mjs",
+    "release:credentials": "node apps/desktop/scripts/release-credentials.mjs",
     "smoke:launch-rate-limit:local": "psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -v ON_ERROR_STOP=1 -f tests/sql/ticket-067-launch-rate-limit-smoke.sql",
     "smoke:push-cap:local": "node scripts/push-subscription-cap-smoke.mjs",
     "smoke:schedule-integrity:local": "psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -v ON_ERROR_STOP=1 -f tests/sql/ticket-060-schedule-integrity-smoke.sql",

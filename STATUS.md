@@ -59,6 +59,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
 | Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Notarized 0.1.10 (owner's instruction); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
+| Ticket 325: release credential backup and restore | `release:credentials` status, verify-backups, restore and backup; preflight checks; runbook; decision D29 | Owner creates the Cadence Release vault, its service account and an App Store Connect API key; agents back up and verify live; notarization switches to the API key; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325 started — November 11, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
@@ -88,6 +89,26 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 325 started: release credential backup and restore — November 11, 2026
+
+Decision D29 (`docs/DECISIONS.md`, 2026-11-11) moves release secrets into a Cadence Release
+vault that a write-capable service account reaches, with the owner's approval per run.
+
+- **Done:** `apps/desktop/release-credentials.json` (non-secret inventory);
+  `npm run release:credentials` with `status`, `probe`, `verify-backups`, `restore` and
+  `backup`; preflight requirements `updater-signing-key`, `notarization-credential`,
+  `release-vault-token` and `release-backups`. The `developer-id` and
+  `provisioning-profile` probes now read the inventory, so the preflight no longer checks
+  the retired profile. Runbook: `docs/DESKTOP_RELEASE.md`, "Signing credentials".
+- **Verified:** `status` passes on the owner's Mac, and it reports the retired profile as
+  not listing the installed identity. Unit tests use a fake `op`.
+- **Not done:** the vault, service account and App Store Connect API key (owner steps);
+  live backup and `verify-backups`; notarization through the API key; the certificate
+  renewal spike. The owner reports having stored the Developer ID `.p12`, the notarization
+  password and the updater key in the Cadence vault; not verified by an agent.
+||||||| 46016e57
+||||||| 20feeaff
 
 ## Connector completion hosted push and merge — November 11, 2026
 

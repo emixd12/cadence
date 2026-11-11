@@ -2206,6 +2206,45 @@ Details: `docs/DESKTOP_RELEASE.md`, "Persistent updater key handoff".
 Platform impact: desktop release tooling and 0.1.10 only. Web, marketing and future mobile:
 not applicable. Messaging impact: none.
 
+## 2026-11-11: Release credentials in a Cadence Release vault; agents run recovery (D29)
+
+The November 9 keychain loss (entry above) showed that every signing secret lived only in
+the owner's login keychain. The owner decided on November 11, 2026:
+
+1. **D29.1: one vault for release credentials.** The Developer ID identity (a `.p12` with
+   its passphrase), the notarization credential and the updater key files and password live
+   in a 1Password vault named **Cadence Release**. Each item carries a non-secret
+   `fingerprint` field, so a check can compare it with what is installed without reading a
+   secret.
+2. **D29.2: a service account that can read and write that vault only.** Its token is in
+   the login keychain under service `cadence-release-1password`. The Cadence Agents service
+   account and `agent:secret` stay read-only and limited to Cadence Agents.
+3. **D29.3: the owner approves each run that reads or writes a secret.** Agents record
+   `release-secrets` in the run folder after the owner says so in chat. Without it, agents
+   may list item titles and read the `fingerprint`, `expires`, `key id`, `issuer id` and
+   `complete` fields only. A backup sets `complete` after its last attachment uploads. Backups never overwrite an item.
+4. **D29.4: notarization moves to an App Store Connect API key.** The owner creates a
+   team key once; agents store it and switch the release wrapper to `APPLE_API_KEY`,
+   `APPLE_API_ISSUER` and `APPLE_API_KEY_PATH`. Agents do not change the owner's Apple
+   Account security settings, so app-specific passwords are no longer needed after the
+   switch.
+5. **D29.5: agents do the clicking.** Agents run backups, restores, renewals and the
+   Apple Developer portal steps, with 1Password filling the Apple sign-in. The owner keeps
+   these steps: the Mac login password and keychain dialogs, Apple two-factor approvals,
+   creating API keys, vaults and service accounts, the go-ahead for each notarization and
+   publication, and anything in the Apple Account's security settings.
+
+Tooling: `npm run release:credentials` (Ticket 325) and the `desktop-release` preflight.
+Runbook: `docs/DESKTOP_RELEASE.md`, "Signing credentials". Setup: `docs/qa/agent-secrets.md`,
+"Cadence Release vault".
+
+Not verified: creating a service account with write access on this 1Password account, and
+whether the App Store Connect API can create Developer ID certificates (an Apple forum
+thread from June 2025 reports it rejecting the G2 type). Ticket 325 tests both.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile: not
+||||||| 20feeaff
+
 ## 2026-11-11: Hevy testing uses the owner's own Pro account
 
 The owner decided on November 11, 2026 not to buy a Hevy Pro test account. Hevy testing,
