@@ -86,6 +86,8 @@ export async function changeCategoryAction(
     for (const path of ["/settings", "/behaviors", "/timeline", "/export"]) revalidatePath(path);
     return { status: "success", message: "Categories saved." };
   } catch (error) {
+    // Reload the list so a stale or refused change shows the stored categories. Open drafts keep their own snapshot.
+    revalidatePath("/settings");
     return { status: "error", message: error instanceof Error ? error.message : "Unable to save categories." };
   }
 }

@@ -10659,15 +10659,15 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Open or cancel a category name and description draft.",
+      "intent": "Open the category list, then open or cancel a category name and description draft.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Add category / Edit / Cancel"
+          "control": "Edit N categories / Add category / Edit / Cancel"
         }
       ],
-      "availability": "Available on Settings.",
-      "success_result": "Open or cancel a category name and description draft.",
+      "availability": "Available on Settings. The category list starts closed under the Categories title and purpose.",
+      "success_result": "Open the category list, or open or cancel a category name and description draft.",
       "failure_result": "Drafts remain mounted; removed category selections reset to All categories.",
       "effects": [
         "ui_state"
@@ -10826,16 +10826,20 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Change category order without changing category identity.",
+      "intent": "Move a category to a new position without changing category identity.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Move up / Move down"
+          "kind": "gesture",
+          "control": "Drag a category's Reorder handle with a mouse or touch, and drop it"
+        },
+        {
+          "kind": "keyboard",
+          "control": "Arrow Up / Arrow Down on a focused Reorder handle"
         }
       ],
-      "availability": "Available on Settings.",
-      "success_result": "Change category order without changing category identity.",
-      "failure_result": "Errors preserve the draft and stored records. Stale category or assignment snapshots require review.",
+      "availability": "Available on Settings in the open category list when there are two or more categories and no category draft is open.",
+      "success_result": "The new order saves on drop or on each arrow key, and the move is announced (\"Fitness moved to position 2 of 8.\").",
+      "failure_result": "A stale category snapshot is refused, the list reloads in its stored order, and the refusal is shown.",
       "effects": [
         "ui_state",
         "database_write"
@@ -10851,9 +10855,10 @@
         "level": "direct",
         "references": [
           "tests/category-controls.dom.test.tsx",
-          "tests/category.service.test.ts"
+          "tests/category.service.test.ts",
+          "tests/desktop-store-contract.test.ts"
         ],
-        "notes": "Mounted control tests exercise draft preservation and view projection; category plans validate concurrency and confirmation."
+        "notes": "Mounted control tests drag with mouse and touch pointers, move with Arrow Up and Arrow Down, check the announcement and restore the stored order after a refusal; category plans validate move positions and the stale snapshot; the real SQLite contract (desktop:contract:test) saves a move and refuses a stale one."
       },
       "platforms": {
         "web": {

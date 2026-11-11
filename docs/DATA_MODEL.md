@@ -274,7 +274,9 @@ Legacy duplicates retain their IDs and assignments; later duplicates receive an
 ID suffix. New names allow 1–120 characters without control characters.
 Descriptions allow 2,000 characters. Existing unchanged legacy names remain valid.
 `manage_categories` locks the account, checks category and affected Behavior
-snapshots, and applies the complete category change atomically.
+snapshots, and applies the complete category change atomically. Ticket 304's
+move-to-position reuses it: the shared planner sends the full reordered list with
+renumbered `sort_order` values, so no schema change was needed.
 
 ### `behaviors`
 
