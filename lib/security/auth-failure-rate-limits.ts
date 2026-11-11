@@ -25,6 +25,12 @@ export const leaveReminderProcessAuthFailureLimiter = new InMemoryRateLimiter({
   windowMs: AUTH_FAILURE_WINDOW_MS,
 });
 
+/** Ticket 321: the connector completion job's cron route. */
+export const connectorCompletionProcessAuthFailureLimiter = new InMemoryRateLimiter({
+  maxAttempts: AUTH_FAILURE_LIMIT,
+  windowMs: AUTH_FAILURE_WINDOW_MS,
+});
+
 export function buildAuthFailureRateLimitKey(
   scope: string,
   headers: Pick<Headers, "get">,
@@ -37,6 +43,7 @@ export function resetAuthFailureRateLimitersForTests(): void {
   reminderProcessAuthFailureLimiter.clear();
   occurrenceSyncAuthFailureLimiter.clear();
   leaveReminderProcessAuthFailureLimiter.clear();
+  connectorCompletionProcessAuthFailureLimiter.clear();
 }
 
 export function getClientIp(headers: Pick<Headers, "get">): string {

@@ -204,7 +204,7 @@ describe("source link service (Ticket 316)", () => {
   it("saves routines, turns a link off, and rejects malformed bodies", async () => {
     const save = vi.fn(async () => link());
     expect(await saveSourceLink(caller, { behaviorId: BEHAVIOR, source: "hevy", mode: "routines", selectorKeys: [LEGS] },
-      { env: ON, listLinks: async () => [], save })).toEqual({ saved: true, mode: "routines" });
+      { env: ON, listLinks: async () => [], save, scheduleCheck: async () => undefined })).toEqual({ saved: true, mode: "routines" });
     expect(save).toHaveBeenCalledWith(caller.client, expect.objectContaining({ selectorKind: "provider_keys", selectorKeys: [LEGS], enabled: true }));
     await saveSourceLink(caller, { behaviorId: BEHAVIOR, source: "hevy", mode: "off", selectorKeys: [] }, { env: ON, listLinks: async () => [link()], save });
     expect(save).toHaveBeenLastCalledWith(caller.client, expect.objectContaining({ enabled: false }));

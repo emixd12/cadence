@@ -96,6 +96,12 @@ const resolverRegistry = [
     source: "docs/plans/2026-11-10-connector-completion-architecture.md",
   },
   {
+    domain: "connector completion check schedule",
+    resolver: "packages/core/src/resolvers/completion-check-schedule.resolver.ts",
+    test: "tests/completion-check-schedule.resolver.test.ts",
+    source: "docs/NOTIFICATION_SPEC.md",
+  },
+  {
     domain: "Note shortcuts",
     resolver: "packages/core/src/resolvers/note-suggestion.resolver.ts",
     test: "tests/note-suggestion.resolver.test.ts",

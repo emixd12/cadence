@@ -441,6 +441,26 @@ reminders retain their OS scheduling and verified coverage behavior.
 Send-time email and browser-push checks reject a Behavior whose end date has
 arrived in its timezone, even when a bounded archive batch has not processed it.
 
+## Connector completions and reminders (Tickets 316 and 321, D28)
+
+A connector completion cancels the Occurrence's pending reminders in the same
+transaction as the status change, as a manual mark does. A connector revert (the
+activity was deleted at the source) repairs reminder coverage as the manual clear
+does. No notification announces a connector completion or a change to a past day
+(D28.6).
+
+The background job (Ticket 321) checks each linked account on its own schedule
+(`packages/core/src/resolvers/completion-check-schedule.resolver.ts`): once at the last
+job run before the reminder time of an Unresolved linked Occurrence, so a reminder is
+cancelled when the workout is already logged; every 30 minutes for 3 hours after the
+scheduled start and then hourly until local midnight, while the Occurrence stays
+Unresolved; and once after local midnight. At most 24 checks per account per day; the
+wait doubles after a failed check, up to 6 hours; `reconnect_required` stops checks.
+Until Ticket 311 records a cheap Hevy read, only the check before a reminder and the
+nightly check run. A Mac schedules its Behavior reminders locally and learns of a
+connector completion only when it syncs, so a Mac reminder can still fire for a logged
+workout while Cadence for Mac is closed.
+
 ## Leave reminders
 
 Owner decisions D3, D12 and D15 (`docs/DECISIONS.md`). Ticket 275 sets these rules and the

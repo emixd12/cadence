@@ -53,6 +53,7 @@ type Dependencies = Readonly<{
   connectionDigest?: (source: RecordedActivitySourceV1_1) => Promise<string | null>;
   save?: typeof upsertSourceLink;
   remove?: typeof deleteSourceLink;
+  scheduleCheck?: (source: RecordedActivitySourceV1_1) => Promise<void>;
 }>;
 
 const DIGEST = /^[a-f0-9]{64}$/u;
@@ -181,7 +182,20 @@ export async function saveSourceLink(
     }
     throw new ConnectorError("provider_unavailable");
   }
+  // Ticket 321: a newly enabled link is due for a background check at once.
+  await (deps.scheduleCheck ?? ((source) => scheduleCheckNow(caller, source)))(input.source).catch(() => undefined);
   return { saved: true, mode: input.mode };
+}
+
+async function scheduleCheckNow(caller: ConnectorCaller, source: RecordedActivitySourceV1_1): Promise<void> {
+  const at = new Date().toISOString();
+  const existing = await caller.client.from("connector_completion_state").select("source")
+    .eq("user_id", caller.user.id).eq("source", source).maybeSingle();
+  if (existing.error) throw existing.error;
+  const { error } = existing.data
+    ? await caller.client.from("connector_completion_state").update({ next_check_at: at }).eq("user_id", caller.user.id).eq("source", source)
+    : await caller.client.from("connector_completion_state").insert({ user_id: caller.user.id, source, next_check_at: at });
+  if (error) throw error;
 }
 
 async function connectedDigest(caller: ConnectorCaller, source: RecordedActivitySourceV1_1): Promise<string | null> {
