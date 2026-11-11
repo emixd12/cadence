@@ -1,5 +1,29 @@
 # Desktop data model
 
+Schema version 23 adds the day-note Note shortcuts pool (Ticket 292). Migration
+`0023_day_note_shortcut_pool.sql` rebuilds `note_shortcut_states` so it also accepts
+`id = 'day_notes'` with a null `behavior_id`, mirroring hosted
+`20261111120000_day_note_shortcut_pool.sql`; existing rows and the data-revision
+triggers carry over. `readNoteShortcutContext` with `behaviorId: "day_notes"` returns
+the profile's non-empty day notes (null `behavior_id` and `scheduled_for`), no
+imported IDs, and a `dayPool` object with the profile timezone. `commitNoteShortcutState`
+accepts that pool. Like Behavior pools since Ticket 305, the pool is on by default: for
+matching, accept and edit only a stored global off switch rejects it, and the pool's own
+`enabled` flag does not gate. The local day-note action matches repeated day notes after
+each save. `saveDayNote` with `usedShortcut: true` saves the note and adds its day-note ID
+to the pool's exclusions in the same transaction; a stale save writes neither, and a
+shortcut clear is rejected. Rust tests
+`day_note_shortcut_pool_reads_day_notes_commits_and_excludes_shortcut_saves`,
+`day_note_shortcut_pool_migration_keeps_existing_shortcut_states` (an upgrade from
+schema 22 with data) and `account_sync_round_trips_the_day_note_shortcut_pool` cover it.
+
+Account sync contract 4 (hosted migration
+`20261111130000_account_sync_day_note_shortcut_pool.sql`) carries the pool as the
+`note_shortcut_state` entity with ID `day_notes`. Contracts 1–3 neither receive nor
+write that row, so older Mac builds keep syncing and cannot change it. A linked Mac
+and the web then share one day-pool state. Exclusion IDs are unioned like a Behavior
+pool's.
+
 Schema version 22 turns Note shortcuts on by default (Ticket 305). Migration
 `0022_note_shortcuts_on_by_default.sql` sets a stored global `enabled = 0` to 1 once,
 matching hosted `20261110170000_turn_on_note_shortcuts_once.sql`, and leaves `revision`

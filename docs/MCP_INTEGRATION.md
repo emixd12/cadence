@@ -585,5 +585,13 @@ Occurrence graph. Evidence: `tests/sql/ticket-292-day-note-integration-write.sql
 `tests/integration-write.test.ts`, and the local read suite including
 `list_day_notes` in the cross-account check (November 10, 2026). The
 `mcp-server.local-integration` suite was not rerun; it is pinned to the isolated
-port-56922 project. `search` and `fetch` do not cover day notes yet.
+port-56922 project.
+
+Contract 1.2.0 adds day notes to `search` and `fetch`. `search` matches day-note text
+and returns `day_note:<uuid>` ids; `fetch` returns one day note as quoted JSON with
+`metadata.kind: "day_note"` and no `behavior_id`. A cleared day note is not found.
+Both read as the grant's user through RLS, so another account's day notes never
+appear. Both descriptions repeat that a day note is separate from Occurrence notes
+and statuses. The minor bump follows the versioning table: a relaxed id pattern and
+a new `metadata.kind` value.
 

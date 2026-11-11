@@ -10,13 +10,15 @@ export function createLocalDayNoteStore(profileId: string, now: Temporal.Instant
     saveDayNote: (plan) => localCommand("saveDayNote", {
       ...localMutation(profileId, now.toString()), newId: crypto.randomUUID(),
       localDate: plan.localDate, expectedNote: plan.expectedNote, note: plan.note,
+      // A shortcut-assisted save also excludes this day note from the day-note pool.
+      ...(plan.usedShortcut ? { usedShortcut: true } : {}),
     }),
   };
 }
 
 export function saveLocalDayNote(
   profileId: string,
-  input: Readonly<{ localDate: unknown; expectedNote: unknown; note: unknown }>,
+  input: Readonly<{ localDate: unknown; expectedNote: unknown; note: unknown; usedShortcut?: boolean }>,
   now: Temporal.Instant,
 ) {
   return saveDayNote(createLocalDayNoteStore(profileId, now), input);

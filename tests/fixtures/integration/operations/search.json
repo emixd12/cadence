@@ -36,7 +36,7 @@
   ],
   "valid_outputs": [
     {
-      "name": "two results",
+      "name": "three record kinds",
       "value": {
         "results": [
           {
@@ -48,6 +48,11 @@
             "id": "occurrence:00000005-1111-4111-8111-000000000005",
             "title": "Morning walk on 2026-10-18",
             "url": "https://app.cadence-me.com/timeline?date=2026-10-18&occurrence=00000005-1111-4111-8111-000000000005"
+          },
+          {
+            "id": "day_note:00000009-1111-4111-8111-000000000009",
+            "title": "Day note for 2026-10-18",
+            "url": "https://app.cadence-me.com/timeline"
           }
         ]
       }

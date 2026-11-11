@@ -9,9 +9,10 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
- * `cadence_private.account_sync_contract_additions` entry; see docs/DESKTOP_DATA_MODEL.md.
+ * `cadence_private.account_sync_contract_additions` or `account_sync_contract_rows`
+ * entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
  */
-export const ACCOUNT_SYNC_CONTRACT = 3;
+export const ACCOUNT_SYNC_CONTRACT = 4;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;

@@ -136,7 +136,7 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
   (timing statistics), 319 (sync convergence of a connector mark and the user's first mark,
   Mac label from the synced event, Mac reconcile after its Hevy refresh) and 321 (schedule
   resolver, `connector_completion` token channel, job route at minutes 7, 22, 37, 52).
-- Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 4, a SQLite
+- Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 5 (4 is day notes), a SQLite
   migration, native changes and installed acceptance. 323 needs 311, a published Mac build
   with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
 - Hosted: no migration pushed. `20261110200000` fits the standing approval once a push can

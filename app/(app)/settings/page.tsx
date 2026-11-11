@@ -27,8 +27,12 @@ import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { getCategorySettings } from "@/lib/services/category.service";
 import { getSettingsPageData } from "@/lib/services/settings.service";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
-import { categoriesSectionState } from "@/lib/ui/settings-sections";
+import { categoriesSectionState, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
 import { changeCategoryAction, deleteAccountAction, disconnectAppAction, updateTimezoneAction } from "./actions";
+import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
+import { DAY_NOTE_SHORTCUTS_PURPOSE, DayNoteShortcutSettings } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -51,13 +55,15 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, connectedApps] = await Promise.all([
+  const [categorySettings, connectedApps, dayNoteShortcutView] = await Promise.all([
     getCategorySettings(),
     getConnectedApps(),
+    getNoteShortcutViewForCurrentUser(DAY_NOTE_SHORTCUT_POOL_ID),
   ]);
 
   // Ticket 301: four groups, a sticky index, closed source rows and drawers.
-  // Note shortcuts has no Settings control here (Ticket 305).
+  // Note shortcuts has no Settings control here (Ticket 305). Day note shortcuts are
+  // reviewed here because day notes have no Behavior settings (Ticket 292).
   return (
     <SettingsSections>
       <SettingsGroup id="settings-general">
@@ -74,6 +80,14 @@ async function SettingsContent() {
           state={categoriesSectionState(categorySettings.categories.length)}
         >
           <CategoryPanel {...categorySettings} action={changeCategoryAction} />
+        </SettingsDrawer>
+        <SettingsDrawer
+          title="Day note shortcuts"
+          description={DAY_NOTE_SHORTCUTS_PURPOSE}
+          label="Day note shortcuts"
+          state={dayNoteShortcutsSectionState(dayNoteShortcutView)}
+        >
+          <DayNoteShortcutSettings view={dayNoteShortcutView} action={manageNoteShortcutAction} />
         </SettingsDrawer>
       </SettingsGroup>
 

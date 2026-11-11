@@ -90,6 +90,12 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "BehaviorLog day-note restore and import",
+    resolver: "packages/core/src/resolvers/behaviorlog-day-note.resolver.ts",
+    test: "tests/behaviorlog-day-note.resolver.test.ts",
+    source: "docs/EXPORT_FORMATS.md",
+  },
+  {
     domain: "connector completion matching",
     resolver: "packages/core/src/resolvers/activity-match.resolver.ts",
     test: "tests/activity-match.resolver.test.ts",

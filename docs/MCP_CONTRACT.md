@@ -89,7 +89,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.1.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.2.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -241,7 +241,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.1.0"` |
+| `contract_version` | yes | `"1.2.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -455,7 +455,7 @@ Output:
 
 ### `search`
 
-**Search Cadence.** Searches the user's Behaviors (titles, descriptions, archive notes) and Occurrence notes by text. Returns ids for `fetch` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword.
+**Search Cadence.** Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, and day notes by text. Returns ids for `fetch` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -477,7 +477,7 @@ Output:
 
 ### `fetch`
 
-**Fetch Cadence record.** Returns the full text of one `search` result: a Behavior's definition or an Occurrence and its note. Use it after `search` to read a result.
+**Fetch Cadence record.** Returns the full text of one `search` result: a Behavior's definition, an Occurrence and its note, or a day note. Use it after `search` to read a result. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false

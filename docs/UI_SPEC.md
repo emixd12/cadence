@@ -1304,6 +1304,12 @@ blocking ordinary Note entry; a failed match after a save never fails the save.
 If shortcut reads fail, show an unavailable notice and disable those controls.
 Keep the tracking screen and ordinary Note entry usable; mutation failures remain errors.
 
+Day notes have no Behavior settings, so their pool (Ticket 292) is reviewed in a Day note
+shortcuts drawer in Settings, General, after Categories, on web and Mac. It uses the same
+review controls with no switch: the drawer shows its title, one-line purpose and a state
+line ("On", "On · 1 suggested · 2 accepted", or "Off for this account"); an empty pool
+says no suggestions exist yet. Its accepted shortcuts appear only above the day-note field.
+
 Only accepted shortcuts appear above the existing Note textarea on Timeline,
 Needs decision, and Behaviors selected-day review. Buttons fill an empty draft
 or append a newline and text to a nonempty draft. They never replace text,

@@ -424,6 +424,19 @@ describe("resolveAccountSync", () => {
     expect(plan(base, snapshot([shortcut(2)]), snapshot([shortcut(3)])).conflicts).toMatchObject([{ kind: "note_shortcut_state", reason: "concurrent_update" }]);
   });
 
+  it("synchronizes the day-note shortcut pool (contract 4) and keeps its day-note exclusions", () => {
+    const dayNoteA = "29200000-0000-4000-8000-000000000101", dayNoteB = "29200000-0000-4000-8000-000000000102";
+    const dayPool = (excluded: string[], revision: number, enabled = true): AccountSyncEntity => ({ kind: "note_shortcut_state", id: "day_notes", value: {
+      id: "day_notes", behavior_id: null, enabled, entries: [], excluded_occurrence_ids: excluded, revision, updated_at: `2026-11-11T12:00:0${revision}Z`,
+    } });
+    const base = snapshot([dayPool([dayNoteA], 1)]);
+    expect(plan(base, base, snapshot([dayPool([dayNoteA], 2, false)])).localWrites).toMatchObject([{ kind: "note_shortcut_state", id: "day_notes", operation: "upsert", value: { enabled: false, revision: 2 } }]);
+    const result = plan(base, snapshot([dayPool([dayNoteA, dayNoteB], 2)]), snapshot([dayPool([], 2, false)]));
+    expect(result.conflicts).toMatchObject([{ kind: "note_shortcut_state", id: "day_notes", reason: "concurrent_update" }]);
+    expect(() => plan(empty, snapshot([{ kind: "note_shortcut_state", id: "day_notes", value: { id: "day_notes", behavior_id: shortcutBehaviorId,
+      enabled: true, entries: [], excluded_occurrence_ids: [], revision: 1, updated_at: "2026-11-11T12:00:00Z" } }]), empty)).toThrow("Note shortcut state is invalid");
+  });
+
   it("restores exclusions cleared by an ordinary one-sided state edit", () => {
     const behavior = row(shortcutBehaviorId, "Behavior");
     const base = snapshot([behavior, shortcutState([excludedA], 1)]);

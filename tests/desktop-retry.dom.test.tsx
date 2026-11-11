@@ -379,8 +379,13 @@ describe("desktop failed-read retries", () => {
     expect(container.querySelector("h1")?.textContent).toBe("Timeline");
     const settings = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Settings")!;
     await act(() => settings.click()); await settle();
-    // Ticket 305: desktop Settings has no Note shortcuts control to report on.
-    expect(container.textContent).not.toContain("Note shortcuts");
+    // Ticket 305: desktop Settings has no global Note shortcuts control.
+    expect(container.querySelector("#note-shortcuts")).toBeNull();
+    expect(container.textContent).not.toContain("Enable Note shortcuts");
+    // Ticket 292: the Day note shortcuts drawer reports the failed read; Settings stays usable.
+    const drawer = [...container.querySelectorAll("[data-settings-drawer]")].find((item) => item.textContent?.startsWith("Day note shortcuts"));
+    expect(drawer?.textContent).toContain("Status unavailable");
+    expect(drawer?.textContent).toContain("Note shortcuts are temporarily unavailable. You can still write and save Notes.");
     expect(container.querySelector("h1")?.textContent).toBe("Settings");
   });
 

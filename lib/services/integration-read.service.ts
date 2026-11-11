@@ -18,13 +18,13 @@ import { getOccurrenceById } from "@/lib/db/occurrences.repo";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { listTimeSessionsForOccurrence } from "@/lib/db/timeSessions.repo";
 import { listExternalReferences } from "@/lib/db/integration.repo";
-import { readIntegrationCategories, readIntegrationOccurrences } from "@/lib/db/integration-read.repo";
+import { readIntegrationCategories, readIntegrationDayNote, readIntegrationOccurrences } from "@/lib/db/integration-read.repo";
 import { getBehaviorReadDataForUser } from "./behavior.service";
 import { ensureUserOccurrencesFresh } from "./occurrence.service";
 import { readOccurrenceSyncState } from "./occurrence-sync-state.service";
 import { integrationInstant, serializeIntegrationBehavior, serializeIntegrationOccurrence } from "./integration-read-serialization";
 import type { Occurrence } from "@/lib/types/database";
-import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
+import { listAllDayNotes, listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 import { listDayNotes } from "@cadence/core/services/day-note.service";
 import { dayNotesByDate } from "@cadence/core/resolvers/day-note.resolver";
 
@@ -206,16 +206,18 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
   };
 }
 
+function serializeDayNote(row: { id: string; local_date: string; note: string | null; updated_at: string }) {
+  return { id: row.id, local_date: row.local_date, note: row.note,
+    revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at) };
+}
+
 export async function listIntegrationDayNotes(context: IntegrationContext, input: IntegrationOperationInput<"list_day_notes">): Promise<IntegrationOperationOutput<"list_day_notes">> {
   const account = await readAccount(context);
   const rows = await listDayNotes({ listDayNotes: (range) => listDayNotesInRange(context.supabase, context.userId, range) },
     { from: input.start_local_date, to: input.end_local_date });
   return {
     timezone: account.timezone,
-    day_notes: rows.filter((row) => row.note !== null).map((row) => ({
-      id: row.id, local_date: row.local_date, note: row.note,
-      revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at),
-    })),
+    day_notes: rows.filter((row) => row.note !== null).map(serializeDayNote),
   };
 }
 
@@ -259,6 +261,8 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
 
 const behaviorUrl = (id: string) => `https://app.cadence-me.com/behaviors?behavior=${id}`;
 const occurrenceUrl = (row: { behavior_id: string; local_date: string }) => `https://app.cadence-me.com/behaviors?behavior=${row.behavior_id}&day=${row.local_date}&range=90`;
+const dayNoteUrl = "https://app.cadence-me.com/timeline";
+const dayNoteTitle = (localDate: string) => `Day note for ${localDate}`;
 
 export async function searchIntegrationRecords(context: IntegrationContext, input: IntegrationOperationInput<"search">): Promise<IntegrationOperationOutput<"search">> {
   const account = await readAccount(context, true);
@@ -266,16 +270,29 @@ export async function searchIntegrationRecords(context: IntegrationContext, inpu
   const matches = (text: string | null) => text?.toLocaleLowerCase("en-US").includes(query) ?? false;
   const behaviors = account.behaviors.filter((row) => matches(row.title) || matches(row.description) ||
     serializeIntegrationBehavior(row, null).archive_notes.some((note) => matches(note.note)));
-  const occurrences = (await readIntegrationOccurrences(context.supabase, context.userId)).filter((row) => matches(row.note));
-  if (behaviors.length + occurrences.length > L.maxSearchResults) throw new IntegrationReadError("limit_exceeded", "More than 20 records match. Use more specific search text.");
+  const [occurrenceRows, dayNoteRows] = await Promise.all([
+    readIntegrationOccurrences(context.supabase, context.userId),
+    listAllDayNotes(context.supabase, context.userId),
+  ]);
+  const occurrences = occurrenceRows.filter((row) => matches(row.note));
+  const dayNotes = dayNoteRows.filter((row) => matches(row.note));
+  if (behaviors.length + occurrences.length + dayNotes.length > L.maxSearchResults) throw new IntegrationReadError("limit_exceeded", "More than 20 records match. Use more specific search text.");
   return { results: [
     ...behaviors.map((row) => ({ id: `behavior:${row.id}`, title: row.title, url: behaviorUrl(row.id) })),
     ...occurrences.map((row) => ({ id: `occurrence:${row.id}`, title: `${findBehavior(account, row.behavior_id).title} — ${row.local_date}`, url: occurrenceUrl(row) })),
+    ...dayNotes.map((row) => ({ id: `day_note:${row.id}`, title: dayNoteTitle(row.local_date), url: dayNoteUrl })),
   ].sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
 export async function fetchIntegrationRecord(context: IntegrationContext, input: IntegrationOperationInput<"fetch">): Promise<IntegrationOperationOutput<"fetch">> {
   const [kind, id] = input.id.split(":");
+  if (kind === "day_note") {
+    const row = await readIntegrationDayNote(context.supabase, context.userId, id);
+    if (!row || row.note === null) throw new IntegrationReadError("not_found", "No day note with that id exists for this account.");
+    const dayNote = serializeDayNote(row);
+    return { id: input.id, title: dayNoteTitle(dayNote.local_date), text: JSON.stringify(dayNote, null, 2), url: dayNoteUrl,
+      metadata: { kind: "day_note", local_date: dayNote.local_date } };
+  }
   const account = await readAccount(context, kind === "occurrence");
   if (kind === "behavior") {
     const behavior = await behaviorResult(context, findBehavior(account, id));
