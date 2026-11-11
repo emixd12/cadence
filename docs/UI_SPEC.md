@@ -186,8 +186,9 @@ calendar selection, visibility, refresh, reconnect, and disconnect controls.
 Calendar selection uses one collapsed multi-select field with wrapping selected
 name tags. Expanding reveals a searchable, scroll-bounded native checkbox list;
 selected entries retain per-calendar Timeline visibility. Escape closes the list
-and returns focus to its summary. Changes remain drafts until Save Calendar
-settings. Refresh Calendar reloads discovery even without saved selections.
+and returns focus to its summary. Each display and selection change saves as it
+changes, then the calendar list reloads (Ticket 303); there is no Save button.
+Refresh Calendar reloads discovery even without saved selections.
 Display names prefer Google's per-user override and retain stable calendar IDs.
 The panel shows a factual unavailable state when the deployment lacks Calendar
 OAuth configuration. Desktop shows an unavailable build state when it lacks a
@@ -391,9 +392,11 @@ Home Behavior.
 Installed acceptance remains in `qa/travel-release.md`.
 
 Travel Settings is one panel (combined October 23, 2026 for the travel release
-train). The setup block comes first: the toggle and its disclosure, Home with its
-marker line, usual travel, Save travel settings, the storage notes, then the device
-location line and Ticket 165's guidance. How you travel (Ticket 217) and Completion
+train). The setup block comes first: usual travel, then the toggle and its
+disclosure (the toggle needs usual travel, so the choice sits above it), Home with
+its marker line, the section's result line, the storage notes, then the device
+location line and Ticket 165's guidance. Usual travel and the toggle save when they
+change; Home saves on blur or Enter (Ticket 303). There is no Save travel settings. How you travel (Ticket 217) and Completion
 places (Ticket 216) follow as subsections, each under a rule with a bold heading and
 one muted description. At 390 px every control stacks in one column.
 
@@ -1165,6 +1168,34 @@ fifth group, This Mac (index link "Mac"), after Account and data.
 - In-app navigation to an anchor inside a row or drawer (the conflict cue's
   `account-conflicts`, Timeline's `travel`) opens it and holds it in place.
 - Legal links and Delete account stay web-only.
+
+Saving (Ticket 303, `docs/DECISIONS.md`, 2026-11-10). Settings save as they change,
+on web and on the Mac, which shares these panels:
+
+- Every checkbox and select saves when it changes. A text field saves on blur or
+  Enter, and only when its text changed: Home, including after **Use my current
+  location** fills it. The fill moves focus to Home so the person can check the
+  address first.
+- Each section has one result line, its only live region (`role="status"`, visually
+  hidden while empty): "Saving…", then "Saved", or one specific error that says what
+  to do. A failed save puts the control back to its saved value and ends with "Your
+  change was undone." Travel's main block, How you travel and Completion places are
+  separate sections; the leave reminder switch and the Home marker report to the line
+  of the section they sit in. Turning Travel estimates on carries the device location
+  outcome in the same line ("Saved. Location denied. …"), so nothing is announced
+  twice.
+- A control stays enabled while it saves, so focus stays on it. Saves run one at a
+  time from the latest saved revision; calendar choices made during a save collapse
+  into one save of the newest choice, then the calendar list reloads.
+- Three kinds of control keep an explicit action: Timezone, because it reschedules
+  future Occurrences; forms the person opens (the category editor, iCloud credentials,
+  the Hevy key); and Connect, Disconnect and Delete account.
+- Disconnect in every source panel asks first, in place: "Disconnect Google
+  Calendar?" with a destructive **Disconnect** and **Cancel**. Focus moves to Cancel
+  and returns to the button after Cancel. The trigger uses the destructive style, as
+  Connected apps does.
+- On the Mac, a save in progress and an unsaved Home or credentials draft hold an
+  app restart through the existing desktop draft guards.
 
 Desktop Settings additionally shows linked-account synchronization state,
 conflict count and review, and disconnect choices. A conflict also exposes one

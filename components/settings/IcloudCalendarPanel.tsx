@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { CalendarSelector } from "@/components/settings/GoogleCalendarPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { useReportSettingsSection } from "@/components/settings/SettingsSections";
+import { SettingsDisconnect } from "@/components/settings/SettingsDisconnect";
+import { SETTINGS_SAVED, SETTINGS_SAVING, SettingsLiveLine, settingsSaveFailed, useAutosave } from "@/components/settings/settings-result";
+import { DesktopDraftGuard } from "@/lib/desktop-draft";
 import { connectorSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
 import type { ConnectorConnectionView, ConnectorPreferences } from "@/lib/types/connectors";
 import type { CalendarPreferences } from "@/lib/types/google-calendar";
@@ -37,28 +40,46 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
   const [preferences, setPreferences] = useState<ConnectorPreferences | null>(null);
   const [appleId, setAppleId] = useState("");
   const [appPassword, setAppPassword] = useState("");
-  const [pending, setPending] = useState<"connect" | "save" | "refresh" | "disconnect" | null>(null);
+  const [pending, setPending] = useState<"connect" | "refresh" | "disconnect" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   useReportSettingsSection(connectorSectionState(settingsSectionLoad(connection, loadFailed)));
+  // Ticket 303: display and selection choices save as they change, then the calendar list reloads.
+  // The credentials form keeps its explicit Connect.
+  const savedPreferences = useRef<ConnectorPreferences | null>(null);
+  const autosave = useAutosave((next: ConnectorPreferences) => coordinator.savePreferences(next), {
+    saved: (view, latest) => { savedPreferences.current = view.preferences; setConnection(view); if (latest) setPreferences(view.preferences); },
+    failed: (error) => {
+      setPreferences(savedPreferences.current);
+      setMessage(settingsSaveFailed(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar settings could not save. Try again.")));
+    },
+    settled: async () => {
+      try { setCalendars(await coordinator.listCalendars()); setMessage(SETTINGS_SAVED); }
+      catch { setMessage(`${SETTINGS_SAVED}. The calendar list could not reload; try Refresh iCloud Calendar.`); }
+    },
+  });
+  const cancelAutosave = autosave.cancel;
 
   useEffect(() => {
     let active = true;
+    cancelAutosave();
     void coordinator.getConnection().then(async (view) => {
       if (!active) return;
       setMessage(null);
       setLoadFailed(false);
       setConnection(view);
       setPreferences(view.preferences);
+      savedPreferences.current = view.preferences;
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
         catch (error) { if (active) setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud calendar list could not load.")); }
       } else setCalendars([]);
     }).catch(() => { if (active) { setLoadFailed(true); setMessage("iCloud Calendar status is unavailable. Other sources and tracking are unaffected."); } });
     return () => { active = false; };
-  }, [coordinator, refreshVersion]);
+  }, [cancelAutosave, coordinator, refreshVersion]);
 
 
+  const clearCredentials = () => { setAppleId(""); setAppPassword(""); };
   const connect = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const submittedId = appleId.trim();
@@ -69,20 +90,10 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     try {
       const view = await coordinator.connect(submittedId, submittedPassword);
       setConnection(view); setPreferences(view.preferences);
+      savedPreferences.current = view.preferences;
       try { setCalendars(await coordinator.listCalendars()); setMessage("iCloud Calendar connected. Choose the calendars Cadence can show."); }
       catch { setCalendars([]); setMessage("iCloud Calendar connected. The calendar list could not load; try Refresh iCloud Calendar."); }
     } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar could not connect. Try again.")); }
-    finally { setPending(null); }
-  };
-  const save = async () => {
-    if (!preferences) return;
-    setPending("save"); setMessage(null);
-    try {
-      const view = await coordinator.savePreferences(preferences);
-      setConnection(view); setPreferences(view.preferences);
-      try { setCalendars(await coordinator.listCalendars()); setMessage("iCloud Calendar preferences saved."); }
-      catch { setMessage("iCloud Calendar preferences saved. The calendar list could not reload; try Refresh iCloud Calendar."); }
-    } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar preferences could not be saved.")); }
     finally { setPending(null); }
   };
   const refresh = async () => {
@@ -90,7 +101,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     try {
       setCalendars(await coordinator.listCalendars());
       if (!connection?.preferences.selectedSourceIds.length) {
-        setMessage("iCloud calendar list refreshed. Select calendars and save to show events.");
+        setMessage("iCloud calendar list refreshed. Select calendars to show events.");
         return;
       }
       const snapshot = await coordinator.refreshEvents(refreshRange, { force: true });
@@ -111,6 +122,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
     try {
       const result = await coordinator.disconnect();
       setConnection(result.view); setPreferences(result.view.preferences); setCalendars([]);
+      savedPreferences.current = result.view.preferences;
       setMessage(`iCloud Calendar disconnected. Cadence deleted its saved Apple Account email and app-specific password. ${CONNECTOR_REVOCATION_COPY[result.revocation]}`);
     } catch (error) { setMessage(icloudErrorMessage(connectorErrorCode(error), "iCloud Calendar disconnect could not finish.")); }
     finally { setPending(null); }
@@ -121,16 +133,27 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
   const canManage = status === "connected" && preferences !== null;
   const shared: CalendarPreferences | null = preferences ? { selectedCalendarIds: preferences.selectedSourceIds, hiddenCalendarIds: preferences.hiddenSourceIds,
     visible: preferences.visible, showAllDay: preferences.showAllDay } : null;
-  const updateShared = (next: CalendarPreferences) => setPreferences({ selectedSourceIds: next.selectedCalendarIds, hiddenSourceIds: next.hiddenCalendarIds,
-    visible: next.visible, showAllDay: next.showAllDay });
+  const updateShared = (next: CalendarPreferences) => {
+    const value: ConnectorPreferences = { selectedSourceIds: next.selectedCalendarIds, hiddenSourceIds: next.hiddenCalendarIds,
+      visible: next.visible, showAllDay: next.showAllDay };
+    setPreferences(value); setMessage(SETTINGS_SAVING);
+    autosave.change(value);
+  };
+  const busy = pending !== null || autosave.saving;
+  const disconnectAction = <SettingsDisconnect label="Disconnect iCloud Calendar" question="Disconnect iCloud Calendar?" pendingLabel="Disconnecting iCloud…"
+    pending={pending === "disconnect"} disabled={busy} onConfirm={() => { void disconnect(); }} />;
 
   return (
     <SettingsPanel id="connector-icloud_calendar" headingLevel={3} title="iCloud Calendar"
       description="Read-only calendar context from your Apple Account. Events never change Behavior status or schedules.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
-        <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? icloudStatusLabel(status)}</p>
+        <DesktopDraftGuard pending={autosave.saving} />
+        <SettingsLiveLine text={message} className="text-muted-readable" />
+        {message ? null : <p className="text-muted-readable">{icloudStatusLabel(status)}</p>}
         {status === "not_configured" ? <p className="text-muted-readable">iCloud Calendar connection is not configured for this Cadence deployment.</p> : null}
         {needsLogin ? <form onSubmit={connect} className="grid gap-3 border-t border-line pt-4" aria-describedby={custodyId}>
+          {/* An opened form keeps its explicit action; a typed draft holds a desktop restart. */}
+          <DesktopDraftGuard dirty={Boolean(appleId || appPassword)} onDiscard={clearCredentials} />
           <p id={custodyId} className="text-muted-readable">{ICLOUD_CUSTODY_COPY}</p>
           <p className="font-bold text-foreground">Never enter your Apple Account password here.</p>
           <label htmlFor={appleIdField} className="font-bold text-foreground">Apple Account email</label>
@@ -146,8 +169,7 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
           </button>
         </form> : null}
         {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting deletes Cadence&apos;s saved copy; Apple keeps the app-specific password active until you remove it at account.apple.com.</p> : null}
-        {status === "reconnect_required" ? <button type="button" onClick={disconnect} disabled={pending !== null}
-          className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Disconnect iCloud Calendar</button> : null}
+        {status === "reconnect_required" ? disconnectAction : null}
         {canManage && shared ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
             <legend className="font-bold text-foreground">iCloud display</legend>
@@ -157,9 +179,8 @@ export function IcloudCalendarPanel({ coordinator, refreshRange, refreshVersion 
           <CalendarSelector calendars={calendars?.map((calendar) => ({ id: calendar.id, name: calendar.name, primary: calendar.isDefault })) ?? null}
             preferences={shared} onChange={updateShared} disabled={pending !== null} refreshLabel="Refresh iCloud Calendar" />
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
-            <button type="button" onClick={save} disabled={pending !== null} className="product-action product-action-primary min-h-11 px-3 py-2 text-sm font-bold">{pending === "save" ? "Saving iCloud…" : "Save iCloud settings"}</button>
-            <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing iCloud…" : "Refresh iCloud Calendar"}</button>
-            <button type="button" onClick={disconnect} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "disconnect" ? "Disconnecting iCloud…" : "Disconnect iCloud Calendar"}</button>
+            <button type="button" onClick={refresh} disabled={busy} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing iCloud…" : "Refresh iCloud Calendar"}</button>
+            {disconnectAction}
           </div>
         </> : null}
       </div>

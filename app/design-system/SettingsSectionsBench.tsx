@@ -10,6 +10,8 @@ import {
   SettingsSourceIcon,
 } from "@/components/settings/SettingsSections";
 import { SETTINGS_SECTION_CHECKING, SETTINGS_SECTION_UNAVAILABLE, type SettingsSectionState } from "@/lib/ui/settings-sections";
+import { SettingsDisconnect } from "@/components/settings/SettingsDisconnect";
+import { SETTINGS_SAVED, SETTINGS_SAVING, SettingsLiveLine, settingsSaveFailed } from "@/components/settings/settings-result";
 
 // Ticket 301 bench previews for the Settings layout components. Fixed states stand
 // in for the panels that report them on /settings; nothing here loads or saves.
@@ -59,6 +61,26 @@ export function SettingsSectionsBench() {
       <SettingsGroup id="settings-account"><SettingsExportEntry /></SettingsGroup>
       <SettingsPageEnd deleteAccount={<p className="text-sm text-muted-readable">The existing Delete account form opens here.</p>} />
       <p className="text-sm text-muted-readable">The full page with the sticky index: /design-system?preview=settings-regroup.</p>
+    </div>
+  );
+}
+
+/** Ticket 303: one result line per section in each state, and a source's Disconnect confirmation. */
+export function SettingsSavingBench() {
+  return (
+    <div className="grid max-w-xl gap-6 text-sm leading-6">
+      <SettingsPanel title="Result line" description="One live region per section, visually hidden while empty.">
+        <div className="grid gap-2">
+          <SettingsLiveLine text={SETTINGS_SAVING} className="text-muted-readable" />
+          <SettingsLiveLine text={SETTINGS_SAVED} className="text-muted-readable" />
+          <SettingsLiveLine text={settingsSaveFailed("Usual travel could not save. Try again, or reload Settings if another device changed it.")} error />
+        </div>
+      </SettingsPanel>
+      <SettingsPanel title="Disconnect" description="The first click asks in place; Cancel returns focus to the button. Nothing disconnects here.">
+        <div className="flex flex-wrap gap-3">
+          <SettingsDisconnect label="Disconnect Hevy" question="Disconnect Hevy?" pendingLabel="Disconnecting Hevy…" pending={false} disabled={false} onConfirm={() => undefined} />
+        </div>
+      </SettingsPanel>
     </div>
   );
 }

@@ -1956,6 +1956,94 @@
       "confidence": "exact"
     },
     {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/ConnectedAppsPanel.tsx",
+      "line": 47,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/GoogleCalendarPanel.tsx",
+      "line": 131,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/HevyPanel.tsx",
+      "line": 83,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/HomeCurrentLocation.tsx",
+      "line": 71,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/IcloudCalendarPanel.tsx",
+      "line": 151,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/LeaveReminderSetting.tsx",
+      "line": 94,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/OutlookCalendarPanel.tsx",
+      "line": 134,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/SettingsDisconnect.tsx",
+      "line": 13,
+      "route": null,
+      "usageKind": "reference",
+      "confidence": "heuristic"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/TravelHabitsSection.tsx",
+      "line": 104,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/TravelSettingsPanel.tsx",
+      "line": 226,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.settings-saving",
+      "file": "components/settings/TravelSettingsPanel.tsx",
+      "line": 238,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "module.settings-row",
       "file": "components/settings/ConnectorLibrary.tsx",
       "line": 46,

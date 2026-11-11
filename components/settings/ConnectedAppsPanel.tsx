@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { formatUserDateTime } from "@/lib/ui/date-time";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { SettingsItemHeading } from "@/components/settings/settings-heading";
+import { SettingsLiveLine } from "@/components/settings/settings-result";
 import { OAUTH_PERMISSION_LABELS, type ConnectedAppsView, type OAuthFormAction } from "@/lib/types/oauth-ui";
 
 export function ConnectedAppsPanel({ view, timezone, action }: { view: ConnectedAppsView; timezone: string; action: OAuthFormAction }) {
@@ -42,8 +43,8 @@ export function ConnectedAppsPanel({ view, timezone, action }: { view: Connected
             </ul> : <p className="py-2 text-sm text-muted-readable">No recent activity.</p>}
           </details>
         </>}
-        {pending ? <p role="status" className="text-sm">Disconnecting…</p> : null}
-        {state.message ? <p role={state.status === "error" ? "alert" : "status"} className="text-sm leading-6">{state.message}</p> : null}
+        {/* One result line (Ticket 303): Disconnecting…, then the result. */}
+        <SettingsLiveLine text={pending ? "Disconnecting…" : state.message} error={!pending && state.status === "error"} className="text-sm leading-6" />
       </div>
     </SettingsPanel>
   );

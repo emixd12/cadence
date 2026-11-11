@@ -451,6 +451,8 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 - **Notification permission:** One section with a Browser notifications status value plus a single primary text action. Permission prompts must be triggered by the user, not on page load.
 - **Unavailable states:** Use factual muted text for denied, unsupported, or unconfigured browser push. Rust Signal is only for an actual save error.
 - **Inline results:** Save confirmations and errors are plain text lines under their form. They do not carry their own divider.
+- **Saving (Ticket 303):** Checkboxes and selects save when they change; Home saves on blur or Enter. Each section has one result line (`SettingsLiveLine` in `components/settings/settings-result.tsx`), its only live region: muted or Ink Black "Saving…", then "Saved"; a failed save shows its specific error in Rust Signal ending "Your change was undone." and the control returns to its saved value. The line is visually hidden while empty and keeps its place in the section: under the status line in a source panel, after Home in Travel, under the sentences in How you travel. Controls stay enabled while they save. There is no per-section Save button except Timezone and opened forms (category editor, iCloud credentials, Hevy key).
+- **Disconnect:** A source's Disconnect is a Rust Signal destructive text action, as in Connected apps. The first click replaces it in place with one line: the question ("Disconnect Hevy?"), a destructive **Disconnect** and a secondary **Cancel**, wrapping at 390 px; no modal (`SettingsDisconnect`). It follows the inline confirm line of Completion places.
 - **Trust and legal:** The end of the page carries one line of Privacy, Terms and Trust secondary text links (44px targets), above Delete account. There is no Trust and legal section; `TrustAndLegalPanel` remains only for the bench and legal-content tests.
 - **Account deletion:** Delete account is a plain secondary text disclosure at the very end of the page (`#delete-account`), after the legal links, so only someone looking for it finds it. It opens the existing flat single-column form unchanged: export reminder copy, a checkbox acknowledgement, typed confirmation, and a Rust Signal destructive text action, with no internal horizontal rules. The form drops its own heading there because the disclosure names it. This is the only destructive account action in the public-launch web app baseline.
 - **Export entry:** Account and data has one Export section: "Download your history as JSONL, CSV, full JSON, or a BehaviorLog bundle." with a primary **Open Export** text action.
@@ -646,7 +648,7 @@ No new tokens, icon sets, cards, or modals. Outlook reuses the shared
 `CalendarSelector` field and the Google button vocabulary. Hevy uses one labeled
 password-type field that clears on submit. iCloud uses labeled email/password fields that clear on submission, a broader
 credential-custody disclosure, and the same CalendarSelector. Reconnect states
-retain a Disconnect action. Desktop local mode shows each source as requiring a linked account.
+retain a Disconnect action. Disconnect asks first on one inline line (Ticket 303). Desktop local mode shows each source as requiring a linked account.
 Disconnect and account deletion copy name the provider-side removal step and
 never claim Cadence revoked provider access.
 

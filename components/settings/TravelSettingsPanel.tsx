@@ -15,6 +15,8 @@ import { readWebDeviceNotifications, webLeaveReminderClient, type LeaveReminderC
 import { LeaveReminderSetting } from "./LeaveReminderSetting";
 import { HomeCurrentLocation } from "./HomeCurrentLocation";
 import { webHomeLookupClient, type HomeLookupClient } from "@/lib/ui/home-lookup";
+import { DesktopDraftGuard } from "@/lib/desktop-draft";
+import { SETTINGS_SAVED, SettingsResultLine, SettingsResultScope, settingsSaveFailed, useSerialSaves, useSettingsResult } from "./settings-result";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -23,9 +25,16 @@ const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "driving", label: "Driving" },
 ];
 
+/** What one Travel save changes. Fields left out keep their saved value. */
+type TravelChange = Readonly<{ enabled?: boolean; baseLocationText?: string | null; mode?: TravelMode | null }>;
+
+const RELOAD_HINT = "Try again, or reload Settings if another device changed it.";
+
 /**
  * Ticket 215: three inputs. The toggle records routing consent and asks for
- * foreground location in the same click; Home and usual travel save together.
+ * foreground location in the same click. Ticket 303: each input saves on its own,
+ * usual travel when it changes and Home on blur or Enter, and the section shows one
+ * result line.
  */
 export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false,
   leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "", homeLookupClient = webHomeLookupClient }: Readonly<{
@@ -44,11 +53,14 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   desktop?: boolean;
 }>) {
   const id = useId();
+  const result = useSettingsResult(true);
+  const reportResult = result.report;
+  /** The last saved settings. The controls below show drafts until each save answers. */
   const [settings, setSettings] = useState<TravelSettings | null>(null);
+  const [enabled, setEnabled] = useState(false);
   const [home, setHome] = useState("");
   const [mode, setMode] = useState<TravelMode | "">("");
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(0);
   const [location, setLocation] = useState<ForegroundLocation["state"] | null>(null);
   const [locating, setLocating] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -60,6 +72,15 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   useReportSettingsSection(travelSectionState(settingsSectionLoad(settings, loadFailed)));
   const locationSequence = useRef(0);
   const permissionSequence = useRef(0);
+  const saved = useRef<TravelSettings | null>(null);
+  /** Home as last sent or saved, so blur after Enter does not save twice. */
+  const requestedHome = useRef<string | null>(null);
+  /** The toggle's own location check: "Checking device location…", then its outcome. */
+  const locationNote = useRef<string | null>(null);
+  /** True while the toggle's save runs: its "Saved" line then carries the location outcome, announced once. */
+  const toggleSaving = useRef(false);
+  const homeInput = useRef<HTMLInputElement>(null);
+  const enqueue = useSerialSaves();
   const refreshPermission = () => {
     const current = ++permissionSequence.current;
     void queryDeviceLocationPermission(readPermission).then((value) => {
@@ -67,8 +88,11 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     });
   };
   const adopt = (value: TravelSettings) => {
-    setSettings(value); setHome(value.baseLocationText ?? ""); setMode(value.mode ?? "");
+    saved.current = value; requestedHome.current = value.baseLocationText;
+    setSettings(value); setEnabled(value.enabled); setHome(value.baseLocationText ?? ""); setMode(value.mode ?? "");
   };
+  /** Travel habits save their own revision; the next Travel save starts from what they returned. */
+  const adoptHabits = (value: TravelSettings) => { saved.current = value; setSettings(value); };
   useEffect(() => {
     refreshPermission();
     // Mount-only query; later queries follow each save. Cleanup invalidates pending results.
@@ -80,48 +104,97 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     const current = ++sequence.current;
     void client.load().then((value) => {
       if (current === sequence.current) { setLoadFailed(false); adopt(value); }
-    }).catch(() => { if (current === sequence.current) { setLoadFailed(true); setMessage("Travel settings could not load."); } });
+    }).catch(() => { if (current === sequence.current) { setLoadFailed(true); reportResult({ text: "Travel settings could not load. Reload Settings to try again.", error: true }); } });
     // The cleanup deliberately invalidates every pending load/save/location result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => { sequence.current++; };
-  }, [client]);
-  const save = async (enabled: boolean) => {
-    if (!settings) return;
+  }, [client, reportResult]);
+  /** Saves one change on top of the latest saved settings. A failure puts that control back. */
+  const persist = (change: TravelChange, failure: string, withLocation = false) => {
+    const current = sequence.current;
+    result.saving(); setSaving((count) => count + 1);
+    enqueue(async () => {
+      const base = saved.current;
+      if (!base || current !== sequence.current) { if (withLocation) toggleSaving.current = false; setSaving((count) => count - 1); return; }
+      const nextEnabled = change.enabled ?? base.enabled;
+      try {
+        // The map-app preference is no longer shown; the stored value passes through unchanged.
+        const next = await client.save({ enabled: nextEnabled,
+          baseLocationText: change.baseLocationText !== undefined ? change.baseLocationText : base.baseLocationText,
+          mode: change.mode !== undefined ? change.mode : base.mode,
+          navigationPreference: base.navigationPreference, expectedUpdatedAt: base.updatedAt, acceptRoutingDisclosure: nextEnabled });
+        if (current !== sequence.current) return;
+        saved.current = next; setSettings(next);
+        if (change.enabled !== undefined) setEnabled(next.enabled);
+        if (change.mode !== undefined) setMode(next.mode ?? "");
+        // Keep typing that started after this save; otherwise show the saved form of Home.
+        if (change.baseLocationText !== undefined && requestedHome.current === change.baseLocationText) {
+          requestedHome.current = next.baseLocationText; setHome(next.baseLocationText ?? "");
+        }
+        // Turning estimates on also checks location; one line carries both outcomes.
+        const note = withLocation ? locationNote.current : null;
+        result.saved(note ? `${SETTINGS_SAVED}. ${note}` : SETTINGS_SAVED);
+        // Ticket 274: travel turned off removes today's leave-time candidates, even with no Timeline open.
+        if (!next.enabled) clearTravelLeaveMemory();
+        notifyTravelSettingsChanged();
+      } catch {
+        if (current !== sequence.current) return;
+        const back = saved.current ?? base;
+        if (change.enabled !== undefined) setEnabled(back.enabled);
+        if (change.mode !== undefined) setMode(back.mode ?? "");
+        if (change.baseLocationText !== undefined) { requestedHome.current = back.baseLocationText; setHome(back.baseLocationText ?? ""); }
+        result.failed(settingsSaveFailed(failure));
+      } finally {
+        if (withLocation) toggleSaving.current = false;
+        setSaving((count) => count - 1);
+        if (current === sequence.current) refreshPermission();
+      }
+    });
+  };
+  const toggle = (next: boolean) => {
+    if (!saved.current) return;
     // Ask for location inside the click, before any await, so the browser keeps the user gesture.
-    if (enabled && !settings.enabled) void locate();
-    const current = ++sequence.current;
-    setPending(true); setMessage("");
-    try {
-      // The map-app preference is no longer shown; the stored value passes through unchanged.
-      const saved = await client.save({ enabled, baseLocationText: home.trim() || null, mode: mode || null,
-        navigationPreference: settings.navigationPreference, expectedUpdatedAt: settings.updatedAt,
-        acceptRoutingDisclosure: enabled });
-      if (current !== sequence.current) return;
-      adopt(saved);
-      setMessage("Travel settings saved.");
-      // Ticket 274: travel turned off removes today's leave-time candidates, even with no Timeline open.
-      if (!saved.enabled) clearTravelLeaveMemory();
-      notifyTravelSettingsChanged();
-    } catch { if (current === sequence.current) setMessage("Travel settings could not save. Reload settings if another device changed them."); }
-    finally { if (current === sequence.current) { setPending(false); refreshPermission(); } }
+    const withLocation = next && !saved.current.enabled;
+    if (withLocation) { toggleSaving.current = true; void locate(); }
+    setEnabled(next);
+    persist({ enabled: next }, `Travel estimates could not turn ${next ? "on" : "off"}. ${RELOAD_HINT}`, withLocation);
+  };
+  const chooseMode = (next: TravelMode | "") => {
+    setMode(next);
+    persist({ mode: next || null }, `Usual travel could not save. ${RELOAD_HINT}`);
+  };
+  const commitHome = () => {
+    if (!saved.current) return;
+    const next = home.trim() || null;
+    if (next === requestedHome.current) return;
+    requestedHome.current = next;
+    persist({ baseLocationText: next }, `Home could not save. ${RELOAD_HINT}`);
   };
   const locate = async () => {
     const current = ++locationSequence.current;
     let request: Promise<ForegroundLocation>;
     try { request = readLocation(true); } catch { request = Promise.resolve({ state: "unavailable" }); }
     setLocating(true);
+    locationNote.current = "Checking device location…";
+    if (!toggleSaving.current) result.info(locationNote.current);
+    const answer = (state: ForegroundLocation["state"], reason: string | null) => {
+      setLocation(state); setLocationReason(reason);
+      locationNote.current = locationResultText(state, reason);
+      if (!toggleSaving.current) result.info(locationNote.current);
+    };
     try {
-      const result = await request;
-      if (current === locationSequence.current) { setLocation(result.state); setLocationReason("reason" in result && result.reason ? result.reason : null); }
-    } catch { if (current === locationSequence.current) { setLocation("unavailable"); setLocationReason(null); } }
-    finally { if (current === locationSequence.current) { setLocating(false); refreshPermission(); } }
+      const value = await request;
+      if (current === locationSequence.current) answer(value.state, "reason" in value && value.reason ? value.reason : null);
+    } catch {
+      if (current === locationSequence.current) answer("unavailable", null);
+    } finally { if (current === locationSequence.current) { setLocating(false); refreshPermission(); } }
   };
   const retry = async () => {
     setRetrying(true);
     try { await locate(); } finally { setRetrying(false); }
   };
   const openSettings = async () => {
-    try { await openLocationSettings?.(); } catch { setMessage("System Settings could not open. Open it from the Apple menu."); }
+    try { await openLocationSettings?.(); } catch { result.failed("System Settings could not open. Open it from the Apple menu."); }
   };
   // Ticket 165: macOS may not show its prompt, so travel that is on explains the manual path.
   // The toggle's own first request hides this until it answers; a retry keeps it in place.
@@ -131,43 +204,52 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     && (permission === "not yet allowed" || locationDenied || locationTimedOut);
   const permissionHint = permission && !locationHelp ? deviceLocationHint(permission, desktop) : null;
   const readWebNotifications = useCallback(() => readWebDeviceNotifications(vapidPublicKey), [vapidPublicKey]);
-  const changed = settings ? (home.trim() || null) !== settings.baseLocationText || (mode || null) !== settings.mode : false;
+  const homeDirty = settings ? (home.trim() || null) !== settings.baseLocationText : false;
   return <SettingsPanel id="travel" title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
     <div className="grid max-w-2xl gap-4 text-sm leading-6">
-      {settings ? <fieldset disabled={pending} className="grid min-w-0 gap-4">
-        <div className="grid gap-1">
-          <label className="flex min-h-11 items-center gap-2 font-bold"><input type="checkbox" checked={settings.enabled}
-            disabled={!settings.enabled && !mode} aria-describedby={`${id}-disclosure`}
-            onChange={(event) => { void save(event.target.checked); }} />Travel estimates</label>
-          <p id={`${id}-disclosure`} className="text-muted-readable">While this is on, Cadence sends trip start and end points, your usual travel and times to Google Maps as you use the app. Trip points can be your current position, Home, Behavior places and Calendar event locations. Google processes requests under its own terms. Turning this on asks for device location.</p>
-          {!settings.enabled && !mode ? <p className="text-muted-readable">Choose your usual travel to turn on estimates.</p> : null}
-        </div>
-        <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><HomeCurrentLocation client={homeLookupClient} travelOn={settings.enabled && Boolean(settings.routingConsentAt)} readLocation={readLocation}
-          onAddress={(address) => setHome(address.slice(0, 500))} onLocationRead={refreshPermission}><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 flex-1 basis-64 border-0 border-b border-line bg-background" autoComplete="off" /></HomeCurrentLocation><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
-        <div className="grid gap-1 sm:max-w-xs"><label htmlFor={`${id}-mode`}>Usual travel</label><select id={`${id}-mode`} value={mode} onChange={(event) => setMode(event.target.value as TravelMode | "")} className="min-h-11 min-w-0 border-0 border-b border-line bg-background">{mode ? null : <option value="">Choose</option>}{TRAVEL_MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
-        <button type="button" onClick={() => { void save(settings.enabled); }} disabled={!changed} className="product-action product-action-primary min-h-11 w-fit">{pending ? "Saving…" : "Save travel settings"}</button>
-        <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
-        {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked account, a synchronized working copy and an internet connection.</p> : null}
-        {permission ? <p className="text-muted-readable">Device location: {permission}.{permissionHint ? ` ${permissionHint}` : ""}</p> : null}
-        {locationHelp ? <div className="grid gap-2">
-          <p className="text-muted-readable">{deviceLocationGuidance(permission, locationDenied, desktop)}</p>
-          <p className="text-muted-readable">Saved places and Calendar trips keep working without device location.</p>
-          <div className="flex flex-wrap gap-2">
-            {desktop && openLocationSettings ? <button type="button" onClick={() => { void openSettings(); }} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Open Location Services</button> : null}
-            <button type="button" onClick={() => { void retry(); }} disabled={locating} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Check again</button>
+      <DesktopDraftGuard dirty={homeDirty} pending={saving > 0} onDiscard={() => setHome(saved.current?.baseLocationText ?? "")} />
+      <SettingsResultScope channel={result}>
+        {settings ? <div className="grid min-w-0 gap-4">
+          {/* Usual travel comes first: Travel estimates needs it. */}
+          <div className="grid gap-1 sm:max-w-xs"><label htmlFor={`${id}-mode`}>Usual travel</label><select id={`${id}-mode`} value={mode} onChange={(event) => chooseMode(event.target.value as TravelMode | "")} className="min-h-11 min-w-0 border-0 border-b border-line bg-background">{mode ? null : <option value="">Choose</option>}{TRAVEL_MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+          <div className="grid gap-1">
+            <label className="flex min-h-11 items-center gap-2 font-bold"><input type="checkbox" checked={enabled}
+              disabled={!enabled && !mode} aria-describedby={`${id}-disclosure`}
+              onChange={(event) => toggle(event.target.checked)} />Travel estimates</label>
+            <p id={`${id}-disclosure`} className="text-muted-readable">While this is on, Cadence sends trip start and end points, your usual travel and times to Google Maps as you use the app. Trip points can be your current position, Home, Behavior places and Calendar event locations. Google processes requests under its own terms. Turning this on asks for device location.</p>
+            {!enabled && !mode ? <p className="text-muted-readable">Choose your usual travel to turn on estimates.</p> : null}
           </div>
-        </div> : null}
-      </fieldset> : <p>Loading travel settings…</p>}
-      {locating ? <p role="status">Checking device location…</p> : location ? <p role="status">{location === "available" ? "A current position is available. Cadence did not save it." : `Location ${location}. Estimates start from Home or your previous stop instead.${locationReason && (location === "unavailable" || location === "denied") ? ` Diagnostic: ${locationReason}.` : ""}`}</p> : null}
-      {message ? <p role="status">{message}</p> : null}
-      {settings && client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={setSettings}>
-        {leaveReminderClient ? <LeaveReminderSetting client={leaveReminderClient} readDeviceNotifications={readDeviceNotifications ?? readWebNotifications}
-          homeSaved={Boolean(settings.baseLocationText)} travelEnabled={settings.enabled} desktop={desktop} /> : null}
-      </TravelHabitsSection> : null}
-      {/* Ticket 216: rendered only inside a PlaceLabelProvider. */}
-      <CompletionPlacesSection />
+          <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><HomeCurrentLocation client={homeLookupClient} travelOn={settings.enabled && Boolean(settings.routingConsentAt)} readLocation={readLocation}
+            onAddress={(address) => { setHome(address.slice(0, 500)); homeInput.current?.focus(); }} onLocationRead={refreshPermission}><input ref={homeInput} id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)}
+              onBlur={commitHome} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitHome(); } }}
+              className="min-h-11 min-w-0 flex-1 basis-64 border-0 border-b border-line bg-background" autoComplete="off" /></HomeCurrentLocation><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
+          <SettingsResultLine channel={result} />
+          <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
+          {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked account, a synchronized working copy and an internet connection.</p> : null}
+          {permission ? <p className="text-muted-readable">Device location: {permission}.{permissionHint ? ` ${permissionHint}` : ""}</p> : null}
+          {locationHelp ? <div className="grid gap-2">
+            <p className="text-muted-readable">{deviceLocationGuidance(permission, locationDenied, desktop)}</p>
+            <p className="text-muted-readable">Saved places and Calendar trips keep working without device location.</p>
+            <div className="flex flex-wrap gap-2">
+              {desktop && openLocationSettings ? <button type="button" onClick={() => { void openSettings(); }} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Open Location Services</button> : null}
+              <button type="button" onClick={() => { void retry(); }} disabled={locating} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Check again</button>
+            </div>
+          </div> : null}
+        </div> : <>{loadFailed ? null : <p>Loading travel settings…</p>}<SettingsResultLine channel={result} /></>}
+        {settings && client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={adoptHabits}>
+          {leaveReminderClient ? <LeaveReminderSetting client={leaveReminderClient} readDeviceNotifications={readDeviceNotifications ?? readWebNotifications}
+            homeSaved={Boolean(settings.baseLocationText)} travelEnabled={settings.enabled} desktop={desktop} /> : null}
+        </TravelHabitsSection> : null}
+        {/* Ticket 216: rendered only inside a PlaceLabelProvider. */}
+        <CompletionPlacesSection />
+      </SettingsResultScope>
     </div>
   </SettingsPanel>;
+}
+
+function locationResultText(state: ForegroundLocation["state"], reason: string | null): string {
+  if (state === "available") return "A current position is available. Cadence did not save it.";
+  return `Location ${state}. Estimates start from Home or your previous stop instead.${reason && (state === "unavailable" || state === "denied") ? ` Diagnostic: ${reason}.` : ""}`;
 }
 
 type DeviceLocationPermission = "allowed" | "not yet allowed" | "blocked";

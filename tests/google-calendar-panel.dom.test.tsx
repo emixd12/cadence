@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExternalEventSnapshotV1 } from "@cadence/core/types/external-event";
 
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
+import { SETTINGS_SAVED, SETTINGS_SAVING, SETTINGS_UNDONE } from "@/components/settings/settings-result";
 import type { CalendarConnectionView, CalendarListEntry, CalendarPreferences } from "@/lib/types/google-calendar";
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 
@@ -44,6 +45,10 @@ function button(label: string) {
   const element = [...container.querySelectorAll("button")].find((node) => node.textContent?.trim() === label);
   if (!element) throw new Error(`Missing button: ${label}`);
   return element;
+}
+
+function statusLines(): string[] {
+  return [...container.querySelectorAll('[role="status"]')].map((node) => node.textContent ?? "").filter(Boolean);
 }
 
 function connection(preferences: CalendarPreferences = defaults()): CalendarConnectionView {
@@ -145,20 +150,50 @@ describe("GoogleCalendarPanel", () => {
     expect(container.textContent).not.toContain("Continue in the browser to connect Calendar.");
   });
 
-  it("saves global visibility and selected calendars through its coordinator", async () => {
+  it("saves each display and selection change as it happens, then reloads the list (Ticket 303)", async () => {
     const adapter = coordinator();
     await render(adapter);
+    expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save Calendar settings")).toBe(false);
 
-    await act(() => checkbox("Show Calendar context").click());
-    await act(() => checkbox("Visible on Timeline").click());
-    await act(() => checkbox("Visible on Timeline").click());
-    await act(() => checkbox("Personal").click());
-    await act(() => button("Save Calendar settings").click());
-
-    await vi.waitFor(() => expect(adapter.savePreferences).toHaveBeenCalledWith({
+    await act(async () => checkbox("Show Calendar context").click());
+    expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: false });
+    await act(async () => checkbox("Visible on Timeline").click());
+    expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: false, hiddenCalendarIds: ["work"] });
+    await act(async () => checkbox("Visible on Timeline").click());
+    await act(async () => checkbox("Personal").click());
+    expect(adapter.savePreferences).toHaveBeenLastCalledWith({
       selectedCalendarIds: ["work", "personal"], hiddenCalendarIds: [], visible: false, showAllDay: true,
-    }));
-    expect(container.textContent).toContain("Calendar preferences saved.");
+    });
+    expect(adapter.savePreferences).toHaveBeenCalledTimes(4);
+    expect(adapter.listCalendars).toHaveBeenCalledTimes(5);
+    expect(statusLines()).toEqual([SETTINGS_SAVED]);
+  });
+
+  it("shows Saving… and saves only the newest choice made while a save runs", async () => {
+    let finish!: () => void;
+    const adapter = coordinator();
+    vi.mocked(adapter.savePreferences).mockImplementationOnce((preferences) => new Promise((resolve) => { finish = () => resolve(connection(preferences)); }));
+    await render(adapter);
+    await act(async () => checkbox("Show Calendar context").click());
+    expect(statusLines()).toEqual([SETTINGS_SAVING]);
+    expect(checkbox("Show Calendar context").disabled).toBe(false);
+    await act(async () => checkbox("Show all-day events").click());
+    await act(async () => checkbox("Show Calendar context").click());
+    expect(adapter.savePreferences).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(); });
+    expect(adapter.savePreferences).toHaveBeenCalledTimes(2);
+    expect(adapter.savePreferences).toHaveBeenLastCalledWith({ ...defaults(), visible: true, showAllDay: false });
+    expect(checkbox("Show all-day events").checked).toBe(false);
+    expect(statusLines()).toEqual([SETTINGS_SAVED]);
+  });
+
+  it("puts a choice back to its saved value when the save fails, and says so", async () => {
+    const adapter = coordinator({ savePreferences: vi.fn(async () => { throw new Error("private provider detail"); }) });
+    await render(adapter);
+    await act(async () => checkbox("Personal").click());
+    expect(checkbox("Personal").checked).toBe(false);
+    expect(statusLines()).toEqual([`Calendar settings could not save. Try again. ${SETTINGS_UNDONE}`]);
+    expect(container.textContent).not.toContain("private provider detail");
   });
 
   it("refreshes the supplied inclusive range and disconnects with the cross-device explanation", async () => {
@@ -173,8 +208,25 @@ describe("GoogleCalendarPanel", () => {
     expect(container.textContent).toContain("No Calendar events in this range. Calendar current.");
 
     await act(() => button("Disconnect Google Calendar").click());
+    expect(adapter.disconnect).not.toHaveBeenCalled();
+    await act(() => button("Disconnect").click());
     await vi.waitFor(() => expect(adapter.disconnect).toHaveBeenCalledOnce());
     expect(container.textContent).toContain("Other devices stop refreshing after they receive this account change.");
+  });
+
+  it("asks before disconnecting, in the destructive style, and Cancel keeps the connection", async () => {
+    const adapter = coordinator();
+    await render(adapter);
+    const trigger = button("Disconnect Google Calendar");
+    expect(trigger.className).toContain("product-action-danger");
+    await act(() => trigger.click());
+    const question = container.querySelector('[role="group"][aria-label="Disconnect Google Calendar"]')!;
+    expect(question.textContent).toContain("Disconnect Google Calendar?");
+    expect(button("Disconnect").className).toContain("product-action-danger");
+    expect(document.activeElement).toBe(button("Cancel"));
+    await act(() => button("Cancel").click());
+    expect(adapter.disconnect).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(button("Disconnect Google Calendar"));
   });
 
   it("keeps selection compact and drafts intact across searching, hiding, and Escape", async () => {
@@ -191,25 +243,25 @@ describe("GoogleCalendarPanel", () => {
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(container.querySelector('input[aria-label="Visible on Timeline: Work"]')).toBeNull();
-    await act(() => checkbox("Personal").click());
+    await act(async () => checkbox("Personal").click());
     expect(summary.textContent).toContain("WorkPersonal");
-    expect(adapter.savePreferences).not.toHaveBeenCalled();
+    expect(adapter.savePreferences).toHaveBeenCalledWith({ ...defaults(), selectedCalendarIds: ["work", "personal"] });
+    // The list reload after a save keeps the search and the open field.
+    expect(search.value).toBe("PERSONAL");
+    expect(details.open).toBe(true);
     await act(() => search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(details.open).toBe(false);
     expect(document.activeElement).toBe(summary);
-    await act(() => button("Save Calendar settings").click());
-    expect(adapter.savePreferences).toHaveBeenCalledWith({ ...defaults(), selectedCalendarIds: ["work", "personal"] });
   });
 
-  it("reloads discovery without saved calendars and preserves unsaved selections", async () => {
+  it("reloads discovery without saved calendars", async () => {
     const adapter = coordinator({ getConnection: vi.fn(async () => connection({ ...defaults(), selectedCalendarIds: [] })) });
     await render(adapter);
-    await act(() => checkbox("Personal").click());
     await act(() => button("Refresh Calendar").click());
     expect(adapter.listCalendars).toHaveBeenCalledTimes(2);
     expect(adapter.refreshEvents).not.toHaveBeenCalled();
-    expect(checkbox("Personal").checked).toBe(true);
-    expect(container.textContent).toContain("Calendar list refreshed.");
+    expect(checkbox("Personal").checked).toBe(false);
+    expect(container.textContent).toContain("Calendar list refreshed. Select calendars to show events.");
   });
 
   it("retains selections and reports discovery failures, including after a successful save", async () => {
@@ -220,8 +272,8 @@ describe("GoogleCalendarPanel", () => {
     expect(checkbox("Work").checked).toBe(true);
     expect(adapter.refreshEvents).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Calendar refresh did not finish.");
-    await act(() => button("Save Calendar settings").click());
-    expect(container.textContent).toContain("Calendar preferences saved. Calendar list could not reload");
+    await act(async () => checkbox("Show all-day events").click());
+    expect(container.textContent).toContain("Saved. The calendar list could not reload; try Refresh Calendar.");
     expect(container.textContent).not.toContain("private provider detail");
   });
 
