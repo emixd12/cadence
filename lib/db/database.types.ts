@@ -301,6 +301,53 @@ export type Database = {
           },
         ]
       }
+      behavior_source_links: {
+        Row: {
+          account_digest: string
+          behavior_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          selector_keys: string[]
+          selector_kind: string
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_digest?: string
+          behavior_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          selector_keys?: string[]
+          selector_kind: string
+          source: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          account_digest?: string
+          behavior_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          selector_keys?: string[]
+          selector_kind?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_source_links_behavior_fk"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       behaviorlog_import_record_mappings: {
         Row: {
           created_at: string
@@ -593,6 +640,47 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      connector_completion_state: {
+        Row: {
+          check_count: number
+          check_count_date: string | null
+          consecutive_failures: number
+          last_attempted_at: string | null
+          last_reconciled_at: string | null
+          next_check_at: string | null
+          read_cursor: string | null
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          check_count?: number
+          check_count_date?: string | null
+          consecutive_failures?: number
+          last_attempted_at?: string | null
+          last_reconciled_at?: string | null
+          next_check_at?: string | null
+          read_cursor?: string | null
+          source: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          check_count?: number
+          check_count_date?: string | null
+          consecutive_failures?: number
+          last_attempted_at?: string | null
+          last_reconciled_at?: string | null
+          next_check_at?: string | null
+          read_cursor?: string | null
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+
         ]
       }
       connector_connections: {
@@ -1045,6 +1133,84 @@ export type Database = {
             columns: ["user_id", "behavior_id"]
             isOneToOne: false
             referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      occurrence_source_matches: {
+        Row: {
+          activity_end_at: string
+          activity_ref: string
+          activity_revision: string | null
+          activity_start_at: string
+          applied_event_id: string | null
+          behavior_id: string
+          created_at: string
+          id: string
+          link_id: string | null
+          occurrence_id: string
+          reverted_event_id: string | null
+          role: string
+          scheduled_end_at: string | null
+          scheduled_start_at: string
+          source: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_end_at: string
+          activity_ref: string
+          activity_revision?: string | null
+          activity_start_at: string
+          applied_event_id?: string | null
+          behavior_id: string
+          created_at?: string
+          id?: string
+          link_id?: string | null
+          occurrence_id: string
+          reverted_event_id?: string | null
+          role: string
+          scheduled_end_at?: string | null
+          scheduled_start_at: string
+          source: string
+          state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_end_at?: string
+          activity_ref?: string
+          activity_revision?: string | null
+          activity_start_at?: string
+          applied_event_id?: string | null
+          behavior_id?: string
+          created_at?: string
+          id?: string
+          link_id?: string | null
+          occurrence_id?: string
+          reverted_event_id?: string | null
+          role?: string
+          scheduled_end_at?: string | null
+          scheduled_start_at?: string
+          source?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "occurrence_source_matches_occurrence_fk"
+            columns: ["user_id", "occurrence_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "occurrences"
+            referencedColumns: ["user_id", "id", "behavior_id"]
+          },
+          {
+            foreignKeyName: "occurrence_source_matches_link_fk"
+            columns: ["user_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "behavior_source_links"
             referencedColumns: ["user_id", "id"]
           },
         ]
@@ -1841,6 +2007,19 @@ export type Database = {
         Args: { restore_payload: Json }
         Returns: Json
       }
+      apply_connector_completion: {
+        Args: {
+          p_activity_end_at: string
+          p_activity_ref: string
+          p_activity_revision: string | null
+          p_activity_start_at: string
+          p_expected_latest_event_id: string | null
+          p_link_id: string
+          p_occurrence_id: string
+          p_recorded_at: string
+        }
+        Returns: Json
+      }
       apply_occurrence_generation_plan: {
         Args: {
           expected_configuration_event_id: string
@@ -1883,6 +2062,18 @@ export type Database = {
           behavior_id: string
           user_id: string
         }[]
+      }
+      attach_source_activity: {
+        Args: {
+          p_activity_end_at: string
+          p_activity_ref: string
+          p_activity_revision: string | null
+          p_activity_start_at: string
+          p_link_id: string
+          p_occurrence_id: string
+          p_recorded_at: string
+        }
+        Returns: Json
       }
       begin_daily_brief: {
         Args: {
@@ -2404,6 +2595,13 @@ export type Database = {
       release_advisor_day_context_read: {
         Args: { p_client_id: string; p_lease_token: string }
         Returns: boolean
+      }
+      remove_source_match: {
+        Args: {
+          p_match_id: string
+          p_recorded_at: string
+        }
+        Returns: Json
       }
       reserve_travel_provider_spend: {
         Args: { requested_microdollars: number }

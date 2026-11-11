@@ -25,6 +25,12 @@ export const leaveReminderProcessAuthFailureLimiter = new InMemoryRateLimiter({
   windowMs: AUTH_FAILURE_WINDOW_MS,
 });
 
+/** Ticket 321: the connector completion job's cron route. */
+export const connectorCompletionProcessAuthFailureLimiter = new InMemoryRateLimiter({
+  maxAttempts: AUTH_FAILURE_LIMIT,
+  windowMs: AUTH_FAILURE_WINDOW_MS,
+});
+
 /** Ticket 307: the one-off Daily Brief Calendar grant retirement route. */
 export const agentCalendarRetirementAuthFailureLimiter = new InMemoryRateLimiter({
   maxAttempts: AUTH_FAILURE_LIMIT,
@@ -43,6 +49,7 @@ export function resetAuthFailureRateLimitersForTests(): void {
   reminderProcessAuthFailureLimiter.clear();
   occurrenceSyncAuthFailureLimiter.clear();
   leaveReminderProcessAuthFailureLimiter.clear();
+  connectorCompletionProcessAuthFailureLimiter.clear();
   agentCalendarRetirementAuthFailureLimiter.clear();
 }
 

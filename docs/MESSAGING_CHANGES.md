@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-043` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-044` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -111,6 +111,7 @@ Status values:
 | [P-040](#p-040-hevy-routine-titles-shown-in-the-link-form) | Hevy routine titles shown in the link form | logged | 310, 315, 317 | Privacy, in-app copy, user guide |
 | [P-041](#p-041-hevy-is-read-in-the-background-over-30-days) | Hevy is read in the background, over 30 days | logged | 310, 316, 321 | Privacy, in-app copy, user guide |
 | [P-042](#p-042-marketing-claim-log-a-workout-once) | Marketing claim: log a workout once | logged | 310, 323 | Marketing |
+| [P-043](#p-043-connector-completion-in-app-copy) | Connector completion in-app copy | logged | 317, 318 | In-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1114,6 +1115,7 @@ cite has not changed.
   ChatGPT plan option.
 - **Update needed:** after release, add "Use your ChatGPT plan" for Cadence for Mac, naming it
   Mac only and following OpenAI's brand guidelines. No claim before release.
+
 ## P-033: Settings groups, Trust links, Delete account link and auto-save
 
 - **Change:** decided November 10, 2026 (`docs/DECISIONS.md`); not implemented. Settings
@@ -1405,4 +1407,24 @@ cite has not changed.
   automatically complete a Behavior or prove free time."
 - **Update needed:** after release, describe linking a Behavior to Hevy. State that Hevy
   Pro is required and that the link is opt-in for each Behavior. No claim before release.
+- **Status:** logged.
+
+## P-043: Connector completion in-app copy
+
+- **Change:** Tickets 317 and 318 add in-app text, shown only while
+  `CADENCE_CONNECTOR_COMPLETION` is on: the "Complete from Hevy" section ("A matching
+  workout marks this Behavior Completed on the workout's day. It never changes a status
+  you set, and each completion is labeled “From Hevy”."), its refusal and save messages,
+  the Timeline line "From Hevy" or "From Hevy · 2 workouts", "Workout in Hevy", the Hevy
+  panel's "Last checked for completed Behaviors …", and the Behaviors review line "On
+  schedule 6 of 9. Usually 40 min later."
+- **Affected:** Tickets 317 and 318. Files: `components/behaviors/SourceLinkSettings.tsx`,
+  `components/timeline/OccurrenceRow.tsx`, `components/settings/HevyPanel.tsx`,
+  `packages/core/src/resolvers/analytics.resolver.ts`,
+  `packages/core/src/services/timeline-source-evidence.ts`.
+- **Surfaces:** in-app copy, user guide.
+- **Conflicting current text:** the Hevy panel description still ends "A workout never
+  completes a Behavior." (P-038). It is accurate while the flag is off.
+- **Update needed:** review the new strings in the messaging track before Ticket 323
+  turns the flag on, together with P-038, and add the user-guide steps.
 - **Status:** logged.

@@ -185,6 +185,24 @@ Tauri-origin rules, and expose no provider write.
 Routes call provider services; services own credentials, provider I/O, and
 validation. Settings remains the only connector UI location.
 
+## Connector completion routes (Tickets 316 and 321, D28)
+
+Source-neutral routes for connector completion. They use the same caller
+authentication as the connector routes above (web cookie session or desktop bearer,
+same-origin writes, Tauri origins, no-store) and return stable codes only. Both do
+nothing while `CADENCE_CONNECTOR_COMPLETION` is not `on`: reconcile returns
+`status: "disabled"` without a provider call, and the link `PUT` returns
+`not_configured`.
+
+| Route | Methods | Ticket | Purpose |
+|---|---|---:|---|
+| `/api/connectors/completions/reconcile` | POST | 316 | Body exactly `{ source }`. One reconcile for the caller: server-side evidence read over today and the 30 prior local dates, at most 100 writes, five-minute throttle. Returns counts, stable codes and the last successful check time |
+| `/api/connectors/links?behaviorId=&source=` | GET, PUT | 316 | GET: the Behavior form's link state, with routine titles read live for the picker and never stored. PUT: body exactly `{ behaviorId, source, mode, selectorKeys }` with `mode` `off`, `any` or `routines`; refuses a routine already linked to another Behavior and a second any-workout link, naming the Behavior that holds it |
+
+Services: `lib/services/connector-completion.service.ts` and
+`lib/services/source-links.service.ts`. The completion-source port is
+`lib/services/completion-sources.ts`.
+
 ## In-app briefing boundary (Tickets 145–148)
 
 Current code still has disabled `GET /api/advisor/day-context`: 401 without a

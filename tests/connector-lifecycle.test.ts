@@ -391,7 +391,9 @@ describe("connector data stays out of tracking surfaces", () => {
   const disclosureFence = "supabase/migrations/20261019041000_daily_brief_connector_disclosure.sql";
   // Ticket 187 redefines the Daily Brief preference save and fence on the agent Calendar grant, keeping this connector fence.
   const agentCalendarFence = "supabase/migrations/20261022180000_separate_agent_calendar_grant.sql";
-  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence]);
+  // Ticket 314: the connector completion functions read connection status and account digest only.
+  const completionFence = "supabase/migrations/20261111140000_connector_completion.sql";
+  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence, completionFence]);
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);
@@ -407,6 +409,8 @@ describe("connector data stays out of tracking surfaces", () => {
     expect(fence).not.toMatch(/connector_(credentials|attempts)|sealed_|account_digest\s*[,=)]|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
     // The agent Calendar migration reads connector connections only through the Daily Brief fence, never their credentials.
     expect(readFileSync(agentCalendarFence, "utf8")).not.toMatch(/connector_(credentials|attempts)|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
+    // Connector completion reads connections only, never credentials, attempts or credential RPCs.
+    expect(readFileSync(completionFence, "utf8")).not.toMatch(/connector_(credentials|attempts|preferences)|sealed_|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
   });
   it("does not log from connector lifecycle modules", () => {
     for (const path of ["lib/services/connector-credentials.ts", "lib/services/connector-request.ts", "lib/db/connectors.repo.ts", "lib/types/connectors.ts"]) {

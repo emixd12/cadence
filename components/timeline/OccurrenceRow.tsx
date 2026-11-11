@@ -3,6 +3,7 @@
 import { useCallback, useId, useState, type ReactNode } from "react";
 import type { TimelineOccurrenceContext } from "@cadence/core/types/day-progress";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
+import { sourceEvidenceSummary } from "@cadence/core/services/timeline-source-evidence";
 
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
@@ -112,6 +113,11 @@ export function OccurrenceRow({
     : visibleOccurrence.showCollapsedStatusLabel
       ? "pr-36 sm:pr-40"
       : "pr-0";
+  // Tickets 317 and 319: "From Hevy" while the connector's event is the latest. Any
+  // status change the user makes in this row hides it at once.
+  const userChangedStatus = Boolean(optimisticStatus.pendingStatus || optimisticStatus.confirmedStatus);
+  const sourceLine = userChangedStatus ? null : sourceEvidenceSummary(occurrence.sourceEvidence, visibleOccurrence.status);
+  const sourceWorkouts = occurrence.sourceEvidence?.workouts ?? [];
   const titleActionBufferClass = optimisticView.showPrimaryStatusActions
     ? "pr-4 sm:pr-5"
     : "";
@@ -189,6 +195,9 @@ export function OccurrenceRow({
               >
                 {visibleOccurrence.title}
               </h3>
+              {sourceLine ? <p className={["timeline-occurrence-source col-start-2 min-w-0 text-xs font-normal leading-5", TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")} data-source-completion={occurrence.sourceEvidence?.source}>
+                {sourceLine}
+              </p> : null}
               {crowdedLine ? <p className="timeline-occurrence-crowded col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable group-open:hidden" data-next-trip-crowded>
                 {crowdedLine}
               </p> : null}
@@ -218,6 +227,17 @@ export function OccurrenceRow({
             </div> : null}
 
             {travelDetails}
+
+            {sourceWorkouts.length > 0 ? <div className="grid gap-1" data-source-workouts>
+              <h4 className="font-bold leading-5 text-foreground">
+                {sourceWorkouts.length === 1 ? `Workout in ${occurrence.sourceEvidence!.sourceLabel}` : `${sourceWorkouts.length} workouts in ${occurrence.sourceEvidence!.sourceLabel}`}
+              </h4>
+              <ul className="grid gap-0.5 leading-5">
+                {sourceWorkouts.map((workout) => <li key={`${workout.startAt}-${workout.endAt}`}>
+                  <time dateTime={workout.startAt}>{workout.label}</time>
+                </li>)}
+              </ul>
+            </div> : null}
 
             <TimeTracker
               occurrenceId={visibleOccurrence.id}

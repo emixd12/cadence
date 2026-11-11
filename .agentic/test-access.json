@@ -254,7 +254,7 @@
     {
       "id": "vault-hevy-a",
       "kind": "vault-item",
-      "summary": "Hevy test identity for A (its credential field holds the Hevy Pro API key). Decision 2026-11-07, item 2.",
+      "summary": "Hevy Pro key for Hevy testing: the owner's own account, vault item hevy-owner (credential field). Decision 2026-11-11.",
       "identity": "account-a",
       "suites": [
         "connectors"
@@ -268,11 +268,11 @@
           "node",
           "scripts/acceptance/access/vault.mjs",
           "--item",
-          "hevy-test-account-a"
+          "hevy-owner"
         ],
         "timeout_seconds": 90
       },
-      "owner_step": "Create the Hevy Pro test account and add the hevy-test-account-a item (its credential field holds the API key) to the Cadence Agents vault.",
+      "owner_step": "Add the hevy-owner item (API Credential; its credential field holds your Hevy Pro API key) to the Cadence Agents vault.",
       "freshness_seconds": 86400
     },
     {

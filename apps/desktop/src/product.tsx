@@ -354,6 +354,8 @@ export function Product() {
   const readLeaveReminderNotifications = useCallback(async () => nativeLeaveReminderNotifications(nativePermission), [nativePermission]);
   // Ticket 216: place labels live in SQLite; each change asks account sync to run.
   const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
+  // Ticket 319: a hosted connector completion reaches this Mac through account sync.
+  const requestConnectorSync = useCallback(() => setSyncRequest((previous) => previous + 1), []);
   const calendarRange = {
     startLocalDate: bundle?.timeline.timeline.todayLocalDate ?? "1970-01-01",
     endLocalDate: bundle?.timeline.timeline.daySections.at(-1)?.localDate ?? "1970-01-01",
@@ -370,6 +372,7 @@ export function Product() {
     accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
     todayLocalDate: calendarRange.startLocalDate, lastLocalDate: calendarRange.endLocalDate,
     enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
+    onConnectorWrites: requestConnectorSync,
   });
   const refreshGoogleStops = calendar.refresh;
   const refreshConnectorStops = connectors.refresh;

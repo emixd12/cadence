@@ -10633,7 +10633,6 @@ Execution requires each ticket's stated acceptance and applicable code/provider
 checks. Native/provider/Workspace coverage remains under Tickets 134–137;
 these follow-ups do not change their status or duplicate their test matrices.
 
-
 ## Ticket 142: Default Behavior duration
 
 Status: complete in source; web production deployed September 18, 2026.
@@ -11044,7 +11043,6 @@ Verification: all required repository checks, synthetic end-to-end and responsiv
 browser/accessibility QA, installed-desktop evidence, and separately authorized
 live-model acceptance. Synthetic success does not establish deployed/live status.
 
-
 ## Ticket 149: Calendar inspection polish and Timeline reload
 
 Status: complete in source (September 18, 2026). Required checks, responsive
@@ -11071,7 +11069,6 @@ Evidence and live/native limits: `docs/qa/calendar-inspection-refresh.md`.
 
 Use the existing interaction registry and design-system Timeline family for evidence.
 No schema, new connector, or provider permission change.
-
 
 ## Ticket 150: Calendar display names and compact selection
 
@@ -12782,8 +12779,6 @@ Platform impact:
 Verification: packet, proposal validation, disposition, same-case rerun, account rerun
 authorization and refusal tests; all required checks.
 
-
-
 ## Remaining Apple-trusted release work: Tickets 178–181
 
 Filed September 28, 2026. These tickets decompose Ticket 115; they add no product
@@ -13314,7 +13309,6 @@ Platform impact:
 Verification: review concrete examples and a lifecycle matrix covering concurrent
 devices, refresh, expiry, timezone change, disablement, revocation and deletion.
 Decision completion is not implementation, migration, deployment or release acceptance.
-
 
 ## Ticket 186: Rename Cadence project folder and GitHub repository
 
@@ -17998,7 +17992,7 @@ Verification: `npm run agents:check` and `npm run interactions:check`.
 
 ## Ticket 311: Live Hevy check for the read strategy
 
-Status: not started.
+Status: complete November 11, 2026 on the owner's own Hevy Pro account (`hevy-owner`, `docs/DECISIONS.md`, 2026-11-11). Strategy A, events cursor; results in `docs/qa/2026-11-hevy-change-feed.md`. Not observed: a `deleted` event and a routine rename or deletion, since the owner allowed additions only.
 Dependencies: Ticket 310.
 
 Goal: decide with live evidence how Cadence reads Hevy for matching.
@@ -18036,7 +18030,7 @@ Verification: the recorded live results and `npm run agents:check`.
 
 ## Ticket 312: Recorded-activity contract 1.1
 
-Status: not started.
+Status: complete November 10, 2026 (branch `claude/pr-206-tickets-c4834e`).
 Dependencies: Ticket 310.
 
 Goal: make the recorded-activity contract source-neutral and able to carry selector keys.
@@ -18070,7 +18064,7 @@ Verification: `npx vitest run tests/recorded-activity-contract.test.ts` and
 
 ## Ticket 313: Match resolver and connector status plan
 
-Status: not started.
+Status: complete November 10, 2026 (branch `claude/pr-206-tickets-c4834e`).
 Dependencies: Ticket 312.
 
 Goal: decide matches and plan connector status events in pure code.
@@ -18108,7 +18102,7 @@ Verification: `npm run resolvers:check`, `tests/activity-match.resolver.test.ts`
 
 ## Ticket 314: Connector completion tables and database functions
 
-Status: not started.
+Status: implemented November 10, 2026; hosted migration `20261111140000` applied November 11, 2026 under the standing approval for additive migrations (RLS and grants read back). A clean local stack replayed all 114 migrations and `tests/sql/ticket-314-connector-completion-smoke.sql` passed.
 Dependencies: Ticket 313.
 
 Goal: add the three tables and the only write path for connector completions.
@@ -18146,7 +18140,7 @@ Verification: `npm run supabase -- db reset`, the SQL smoke fixture and
 
 ## Ticket 315: Hevy adapter reads for matching
 
-Status: not started.
+Status: implemented November 10, 2026; on November 11 Ticket 311 chose strategy A, so `GET /v1/workouts/events` (page, `pageSize=10`, a UTC `since`; at most 20 pages) is on the allowlist and `readHevyMatchChanges` reads it. The full match read stays for a new cursor.
 Dependencies: Tickets 311 and 312.
 
 Goal: read what matching needs from Hevy and nothing more.
@@ -18179,7 +18173,7 @@ Verification: `tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts` and
 
 ## Ticket 316: Completion-source port, reconcile service and routes
 
-Status: not started.
+Status: implemented November 10, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`. November 11: reconcile reads changes since `connector_completion_state.read_cursor` (Ticket 311 strategy A). It reads in full when there is no cursor, the cursor is from another connection generation, a link changed after it, or the feed passes 20 pages. It stores the next cursor only after a run that deferred no writes.
 Dependencies: Tickets 314 and 315.
 
 Goal: run reconcile on request through one service.
@@ -18216,7 +18210,7 @@ Verification: `npm run resolvers:check`, `tests/connector-completion.service.tes
 
 ## Ticket 317: Web link form and completion label
 
-Status: not started.
+Status: implemented November 10, 2026 (web), off behind the flag. Links are edited on the web only.
 Dependencies: Ticket 316.
 
 Goal: let the user turn a link on and see what a connector completed.
@@ -18257,7 +18251,7 @@ at desktop width and 390 px, and `dagger check --progress=report`.
 
 ## Ticket 318: Timing statistics on Behaviors
 
-Status: not started.
+Status: implemented November 10, 2026 (web), off behind the flag.
 Dependencies: Ticket 317.
 
 Goal: show whether linked Behaviors happen when scheduled.
@@ -18289,7 +18283,7 @@ Verification: `npm run resolvers:check`, `tests/analytics.resolver.test.ts`,
 
 ## Ticket 319: Mac sync merge rule and label
 
-Status: not started.
+Status: implemented in source November 10, 2026. Not yet in a dev-signed or published Mac build; installed acceptance with a forced collision has not run.
 Dependencies: Ticket 313.
 
 Goal: keep Mac sync working when a connector and the user mark the same Occurrence.
@@ -18331,7 +18325,7 @@ build with one forced collision (`desktop-acceptance` skill) and
 
 ## Ticket 320: Sync links and matches to the Mac
 
-Status: not started. Not required for the first release.
+Status: not started. Not required for the first release. Deferred from the November 10, 2026 run: it needs account sync contract 5 (contract 4 carries day notes, Ticket 292), a SQLite migration, native store and sync-apply changes and installed acceptance.
 Dependencies: Tickets 314 and 319.
 
 Goal: show link state and workout timing on the Mac, offline.
@@ -18361,7 +18355,7 @@ build and `dagger check --progress=report`.
 
 ## Ticket 321: Background completion job
 
-Status: not started.
+Status: implemented November 10, 2026, off behind the flag. Migration `20261111150000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026, and it was applied on November 11. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. Vercel usage not measured; no local-stack job run.
 Dependencies: Ticket 316. The cadence depends on Ticket 311.
 
 Goal: complete Occurrences and cancel reminders without Cadence being opened.
@@ -18401,7 +18395,7 @@ seeded match and `dagger check --progress=report`.
 
 ## Ticket 322: Read surfaces for connector completions
 
-Status: not started.
+Status: complete November 10, 2026 (branch `claude/pr-206-tickets-c4834e`).
 Dependencies: Ticket 316.
 
 Goal: make connector provenance correct wherever status history is read.
@@ -18435,7 +18429,7 @@ Verification: export and completion-timing tests with a connector-completed fixt
 
 ## Ticket 323: Connector completion release acceptance
 
-Status: not started.
+Status: blocked. Needs Ticket 311's live result, Ticket 319 in a published Mac build with Ticket 319 (owner instruction), Ticket 241's release steps 6–7 and the hosted migrations.
 Dependencies: Tickets 311–319, 321 and 322; Ticket 241's release steps 6–7 and installed
 connector acceptance.
 

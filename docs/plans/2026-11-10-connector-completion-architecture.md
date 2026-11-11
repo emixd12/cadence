@@ -540,9 +540,9 @@ impact as `AGENTS.md` requires.
 **Files:**
 - Create: `docs/qa/2026-11-hevy-change-feed.md`
 
-**Decisions:** Run `npm run qa:preflight -- --suite connectors` first. Test account A's
-Hevy Pro key is the vault item `hevy-test-account-a`; the owner is asked only if the
-preflight lists it as missing. Use a local stack as on October 19. Read-only calls only, except creating, editing and
+**Decisions:** Run `npm run qa:preflight -- --suite connectors` first. The owner's own
+Hevy Pro key is the vault item `hevy-owner` (`docs/DECISIONS.md`, 2026-11-11); the owner
+is asked only if the preflight lists it as missing. Use a local stack as on October 19. Read-only calls only, except creating, editing and
 deleting test workouts in the Hevy app by hand. Answer:
 
 1. Does creating a workout emit an `updated` event in `/v1/workouts/events`?

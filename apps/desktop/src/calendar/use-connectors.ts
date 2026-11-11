@@ -37,6 +37,8 @@ export type DesktopConnectorsOptions = Readonly<{
   lastLocalDate: string;
   enabled: boolean;
   screen: "timeline" | "settings" | null;
+  /** Ticket 319: called when a hosted reconcile wrote anything, so account sync runs. */
+  onConnectorWrites?: () => void;
 }>;
 
 export type DesktopConnectorsResult = Readonly<{
@@ -58,6 +60,8 @@ const HEVY_EMPTY: HevyTimelineState = { state: "not_loaded", day: null, error: n
 
 export function useDesktopConnectors(options: DesktopConnectorsOptions): DesktopConnectorsResult {
   const { client, accountId, timezone, todayLocalDate, lastLocalDate, enabled, screen } = options;
+  const onConnectorWrites = useRef(options.onConnectorWrites);
+  useEffect(() => { onConnectorWrites.current = options.onConnectorWrites; }, [options.onConnectorWrites]);
   const cache = useMemo(() => new DesktopConnectorCache(), []);
   const outlookSnapshots = useMemo(() => new DesktopConnectorSnapshots<ExternalEventSnapshotV1_1>(outlookSourceRules(), cache), [cache]);
   const icloudSnapshots = useMemo(() => new DesktopConnectorSnapshots<ExternalEventSnapshotV1_1>(icloudSourceRules(), cache), [cache]);
@@ -233,6 +237,11 @@ export function useDesktopConnectors(options: DesktopConnectorsOptions): Desktop
         if (current()) setHevy({ state: "error", day: null, error: result.refreshError ?? "provider_unavailable" });
         return false;
       }
+      // Ticket 319: after the Hevy refresh, reconcile through the hosted broker, then sync
+      // when it wrote anything. A failure here never changes the Hevy line.
+      void Promise.resolve().then(() => broker.connectorReconcile("hevy")).then((reconcile) => {
+        if (reconcile.counts.completed + reconcile.counts.attached + reconcile.counts.removed > 0) onConnectorWrites.current?.();
+      }).catch(() => undefined);
       const projected = day(result.snapshot, Boolean(result.refreshError) && result.source === "cache");
       setHevy({ state: projected.state === "incomplete" ? "incomplete" : projected.state === "stale" ? (result.refreshError ? "error" : "stale") : projected.items.length ? "ready" : "empty",
         day: projected, error: result.refreshError });

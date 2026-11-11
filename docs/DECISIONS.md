@@ -577,7 +577,6 @@ mobile stay deferred. Ticket 132 validates layout and statistical defaults;
 Ticket 134 verifies provider capabilities and secure credential custody.
 This decision authorizes planning, not implementation or provider deployment.
 
-
 ## 2026-09-16: Day-progress UI accepted; external-event infrastructure next
 
 The owner explicitly closed the seventh-revision UI review and requested connector
@@ -683,7 +682,6 @@ mobile stays deferred. Preserve existing style and Timeline controls. The plan's
 once-per-local-day/install dismissal policy is an implementation default, not an
 additional explicit owner decision. Model-data disclosure, actual access, retention,
 provider requirements and live testing still need concrete implementation evidence.
-
 
 ## 2026-09-20: Ticket the internal briefing control surface
 
@@ -835,7 +833,6 @@ full account capture for the development workbench.
   review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
   are not implemented.
 
-
 ## 2026-09-30: Daily Brief evaluation criteria and versioned coverage profiles
 
 The owner supplied Ticket 184's evaluation criteria before reviewing candidate outputs.
@@ -858,7 +855,6 @@ The owner supplied Ticket 184's evaluation criteria before reviewing candidate o
 frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
 acceptance, promotion, deployment and stored-brief decisions remain separate.
 This is an evaluation direction; runtime policy and production presets are unchanged.
-
 
 ## 2026-10-08: Rename the repository to emixd12/cadence
 
@@ -1019,7 +1015,6 @@ still uses it only for read-only CalDAV `PROPFIND`/`REPORT` calls, and disconnec
 and account deletion still tell the user to revoke it. This unblocks owner-run
 live tests with a real Apple credential. Hosted migration, deployment and user
 release remain separate approvals.
-
 
 ## 2026-10-21: Request Calendars.Read for Outlook Calendar
 
@@ -1604,7 +1599,6 @@ Platform impact: web and desktop through the hosted route, the shared departure 
 module and Timeline components. Marketing: not applicable. Future mobile: shared modules.
 Messaging impact: P-023, with notes on P-020 and P-021.
 
-
 ## 2026-11-06: Next-trip marker and Wave 3 wording (D13)
 
 The owner decided on November 6, 2026, as relayed by the travel coordinator after reviewing the
@@ -1628,7 +1622,6 @@ contrast; strokes keep `--calendar-overlap`.
 Platform impact: web and desktop through the shared Timeline component, day-progress resolver
 and phrase module. Marketing: not applicable. Future mobile: shared modules. Messaging impact:
 P-021 note.
-
 
 ## 2026-11-06: Next-trip label lines, trip-home words and wording approvals (D14)
 
@@ -1995,7 +1988,6 @@ Occurrence notes and statuses.
 - Clearing keeps the row with a null note, so synchronization needs no tombstone.
 - Daily Brief input from day notes is deferred to a later Daily Brief upgrade.
 
-
 ## 2026-11-10: Standing approval for additive hosted migrations
 
 The owner decided on November 10, 2026 that agents may run `npm run supabase -- db push`
@@ -2251,4 +2243,17 @@ whether the App Store Connect API can create Developer ID certificates (an Apple
 thread from June 2025 reports it rejecting the G2 type). Ticket 325 tests both.
 
 Platform impact: desktop release tooling only. Web, marketing and future mobile: not
+||||||| 20feeaff
+
+## 2026-11-11: Hevy testing uses the owner's own Pro account
+
+The owner decided on November 11, 2026 not to buy a Hevy Pro test account. Hevy testing,
+including Ticket 311 and later connector acceptance, uses the owner's own Hevy Pro account
+through the vault item `hevy-owner` (API Credential, key in `credential`), which replaces
+`hevy-test-account-a`. Agents may add test workouts to that account but must not edit or
+delete existing workouts or routines. Hevy's website cannot log workouts, so additions go
+through `POST /v1/workouts`; this is a test step, and Cadence's product code still writes
+nothing to Hevy.
+
+Platform impact: test access only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.

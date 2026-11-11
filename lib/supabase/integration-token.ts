@@ -13,6 +13,9 @@ import {
 // - "leave_reminder": the leave reminder job (Ticket 276, decision D3). It
 //   carries no grant claims, so MCP grant functions refuse it, and MCP tokens
 //   never carry this channel.
+// - "connector_completion": the connector completion job (Ticket 321, D28.5). It
+//   carries no grant claims either. Only the connector completion functions accept
+//   it besides ordinary user sessions; MCP and leave reminder tokens never carry it.
 // Tokens never leave the server and must never be logged.
 
 export const INTEGRATION_SIGNING_KEY_ENV = "CADENCE_INTEGRATION_JWT_SIGNING_KEY";
@@ -21,6 +24,8 @@ export const INTEGRATION_TOKEN_MAX_TTL_SECONDS = 300;
 export type IntegrationTokenChannel = "mcp";
 export const LEAVE_REMINDER_TOKEN_CHANNEL = "leave_reminder";
 export type LeaveReminderTokenChannel = typeof LEAVE_REMINDER_TOKEN_CHANNEL;
+export const CONNECTOR_COMPLETION_TOKEN_CHANNEL = "connector_completion";
+export type ConnectorCompletionTokenChannel = typeof CONNECTOR_COMPLETION_TOKEN_CHANNEL;
 
 export type IntegrationSigningKey = {
   kid: string;
@@ -201,6 +206,22 @@ export function mintLeaveReminderAccessToken(
     ...base,
     cadence_channel: LEAVE_REMINDER_TOKEN_CHANNEL,
   }) satisfies LeaveReminderTokenClaims);
+}
+
+export type ConnectorCompletionTokenClaims = Omit<LeaveReminderTokenClaims, "cadence_channel"> & {
+  cadence_channel: ConnectorCompletionTokenChannel;
+};
+
+// The connector completion job's own channel (Ticket 321). It never uses an MCP grant
+// or the leave reminder channel.
+export function mintConnectorCompletionAccessToken(
+  key: IntegrationSigningKey,
+  input: LeaveReminderTokenInput,
+): MintedIntegrationToken {
+  return signUserToken(key, input, (base) => ({
+    ...base,
+    cadence_channel: CONNECTOR_COMPLETION_TOKEN_CHANNEL,
+  }) satisfies ConnectorCompletionTokenClaims);
 }
 
 type BaseUserClaims = Omit<IntegrationTokenClaims, "cadence_channel" | "cadence_grant_id" | "cadence_client_id">;

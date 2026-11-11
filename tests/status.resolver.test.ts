@@ -2,6 +2,10 @@ import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import {
+  isConnectorStatusEvent,
+  resolveConnectorStatusEvent,
+} from "../packages/core/src/resolvers/status.resolver";
+import {
   normalizeNoteLineEndings,
   resolveExpectedNote,
   resolveNoteUpdate,
@@ -275,6 +279,52 @@ describe("resolveNoteUpdate", () => {
     expect(resolveNoteUpdate({ note: " \n\t " })).toEqual({
       note: null,
     });
+  });
+});
+
+describe("resolveConnectorStatusEvent (Ticket 313, D28.7)", () => {
+  it("plans a connector completion with connector provenance and the activity end", () => {
+    const plan = resolveConnectorStatusEvent({
+      source: "hevy",
+      transition: "complete",
+      now: NOW,
+      activityEndAt: "2026-06-08T13:45:00Z",
+    });
+    expect(plan).toEqual({
+      update: { status: "completed", completedAt: "2026-06-08T13:45:00Z", statusMarkedAt: "2026-06-08T14:35:00Z" },
+      event: {
+        previousStatus: "unresolved",
+        status: "completed",
+        statusSemantics: "system_rule_declared",
+        recordedAt: "2026-06-08T14:35:00Z",
+        effectiveAt: "2026-06-08T13:45:00Z",
+        sourceCaptureMethod: "derived",
+        sourceConfidence: "high",
+        reasonCode: "connector:hevy",
+      },
+    });
+    expect(isConnectorStatusEvent(plan.event)).toBe(true);
+  });
+
+  it("plans a revert to Unresolved without status timestamps", () => {
+    const plan = resolveConnectorStatusEvent({ source: "hevy", transition: "revert", now: NOW });
+    expect(plan.update).toEqual({ status: "unresolved", completedAt: null, statusMarkedAt: null });
+    expect(plan.event).toMatchObject({ previousStatus: "completed", status: "unresolved", effectiveAt: null, reasonCode: "connector:hevy" });
+  });
+
+  it("rejects a future activity end, a missing end and a malformed source", () => {
+    expect(() => resolveConnectorStatusEvent({ source: "hevy", transition: "complete", now: NOW, activityEndAt: "2026-06-08T15:00:00Z" }))
+      .toThrow("cannot end after");
+    expect(() => resolveConnectorStatusEvent({ source: "hevy", transition: "complete", now: NOW })).toThrow("activity end");
+    expect(() => resolveConnectorStatusEvent({ source: "Hevy:x", transition: "revert", now: NOW })).toThrow("lowercase");
+  });
+
+  it("keeps manual plans unable to carry connector provenance", () => {
+    const update = resolveStatusTransition({ occurrence: occurrence(), nextStatus: "completed", now: NOW });
+    const event = resolveStatusEvent({ occurrence: occurrence(), nextStatus: "completed", now: NOW, update });
+    expect(event).toMatchObject({ statusSemantics: "explicit_user_mark", sourceCaptureMethod: "manual_tap" });
+    expect(event).not.toHaveProperty("reasonCode");
+    expect(isConnectorStatusEvent({ ...event!, reasonCode: "connector:hevy" })).toBe(false);
   });
 });
 

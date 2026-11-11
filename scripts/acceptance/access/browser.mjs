@@ -97,7 +97,8 @@ export async function cadenceSignIn(page, { email, timeoutMs = 120_000 }) {
     const url = (() => { try { return new URL(page.url()); } catch { return null; } })();
     if (url?.origin === ORIGIN && !url.pathname.startsWith('/login') && !url.pathname.startsWith('/auth')) return 'signed-in';
     if (url?.origin === ORIGIN && url.pathname.startsWith('/login') && !clicked) {
-      const button = page.getByRole('button', { name: /Continue with Google/ }).first();
+      // The login page renders the control as a link to /auth/google; accept a button too.
+      const button = page.getByRole('link', { name: /Continue with Google/ }).or(page.getByRole('button', { name: /Continue with Google/ })).first();
       if (await button.count() && await button.isVisible().catch(() => false)) { await button.click(); clicked = true; }
       continue;
     }

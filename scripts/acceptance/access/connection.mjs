@@ -23,7 +23,7 @@ export const CONNECTORS = Object.freeze(['google-calendar', 'outlook-calendar', 
 /** Vault items and fields for direct-credential connectors (decision 2026-11-07, item 2). */
 export const DIRECT_CREDENTIALS = Object.freeze({
   hevy: Object.freeze({
-    item: 'hevy-test-account-a',
+    item: 'hevy-owner', // decision 2026-11-11: the owner's own Hevy Pro account
     env: Object.freeze({ CONNECTOR_HEVY_API_KEY: 'credential' }),
     body: (env) => ({ apiKey: env.CONNECTOR_HEVY_API_KEY ?? '' }),
   }),

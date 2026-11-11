@@ -146,10 +146,22 @@ the Supabase project owner accepts that operational tradeoff.
     {
       "path": "/api/travel/leave-reminders/process",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/connectors/completions/process",
+      "schedule": "7,22,37,52 * * * *"
     }
   ]
 }
 ```
+
+The connector completion job (Ticket 321, D28.5) runs every 15 minutes at minutes
+7, 22, 37 and 52, off the top of the hour as Hevy asks of pollers. It accepts only
+`CRON_SECRET`, returns `enabled: false` until `CADENCE_CONNECTOR_COMPLETION=on`, and
+visits only accounts whose `next_check_at` has passed (20 per run by default, 100 at
+most, within a 50-second budget). Its service-role selection needs migration
+`20261111150000_connector_completion_job_selection.sql`. The owner approved its hosted
+push on November 10, 2026.
 
 The leave reminder job (Ticket 277) accepts only `CRON_SECRET` and stays off until
 `CADENCE_LEAVE_REMINDER_JOB=enabled`; `docs/ROUTE_MAP.md` has its contract.

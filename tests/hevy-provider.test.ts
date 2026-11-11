@@ -2,12 +2,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
-import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
+import { recordedActivitySelectorKey, validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
 import {
   HEVY_API_ORIGIN,
   HevyProviderError,
   hevyRequestUrl,
   isAllowedHevyRequest,
+  listHevyRoutines,
+  readHevyMatchChanges,
+  readHevyMatchEvidence,
   readHevyWorkouts,
   verifyHevyApiKey,
   type HevyFetch,
@@ -359,3 +362,147 @@ describe("Hevy retries and the absolute deadline", () => {
 function todayInNewYork(offsetDays: number): string {
   return Temporal.Now.instant().toZonedDateTimeISO("America/New_York").toPlainDate().add({ days: offsetDays }).toString();
 }
+
+describe("Hevy reads for connector completion (Ticket 315)", () => {
+  const DIGEST_A = "a".repeat(64);
+  const DIGEST_B = "b".repeat(64);
+
+  it("allows only the bounded routine list GET", () => {
+    expect(hevyRequestUrl({ kind: "routines", page: 20 })).toBe(`${HEVY_API_ORIGIN}/v1/routines?page=20&pageSize=10`);
+    expect(() => hevyRequestUrl({ kind: "routines", page: 21 })).toThrow(RangeError);
+    expect(isAllowedHevyRequest("GET", `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=10`)).toBe(true);
+    for (const url of [
+      `${HEVY_API_ORIGIN}/v1/routines?page=21&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=5`,
+      `${HEVY_API_ORIGIN}/v1/routines/abc`,
+      `${HEVY_API_ORIGIN}/v1/routine_folders?page=1&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10`,
+    ]) expect(isAllowedHevyRequest("GET", url)).toBe(false);
+    for (const method of ["POST", "PUT", "DELETE"]) expect(isAllowedHevyRequest(method, `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=10`)).toBe(false);
+  });
+
+  it("keeps the routine as a digest on match reads and discards it on display reads", async () => {
+    const workouts = [workout(1, { routine_id: "routine-legs" }), workout(2, { routine_id: null }), workout(3)];
+    const display = await read(fakeHevy({ counts: [3], pages: pages(workouts) }));
+    expect(JSON.stringify(display)).not.toContain("selectorKeys");
+    expect(JSON.stringify(display)).not.toContain("SECRET-ROUTINE");
+    const fake = fakeHevy({ counts: [3], pages: pages(workouts) });
+    const match = await readHevyMatchEvidence({ apiKey: KEY, accountId: ACCOUNT, connectionGeneration: 3, range: RANGE, accountDigest: DIGEST_A,
+      fetch: fake.fetch, clock: fake.clock, sleep: fake.sleep, random: fake.random });
+    expect(match).toMatchObject({ schemaVersion: "1.1.0", adapterVersion: "hevy-workouts-v2", selectorKeysRequested: true, completeness: "complete" });
+    const legs = recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-legs" });
+    const secret = recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "SECRET-ROUTINE" });
+    expect(match.activities.map((activity) => activity.selectorKeys)).toEqual([[legs], [], [secret]]);
+    const text = JSON.stringify(match);
+    for (const forbidden of ["routine-legs", "SECRET-ROUTINE", "SECRET-TITLE", "SECRET-EXERCISE", "synthetic-workout"]) expect(text).not.toContain(forbidden);
+    expect(workoutPaths(fake.calls).every((path) => path.startsWith("/v1/workouts"))).toBe(true);
+  });
+
+  it("derives different selector digests for different Hevy accounts", () => {
+    expect(recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-legs" }))
+      .not.toBe(recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_B, providerKey: "routine-legs" }));
+  });
+
+  function routineFake(total: number) {
+    const calls: Calls = [];
+    let clock = NOW;
+    const fetch: HevyFetch = async (url, init) => {
+      calls.push({ url, init });
+      clock += 50;
+      const page = Number(new URL(url).searchParams.get("page"));
+      const pageCount = Math.ceil(total / 10);
+      const routines = Array.from({ length: Math.min(10, Math.max(0, total - (page - 1) * 10)) }, (_, index) => ({
+        id: `routine-${(page - 1) * 10 + index}`, title: `Routine ${(page - 1) * 10 + index}`, folder_id: null, exercises: [{ title: "SECRET-EXERCISE" }],
+      }));
+      return Response.json({ page, page_count: pageCount, routines });
+    };
+    return { calls, fetch, clock: () => clock };
+  }
+
+  it("lists routine titles with digests and marks the list complete", async () => {
+    const fake = routineFake(12);
+    const list = await listHevyRoutines({ apiKey: KEY, accountDigest: DIGEST_A, fetch: fake.fetch, clock: fake.clock });
+    expect(list.complete).toBe(true);
+    expect(list.routines).toHaveLength(12);
+    expect(list.routines[0]).toEqual({
+      selectorKey: recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-0" }), title: "Routine 0",
+    });
+    expect(JSON.stringify(list)).not.toContain("routine-0");
+    expect(JSON.stringify(list)).not.toContain("SECRET-EXERCISE");
+    expect(fake.calls.map((call) => call.init.method)).toEqual(["GET", "GET"]);
+  });
+
+  it("does not read a 21st routine page and marks the list incomplete", async () => {
+    const fake = routineFake(250);
+    const list = await listHevyRoutines({ apiKey: KEY, accountDigest: DIGEST_A, fetch: fake.fetch, clock: fake.clock });
+    expect(fake.calls).toHaveLength(20);
+    expect(list).toMatchObject({ complete: false });
+    expect(list.routines).toHaveLength(200);
+  });
+});
+
+describe("Hevy change read (Ticket 311 strategy A)", () => {
+  const DIGEST = "c".repeat(64);
+  const SINCE = "2026-10-18T12:00:00Z";
+  const eventsFetch = (pagesBody: Record<number, unknown>, calls: string[] = []): HevyFetch => async (url, init) => {
+    calls.push(url);
+    expect(init.method).toBe("GET");
+    expect(isAllowedHevyRequest("GET", url)).toBe(true);
+    const body = pagesBody[Number(new URL(url).searchParams.get("page"))];
+    return body ? Response.json(body) : new Response("not found", { status: 404 });
+  };
+  const changes = (fetch: HevyFetch) => readHevyMatchChanges({ apiKey: KEY, accountId: ACCOUNT, connectionGeneration: 3, range: RANGE,
+    accountDigest: DIGEST, since: SINCE, fetch, clock: () => NOW, random: () => 0 });
+
+  it("allows the events GET only with page, pageSize 10 and a UTC since", () => {
+    expect(hevyRequestUrl({ kind: "workout_events", page: 2, since: SINCE }))
+      .toBe(`${HEVY_API_ORIGIN}/v1/workouts/events?page=2&pageSize=10&since=2026-10-18T12%3A00%3A00Z`);
+    expect(() => hevyRequestUrl({ kind: "workout_events", page: 21, since: SINCE })).toThrow(RangeError);
+    expect(() => hevyRequestUrl({ kind: "workout_events", page: 1, since: "2026-10-18" })).toThrow(RangeError);
+    for (const url of [
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=50&since=2026-10-18T12%3A00%3A00Z`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=21&pageSize=10&since=2026-10-18T12%3A00%3A00Z`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00%2B02%3A00`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00Z&extra=1`,
+    ]) expect(isAllowedHevyRequest("GET", url), url).toBe(false);
+    expect(isAllowedHevyRequest("POST", `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10&since=2026-10-18T12%3A00%3A00Z`)).toBe(false);
+  });
+
+  it("returns changed workouts in range with digests, deletions as activity IDs, and nothing raw", async () => {
+    const edited = workout(2, { routine_id: "routine-legs", updated_at: "2026-10-18T15:00:00Z" });
+    const older = workout(2, { routine_id: "routine-old", updated_at: "2026-10-18T13:00:00Z" });
+    const outside = { ...workout(3), start_time: "2026-08-01T12:00:00Z", end_time: "2026-08-01T13:00:00Z" };
+    const calls: string[] = [];
+    const result = await changes(eventsFetch({
+      1: { page: 1, page_count: 2, events: [
+        { type: "updated", workout: edited },
+        { type: "deleted", id: "synthetic-workout-9", deleted_at: "2026-10-18T14:00:00Z" },
+        { type: "updated", workout: older },
+      ] },
+      2: { page: 2, page_count: 2, events: [{ type: "updated", workout: outside }] },
+    }, calls));
+    expect(calls).toHaveLength(2);
+    expect(result.complete).toBe(true);
+    expect(result.newestChangeAt).toBe("2026-10-18T15:00:00Z");
+    expect(result.activities).toHaveLength(1);
+    expect(result.activities[0].selectorKeys).toEqual([recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST, providerKey: "routine-legs" })]);
+    expect(result.deletedActivityRefs).toHaveLength(1);
+    expect(result.deletedActivityRefs[0]).toMatch(/^hevy\/[a-f0-9]{64}$/u);
+    const text = JSON.stringify(result);
+    for (const forbidden of ["routine-legs", "routine-old", "SECRET", "synthetic-workout"]) expect(text).not.toContain(forbidden);
+  });
+
+  it("reports an empty feed as complete and a feed past 20 pages as incomplete without reading it", async () => {
+    expect(await changes(eventsFetch({ 1: { page: 1, page_count: 0, events: [] } })))
+      .toMatchObject({ complete: true, activities: [], deletedActivityRefs: [], newestChangeAt: null });
+    const calls: string[] = [];
+    expect(await changes(eventsFetch({ 1: { page: 1, page_count: 21, events: [] } }, calls))).toMatchObject({ complete: false, activities: [] });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("treats an unknown event shape as malformed", async () => {
+    await expect(changes(eventsFetch({ 1: { page: 1, page_count: 1, events: [{ type: "created", workout: workout(1) }] } })))
+      .rejects.toMatchObject({ failure: { code: "malformed_provider_response" } });
+  });
+});

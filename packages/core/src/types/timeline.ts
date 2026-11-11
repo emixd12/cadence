@@ -73,7 +73,18 @@ export type TimelineOccurrenceView = {
   note: string;
   timeTracking: TimelineTimeTrackingView;
   canStartTimeTracking: boolean;
+  /** Tickets 317 and 319: what a connected service contributed. Absent when nothing did. */
+  sourceEvidence?: TimelineSourceEvidence;
 };
+
+export type TimelineSourceEvidence = Readonly<{
+  source: string;
+  sourceLabel: string;
+  /** True while the connector's own status event is the latest and the row is Completed. */
+  fromConnector: boolean;
+  /** Active matches, oldest first; empty on the Mac until Ticket 320. */
+  workouts: readonly Readonly<{ startAt: string; endAt: string; label: string }>[];
+}>;
 
 export type TimelineDaySectionKind = "today" | "future" | "needs_decision_day";
 
