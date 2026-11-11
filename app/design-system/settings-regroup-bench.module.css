@@ -1,0 +1,39 @@
+/* Settings regroup proposal. Only this bench uses these rules. They stand in for changes an
+   implementation would make inside the panels: a heading owned by the row. */
+
+/* A disclosure row's summary carries the title, so the panel inside drops its own heading. */
+.rowBody > :global(section) > :is(h2, h3):first-child {
+  display: none;
+}
+.rowBody > :global(section) > :is(h2, h3):first-child + * {
+  margin-top: 0;
+}
+
+/* A panel that sits under a row keeps its heading one tier below the row title. */
+.subPanel > :global(section) > h2:first-child {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+}
+
+/* Existing panel anchors (`#connected-apps`, `#notifications`) must clear the sticky index too. */
+.proposal :global(section[id]) {
+  scroll-margin-top: 8rem;
+}
+@media (min-width: 64rem) {
+  .proposal :global(section[id]) {
+    scroll-margin-top: 4rem;
+  }
+}
+
+.index {
+  scrollbar-width: none;
+}
+.index::-webkit-scrollbar {
+  display: none;
+}
+
+/* A closed drawer ends at its button label, not at the 44px target's lower edge, so the
+   space to the next section or group matches the space after ordinary content. */
+.drawer:not([open]) {
+  margin-bottom: -0.625rem;
+}

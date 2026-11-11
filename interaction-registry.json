@@ -1049,6 +1049,13 @@
       "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
     },
     {
+      "path": "app/design-system/SettingsRegroupBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 34,
+      "interaction_ids": [],
+      "reason": "Development-only Settings regroup proposal bench (usability evaluation, 2026-11-09 and 2026-11-10): layout, account-state and category-option toggles, a four-link section index, native disclosure rows around the existing Settings panels on synthetic clients, and non-saving sketches of Categories and Daily Brief controls. No provider call, account access or product write; /settings is unchanged."
+    },
+    {
       "path": "app/design-system/TravelBench.tsx",
       "classification": "excluded",
       "interaction_marker_count": 1,
