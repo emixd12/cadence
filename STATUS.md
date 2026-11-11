@@ -90,6 +90,23 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Cadence for Mac 0.1.10 prepared — November 11, 2026
+
+The desktop source version is now 0.1.10. The release commit will be this change's merge on
+`main`, which carries Ticket 292 (SQLite 0021–0023, sync contract 4), the Settings regroup
+(P-037), Ticket 319 and Ticket 320 (SQLite 0024, contract 5).
+
+- `release:credentials -- status` passes on the owner's Mac: new identity (394 days left),
+  2026-11 profile, notarization password and the rotated updater key.
+- Preflight `desktop-release,desktop-test-mac,desktop-owner-mac`
+  (`.intent/acceptance/mac-0.1.10-20261111`): 13 ready, 5 owner steps (test-Mac app
+  permissions, the owner's Mac has no Cadence install, Cadence Release service account,
+  `release-secrets` approval, notarization go-ahead).
+- Release check 4 (real updater) cannot run: 0.1.9 and earlier reject the rotated key, so
+  every installed copy upgrades by hand once (`docs/DECISIONS.md`, 2026-11-11). Check 3 runs
+  from a downloaded DMG.
+- Not done: notarized build, installed acceptance, publication. Each waits on the owner.
+
 ## Ticket 320: connector records sync to the Mac — November 11, 2026
 
 **On branch `claude/ticket-320-mac-source-sync`. Not merged, not pushed to hosted, not in
