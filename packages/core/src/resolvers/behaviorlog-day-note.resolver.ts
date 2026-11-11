@@ -101,15 +101,18 @@ export function readBehaviorLogDayNoteReviews(files: readonly BundleFile[]): Beh
 
 /**
  * Plans day-note writes. Import never overwrites a different saved note; it
- * reports the date as a conflict. Restore replaces a different note on a date
- * the bundle covers. Neither mode clears dates the bundle does not mention,
+ * reports the date as a conflict. A fresh restore replaces a different note on a
+ * date the bundle covers. A retried restore passes `replaceDifferent: false`: it
+ * only fills dates with no note, so an edit made after the first restore stays. Neither mode clears dates the bundle does not mention,
  * because an export can cover a date range or leave notes out.
  */
 export function planBehaviorLogDayNoteWrites(input: Readonly<{
   read: BehaviorLogDayNoteRead;
   existing: readonly Readonly<{ local_date: string; note: string | null }>[];
   mode: BehaviorLogDayNoteMode;
+  replaceDifferent?: boolean;
 }>): BehaviorLogDayNotePlan {
+  const replaceDifferent = input.replaceDifferent ?? input.mode === "restore";
   const existingByDate = new Map(input.existing.map((record) => [record.local_date, record.note]));
   const actions = input.read.reviews.map((review): BehaviorLogDayNoteAction => {
     const existingNote = existingByDate.get(review.localDate) ?? null;
@@ -117,7 +120,7 @@ export function planBehaviorLogDayNoteWrites(input: Readonly<{
       ? "create"
       : existingNote === review.note
         ? "keep"
-        : input.mode === "restore" ? "replace" : "conflict";
+        : replaceDifferent ? "replace" : "conflict";
     return { ...review, existingNote, action };
   });
   return { mode: input.mode, actions, skipped: input.read.skipped };

@@ -136,6 +136,16 @@ describe("planning day-note writes", () => {
     expect(describeBehaviorLogDayNoteOutcome(previewBehaviorLogDayNoteOutcome(plan), "preview")).toBe("Day notes: 1 to add, 1 to replace, 1 already saved.");
   });
 
+  it("keeps a different saved note on a retried restore and still fills empty dates", () => {
+    const plan = planBehaviorLogDayNoteWrites({ read, existing, mode: "restore", replaceDifferent: false });
+    expect(plan.actions.map((action) => [action.localDate, action.action])).toEqual([
+      ["2026-06-07", "keep"], ["2026-06-08", "conflict"], ["2026-06-09", "create"],
+    ]);
+    expect(describeBehaviorLogDayNoteOutcome(previewBehaviorLogDayNoteOutcome(plan), "applied")).toBe(
+      "Day notes: 1 added, 1 already saved. 1 day already has a different day note, which this restore did not change: 2026-06-08.",
+    );
+  });
+
   it("leaves status messages unchanged when the bundle has no day notes", () => {
     expect(withBehaviorLogDayNoteMessage("BehaviorLog import applied.", null, "applied")).toBe("BehaviorLog import applied.");
   });

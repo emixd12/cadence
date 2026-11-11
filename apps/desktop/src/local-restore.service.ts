@@ -53,7 +53,7 @@ export async function applyLocalBehaviorLogRestore(profile: Profile, form: FormD
     }
     const applied = checkedApplyResult(result);
     // Ticket 292: day notes save after the import commits, one compare-and-set save per date.
-    const dayNotes = await applyBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore");
+    const dayNotes = await applyBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore", { replaceDifferent: !applied.alreadyApplied });
     return { status: "applied", message: withBehaviorLogDayNoteMessage("BehaviorLog restore applied.", dayNotes, "applied"), upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview: reviewedPreview, previewRun: view(accepted), applyResult: { importRun: view(applied.importRun), appliedCounts: Object.fromEntries(Object.entries(object(applied.result)).filter((entry): entry is [string, number] => typeof entry[1] === "number")) } };
   } catch (error) { return { ...BEHAVIORLOG_RESTORE_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }

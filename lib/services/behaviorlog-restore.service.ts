@@ -19,6 +19,7 @@ import {
   listBehaviorLogExistingRecords,
   parseBehaviorLogZipFiles,
   type BehaviorLogZipInput,
+  createBehaviorLogDayNoteStore,
 } from "@/lib/services/behaviorlog-import.service";
 import { markOccurrenceSyncStale } from "@/lib/services/occurrence-sync-state.service";
 import { repairUserOccurrenceReminderGraphBestEffort } from "@/lib/services/occurrence-reminder-repair.service";
@@ -35,7 +36,6 @@ import type {
 } from "@/lib/types/behaviorlog-import";
 import type { BehaviorLogImportRun } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/server";
-import { createDayNoteStore } from "@/lib/db/dayNotes.repo";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import { DEFAULT_ZIP_READ_LIMITS } from "@/lib/services/zip";
@@ -224,7 +224,7 @@ export async function previewBehaviorLogRestoreUploadFromFormData(
     },
   );
   const dayNotes = preview.valid
-    ? await previewBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "restore")
+    ? await previewBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "restore")
     : null;
 
   return {
@@ -459,9 +459,12 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
   await repairUserOccurrenceReminderGraphBestEffort(supabase, userId, {
     operation: "behaviorlog_restore",
   });
-  // Ticket 292: day notes restore after the product restore commits. Restore
-  // replaces a different note on each date the bundle covers.
-  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "restore");
+  // Ticket 292: day notes restore after the product restore commits. A fresh
+  // restore replaces a different note on each date the bundle covers; a retry
+  // only fills missing notes, so an edit made since the first restore stays.
+  const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "restore", {
+    replaceDifferent: !rpcResult.alreadyApplied,
+  });
 
   return {
     status: "applied",
@@ -527,8 +530,9 @@ function toRestorePreviewSnapshot(
 }
 
 // A retried restore still saves day notes: an earlier attempt may have
-// committed the product restore before its day-note step ran. The step is
-// idempotent and never throws.
+// committed the product restore before its day-note step ran. The retry only
+// fills dates with no note and reports a different note by date, so it never
+// overwrites an edit made after the first restore. The step never throws.
 async function createAlreadyAppliedRestoreState(
   supabase: AppSupabaseClient,
   userId: string,
@@ -539,7 +543,7 @@ async function createAlreadyAppliedRestoreState(
   },
 ): Promise<BehaviorLogRestoreActionState> {
   const appliedSummary = readObject(input.appliedRun.dry_run_summary);
-  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), input.bundle.files, "restore");
+  const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), input.bundle.files, "restore", { replaceDifferent: false });
 
   return {
     status: "applied",

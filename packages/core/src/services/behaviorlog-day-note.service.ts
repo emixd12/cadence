@@ -12,6 +12,9 @@ import {
 
 type BundleFile = Readonly<{ path: string; content: string }>;
 
+/** `replaceDifferent: false` keeps a different saved note (retried restore). */
+export type BehaviorLogDayNoteOptions = Readonly<{ replaceDifferent?: boolean }>;
+
 /**
  * Ticket 292: plans day-note writes for a BehaviorLog import or restore against
  * the saved notes. Returns null when the bundle has no Cadence day notes.
@@ -20,12 +23,13 @@ export async function planBehaviorLogDayNotes(
   store: Pick<DayNoteDataStore, "listDayNotes">,
   files: readonly BundleFile[],
   mode: BehaviorLogDayNoteMode,
+  options: BehaviorLogDayNoteOptions = {},
 ): Promise<BehaviorLogDayNotePlan | null> {
   const read = readBehaviorLogDayNoteReviews(files);
   if (!read.reviews.length && !read.skipped.length) return null;
   const range = behaviorLogDayNoteDateRange(read);
   const existing = range ? await store.listDayNotes(range) : [];
-  return planBehaviorLogDayNoteWrites({ read, existing, mode });
+  return planBehaviorLogDayNoteWrites({ read, existing, mode, replaceDifferent: options.replaceDifferent });
 }
 
 export async function previewBehaviorLogDayNotes(
@@ -54,10 +58,11 @@ export async function applyBehaviorLogDayNotes(
   store: DayNoteDataStore,
   files: readonly BundleFile[],
   mode: BehaviorLogDayNoteMode,
+  options: BehaviorLogDayNoteOptions = {},
 ): Promise<BehaviorLogDayNoteOutcome | null> {
   let plan: BehaviorLogDayNotePlan | null;
   try {
-    plan = await planBehaviorLogDayNotes(store, files, mode);
+    plan = await planBehaviorLogDayNotes(store, files, mode, options);
   } catch {
     return unavailableBehaviorLogDayNoteOutcome(mode);
   }

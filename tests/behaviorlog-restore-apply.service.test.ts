@@ -133,6 +133,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/db/dayNotes.repo", () => ({
   createDayNoteStore: () => ({ listDayNotes: mocks.listDayNotes, saveDayNote: mocks.saveDayNote }),
+  listAllDayNotes: () => mocks.listDayNotes(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -207,7 +208,7 @@ describe("BehaviorLog restore apply service", () => {
     }));
   });
 
-  it("saves day notes when a retried restore was already applied", async () => {
+  it("fills missing day notes when a retried restore was already applied", async () => {
     const zip = createStoredZip(bundleFiles({ dayNotes: [DAY_NOTE] }));
     const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
     mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
@@ -219,6 +220,25 @@ describe("BehaviorLog restore apply service", () => {
     expect(result.message).toBe("This accepted BehaviorLog restore was already applied. Day notes: 1 added.");
     expect(mocks.saveDayNote).toHaveBeenCalledWith({ localDate: "2026-06-07", expectedNote: null, note: "Sick" });
     expect(mocks.createBehaviorLogImportRun).not.toHaveBeenCalled();
+  });
+
+  it("keeps a day note the user edited after the first restore when the restore is retried", async () => {
+    const zip = createStoredZip(bundleFiles({ dayNotes: [DAY_NOTE] }));
+    const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
+    mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
+    mocks.getAppliedBehaviorLogRestoreRunByAcceptedPreview.mockResolvedValue(restoreAppliedRun(preview));
+    mocks.listDayNotes.mockResolvedValue([{
+      id: "day-note-1", user_id: USER_ID, local_date: "2026-06-07", note: "Edited after restore", revision: 2,
+      created_at: NOW.toString(), updated_at: NOW.toString(),
+    }]);
+
+    const result = await applyBehaviorLogRestoreUploadFromFormData(restoreApplyFormData(zip, preview));
+
+    expect(result.status).toBe("applied");
+    expect(result.message).toBe(
+      "This accepted BehaviorLog restore was already applied. 1 day already has a different day note, which this restore did not change: 2026-06-07.",
+    );
+    expect(mocks.saveDayNote).not.toHaveBeenCalled();
   });
 
   it("reports the committed restore as applied when saved day notes cannot be read", async () => {

@@ -36,7 +36,8 @@ import {
 } from "@/lib/services/zip";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
-import { createDayNoteStore } from "@/lib/db/dayNotes.repo";
+import { createDayNoteStore, listAllDayNotes } from "@/lib/db/dayNotes.repo";
+import type { DayNoteDataStore } from "@cadence/core/data-store";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import type {
@@ -144,6 +145,24 @@ export function createBehaviorLogImportPageDataFromRuns(
   };
 }
 
+/**
+ * Day-note store for BehaviorLog import and restore planning. It reads saved
+ * day notes through paginated reads, so accounts past the 1,000-row PostgREST
+ * page limit still see every note. Saves use the normal compare-and-set store.
+ */
+export function createBehaviorLogDayNoteStore(
+  supabase: AppSupabaseClient,
+  userId: string,
+): DayNoteDataStore {
+  return {
+    ...createDayNoteStore(supabase, userId),
+    listDayNotes: async (range) =>
+      (await listAllDayNotes(supabase, userId)).filter(
+        (row) => row.local_date >= range.from && row.local_date <= range.to,
+      ),
+  };
+}
+
 export async function previewBehaviorLogImportUploadFromFormData(
   formData: FormData,
 ): Promise<BehaviorLogImportActionState> {
@@ -164,7 +183,7 @@ export async function previewBehaviorLogImportUploadFromFormData(
     importMode: "merge_preview",
   });
   const dayNotes = preview.valid
-    ? await previewBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "import")
+    ? await previewBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "import")
     : null;
 
   return {
@@ -275,7 +294,7 @@ export async function applyBehaviorLogImportUploadFromFormData(
   });
   // Ticket 292: day notes save after the import commits, one compare-and-set
   // save per date. A different saved note is reported, never overwritten.
-  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "import");
+  const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "import");
   if (modeValue === "create_missing_only") {
     return {
       status: "applied",
