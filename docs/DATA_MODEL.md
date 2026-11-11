@@ -274,7 +274,9 @@ Legacy duplicates retain their IDs and assignments; later duplicates receive an
 ID suffix. New names allow 1–120 characters without control characters.
 Descriptions allow 2,000 characters. Existing unchanged legacy names remain valid.
 `manage_categories` locks the account, checks category and affected Behavior
-snapshots, and applies the complete category change atomically.
+snapshots, and applies the complete category change atomically. Ticket 304's
+move-to-position reuses it: the shared planner sends the full reordered list with
+renumbered `sort_order` values, so no schema change was needed.
 
 ### `behaviors`
 
@@ -1572,7 +1574,7 @@ native notification state, and the hosted-only leave reminder tables (Ticket 275
 ```sql
 create table launch_rate_limits (
   user_id uuid not null references auth.users(id) on delete cascade,
-  action text not null check (action in ('export_download')),
+  action text not null check (action in ('export_download', 'push_subscription_registration', 'travel_home_lookup')),
   window_started_at timestamptz not null,
   attempt_count integer not null check (attempt_count > 0),
   updated_at timestamptz not null default now(),
@@ -1590,6 +1592,11 @@ Ticket 067 defines `export_download` as six attempts in one 60-second window
 per account across application instances and export formats. A denied attempt
 does not start export reads or return a partial artifact. Account deletion
 removes the counter through the Auth user cascade.
+
+Ticket 308 adds `travel_home_lookup`: five Home lookups from the current location per
+account in one 3,600-second window. The other actions keep six attempts per 60 seconds. The
+counter stores no position, address or request body. A denied attempt makes no spend
+reservation and no provider call.
 
 ### `push_subscriptions`
 
@@ -1925,6 +1932,8 @@ returns `allowed`, `limit_count`, `remaining`, `reset_at`, and
 The function does not bypass product-row RLS, read exports, or mutate user
 content. It writes only the caller's `launch_rate_limits` row. The export
 service consumes the decision after authentication and before export reads.
+Ticket 308 lets the Home lookup service consume `travel_home_lookup` (five per hour) after
+it checks Travel estimates and before it reserves travel spend.
 
 ### `public.get_export_page_read_bundle(range_start_local_date date, range_end_local_date date)`
 
@@ -2107,7 +2116,14 @@ or the exact Behavior UUID text with that owned `behavior_id`. Composite ownersh
 foreign keys and RLS reject foreign Behaviors; account/Behavior deletion cascades.
 Fields are `enabled boolean`, `entries jsonb`, `excluded_occurrence_ids jsonb`,
 `revision integer`, and `updated_at timestamptz`. Global arrays must be empty.
-Absent state means disabled. Arrays, enum values, IDs, lengths, and ownership
+Since Ticket 305 an absent global state means on, and only a stored global
+`enabled = false` turns the feature off. Behavior rows keep `enabled` for storage
+and synchronization, but it no longer gates matching or quick-fill. Migration
+`20261110153050_allow_default_on_note_shortcuts.sql` replaces only the enablement
+gate of `commit_note_shortcut_state`; `20261110170000_turn_on_note_shortcuts_once.sql`
+sets every stored global `enabled = false` to true once, leaving `revision` and
+`updated_at` unchanged so it converges with desktop SQLite migration 0022 without a
+sync conflict. Arrays, enum values, IDs, lengths, and ownership
 are validated at storage boundaries. Mutations compare the captured state and
 commit atomically; concurrent changes fail rather than overwrite. Rendered management
 actions also carry a content fingerprint, because equal integer revisions from
@@ -2132,12 +2148,13 @@ Normal and reviewed account synchronization retains the sorted union of exclusio
 IDs from the common baseline and both copies. It changes no winning shortcut text,
 status, suppression key, or setting. If review selects deletion while the owned
 Behavior survives, synchronization writes a disabled state with no entries and
-the retained IDs. Deleting the Behavior may cascade the state. An explicit
+the retained IDs; since Ticket 305 that flag no longer gates. Deleting the Behavior may cascade the state. An explicit
 first-link local-dataset discard does not retain exclusions from that discarded
 copy. A union above 100,000 IDs fails instead of truncating.
 
-Analysis reads current owned sources. Before proposal persistence, compare source
-Notes, current state, global enablement, and Behavior lifecycle again atomically.
+Analysis runs after an in-app Note save and reads current owned sources. Before
+proposal persistence, compare source Notes, current state, global enablement, and
+Behavior lifecycle again atomically. It writes only when the current entries change.
 No stale result may revive removed text or overwrite an accepted edit. No raw
 Note text enters logs or monitoring. Cloud consent is separate, device-specific,
 and never a synchronized state field. Provider analysis remains disabled until
@@ -2421,6 +2438,33 @@ Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
   `finish_daily_brief` fence the new sources without being rewritten.
 - `read_daily_brief_preferences` returns the new keys. The repository treats a
   missing key as off and rejects a disclosure without its fence.
+
+Migration `20261110150000_daily_brief_connected_sources.sql` (Ticket 306, additive):
+
+- `daily_brief_preferences` adds nullable `use_connected_sources`,
+  `exclude_google_calendar`, `exclude_outlook_calendar`, `exclude_icloud_calendar`
+  and `exclude_hevy`. A check constraint keeps all five null or all set; another
+  requires every one false while Daily Brief is off. Null means the row predates
+  the one choice. No existing row is rewritten.
+- `read_daily_brief_preferences` keeps every earlier key and adds
+  `use_connected_sources` and `excluded_sources` (`google_calendar`,
+  `outlook_calendar`, `icloud_calendar`, `hevy`). For a null row it derives them:
+  the choice is on when Daily Brief is on and at least one source was allowed; then
+  every source that was not allowed is excluded. With nothing allowed the choice is
+  off and nothing is excluded.
+- `save_daily_brief_preferences_v4(enabled, use_connected_sources, four exclusions,
+  include_reminder_history, include_notes, expected_revision)` stores the choice,
+  sets the per-source `include_*` columns false and their fences null, bumps the
+  revision and deletes the owner's `daily_brief_runs` (and tip deliveries when
+  Daily Brief turns off). Disabled with any other value on raises `22023`; a stale
+  revision raises `55000`. It does not require a source to be connected: a source
+  connected later is covered. Granted to `authenticated` only.
+- `daily_brief_calendar_fence_is_current` keeps its signature and now checks only
+  the caller. Covered sources follow their current connection, so `begin_daily_brief`
+  and `finish_daily_brief` fence on the stored revision; the service fences each
+  run on the connection and selection it read at the start.
+- The per-source `include_*` columns and `save_daily_brief_preferences_v3` remain
+  for clients built before this migration.
 
 Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
 
@@ -2812,7 +2856,39 @@ checks, concurrency, exact replay, rollback, ownership, and web/desktop row
 compatibility. Use only an isolated loopback database and the local integration
 test environment documented in `docs/SUPABASE_WORKFLOW.md`.
 
-## Agent Calendar grant (Ticket 187)
+## Agent Calendar grant (Ticket 187, retired by Ticket 307)
+
+Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
+standard Timeline connection (`google_calendar_connections` and
+`google_calendar_preferences`) and its selected calendars. Migration
+`20261110160000_daily_brief_google_calendar_timeline.sql` (not additive):
+
+- refuses to run while `cadence_calendar_agent_private.credentials` holds a row; the
+  retirement route revokes each token at Google and deletes it first
+  (`docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)");
+- stores the one connected-sources choice for every Daily Brief preference row through
+  the private `map_daily_brief_google_calendar_to_timeline()` (not granted to any
+  role). A row from before Ticket 306 is mapped as that migration derives it, except
+  that Google Calendar stays allowed only if the account allowed Calendar timing and
+  its Timeline connection is connected. A stored choice that covers Google Calendar
+  without a connected Timeline connection gets Google Calendar excluded. Every
+  per-source `include_*` column is set false and its fence null. Each changed row
+  bumps its revision and loses its `daily_brief_runs`;
+- deletes every row in `cadence_calendar_agent_private.attempts`,
+  `google_calendar_agent_preferences` and `google_calendar_agent_connections`. The
+  empty tables remain until a cleanup ticket drops them;
+- revokes `service_role` execute on the five `calendar_agent_*` functions;
+- makes `read_daily_brief_preferences` also return `google_calendar_source:
+  "timeline"`. The app reads no Google Calendar for Daily Brief without it;
+- makes `save_daily_brief_preferences_v3` (and so v2 and the original save) store the
+  one choice through v4, excluding every source the caller leaves off.
+
+`tests/sql/ticket-307-daily-brief-google-calendar-timeline.sql` replaces
+`tests/sql/google-calendar-agent-contract.sql`. It verifies the mapping, the empty and
+unreachable grant, the read marker and the older-client save. The rollback note is
+in the migration header.
+
+Ticket 187 record:
 
 Migration `20261022180000_separate_agent_calendar_grant.sql` adds independent owner-scoped
 `google_calendar_agent_connections` and `google_calendar_agent_preferences` tables.
@@ -2826,7 +2902,7 @@ Standard ciphertext retains its existing format. Tokens and selections are never
 Daily Brief SQL admission, completion and preference fences now reference the agent tables.
 The migration clears existing Calendar disclosure, increments its preference revision, and removes affected outstanding brief attempts.
 Behavior-only preferences and attempts remain unchanged. Fresh agent consent and model disclosure are required.
-`tests/sql/google-calendar-agent-contract.sql` verifies grant isolation, RLS, replay and disconnect boundaries.
+`tests/sql/google-calendar-agent-contract.sql` verified grant isolation, RLS, replay and disconnect boundaries until Ticket 307.
 
 The migration was written October 12, 2026 as `20261012213059_…` and never applied to hosted.
 On October 22 it was renamed to sort after hosted migrations already applied through `20261019025157`.

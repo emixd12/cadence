@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { formatUserDateTime } from "@/lib/ui/date-time";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
+import { SettingsItemHeading } from "@/components/settings/settings-heading";
+import { SettingsLiveLine } from "@/components/settings/settings-result";
 import { OAUTH_PERMISSION_LABELS, type ConnectedAppsView, type OAuthFormAction } from "@/lib/types/oauth-ui";
 
 export function ConnectedAppsPanel({ view, timezone, action }: { view: ConnectedAppsView; timezone: string; action: OAuthFormAction }) {
@@ -14,10 +16,10 @@ export function ConnectedAppsPanel({ view, timezone, action }: { view: Connected
         <p className="text-sm leading-6 text-muted-readable">AI clients with access to this Cadence account. Disconnect stops their access immediately.</p>
         <a href="https://cadence-me.com/developers" className="product-action min-h-11 w-fit py-2">Developer documentation</a>
         {view.error ? <p role="alert" className="text-sm text-accent">{view.error}</p> : <>
-          {view.grants.length === 0 ? <p className="text-sm leading-6 text-muted-readable">No apps connected. Start a connection from an AI client to review its permissions here.</p> : (
+          {view.grants.length === 0 ? <p className="text-sm leading-6 text-muted-readable">No apps connected yet. When you connect Cadence from an AI app, it shows here with its permissions.</p> : (
             <ul className="grid min-w-0 divide-y divide-line">
               {view.grants.map((grant) => <li key={grant.grantId} className="grid min-w-0 gap-3 py-4 first:pt-0">
-                <h3 className="text-lg [overflow-wrap:anywhere]">{grant.clientName}</h3>
+                <SettingsItemHeading className="text-lg [overflow-wrap:anywhere]">{grant.clientName}</SettingsItemHeading>
                 <p className="text-sm text-muted-readable">{grant.verifiedClient ? "Verified client" : "Unverified client"}</p>
                 <ul className="grid gap-1 text-sm leading-6">{grant.scopes.map((scope) => <li key={scope}>{OAUTH_PERMISSION_LABELS[scope]}</li>)}</ul>
                 <dl className="grid gap-1 text-sm leading-6 text-muted-readable">
@@ -41,8 +43,8 @@ export function ConnectedAppsPanel({ view, timezone, action }: { view: Connected
             </ul> : <p className="py-2 text-sm text-muted-readable">No recent activity.</p>}
           </details>
         </>}
-        {pending ? <p role="status" className="text-sm">Disconnecting…</p> : null}
-        {state.message ? <p role={state.status === "error" ? "alert" : "status"} className="text-sm leading-6">{state.message}</p> : null}
+        {/* One result line (Ticket 303): Disconnecting…, then the result. */}
+        <SettingsLiveLine text={pending ? "Disconnecting…" : state.message} error={!pending && state.status === "error"} className="text-sm leading-6" />
       </div>
     </SettingsPanel>
   );

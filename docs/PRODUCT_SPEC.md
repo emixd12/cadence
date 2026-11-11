@@ -586,9 +586,9 @@ Decision D4 adds event location reads from Outlook and iCloud for routing under 
 New provider identities bind to the current Cadence account and need not match
 the Google sign-in identity. One account per provider. Credentials stay sealed on
 the server. Desktop uses hosted brokers and stores no provider credential.
-Account-free desktop mode offers no connector. Each source reaches Daily Brief
-only after its own default-off disclosure; the existing Calendar disclosure stays
-Google-only.
+Account-free desktop mode offers no connector. A source reaches Daily Brief only
+while the one connected-sources choice is on and the source is not excluded
+(Ticket 306, "One Daily Brief choice for connected sources").
 
 iCloud uses a user-generated app-specific password over CalDAV. Apple does not
 limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
@@ -1024,8 +1024,10 @@ archiving rules are added.
 
 ## Recurring Note shortcuts contract (Tickets 126–128)
 
-The deterministic feature is optional and defaults off globally and for each
-Behavior. Explicit **Find repeated Notes** analyzes only one owner's current,
+The deterministic feature is on for every account and every active Behavior
+(Ticket 305, `docs/DECISIONS.md` 2026-11-10). No Behavior needs its own switch.
+After an in-app Note save on Timeline, Needs decision or Behaviors review, matching
+runs for that Note's Behavior without a request. It analyzes only one owner's current,
 nonblank Occurrence Notes for one active Behavior, across all three statuses.
 Use the latest 100 eligible Occurrences in the 90 local calendar days ending
 today (today minus 89 days). Sort local date descending, scheduled instant
@@ -1043,7 +1045,9 @@ latest supporting date descending, then pattern key ascending. Reject control
 characters and instruction-like prompt text. This conservative rule preserves
 negation and never infers advice, diagnoses, or status changes.
 
-Proposals expire after 30 elapsed days and disappear immediately when their
+Proposals expire 30 elapsed days after they first appear; a proposal that later
+matching still supports keeps its first proposal time. Matching writes only when the
+current entries change. Proposals disappear immediately when their
 exact source Note hashes no longer support three eligible Occurrences. Accepted
 shortcuts have no expiry and fresh analysis never edits them. Accept permits
 editing before saving; later editing retains the original pattern key.
@@ -1059,11 +1063,17 @@ excluded future evidence. Edits, removal, off controls, and synchronization neve
 clear this exclusion. Cancelled/failed saves create no exclusion. Exclusions
 retain IDs only, with a 100,000-ID ceiling that fails instead of truncating.
 
-Global off dominates every Behavior setting, hides quick-fill and proposals,
-and rejects new analysis. Settings and removals remain available. Off preserves
-accepted shortcuts and historical Notes. Both settings persist and synchronize;
-neither is provider consent. There is no automatic analysis on opening/saving a
-Note, schedule, background worker, or automatic Note submission.
+A proposal still needs **Accept** before it appears above a Note field, and
+**Dismiss** still hides it. Settings shows no Note shortcuts control. The account's
+stored global switch remains so the control can return: an absent switch means on,
+and a stored off value hides quick-fill and proposals and rejects new analysis while
+removals remain available. Off preserves accepted shortcuts and historical Notes.
+Accounts and local Mac profiles that had turned the switch off are turned on once
+(hosted migration `20261110170000_turn_on_note_shortcuts_once.sql`, SQLite migration
+0022; P-034). The per-Behavior `enabled` field persists and synchronizes but no
+longer gates anything. Neither is provider consent. Matching runs only after a Note
+save in the app; MCP Note writes, imports, opening a Note, schedules and background
+workers do not run it, and nothing submits a Note automatically.
 
 Ticket 128 requires a separate explicit device-specific cloud consent with a
 versioned privacy notice, global and per-Behavior checks, current account identity,
@@ -1096,10 +1106,58 @@ recaps and routine diagnostic prose remain prohibited. A marking pattern cannot
 prove availability or override Calendar evidence, duration or planner constraints.
 Consent, explicit comparison runs, read-only authority and duration controls remain.
 
-## Separate Calendar consent for Daily Brief (Ticket 187)
+## Daily Brief reads Google Calendar through the Timeline connection (Ticket 307)
 
-Timeline Calendar and Daily Brief Calendar use independent read-only Google grants and selections.
-Settings exposes **Google Calendar for Daily Brief** before the Daily Brief disclosure controls.
-Connecting this grant does not enable model sharing. The user must enable Calendar separately in Daily Brief settings.
-Missing agent configuration or denied agent consent cannot authorize use of the Timeline grant.
-Web and linked desktop share this contract. Marketing has no authenticated consent control; native mobile remains deferred.
+A person connects Google Calendar once. Daily Brief reads Google Calendar timing
+through the Timeline connection and its selected calendars. The one connected-sources
+choice of Ticket 306 covers Google Calendar like any other source, and **Advanced:
+choose sources** can exclude it. Settings no longer shows **Google Calendar for Daily
+Brief** on web or desktop.
+
+- What is sent does not change: today's event times, timezone, availability and
+  response for the selected calendars. Titles, descriptions, locations and
+  attendees are never sent. Timeline display choices (showing Calendar on Timeline,
+  hiding a selected calendar, all-day events) do not change what Daily Brief reads.
+- The separate Daily Brief grant of Ticket 187 is retired. Each grant is revoked at
+  Google, then a migration deletes its stored credentials, selections and attempts
+  (`docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)").
+- An account that had allowed Calendar timing keeps it allowed only if its Timeline
+  connection is connected; otherwise Google Calendar starts excluded.
+- Until that migration runs, the brief reads no Google Calendar at all.
+
+This supersedes "Separate Calendar consent for Daily Brief (Ticket 187)". Web: this
+ticket. Desktop: the linked Mac loses the same panel; no local data changes.
+Marketing: P-035 logs the Privacy and FAQ text. Future mobile: mobile web inherits it.
+
+## One Daily Brief choice for connected sources (Ticket 306)
+
+Owner decision, 2026-11-10: one choice covers every connected source. Daily Brief
+settings show **Daily Brief** (on or off) and **Plan around my connected sources**
+(one choice, off by default). A line under the choice names the connected sources
+it covers. **Advanced: choose sources** lists each connected source with its own
+checkbox, plus the reminder-history and Notes choices. Each keeps its statement of
+what is sent.
+
+- A source connected after the choice is covered by it. Its row under Advanced
+  says that Daily Brief uses it. Reconnecting or reselecting a covered source does
+  not ask again.
+- A source excluded under Advanced is never read or sent. The server is the
+  authority: it reads only sources the choice covers and that have something to
+  read (a connection, and for calendars at least one selected calendar).
+- Turning Daily Brief off withdraws every source choice, reminder history and
+  Notes.
+- Existing accounts keep exactly what they allowed. The choice is on when Daily
+  Brief was on and at least one source was allowed; every source that was not
+  allowed starts excluded. An account that allowed no source starts with the
+  choice off and nothing excluded, like a new account. The hosted migration derives
+  this when the preferences are read; it rewrites no row.
+- Clients built before Ticket 306 still send per-source keys. The server maps their
+  saves the same way, so every source they leave off is excluded and an older save
+  never adds a source. Each per-source flag it returns reports whether the brief
+  uses that source now.
+- Each run fences every source it reads on the connection and selection it read
+  at the start; a change during the run withholds the output.
+
+What each source sends, the model and the prompt are unchanged. Web: this ticket.
+Desktop: the same shared panel on a linked, online Mac. Marketing: P-035 logs the
+FAQ answer. Future mobile: mobile web inherits it; native mobile is deferred.

@@ -185,25 +185,19 @@ describe("desktop Calendar transport", () => {
 });
 
 
-it("isolates concurrent standard and agent callback state and cancellation", async () => {
+it("ignores callbacks from the retired Daily Brief grant and never sends its purpose (Ticket 307)", async () => {
   const secrets = new Map<string, string>();
   const io = { get: async (name: string) => secrets.get(name) ?? null,
     set: async (name: string, value: string) => { secrets.set(name, value); },
     remove: async (name: string) => { secrets.delete(name); }, open: async () => undefined };
   const fetcher = vi.fn(async (url: string | URL | Request) => Response.json(String(url).includes("connection") ? { url: "https://accounts.example/consent", status: "connected" } : {}));
   const standard = new DesktopCalendarConnection(new DesktopCalendarBroker("https://calendar.example", async () => "jwt", fetcher), io);
-  const agent = new DesktopCalendarConnection(new DesktopCalendarBroker("https://calendar.example", async () => "jwt", fetcher, "agent"), io);
-  await standard.begin("owner"); await agent.begin("owner");
-  const pending = JSON.parse(secrets.get("pending-calendar-agent-state")!);
-  const callback = `cadence://calendar/callback?purpose=agent&state=${pending.state}&result=connected`;
-  expect(await standard.complete(callback, "owner")).toBeNull();
-  expect(secrets.size).toBe(2);
-  expect(await agent.complete(callback, "owner")).toMatchObject({ result: "connected" });
+  await standard.begin("owner");
+  const pending = JSON.parse(secrets.get("pending-calendar-state")!);
+  expect(await standard.complete(`cadence://calendar/callback?purpose=agent&state=${pending.state}&result=connected`, "owner")).toBeNull();
   expect(secrets.has("pending-calendar-state")).toBe(true);
-  expect(fetcher).toHaveBeenLastCalledWith("https://calendar.example/api/google-calendar/connection?purpose=agent", expect.anything());
-  await agent.begin("owner"); await agent.cancel();
-  expect(secrets.has("pending-calendar-state")).toBe(true);
-  await expect(agent.complete(callback, "owner")).rejects.toThrow("already used or cancelled");
+  expect(await standard.complete(`cadence://calendar/callback?state=${pending.state}&result=connected`, "owner")).toMatchObject({ result: "connected" });
+  expect(fetcher.mock.calls.every(([url]) => !String(url).includes("purpose="))).toBe(true);
 });
 
 // Ticket 238 desktop connector sources.

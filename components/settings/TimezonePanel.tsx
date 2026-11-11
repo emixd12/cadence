@@ -7,6 +7,8 @@ import {
   type TimezoneActionState,
 } from "@/lib/types/settings";
 import { DesktopDraftGuard } from "@/lib/desktop-draft";
+import { SettingsSectionHeading } from "@/components/settings/settings-heading";
+import { groupTimezoneOptions, timezonePlaceLabel } from "@/lib/ui/timezone-labels";
 
 export type TimezoneUpdateAction = (
   state: TimezoneActionState,
@@ -79,7 +81,7 @@ export function TimezonePanel({
       id="timezone"
       className="scroll-mt-20 bg-background py-4 first:pt-0 last:pb-0"
     >
-      <h2 className="text-xl leading-tight">Timezone</h2>
+      <SettingsSectionHeading>Timezone</SettingsSectionHeading>
       <form
         key={savedTimezone}
         action={formAction}
@@ -103,26 +105,27 @@ export function TimezonePanel({
         />
         {showDetectedHint ? (
           <p className="text-sm leading-6 text-muted-readable">
-            Detected {browserTimezone.value}.{" "}
+            Your device is set to {timezonePlaceLabel(browserTimezone.value)}.{" "}
             <button
               type="button"
               onClick={() => setSelectedTimezone(browserTimezone.value)}
               className="product-action product-action-secondary"
             >
-              Use detected timezone
+              Use device timezone
             </button>
           </p>
         ) : null}
         <p className="text-sm leading-6 text-muted-readable">
-          Saving updates active behavior schedules and future unresolved
-          occurrences. Past and resolved history stays unchanged.
+          Saving moves active Behavior schedules and future Unresolved
+          Occurrences to this timezone. Past Occurrences and ones you have
+          marked stay as they are.
         </p>
         <button
           type="submit"
           disabled={isPending}
           className="product-action product-action-primary min-h-11 w-fit py-2 text-sm"
         >
-          {isPending ? "Saving..." : "Save timezone"}
+          {isPending ? "Saving…" : "Save timezone"}
         </button>
         {state.message ? (
           <p
@@ -170,11 +173,24 @@ export function TimezoneControl({
       onChange={(event) => onValueChange(event.currentTarget.value)}
       className="product-select min-h-11 min-w-0 w-full border border-line bg-background pl-3 py-2 text-base"
     >
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
+      {/* Ticket 309: each option reads as a place ("New York"); its value stays the IANA name. */}
+      {groupTimezoneOptions(options).map((group) =>
+        group.region === null ? (
+          group.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))
+        ) : (
+          <optgroup key={group.region} label={group.region}>
+            {group.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        ),
+      )}
     </select>
   );
 }

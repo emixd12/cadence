@@ -168,17 +168,18 @@ pub fn commit(
         if behavior.id != behavior_id || behavior.user_id != profile_id {
             return Err("Behavior not found.".into());
         }
+        // Ticket 305: on unless the retained global switch is stored off. The
+        // per-Behavior flag is kept for sync but no longer gates.
+        if require_enabled && !behavior.active {
+            return Err("Note shortcuts are available for active Behaviors only.".into());
+        }
         if require_enabled
-            && (!behavior.active
-                || !next.enabled
-                || !current
-                    .global_state
-                    .as_ref()
-                    .is_some_and(|state| state.enabled))
+            && current
+                .global_state
+                .as_ref()
+                .is_some_and(|state| !state.enabled)
         {
-            return Err(
-                "Enable Note shortcuts globally and for this active Behavior first.".into(),
-            );
+            return Err("Note shortcuts are turned off for this account.".into());
         }
     } else if require_enabled {
         return Err("Choose a Behavior for shortcut management.".into());

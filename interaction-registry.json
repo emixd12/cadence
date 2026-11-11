@@ -203,7 +203,10 @@
         "INT-SETTINGS-010",
         "INT-SETTINGS-011",
         "INT-SETTINGS-012",
-        "INT-SETTINGS-013"
+        "INT-SETTINGS-013",
+        "INT-SETTINGS-015",
+        "INT-SETTINGS-016",
+        "INT-SETTINGS-017"
       ]
     },
     {
@@ -289,7 +292,6 @@
         "INT-NOTIFICATION-001",
         "INT-TIMELINE-011",
         "INT-BEHAVIOR-029",
-        "INT-SETTINGS-014",
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
         "INT-CALENDAR-003",
@@ -327,7 +329,8 @@
         "INT-PLACE-007",
         "INT-TRAVEL-011",
         "INT-TRAVEL-012",
-        "INT-TRAVEL-013"
+        "INT-TRAVEL-013",
+        "INT-TRAVEL-014"
       ]
     },
     {
@@ -696,6 +699,17 @@
       ]
     },
     {
+      "path": "components/settings/SettingsSections.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 8,
+      "interaction_ids": [
+        "INT-SETTINGS-005",
+        "INT-SETTINGS-015",
+        "INT-SETTINGS-016",
+        "INT-SETTINGS-017"
+      ]
+    },
+    {
       "path": "components/settings/SettingsPanels.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 1,
@@ -733,11 +747,10 @@
     {
       "path": "components/note-shortcuts/NoteShortcutControls.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 18,
+      "interaction_marker_count": 14,
       "interaction_ids": [
         "INT-TIMELINE-011",
-        "INT-BEHAVIOR-029",
-        "INT-SETTINGS-014"
+        "INT-BEHAVIOR-029"
       ]
     },
     {
@@ -798,7 +811,7 @@
     {
       "path": "components/settings/GoogleCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 24,
+      "interaction_marker_count": 20,
       "interaction_ids": [
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
@@ -844,7 +857,7 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 12,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
@@ -876,7 +889,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 13,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -891,14 +904,23 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 11,
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
         "INT-PLACE-006",
         "INT-TRAVEL-006",
         "INT-TRAVEL-007",
-        "INT-TRAVEL-013"
+        "INT-TRAVEL-013",
+        "INT-TRAVEL-014"
+      ]
+    },
+    {
+      "path": "components/settings/HomeCurrentLocation.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TRAVEL-014"
       ]
     },
     {
@@ -997,7 +1019,7 @@
     {
       "path": "components/settings/OutlookCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 15,
+      "interaction_marker_count": 9,
       "interaction_ids": [
         "INT-CALENDAR-008",
         "INT-CALENDAR-009",
@@ -1008,10 +1030,21 @@
     {
       "path": "components/settings/HevyPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 9,
+      "interaction_marker_count": 7,
       "interaction_ids": [
         "INT-CONNECTOR-001",
         "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "components/settings/SettingsDisconnect.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-CALENDAR-004",
+        "INT-CALENDAR-011",
+        "INT-CALENDAR-015",
         "INT-CONNECTOR-003"
       ]
     },
@@ -1025,7 +1058,7 @@
     {
       "path": "components/settings/IcloudCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 20,
+      "interaction_marker_count": 14,
       "interaction_ids": [
         "INT-CALENDAR-012",
         "INT-CALENDAR-013",
@@ -1047,6 +1080,13 @@
       "interaction_marker_count": 8,
       "interaction_ids": [],
       "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
+    },
+    {
+      "path": "app/design-system/SettingsRegroupBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 28,
+      "interaction_ids": [],
+      "reason": "Development-only Settings regroup bench (usability evaluation, 2026-11-09 and 2026-11-10): layout and account-state toggles over the real Ticket 301 Settings groups, index, rows and drawers on synthetic clients, plus non-saving sketches of the Categories list (Ticket 304) and Daily Brief controls (Tickets 306-307). No provider call, account access or product write."
     },
     {
       "path": "app/design-system/TravelBench.tsx",
@@ -1223,7 +1263,7 @@
         },
         {
           "kind": "activate",
-          "control": "Discard drafts and restart"
+          "control": "Discard changes and restart"
         }
       ],
       "availability": "Configured desktop builds check at startup and every 24 hours while open. Settings and the nonmodal notice expose explicit installation and restart.",
@@ -8673,7 +8713,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Use detected timezone"
+          "control": "Use device timezone"
         }
       ],
       "availability": "Visible only when browser detection succeeds and differs from the current draft.",
@@ -8858,11 +8898,11 @@
         },
         {
           "kind": "activate",
-          "control": "Request notification permission"
+          "control": "Allow notifications"
         },
         {
           "kind": "activate",
-          "control": "Refresh reminder coverage"
+          "control": "Check reminders"
         }
       ],
       "availability": "Web registration remains available when supported. Desktop requests permission only when not determined, and disables refresh while busy or unavailable.",
@@ -8989,7 +9029,7 @@
           "result": "Navigate to /trust."
         }
       ],
-      "availability": "Always available in Settings.",
+      "availability": "Always available as one line of links at the end of Settings (Ticket 301).",
       "success_result": "Opens the selected public account-information page.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -8998,23 +9038,27 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsPageEnd",
         "components/settings/SettingsPanels.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/settings-sections.dom.test.tsx",
           "tests/settings-interactions-ui.test.tsx"
         ],
-        "notes": "The Settings UI test renders the Trust, Privacy, and Terms destinations."
+        "notes": "The Settings sections DOM test renders the end-of-page Privacy, Terms and Trust links; the interaction test still renders the bench-only TrustAndLegalPanel."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsPageEnd",
             "components/settings/SettingsPanels.tsx"
           ],
           "evidence": [
+            "tests/settings-sections.dom.test.tsx",
             "tests/settings-interactions-ui.test.tsx"
           ]
         },
@@ -9064,7 +9108,7 @@
           "control": "Open Export"
         }
       ],
-      "availability": "Always available in Delete account guidance.",
+      "availability": "Always available in Delete account guidance. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Navigates to /export.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -9136,7 +9180,7 @@
           "control": "I downloaded an export or do not need one checkbox"
         }
       ],
-      "availability": "Always available in the Delete account form.",
+      "availability": "Always available in the Delete account form. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Satisfies one required client and server deletion gate; it performs no deletion by itself.",
       "failure_result": "Delete account remains disabled or server submission is rejected when absent.",
       "effects": [
@@ -9209,7 +9253,7 @@
           "control": "Delete account confirmation field"
         }
       ],
-      "availability": "Always available in the Delete account form.",
+      "availability": "Always available in the Delete account form. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Satisfies the typed gate when the trimmed value exactly matches the required label.",
       "failure_result": "Delete account remains disabled or server submission is rejected for a mismatch.",
       "effects": [
@@ -9284,7 +9328,7 @@
           "control": "Delete account"
         }
       ],
-      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion.",
+      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
       "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation and global sign-out to clear the current browser session and redirects to the public login confirmation.",
       "failure_result": "A validation, service-role verification, or user-deletion failure shows a specific recoverable error and preserves both account and session. A post-deletion sign-out error cannot restore the deleted account and does not block the success redirect.",
       "effects": [
@@ -10194,7 +10238,7 @@
         }
       ],
       "availability": "Shown persistently while one or more first-link or later synchronization conflicts pause reconciliation. Matching hosted Sent/local Cancelled reminders with valid evidence and compatible initial manual status marks reconcile automatically; other reminder conflicts and conflicting user edits still require review.",
-      "success_result": "Opens Settings at the conflict review and keeps both copies unchanged.",
+      "success_result": "Opens Settings with the Cadence account drawer open at the conflict review and keeps both copies unchanged.",
       "failure_result": "The cue remains available until review opens or the account disconnects.",
       "effects": [
         "navigation"
@@ -10203,7 +10247,8 @@
       "confirmation": "none",
       "implementation": [
         "apps/desktop/src/desktop-app.tsx",
-        "apps/desktop/src/product.tsx"
+        "apps/desktop/src/product.tsx",
+        "apps/desktop/src/desktop-navigation.ts"
       ],
       "test_coverage": {
         "level": "direct",
@@ -10222,10 +10267,13 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "apps/desktop/src/desktop-app.tsx"
+            "apps/desktop/src/desktop-app.tsx",
+            "apps/desktop/src/desktop-navigation.ts",
+            "apps/desktop/src/account/account-section-state.ts"
           ],
           "evidence": [
-            "tests/desktop-account-sync-ui.test.tsx"
+            "tests/desktop-account-sync-ui.test.tsx",
+            "tests/desktop-settings-groups.dom.test.tsx"
           ]
         },
         "marketing": {
@@ -10263,7 +10311,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Apply conflict decisions"
+          "control": "Apply choices"
         }
       ],
       "availability": "Available after every conflict has one valid decision. Keep both stays hidden when graph identity cannot be duplicated safely.",
@@ -10660,15 +10708,15 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Open or cancel a category name and description draft.",
+      "intent": "Open the category list, then open or cancel a category name and description draft.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Add category / Edit / Cancel"
+          "control": "Edit N categories / Add category / Edit / Cancel"
         }
       ],
-      "availability": "Available on Settings.",
-      "success_result": "Open or cancel a category name and description draft.",
+      "availability": "Available on Settings. The category list starts closed under the Categories title and purpose.",
+      "success_result": "Open the category list, or open or cancel a category name and description draft.",
       "failure_result": "Drafts remain mounted; removed category selections reset to All categories.",
       "effects": [
         "ui_state"
@@ -10827,16 +10875,20 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Change category order without changing category identity.",
+      "intent": "Move a category to a new position without changing category identity.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Move up / Move down"
+          "kind": "gesture",
+          "control": "Drag a category's Reorder handle with a mouse or touch, and drop it"
+        },
+        {
+          "kind": "keyboard",
+          "control": "Arrow Up / Arrow Down on a focused Reorder handle"
         }
       ],
-      "availability": "Available on Settings.",
-      "success_result": "Change category order without changing category identity.",
-      "failure_result": "Errors preserve the draft and stored records. Stale category or assignment snapshots require review.",
+      "availability": "Available on Settings in the open category list when there are two or more categories and no category draft is open.",
+      "success_result": "The new order saves on drop or on each arrow key, and the move is announced (\"Fitness moved to position 2 of 8.\").",
+      "failure_result": "A stale category snapshot is refused, the list reloads in its stored order, and the refusal is shown.",
       "effects": [
         "ui_state",
         "database_write"
@@ -10852,9 +10904,10 @@
         "level": "direct",
         "references": [
           "tests/category-controls.dom.test.tsx",
-          "tests/category.service.test.ts"
+          "tests/category.service.test.ts",
+          "tests/desktop-store-contract.test.ts"
         ],
-        "notes": "Mounted control tests exercise draft preservation and view projection; category plans validate concurrency and confirmation."
+        "notes": "Mounted control tests drag with mouse and touch pointers, move with Arrow Up and Arrow Down, check the announcement and restore the stored order after a refusal; category plans validate move positions and the stale snapshot; the real SQLite contract (desktop:contract:test) saves a move and refuses a stale one."
       },
       "platforms": {
         "web": {
@@ -11639,22 +11692,14 @@
         "J06",
         "J10"
       ],
-      "intent": "Enable one Behavior's Note shortcuts and explicitly find, accept, edit, dismiss, or remove repeated-Note text.",
+      "intent": "Review repeated-Note text that Cadence proposed after Note saves: accept, edit, dismiss, or remove it. Note shortcuts are on by default (Ticket 305); there is no per-Behavior or Settings switch and no request to find repeated Notes.",
       "triggers": [
-        {
-          "kind": "change",
-          "control": "Enable Note shortcuts for this Behavior"
-        },
-        {
-          "kind": "activate",
-          "control": "Find repeated Notes"
-        },
         {
           "kind": "activate",
           "control": "Accept, Edit, Dismiss, or Remove Note shortcut"
         }
       ],
-      "availability": "Available in Behavior Details and Settings. Analysis needs an active Behavior and global/Behavior enablement; retained shortcut removal remains available when archived or off.",
+      "availability": "Available in Behavior Details and Settings. Proposals appear after the same Note is saved on three eligible Occurrences of an active Behavior; they need Accept before reaching a Note field. Retained shortcut removal remains available when archived or when the retained account switch is stored off.",
       "success_result": "Persists the reviewed shortcut state for one Behavior and announces the result without changing historical Notes.",
       "failure_result": "Shows the service error and retains the visible editor draft.",
       "effects": [
@@ -11716,65 +11761,81 @@
       }
     },
     {
-      "id": "INT-SETTINGS-014",
-      "name": "Enable Note shortcuts globally",
-      "user_guidance": {
-        "audience": "user",
-        "references": [
-          "docs/user-guide/timeline.md#use-a-note-shortcut"
-        ]
-      },
+      "id": "INT-SETTINGS-015",
       "status": "implemented",
       "surfaces": [
         "settings"
       ],
+      "name": "Jump to a Settings group from the section index",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#open-trust-privacy-or-terms-from-settings"
+        ]
+      },
       "routes": [
-        "/settings#note-shortcuts"
+        "/settings#settings-general",
+        "/settings#settings-connections",
+        "/settings#settings-planning",
+        "/settings#settings-account"
       ],
       "journeys": [
-        "J14"
+        "J21"
       ],
-      "intent": "Enable or turn off recurring Note shortcuts for the account or local desktop profile.",
+      "intent": "Move to General, Connections, Planning, or Account and data without scrolling the whole page.",
       "triggers": [
         {
-          "kind": "change",
-          "control": "Enable Note shortcuts"
+          "kind": "activate",
+          "control": "General"
+        },
+        {
+          "kind": "activate",
+          "control": "Connections"
+        },
+        {
+          "kind": "activate",
+          "control": "Planning"
+        },
+        {
+          "kind": "activate",
+          "control": "Account"
+        },
+        {
+          "kind": "activate",
+          "control": "Mac (desktop only)"
         }
       ],
-      "availability": "Available in Settings.",
-      "success_result": "Persists the global setting, hides or restores quick-fill and proposals, and keeps accepted shortcuts and saved Notes.",
-      "failure_result": "Shows the service error and keeps the prior setting visible.",
+      "availability": "Always available; the index stays in view below the app header while Settings scrolls. On the Mac it has a fifth link, Mac, and sits below the sync-conflict cue while that cue shows.",
+      "success_result": "The group title lands below the app header and index.",
+      "failure_result": "Normal in-page navigation applies.",
       "effects": [
-        "database_write",
-        "ui_state"
+        "navigation",
+        "focus_navigation"
       ],
-      "risk": "moderate",
+      "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/note-shortcuts/NoteShortcutControls.tsx#GlobalNoteShortcutControl",
-        "apps/desktop/src/settings-screen.tsx#SettingsScreen",
-        "apps/desktop/src/product.tsx#Product"
+        "components/settings/SettingsSections.tsx#SettingsSectionIndex",
+        "components/settings/SettingsSections.tsx#useOpenAnchorTarget",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/occurrence-note-shortcuts-ui.test.tsx",
-          "tests/note-suggestion.resolver.test.ts",
-          "tests/desktop-store-contract.test.ts"
+          "tests/settings-sections.dom.test.tsx",
+          "tests/desktop-settings-groups.dom.test.tsx"
         ],
-        "notes": "Mounted UI checks cover draft preservation and off controls; shared resolver and real SQLite/Postgres contracts cover ownership, revisions, lifecycle, and atomic saves."
+        "notes": "Renders the four index links in order and checks anchor placement handling."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/note-shortcuts/NoteShortcutControls.tsx#GlobalNoteShortcutControl"
+            "components/settings/SettingsSections.tsx#SettingsSectionIndex"
           ],
           "evidence": [
-            "tests/occurrence-note-shortcuts-ui.test.tsx",
-            "tests/note-suggestion.resolver.test.ts",
-            "docs/qa/2026-09-07-note-shortcuts.md"
+            "tests/settings-sections.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -11782,23 +11843,241 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/settings-screen.tsx#SettingsScreen",
-            "apps/desktop/src/product.tsx#Product"
+            "components/settings/SettingsSections.tsx#SettingsSectionIndex",
+            "components/settings/SettingsSections.tsx#DESKTOP_SETTINGS_GROUPS"
           ],
           "evidence": [
-            "tests/occurrence-note-shortcuts-ui.test.tsx",
-            "tests/note-suggestion.resolver.test.ts",
-            "tests/desktop-store-contract.test.ts"
-          ]
+            "tests/desktop-settings-groups.dom.test.tsx"
+          ],
+          "reason": "Ticket 302: the same index with a fifth link to the Mac group (#settings-mac). While the sync-conflict cue shows, the index and anchors sit 4rem lower so the cue stays visible."
         },
         "marketing": {
           "applicability": "not_applicable",
           "status": "not_applicable",
-          "reason": "Marketing does not alter authenticated settings."
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
         },
         "mobile": {
           "applicability": "deferred",
           "status": "deferred",
-          "reason": "Future mobile remains deferred."
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-016",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "name": "Open or close a Settings source row or drawer",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#outlook-icloud-hevy-and-daily-brief-data"
+        ]
+      },
+      "routes": [
+        "/settings#connector-google_calendar",
+        "/settings#connector-outlook_calendar",
+        "/settings#connector-icloud_calendar",
+        "/settings#connector-hevy",
+        "/settings#travel",
+        "/settings#categories",
+        "/settings#delete-account"
+      ],
+      "journeys": [
+        "J20",
+        "J21"
+      ],
+      "intent": "See a section's state without opening it, then open its existing controls: a connected source, Travel, Daily Brief, Categories, Delete account, or, on the Mac, the Cadence account.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Source row summary (Google Calendar, Outlook Calendar, iCloud Calendar, Hevy)"
+        },
+        {
+          "kind": "activate",
+          "control": "Set up Travel / Travel settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Set up Daily Brief / Daily Brief settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Edit categories"
+        },
+        {
+          "kind": "activate",
+          "control": "Link a Cadence account / Account settings (desktop only)"
+        },
+        {
+          "kind": "activate",
+          "control": "Delete account"
+        },
+        {
+          "kind": "activate",
+          "control": "Link to an anchor inside a row or drawer (opens it on arrival)"
+        }
+      ],
+      "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, Status unavailable after a failed read, or on the Mac a sync conflict, a first-link choice or a revoked session) opens by itself once.",
+      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
+      "failure_result": "A failed status read shows Status unavailable and opens the panel, which shows its own error.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsRow",
+        "components/settings/SettingsSections.tsx#SettingsDrawer",
+        "components/settings/SettingsSections.tsx#SettingsPageEnd",
+        "components/settings/SettingsSections.tsx#useOpenAnchorTarget",
+        "components/settings/ConnectorLibrary.tsx#ConnectorLibrary",
+        "lib/ui/settings-sections.ts",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+        "apps/desktop/src/account/account-section-state.ts",
+        "apps/desktop/src/desktop-navigation.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/settings-sections.dom.test.tsx",
+          "tests/settings-sections.test.ts",
+          "tests/desktop-settings-groups.dom.test.tsx",
+          "tests/desktop-account-section-state.test.ts",
+          "tests/desktop-navigation.test.ts"
+        ],
+        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsRow",
+            "components/settings/SettingsSections.tsx#SettingsDrawer",
+            "components/settings/ConnectorLibrary.tsx#ConnectorLibrary"
+          ],
+          "evidence": [
+            "tests/settings-sections.dom.test.tsx",
+            "tests/settings-sections.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+            "apps/desktop/src/product.tsx#Product",
+            "apps/desktop/src/account/account-section-state.ts",
+            "apps/desktop/src/desktop-navigation.ts",
+            "components/settings/SettingsSections.tsx#SettingsRow",
+            "components/settings/SettingsSections.tsx#SettingsDrawer",
+            "components/settings/SettingsSections.tsx#revealSettingsTarget",
+            "components/settings/ConnectorLibrary.tsx#ConnectorUnavailable"
+          ],
+          "evidence": [
+            "tests/desktop-settings-groups.dom.test.tsx",
+            "tests/desktop-account-section-state.test.ts",
+            "tests/settings-sections.test.ts",
+            "tests/desktop-navigation.test.ts"
+          ],
+          "reason": "Ticket 302: the same source rows and the Travel, Daily Brief and Categories drawers, plus a Cadence account drawer in General. On a local Mac each source that needs an account shows Link a Cadence account as row state. A sync conflict opens the account drawer. In-app navigation to an anchor inside a row or drawer opens it. Delete account stays web-only."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-017",
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "export_import"
+      ],
+      "name": "Open Export from Account and data",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/data-portability.md#choose-export-options"
+        ]
+      },
+      "routes": [
+        "/settings#settings-account",
+        "/export"
+      ],
+      "journeys": [
+        "J15"
+      ],
+      "intent": "Go from Settings to Export to download history as JSONL, CSV, full JSON, or a BehaviorLog bundle.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Open Export"
+        }
+      ],
+      "availability": "Always available in the Account and data group.",
+      "success_result": "Web navigates to /export; the Mac switches to its Export screen.",
+      "failure_result": "Normal navigation failure behavior applies.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SettingsSections.tsx#SettingsExportEntry",
+        "apps/desktop/src/settings-screen.tsx#SettingsScreen"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/settings-sections.dom.test.tsx",
+          "tests/desktop-settings-groups.dom.test.tsx"
+        ],
+        "notes": "Renders the Export entry text and its /export link."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SettingsSections.tsx#SettingsExportEntry"
+          ],
+          "evidence": [
+            "tests/settings-sections.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/settings-screen.tsx#SettingsScreen",
+            "components/settings/SettingsSections.tsx#SettingsExportEntry",
+            "apps/desktop/src/product.tsx#Product"
+          ],
+          "evidence": [
+            "tests/desktop-settings-groups.dom.test.tsx"
+          ],
+          "reason": "Ticket 302: the same entry in Account and data; Open Export is a button that opens the Mac's Export screen."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled; mobile web inherits the 390 px layout."
         }
       }
     },
@@ -11846,9 +12125,9 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11891,11 +12170,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -11919,16 +12193,28 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Expand the compact calendar field, search readable calendars, select calendars, and control timed/all-day visibility. Selected names appear as tags; drafts persist until Save.",
+      "intent": "Expand the compact calendar field, search readable calendars, select calendars, and control timed/all-day visibility. Selected names appear as tags. Each change saves as it happens (Ticket 303); there is no Save button.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save Calendar settings"
+          "kind": "change",
+          "control": "Show Google Calendar events on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day Google Calendar events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
       "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. Agent mode saves a separate selection and omits Timeline visibility controls.",
-      "failure_result": "Invalid or unavailable selections keep a visible error.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "A failed save puts the controls back to their saved values and says so. Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
         "local_preference"
@@ -11936,22 +12222,24 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/GoogleCalendarPanel.tsx"
+        "components/settings/GoogleCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/GoogleCalendarPanel.tsx"
+            "components/settings/GoogleCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx"
@@ -11963,7 +12251,8 @@
           "implementation": [
             "components/settings/GoogleCalendarPanel.tsx",
             "apps/desktop/src/calendar/google-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx",
@@ -11986,12 +12275,7 @@
         {
           "id": "standard",
           "label": "Google Calendar",
-          "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+          "result": "Uses the standard grant for Timeline context. Choices save as they change."
         }
       ]
     },
@@ -12019,11 +12303,11 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Refresh Calendar"
+          "control": "Refresh Google Calendar"
         }
       ],
       "availability": "Connected accounts can refresh calendar discovery, including without selected calendars. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state. Agent mode refreshes calendar discovery only; event reads remain behind Daily Brief authorization.",
+      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state.",
       "failure_result": "A failed or incomplete read preserves the last complete stale snapshot.",
       "effects": [
         "network_request",
@@ -12038,10 +12322,10 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-client.test.tsx",
-          "tests/google-calendar-agent.test.ts",
+          "tests/google-calendar-agent-retirement.test.ts",
           "tests/google-calendar-panel.dom.test.tsx"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -12084,11 +12368,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -12117,34 +12396,44 @@
         {
           "kind": "activate",
           "control": "Disconnect Google Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Fences reads for the selected purpose, deletes its credentials, and attempts provider revocation. Standard disconnect clears the Timeline cache; agent disconnect invalidates agent reads only.",
-      "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted.",
+      "availability": "Available for an existing Timeline connection; the UI explains other-device effects. The first click asks \"Disconnect Google Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
+      "success_result": "Fences reads, deletes the credentials, attempts provider revocation and clears the Timeline cache. Daily Brief stops reading Google Calendar because it uses this connection (Ticket 307).",
+      "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/GoogleCalendarPanel.tsx"
+        "components/settings/GoogleCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/GoogleCalendarPanel.tsx"
+            "components/settings/GoogleCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx"
@@ -12156,7 +12445,8 @@
           "implementation": [
             "components/settings/GoogleCalendarPanel.tsx",
             "apps/desktop/src/calendar/google-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/google-calendar-panel.dom.test.tsx",
@@ -12180,11 +12470,6 @@
           "id": "standard",
           "label": "Google Calendar",
           "result": "Uses the standard grant for Timeline context."
-        },
-        {
-          "id": "agent",
-          "label": "Google Calendar for Daily Brief",
-          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
         }
       ]
     },
@@ -12553,13 +12838,25 @@
       "intent": "Choose which Outlook calendars Cadence may show and how.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save Outlook settings"
+          "kind": "change",
+          "control": "Show Outlook Calendar events on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day Outlook Calendar events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
-      "availability": "Available while Outlook Calendar is connected.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
-      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "availability": "Available while Outlook Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
         "local_preference"
@@ -12567,7 +12864,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/OutlookCalendarPanel.tsx"
+        "components/settings/OutlookCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12581,7 +12879,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/OutlookCalendarPanel.tsx"
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -12593,7 +12892,8 @@
           "implementation": [
             "components/settings/OutlookCalendarPanel.tsx",
             "apps/desktop/src/calendar/outlook-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -12721,19 +13021,28 @@
         {
           "kind": "activate",
           "control": "Disconnect Outlook Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while Outlook Calendar is connected or requiring reconnection.",
+      "availability": "Available while Outlook Calendar is connected or requiring reconnection. The first click asks \"Disconnect Outlook Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes the sealed credential and that source's cache, fences late responses, and shows the Microsoft account or My Apps removal step.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/OutlookCalendarPanel.tsx"
+        "components/settings/OutlookCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -12748,7 +13057,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/OutlookCalendarPanel.tsx"
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx",
@@ -12761,7 +13071,8 @@
           "implementation": [
             "components/settings/OutlookCalendarPanel.tsx",
             "apps/desktop/src/calendar/outlook-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -12976,19 +13287,28 @@
         {
           "kind": "activate",
           "control": "Disconnect Hevy"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while Hevy is connected.",
+      "availability": "Available while Hevy is connected. The first click asks \"Disconnect Hevy?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes the sealed key and that source's cache and shows the Hevy key removal step.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/HevyPanel.tsx"
+        "components/settings/HevyPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13002,7 +13322,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/HevyPanel.tsx"
+            "components/settings/HevyPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -13014,7 +13335,8 @@
           "implementation": [
             "components/settings/HevyPanel.tsx",
             "apps/desktop/src/calendar/hevy.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -13484,11 +13806,23 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Google Calendar timing, reminder delivery history, Notes on Not Completed occurrences, and each separately connected Outlook Calendar, iCloud Calendar, or Hevy workout-timing source may inform it.",
+      "intent": "Turn the Daily Brief on or off, make one choice that covers every connected source (including one connected later), and under Advanced exclude a connected Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy workout-timing source, or choose reminder delivery history and Notes on Not Completed occurrences.",
       "triggers": [
         {
           "kind": "change",
-          "control": "Enable Daily Brief or Include calendars selected in Google Calendar for Daily Brief"
+          "control": "Daily Brief"
+        },
+        {
+          "kind": "change",
+          "control": "Plan around my connected sources"
+        },
+        {
+          "kind": "activate",
+          "control": "Advanced: choose sources"
+        },
+        {
+          "kind": "change",
+          "control": "Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy under Advanced"
         },
         {
           "kind": "change",
@@ -13496,19 +13830,11 @@
         },
         {
           "kind": "change",
-          "control": "Include Notes on Not Completed occurrences"
-        },
-        {
-          "kind": "change",
-          "control": "Include selected Outlook Calendar timing, Include selected iCloud Calendar timing, or Include today's recorded Hevy workout times"
-        },
-        {
-          "kind": "activate",
-          "control": "Allow Outlook Calendar again, Allow iCloud Calendar again, or Allow Hevy again"
+          "control": "Include Notes on Not Completed Occurrences"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 240 adds its adapter. Google Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one. Google Calendar disclosure binds the agent grant generation and selection revision.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. Plan around my connected sources needs Daily Brief on and cannot be turned on while nothing is connected. Advanced lists only connected sources; a source row is disabled while the one choice is off. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Google Calendar is the Timeline connection and its selected calendars (Ticket 307).",
+      "success_result": "Saves the declared preference fields (Ticket 306: enabled, the one connected-sources choice, four per-source exclusions, reminder history and Notes) and withdraws any current Daily Brief presentation. Turning Daily Brief off withdraws every choice and deletes tip repetition metadata. A source connected after the choice is covered and its Advanced row says Daily Brief uses it; reconnecting or reselecting a covered source asks nothing. The server never reads an excluded source. Older per-source clients' saves map to the one choice and exclude every source they leave off. Each run fences the sources it reads on the connection and selection read at its start.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -13526,9 +13852,11 @@
         "level": "direct",
         "references": [
           "tests/daily-brief-ui.dom.test.tsx",
-          "tests/daily-brief.service.test.ts"
+          "tests/daily-brief.service.test.ts",
+          "tests/daily-brief-sources.test.ts",
+          "tests/briefing-account-context.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, revocation on disable, per-source changed/no-calendar/unavailable copy, Allow again renewing only its source, and unrelated saves revoking sources that need attention; service coverage verifies two-, four-, and seven-field saves, connected-source checks, and generation/selection renewal state; SQL smoke verifies admission after renewal."
+        "notes": "DOM coverage verifies the one choice, its coverage line, Advanced rows with each statement of what is sent, a later-connected source shown as used, exclusion and restore of one source, disabled rows while the choice is off, and withdrawal on disable; service coverage verifies the new shape, older two-, four- and seven-field saves mapped to exclusions, and per-source status; SQL smoke (tests/sql/ticket-306-daily-brief-connected-sources-smoke.sql) verifies the migration mapping, v4 save, withdrawal and admission for a later-connected source."
       },
       "platforms": {
         "web": {
@@ -13663,16 +13991,24 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Save the optional Home and the usual travel mode (walking, cycling, transit or driving). The travel toggle keeps its state.",
+      "intent": "Set the optional Home and the usual travel mode (walking, cycling, transit or driving). Usual travel comes first, above Travel estimates, which needs it. Each saves on its own; the travel toggle keeps its state (Ticket 303).",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save travel settings"
+          "kind": "change",
+          "control": "Usual travel"
+        },
+        {
+          "kind": "change",
+          "control": "Home (optional)"
+        },
+        {
+          "kind": "keyboard",
+          "control": "Enter in Home (optional)"
         }
       ],
-      "availability": "Existing Settings; enabled after Home or usual travel changes. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
-      "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
-      "failure_result": "Shows an unavailable state and preserves tracking data.",
+      "availability": "Existing Settings. Usual travel saves when it changes; Home saves on blur or Enter when its text changed. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
+      "success_result": "Saves the one changed value on the latest saved revision, shows Saving\u2026 then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
+      "failure_result": "Puts the control back to its saved value and says what to do in the same line: try again, or reload Settings if another device changed it. Tracking data is unchanged.",
       "effects": [
         "ui_state",
         "network_request",
@@ -13682,7 +14018,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/settings/TravelSettingsPanel.tsx"
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13697,7 +14034,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13709,7 +14047,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelSettingsPanel.tsx",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13754,9 +14093,9 @@
           "control": "Travel estimates"
         }
       ],
-      "availability": "Existing Settings after usual travel is chosen; route estimates remain deployment-gated.",
-      "success_result": "Saves the toggle with consent, shows the device location state, and does not save or send the position from this request.",
-      "failure_result": "Shows an unavailable state and preserves tracking data.",
+      "availability": "Existing Settings after usual travel is chosen; usual travel sits above the toggle. Route estimates remain deployment-gated.",
+      "success_result": "Saves the toggle with consent at once and shows Saving\u2026, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
+      "failure_result": "Puts the toggle back to its saved state and says what to do. Tracking data is unchanged.",
       "effects": [
         "ui_state",
         "network_request",
@@ -13767,7 +14106,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/settings/TravelSettingsPanel.tsx"
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -13781,7 +14121,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -13793,7 +14134,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelSettingsPanel.tsx",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx"
@@ -14411,9 +14753,9 @@
           "control": "Travel to {place}"
         }
       ],
-      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision; there are no separate buffer fields.",
-      "success_result": "Saves the habit, says Travel habits saved, and refreshes estimates once.",
-      "failure_result": "Keeps the stored habits and asks the user to reload Settings when another device changed them.",
+      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision, one save at a time; there are no separate buffer fields.",
+      "success_result": "Saves the habit, shows Saving\u2026 then Saved in How you travel's one result line, and refreshes estimates once.",
+      "failure_result": "Puts the choice back to its stored value, says so, and asks the user to reload Settings when another device changed them.",
       "effects": [
         "ui_state",
         "network_request",
@@ -14425,7 +14767,8 @@
       "implementation": [
         "components/settings/TravelHabitsSection.tsx",
         "components/settings/TravelSettingsPanel.tsx",
-        "app/api/travel/habits/route.ts"
+        "app/api/travel/habits/route.ts",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -14441,7 +14784,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/TravelHabitsSection.tsx",
-            "app/api/travel/habits/route.ts"
+            "app/api/travel/habits/route.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-habits.dom.test.tsx",
@@ -14455,7 +14799,8 @@
           "implementation": [
             "components/settings/TravelHabitsSection.tsx",
             "apps/desktop/src/product.tsx",
-            "apps/desktop/src/local-travel-settings.service.ts"
+            "apps/desktop/src/local-travel-settings.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-habits.dom.test.tsx",
@@ -14849,8 +15194,8 @@
         }
       ],
       "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section. Ticket 283: Outlook and iCloud events get reminders like Google Calendar events, so the readiness list no longer limits sources.",
-      "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
-      "failure_result": "Keeps the stored value and says the reminder setting could not save. A failed load leaves the checkbox unavailable and says so.",
+      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving\u2026, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
+      "failure_result": "Puts the switch back to its stored value and says the reminder setting could not save and the change was undone. A failed load leaves the checkbox unavailable and says so.",
       "effects": [
         "ui_state",
         "network_request",
@@ -14864,7 +15209,8 @@
         "lib/ui/leave-reminders.ts",
         "app/api/travel/leave-reminders/route.ts",
         "lib/services/leave-reminder-settings.service.ts",
-        "lib/db/leave-reminder-settings.repo.ts"
+        "lib/db/leave-reminder-settings.repo.ts",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -14880,7 +15226,8 @@
           "status": "implemented",
           "implementation": [
             "components/settings/LeaveReminderSetting.tsx",
-            "app/api/travel/leave-reminders/route.ts"
+            "app/api/travel/leave-reminders/route.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx",
@@ -14896,7 +15243,8 @@
             "apps/desktop/src/leave-reminders.ts",
             "apps/desktop/src/product.tsx",
             "apps/desktop/src/use-leave-reminders.ts",
-            "apps/desktop/src/local-leave-reminder.service.ts"
+            "apps/desktop/src/local-leave-reminder.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx",
@@ -14914,6 +15262,100 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred; mobile web inherits the shared Settings section, checked at 390 px."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-014",
+      "name": "Set Home from the current location",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#set-up-travel"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings",
+        "/settings#travel"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Fill the Home field with a street address from this device's position, then check or edit it; Home saves on blur or Enter as usual (Tickets 308 and 303).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Use my current location"
+        }
+      ],
+      "availability": "Settings, Travel, beside Home, on web and on a linked Mac, once Travel estimates is on with its disclosure accepted. Until then one line says to turn on Travel estimates first. Hidden on a Mac in local mode, which keeps typing only. Five lookups per account per hour, inside the monthly travel spend ceiling.",
+      "success_result": "Reads the device position once, asking for permission if needed, sends it to Cadence's server for one Google reverse-geocoding request, fills Home with the returned street address and moves focus to it. Nothing saves on fill; Home saves when the person presses Enter or leaves the field. The position is not stored, logged, synced, exported or returned.",
+      "failure_result": "Shows one plain message in Travel's result line for a denied, unavailable or inaccurate position, no street address, too many lookups, an unavailable lookup or no internet. Home keeps its text and typing always works.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "permission_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HomeCurrentLocation.tsx",
+        "components/settings/TravelSettingsPanel.tsx",
+        "lib/ui/home-lookup.ts",
+        "app/api/travel/home-lookup/route.ts",
+        "lib/services/travel-home-lookup.service.ts",
+        "lib/services/travel-provider.ts",
+        "lib/db/launchRateLimits.repo.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx",
+          "tests/travel-home-lookup.test.ts"
+        ],
+        "notes": "Provider-free tests with a fake provider: success, no result, rate limit, spend ceiling and no logged position. Hosted acceptance within the owner's travel spend cap and installed Mac acceptance remain open."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HomeCurrentLocation.tsx",
+            "app/api/travel/home-lookup/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/travel-home-lookup.test.ts"
+          ],
+          "reason": "Shared Settings section; the hosted endpoint runs as the signed-in user. Hosted acceptance remains open."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HomeCurrentLocation.tsx",
+            "apps/desktop/src/home-lookup.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/travel-home-lookup.test.ts"
+          ],
+          "reason": "Same component with the Mac's foreground location read and the hosted endpoint through the account's bearer token, on a linked Mac. Local mode keeps typing only. Installed dev-signed acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; mobile web inherits the shared Settings section, with the button wrapping below Home at 390 px."
         }
       }
     },
@@ -15168,7 +15610,7 @@
         }
       ],
       "availability": "Signed in, under Settings \u2192 Connected apps.",
-      "success_result": "Revoke the owned grant and every token immediately.",
+      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting\u2026, then the result (Ticket 303).",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_revocation"
@@ -15178,7 +15620,8 @@
       "implementation": [
         "components/settings/ConnectedAppsPanel.tsx",
         "app/(app)/settings/actions.ts",
-        "lib/services/oauth-ui.service.ts"
+        "lib/services/oauth-ui.service.ts",
+        "components/settings/settings-result.tsx"
       ],
       "user_guidance": {
         "audience": "user",
@@ -15201,7 +15644,8 @@
           "implementation": [
             "components/settings/ConnectedAppsPanel.tsx",
             "app/(app)/settings/actions.ts",
-            "lib/services/oauth-ui.service.ts"
+            "lib/services/oauth-ui.service.ts",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/oauth-ui.dom.test.tsx",
@@ -15562,13 +16006,25 @@
       "intent": "Choose which iCloud calendars Cadence may show and how.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Save iCloud settings"
+          "kind": "change",
+          "control": "Show iCloud Calendar events on Timeline"
+        },
+        {
+          "kind": "change",
+          "control": "Show all-day iCloud Calendar events"
+        },
+        {
+          "kind": "change",
+          "control": "Calendar choice"
+        },
+        {
+          "kind": "change",
+          "control": "Visible on Timeline: {calendar}"
         }
       ],
-      "availability": "Available while iCloud Calendar is connected.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
-      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "availability": "Available while iCloud Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
         "local_preference"
@@ -15576,7 +16032,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/IcloudCalendarPanel.tsx"
+        "components/settings/IcloudCalendarPanel.tsx",
+        "components/settings/settings-result.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -15590,7 +16047,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/IcloudCalendarPanel.tsx"
+            "components/settings/IcloudCalendarPanel.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx"
@@ -15602,7 +16060,8 @@
           "implementation": [
             "components/settings/IcloudCalendarPanel.tsx",
             "apps/desktop/src/calendar/icloud-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/settings-result.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"
@@ -15730,19 +16189,28 @@
         {
           "kind": "activate",
           "control": "Disconnect iCloud Calendar"
+        },
+        {
+          "kind": "activate",
+          "control": "Disconnect"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
         }
       ],
-      "availability": "Available while connected or requiring reconnection.",
+      "availability": "Available while connected or requiring reconnection. The first click asks \"Disconnect iCloud Calendar?\" in place, with a destructive Disconnect and Cancel (Ticket 303).",
       "success_result": "Deletes sealed Apple login values and iCloud cache. Explains manual revocation at account.apple.com under Sign-In and Security, App-Specific Passwords.",
-      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access. Cancel leaves the connection unchanged.",
       "effects": [
         "database_delete",
         "network_request"
       ],
       "risk": "low",
-      "confirmation": "none",
+      "confirmation": "acknowledgement",
       "implementation": [
-        "components/settings/IcloudCalendarPanel.tsx"
+        "components/settings/IcloudCalendarPanel.tsx",
+        "components/settings/SettingsDisconnect.tsx"
       ],
       "test_coverage": {
         "level": "direct",
@@ -15757,7 +16225,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/settings/IcloudCalendarPanel.tsx"
+            "components/settings/IcloudCalendarPanel.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/connector-library.dom.test.tsx",
@@ -15770,7 +16239,8 @@
           "implementation": [
             "components/settings/IcloudCalendarPanel.tsx",
             "apps/desktop/src/calendar/icloud-calendar.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "components/settings/SettingsDisconnect.tsx"
           ],
           "evidence": [
             "tests/desktop-calendar.test.ts"

@@ -379,7 +379,8 @@ describe("desktop failed-read retries", () => {
     expect(container.querySelector("h1")?.textContent).toBe("Timeline");
     const settings = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Settings")!;
     await act(() => settings.click()); await settle();
-    expect(container.textContent).toContain("Note shortcuts are temporarily unavailable");
+    // Ticket 305: desktop Settings has no Note shortcuts control to report on.
+    expect(container.textContent).not.toContain("Note shortcuts");
     expect(container.querySelector("h1")?.textContent).toBe("Settings");
   });
 

@@ -1866,6 +1866,12 @@ provider/privacy go decision are documented. Cloud consent cannot synchronize.
 Do not log Notes, shortcut text, evidence hashes, provider payloads, or account IDs.
 Record aggregate synthetic checks and sanitized failures only.
 
+Ticket 305 adds `20261110153050_allow_default_on_note_shortcuts.sql` (commit gate
+only) and `20261110170000_turn_on_note_shortcuts_once.sql` (a once-only data change
+that turns stored global off switches on; not additive), plus SQLite migration 0022.
+Web code that matches after a save needs the first migration on the hosted database
+before it deploys. Fixture: `tests/sql/ticket-305-note-shortcuts-default-on.sql`.
+
 Apply tracked Postgres and SQLite migrations with the normal local replay,
 ownership, rollback, backup, and old-client compatibility checks. Hosted migration,
 deployment, distribution, new provider access, and spending beyond authorization
@@ -1888,7 +1894,9 @@ Server environment names: `GOOGLE_CALENDAR_CLIENT_ID`,
 `GOOGLE_CALENDAR_KEY_ID`, and optional `GOOGLE_CALENDAR_DECRYPTION_KEYS`
 (JSON map of prior key IDs to canonical base64 keys). The callback must use the
 configured HTTPS `/auth/google-calendar/callback` path. Desktop uses only public
-`VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets.
+`VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets. Since Ticket
+307, Daily Brief reads this connection's selected calendars when the one
+connected-sources choice covers Google Calendar.
 
 Hevy, Outlook, and iCloud credentials (Ticket 235) use a separate server-only
 keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
@@ -2252,6 +2260,13 @@ retry and 45 seconds of provider work. Geocoding and driving refinement also con
 provider billable calls; the request counter is not a monetary spending cap.
 Configure provider quotas and a reviewed budget before enabling the gate.
 
+Ticket 308's Home lookup (`POST /api/travel/home-lookup`) uses the same clearance and
+credentials. Locally the Geocoding v3 key serves reverse geocoding unchanged. Hosted calls
+use Geocoding v4 `GeocodeLocation`, which has its own Google quota; check that quota and that
+the `cadence-travel` token's `cloud-platform` scope is accepted before the first hosted
+lookup (not verified on November 10, 2026). Each lookup reserves US$0.005 under the monthly
+travel ceiling after a five-per-hour account limit. No new environment variable.
+
 Rollback first removes the clearance flag. Foreground clients clear transient evidence
 when they refresh, lose focus, go offline or reach their five-minute expiry.
 User-authored locations and tracking remain intact. Do not roll back the additive
@@ -2403,47 +2418,65 @@ and registrations and stops its own development server. It never reads or
 copies `.env.local`; local Supabase keys enter the child environment in memory.
 A clean isolated database reset and generated-type comparison remain required.
 
-## Agent Calendar grant (Ticket 187)
+## Retiring the Daily Brief Calendar grant (Ticket 307)
 
-Implementation checklist: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
-The rollout requires corrected AI disclosures and a demonstrated barrier against older AI readers.
+Ticket 307 retires the separate Daily Brief Google Calendar grant of Ticket 187.
+Daily Brief now reads Google Calendar timing through the Timeline connection and its
+selected calendars, covered by the one connected-sources choice of Ticket 306. What
+is sent is unchanged: today's event times, timezone, availability and response.
+The owner authorized pushing the non-additive migration after the pull request
+merges (`docs/DECISIONS.md`, 2026-11-10).
 
-Ticket 187 separates AI Calendar access from Timeline Calendar access. Cadence sign-in stays unchanged.
-The existing standard client remains non-agentic; confirm that classification before rollout.
-Daily Brief and private workbench current/historical reads use a new agent client exclusively.
-No Workspace MCP endpoint or additional Google scope is introduced.
+Hosted runbook, in this order:
 
-Provision the agent client in a different Google Cloud project from both standard Calendar and sign-in.
-Google token revocation affects grants across clients within one project.
-Configure these server-only values alongside the existing Calendar settings:
+1. Push `20261110150000_daily_brief_connected_sources.sql` (Ticket 306, additive)
+   under the standing approval, before the deploy that needs it.
+2. Merge and let the web deploy. The Ticket 307 app reads no Google Calendar for
+   Daily Brief until step 4: the preference read must report
+   `google_calendar_source = timeline`. It starts no new Daily Brief grant, installs
+   nothing from a late agent callback, and answers older desktop builds' agent
+   requests as `not_configured`. Keep `GOOGLE_CALENDAR_AGENT_PROJECT_ID`,
+   `GOOGLE_CALENDAR_AGENT_CLIENT_ID` and `GOOGLE_CALENDAR_AGENT_CLIENT_SECRET` set:
+   step 3 needs them to open and revoke the stored tokens. Before the merge, the owner
+   sets a new random `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` in Production (Sensitive) and
+   stores the same value in the vault item `google-calendar-agent-retire-secret`, so the
+   deploy carries it.
+3. Revoke the grants at Google. Call the one-off route until it reports
+   `"remaining": 0`. Each call handles up to 100 grants and is safe to repeat:
+   ```bash
+   curl -sS -X POST -H "Authorization: Bearer $GOOGLE_CALENDAR_AGENT_RETIRE_SECRET" \
+     https://<production-host>/api/google-calendar/agent-grants/retire
+   ```
+   The response holds counts only: `revoked`, `unrevocable` (a token Cadence cannot
+   open, removed without revocation), `failed` (Google did not confirm; the credential
+   stays for the next call) and `remaining`. `not_configured` means the agent client
+   or sealing key is missing; restore them and call again. `503` means
+   `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` is unset in Production. The route has its own
+   secret, not `CRON_SECRET`, so the caller gets no access to the cron routes. Agents read it
+   from the Cadence Agents vault item `google-calendar-agent-retire-secret` through
+   `npm run agent:secret`. Never print it.
+4. Push `20261110160000_daily_brief_google_calendar_timeline.sql`. It refuses to run
+   while any Daily Brief credential remains (`55000`), so step 3 must finish first.
+   It maps preferences, deletes every attempt, selection and connection row of the
+   retired grant, and revokes service-role access to the five `calendar_agent_*`
+   functions. An account that had allowed Calendar timing keeps it allowed only if
+   its Timeline connection is connected; otherwise Google Calendar starts excluded.
+5. Read back as a test account: `GET /api/advisor/preferences` reports
+   `sourceStatus.googleCalendar` from the Timeline connection, and a brief with
+   Google covered carries the Calendar connector.
+6. After step 4, remove the three agent environment values and
+   `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` from Vercel, and delete the vault item
+   `google-calendar-agent-retire-secret`. A later cleanup ticket
+   may drop the empty tables, the retirement route and the agent repository branches.
 
-- `GOOGLE_CALENDAR_PROJECT_ID`: actual standard Calendar project ID.
-- `GOOGLE_CALENDAR_AGENT_PROJECT_ID`: actual, distinct agent Calendar project ID.
-- `GOOGLE_CALENDAR_AGENT_CLIENT_ID` and `GOOGLE_CALENDAR_AGENT_CLIENT_SECRET`: the agent client.
+Rollback: revoked tokens cannot be restored, so a restored grant needs new consent.
+Before step 4, redeploying the previous app restores the old panel with no data loss.
+After step 4, follow the migration header: restore the service-role grants, re-create
+`read_daily_brief_preferences` and `save_daily_brief_preferences_v3` from the earlier
+migrations, and redeploy an app from before Ticket 307. Mapped preference rows keep
+their stored choice.
 
-The agent client uses the same HTTPS callback path and encryption keyring as standard Calendar.
-Register the active callback on the agent client. Register the legacy callback only if that origin remains supported.
-Runtime rejects missing agent credentials, equal project IDs, and equal client IDs. It never falls back to standard credentials.
-Project IDs are configuration assertions; verify actual client ownership and agentic classification in Google Console.
-Complete consent-screen branding, authorized domains, Calendar API enablement, and sensitive-scope verification for the new project.
-Do not copy standard refresh tokens or change the standard client ID.
-
-Rollout order:
-1. Confirm both project/client inventories, classification, callbacks, scopes and verification with an authorized Google owner session.
-2. Keep AI Calendar requests unavailable during the migration/application cutover. Do not run old AI readers against newly enabled agent preferences.
-3. Apply `20261022180000_separate_agent_calendar_grant.sql` through the approved Supabase migration workflow, then deploy the matching server source.
-4. Add verified agent configuration. The migration clears old Calendar disclosures and outstanding brief attempts for those accounts only.
-5. Obtain fresh consent in **Google Calendar for Daily Brief**, select calendars, and enable Calendar separately in **Daily Brief**.
-6. Verify web and an installed desktop build with both grants. Disconnect each independently; verify the other still reads Calendar and sign-in works.
-7. Check denied consent, Workspace policy rejection, revoked refresh, missing configuration, replay, wrong account and account deletion.
-8. Record sanitized evidence in `docs/qa/2026-10-12-agentic-calendar.md` before closing Ticket 187.
-
-Agent credentials, attempts, preferences, generations and pending requests are separate from standard Calendar.
-Desktop uses a separate Keychain pending-state entry, the hosted broker, and no agent event cache.
-Account deletion cascades both grants and attempts provider revocation after Auth deletion succeeds.
-A Google revocation outage leaves local credentials deleted and reports the existing manual-removal warning.
-Pre-separation workbench cases containing Calendar data remain locally reviewable, but cannot be rerun against the model.
-
-Rollback removes agent configuration and disables Calendar disclosure. Preserve the standard connection and additive schema.
-Do not roll back to source that sends standard-grant Calendar data to AI. Behavior-only briefing can remain enabled.
-The email's November 11/12 dates remain notice evidence; live classification is a separate verification gate.
+History: Ticket 187 (`20261022180000_separate_agent_calendar_grant.sql`) added a
+separate Google Cloud project and client for Daily Brief Calendar reads. Its rollout
+checklist is `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`; evidence is in
+`docs/qa/2026-10-12-agentic-calendar.md`. Both are historical after Ticket 307.

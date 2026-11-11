@@ -109,7 +109,7 @@ checked 2026-10-16. Prices are per call, up to 100,000 calls a month.
 | --- | --- | --- |
 | Compute Routes Essentials | US$0.005 | Walking, cycling, transit (assumed; transit tier not confirmed) |
 | Compute Routes Pro | US$0.010 | Driving, because the code sends `TRAFFIC_AWARE_OPTIMAL` |
-| Geocoding | US$0.005 | Looking up a place from typed text |
+| Geocoding | US$0.005 | Looking up a place from typed text; a Home address from the current location (Ticket 308) |
 | Compute Route Matrix | Same price per element | Not used; it saves round trips, not money |
 
 ### Caching terms constrain the design
@@ -167,6 +167,25 @@ keep the three-hour `timeline` scope until they update.
 
 Cost per leg: US$0.005 for walking, cycling and transit. About US$0.0085 for
 driving, assuming half the legs fall within an hour of departure and 10% of calls are retried.
+
+### Home from the current location (Ticket 308), assumed
+
+**Use my current location** beside Home makes one Google reverse-geocoding request. Google
+bills it under the same Geocoding SKU as an address lookup ("All Geocoding API requests",
+[Geocoding usage and billing](https://developers.google.com/maps/documentation/geocoding/usage-and-billing),
+checked 2026-11-10), so US$0.005 at list price. The request reserves US$0.005 through
+`reserve_travel_provider_spend`, inside the same US$5 monthly ceiling, after the account's
+rate limit of five lookups per hour (`launch_rate_limits`, action `travel_home_lookup`).
+A refused lookup reserves nothing. Saving the filled address then makes the usual one-time
+place lookup for Home, already counted above.
+
+| Assumption | Light | Typical | Heavy |
+| --- | --- | --- | --- |
+| Lookups when setting or moving Home | 1 | 1 | 2 |
+| **Cost, one-time** | **US$0.005** | **US$0.005** | **US$0.01** |
+
+The rate limit bounds abuse at 5 lookups an hour, about US$0.60 a day, and the monthly
+ceiling still applies. Totals are unchanged: the cost is one-time and below rounding.
 
 ### Travel advisory revamp usage model, assumed
 
@@ -578,6 +597,9 @@ arrives, fees reduce the US$5:
   Cadence no model spend; hosted preparation compute remains. Totals are unchanged.
 - 2026-11-09: Ticket 288 records Daily Brief token usage per model call in the
   performance log and in workbench runs. Token figures stay assumed until measured.
+- 2026-11-10: Ticket 308 in source. Use my current location makes one reverse-geocoding call
+  (Geocoding SKU, US$0.005) per lookup, rate-limited to five an hour per account and reserved
+  against the US$5 monthly travel ceiling. One-time cost; totals are unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

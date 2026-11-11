@@ -40,9 +40,13 @@ export function planCategoryChange(categories: readonly ManagedCategory[], form:
     if (form.get("confirm_delete") !== "yes") throw new Error("Confirm deletion before removing a category.");
     deletedId = rows[index]!.id;
     rows.splice(index, 1);
-  } else if (operation === "up" || operation === "down") {
-    const target = index + (operation === "up" ? -1 : 1);
-    if (target >= 0 && target < rows.length) [rows[index], rows[target]] = [rows[target]!, rows[index]!];
+  } else if (operation === "move") {
+    // `position` is the category's zero-based place in the list after the move.
+    const raw = form.get("position");
+    const position = typeof raw === "string" && /^\d+$/.test(raw) ? Number(raw) : -1;
+    if (position < 0 || position >= rows.length) throw new Error("Choose a position in the category list.");
+    const [moved] = rows.splice(index, 1);
+    rows.splice(position, 0, moved!);
   } else throw new Error("Choose a category action.");
   return { deletedId, categories: rows.map((category, index) => ({ ...category, sort_order: index,
     updated_at: category.sort_order === index ? category.updated_at : now })) };

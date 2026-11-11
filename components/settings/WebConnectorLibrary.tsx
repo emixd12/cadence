@@ -11,12 +11,12 @@ import { OutlookCalendarPanel } from "./OutlookCalendarPanel";
 import { WebGoogleCalendarPanel } from "./WebGoogleCalendarPanel";
 import { outlookCallbackMessage, outlookTimelineRange, webHevyCoordinator, webIcloudCalendarCoordinator, webOutlookCalendarCoordinator } from "@/lib/ui/connectors";
 
-/** Web Settings connector library: Google (unchanged flow), Outlook, iCloud, and Hevy. */
+/** Web Settings connector library: Google (unchanged flow), Outlook, iCloud, and Hevy, one closed row each (Ticket 301). */
 export function WebConnectorLibrary({ timezone }: Readonly<{ timezone: string }>) {
   const searchParams = useSearchParams();
   const today = useMemo(() => Temporal.Now.zonedDateTimeISO(timezone).toPlainDate().toString(), [timezone]);
   const outlookRange = useMemo(() => outlookTimelineRange(today, Temporal.PlainDate.from(today).add({ days: 7 }).toString(), timezone), [timezone, today]);
-  return <ConnectorLibrary sources={[
+  return <ConnectorLibrary rows sources={[
     { id: "google_calendar", content: <WebGoogleCalendarPanel timezone={timezone} nested /> },
     { id: "outlook_calendar", content: <OutlookCalendarPanel coordinator={webOutlookCalendarCoordinator} refreshRange={outlookRange}
       callbackMessage={outlookCallbackMessage(searchParams?.get("outlook_calendar"))} /> },

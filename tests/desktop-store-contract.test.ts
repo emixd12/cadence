@@ -102,6 +102,28 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     expect((await localCommand("readCategories", { profileId: profile.id })).some((row) => row.id === category.id)).toBe(false);
   });
 
+  it("moves a category to a position in one write and refuses a stale snapshot", async () => {
+    const profile = await localCommand("readProfile", {});
+    const action = createLocalCategoryAction(() => undefined);
+    const before = await localCommand("readCategories", { profileId: profile.id });
+    const last = before.at(-1)!;
+    const move = (expected: string) => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries({ intent: "move", category_id: last.id, position: "1", expected })) form.set(key, value);
+      return action({ status: "idle", message: "" }, form);
+    };
+    expect((await move(categorySnapshot(before))).status).toBe("success");
+    await stop(); await start();
+    const after = await localCommand("readCategories", { profileId: profile.id });
+    const ids = before.map((row) => row.id).filter((id) => id !== last.id);
+    ids.splice(1, 0, last.id);
+    expect([...after].sort((a, b) => a.sort_order - b.sort_order).map((row) => row.id)).toEqual(ids);
+    expect(after.map((row) => row.sort_order).sort((a, b) => a - b)).toEqual(before.map((_, index) => index));
+    const refused = await move(categorySnapshot(before));
+    expect(refused).toMatchObject({ status: "error", message: expect.stringMatching(/Categories changed/) });
+    expect(await localCommand("readCategories", { profileId: profile.id })).toEqual(after);
+  });
+
   it("satisfies the shared BehaviorDataStore transaction and history contract", async () => {
     const profile = await localCommand("readProfile", {});
     await exerciseBehaviorStoreContract({
@@ -218,18 +240,26 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       userId: profile.id, timezone: profile.timezone, values: VALUES, recordedAt: NOW.toString(),
     });
     const occurrences = (await loadLocalTimeline(7, NOW)).timeline.daySections.flatMap((day) => day.occurrences);
-    for (const [index, occurrence] of occurrences.slice(0, 3).entries()) {
-      await saveLocalOccurrenceNote(profile.id, { occurrenceId: occurrence.id, expectedNote: "", note: "Wore aligners overnight" }, NOW.add({ seconds: index + 1 }));
+    // Ticket 305: no opt-in. Saving the same Note three times through the app's Note
+    // action proposes it without a request.
+    let tick = 0;
+    vi.spyOn(Temporal.Now, "instant").mockImplementation(() => NOW.add({ hours: 48, seconds: ++tick }));
+    const noteActions = createLocalOccurrenceActions(profile.id, () => undefined);
+    for (const occurrence of occurrences.slice(0, 3)) {
+      const saveForm = new FormData();
+      saveForm.set("occurrence_id", occurrence.id);
+      saveForm.set("expected_note", "");
+      saveForm.set("note", "Wore aligners overnight");
+      expect(await noteActions.noteAction({ status: "idle", message: "" }, saveForm)).toMatchObject({ status: "success" });
     }
     const store = createLocalNoteShortcutStore(profile.id);
-    const analysisNow = NOW.add({ hours: 48 });
+    vi.mocked(Temporal.Now.instant).mockRestore();
+    const analysisNow = NOW.add({ hours: 49 });
     let view = await getNoteShortcutView(store, null, analysisNow);
-    await manageNoteShortcuts(store, { behaviorId: null, command: { operation: "enable", enabled: true }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
+    expect(view).toMatchObject({ state: null, globalEnabled: true });
     view = await getNoteShortcutView(store, behavior.id, analysisNow);
-    await manageNoteShortcuts(store, { behaviorId: behavior.id, command: { operation: "enable", enabled: true }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
-    view = await getNoteShortcutView(store, behavior.id, analysisNow);
-    const analyzed = await manageNoteShortcuts(store, { behaviorId: behavior.id, command: { operation: "analyze" }, expectedRevision: noteShortcutRevision(view.state), now: analysisNow });
-    expect(analyzed.entries).toHaveLength(1);
+    const analyzed = view.state!;
+    expect(analyzed.entries).toMatchObject([{ status: "proposed", text: "Wore aligners overnight" }]);
     const accepted = await manageNoteShortcuts(store, { behaviorId: behavior.id,
       command: { operation: "accept", key: analyzed.entries[0].key, text: "Private accepted shortcut" },
       expectedRevision: noteShortcutRevision(analyzed), now: analysisNow.add({ seconds: 1 }) });

@@ -314,7 +314,7 @@ Not in the manifest (from the test access inventory), one reason each:
 
 - `supabase-cli-login`: the owner's Supabase CLI token serves only the Ticket 232 tools and
   owner-approved `supabase db push`; routine acceptance must not use an owner credential.
-  Agents' own hosted-migration credential is the vault item `cadence-agents`, checked by
+  Agents' own hosted-migration credential is the vault item `supabase-access-token`, checked by
   `vault-supabase-access-token` in suite `hosted-migrations` (`docs/DECISIONS.md`,
   2026-11-10).
 - `mcp-signing-key`: kept in the owner's "Cadence" vault behind Touch ID and used only for key

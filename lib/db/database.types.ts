@@ -2641,6 +2641,20 @@ export type Database = {
         }
         Returns: Json
       }
+      save_daily_brief_preferences_v4: {
+        Args: {
+          p_enabled: boolean
+          p_exclude_google_calendar: boolean
+          p_exclude_hevy: boolean
+          p_exclude_icloud_calendar: boolean
+          p_exclude_outlook_calendar: boolean
+          p_expected_revision: number
+          p_include_notes: boolean
+          p_include_reminder_history: boolean
+          p_use_connected_sources: boolean
+        }
+        Returns: Json
+      }
       save_day_note: {
         Args: {
           expected_note: string

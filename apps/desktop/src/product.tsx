@@ -11,6 +11,7 @@ import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
+import { createDesktopHomeLookupClient } from "./home-lookup";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
@@ -18,6 +19,8 @@ import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPerm
 import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
+import { connectorUnavailableSectionState } from "@/lib/ui/settings-sections";
+import { desktopAccountSectionState } from "./account/account-section-state";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
@@ -32,7 +35,7 @@ import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
-import { GlobalNoteShortcutControl, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import { SettingsScreen } from "./settings-screen";
 import { LocalExportScreen } from "./export-screen";
 import { hasPendingLocalCommands, localCommand } from "./local-store";
@@ -64,7 +67,7 @@ import { completedFirstLinkState, finishFirstAccountLink, finishReviewedFirstAcc
 
 type Bundle = { timeline: Awaited<ReturnType<typeof loadLocalTimeline>>;
   behaviors: Awaited<ReturnType<typeof getLocalBehaviorsPageData>>; hasImportRuns: boolean;
-  shortcuts: { global: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
+  shortcuts: { accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
 type SyncCompletion = Readonly<{ status: SyncStatus; localCurrent: boolean }>;
 const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "behaviors", "export", "settings"];
 
@@ -165,10 +168,9 @@ export function Product() {
           await archiveLifecycle.current;
           const timeline = await loadLocalTimeline(parameters.current.days, now);
           if (!mounted.current || current !== revision.current) continue;
-          const [behaviors, imports, global, accepted, behaviorViews] = await Promise.all([
+          const [behaviors, imports, accepted, behaviorViews] = await Promise.all([
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
             localCommand("readImportRuns", { profileId: timeline.profile.id, limit: 1 }),
-            getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), null, now),
             listAcceptedNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id)),
             Promise.all(timeline.behaviors.map(async (behavior) => [behavior.id, await getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), behavior.id, now)] as const)),
           ]);
@@ -185,7 +187,7 @@ export function Product() {
             if (mounted.current && current === revision.current && activation.current?.requestKey === requestedActivation.requestKey) setNotificationTarget(target);
           }
           if (mounted.current && current === revision.current) {
-            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { global, accepted, views: Object.fromEntries(behaviorViews) } });
+            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { accepted, views: Object.fromEntries(behaviorViews) } });
             setError("");
             successful = true;
             if (syncAfterRefresh.current) {
@@ -339,6 +341,8 @@ export function Product() {
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
   // Ticket 279: the account's leave reminder switch lives on the hosted server, so only a linked Mac shows it.
   const leaveReminderClient = useMemo(() => calendarClient && accountUserId ? createDesktopLeaveReminderClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 308: Home from the Mac's position needs the hosted lookup, so only a linked Mac offers it.
+  const homeLookupClient = useMemo(() => calendarClient && accountUserId ? createDesktopHomeLookupClient(calendarClient) : null, [calendarClient, accountUserId]);
   const leaveReminders = useDesktopLeaveReminders({ native: isTauri(), accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
     // "error" and "waiting" keep what is scheduled; only a read session or a signed-out Mac reconciles.
     accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient,
@@ -601,27 +605,33 @@ export function Product() {
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
-        noteShortcutControls={<GlobalNoteShortcutControl view={bundle.shortcuts.global} action={noteShortcutAction} />}
+        shellCue={(conflictReview?.conflicts.length ?? 0) > 0}
+        accountState={desktopAccountSectionState({ known: accountKnown, account, configured: readDesktopAuthConfig() !== null, connected: syncReady,
+          syncStatus, conflictCount: conflictReview?.conflicts.length ?? 0, firstLinkPending: Boolean(firstLink && !firstLink.complete) })}
+        categoryCount={bundle.timeline.categories.length}
+        onOpenExport={() => navigate("export")}
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
-        calendarControls={<ConnectorLibrary sources={[
+        calendarControls={<ConnectorLibrary rows sources={[
           { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} nested />
-            : <ConnectorUnavailable id="google_calendar" reason={calendar.label} /> },
+            : <ConnectorUnavailable id="google_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)}
+              reason={connectors.unavailableReason ? connectorUnavailableReason("Google Calendar", connectors.unavailableReason) : calendar.label} /> },
           { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
             refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")}
             callbackMessage={connectors.outlookMessage} refreshVersion={connectors.panelVersion} />
-            : <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="outlook_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
           { id: "icloud_calendar", content: connectors.icloudCoordinator ? <IcloudCalendarPanel key={`icloud-${accountUserId}`} coordinator={connectors.icloudCoordinator}
             refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")} />
-            : <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="icloud_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
           { id: "hevy", content: connectors.hevyCoordinator ? <HevyPanel key={`hevy-${accountUserId}`} coordinator={connectors.hevyCoordinator}
             localDate={calendarRange.startLocalDate} timezone={profile?.timezone ?? "America/New_York"} refreshVersion={connectors.panelVersion} />
-            : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
+            : <ConnectorUnavailable id="hevy" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
-        dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
+        dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
+        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
-          leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} />}
+          leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}

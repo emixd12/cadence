@@ -72,6 +72,8 @@ import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
 import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
+import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
+import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -374,6 +376,7 @@ type DesignSystemPageProps = Readonly<{
   searchParams?: Promise<{
     preview?: string | string[];
     state?: string | string[];
+    layout?: string | string[];
   }>;
 }>;
 
@@ -417,6 +420,10 @@ export default async function DesignSystemPage({
         </main>
       </WebRuntimeProvider>
     );
+  }
+  if (selectedPreviewId === "settings-regroup") {
+    // Usability evaluation, 2026-11-09: the Settings regroup proposal on synthetic data.
+    return <SettingsRegroupBench query={{ layout: firstSearchParam(params?.layout), state: selectedFixtureState }} />;
   }
   const usageByComponent = groupUsages(usage.usages);
   const previews = buildPreviews(selectedPreviewId, selectedFixtureState);
@@ -502,6 +509,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-canonical-inventory">Canonical inventory</BenchAnchor>
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
       <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
+      <BenchAnchor href="?preview=settings-regroup">Settings regroup proposal</BenchAnchor>
     </nav>
   );
 }
@@ -1945,7 +1953,8 @@ const previewFactories: Record<
       </ProductPreview>
     ),
   "module.category-panel": () => (
-    <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
+    <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" },
+      { id: "fitness", name: "Fitness", description: null, sort_order: 1, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
       action={async () => { "use server"; return { status: "error", message: "Preview only. Your draft remains available." }; }} /></ProductPreview>
   ),
   "flow.consent-form": () => <ProductPreview><ConsentBench /></ProductPreview>,
@@ -1963,6 +1972,10 @@ const previewFactories: Record<
         <NotificationPermissionPanel vapidPublicKey="" />
       </ProductPreview>
   ),
+  "module.settings-sections": () => <ProductPreview><SettingsSectionsBench /></ProductPreview>,
+  "module.settings-row": () => <ProductPreview maxHeight="48rem"><SettingsRowBench /></ProductPreview>,
+  "module.settings-drawer": () => <ProductPreview><SettingsDrawerBench /></ProductPreview>,
+  "module.settings-saving": () => <ProductPreview><SettingsSavingBench /></ProductPreview>,
   "module.trust-and-legal-panel": () => (
       <ProductPreview>
         <TrustAndLegalPanel />

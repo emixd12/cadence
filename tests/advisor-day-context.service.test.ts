@@ -488,7 +488,8 @@ describe("advisor day-context service", () => {
 
     expect(calendar.getCalendarEventsForAdvisor).toHaveBeenCalledOnce();
     expect(contexts[0]?.connectors).toEqual(contexts[1]?.connectors);
-    expect(calendar.getCalendarConnection).toHaveBeenCalledWith({ client, user }, "agent");
+    // Ticket 307: the Timeline connection.
+    expect(calendar.getCalendarConnection).toHaveBeenCalledWith({ client, user });
     calendar.getCalendarConnection.mockResolvedValue({ status: "reconnect_required", generation: calendarSnapshot.connectionGeneration, selectionRevision: 2 });
     await expect(readAdvisorDayContexts({
       caller: { client, user }, authorization: calendarAuthorization,

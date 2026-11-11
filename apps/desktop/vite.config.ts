@@ -8,6 +8,10 @@ import { defineConfig, type Plugin } from "vite";
 const productAssets = [
   "brand/cadence-logo.png",
   "brand/google-calendar.svg",
+  // Ticket 302: the Settings source rows show each provider's own mark (public/brand/connector-icons-source.md).
+  "brand/outlook-calendar.svg",
+  "brand/icloud-calendar.png",
+  "brand/hevy.png",
   "brand/cadence-page-banner-lines-dots.png",
   "brand/cadence-timeline-horse-lines-dots-clear-background.png",
   "brand/cadence-timeline-horse-lines-dots-mobile-right-18.png",

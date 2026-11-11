@@ -10633,7 +10633,6 @@ Execution requires each ticket's stated acceptance and applicable code/provider
 checks. Native/provider/Workspace coverage remains under Tickets 134–137;
 these follow-ups do not change their status or duplicate their test matrices.
 
-
 ## Ticket 142: Default Behavior duration
 
 Status: complete in source; web production deployed September 18, 2026.
@@ -11044,7 +11043,6 @@ Verification: all required repository checks, synthetic end-to-end and responsiv
 browser/accessibility QA, installed-desktop evidence, and separately authorized
 live-model acceptance. Synthetic success does not establish deployed/live status.
 
-
 ## Ticket 149: Calendar inspection polish and Timeline reload
 
 Status: complete in source (September 18, 2026). Required checks, responsive
@@ -11071,7 +11069,6 @@ Evidence and live/native limits: `docs/qa/calendar-inspection-refresh.md`.
 
 Use the existing interaction registry and design-system Timeline family for evidence.
 No schema, new connector, or provider permission change.
-
 
 ## Ticket 150: Calendar display names and compact selection
 
@@ -12782,8 +12779,6 @@ Platform impact:
 Verification: packet, proposal validation, disposition, same-case rerun, account rerun
 authorization and refusal tests; all required checks.
 
-
-
 ## Remaining Apple-trusted release work: Tickets 178–181
 
 Filed September 28, 2026. These tickets decompose Ticket 115; they add no product
@@ -13314,7 +13309,6 @@ Platform impact:
 Verification: review concrete examples and a lifecycle matrix covering concurrent
 devices, refresh, expiry, timezone change, disablement, revocation and deletion.
 Decision completion is not implementation, migration, deployment or release acceptance.
-
 
 ## Ticket 186: Rename Cadence project folder and GitHub repository
 
@@ -17521,12 +17515,423 @@ Messaging impact: none.
 
 Verification: the installed-app checks above and `dagger check --progress=report`.
 
+## Settings regroup and simplification: Tickets 301–309
+
+Owner direction: `docs/DECISIONS.md`, 2026-11-10. The mock is the development-only bench at
+`/design-system?preview=settings-regroup` (`app/design-system/SettingsRegroupBench.tsx`).
+It shows the target layout with the real panels on synthetic data; its Categories list
+and Daily Brief row are non-saving sketches.
+
+Suggested order: 301, then 303 and 304 in parallel, then 302. Tickets 305, 306, 308 and 309
+do not depend on 301. Ticket 307 follows 306.
+
+## Ticket 301: Settings groups, section index and state rows (web)
+
+Status: implemented November 10, 2026 on PR 205. Not verified: a signed-in check on the hosted page as a test account.
+Dependencies: none.
+
+Goal: a person finds any setting within four groups and sees what is connected or turned
+on without opening anything.
+
+Scope and acceptance:
+
+- Four groups, in this order, each with a `text-2xl` title: General (Profile, Timezone,
+  Notifications, Categories), Connections (Connected sources, Connected apps), Planning
+  (Travel, Daily Brief), Account and data (Export).
+- A four-link section index stays in view while the page scrolls. On small screens it sits
+  below the app header.
+- Each connected source is one closed row: the provider's icon, its name, its kind and its
+  state ("Not connected", "Connected · 3 calendars", "Needs reconnection"). Opening the
+  row shows the existing panel.
+- Travel and Daily Brief keep their title, one-line purpose and state in view. One button
+  below them opens the controls ("Set up Travel" when off, "Travel settings" when on).
+- A row or drawer whose state needs action opens by itself.
+- Each panel maps its loaded state to `{ text, attention }` through one pure function with
+  unit tests. While loading the row says "Checking…". On a failed read it says "Status
+  unavailable" and opens.
+- One heading per section: `SettingsPanel` gains a no-heading mode, and the Categories and
+  Delete account panels accept a heading level.
+- The Trust and legal section goes. One line of Privacy, Terms and Trust links sits at the
+  end of the page. The owner confirmed this placement on November 10.
+- Delete account is a plain link at the end of the page. It opens the existing form
+  unchanged: export acknowledgement and typed confirmation stay.
+- Account and data has an Export entry: "Download your history as JSONL, CSV, full JSON, or
+  a BehaviorLog bundle." with **Open Export**.
+- Links to `#timezone`, `#notifications`, `#travel`, `#categories`, `#connected-apps` and
+  `#connector-*` open their row or drawer, land below the header and index, and stay there
+  while panels above finish loading.
+- Body text stays at the current size.
+- Measured at 1280×800 on the bench fixtures: a new account's page is no taller than
+  2,800 px (6,470 px today), and Delete account is reached in at most 35 tab stops with
+  every source connected (78 today). No horizontal scroll at 390 px.
+- Update `DESIGN.md` ("Settings Panels"), `docs/UI_SPEC.md` ("Settings screen"),
+  `interaction-registry.json` and the design-system manifest for the new row and drawer.
+- Out of scope: how settings save (Ticket 303), the Categories list (Ticket 304), Note
+  shortcuts (Ticket 305), Daily Brief choices (Tickets 306 and 307) and disclosure wording.
+
+References: `app/(app)/settings/page.tsx`, `components/settings/SettingsPanels.tsx`,
+`components/settings/ConnectorLibrary.tsx`, the four source panels,
+`components/settings/TravelSettingsPanel.tsx`, `components/briefing/DailyBriefSettingsPanel.tsx`,
+`public/brand/connector-icons-source.md`, `docs/LEGAL.md` L-020.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: the Settings page and the shared Settings components. |
+| Desktop | Ticket 302. Shared panels must keep rendering in the current desktop Settings until then. |
+| Marketing | Not applicable: no public page changes. P-033 logs the user guide steps. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-033.
+
+Verification: unit tests for each state function; DOM tests for row state, self-opening and
+anchor links; `npm run interactions:check`, `npm run design-system:check`; the bench at
+1280 px and 390 px; a signed-in check on the hosted page as a test account.
+
+## Ticket 302: Mac Settings adopts the groups
+
+Status: implemented November 10, 2026 on PR 205. Not verified: a dev-signed build in local and linked mode (Cadence for Mac is not installed on the owner's Mac); the Mac's WebKit view.
+Dependencies: Ticket 301.
+
+Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
+
+Scope and acceptance:
+
+- `apps/desktop/src/settings-screen.tsx` uses the Ticket 301 groups, index, rows and
+  drawers. Shared sections appear in the same group and order as on web.
+- Mac-only sections get a group: Local profile and the linked account in General; Native
+  notifications and Reminder coverage beside Notifications; the database, updates and the
+  Setup guide in a Mac group after Account and data.
+- Local mode keeps its "link a Cadence account" rows for sources that need one, shown as
+  row state.
+- A sync conflict still shows the persistent shell cue, and its section opens by itself.
+- Update `docs/DESKTOP_PARITY.md` and the desktop rows of `interaction-registry.json`.
+- Out of scope: any change to sync, reminders or updates behaviour.
+
+References: `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/product.tsx`,
+`docs/DESKTOP_PARITY.md`, `docs/UI_SPEC.md` ("Settings screen", desktop paragraph).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: Ticket 301 owns web. |
+| Desktop | This ticket. |
+| Marketing | Not applicable: no public page changes. |
+| Future mobile | Not applicable: no mobile surface. |
+
+Messaging impact: P-033.
+
+Verification: `tests/desktop-settings-ui.test.tsx`; `npm run interactions:check`; a
+dev-signed build checked in local mode and linked mode (`docs/DESKTOP_RELEASE.md`,
+"Agent-run installed acceptance").
+
+## Ticket 303: Settings save as they change
+
+Status: implemented November 10, 2026 on PR 205. The owner confirmed the three exceptions below
+on November 10.
+Dependencies: none. Easier after Ticket 301.
+
+Goal: a person never wonders whether a setting was saved.
+
+Scope and acceptance:
+
+- Every checkbox and select on Settings saves when it changes. Each section shows one
+  result line: "Saving…", then "Saved", or one specific error that says what to do.
+- A text field saves on blur or Enter (Home).
+- Three kinds of control keep an explicit action: Timezone, because it reschedules future
+  Occurrences; forms the user opens (the category editor, iCloud credentials, the Hevy
+  key); and Connect, Disconnect and Delete account.
+- **Save travel settings** and each calendar panel's Save action go. Calendar display and
+  selection choices save as they change and then refresh.
+- A failed save puts the control back to its saved value and says so.
+- Disconnect asks for confirmation in every source panel and uses the destructive style, as
+  Connected apps does.
+- Travel estimates no longer sits disabled above the field it depends on: the usual-travel
+  choice comes first, or turning estimates on asks for it.
+- One live region per section; no message is announced twice.
+- Out of scope: new settings; disclosure wording.
+
+References: `components/settings/TravelSettingsPanel.tsx`,
+`components/settings/GoogleCalendarPanel.tsx`, `components/settings/OutlookCalendarPanel.tsx`,
+`components/settings/IcloudCalendarPanel.tsx`, `components/settings/HevyPanel.tsx`,
+`components/settings/TimezonePanel.tsx`, `docs/UI_SPEC.md` ("Settings screen").
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: the shared Settings components. |
+| Desktop | Same components. Desktop draft guards (`lib/desktop-draft`) must still protect opened forms. Checked in a dev-signed build. |
+| Marketing | Not applicable: no public page changes. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-033.
+
+Verification: DOM tests for save-on-change, failure rollback and the Disconnect
+confirmation; `npm run interactions:check`; bench at both widths.
+
+## Ticket 304: Categories drawer with drag reordering
+
+Status: implemented November 10, 2026 on PR 205. Not verified: drag in a real browser at 390 px and on touch hardware.
+Dependencies: Ticket 301 for the drawer; can be built first against the current page.
+
+Goal: a person reorders and edits categories in one compact list.
+
+Scope and acceptance:
+
+- The Categories section keeps its title and one-line purpose. An **Edit N categories**
+  button below them opens the list. It starts closed.
+- Each category is one line: a drag handle, the name and **Edit**. Dragging the handle
+  moves the category; the new order saves when it is dropped.
+- The handle works with a mouse, with touch, and with the keyboard: Arrow Up and Arrow Down
+  move the focused category one place. Each move is announced ("Fitness moved to position 2
+  of 8.").
+- The category service accepts a move to a position, checked against the same expected
+  snapshot as today's Move up and Move down. A stale snapshot is refused and the list
+  reloads. Move up and Move down buttons go.
+- **Edit** opens the existing name, description and delete form unchanged.
+- No new dependency for dragging.
+- Out of scope: category colours, nesting or bulk actions.
+
+References: `components/settings/CategoryPanel.tsx`,
+`packages/core/src/services/category.service.ts`, the bench sketch `CategoriesSketch` in
+`app/design-system/SettingsRegroupBench.tsx`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: `CategoryPanel` and the category action. |
+| Desktop | Same component. The desktop DataStore gains the same move-to-position operation in one atomic write, and it syncs like other category changes. |
+| Marketing | Not applicable: no public page changes. |
+| Future mobile | Mobile web inherits it; touch dragging checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-033 (user guide: "Move up and Move" in
+`docs/user-guide/behaviors-and-review.md`).
+
+Verification: service tests for move-to-position and the stale-snapshot refusal; DOM tests
+for mouse, touch and keyboard moves and the announcement; `npm run resolvers:check`,
+`npm run interactions:check`.
+
+## Ticket 305: Note shortcuts on by default
+
+Status: implemented November 10, 2026 on PR 205. Hosted: `20261110153050` relaxes the commit check; `20261110170000` turns stored off switches on once and needs the owner's authorization.
+Dependencies: none.
+
+Goal: repeated Notes are offered as shortcuts without anyone switching the feature on.
+
+Scope and acceptance:
+
+- Note shortcuts are on for every account and every active Behavior. The per-Behavior
+  switch goes from Behavior settings.
+- Repeated Notes are matched without a request, after a Note is saved. **Find repeated
+  Notes** goes. Matching stays the deterministic, local text comparison; nothing new is
+  sent to a provider.
+- A proposed shortcut still needs **Accept** before it appears above a Note field, and
+  **Dismiss** still hides it.
+- Settings shows no Note shortcuts control. The stored global switch and the resolver's
+  support for it stay, so the control can return. Accounts that turned it off are turned on
+  once; P-034 records this.
+- Model-sourced shortcuts and cloud consent are unchanged and stay off.
+- Links to `/settings#note-shortcuts` are removed or point to Behavior settings.
+- Update `docs/PRODUCT_SPEC.md` ("Recurring Note shortcuts contract"), `docs/UI_SPEC.md`
+  ("Note shortcut controls") and `docs/DATA_MODEL.md` ("Note shortcut state").
+- Out of scope: new shortcut sources; changing limits or the 90-day suppression.
+
+References: `components/note-shortcuts/NoteShortcutControls.tsx`,
+`packages/core/src/types/note-shortcut.ts`, the note-shortcut resolver and service,
+`docs/DECISIONS.md` (2026-09-07 and 2026-11-10).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: resolver defaults, the Note save path and both controls. A hosted migration only if stored defaults change. |
+| Desktop | Same resolver and components; the local store applies the same defaults and syncs the retained switch. |
+| Marketing | Not applicable: no public page mentions Note shortcuts as opt-in (not checked beyond the FAQ). |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-034.
+
+Verification: resolver tests for default-on, automatic matching and the retained switch;
+DOM tests that no switch renders and proposals still need Accept;
+`npm run resolvers:check`, `npm run interactions:check`.
+
+## Ticket 306: One Daily Brief choice for every connected source
+
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000`. Not verified: hosted and installed desktop checks.
+Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
+change Daily Brief.
+
+Goal: a person turns Daily Brief on, makes one choice about connected sources, and is done.
+
+Scope and acceptance:
+
+- Daily Brief settings show: **Daily Brief** (on or off), and **Plan around my connected
+  sources** (one choice, off by default). A line under it names the sources it covers.
+- **Advanced: choose sources** lists each connected source with its own checkbox, plus the
+  existing reminder-history and Notes choices. Each keeps its statement of what is sent.
+- A source connected later is covered by the choice already made, and its row says that
+  Daily Brief uses it. The owner confirmed this rule on November 10.
+- Existing accounts keep exactly what they allowed: the one choice is on when at least one
+  connected source was allowed, and every source that was not allowed starts excluded under
+  Advanced.
+- Turning Daily Brief off still withdraws every source choice.
+- The server stays the authority: a source excluded under Advanced is never sent.
+- Update `AGENTS.md` (scope lines), `docs/PRODUCT_SPEC.md`, `docs/UI_SPEC.md`,
+  `DESIGN.md` ("Daily Brief") and `docs/INTEGRATION_PLAYBOOK.md` (onward disclosure rows).
+- Out of scope: the Google Calendar connection (Ticket 307); what each source sends; the
+  model or prompt.
+
+References: `components/briefing/DailyBriefSettingsPanel.tsx`,
+`packages/core/src/types/daily-brief.ts`, `lib/ui/daily-brief.ts`, the Daily Brief
+preference service and its SQL fences, Ticket 239, `docs/LEGAL.md` L-021.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: preferences contract, a hosted migration for the new choice, and the panel. |
+| Desktop | Same panel on a linked, online Mac through the hosted endpoint. Checked in a dev-signed build. |
+| Marketing | Not applicable in this ticket. P-035 logs the FAQ answer that becomes wrong. |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-035.
+
+Verification: service and SQL tests for the migration mapping, the exclusion rule and
+later-connected sources; `tests/daily-brief-ui.dom.test.tsx`;
+`npm run supabase -- db reset`; `npm run interactions:check`.
+
+## Ticket 307: Daily Brief reads Google Calendar through the Timeline connection
+
+Status: implemented November 10, 2026 on PR 205. Hosted runbook in `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)"; the owner authorized the push after merge.
+Dependencies: Ticket 306.
+
+Goal: a person connects Google Calendar once.
+
+Scope and acceptance:
+
+- Daily Brief reads Google Calendar timing through the Timeline connection and its selected
+  calendars. The **Google Calendar for Daily Brief** panel goes from Settings.
+- The one choice from Ticket 306 covers Google Calendar like any other source.
+- Existing Daily Brief Google grants are revoked at Google and their stored credentials and
+  selections deleted, in a migration with a rollback note. An account that had allowed
+  Calendar timing keeps it allowed only if its Timeline connection is connected; otherwise
+  Google Calendar starts excluded.
+- What is sent does not change: today's event times, timezone, availability and response.
+- Update `docs/DATA_MODEL.md` ("Agent Calendar grant"), `docs/PRODUCT_SPEC.md` and
+  `docs/UI_SPEC.md`.
+- Out of scope: Outlook and iCloud connections; Timeline display.
+
+References: Ticket 187, `components/settings/GoogleCalendarPanel.tsx` (agent mode),
+`lib/services/google-calendar.service.ts`, the `google_calendar_agent_*` tables,
+`docs/LEGAL.md` L-021 and L-016.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: the Daily Brief Calendar read, the migration and the removed panel. |
+| Desktop | The linked Mac loses the same panel; no local data changes. Checked in a dev-signed build. |
+| Marketing | Not applicable in this ticket. P-035 logs the Privacy and FAQ text. |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-035. The Google verification narrative (Ticket 245) changes; no
+submission waits on this ticket.
+
+Verification: `tests/sql/google-calendar-agent-contract.sql` replaced or updated; service
+tests for the read path and the migration mapping; `npm run supabase -- db reset`; a
+hosted check as a test account after the migration is authorized.
+
+## Ticket 308: Set Home from the current location
+
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000`. Not verified: a hosted lookup within the owner's travel spend cap; iPhone Safari.
+Dependencies: none.
+
+Goal: a person sets Home without typing an address.
+
+Scope and acceptance:
+
+- **Use my current location** sits beside the Home field. It reads the device position
+  once, asks for permission if needed, and fills the field with an address.
+- The address comes from one Google reverse-geocoding request made by the server. The user
+  can edit it before it saves.
+- The position is used for that request only. Cadence does not store it, log it, sync it or
+  export it.
+- The button is offered once the person has accepted the Travel disclosure. Until then it
+  explains that turning on Travel estimates comes first.
+- Denied, unavailable and inaccurate positions each show one plain message; typing an
+  address always works.
+- Requests are rate-limited per account. Update `docs/COSTS.md` in the same change.
+- Out of scope: a map, address search or autocomplete; Behavior places.
+
+References: `components/settings/TravelSettingsPanel.tsx`, `lib/ui/foreground-location.ts`,
+`lib/services/travel-provider.ts` (geocoding), `lib/services/travel-google-auth.ts`,
+`AGENTS.md` (security rules on device positions).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: the button, a hosted endpoint and the provider call. |
+| Desktop | Same component with the Mac's location read, on a linked and online Mac. Local mode keeps typing only. Checked in a dev-signed build. |
+| Marketing | Not applicable: no public page changes. |
+| Future mobile | Mobile web inherits it, checked at 390 px and on iPhone Safari. Native mobile is deferred. |
+
+Messaging impact: P-036.
+
+Verification: service tests with a fake provider for success, no result, rate limit and
+that no position is logged; `tests/travel-settings.dom.test.tsx`; a hosted check as a test
+account within the travel spend cap the owner sets.
+
+## Ticket 309: Settings wording pass
+
+Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`, for the owner to read.
+Dependencies: Ticket 301 for the final section names.
+
+Goal: Settings reads clearly and warmly, and each thing has one name.
+
+Scope and acceptance:
+
+- Rewrite Settings headings, one-line purposes, button labels, status text and help text
+  that do not state what Cadence does with data. Short sentences, plain words, no jargon
+  ("atomic snapshot", "provider responses").
+- One name per thing: "Connected sources" everywhere, never "Connectors"; one label for
+  each Connect action.
+- Timezone names read as places ("New York") with the IANA name kept as the value.
+- Update `PRODUCT.md` ("Brand Personality") to record the voice: clear, warm and brief,
+  still without motivational or promotional copy.
+- Sentences that state what is sent, stored or shared are not edited here. List each one
+  that needs plainer wording in P-033 for Ticket 246.
+- Update tests that assert the rewritten copy. Do not edit `tests/legal-content.test.tsx`.
+- Out of scope: Privacy, Terms and Trust pages; consent text; marketing.
+
+References: every component under `components/settings/`,
+`components/briefing/DailyBriefSettingsPanel.tsx`, `PRODUCT.md`, `DESIGN.md`,
+`docs/MESSAGING_CHANGES.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: shared Settings copy. |
+| Desktop | Same components, plus the Mac-only Settings sections in `apps/desktop/src/settings-screen.tsx`. |
+| Marketing | Not applicable: marketing copy belongs to Ticket 246. |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-033.
+
+Verification: the Settings DOM tests; `npm run interactions:check`; the owner reads the
+before-and-after list.
+
 ## Tickets 310–324: connector completion, starting with Hevy
 
 Decision: `docs/DECISIONS.md`, 2026-11-10, D28. Plan:
 `docs/plans/2026-11-10-connector-completion-architecture.md`. Ticket 309 + n is the plan's
 Task n. Each ticket below states its status, scope and acceptance; the plan's task holds
-the files, interfaces and tests. Read both. Tickets 301–309 are filed on draft PR #205.
+the files, interfaces and tests. Read both. Tickets 301–309 come before this section.
 
 Order: 310 first. 311 and 312 follow it. 313 follows 312; 314 follows 313; 315 follows
 311 and 312; 316 follows 314 and 315. 317, 321 and 322 follow 316; 318 follows 317. 319

@@ -3,4 +3,6 @@
 
 @source "../../../components/timeline";
 @source "../../../components/behaviors";
+/* Ticket 302: the shared Settings groups, rows and drawers. */
+@source "../../../components/settings";
 @source "./";

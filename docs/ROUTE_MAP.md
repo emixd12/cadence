@@ -128,7 +128,9 @@ These controls introduce no routes and do not change Timeline.
 
 ## Note shortcut operations (Tickets 126–128)
 
-Existing Behaviors and Settings surfaces own shortcut management and opt-in.
+Existing Behaviors surfaces own shortcut review. Since Ticket 305 there is no opt-in
+and no Settings control or `/settings#note-shortcuts` anchor; the Timeline and
+Behaviors Note save actions run matching after each save.
 Timeline and Behaviors reuse the existing guarded Note save action for insertion
 provenance. No new navigation route is added. Authenticated actions call a shared
 shortcut service, which calls owner-scoped repositories. A desktop-callable cloud
@@ -324,6 +326,19 @@ account's reminder rows (decision D15). Both methods accept the web session or a
 Mac's bearer token, with the same native-origin CORS as the other travel routes, and run
 under RLS as that user. Neither calls a provider.
 
+`POST /api/travel/home-lookup` (Ticket 308) serves **Use my current location** beside Home.
+It accepts the web session or a linked Mac's bearer token, with the same native-origin CORS,
+and returns `503 provider_clearance_required` or `not_configured` before reading the body.
+The body is exactly `{ latitude, longitude, accuracyMeters }`, at most 1,000 bytes; the
+position never goes in a URL. It calls `travel-home-lookup.service.ts`, which requires Travel
+estimates on with the disclosure accepted (409 `travel_off`), rejects an accuracy above 100 m
+(422 `inaccurate_position`), consumes the account's `travel_home_lookup` rate limit (five an
+hour, 429 `rate_limited` with `Retry-After`), reserves US$0.005 through
+`reserve_travel_provider_spend` (429 `quota_exceeded`), and makes one Google reverse-geocoding
+request. The `no-store` response is `{ address }`, a street address or `null`. It saves
+nothing: the person edits the field and saves Home through `PUT /api/travel/settings`. The
+position is not stored, logged, synced, exported or returned, and errors carry codes only.
+
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 
 `GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
@@ -414,11 +429,18 @@ read uses a separate development adapter with live authorization. No new hosted 
 production route, migration or production tip-history write is introduced.
 `POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
 
-## Calendar purpose routing (Ticket 187)
+## Calendar purpose routing (Tickets 187 and 307)
 
-`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
-Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
-`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
-The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
-Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
-Desktop Keychain entries isolate pending standard and agent consent.
+Ticket 307 retires the separate Daily Brief grant. Daily Brief reads the Timeline
+connection's selected calendars inside its authorized briefing services.
+`purpose=agent` stays parseable for desktop builds released before Ticket 307:
+`GET /api/google-calendar/connection?purpose=agent` returns a `not_configured` view,
+and every other agent request fails with `not_configured`. Absent purpose or
+`purpose=standard` keeps Timeline behavior; other values fail validation.
+`/api/google-calendar/events` remains standard-only. A late agent consent callback
+(`a_` state) installs nothing and returns `agentCalendar=error`. Desktop ignores
+callbacks that name a purpose.
+
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/google-calendar/agent-grants/retire` | POST | One-off, unscheduled operator route (Ticket 307). Validates its own `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` only (not `CRON_SECRET`; returns `503` while unset) and rate-limits auth failures. It calls `google-calendar-agent-retirement.service.ts`, which revokes up to 100 Daily Brief grants at Google per call and then deletes their credentials. Responses carry counts only. Run it before migration `20261110160000`; see `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)". |

@@ -31,6 +31,12 @@ export const connectorCompletionProcessAuthFailureLimiter = new InMemoryRateLimi
   windowMs: AUTH_FAILURE_WINDOW_MS,
 });
 
+/** Ticket 307: the one-off Daily Brief Calendar grant retirement route. */
+export const agentCalendarRetirementAuthFailureLimiter = new InMemoryRateLimiter({
+  maxAttempts: AUTH_FAILURE_LIMIT,
+  windowMs: AUTH_FAILURE_WINDOW_MS,
+});
+
 export function buildAuthFailureRateLimitKey(
   scope: string,
   headers: Pick<Headers, "get">,
@@ -44,6 +50,7 @@ export function resetAuthFailureRateLimitersForTests(): void {
   occurrenceSyncAuthFailureLimiter.clear();
   leaveReminderProcessAuthFailureLimiter.clear();
   connectorCompletionProcessAuthFailureLimiter.clear();
+  agentCalendarRetirementAuthFailureLimiter.clear();
 }
 
 export function getClientIp(headers: Pick<Headers, "get">): string {
