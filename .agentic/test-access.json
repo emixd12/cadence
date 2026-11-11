@@ -1249,7 +1249,7 @@
     {
       "id": "developer-id",
       "kind": "signing-identity",
-      "summary": "Developer ID Application certificate (team HK26VT477G) in the login Keychain.",
+      "summary": "Valid Developer ID Application identity (team HK26VT477G) in the login Keychain, not within 60 days of expiry (apps/desktop/release-credentials.json).",
       "identity": "owner-mac",
       "suites": [
         "desktop-owner-mac",
@@ -1258,19 +1258,19 @@
       "probe": {
         "argv": [
           "node",
-          "scripts/acceptance/access/host.mjs",
-          "--codesign",
-          "Developer ID Application: Emiliano Bache Rodriguez (HK26VT477G)"
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "identity"
         ],
         "timeout_seconds": 30
       },
-      "owner_step": "Install or renew the Developer ID Application certificate in the login Keychain.",
+      "owner_step": "Approve release-secrets for one run so an agent restores the identity from the Cadence Release vault; if it has expired, review the renewal (docs/DESKTOP_RELEASE.md, \"Signing credentials\").",
       "freshness_seconds": 86400
     },
     {
       "id": "provisioning-profile",
       "kind": "signing-identity",
-      "summary": "Cadence Desktop Developer ID provisioning profile in Cadence Release/apple.",
+      "summary": "The inventory's Developer ID provisioning profile lists the installed identity and authorizes Entitlements.plist.",
       "identity": "owner-mac",
       "suites": [
         "desktop-owner-mac",
@@ -1282,13 +1282,99 @@
       "probe": {
         "argv": [
           "node",
-          "scripts/acceptance/access/host.mjs",
-          "--profile-expiry",
-          "~/Library/Application Support/Cadence Release/apple/Cadence_Desktop_Developer_ID.provisionprofile"
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "profile"
         ],
         "timeout_seconds": 30
       },
-      "owner_step": "Download a current Cadence Desktop Developer ID provisioning profile into Cadence Release/apple.",
+      "owner_step": "Download a profile that lists the current certificate into Cadence Release/apple and update apps/desktop/release-credentials.json (docs/DESKTOP_RELEASE.md, \"Signing credentials\").",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "updater-signing-key",
+      "kind": "signing-identity",
+      "summary": "Tauri updater key files match the inventory fingerprint and the key password is in the login Keychain.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "updater"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Approve release-secrets for one run so an agent restores the updater key from the Cadence Release vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "notarization-credential",
+      "kind": "secret-store-item",
+      "summary": "Notarization credential on this Mac: the App Store Connect API key, or the app-specific password in the login Keychain.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "notarization"
+        ],
+        "timeout_seconds": 30
+      },
+      "owner_step": "Approve release-secrets for one run so an agent restores the notarization credential from the Cadence Release vault.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "release-vault-token",
+      "kind": "secret-store-item",
+      "summary": "1Password service-account token for the Cadence Release vault, in the Keychain (cadence-release-1password / service-account-token), scoped to that vault only.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-release"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "vault"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Create or renew the Cadence Release service account and store its token (docs/qa/agent-secrets.md, \"Cadence Release vault\").",
+      "freshness_seconds": 86400,
+      "expiry": "The service account's own expiry date; not readable without the owner's 1Password session."
+    },
+    {
+      "id": "release-backups",
+      "kind": "vault-item",
+      "summary": "The Cadence Release vault holds the Developer ID identity, the updater key and the notarization credential, with fingerprints matching this Mac.",
+      "identity": "owner-mac",
+      "suites": [
+        "desktop-release"
+      ],
+      "depends_on": [
+        "release-vault-token",
+        "developer-id"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "apps/desktop/scripts/release-credentials.mjs",
+          "probe",
+          "backups"
+        ],
+        "timeout_seconds": 120
+      },
+      "owner_step": "Approve release-secrets for one run so an agent can back up the missing items (release:credentials backup).",
       "freshness_seconds": 86400
     },
     {

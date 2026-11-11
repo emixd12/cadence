@@ -18489,3 +18489,45 @@ Platform impact:
 Messaging impact: new entries for the control's copy.
 
 Verification: `npm run interactions:check` and `dagger check --progress=report`.
+
+## Ticket 325: Release credential backup, restore and renewal
+
+Status: in progress. Started November 11, 2026.
+Dependencies: none. Decision: `docs/DECISIONS.md`, 2026-11-11 (D29).
+
+Goal: losing the login keychain or renewing the Developer ID certificate becomes an agent
+run with a few owner approvals, not an afternoon of portal and Keychain Access work.
+
+Scope and acceptance:
+
+- `apps/desktop/release-credentials.json` lists every signing and notarization credential,
+  its file or keychain location, its fingerprint and its Cadence Release vault item. Done.
+- `npm run release:credentials -- status` checks the identity, the profile (it lists the
+  installed certificate and authorizes `Entitlements.plist`), the notarization credential
+  and the updater key, and warns 60 days before an expiry. Done.
+- `verify-backups` compares the vault items' fingerprints with this Mac without reading a
+  secret. `restore` and `backup` need the owner's `release-secrets` approval for the run.
+  Done; tested with a fake `op` only.
+- The `desktop-release` preflight runs these checks. The profile probe reads the inventory,
+  so it no longer checks the retired profile. Done.
+- Live: the owner creates the vault, the service account and the App Store Connect API key;
+  agents back up the identity, notarization credential and updater key, and
+  `verify-backups` passes. Not done.
+- Notarization uses the API key in the next release wrapper. Not done.
+- Spike: create a Developer ID certificate and a Developer ID profile through the App Store
+  Connect API. If the API refuses, agents use the Apple Developer portal in Chrome with
+  1Password filling the sign-in. Not done.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: release tooling for the Mac app. |
+| Desktop | Release tooling, preflight and runbook; no app code changes. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: none.
+
+Verification: `npx vitest run tests/release-credentials.test.mjs` and
+`dagger check --progress=report`.
