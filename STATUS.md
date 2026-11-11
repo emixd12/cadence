@@ -47,7 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 301–309: Settings regroup and simplification | Implemented November 10 on PR 205; local and CI checks pass | Hosted runbook (306, 308, 305 relax, deploy, 307 retirement then migration); owner decision on the 305 switch flip `20261110170000`; installed Mac check (302); signed-in hosted check; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309: Settings regroup implemented — November 10, 2026" |
+| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -86,6 +86,39 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 301–309 hosted rollout — November 11, 2026
+
+PR #205 merged to `main` as `6dd414f8`, and the production deploy succeeded. The owner
+authorized every push below (`docs/DECISIONS.md`, 2026-11-10). An agent pushed with the vault
+token `supabase-access-token` and the pinned CLI 2.105.0 (Go backend).
+
+- **Before the deploy:** `20261110150000`, `20261110153050` and `20261110155000`. Readback:
+  RLS on `cadence_advisor_private.daily_brief_preferences`, `launch_rate_limits` and
+  `note_shortcut_states`. `save_daily_brief_preferences_v4`, `read_daily_brief_preferences`,
+  `daily_brief_calendar_fence_is_current`, `commit_note_shortcut_state` and
+  `consume_launch_rate_limit` execute for `authenticated` only, and `anon` has no usage on
+  `cadence_advisor_private`. The action check includes `travel_home_lookup`.
+- **Ticket 307 retirement:** the route returned `401` without its secret. One authorized call
+  reported `revoked 1, unrevocable 0, failed 0, remaining 0`.
+- **After the retirement:** `20261110160000` applied. Both `google_calendar_agent_*` tables
+  are empty, and no role can execute the five `calendar_agent_*` functions.
+- **Ticket 305 flip:** a backup query found 0 stored global off switches out of 1 row, so
+  `20261110170000` changed no data. The empty backup is kept outside the repository.
+- `migration list`: hosted equals git.
+- **Tooling:** `scripts/acceptance/agent-secret.mjs` now gives `op` a private HOME; with the
+  real HOME, `op` 2.42 hung on the desktop app's settings. The retirement route uses its own
+  `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET`, not `CRON_SECRET`. The agents' Supabase item is now
+  `supabase-access-token`.
+- **Vercel:** an agent removed `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET`, `_CLIENT_SECRET`,
+  `_CLIENT_ID` and `_PROJECT_ID` from Production with the owner's per-command approval; a
+  readback lists none.
+- **Open:** delete the vault item `google-calendar-agent-retire-secret`.
+- **Not verified:** a signed-in `GET /api/advisor/preferences` as a test account, installed
+  Mac checks, and a hosted Home lookup.
+
+Platform impact: web hosted database and production deploy. Desktop: none until a Mac release
+(P-037). Marketing and future mobile: not applicable. Messaging impact: none new.
 
 ## Tickets 301–309: Settings regroup implemented — November 10, 2026
 
