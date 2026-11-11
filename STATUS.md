@@ -48,7 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310, 311, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`, reading Hevy by events cursor (strategy A); 320, 323 and 324 not started | Merge PR #207 with both hosted migration pushes (`20261110210000` approved); a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Ticket 311: Hevy read strategy decided — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310, 311, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`, reading Hevy by events cursor (strategy A); 320, 323 and 324 not started | Merge PR #207 with both hosted migration pushes (`20261111150000` approved); a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Ticket 311: Hevy read strategy decided — November 11, 2026" |
 | Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -242,7 +242,7 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
   313 (`activity-match.resolver.ts`, `resolveConnectorStatusEvent`, timing classifier) and
   322 (connector marks excluded from marking patterns; export and MCP provenance documented).
 - Implemented: 314 (three tables, three security-definer writers, migration
-  `20261110200000`), 315 (routine list and match read with routine digests), 316
+  `20261111140000`), 315 (routine list and match read with routine digests), 316
   (completion-source port, reconcile and link services, `/api/connectors/...` routes), 317
   (Complete from Hevy on web Behaviors, "From Hevy" row line, Hevy panel last check), 318
   (timing statistics), 319 (sync convergence of a connector mark and the user's first mark,
@@ -251,9 +251,9 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
 - Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 5 (4 is day notes), a SQLite
   migration, native changes and installed acceptance. 323 needs 311, a published Mac build
   with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
-- Hosted: no migration pushed. `20261110200000` fits the standing approval once a push can
+- Hosted: no migration pushed. `20261111140000` fits the standing approval once a push can
   run; the `cadence-agents` token needs the vault service-account token first.
-  `20261110210000` grants `service_role` a column read; the owner approved its hosted push
+  `20261111150000` grants `service_role` a column read; the owner approved its hosted push
   on November 10, 2026. Both pushes run when the branch merges to `main` (condition 4).
 - Owner steps from `npm run qa:preflight -- --suite connectors` (exit 10): store the Cadence
   Agents service-account token (`docs/qa/agent-secrets.md`, steps 4–5); then the vault items

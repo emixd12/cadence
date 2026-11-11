@@ -18351,7 +18351,7 @@ build and `dagger check --progress=report`.
 
 ## Ticket 321: Background completion job
 
-Status: implemented November 10, 2026, off behind the flag. Migration `20261110210000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. Vercel usage not measured; no local-stack job run.
+Status: implemented November 10, 2026, off behind the flag. Migration `20261111150000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. Vercel usage not measured; no local-stack job run.
 Dependencies: Ticket 316. The cadence depends on Ticket 311.
 
 Goal: complete Occurrences and cancel reminders without Cadence being opened.

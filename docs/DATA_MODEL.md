@@ -2333,7 +2333,7 @@ and `tests/connector-lifecycle.test.ts`.
 
 ## Connector completion (Ticket 314, D28)
 
-Migration `20261110200000_connector_completion.sql`. Three hosted tables, each with
+Migration `20261111140000_connector_completion.sql`. Three hosted tables, each with
 `user_id`, RLS and cascade on account deletion. No grant to `anon` or
 `service_role`. Ticket 321 adds the job's account selection separately.
 

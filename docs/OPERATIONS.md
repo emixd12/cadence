@@ -1694,11 +1694,11 @@ contains Ticket 319's sync rule; published 0.1.9 stops syncing when a connector 
 the user mark the same Occurrence. Turning it off again stops new writes at once;
 past connector completions and match rows stay as history.
 
-Hosted schema: migration `20261110200000_connector_completion.sql` (Ticket 314) is
+Hosted schema: migration `20261111140000_connector_completion.sql` (Ticket 314) is
 additive and grants nothing to `anon` or `service_role`, so it fits the standing
 approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) once its five
 conditions hold. The job's service-role account selection (Ticket 321) is a separate
-migration, `20261110210000`; the owner approved its hosted push on November 10, 2026.
+migration, `20261111150000`; the owner approved its hosted push on November 10, 2026.
 
 Logs and telemetry from reconcile carry counts and stable codes only. Never log a
 routine title, an activity reference, a provider identifier, a credential or a token.
