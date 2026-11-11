@@ -47,7 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner removes four `GOOGLE_CALENDAR_AGENT_*` Production variables in Vercel and the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
+| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -110,11 +110,10 @@ token `supabase-access-token` and the pinned CLI 2.105.0 (Go backend).
   real HOME, `op` 2.42 hung on the desktop app's settings. The retirement route uses its own
   `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET`, not `CRON_SECRET`. The agents' Supabase item is now
   `supabase-access-token`.
-- **Open:**
-  - Remove `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET`, `_CLIENT_SECRET`, `_CLIENT_ID` and
-    `_PROJECT_ID` from Vercel Production. The agent's removal was blocked by a permission
-    rule.
-  - Delete the vault item `google-calendar-agent-retire-secret`.
+- **Vercel:** an agent removed `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET`, `_CLIENT_SECRET`,
+  `_CLIENT_ID` and `_PROJECT_ID` from Production with the owner's per-command approval; a
+  readback lists none.
+- **Open:** delete the vault item `google-calendar-agent-retire-secret`.
 - **Not verified:** a signed-in `GET /api/advisor/preferences` as a test account, installed
   Mac checks, and a hosted Home lookup.
 
