@@ -3,6 +3,7 @@ import { applyRecordedActivityRefresh, type RecordedActivityRefresh } from "@cad
 import {
   RECORDED_ACTIVITY_MAX_RANGE_DAYS,
   type RecordedActivitySnapshotV1,
+  type RecordedActivitySnapshotV1_1,
 } from "@cadence/core/types/recorded-activity";
 import {
   ConnectorError,
@@ -17,7 +18,16 @@ import {
   withConnectorCredential,
   type ConnectorCaller,
 } from "./connector-credentials";
-import { HEVY_READ_DEADLINE_MS, HevyProviderError, readHevyWorkouts, verifyHevyApiKey, type HevyRequestOptions } from "./hevy-provider";
+import {
+  HEVY_READ_DEADLINE_MS,
+  HevyProviderError,
+  listHevyRoutines,
+  readHevyMatchEvidence,
+  readHevyWorkouts,
+  verifyHevyApiKey,
+  type HevyRequestOptions,
+  type HevyRoutineList,
+} from "./hevy-provider";
 import { assertConnectorReadActive, withConnectorReadDeadline } from "./connector-read-deadline";
 
 // Ticket 236 Hevy orchestration. Credentials stay inside the Ticket 235
@@ -99,6 +109,65 @@ async function readActivities(caller: ConnectorCaller, start: string, end: strin
     }
     return snapshot;
   });
+}
+
+export type HevyMatchEvidence = Readonly<{
+  snapshot: RecordedActivitySnapshotV1_1;
+  accountDigest: string;
+  connectionGeneration: number;
+}>;
+
+/**
+ * Ticket 315: the server-side match read for connector completion. Today and the
+ * 30 prior local dates in the profile timezone (D28.6). Never accepts evidence
+ * from a client. Discarded as `connection_changed` if the connection moved.
+ */
+export async function readHevyMatchEvidenceForCaller(caller: ConnectorCaller,
+  options: HevyServiceOptions = {}): Promise<HevyMatchEvidence> {
+  return withConnectorReadDeadline(options, HEVY_READ_DEADLINE_MS, async (bounded, deadlineAt) => {
+    const clock = bounded.clock ?? Date.now;
+    const timezone = await profileTimezone(caller, bounded.signal);
+    assertConnectorReadActive(bounded, deadlineAt);
+    const today = Temporal.Instant.fromEpochMilliseconds(clock()).toZonedDateTimeISO(timezone).toPlainDate();
+    const range = validateRange(today.subtract({ days: RECORDED_ACTIVITY_MAX_RANGE_DAYS - 1 }).toString(), today.toString(), timezone,
+      Temporal.Instant.fromEpochMilliseconds(clock()));
+    return withConnectorCredential(caller, "hevy", async (credential, connection) => {
+      assertConnectorReadActive(bounded, deadlineAt);
+      if (credential.provider !== "hevy" || !connection.accountDigest) throw new ConnectorError("reconnect_required");
+      let snapshot: RecordedActivitySnapshotV1_1;
+      try {
+        snapshot = await readHevyMatchEvidence({ ...bounded, clock, deadlineMs: deadlineAt - clock(), apiKey: credential.apiKey,
+          accountId: caller.user.id, connectionGeneration: connection.generation, range, accountDigest: connection.accountDigest });
+      } catch (error) {
+        throw connectorError(error);
+      }
+      if (snapshot.failures.some((failure) => failure.code === "reconnect_required")) {
+        await markConnectorReconnectRequired(connection);
+        throw new ConnectorError("reconnect_required");
+      }
+      return { snapshot, accountDigest: connection.accountDigest, connectionGeneration: connection.generation };
+    });
+  });
+}
+
+/** Ticket 315: routine titles for the link form. Returned only; never stored or logged. */
+export async function listHevyRoutinesForCaller(caller: ConnectorCaller,
+  options: HevyServiceOptions = {}): Promise<HevyRoutineList & Readonly<{ accountDigest: string }>> {
+  return withConnectorReadDeadline(options, HEVY_READ_DEADLINE_MS, async (bounded, deadlineAt) =>
+    withConnectorCredential(caller, "hevy", async (credential, connection) => {
+      assertConnectorReadActive(bounded, deadlineAt);
+      if (credential.provider !== "hevy" || !connection.accountDigest) throw new ConnectorError("reconnect_required");
+      const clock = bounded.clock ?? Date.now;
+      try {
+        const list = await listHevyRoutines({ ...bounded, clock, deadlineMs: deadlineAt - clock(), apiKey: credential.apiKey,
+          accountDigest: connection.accountDigest });
+        return { ...list, accountDigest: connection.accountDigest };
+      } catch (error) {
+        const failure = connectorError(error);
+        if (failure.code === "reconnect_required") await markConnectorReconnectRequired(connection);
+        throw failure;
+      }
+    }));
 }
 
 /**

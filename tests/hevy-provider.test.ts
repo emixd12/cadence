@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
-import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
+import { recordedActivitySelectorKey, validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
 import {
   HEVY_API_ORIGIN,
   HevyProviderError,
   hevyRequestUrl,
   isAllowedHevyRequest,
+  listHevyRoutines,
+  readHevyMatchEvidence,
   readHevyWorkouts,
   verifyHevyApiKey,
   type HevyFetch,
@@ -359,3 +361,81 @@ describe("Hevy retries and the absolute deadline", () => {
 function todayInNewYork(offsetDays: number): string {
   return Temporal.Now.instant().toZonedDateTimeISO("America/New_York").toPlainDate().add({ days: offsetDays }).toString();
 }
+
+describe("Hevy reads for connector completion (Ticket 315)", () => {
+  const DIGEST_A = "a".repeat(64);
+  const DIGEST_B = "b".repeat(64);
+
+  it("allows only the bounded routine list GET", () => {
+    expect(hevyRequestUrl({ kind: "routines", page: 20 })).toBe(`${HEVY_API_ORIGIN}/v1/routines?page=20&pageSize=10`);
+    expect(() => hevyRequestUrl({ kind: "routines", page: 21 })).toThrow(RangeError);
+    expect(isAllowedHevyRequest("GET", `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=10`)).toBe(true);
+    for (const url of [
+      `${HEVY_API_ORIGIN}/v1/routines?page=21&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=5`,
+      `${HEVY_API_ORIGIN}/v1/routines/abc`,
+      `${HEVY_API_ORIGIN}/v1/routine_folders?page=1&pageSize=10`,
+      `${HEVY_API_ORIGIN}/v1/workouts/events?page=1&pageSize=10`,
+    ]) expect(isAllowedHevyRequest("GET", url)).toBe(false);
+    for (const method of ["POST", "PUT", "DELETE"]) expect(isAllowedHevyRequest(method, `${HEVY_API_ORIGIN}/v1/routines?page=1&pageSize=10`)).toBe(false);
+  });
+
+  it("keeps the routine as a digest on match reads and discards it on display reads", async () => {
+    const workouts = [workout(1, { routine_id: "routine-legs" }), workout(2, { routine_id: null }), workout(3)];
+    const display = await read(fakeHevy({ counts: [3], pages: pages(workouts) }));
+    expect(JSON.stringify(display)).not.toContain("selectorKeys");
+    expect(JSON.stringify(display)).not.toContain("SECRET-ROUTINE");
+    const fake = fakeHevy({ counts: [3], pages: pages(workouts) });
+    const match = await readHevyMatchEvidence({ apiKey: KEY, accountId: ACCOUNT, connectionGeneration: 3, range: RANGE, accountDigest: DIGEST_A,
+      fetch: fake.fetch, clock: fake.clock, sleep: fake.sleep, random: fake.random });
+    expect(match).toMatchObject({ schemaVersion: "1.1.0", adapterVersion: "hevy-workouts-v2", selectorKeysRequested: true, completeness: "complete" });
+    const legs = recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-legs" });
+    const secret = recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "SECRET-ROUTINE" });
+    expect(match.activities.map((activity) => activity.selectorKeys)).toEqual([[legs], [], [secret]]);
+    const text = JSON.stringify(match);
+    for (const forbidden of ["routine-legs", "SECRET-ROUTINE", "SECRET-TITLE", "SECRET-EXERCISE", "synthetic-workout"]) expect(text).not.toContain(forbidden);
+    expect(workoutPaths(fake.calls).every((path) => path.startsWith("/v1/workouts"))).toBe(true);
+  });
+
+  it("derives different selector digests for different Hevy accounts", () => {
+    expect(recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-legs" }))
+      .not.toBe(recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_B, providerKey: "routine-legs" }));
+  });
+
+  function routineFake(total: number) {
+    const calls: Calls = [];
+    let clock = NOW;
+    const fetch: HevyFetch = async (url, init) => {
+      calls.push({ url, init });
+      clock += 50;
+      const page = Number(new URL(url).searchParams.get("page"));
+      const pageCount = Math.ceil(total / 10);
+      const routines = Array.from({ length: Math.min(10, Math.max(0, total - (page - 1) * 10)) }, (_, index) => ({
+        id: `routine-${(page - 1) * 10 + index}`, title: `Routine ${(page - 1) * 10 + index}`, folder_id: null, exercises: [{ title: "SECRET-EXERCISE" }],
+      }));
+      return Response.json({ page, page_count: pageCount, routines });
+    };
+    return { calls, fetch, clock: () => clock };
+  }
+
+  it("lists routine titles with digests and marks the list complete", async () => {
+    const fake = routineFake(12);
+    const list = await listHevyRoutines({ apiKey: KEY, accountDigest: DIGEST_A, fetch: fake.fetch, clock: fake.clock });
+    expect(list.complete).toBe(true);
+    expect(list.routines).toHaveLength(12);
+    expect(list.routines[0]).toEqual({
+      selectorKey: recordedActivitySelectorKey({ source: "hevy", accountDigest: DIGEST_A, providerKey: "routine-0" }), title: "Routine 0",
+    });
+    expect(JSON.stringify(list)).not.toContain("routine-0");
+    expect(JSON.stringify(list)).not.toContain("SECRET-EXERCISE");
+    expect(fake.calls.map((call) => call.init.method)).toEqual(["GET", "GET"]);
+  });
+
+  it("does not read a 21st routine page and marks the list incomplete", async () => {
+    const fake = routineFake(250);
+    const list = await listHevyRoutines({ apiKey: KEY, accountDigest: DIGEST_A, fetch: fake.fetch, clock: fake.clock });
+    expect(fake.calls).toHaveLength(20);
+    expect(list).toMatchObject({ complete: false });
+    expect(list.routines).toHaveLength(200);
+  });
+});

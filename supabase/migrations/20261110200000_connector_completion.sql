@@ -118,7 +118,7 @@ grant update (selector_kind, selector_keys, enabled) on table public.behavior_so
 -- Only the three functions below write matches.
 grant select on table public.occurrence_source_matches to authenticated;
 grant select on table public.connector_completion_state to authenticated;
-grant insert (source, next_check_at, last_reconciled_at, last_attempted_at, read_cursor, consecutive_failures,
+grant insert (user_id, source, next_check_at, last_reconciled_at, last_attempted_at, read_cursor, consecutive_failures,
   check_count_date, check_count) on table public.connector_completion_state to authenticated;
 grant update (next_check_at, last_reconciled_at, last_attempted_at, read_cursor, consecutive_failures,
   check_count_date, check_count) on table public.connector_completion_state to authenticated;

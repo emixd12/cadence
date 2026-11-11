@@ -1680,6 +1680,25 @@ All three publication gates pass. Privacy and Terms may publish, and public
 registration is approved. The completion changes no authentication provider
 setting.
 
+## Connector completion operation (Tickets 314–323, D28)
+
+`CADENCE_CONNECTOR_COMPLETION` gates the feature on the hosted app. Only the exact
+value `on` enables it; any other value or no value leaves reconcile, the link `PUT`
+and the background job inert, with no provider call (invariant 9). Default: off.
+Turn it on only after Ticket 323's acceptance and after a published Mac build
+contains Ticket 319's sync rule; published 0.1.9 stops syncing when a connector and
+the user mark the same Occurrence. Turning it off again stops new writes at once;
+past connector completions and match rows stay as history.
+
+Hosted schema: migration `20261110200000_connector_completion.sql` (Ticket 314) is
+additive and grants nothing to `anon` or `service_role`, so it fits the standing
+approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) once its five
+conditions hold. The job's service-role account selection (Ticket 321) is a separate
+migration that needs the owner's yes.
+
+Logs and telemetry from reconcile carry counts and stable codes only. Never log a
+routine title, an activity reference, a provider identifier, a credential or a token.
+
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115

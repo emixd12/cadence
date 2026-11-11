@@ -1,29 +1,39 @@
 import { Temporal } from "@js-temporal/polyfill";
 import {
   normalizeRecordedWorkout,
+  recordedActivityId,
+  recordedActivitySelectorKey,
   validateRecordedActivitySnapshot,
+  validateRecordedActivitySnapshotV1_1,
+  withSelectorKeys,
 } from "@cadence/core/services/recorded-activity-validation";
 import type { ExternalEventErrorCode } from "@cadence/core/types/external-event";
 import {
   HEVY_WORKOUTS_ADAPTER_VERSION,
+  HEVY_WORKOUTS_MATCH_ADAPTER_VERSION,
   RECORDED_ACTIVITY_MAX_ITEMS,
   RECORDED_ACTIVITY_MAX_PAGES,
   RECORDED_ACTIVITY_PAGE_SIZE,
   RECORDED_ACTIVITY_SCHEMA_VERSION,
+  RECORDED_ACTIVITY_SCHEMA_VERSION_1_1,
   RECORDED_ACTIVITY_SOURCE,
   type RecordedActivity,
   type RecordedActivityCoverage,
   type RecordedActivityFailure,
   type RecordedActivityRequestedRange,
   type RecordedActivitySnapshotV1,
+  type RecordedActivitySnapshotV1_1,
+  type RecordedActivityV1_1,
   type RecordedWorkoutTimingInput,
 } from "@cadence/core/types/recorded-activity";
 import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "./provider-call-timeout";
 
-// Ticket 236 Hevy adapter. It performs exactly three read-only calls and keeps
+// Ticket 236 Hevy adapter. It performs only fixed read-only calls and keeps
 // only workout identity and timing. Titles, descriptions, routines, exercises,
 // sets, weights, reps, and notes are dropped per item before anything else sees
-// them. See docs/INTEGRATION_PLAYBOOK.md "Hevy workout timing (Ticket 236)" and
+// them. Ticket 315 adds two reads for connector completion: a match read that also
+// keeps each workout's `routine_id` as an account-scoped digest (contract 1.1), and
+// a routine list for the link form whose titles are returned and never stored. See docs/INTEGRATION_PLAYBOOK.md "Hevy workout timing (Ticket 236)" and
 // docs/EXTERNAL_EVENT_CONTRACT.md "Recorded activity snapshot (Hevy)".
 
 export const HEVY_API_ORIGIN = "https://api.hevyapp.com";
@@ -40,7 +50,12 @@ export type HevyFetch = (input: string, init: RequestInit) => Promise<Response>;
 export type HevyCall =
   | Readonly<{ kind: "user_info" }>
   | Readonly<{ kind: "workout_count" }>
-  | Readonly<{ kind: "workouts"; page: number }>;
+  | Readonly<{ kind: "workouts"; page: number }>
+  | Readonly<{ kind: "routines"; page: number }>;
+
+/** Hevy returns routines 10 per page; the link form reads at most 20 pages (200 routines). */
+export const HEVY_ROUTINE_PAGE_SIZE = 10;
+export const HEVY_ROUTINE_MAX_PAGES = 20;
 
 export type HevyRequestOptions = Readonly<{
   fetch?: HevyFetch;
@@ -77,6 +92,12 @@ const API_KEY = /^[A-Za-z0-9._~-]{1,256}$/;
 export function hevyRequestUrl(call: HevyCall): string {
   if (call.kind === "user_info") return `${HEVY_API_ORIGIN}/v1/user/info`;
   if (call.kind === "workout_count") return `${HEVY_API_ORIGIN}/v1/workouts/count`;
+  if (call.kind === "routines") {
+    if (!Number.isSafeInteger(call.page) || call.page < 1 || call.page > HEVY_ROUTINE_MAX_PAGES) {
+      throw new RangeError("Hevy routine page is outside the allowed bound.");
+    }
+    return `${HEVY_API_ORIGIN}/v1/routines?page=${call.page}&pageSize=${HEVY_ROUTINE_PAGE_SIZE}`;
+  }
   if (!Number.isSafeInteger(call.page) || call.page < 1 || call.page > RECORDED_ACTIVITY_MAX_PAGES) {
     throw new RangeError("Hevy page is outside the allowed bound.");
   }
@@ -90,12 +111,17 @@ export function isAllowedHevyRequest(method: string, url: string): boolean {
   try { parsed = new URL(url); } catch { return false; }
   if (parsed.origin !== HEVY_API_ORIGIN || parsed.username || parsed.password || parsed.hash) return false;
   if (parsed.pathname === "/v1/user/info" || parsed.pathname === "/v1/workouts/count") return parsed.search === "";
-  if (parsed.pathname !== "/v1/workouts") return false;
+  const bounds = parsed.pathname === "/v1/workouts"
+    ? { maxPages: RECORDED_ACTIVITY_MAX_PAGES, pageSize: RECORDED_ACTIVITY_PAGE_SIZE }
+    : parsed.pathname === "/v1/routines"
+      ? { maxPages: HEVY_ROUTINE_MAX_PAGES, pageSize: HEVY_ROUTINE_PAGE_SIZE }
+      : null;
+  if (!bounds) return false;
   const keys = [...parsed.searchParams.keys()];
   const page = parsed.searchParams.get("page") ?? "";
   return keys.length === 2 && keys[0] === "page" && keys[1] === "pageSize"
-    && /^[1-9]\d{0,1}$/.test(page) && Number(page) <= RECORDED_ACTIVITY_MAX_PAGES
-    && parsed.searchParams.get("pageSize") === String(RECORDED_ACTIVITY_PAGE_SIZE);
+    && /^[1-9]\d{0,1}$/.test(page) && Number(page) <= bounds.maxPages
+    && parsed.searchParams.get("pageSize") === String(bounds.pageSize);
 }
 
 /**
@@ -128,13 +154,94 @@ export async function verifyHevyApiKey(apiKey: string, options: HevyRequestOptio
  * detected; it is not an atomic snapshot.
  */
 export async function readHevyWorkouts(input: HevyReadInput): Promise<RecordedActivitySnapshotV1> {
+  const { state, fetchedAtText, now } = await readWorkoutPages(input, false);
+  return buildSnapshot(input, fetchedAtText, state, now);
+}
+
+export type HevyMatchReadInput = HevyReadInput & Readonly<{
+  /** The connection's account digest; selector keys are scoped to it. */
+  accountDigest: string;
+}>;
+
+/**
+ * The connector-completion match read (Ticket 315). Same pages, bounds and
+ * completeness rules as the display read, plus each workout's `routine_id` as an
+ * account-scoped selector digest. Returns contract `1.1.0`. The raw routine ID
+ * never leaves this function.
+ */
+export async function readHevyMatchEvidence(input: HevyMatchReadInput): Promise<RecordedActivitySnapshotV1_1> {
+  if (!/^[a-f0-9]{64}$/u.test(input.accountDigest)) throw new RangeError("Hevy match read requires the account digest.");
+  const { state, fetchedAtText, now } = await readWorkoutPages(input, true);
+  const display = buildSnapshot(input, fetchedAtText, state, now);
+  const activities: RecordedActivityV1_1[] = display.activities.map((activity) => {
+    const providerKey = state.routineByActivity.get(activity.id) ?? null;
+    return withSelectorKeys(activity, providerKey === null ? [] : [recordedActivitySelectorKey({
+      source: RECORDED_ACTIVITY_SOURCE, accountDigest: input.accountDigest, providerKey,
+    })]);
+  });
+  return validateRecordedActivitySnapshotV1_1({
+    ...display,
+    schemaVersion: RECORDED_ACTIVITY_SCHEMA_VERSION_1_1,
+    adapterVersion: HEVY_WORKOUTS_MATCH_ADAPTER_VERSION,
+    selectorKeysRequested: true,
+    activities,
+  }, { now });
+}
+
+export type HevyRoutineOption = Readonly<{ selectorKey: string; title: string }>;
+export type HevyRoutineList = Readonly<{
+  routines: readonly HevyRoutineOption[];
+  /** False when Hevy has more than 20 pages; the first 200 are returned. */
+  complete: boolean;
+}>;
+
+/**
+ * Routine titles for the link form. Titles are returned to the caller only and are
+ * never stored or logged; each routine's identity leaves as its selector digest.
+ */
+export async function listHevyRoutines(
+  input: HevyRequestOptions & Readonly<{ apiKey: string; accountDigest: string }>,
+): Promise<HevyRoutineList> {
+  if (!/^[a-f0-9]{64}$/u.test(input.accountDigest)) throw new RangeError("Hevy routine list requires the account digest.");
+  const session = new HevySession(input.apiKey, input);
+  const routines = new Map<string, string>();
+  try {
+    for (let page = 1; page <= HEVY_ROUTINE_MAX_PAGES; page += 1) {
+      const body = record(await session.get({ kind: "routines", page }));
+      const pageCount = body?.page_count;
+      if (!body || !Number.isSafeInteger(pageCount) || (pageCount as number) < 0 || !Array.isArray(body.routines)
+        || body.routines.length > HEVY_ROUTINE_PAGE_SIZE) {
+        throw new HevyProviderError(failure("malformed_provider_response", false, null));
+      }
+      for (const item of body.routines) {
+        const routine = record(item);
+        const id = routine?.id, title = routine?.title;
+        if (typeof id !== "string" || id.length === 0 || id.length > 512) continue;
+        const selectorKey = recordedActivitySelectorKey({ source: RECORDED_ACTIVITY_SOURCE, accountDigest: input.accountDigest, providerKey: id });
+        routines.set(selectorKey, typeof title === "string" && title.trim() ? title.trim().slice(0, 120) : "Untitled routine");
+      }
+      if (page >= (pageCount as number)) {
+        return { routines: [...routines].map(([selectorKey, title]) => ({ selectorKey, title })), complete: true };
+      }
+    }
+    return { routines: [...routines].map(([selectorKey, title]) => ({ selectorKey, title })), complete: false };
+  } finally {
+    session.close();
+  }
+}
+
+async function readWorkoutPages(input: HevyReadInput, keepRoutines: boolean): Promise<Readonly<{
+  state: ReadState;
+  fetchedAtText: string;
+  now: Temporal.Instant;
+}>> {
   if (!input.accountId || !Number.isSafeInteger(input.connectionGeneration) || input.connectionGeneration < 1) {
     throw new RangeError("Hevy read requires an account and connection generation.");
   }
   const session = new HevySession(input.apiKey, input);
   const fetchedAt = Temporal.Instant.fromEpochMilliseconds(session.startedAt);
   const fetchedAtText = fetchedAt.toString();
-  const state = new ReadState();
+  const state = new ReadState(keepRoutines ? input.accountId : null);
   try {
     state.countBefore = parseCount(await session.get({ kind: "workout_count" }));
     if (state.countBefore > RECORDED_ACTIVITY_MAX_ITEMS) {
@@ -150,10 +257,14 @@ export async function readHevyWorkouts(input: HevyReadInput): Promise<RecordedAc
   } finally {
     session.close();
   }
-  return buildSnapshot(input, fetchedAtText, state, Temporal.Instant.fromEpochMilliseconds(Math.max(session.now(), session.startedAt)));
+  return { state, fetchedAtText, now: Temporal.Instant.fromEpochMilliseconds(Math.max(session.now(), session.startedAt)) };
 }
 
 class ReadState {
+  /** Set only for a match read: the Cadence account that scopes activity IDs. */
+  constructor(readonly routineAccountId: string | null = null) {}
+  /** Activity ID → raw routine ID, for a match read only. Never leaves the adapter. */
+  readonly routineByActivity = new Map<string, string | null>();
   countBefore: number | null = null;
   countAfter: number | null = null;
   pageCount: number | null = null;
@@ -215,14 +326,28 @@ function acceptItem(state: ReadState, item: unknown): void {
     state.quarantined += 1;
     return;
   }
+  const routineId = state.routineAccountId !== null && typeof workout?.routine_id === "string"
+    && workout.routine_id.length > 0 && workout.routine_id.length <= 512 ? workout.routine_id : null;
   const previous = state.timing.get(id);
   if (previous) {
     state.itemCount -= 1;
     state.duplicatesRemoved += 1;
-    if (compareUpdated(timing.updatedAt, previous.updatedAt) > 0) state.timing.set(id, timing);
+    if (compareUpdated(timing.updatedAt, previous.updatedAt) > 0) {
+      state.timing.set(id, timing);
+      rememberRoutine(state, id, routineId);
+    }
     return;
   }
   state.timing.set(id, timing);
+  rememberRoutine(state, id, routineId);
+}
+
+function rememberRoutine(state: ReadState, providerWorkoutId: string, routineId: string | null): void {
+  if (state.routineAccountId === null) return;
+  state.routineByActivity.set(
+    recordedActivityId({ accountId: state.routineAccountId, providerWorkoutId }),
+    routineId,
+  );
 }
 
 /** Keeps strings and absence only, so no nested provider object survives the item. */
