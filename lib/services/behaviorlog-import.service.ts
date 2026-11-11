@@ -36,6 +36,9 @@ import {
 } from "@/lib/services/zip";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { createDayNoteStore } from "@/lib/db/dayNotes.repo";
+import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
+import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import type {
   BehaviorLogExistingRecords,
   BehaviorLogImportFile,
@@ -160,11 +163,14 @@ export async function previewBehaviorLogImportUploadFromFormData(
     archiveFingerprint: bundle.archiveFingerprint,
     importMode: "merge_preview",
   });
+  const dayNotes = preview.valid
+    ? await previewBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "import")
+    : null;
 
   return {
     status: "previewed",
     message: preview.valid
-      ? "BehaviorLog preview ready."
+      ? withBehaviorLogDayNoteMessage("BehaviorLog preview ready.", dayNotes, "preview")
       : "BehaviorLog preview found validation errors.",
     upload: {
       fileName: bundle.fileName,
@@ -267,10 +273,13 @@ export async function applyBehaviorLogImportUploadFromFormData(
     acceptedPreviewRunId: acceptedPreview.run.id,
     acceptedPreviewFingerprint,
   });
+  // Ticket 292: day notes save after the import commits, one compare-and-set
+  // save per date. A different saved note is reported, never overwritten.
+  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "import");
   if (modeValue === "create_missing_only") {
     return {
       status: "applied",
-      message: "Create-only import applied.",
+      message: withBehaviorLogDayNoteMessage("Create-only import applied.", dayNotes, "applied"),
       upload: {
         fileName: bundle.fileName,
         fileSize: bundle.fileSize,
@@ -290,7 +299,7 @@ export async function applyBehaviorLogImportUploadFromFormData(
 
   return {
     status: "applied",
-    message: "Approved merge import applied.",
+    message: withBehaviorLogDayNoteMessage("Approved merge import applied.", dayNotes, "applied"),
     upload: {
       fileName: bundle.fileName,
       fileSize: bundle.fileSize,

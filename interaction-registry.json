@@ -737,7 +737,8 @@
       "interaction_ids": [
         "INT-TIMELINE-011",
         "INT-BEHAVIOR-029",
-        "INT-SETTINGS-014"
+        "INT-SETTINGS-014",
+        "INT-SETTINGS-015"
       ]
     },
     {
@@ -8032,7 +8033,7 @@
         }
       ],
       "availability": "Enabled only for a valid supported preview of the currently selected file, with exact-preview acknowledgement and any required sensitivity acknowledgement.",
-      "success_result": "Verifies the persisted preview identity and all fingerprints, writes the supported owner-scoped records, and records the applied import run and mappings. Existing passive Note and Intervention identities require matching attachments, content, and captured provenance; changed records require review.",
+      "success_result": "Verifies the persisted preview identity and all fingerprints, writes the supported owner-scoped records, and records the applied import run and mappings. Existing passive Note and Intervention identities require matching attachments, content, and captured provenance; changed records require review. Cadence day-note reviews then save to day notes one date at a time; a different saved note is reported by date and left unchanged.",
       "failure_result": "Rejects stale, altered, mismatched, unaccepted, unsafe, or unsupported plans without silently recomputing a replacement plan.",
       "effects": [
         "database_write",
@@ -8481,7 +8482,7 @@
         }
       ],
       "availability": "Enabled only for a valid supported preview of the currently selected file, with fresh-backup acknowledgement, exact RESTORE text, and any required sensitivity acknowledgement.",
-      "success_result": "Revalidates the canonical bundle and stale-row preconditions, then atomically applies create/replace/archive/delete/keep decisions, definition history, provenance, and applied ledger entries without provider calls.",
+      "success_result": "Revalidates the canonical bundle and stale-row preconditions, then atomically applies create/replace/archive/delete/keep decisions, definition history, provenance, and applied ledger entries without provider calls. Cadence day-note reviews then save to day notes one date at a time, replacing a different note on each date the bundle covers.",
       "failure_result": "Rejects stale, altered, mismatched, skipped, unsupported, or unconfirmed restore input without partial product writes.",
       "effects": [
         "database_write",
@@ -11522,6 +11523,10 @@
           "control": "Day note textarea"
         },
         {
+          "kind": "activate",
+          "control": "Accepted day note shortcut"
+        },
+        {
           "kind": "submit",
           "control": "Save note"
         }
@@ -11567,7 +11572,8 @@
         "references": [
           "tests/day-note-ui.test.tsx",
           "tests/day-note.resolver.test.ts",
-          "tests/local-day-note.service.test.ts"
+          "tests/local-day-note.service.test.ts",
+          "tests/day-note-shortcuts-ui.test.tsx"
         ],
         "notes": "Mounted UI checks cover the submitted local date, expected note, preview, day-pool shortcuts and Needs decision placement; the resolver and service tests cover normalization, limits, compare-and-set and no-op clears."
       },
@@ -11781,6 +11787,92 @@
             "tests/note-suggestion.resolver.test.ts",
             "tests/desktop-store-contract.test.ts"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not alter authenticated settings."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-015",
+      "name": "Manage day note shortcuts",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#use-a-note-shortcut"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#note-shortcuts"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Enable the day-note shortcut pool and explicitly find, accept, edit, dismiss, or remove repeated day-note text. The pool learns only from day notes and its shortcuts appear only in the day-note editor.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Enable day note shortcuts"
+        },
+        {
+          "kind": "activate",
+          "control": "Find repeated day notes"
+        },
+        {
+          "kind": "activate",
+          "control": "Accept, Edit, Dismiss, or Remove day note shortcut"
+        }
+      ],
+      "availability": "Available in Settings under the global Note shortcuts control. Finding, accepting and editing need global and day-note enablement; removing an accepted shortcut stays available when either is off.",
+      "success_result": "Persists the reviewed day-note shortcut state and announces the result without changing saved day notes or Behavior shortcut pools.",
+      "failure_result": "Shows the service error and retains the visible editor draft.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings",
+        "app/(app)/settings/page.tsx",
+        "app/(app)/note-shortcuts/actions.ts#manageNoteShortcutAction"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/day-note-shortcuts-ui.test.tsx",
+          "tests/day-note-shortcuts.test.ts"
+        ],
+        "notes": "Mounted UI checks cover the Settings placement, pool routing and off controls; the shared resolver and web repository tests cover the 90-day window, three-note threshold, expiry, limits and exclusions; the Ticket 292 day-note shortcut SQL fixture covers RLS, the guarded commit and atomic shortcut saves."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings",
+            "app/(app)/settings/page.tsx"
+          ],
+          "evidence": [
+            "tests/day-note-shortcuts-ui.test.tsx",
+            "tests/day-note-shortcuts.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Ticket 292 desktop slice: the SQLite migration, native store, DataStore methods and account sync for the day-note pool land in a separate task. The shared DayNoteShortcutSettings takes a callback for that wiring."
         },
         "marketing": {
           "applicability": "not_applicable",

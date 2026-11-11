@@ -35,6 +35,9 @@ import type {
 } from "@/lib/types/behaviorlog-import";
 import type { BehaviorLogImportRun } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/server";
+import { createDayNoteStore } from "@/lib/db/dayNotes.repo";
+import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
+import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import { DEFAULT_ZIP_READ_LIMITS } from "@/lib/services/zip";
 import type {
   BehaviorLogRestorePreview,
@@ -220,11 +223,14 @@ export async function previewBehaviorLogRestoreUploadFromFormData(
       convertNativeRemindersToBrowser: formData.get("convert_native_reminders") === "yes",
     },
   );
+  const dayNotes = preview.valid
+    ? await previewBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "restore")
+    : null;
 
   return {
     status: "previewed",
     message: preview.valid
-      ? "BehaviorLog restore preview ready."
+      ? withBehaviorLogDayNoteMessage("BehaviorLog restore preview ready.", dayNotes, "preview")
       : "BehaviorLog restore preview found validation errors.",
     upload: {
       fileName: bundle.fileName,
@@ -453,12 +459,19 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
   await repairUserOccurrenceReminderGraphBestEffort(supabase, userId, {
     operation: "behaviorlog_restore",
   });
+  // Ticket 292: day notes restore after the product restore commits. Restore
+  // replaces a different note on each date the bundle covers.
+  const dayNotes = await applyBehaviorLogDayNotes(createDayNoteStore(supabase, userId), bundle.files, "restore");
 
   return {
     status: "applied",
-    message: rpcResult.alreadyApplied
-      ? "This accepted BehaviorLog restore was already applied."
-      : "BehaviorLog restore applied.",
+    message: withBehaviorLogDayNoteMessage(
+      rpcResult.alreadyApplied
+        ? "This accepted BehaviorLog restore was already applied."
+        : "BehaviorLog restore applied.",
+      dayNotes,
+      "applied",
+    ),
     upload: {
       fileName: bundle.fileName,
       fileSize: bundle.fileSize,
