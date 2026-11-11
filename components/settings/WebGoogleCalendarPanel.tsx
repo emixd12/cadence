@@ -19,6 +19,6 @@ export function calendarCallbackMessage(code: string | null): string | undefined
   if (code === "same_account_required") return "Use the same Google account as the Cadence account that started this Calendar connection.";
   if (code === "reconnect_required") return "Google Calendar needs reconnection. Reconnect to continue.";
   if (code === "unauthenticated") return "Sign in to the same Cadence account and reconnect Google Calendar.";
-  if (code === "error" || code === "invalid_request") return "Calendar connection could not complete. Try connecting again.";
+  if (code === "error" || code === "invalid_request") return "Google Calendar did not connect. Try again.";
   return undefined;
 }

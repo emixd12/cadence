@@ -71,10 +71,10 @@ function timezoneSuccessMessage(result: {
   }
 
   if (result.activeBehaviorCount === 1) {
-    return "Timezone saved. 1 active behavior was updated.";
+    return "Timezone saved. 1 active Behavior now uses it.";
   }
 
-  return `Timezone saved. ${result.activeBehaviorCount} active behaviors were updated.`;
+  return `Timezone saved. ${result.activeBehaviorCount} active Behaviors now use it.`;
 }
 
 export async function changeCategoryAction(

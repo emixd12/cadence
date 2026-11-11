@@ -11,7 +11,7 @@ import { categoryAssignmentSnapshot, type CategoryAssignment, categorySnapshot, 
 type OrderDraft = { base: string; ids: readonly string[] };
 type Drag = { id: string; pointerId: number; from: number };
 
-export const CATEGORY_PANEL_PURPOSE = "Organize Behaviors with your own categories. Descriptions provide context in forms and exports.";
+export const CATEGORY_PANEL_PURPOSE = "Group Behaviors your way. A category’s description shows in Behavior forms and exports.";
 
 /** The button that opens the category list (Ticket 304). */
 export function drawerLabel(count: number) {
@@ -57,7 +57,7 @@ export function CategoryPanel({ categories, assignments, action, headingLevel }:
         if (next.status === "success" && !move) setEditor(null);
       } catch {
         setDraft(null); setAnnouncement("");
-        setResult({ status: "error", message: "Unable to save categories. Your draft is unchanged. Try again." });
+        setResult({ status: "error", message: "Categories could not save. Your changes are still here. Try again." });
       }
     });
   }

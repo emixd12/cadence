@@ -18,7 +18,7 @@ describe("desktop Vite public auth configuration", () => {
     const unconfigured = build(path.join(directory, "unconfigured"), {});
     expect(unconfigured).not.toContain(url);
     expect(unconfigured).not.toContain(key);
-    expect(unconfigured).toContain("Account sign-in is not configured in this build.");
+    expect(unconfigured).toContain("This version of Cadence cannot sign in to an account.");
   }, 30_000);
 });
 

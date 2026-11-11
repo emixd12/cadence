@@ -123,7 +123,7 @@ export function dailyBriefSectionState(load: SettingsSectionLoad<DailyBriefSetti
  */
 export function connectorUnavailableSectionState(reason: "local" | "build" | null): SettingsSectionState {
   if (reason === "local") return state("Link a Cadence account", false);
-  if (reason === "build") return state("Unavailable in this build", false);
+  if (reason === "build") return state("Not in this version", false);
   return state("Unavailable", false);
 }
 

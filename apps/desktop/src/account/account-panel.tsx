@@ -11,22 +11,22 @@ export function AccountPanel({ state, configured, connected, busy, onSignIn, onC
   return <section id="account" aria-busy={busy} className="bg-background py-4">
     <SettingsSectionHeading>Account</SettingsSectionHeading>
     {connected ? <>
-      <p className="mt-4 max-w-2xl text-sm leading-6">{state.status === "linked" ? `Signed in${state.email ? ` as ${state.email}` : " with Google"}.` : "This Mac remains connected to its Cadence account."}</p>
+      <p className="mt-4 max-w-2xl text-sm leading-6">{state.status === "linked" ? `Signed in${state.email ? ` as ${state.email}` : " with Google"}.` : "This Mac is linked to your Cadence account."}</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">SQLite is this Mac’s offline working copy. Account changes synchronize while Cadence runs with connectivity.</p>
       {state.status === "linked" && state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
       {state.status === "error" ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.message}</p> : null}
-      {state.status === "waiting" ? <><p role="status" className="mt-3 text-sm leading-6">Complete account reconnection in your browser.</p>
+      {state.status === "waiting" ? <><p role="status" className="mt-3 text-sm leading-6">Finish reconnecting in your browser.</p>
         <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel reconnect</button></> : null}
     </> : state.status === "linked" ? <>
       <p className="mt-4 max-w-2xl text-sm leading-6">Signed in{state.email ? ` as ${state.email}` : " with Google"}.</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Your local data has not been uploaded or replaced. Choose how to link it in the next step.</p>
       {state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
     </> : <>
-      <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Sign in with the Google account you use for Cadence. Local tracking remains available without an account.</p>
-      {!configured ? <p role="status" className="mt-3 text-sm leading-6 text-muted-readable">Account sign-in is not configured in this build.</p> : null}
+      <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Sign in with the Google account you use for Cadence. Tracking works without an account.</p>
+      {!configured ? <p role="status" className="mt-3 text-sm leading-6 text-muted-readable">This version of Cadence cannot sign in to an account.</p> : null}
       {state.status === "error" ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.message}</p> : null}
       {state.status === "waiting" ? <>
-        <p role="status" className="mt-3 text-sm leading-6">Complete Google sign-in in your browser.</p>
+        <p role="status" className="mt-3 text-sm leading-6">Finish signing in with Google in your browser.</p>
         <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel sign in</button>
       </> : <button type="button" disabled={busy || !configured} onClick={onSignIn} className="product-action product-action-primary mt-4 min-h-11 py-2 text-sm">Sign in with Google</button>}
     </>}
@@ -34,14 +34,14 @@ export function AccountPanel({ state, configured, connected, busy, onSignIn, onC
 }
 
 export function AccountSyncPanel({ status, busy, onSync, onReconnect, onUpdate }: Readonly<{ status: SyncStatus; busy: boolean; onSync: () => void; onReconnect: () => void; onUpdate?: () => void }>) {
-  const message = status.state === "offline" ? "Offline. Local changes will synchronize when Cadence reconnects."
-    : status.state === "syncing" ? "Synchronizing account data…"
+  const message = status.state === "offline" ? "Offline. Changes on this Mac sync when Cadence is back online."
+    : status.state === "syncing" ? "Syncing…"
     : status.state === "current" ? "Account data is current."
-    : status.state === "conflict" ? `${status.count} synchronization conflict${status.count === 1 ? " requires" : "s require"} review.`
-    : status.state === "revoked" ? "The account session expired or was revoked. Reconnect or disconnect the account."
+    : status.state === "conflict" ? `${status.count} sync ${status.count === 1 ? "conflict" : "conflicts"} to review.`
+    : status.state === "revoked" ? "You were signed out of your Cadence account. Reconnect, or disconnect this Mac."
     : status.message;
   return <section id="account-sync" aria-busy={busy} className="bg-background py-4">
-    <SettingsPartHeading className="text-lg leading-tight">Account synchronization</SettingsPartHeading>
+    <SettingsPartHeading className="text-lg leading-tight">Sync</SettingsPartHeading>
     <p role={status.state === "failed" || status.state === "revoked" ? "alert" : "status"} aria-live="polite" className={`mt-3 max-w-2xl text-sm leading-6 ${status.state === "failed" || status.state === "conflict" || status.state === "revoked" ? "text-accent" : "text-muted-readable"}`}>{message}</p>
     <button type="button" disabled={busy} onClick={status.state === "update_required" ? onUpdate : status.state === "revoked" ? onReconnect : onSync} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">{status.state === "update_required" ? "Review update" : status.state === "revoked" ? "Reconnect account" : "Sync now"}</button>
   </section>;
@@ -55,7 +55,7 @@ export function AccountConflictReview({ conflicts, busy, error, onResolve }: Rea
   const complete = conflicts.every((conflict) => choices[`${conflict.kind}:${conflict.id}`]);
   return <section id="account-conflicts" aria-busy={busy} className="scroll-mt-20 bg-background py-4">
     <SettingsPartHeading className="text-lg leading-tight">Review conflicts ({conflicts.length})</SettingsPartHeading>
-    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Synchronization stays paused until every conflict has a valid decision.</p>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Sync stays paused until you choose a version for every conflict.</p>
     <div className="mt-4 divide-y divide-line">{conflicts.map((conflict) => {
       const key = `${conflict.kind}:${conflict.id}`;
       return <fieldset key={`${key}:${conflict.reason}`} className="py-4 first:pt-0 last:pb-0">
@@ -74,7 +74,7 @@ export function AccountConflictReview({ conflicts, busy, error, onResolve }: Rea
     <button type="button" disabled={busy || !complete} onClick={() => onResolve(conflicts.map((conflict) => {
       const choice = choices[`${conflict.kind}:${conflict.id}`]!;
       return { kind: conflict.kind, id: conflict.id, choice, ...(choice === "both" ? { duplicateId: crypto.randomUUID() } : {}) };
-    }))} className="product-action product-action-primary mt-4 min-h-11 py-2 text-sm">Apply conflict decisions</button>
+    }))} className="product-action product-action-primary mt-4 min-h-11 py-2 text-sm">Apply choices</button>
     {error ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{error}</p> : null}
   </section>;
 }
@@ -107,8 +107,8 @@ export function FirstAccountLinkChoice({ recognized = true, complete = false, bu
   onImport: () => void; onIgnore: () => void; onCancel: () => void;
 }>) {
   return <section id="account-link-choice" aria-busy={busy} className="bg-background py-4">
-    <SettingsPartHeading className="text-lg leading-tight">{complete ? "Account data connected" : recognized ? "Choose which data to use" : "Connecting account data"}</SettingsPartHeading>
-    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">{complete ? "The hosted and local copies now share one saved baseline." : recognized ? "Cadence found tracking data on this Mac. Choose one path before connecting the account." : "This untouched local profile is using the account data automatically."}</p>
+    <SettingsPartHeading className="text-lg leading-tight">{complete ? "Account linked" : recognized ? "Choose which data to use" : "Linking your account"}</SettingsPartHeading>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">{complete ? "This Mac and your account now have the same data." : recognized ? "Cadence found tracking data on this Mac. Choose what to do with it before linking." : "This Mac had no tracking data, so it uses your account’s data."}</p>
     <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap">
       {recognized && !complete ? <button type="button" disabled={busy} onClick={onImport} className="product-action product-action-primary min-h-11 py-2 text-sm">Import local data into the account</button> : null}
       {recognized && !complete ? <button type="button" disabled={busy} onClick={onIgnore} className="product-action product-action-secondary min-h-11 py-2 text-sm">Ignore local data and use account data</button> : null}

@@ -40,7 +40,7 @@ describe("native Settings coverage", () => {
   it("shows actual verified counts and through dates without capping them", () => {
     const { props, html } = settings();
     expect(html).toContain(
-      "All eligible reminders in the target window are scheduled.",
+      "Every reminder for the next 30 days is scheduled.",
     );
     expect(html).toContain("2026-09-29T15:00:00Z");
     expect(html).toContain("2026-08-30T15:00:00Z");
@@ -62,13 +62,13 @@ describe("native Settings coverage", () => {
         missingIds: ["gap"],
       },
     });
-    expect(html).toContain("Limited reminder coverage.");
+    expect(html).toContain("macOS kept fewer reminders than Cadence scheduled.");
     expect(html).toContain("2026-09-01T15:00:00Z");
     expect(html).toContain("2026-09-02T15:00:00Z");
     expect(html).toContain("2026-09-29T15:00:00Z");
     expect(html).toContain(">73</dd>");
     expect(html).not.toContain(
-      "All eligible reminders in the target window are scheduled.",
+      "Every reminder for the next 30 days is scheduled.",
     );
   });
 
@@ -81,19 +81,19 @@ describe("native Settings coverage", () => {
     { error: "macOS readback failed" },
   ])("does not present stale or unknown data as verified: %j", (overrides) => {
     const { html } = settings(overrides);
-    expect(html).toContain("Reminder coverage is not verified.");
-    expect(html).toMatch(/Verified through<\/dt><dd[^>]*>Not verified<\/dd>/);
-    expect(html).toMatch(/Retained reminders<\/dt><dd[^>]*>Not verified<\/dd>/);
+    expect(html).toContain("Cadence has not confirmed which reminders are scheduled.");
+    expect(html).toMatch(/Scheduled through<\/dt><dd[^>]*>Not confirmed<\/dd>/);
+    expect(html).toMatch(/Reminders macOS kept<\/dt><dd[^>]*>Not confirmed<\/dd>/);
   });
 
   it("requests permission only when macOS has not recorded a decision", () => {
     expect(
       settings({ permission: "notDetermined", coverage: null }).html,
-    ).toContain("Request notification permission");
+    ).toContain("Allow notifications");
     const denied = settings({ permission: "denied" }).html;
-    expect(denied).not.toContain("Request notification permission");
-    expect(denied).toContain("macOS System Settings");
-    expect(denied).toContain("Refresh reminder coverage");
+    expect(denied).not.toContain("Allow notifications");
+    expect(denied).toContain("System Settings › Notifications");
+    expect(denied).toContain("Check reminders");
     expect(settings({ busy: true }).html).toContain('disabled=""');
   });
 
@@ -107,8 +107,8 @@ describe("native Settings coverage", () => {
     const { html } = settings();
     const titles = [...html.matchAll(/<h2 id="settings-[a-z]+-title"[^>]*>([^<]+)<\/h2>/g)].map((match) => match[1]);
     expect(titles).toEqual(["General", "Connections", "Planning", "Account and data", "This Mac"]);
-    expect(html.indexOf("Local profile")).toBeLessThan(html.indexOf("Native notifications"));
-    expect(html.indexOf("Native notifications")).toBeLessThan(html.indexOf('id="settings-connections"'));
+    expect(html.indexOf("Local profile")).toBeLessThan(html.indexOf(">Notifications</h3>"));
+    expect(html.indexOf(">Notifications</h3>")).toBeLessThan(html.indexOf('id="settings-connections"'));
     expect(html.indexOf("Open Export")).toBeLessThan(html.indexOf("Show setup guide"));
     expect(html.indexOf('id="settings-mac"')).toBeLessThan(html.indexOf("Show setup guide"));
   });
@@ -135,7 +135,7 @@ describe("native setup guide", () => {
         forceOpen
       />,
     );
-    expect(html).toContain("Native notifications");
+    expect(html).toContain(">Notifications<");
     expect(html).not.toContain("Browser notifications");
     expect(html).toContain("Blocked");
     expect(html).toContain("Create behavior");
@@ -156,7 +156,7 @@ describe("local database controls", () => {
     expect(html).toContain("Reveal in Finder");
     expect(html).toContain("Back Up");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Restore local database/);
-    expect(html).toContain("protects the current database");
+    expect(html).toContain("keeps a copy of the current database");
   });
 
   it("reports recovery totals and requires acknowledgement before deleting its backup", () => {
@@ -165,7 +165,7 @@ describe("local database controls", () => {
       info={{ path: "/Application Support/cadence.sqlite3", localMode: false,
         recovery: { state: "reopen_verified", backupPath: "/Application Support/Backups/recovery.sqlite3", before: usage, after: usage } }}
       confirmation="" busy={false} message="" onConfirmationChange={vi.fn()} onReveal={vi.fn()} onBackup={vi.fn()} onRestore={vi.fn()} onDeleteRecoveryBackup={vi.fn()} />);
-    expect(html).toContain("Current storage, including remaining recovery files");
+    expect(html).toContain("Size now, with recovery files");
     expect(html).toContain("Permanently delete this recovery backup");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Delete recovery backup/);
   });
@@ -185,7 +185,7 @@ describe("local database controls", () => {
     const html = renderToStaticMarkup(<LocalDatabaseSection
       info={{ path: "/Application Support/cadence.sqlite3", localMode: false }} confirmation="RESTORE"
       busy={false} message="" onConfirmationChange={vi.fn()} onReveal={vi.fn()} onBackup={vi.fn()} onRestore={vi.fn()} />);
-    expect(html).toContain("Disconnect the account before restoring");
+    expect(html).toContain("Disconnect your Cadence account before restoring");
     expect(html).not.toContain("Restore local database");
   });
 });

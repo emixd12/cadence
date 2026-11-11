@@ -224,7 +224,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
       includeNotes: true, includeReminderHistory: true, optionalSources: { reminders: true, notes: true } });
     const adapter = client({ preferences: vi.fn(async () => offered), updatePreferences: vi.fn(async (input) => ({ ...offered, ...input })) });
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Include Notes on Not Completed occurrences"));
+    await vi.waitFor(() => expect(container.textContent).toContain("Include Notes on Not Completed Occurrences"));
     expect(container.querySelector("details")?.textContent).toContain("Include reminder delivery history");
     expect(container.textContent).toContain("up to 12 Notes, the first 280 characters of each");
     expect(container.textContent).toContain("never reminder content");
@@ -240,7 +240,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
     await vi.waitFor(() => expect(checkbox("daily-brief-sources-coverage")).not.toBeNull());
     await act(() => checkbox("daily-brief-sources-coverage").click());
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toBe("Cadence could not save Daily Brief settings."));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toBe("Daily Brief settings could not save. Try again."));
   });
 });
 

@@ -86,7 +86,7 @@ describe("desktop Settings groups (Ticket 302)", () => {
   it("places shared and Mac-only sections in their groups, one heading level below the group", async () => {
     await render();
     const titles = (id: string) => [...group(id).querySelectorAll("h3")].map((heading) => heading.textContent);
-    expect(titles("settings-general")).toEqual(["Local profile", "Cadence account", "Timezone", "Native notifications", "Categories"]);
+    expect(titles("settings-general")).toEqual(["Local profile", "Cadence account", "Timezone", "Notifications", "Categories"]);
     expect(group("settings-general").querySelector("h4")?.textContent).toBe("Reminder coverage");
     expect(titles("settings-connections")[0]).toBe("Connected sources");
     expect(titles("settings-planning")).toEqual(["Travel", "Daily Brief"]);

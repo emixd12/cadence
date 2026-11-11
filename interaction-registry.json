@@ -1255,7 +1255,7 @@
         },
         {
           "kind": "activate",
-          "control": "Discard drafts and restart"
+          "control": "Discard changes and restart"
         }
       ],
       "availability": "Configured desktop builds check at startup and every 24 hours while open. Settings and the nonmodal notice expose explicit installation and restart.",
@@ -8705,7 +8705,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Use detected timezone"
+          "control": "Use device timezone"
         }
       ],
       "availability": "Visible only when browser detection succeeds and differs from the current draft.",
@@ -8890,11 +8890,11 @@
         },
         {
           "kind": "activate",
-          "control": "Request notification permission"
+          "control": "Allow notifications"
         },
         {
           "kind": "activate",
-          "control": "Refresh reminder coverage"
+          "control": "Check reminders"
         }
       ],
       "availability": "Web registration remains available when supported. Desktop requests permission only when not determined, and disables refresh while busy or unavailable.",
@@ -10303,7 +10303,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Apply conflict decisions"
+          "control": "Apply choices"
         }
       ],
       "availability": "Available after every conflict has one valid decision. Keep both stays hidden when graph identity cannot be duplicated safely.",
@@ -12189,11 +12189,11 @@
       "triggers": [
         {
           "kind": "change",
-          "control": "Show Calendar context on Timeline"
+          "control": "Show Google Calendar events on Timeline"
         },
         {
           "kind": "change",
-          "control": "Show all-day events"
+          "control": "Show all-day Google Calendar events"
         },
         {
           "kind": "change",
@@ -12295,7 +12295,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Refresh Calendar"
+          "control": "Refresh Google Calendar"
         }
       ],
       "availability": "Connected accounts can refresh calendar discovery, including without selected calendars. Each purpose requires its own configured client and same-account grant.",
@@ -12831,11 +12831,11 @@
       "triggers": [
         {
           "kind": "change",
-          "control": "Show Outlook context on Timeline"
+          "control": "Show Outlook Calendar events on Timeline"
         },
         {
           "kind": "change",
-          "control": "Show all-day Outlook events"
+          "control": "Show all-day Outlook Calendar events"
         },
         {
           "kind": "change",
@@ -13822,7 +13822,7 @@
         },
         {
           "kind": "change",
-          "control": "Include Notes on Not Completed occurrences"
+          "control": "Include Notes on Not Completed Occurrences"
         }
       ],
       "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. Plan around my connected sources needs Daily Brief on and cannot be turned on while nothing is connected. Advanced lists only connected sources; a source row is disabled while the one choice is off. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Google Calendar is the Timeline connection and its selected calendars (Ticket 307).",
@@ -15999,11 +15999,11 @@
       "triggers": [
         {
           "kind": "change",
-          "control": "Show iCloud context on Timeline"
+          "control": "Show iCloud Calendar events on Timeline"
         },
         {
           "kind": "change",
-          "control": "Show all-day iCloud events"
+          "control": "Show all-day iCloud Calendar events"
         },
         {
           "kind": "change",

@@ -24,6 +24,16 @@ Sparse, calm, exact.
 
 The product voice is matter-of-fact and quietly supportive. It should feel like a personal cockpit, not a productivity platform. Copy should name the state or action plainly, avoid motivational language, and never imply that an unresolved item has failed by default.
 
+Voice: clear, warm and brief (owner direction, `docs/DECISIONS.md`, 2026-11-10: "prioritize clear and delightful language"). Warmth comes from plain, considerate wording, not from praise, exclamation or promotion. In practice:
+
+- Short sentences and plain words. Say what happened and what to do next ("Google Calendar did not refresh. Try again."). No implementation terms such as "atomic snapshot", "provider responses", "runtime", "deployment" or "working copy".
+- Active voice that names the actor: "Cadence checks the backup", "macOS kept fewer reminders".
+- One name for one thing. "Connected sources" is the section for Google Calendar, Outlook Calendar, iCloud Calendar and Hevy, never "Connectors". Each Connect, Refresh and Disconnect action names its source in full ("Refresh Outlook Calendar").
+- Places read as places: a timezone shows "New York", while the saved value stays `America/New_York`.
+- Keep the domain terms exactly: Behavior, Occurrence, Completed, Not Completed, Unresolved, Needs decision.
+- Still no motivational, celebratory or promotional copy, and no mannered metaphors.
+- Sentences that state what Cadence sends, stores or shares change only through the messaging track (`docs/MESSAGING_CHANGES.md`).
+
 ## Anti-references
 
 No named visual anti-references are documented. The locked product anti-references are pattern-based:

@@ -154,15 +154,15 @@ export function NotificationPermissionPanel({
           className="product-action product-action-primary mt-4 min-h-11 w-fit py-2 text-sm"
         >
           {isBusy
-            ? "Saving..."
+            ? "Saving…"
             : actionModel.label}
         </button>
       ) : null}
 
       {actionModel.permissionBlocked ? (
         <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">
-          Allow notifications for Cadence in your browser or site settings,
-          then return here and select Refresh this device.
+          Allow notifications for Cadence in your browser&apos;s site settings,
+          then come back and choose Refresh this device.
         </p>
       ) : null}
 
@@ -229,7 +229,7 @@ export async function enableBrowserNotificationsOnDevice(
         subscriptionStatus: "missing",
         saveState: "error",
         message:
-          "Notifications were not enabled. Click Enable notifications on this device to try again.",
+          "Notifications are still off. Choose Enable notifications on this device to try again.",
       };
     }
 
@@ -273,7 +273,7 @@ function deviceNotificationStatusLabel(input: {
   support: BrowserPushSupport | null;
 }): string {
   if (input.support === null || input.subscriptionStatus === "checking") {
-    return "Checking";
+    return "Checking…";
   }
 
   if (input.support.supported === false || input.permission === "unavailable") {
@@ -356,7 +356,7 @@ export async function inspectBrowserNotificationState(
       permission,
       subscriptionStatus: "missing",
       errorMessage:
-        "Cadence could not check notification delivery for this device. Select Refresh this device to try again.",
+        "Cadence could not check notifications on this device. Choose Refresh this device to try again.",
     };
   }
 }
@@ -364,7 +364,7 @@ export async function inspectBrowserNotificationState(
 function supportMessage(reason: BrowserPushUnavailableReason): string {
   switch (reason) {
     case "missing_public_key":
-      return "Notifications are not configured.";
+      return "This Cadence server has not set up notifications.";
     case "notifications_unavailable":
       return "Notifications are not supported on this device.";
     case "service_worker_unavailable":

@@ -280,7 +280,7 @@ it.each(["available", "unavailable"] as const)("keeps the grant visible after a 
     expect(container.textContent).toContain("Checking device location…");
     expect(container.textContent).toContain("Device location: allowed.");
     await act(async () => { finish(); });
-    expect(container.textContent).toContain(state === "available" ? "A current position is available." : "Diagnostic: timeout.");
+    expect(container.textContent).toContain(state === "available" ? "A current position is available." : "Details: timeout.");
     expect(container.textContent).toContain("Device location: allowed.");
     if (state === "unavailable") {
       expect(container.textContent).toContain("Keep Cadence in front and choose Check again");
@@ -311,7 +311,7 @@ it("requests permission inside the toggle click without showing Saving…", asyn
     expect(resultLines(container)).toEqual([`${SETTINGS_SAVED}. Checking device location…`]);
     expect(container.textContent).not.toContain("Saving…");
     await act(async () => { finishLocate(); });
-    expect(resultLines(container)).toEqual(["Location denied. Estimates start from Home or your previous stop instead."]);
+    expect(resultLines(container)).toEqual(["Location access is off. Estimates start from Home or your previous stop instead."]);
   } finally { await unmount(); }
 });
 
@@ -320,13 +320,13 @@ it("shows a diagnostic reason only when the location request returns one", async
   const withReason = await renderPanel({ readLocation: vi.fn(async () => ({ state: "unavailable" as const, reason: "timeout" })) });
   try {
     await act(async () => withReason.container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-    expect(withReason.container.textContent).toContain("Location unavailable. Estimates start from Home or your previous stop instead. Diagnostic: timeout.");
+    expect(withReason.container.textContent).toContain("Your device did not share a position. Estimates start from Home or your previous stop instead. Details: timeout.");
   } finally { await withReason.unmount(); }
   const without = await renderPanel({ readLocation: vi.fn(async () => ({ state: "denied" as const })) });
   try {
     await act(async () => without.container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-    expect(without.container.textContent).toContain("Location denied.");
-    expect(without.container.textContent).not.toContain("Diagnostic:");
+    expect(without.container.textContent).toContain("Location access is off.");
+    expect(without.container.textContent).not.toContain("Details:");
   } finally { await without.unmount(); }
 });
 
@@ -350,7 +350,7 @@ it("explains the manual macOS path when travel is on and location is not yet all
     expect(readLocation).not.toHaveBeenCalledWith(true);
     await act(async () => buttonNamed(container, "Check again")!.click());
     expect(readLocation).toHaveBeenCalledWith(true);
-    expect(container.textContent).toContain("Diagnostic: timeout.");
+    expect(container.textContent).toContain("Details: timeout.");
     expect(container.textContent).toContain(desktopSteps);
   } finally { await unmount(); }
 });

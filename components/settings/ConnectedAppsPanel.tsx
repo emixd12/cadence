@@ -16,7 +16,7 @@ export function ConnectedAppsPanel({ view, timezone, action }: { view: Connected
         <p className="text-sm leading-6 text-muted-readable">AI clients with access to this Cadence account. Disconnect stops their access immediately.</p>
         <a href="https://cadence-me.com/developers" className="product-action min-h-11 w-fit py-2">Developer documentation</a>
         {view.error ? <p role="alert" className="text-sm text-accent">{view.error}</p> : <>
-          {view.grants.length === 0 ? <p className="text-sm leading-6 text-muted-readable">No apps connected. Start a connection from an AI client to review its permissions here.</p> : (
+          {view.grants.length === 0 ? <p className="text-sm leading-6 text-muted-readable">No apps connected yet. When you connect Cadence from an AI app, it shows here with its permissions.</p> : (
             <ul className="grid min-w-0 divide-y divide-line">
               {view.grants.map((grant) => <li key={grant.grantId} className="grid min-w-0 gap-3 py-4 first:pt-0">
                 <SettingsItemHeading className="text-lg [overflow-wrap:anywhere]">{grant.clientName}</SettingsItemHeading>

@@ -64,8 +64,10 @@ describe("UX Tickets 049-052 UI regressions", () => {
     expect(html).toContain("<select");
     expect(html).not.toContain("Browser timezone");
     expect(html).not.toContain("datalist");
-    expect(html).toContain("Saving updates active behavior schedules");
-    expect(html).toContain("Past and resolved history stays unchanged");
+    expect(html).toContain("Saving moves active Behavior schedules and future Unresolved Occurrences to this timezone.");
+    expect(html).toContain("Past Occurrences and ones you have marked stay as they are.");
+    // Ticket 309: the option reads as a place; its value stays the IANA name.
+    expect(html).toMatch(/<option value="America\/New_York"[^>]*>New York<\/option>/);
   });
 
   it("mirrors account deletion gates before submit", () => {
@@ -100,7 +102,7 @@ describe("UX Tickets 049-052 UI regressions", () => {
 
     expect(html).toContain("disabled");
     expect(html).toContain(
-      "Deletion unlocks after the export acknowledgement and typed confirmation match.",
+      "Delete account turns on after you check the box and type the confirmation.",
     );
   });
 
@@ -203,7 +205,7 @@ describe("UX Tickets 049-052 UI regressions", () => {
       permission: "granted",
       subscriptionStatus: "missing",
       errorMessage:
-        "Cadence could not check notification delivery for this device. Select Refresh this device to try again.",
+        "Cadence could not check notifications on this device. Choose Refresh this device to try again.",
     });
 
     await expect(
@@ -284,7 +286,7 @@ describe("UX Tickets 049-052 UI regressions", () => {
       "Notifications are still blocked in this browser.",
     );
     expect(notGranted.message).toBe(
-      "Notifications were not enabled. Click Enable notifications on this device to try again.",
+      "Notifications are still off. Choose Enable notifications on this device to try again.",
     );
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(registerSubscription).toHaveBeenCalledTimes(1);

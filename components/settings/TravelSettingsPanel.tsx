@@ -205,7 +205,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   const permissionHint = permission && !locationHelp ? deviceLocationHint(permission, desktop) : null;
   const readWebNotifications = useCallback(() => readWebDeviceNotifications(vapidPublicKey), [vapidPublicKey]);
   const homeDirty = settings ? (home.trim() || null) !== settings.baseLocationText : false;
-  return <SettingsPanel id="travel" title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
+  return <SettingsPanel id="travel" title="Travel" description="Estimates travel time to Calendar events and Behaviors that have a place. Travel never changes a schedule or status.">
     <div className="grid max-w-2xl gap-4 text-sm leading-6">
       <DesktopDraftGuard dirty={homeDirty} pending={saving > 0} onDiscard={() => setHome(saved.current?.baseLocationText ?? "")} />
       <SettingsResultScope channel={result}>
@@ -225,7 +225,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
               className="min-h-11 min-w-0 flex-1 basis-64 border-0 border-b border-line bg-background" autoComplete="off" /></HomeCurrentLocation><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
           <SettingsResultLine channel={result} />
           <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
-          {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked account, a synchronized working copy and an internet connection.</p> : null}
+          {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked Cadence account, a finished sync and an internet connection.</p> : null}
           {permission ? <p className="text-muted-readable">Device location: {permission}.{permissionHint ? ` ${permissionHint}` : ""}</p> : null}
           {locationHelp ? <div className="grid gap-2">
             <p className="text-muted-readable">{deviceLocationGuidance(permission, locationDenied, desktop)}</p>
@@ -249,8 +249,18 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
 
 function locationResultText(state: ForegroundLocation["state"], reason: string | null): string {
   if (state === "available") return "A current position is available. Cadence did not save it.";
-  return `Location ${state}. Estimates start from Home or your previous stop instead.${reason && (state === "unavailable" || state === "denied") ? ` Diagnostic: ${reason}.` : ""}`;
+  return `${LOCATION_STATE_TEXT[state]} Estimates start from Home or your previous stop instead.${reason && (state === "unavailable" || state === "denied") ? ` Details: ${reason}.` : ""}`;
 }
+
+/** Ticket 309: each location outcome in plain words. */
+const LOCATION_STATE_TEXT: Readonly<Record<Exclude<ForegroundLocation["state"], "available">, string>> = {
+  denied: "Location access is off.",
+  unavailable: "Your device did not share a position.",
+  inaccurate: "Your position is not precise enough.",
+  prompt: "Location access has not been allowed yet.",
+  revoked: "Location access was turned off.",
+  stale: "Your last position is too old to use.",
+};
 
 type DeviceLocationPermission = "allowed" | "not yet allowed" | "blocked";
 

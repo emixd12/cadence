@@ -46,6 +46,6 @@ export function desktopAccountSectionState(input: DesktopAccountSectionInput): S
     case "error": return state("Sign-in did not finish", false, true);
     // Linked but not yet synchronizing: the link is still being set up.
     case "linked": return SETTINGS_SECTION_CHECKING;
-    case "local": return input.configured ? state("Not linked", false) : state("Unavailable in this build", false);
+    case "local": return input.configured ? state("Not linked", false) : state("Not in this version", false);
   }
 }
