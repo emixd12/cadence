@@ -47,6 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 301–309: Settings regroup and simplification | Implemented November 10 on PR 205; local and CI checks pass | Hosted runbook (306, 308, 305 relax, deploy, 307 retirement then migration); owner decision on the 305 switch flip `20261110170000`; installed Mac check (302); signed-in hosted check; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309: Settings regroup implemented — November 10, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -85,6 +86,82 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 301–309: Settings regroup implemented — November 10, 2026
+
+The owner asked on November 10 to carry out Tickets 301–309 and merge PR 205, confirmed the
+three agent proposals and authorized pushing Ticket 307's migration after merge
+(`docs/DECISIONS.md`, 2026-11-10). Seven parallel agents built the tickets on branches off
+`claude/determined-fermi-78a61d`; the orchestrating agent merged and reconciled each one.
+
+- **301:** four groups, a sticky index, source rows with provider icons and state, drawers,
+  pure state functions (`lib/ui/settings-sections.ts`), one line of Privacy, Terms and Trust
+  links, and a quiet Delete account link. Bench fixtures: a new account measures 2,539 px
+  (6,432 before) and Delete account is 22 tab stops away with every source connected.
+- **302:** the Mac uses the same groups plus a "This Mac" group and a self-opening Cadence
+  account drawer; local-mode rows say "Link a Cadence account".
+- **303:** checkboxes and selects save as they change, Home on blur or Enter; one result line
+  per section; failures roll back; Disconnect asks first everywhere. Timezone, opened forms,
+  Connect, Disconnect and Delete account keep explicit actions.
+- **304:** Categories as a closed list with drag, touch and arrow-key reordering; a move is one
+  checked `manage_categories` write. No migration.
+- **305:** Note shortcuts on for everyone; matching runs after each Note save; no Settings
+  control. Migrations `20261110153050` (commit check) and `20261110170000` (turns stored off
+  switches on once; not additive). Desktop SQLite migration 0022.
+- **306:** one **Plan around my connected sources** choice with per-source exclusions under
+  Advanced. Migration `20261110150000` (adds columns and `save_daily_brief_preferences_v4`; it
+  also replaces `daily_brief_calendar_fence_is_current` with a looser caller check).
+- **307:** Daily Brief reads Google Calendar through the Timeline connection. Retirement route
+  `POST /api/google-calendar/agent-grants/retire`, then migration `20261110160000`, which
+  refuses to run while any agent credential remains.
+- **308:** **Use my current location** fills Home from one server-side reverse-geocoding call;
+  the position is never stored or logged. Migration `20261110155000` (rate-limit action).
+  `docs/COSTS.md` updated.
+- **309:** plainer Settings copy, place-name timezones, `PRODUCT.md` voice. Before-and-after
+  list: `docs/qa/2026-11-10-settings-wording.md`.
+- **Logged:** `docs/LEGAL.md` L-022 (storing a geocoded Home address);
+  `docs/MESSAGING_CHANGES.md` P-037 (old Mac builds' Daily Brief text) and Ticket 309's P-033
+  additions.
+
+Verification: each agent ran agents, interactions, resolvers, design-system, lint, typecheck,
+desktop typecheck, build and desktop build (all pass) and the full Vitest suite (only the known
+`acceptance-web-client` `afterAll` timeout plus load-sensitive files that pass alone). The
+306–307 agent ran `db reset` and the new SQL fixtures on the local stack. CI on the merged
+branch through Ticket 303 passed, including `rehearse` (every migration and SQL fixture) and
+`verify`. Not verified: installed Mac checks (Cadence for Mac is not installed on the owner's
+Mac), a signed-in hosted check, a real Google revocation, iPhone Safari, a screen reader.
+
+Platform impact: web and desktop in this change; marketing only through P-035; future mobile
+inherits the web page. Messaging impact: P-033 to P-037.
+
+## Settings regroup: evaluation, mock and Tickets 301–309 — November 10, 2026
+
+Owner direction: `docs/DECISIONS.md`, 2026-11-10. Branch `claude/determined-fermi-78a61d`,
+opened as a draft pull request on November 10.
+
+- **Evaluation, November 9.** The web Settings page was measured from the real components
+  on synthetic data in headless Chrome: 6,470 px, 1,265 visible words and 59 controls for a
+  new account at 1280×800; 8,402 px with every source connected. The production page was not
+  checked: no kept test-account session was available on this Mac.
+- **Mock.** `/design-system?preview=settings-regroup` shows four groups, a section index,
+  source rows with state and provider icons, drawers for Categories, Travel and Daily Brief,
+  a drag-to-reorder Categories sketch and a one-choice Daily Brief sketch. A new account
+  measures 2,537 px, 182 words and 20 controls. `/settings` is unchanged.
+- **Files.** `app/design-system/SettingsRegroupBench.tsx`, `SettingsRegroupFixtures.tsx`,
+  `settings-regroup-bench.module.css`, `app/design-system/page.tsx`,
+  `interaction-registry.json` (bench file excluded), three provider icons and
+  `public/brand/connector-icons-source.md`.
+- **Tickets 301–309 filed, none started.** The branch was rebased onto `main` on November 10,
+  after the consolidation merge that holds Tickets 292–300.
+- **Logged.** `docs/LEGAL.md` L-020 (provider marks) and L-021 (one Daily Brief choice, one
+  Google connection). `docs/MESSAGING_CHANGES.md` P-033 to P-036.
+- **Verification, November 10, after the rebase.** `agents:check`, `interactions:check`,
+  `resolvers:check`, `design-system:check`, lint, typecheck and build pass. `npm run test`:
+  5,428 pass and 16 fail in 5 files this branch does not change. Four files require Node 24
+  (this Mac runs Node 26.13). `tests/acceptance-web-client.test.mjs` passes its 71 tests and
+  then times out in its `afterAll` hook, also when run alone. Dagger did not run: Docker is
+  not installed here.
+- **Not verified.** Safari, an iPhone, a screen reader and the Mac app.
 
 ## Branch consolidation into main — November 10, 2026
 

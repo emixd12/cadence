@@ -71,10 +71,10 @@ function timezoneSuccessMessage(result: {
   }
 
   if (result.activeBehaviorCount === 1) {
-    return "Timezone saved. 1 active behavior was updated.";
+    return "Timezone saved. 1 active Behavior now uses it.";
   }
 
-  return `Timezone saved. ${result.activeBehaviorCount} active behaviors were updated.`;
+  return `Timezone saved. ${result.activeBehaviorCount} active Behaviors now use it.`;
 }
 
 export async function changeCategoryAction(
@@ -86,6 +86,8 @@ export async function changeCategoryAction(
     for (const path of ["/settings", "/behaviors", "/timeline", "/export"]) revalidatePath(path);
     return { status: "success", message: "Categories saved." };
   } catch (error) {
+    // Reload the list so a stale or refused change shows the stored categories. Open drafts keep their own snapshot.
+    revalidatePath("/settings");
     return { status: "error", message: error instanceof Error ? error.message : "Unable to save categories." };
   }
 }

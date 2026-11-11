@@ -120,6 +120,8 @@ grant execute on function public.read_day_note_shortcut_context() to authenticat
 
 -- Like the guarded occurrence-status write RPC, this mutation uses the table
 -- owner's rights so authenticated clients cannot bypass its full-context CAS.
+-- This replaces Ticket 305's definition (20261110153050) and keeps its default-on
+-- gate; it adds only the 'day_notes' target.
 create or replace function public.commit_note_shortcut_state(
   expected_context jsonb,
   next_state jsonb,
@@ -214,19 +216,19 @@ begin
   then
     raise exception 'This shortcut changed elsewhere. Refresh and try again.' using errcode = 'P0001';
   end if;
-  if require_enabled and target_id = 'day_notes' and (
-    coalesce((current_context #>> '{globalState,enabled}')::boolean, false) is not true
-    or coalesce((current_context #>> '{state,enabled}')::boolean, false) is not true
-  ) then
-    raise exception 'Enable Note shortcuts globally and for day notes first.' using errcode = 'P0001';
-  end if;
+  -- Ticket 305 (20261110153050): an absent global state means on, and a pool's own
+  -- flag no longer gates. A stored global off switch still rejects matching and
+  -- acceptance. The day pool follows the same rule; it has no Behavior to be active.
   if require_enabled and target_id <> 'day_notes' and (
     target_behavior_id is null
-    or coalesce((current_context #>> '{globalState,enabled}')::boolean, false) is not true
-    or coalesce((current_context #>> '{state,enabled}')::boolean, false) is not true
     or coalesce((current_context #>> '{behavior,active}')::boolean, false) is not true
   ) then
-    raise exception 'Enable Note shortcuts globally and for this active Behavior first.' using errcode = 'P0001';
+    raise exception 'Note shortcuts are available for active Behaviors only.' using errcode = 'P0001';
+  end if;
+  if require_enabled
+    and coalesce((current_context #>> '{globalState,enabled}')::boolean, true) is not true
+  then
+    raise exception 'Note shortcuts are turned off for this account.' using errcode = 'P0001';
   end if;
 
   insert into public.note_shortcut_states as shortcut_state (

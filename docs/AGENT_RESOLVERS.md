@@ -286,12 +286,18 @@ normalization, repeated-text matching, evidence thresholds, expiry, suppression,
 and review transitions. `tests/note-suggestion.resolver.test.ts` pairs its boundary
 checks. Shared `services/note-shortcut.service` orchestrates the owner-scoped
 `NoteShortcutStore`; web and desktop adapters perform atomic reads and CAS writes.
+Since Ticket 305 `noteShortcutsEnabled` owns the default-on rule (an absent global
+state is on; the per-Behavior flag never gates), and the shared service's
+`matchRepeatedNoteShortcuts` runs the same analysis after a Note save, writing only
+when current entries change. Native and SQL commit gates mirror that rule.
 UI, API, repositories, and native code must not independently derive patterns.
 No network, storage, environment, clock reads, or UI may enter this resolver.
 The same resolver owns the day-note pool (Ticket 292, pool ID `day_notes`): its
 context carries `dayPool` (owner and timezone) instead of a Behavior, and it reads
-only day notes. `tests/day-note-shortcuts.test.ts` pairs its window, threshold,
-expiry, limit and exclusion checks.
+only day notes. It follows the same Ticket 305 gate: only a stored global off switch
+blocks it, and `matchRepeatedNoteShortcuts` accepts `day_notes` after a day-note save.
+`tests/day-note-shortcuts.test.ts` and `tests/local-day-note-shortcuts.test.ts` pair its
+window, threshold, expiry, limit, exclusion and default-on checks.
 
 ## Day-progress contract ownership (Tickets 132–137)
 

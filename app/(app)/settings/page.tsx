@@ -8,28 +8,31 @@ import {
 import { AccountDeletionPanel } from "@/components/settings/AccountDeletionPanel";
 import { NotificationPermissionPanel } from "@/components/settings/NotificationPermissionPanel";
 import { TimezonePanel } from "@/components/settings/TimezonePanel";
+import { SettingsProfile } from "@/components/settings/SettingsPanels";
 import {
-  SettingsPanelGrid,
-  SettingsProfile,
-  TrustAndLegalPanel,
-} from "@/components/settings/SettingsPanels";
-import { CategoryPanel } from "@/components/settings/CategoryPanel";
+  SETTINGS_DAILY_BRIEF_PURPOSE,
+  SETTINGS_TRAVEL_PURPOSE,
+  SettingsDrawer,
+  SettingsExportEntry,
+  SettingsGroup,
+  SettingsPageEnd,
+  SettingsSections,
+} from "@/components/settings/SettingsSections";
+import { CATEGORY_PANEL_PURPOSE, CategoryPanel, drawerLabel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
-import { disconnectAppAction } from "./actions";
-import { DayNoteShortcutSettings, GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
-import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
-import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
-import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import { getCategorySettings } from "@/lib/services/category.service";
-import { changeCategoryAction } from "./actions";
 import { getSettingsPageData } from "@/lib/services/settings.service";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
-import { deleteAccountAction, updateTimezoneAction } from "./actions";
+import { categoriesSectionState, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
+import { changeCategoryAction, deleteAccountAction, disconnectAppAction, updateTimezoneAction } from "./actions";
+import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
+import { DAY_NOTE_SHORTCUTS_PURPOSE, DayNoteShortcutSettings } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -52,47 +55,79 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, noteShortcutView, dayNoteShortcutView, connectedApps] = await Promise.all([
+  const [categorySettings, connectedApps, dayNoteShortcutView] = await Promise.all([
     getCategorySettings(),
-    getNoteShortcutViewForCurrentUser(null),
-    getNoteShortcutViewForCurrentUser(DAY_NOTE_SHORTCUT_POOL_ID),
     getConnectedApps(),
+    getNoteShortcutViewForCurrentUser(DAY_NOTE_SHORTCUT_POOL_ID),
   ]);
 
+  // Ticket 301: four groups, a sticky index, closed source rows and drawers.
+  // Note shortcuts has no Settings control here (Ticket 305). Day note shortcuts are
+  // reviewed here because day notes have no Behavior settings (Ticket 292).
   return (
-    <SettingsPanelGrid>
-      <SettingsProfile email={settings.email} />
+    <SettingsSections>
+      <SettingsGroup id="settings-general">
+        <SettingsProfile email={settings.email} />
+        <TimezonePanel
+          currentTimezone={settings.timezone}
+          updateTimezoneAction={updateTimezoneAction}
+        />
+        <NotificationPermissionPanel vapidPublicKey={settings.vapidPublicKey} />
+        <SettingsDrawer
+          title="Categories"
+          description={CATEGORY_PANEL_PURPOSE}
+          label={drawerLabel(categorySettings.categories.length)}
+          state={categoriesSectionState(categorySettings.categories.length)}
+        >
+          <CategoryPanel {...categorySettings} action={changeCategoryAction} />
+        </SettingsDrawer>
+        <SettingsDrawer
+          title="Day note shortcuts"
+          description={DAY_NOTE_SHORTCUTS_PURPOSE}
+          label="Day note shortcuts"
+          state={dayNoteShortcutsSectionState(dayNoteShortcutView)}
+        >
+          <DayNoteShortcutSettings view={dayNoteShortcutView} action={manageNoteShortcutAction} />
+        </SettingsDrawer>
+      </SettingsGroup>
 
-      <TimezonePanel
-        currentTimezone={settings.timezone}
-        updateTimezoneAction={updateTimezoneAction}
+      <SettingsGroup id="settings-connections">
+        <WebConnectorLibrary timezone={settings.timezone} />
+        <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
+      </SettingsGroup>
+
+      <SettingsGroup id="settings-planning">
+        <SettingsDrawer
+          title="Travel"
+          description={SETTINGS_TRAVEL_PURPOSE}
+          label="Travel settings"
+          setupLabel="Set up Travel"
+        >
+          <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
+        </SettingsDrawer>
+        <SettingsDrawer
+          title="Daily Brief"
+          description={SETTINGS_DAILY_BRIEF_PURPOSE}
+          label="Daily Brief settings"
+          setupLabel="Set up Daily Brief"
+        >
+          <DailyBriefSettingsPanel />
+        </SettingsDrawer>
+      </SettingsGroup>
+
+      <SettingsGroup id="settings-account">
+        <SettingsExportEntry />
+      </SettingsGroup>
+
+      <SettingsPageEnd
+        deleteAccount={
+          <AccountDeletionPanel
+            headingLevel={null}
+            confirmationLabel={settings.deleteConfirmationLabel}
+            deleteAccountAction={deleteAccountAction}
+          />
+        }
       />
-
-      <NotificationPermissionPanel
-        vapidPublicKey={settings.vapidPublicKey}
-      />
-
-      <WebConnectorLibrary timezone={settings.timezone} />
-
-      <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
-
-      <WebGoogleCalendarPanel timezone={settings.timezone} agent />
-      <DailyBriefSettingsPanel />
-
-      <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
-
-      <CategoryPanel {...categorySettings} action={changeCategoryAction} />
-
-      <GlobalNoteShortcutControl view={noteShortcutView} action={manageNoteShortcutAction}>
-        <DayNoteShortcutSettings view={dayNoteShortcutView} action={manageNoteShortcutAction} />
-      </GlobalNoteShortcutControl>
-
-      <TrustAndLegalPanel />
-
-      <AccountDeletionPanel
-        confirmationLabel={settings.deleteConfirmationLabel}
-        deleteAccountAction={deleteAccountAction}
-      />
-    </SettingsPanelGrid>
+    </SettingsSections>
   );
 }

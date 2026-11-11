@@ -8,7 +8,7 @@ vi.mock("../apps/desktop/src/local-store", () => ({
 }));
 
 import { createLocalNoteShortcutStore } from "../apps/desktop/src/local-note-shortcut.service";
-import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
+import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts, matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { noteShortcutRevision } from "@cadence/core/resolvers/note-suggestion.resolver";
 import type { NoteShortcutContext, NoteShortcutState } from "@cadence/core/types/note-shortcut";
@@ -47,6 +47,24 @@ describe("local day-note shortcuts", () => {
     const commit = localCommand.mock.calls.find(([operation]) => operation === "commitNoteShortcutState")?.[1];
     expect(commit).toMatchObject({ profileId, requireEnabled: true, next: { id: DAY_NOTE_SHORTCUT_POOL_ID, behavior_id: null, revision: 2 } });
     expect(commit.next.entries).toEqual([expect.objectContaining({ status: "proposed", text: "Travel day" })]);
+  });
+
+  it("matches repeated day notes after a save with no pool state or global row (Ticket 305)", async () => {
+    localCommand.mockImplementation(async (operation: string, input: { next?: NoteShortcutState }) => {
+      if (operation === "readNoteShortcutContext") return context({ state: null, globalState: null });
+      if (operation === "commitNoteShortcutState") return input.next;
+      throw new Error(operation);
+    });
+    expect(await matchRepeatedNoteShortcuts(createLocalNoteShortcutStore(profileId), DAY_NOTE_SHORTCUT_POOL_ID, now)).toBe(true);
+    const commit = localCommand.mock.calls.find(([operation]) => operation === "commitNoteShortcutState")?.[1];
+    expect(commit).toMatchObject({ requireEnabled: true, next: { id: DAY_NOTE_SHORTCUT_POOL_ID, behavior_id: null, enabled: true, revision: 1 } });
+    expect(commit.next.entries).toEqual([expect.objectContaining({ status: "proposed", text: "Travel day" })]);
+  });
+
+  it("does not match while the stored account switch is off", async () => {
+    localCommand.mockResolvedValue(context({ globalState: state("global", { enabled: false }) }));
+    expect(await matchRepeatedNoteShortcuts(createLocalNoteShortcutStore(profileId), DAY_NOTE_SHORTCUT_POOL_ID, now)).toBe(false);
+    expect(localCommand).toHaveBeenCalledTimes(1);
   });
 
   it("returns accepted day-note chips under the day pool key only", async () => {

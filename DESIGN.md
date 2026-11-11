@@ -440,15 +440,23 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 
 ### Settings Panels
 
-- **Page structure:** Settings is a single-column stack of unboxed sections separated by one 1px Ash Line divider between neighbors, following the One-Line-Per-Boundary Rule. Sections draw no perimeter or `border-y` of their own, and no side-by-side section grid. Section content keeps a readable measure: prose within roughly 65ch and form controls at a compact single-column width instead of multi-column desktop sprawl.
-- **Daily Brief:** Settings uses native checkboxes for explicit Daily Brief enablement and optional selected Google Calendar timing. Each connected Outlook Calendar, iCloud Calendar, or Hevy source adds its own default-off checkbox with an indented, `aria-describedby` disclosure of exactly what is sent; a still-on disclosure the brief cannot use stays visible with a plain, source-specific note: not connected, no selected calendars, or reconnected/reselected since it was allowed. Only the reconnected/reselected state adds a secondary 44px **Allow <source> again** button beside the note. Saving another choice turns such sources off rather than renewing them. The disclosure stays factual, links to provider retention terms, and states that the model cannot change Cadence or Calendar records.
+- **Page structure (Ticket 301):** Settings is four groups in a fixed order, each with a `text-2xl` level-2 title over a 1px Ash Line rule: General (Profile, Timezone, Notifications, Categories), Connections (Connected sources, Connected apps), Planning (Travel, Daily Brief) and Account and data (Export). Inside a group, sections are unboxed and separated by one 1px Ash Line divider between neighbors, following the One-Line-Per-Boundary Rule; sections draw no perimeter or `border-y` of their own, and there is no side-by-side grid. The column is `max-w-xl`; prose stays within roughly 65ch and form controls at a compact single-column width. Body text keeps its size (`text-sm` with `leading-6`). Implementation: `components/settings/SettingsSections.tsx`.
+- **Section index:** A four-link index (General, Connections, Planning, Account) sits above the groups as secondary text actions with 44px targets. It is sticky: under the 4rem mobile app header (`top-16`) on small screens and at the top from `lg`. It scrolls sideways without a visible scrollbar rather than wrapping. Anchors land below the header and index (`scroll-mt-32`, `lg:scroll-mt-16`), including existing panel anchors such as `#timezone` and `#connected-apps`.
+- **Source rows:** Each connected source is one closed native disclosure row (`SettingsRow`). The summary shows the disclosure indicator, the provider's own 20px icon (decorative, `alt=""`), the source name as a level-4 `text-lg` heading, its kind in muted text, and one state line: muted when off, Ink Black when connected, bold Ink Black when it needs action. Opening the row shows the existing source panel, which drops its own heading. Rows sit between inner Ash Line dividers under the Connected sources description.
+- **Drawers:** Travel, Daily Brief and Categories are drawers (`SettingsDrawer`): the level-3 `text-xl` title and the state line share a baseline row, a muted one-line purpose sits below, and one disclosure text action opens the controls ("Set up Travel" while off, "Travel settings" while on; the neutral label shows while checking). A closed drawer ends at its label, not at the 44px target's lower edge.
+- **Section state:** Every row and drawer shows "Checking…" while its panel loads and "Status unavailable" on a failed read. States come from pure functions in `lib/ui/settings-sections.ts`. A row or drawer whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, a failed read) opens by itself once; the person can close it again. A link to an anchor inside a row or drawer opens it and holds it in place while panels above finish loading, until the reader scrolls, types or taps.
+- **Daily Brief:** Settings uses native checkboxes: **Daily Brief**, then **Plan around my connected sources** (Ticket 306), one default-off choice with an indented line naming the connected sources it covers. A closed native `details` disclosure, **Advanced: choose sources**, uses the secondary-action summary style and lists each connected source as a checkbox with an indented, `aria-describedby` statement of exactly what is sent and "Daily Brief uses it." while it is used, then the reminder-history and Notes checkboxes. There is no per-source **Allow again** button: a covered source follows its current connection. The disclosure stays factual, links to provider retention terms, and states that the model cannot change Cadence or Calendar records.
 - **Profile:** Quiet label/value rows only.
-- **Timezone:** One native select of IANA timezones whose selected value is the saved timezone; the select is the single source for "current timezone", with no separate current or browser-detected value rows and no visible label repeating the section heading. When the browser-detected timezone differs from the saved one, show one quiet muted line, "Detected {timezone}", with an inline secondary Use detected timezone text action that updates the select; when they match or detection is unavailable, show nothing. Saving stays an explicit primary Save timezone action, with helper copy explaining the schedule impact. If the browser cannot enumerate timezones, fall back to a plain IANA text field.
+- **Timezone:** One native select of IANA timezones whose selected value is the saved timezone. Each option reads as a place ("New York", "Knox, Indiana") under a region group ("Americas"), while its value stays the IANA name (`lib/ui/timezone-labels.ts`, Ticket 309); the select is the single source for "current timezone", with no separate current or browser-detected value rows and no visible label repeating the section heading. When the browser-detected timezone differs from the saved one, show one quiet muted line, "Your device is set to {place}.", with an inline secondary Use device timezone text action that updates the select; when they match or detection is unavailable, show nothing. Saving stays an explicit primary Save timezone action, with helper copy explaining the schedule impact. If the browser cannot enumerate timezones, fall back to a plain IANA text field.
 - **Notification permission:** One section with a Browser notifications status value plus a single primary text action. Permission prompts must be triggered by the user, not on page load.
 - **Unavailable states:** Use factual muted text for denied, unsupported, or unconfigured browser push. Rust Signal is only for an actual save error.
 - **Inline results:** Save confirmations and errors are plain text lines under their form. They do not carry their own divider.
-- **Trust and legal:** Link to Terms, Privacy, and Trust from Settings using quiet ledger rows separated by inner dividers only; the list draws no outer border. The list sizes to its content so row dividers span only the length of the text, not the full section width. Each row is a full-row link and hovers with the standard inactive-row treatment: Cold Surface fill across the row with the muted summary shifting to Ink Black; keyboard focus uses the global focus outline.
-- **Account deletion:** Use a flat single-column Settings section with export reminder copy, a checkbox acknowledgement, typed confirmation, and a Rust Signal destructive text action, with no internal horizontal rules. This is the only destructive account action in the public-launch web app baseline.
+- **Saving (Ticket 303):** Checkboxes and selects save when they change; Home saves on blur or Enter. Each section has one result line (`SettingsLiveLine` in `components/settings/settings-result.tsx`), its only live region: muted or Ink Black "Saving…", then "Saved"; a failed save shows its specific error in Rust Signal ending "Your change was undone." and the control returns to its saved value. The line is visually hidden while empty and keeps its place in the section: under the status line in a source panel, after Home in Travel, under the sentences in How you travel. Controls stay enabled while they save. There is no per-section Save button except Timezone and opened forms (category editor, iCloud credentials, Hevy key).
+- **Disconnect:** A source's Disconnect is a Rust Signal destructive text action, as in Connected apps. The first click replaces it in place with one line: the question ("Disconnect Hevy?"), a destructive **Disconnect** and a secondary **Cancel**, wrapping at 390 px; no modal (`SettingsDisconnect`). It follows the inline confirm line of Completion places.
+- **Trust and legal:** The end of the page carries one line of Privacy, Terms and Trust secondary text links (44px targets), above Delete account. There is no Trust and legal section; `TrustAndLegalPanel` remains only for the bench and legal-content tests.
+- **Account deletion:** Delete account is a plain secondary text disclosure at the very end of the page (`#delete-account`), after the legal links, so only someone looking for it finds it. It opens the existing flat single-column form unchanged: export reminder copy, a checkbox acknowledgement, typed confirmation, and a Rust Signal destructive text action, with no internal horizontal rules. The form drops its own heading there because the disclosure names it. This is the only destructive account action in the public-launch web app baseline.
+- **Export entry:** Account and data has one Export section: "Download your history as JSONL, CSV, full JSON, or a BehaviorLog bundle." with a primary **Open Export** text action.
+- **Mac Settings (Ticket 302):** The Mac uses the same groups, index, rows and drawers, plus a fifth group, This Mac (index link "Mac"), after Account and data, holding Local database, App updates and Setup guide. General holds Local profile, a Cadence account drawer ("Link a Cadence account" while not linked, "Account settings" when linked), Timezone, Notifications with Reminder coverage as its level-4 part, and Categories. Sources that need an account show "Link a Cadence account" as muted row state. The sync-conflict cue in the shell is a fixed 4rem bar; while it shows, the index sticks below it (`top-32`, `lg:top-16`) and anchors land 4rem lower (`scroll-mt-48`, `lg:scroll-mt-32`). **Open Export** is a button that opens the Mac's Export screen. There are no legal links or Delete account on the Mac.
 
 ### Public Account Information
 
@@ -555,8 +563,11 @@ Desktop retains the same section with a locally prepared summary.
 
 ## Category controls (Tickets 123–124)
 
-CategoryPanel uses native inputs, a textarea, explicit deletion acknowledgement,
-and Move up / Move down text actions. BehaviorList uses native Category and Sort
+CategoryPanel keeps its title and purpose above a native `<details>` drawer
+(`product-disclosure-trigger`, "Edit N categories"). Inside, each category is one
+bordered line: a 44 px `GripVertical` drag handle (`touch-none`, `cursor-grab`), the
+name, and a secondary **Edit** action. The dragged line takes `bg-surface`. The form keeps
+native inputs, a textarea and explicit deletion acknowledgement (Ticket 304). BehaviorList uses native Category and Sort
 selects with matching counts and Clear filters. Hidden rows retain mounted drafts.
 
 
@@ -637,9 +648,15 @@ No new tokens, icon sets, cards, or modals. Outlook reuses the shared
 `CalendarSelector` field and the Google button vocabulary. Hevy uses one labeled
 password-type field that clears on submit. iCloud uses labeled email/password fields that clear on submission, a broader
 credential-custody disclosure, and the same CalendarSelector. Reconnect states
-retain a Disconnect action. Desktop local mode shows each source as requiring a linked account.
+retain a Disconnect action. Disconnect asks first on one inline line (Ticket 303). Desktop local mode shows each source as requiring a linked account.
 Disconnect and account deletion copy name the provider-side removal step and
 never claim Cadence revoked provider access.
+
+On web Settings (Ticket 301) the library renders with `rows`: each source is a
+closed `SettingsRow` with the provider's bundled icon
+(`public/brand/connector-icons-source.md`), name, kind and state, and the
+nested panel drops its h3 because the row summary carries the title. Desktop
+Settings keeps the open list until Ticket 302.
 
 Timeline markers name their source in accessible labels and details. Google
 keeps its bundled provider asset; Outlook uses the neutral lucide calendar
@@ -790,12 +807,11 @@ have separate text. Controls preserve 44px targets and semantic live feedback.
 
 The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.
 
-## Agent Calendar settings — Ticket 187
+## Agent Calendar settings — Ticket 187 (retired by Ticket 307)
 
-Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief grant.
-Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
-It omits Timeline display controls and explains the separate model-data disclosure.
-`CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.
+`GoogleCalendarPanel` has no agent mode. Daily Brief reads the Timeline connection, so
+web and linked desktop Settings show one Google Calendar panel, inside Connected
+sources. `CalendarSettingsBench` provides connection-state fixtures only.
 
 ## Daily Brief recipe 1.1 bubble — Ticket 184
 

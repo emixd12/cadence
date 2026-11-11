@@ -110,12 +110,12 @@ describe("Day note shortcut pool", () => {
     expect(() => command(ctx, { operation: "accept", key: proposal.key, text: "Fresh" })).toThrow("20 accepted day note shortcuts");
   });
 
-  it("requires the global switch and the day pool switch before analysis or acceptance", () => {
+  it("is on by default and gated only by a stored global off switch (Ticket 305)", () => {
     const off = { ...context(), globalState: globalState(false) };
-    expect(() => command(off, { operation: "analyze" })).toThrow("for day notes first");
+    expect(() => command(off, { operation: "analyze" })).toThrow("turned off for this account");
+    expect(() => command({ ...context(), globalState: null, state: null }, { operation: "analyze" })).not.toThrow();
     const poolOff = { ...context(), state: state({ enabled: false }) };
-    expect(() => command(poolOff, { operation: "analyze" })).toThrow("for day notes first");
-    expect(command(poolOff, { operation: "enable", enabled: true }).enabled).toBe(true);
+    expect(() => command(poolOff, { operation: "analyze" })).not.toThrow();
   });
 
   it("rejects a day pool context mixed with a Behavior or a foreign owner", () => {
@@ -149,9 +149,10 @@ describe("Day note shortcut services", () => {
     expect(result[behaviorId].some((entry) => entry.text === "Travel day")).toBe(false);
   });
 
-  it("returns no chips for either pool while the global switch is off", async () => {
+  it("returns no chips for either pool only while the global switch is off", async () => {
     expect(await listAcceptedNoteShortcuts(store([globalState(false), state({ entries: [accepted] }), behaviorState]))).toEqual({});
-    expect(await listAcceptedNoteShortcuts(store([globalState(), state({ enabled: false, entries: [accepted] })]))).toEqual({});
+    // The pool's own flag no longer gates its chips (Ticket 305).
+    expect(await listAcceptedNoteShortcuts(store([globalState(), state({ enabled: false, entries: [accepted] })]))).toEqual({ [pool]: [accepted] });
   });
 
   it("builds an available day pool view and rejects a mismatched context", async () => {

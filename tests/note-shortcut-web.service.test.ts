@@ -6,12 +6,14 @@ import {
   getNoteShortcutViewForCurrentUser,
   listAcceptedNoteShortcutsForCurrentUser,
   manageNoteShortcutsForCurrentUser,
+  matchRepeatedNotesAfterNoteSave,
 } from "@/lib/services/note-shortcut.service";
 import { createClient } from "@/lib/supabase/server";
 import {
   getNoteShortcutView,
   listAcceptedNoteShortcuts,
   manageNoteShortcuts,
+  matchRepeatedNoteShortcuts,
 } from "@cadence/core/services/note-shortcut.service";
 
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUserId: vi.fn() }));
@@ -21,6 +23,7 @@ vi.mock("@cadence/core/services/note-shortcut.service", () => ({
   getNoteShortcutView: vi.fn(),
   manageNoteShortcuts: vi.fn(),
   listAcceptedNoteShortcuts: vi.fn(),
+  matchRepeatedNoteShortcuts: vi.fn(),
 }));
 
 const STORE = { userId: "user-1" } as never;
@@ -75,5 +78,15 @@ describe("Note shortcut web service", () => {
       expect.anything(),
     );
     expect(listAcceptedNoteShortcuts).toHaveBeenCalledWith(STORE);
+  });
+  it("matches repeated Notes for the saved Behavior and never fails the saved Note", async () => {
+    const supabase = { from: vi.fn() } as never;
+    vi.mocked(matchRepeatedNoteShortcuts).mockResolvedValue(true);
+    await expect(matchRepeatedNotesAfterNoteSave(supabase, "user-1", "behavior-1")).resolves.toBeUndefined();
+    expect(createNoteShortcutStore).toHaveBeenCalledWith(supabase, "user-1");
+    expect(matchRepeatedNoteShortcuts).toHaveBeenCalledWith(STORE, "behavior-1", expect.anything());
+
+    vi.mocked(matchRepeatedNoteShortcuts).mockRejectedValue(new Error("This shortcut changed elsewhere."));
+    await expect(matchRepeatedNotesAfterNoteSave(supabase, "user-1", "behavior-1")).resolves.toBeUndefined();
   });
 });

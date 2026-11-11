@@ -20,9 +20,16 @@ export async function consumePushSubscriptionRegistrationRateLimit(
   return consumeLaunchRateLimit(supabase, "push_subscription_registration");
 }
 
+/** Ticket 308: Home lookups from the current location, five per account per hour. */
+export async function consumeTravelHomeLookupRateLimit(
+  supabase: AppSupabaseClient,
+): Promise<LaunchRateLimitResult> {
+  return consumeLaunchRateLimit(supabase, "travel_home_lookup");
+}
+
 async function consumeLaunchRateLimit(
   supabase: AppSupabaseClient,
-  action: "export_download" | "push_subscription_registration",
+  action: "export_download" | "push_subscription_registration" | "travel_home_lookup",
 ): Promise<LaunchRateLimitResult> {
   const { data, error } = await supabase.rpc("consume_launch_rate_limit", {
     p_action: action,

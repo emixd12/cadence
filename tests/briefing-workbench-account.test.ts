@@ -17,13 +17,15 @@ vi.mock('@/lib/services/briefing-account-context.service', () => ({ prepareAccou
 
 const origin = 'http://127.0.0.1:4321';
 const caller = { user: { id: 'owner' }, client: {} };
-const preferences = { enabled: true, includeCalendar: true, revision: 4, calendarConnectionGeneration: 1, calendarSelectionRevision: 1 };
+const preferences = dailyBriefPreferences({ revision: 4, allow: ['googleCalendar'] });
+const calendar = { calendarIds: ['work'], connectionGeneration: 1, selectionRevision: 1 };
 const settings = { accountRef: 'account_owner', enabled: true, includeCalendar: true, revision: 4, available: true, localDate: '2026-11-01', timezone: 'America/New_York' };
 function config(historyDays = 90): BriefingConfig { return structuredClone({ ...DEFAULT_BRIEFING_CONFIG, context: { ...DEFAULT_BRIEFING_CONFIG.context, includeCompletionHistory: true }, scope: { ...DEFAULT_BRIEFING_CONFIG.scope, historyDays } }); }
 function request(overrides = {}, signal?: AbortSignal) { return new Request(`${origin}/api/dev/briefing-comparison`, {
   method: 'POST', headers: { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' }, signal,
   body: JSON.stringify({ mode: 'account', accountRef: 'account_owner', preferenceRevision: 4, configs: [config(), config(30)], ...overrides }),
 }); }
+import { dailyBriefPreferences } from './helpers/daily-brief-preferences';
 const output = { text: 'Review your supplied context.', occurrenceRefs: [], suggestions: [] };
 
 beforeEach(() => {
@@ -33,7 +35,7 @@ beforeEach(() => {
   mocks.authenticate.mockResolvedValue(caller); mocks.preferences.mockResolvedValue(preferences); mocks.settings.mockResolvedValue(settings);
   mocks.labels.mockResolvedValue([{ id: 'owned', title: 'Private Behavior' }]);
   mocks.current.mockResolvedValue(undefined);
-  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences,
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences, calendar,
     contexts: input.historyDays.map((days: number) => briefingFixture('sparse', config(days))),
     configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current }));
 });
@@ -70,8 +72,8 @@ it('captures once, freezes planning, narrows each scope and never consumes daily
 
 it('maps only authorized Behavior handles and intersects Calendar consent', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
-  mocks.preferences.mockResolvedValue({ ...preferences, includeCalendar: false });
-  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences: { ...preferences, includeCalendar: false },
+  mocks.preferences.mockResolvedValue({ ...preferences, useConnectedSources: false });
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences: { ...preferences, useConnectedSources: false }, calendar: null,
     contexts: input.historyDays.map((days: number) => briefingFixture('sparse', config(days))), configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current }));
   const scoped = { ...config(), scope: { ...config().scope, behaviorRefs: ['behavior_owned'] } };
   const generate = vi.fn<(input: { facts: string }) => Promise<typeof output>>().mockResolvedValue(output);
@@ -183,7 +185,7 @@ it('sends descriptions only after workbench confirmation and only for estimating
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
   const { BRIEFING_PRESETS } = await import('@cadence/core/services/briefing-config');
   const candidate = structuredClone(BRIEFING_PRESETS.find((item) => item.id === 'advisor-analysis-2')!.config);
-  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences,
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences, calendar,
     contexts: input.historyDays.map((days: number) => briefingFixture('missing_duration', config(days))),
     configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current,
     analysisSource: null, descriptions: input.descriptions ? { behavior_fixture: 'About a 25 minute walk.' } : null }));

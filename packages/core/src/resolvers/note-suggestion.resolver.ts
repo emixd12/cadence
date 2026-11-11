@@ -13,6 +13,13 @@ const onlyKeys = (value: object, keys: string[]) => Object.keys(value).every((ke
 const compareScheduled = (a: string | null, b: string | null) => a && b ? Temporal.Instant.compare(a, b) : a ? 1 : b ? -1 : 0;
 export const isDayNoteShortcutPool = (poolId: string | null): boolean => poolId === DAY_NOTE_SHORTCUT_POOL_ID;
 
+// Ticket 305: Note shortcuts are on unless the account's stored global switch says off.
+// The per-Behavior `enabled` field is retained for storage and sync but no longer gates.
+export const NOTE_SHORTCUTS_ON_BY_DEFAULT = true;
+export function noteShortcutsEnabled(globalState: Pick<NoteShortcutState, "enabled"> | null | undefined): boolean {
+  return globalState ? globalState.enabled : NOTE_SHORTCUTS_ON_BY_DEFAULT;
+}
+
 export function normalizeNoteShortcutText(text: string): string {
   return text.normalize("NFKC").trim().replace(/\s+/gu, " ");
 }
@@ -65,7 +72,10 @@ export function currentNoteShortcuts(input: { context: NoteShortcutContext; user
 }
 
 export function resolveNoteSuggestions(input: { context: NoteShortcutContext; userId: string; now: Temporal.Instant }): NoteShortcut[] {
-  const retained = currentNoteShortcuts(input).filter((entry) => entry.status !== "proposed");
+  const current = currentNoteShortcuts(input);
+  const retained = current.filter((entry) => entry.status !== "proposed");
+  // A proposal that is still supported keeps its first proposal time and 30-day expiry.
+  const proposedAt = new Map(current.filter((entry) => entry.status === "proposed").map((entry) => [entry.key, entry]));
   const suppressed = new Set(retained.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]));
   const groups = new Map<string, { text: string; notes: NoteSource[] }>();
   for (const note of eligibleNoteSources(input)) {
@@ -82,7 +92,8 @@ export function resolveNoteSuggestions(input: { context: NoteShortcutContext; us
     .slice(0, NOTE_SHORTCUT_LIMITS.proposals).map(([key, group]) => ({
       key, text: group.text, status: "proposed", source: "repeated_text",
       evidence: group.notes.map((note) => ({ occurrence_id: note.id, note_hash: sha256(note.note!) })),
-      created_at: input.now.toString(), expires_at: input.now.add({ hours: 30 * 24 }).toString(),
+      created_at: proposedAt.get(key)?.created_at ?? input.now.toString(),
+      expires_at: proposedAt.get(key)?.expires_at ?? input.now.add({ hours: 30 * 24 }).toString(),
     }));
   if (retained.length + proposals.length + retained.filter((entry) => entry.status === "accepted").length > NOTE_SHORTCUT_LIMITS.entries) throw new Error("The shortcut history is full. Try again after dismissed patterns expire.");
   return [...retained, ...proposals];
@@ -107,14 +118,16 @@ export function resolveNoteShortcutCommand(input: { context: NoteShortcutContext
   if (context.globalState) validateNoteShortcutState(context.globalState);
   if (context.state && (context.state.user_id !== userId || context.state.id !== (behaviorId ?? "global") || context.state.behavior_id !== stateBehaviorId)) throw new Error("Shortcut state belongs to another owner or Behavior.");
   if (context.globalState && (context.globalState.user_id !== userId || context.globalState.id !== "global")) throw new Error("Global shortcut state belongs to another owner.");
-  const state: NoteShortcutState = context.state ?? { id: behaviorId ?? "global", behavior_id: stateBehaviorId, user_id: userId, enabled: false, entries: [], excluded_occurrence_ids: [], revision: 0, updated_at: now.toString() };
+  const state: NoteShortcutState = context.state ?? { id: behaviorId ?? "global", behavior_id: stateBehaviorId, user_id: userId, enabled: NOTE_SHORTCUTS_ON_BY_DEFAULT, entries: [], excluded_occurrence_ids: [], revision: 0, updated_at: now.toString() };
   if (state.revision === NOTE_SHORTCUT_LIMITS.revision) throw new Error("The Note shortcut revision limit has been reached.");
   let entries = currentNoteShortcuts(input);
   let enabled = state.enabled;
   if (command.operation === "enable") enabled = command.enabled;
   else {
     if (!behaviorId) throw new Error("Choose a Behavior for shortcut management.");
-    if (["analyze", "accept", "edit"].includes(command.operation) && (!context.globalState?.enabled || !state.enabled || (!dayPool && !context.behavior?.active))) throw new Error(dayPool ? "Enable Note shortcuts globally and for day notes first." : "Enable Note shortcuts globally and for this active Behavior first.");
+    // Ticket 305 applies to the day pool too: only the account's stored global switch gates it.
+    if (["analyze", "accept", "edit"].includes(command.operation) && !dayPool && !context.behavior?.active) throw new Error("Note shortcuts are available for active Behaviors only.");
+    if (["analyze", "accept", "edit"].includes(command.operation) && !noteShortcutsEnabled(context.globalState)) throw new Error("Note shortcuts are turned off for this account.");
     if (command.operation === "analyze") entries = resolveNoteSuggestions(input);
     else {
       const entry = entries.find((entry) => entry.key === command.key);

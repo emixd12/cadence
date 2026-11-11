@@ -81,7 +81,7 @@ const { join } = require('node:path');
 const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
 const args = process.argv.slice(2);
 const opVars = Object.keys(process.env).filter((k) => k.startsWith('OP_')).sort();
-appendFileSync(join(process.env.HOME, 'op-calls.log'), JSON.stringify({ args, opVars, tokenMatches: process.env.OP_SERVICE_ACCOUNT_TOKEN === config.token }) + '\\n');
+appendFileSync(join(__dirname, 'op-calls.log'), JSON.stringify({ args, opVars, tokenMatches: process.env.OP_SERVICE_ACCOUNT_TOKEN === config.token, home: process.env.HOME, configDir: process.env.OP_CONFIG_DIR }) + '\\n');
 if (process.env.OP_SERVICE_ACCOUNT_TOKEN !== config.token) { process.stderr.write('[ERROR] authentication required\\n'); process.exit(1); }
 if (args[0] === 'vault' && args[1] === 'list') { process.stdout.write(JSON.stringify(config.vaults)); process.exit(0); }
 if (args[0] === 'item' && args[1] === 'list') {
@@ -153,9 +153,24 @@ function ledgerLines(path) {
 }
 
 function opCalls() {
-  const path = join(home, 'op-calls.log');
+  const path = join(fakebin, 'op-calls.log');
   return existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line)) : [];
 }
+
+describe('agent-secret op isolation', () => {
+  it('runs op with a private HOME and config folder, never the caller\'s HOME, and removes it afterwards', () => {
+    const result = run(['--check', '--env', 'ANTHROPIC_API_KEY=anthropic-api-key']);
+    expect(result.code).toBe(0);
+    const calls = opCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call.home).not.toBe(home);
+      expect(call.configDir).toBe(call.home);
+      expect(call.home.includes('cadence-agent-op-')).toBe(true);
+      expect(existsSync(call.home)).toBe(false);
+    }
+  });
+});
 
 describe('agent-secret wrapper', () => {
   it('passes values to the child through the environment and never prints or writes them', () => {
@@ -185,7 +200,7 @@ describe('agent-secret wrapper', () => {
     expect(calls).toHaveLength(2);
     for (const call of calls) {
       expect(call.tokenMatches).toBe(true);
-      expect(call.opVars).toEqual(['OP_BIOMETRIC_UNLOCK_ENABLED', 'OP_SERVICE_ACCOUNT_TOKEN']);
+      expect(call.opVars).toEqual(['OP_BIOMETRIC_UNLOCK_ENABLED', 'OP_CONFIG_DIR', 'OP_SERVICE_ACCOUNT_TOKEN']);
       expect(call.args.slice(0, 2)).toEqual(['read', '--no-newline']);
     }
     expectNoLeak(result);

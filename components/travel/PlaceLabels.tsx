@@ -14,6 +14,7 @@ import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import type { BehaviorWhereKind } from "@cadence/core/types/behavior";
 import type { PlaceLabelRetention, PlaceLabelState, PlaceMarkerInput, PlaceRef } from "@cadence/core/types/place-labels";
 import { PLACE_LABELS_CHANGED_EVENT, notifyPlaceLabelsChanged, webPlaceLabelClient, type PlaceLabelClient } from "@/lib/ui/place-labels";
+import { useSettingsResult } from "@/components/settings/settings-result";
 
 /**
  * Ticket 216: completion place labels. Every control here is sparse and hidden
@@ -162,6 +163,9 @@ export function PlaceMarkerControl({ place }: Readonly<{ place: MarkerPlace }>) 
   const context = usePlaceLabels();
   const { busy, message, record } = useRecordMarker(context);
   const [removing, setRemoving] = useState(false);
+  // Ticket 303: inside Travel Settings the marker result goes to Travel's one result line.
+  const { owns, report } = useSettingsResult();
+  useEffect(() => { if (!owns && message) report({ text: message, error: false }); }, [owns, message, report]);
   const state = context?.state;
   if (!context || !state?.settings.enabled) return null;
   let ref: PlaceRef, recordedAt: string | null, label: string;
@@ -196,7 +200,7 @@ export function PlaceMarkerControl({ place }: Readonly<{ place: MarkerPlace }>) 
       {recordedAt ? <button type="button" className="product-action product-action-secondary min-h-11 w-fit" disabled={busy || removing}
         onClick={() => { void remove(); }}>Remove</button> : null}
     </div>
-    {message ? <p role="status" className="text-muted-readable">{message}</p> : null}
+    {owns && message ? <p role="status" className="text-muted-readable">{message}</p> : null}
   </div>;
 }
 

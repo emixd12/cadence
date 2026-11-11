@@ -7,10 +7,12 @@ import { RefreshProvider } from "@cadence/ui/runtime";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcut, NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import {
+  DAY_NOTE_SHORTCUTS_PURPOSE,
   DayNoteShortcutSettings,
-  GlobalNoteShortcutControl,
   type NoteShortcutAction,
 } from "../components/note-shortcuts/NoteShortcutControls";
+import { SettingsDrawer, SettingsGroup, SettingsSections } from "../components/settings/SettingsSections";
+import { dayNoteShortcutsSectionState } from "../lib/ui/settings-sections";
 import { DayNoteControl } from "../components/timeline/DayNoteControl";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -40,38 +42,57 @@ async function render(node: React.ReactNode) {
 }
 
 describe("Day note shortcuts in Settings", () => {
-  it("renders under the global control and manages only the day-note pool", async () => {
+  it("sits in a General drawer, shows no switch, and manages only the day-note pool", async () => {
     const calls: Array<string | null> = [];
     const action: NoteShortcutAction = async (poolId) => {
       calls.push(poolId);
-      return { status: "success", message: "Repeated day notes checked." };
+      return { status: "success", message: "Note shortcut accepted." };
     };
     const { container, unmount } = await render(
-      <GlobalNoteShortcutControl view={{ ...view(), state: null }} action={action}>
-        <DayNoteShortcutSettings view={view()} action={action} />
-      </GlobalNoteShortcutControl>,
+      <SettingsSections>
+        <SettingsGroup id="settings-general">
+          <SettingsDrawer title="Day note shortcuts" description={DAY_NOTE_SHORTCUTS_PURPOSE} label="Day note shortcuts"
+            state={dayNoteShortcutsSectionState(view())}>
+            <DayNoteShortcutSettings view={view()} action={action} />
+          </SettingsDrawer>
+        </SettingsGroup>
+      </SettingsSections>,
     );
     try {
-      const global = container.querySelector("#note-shortcuts")!;
-      expect(global.querySelector("h3")?.textContent).toBe("Day note shortcuts");
-      expect(container.textContent).toContain("Enable day note shortcuts");
+      const drawer = container.querySelector("#settings-general [data-settings-drawer]")!;
+      // The drawer owns the title, so the panel adds no second heading.
+      expect([...drawer.querySelectorAll("h2,h3,h4,h5")].filter((heading) => heading.textContent === "Day note shortcuts")).toHaveLength(1);
+      expect(drawer.textContent).toContain("On · 1 suggested · 1 accepted");
+      expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+      expect(button(container, "Find repeated day notes")).toBeUndefined();
       expect(container.textContent).toContain("Rest day");
       expect(container.textContent).toContain("Travel day");
-      await act(async () => button(container, "Find repeated day notes")!.click());
+      await act(async () => button(container, "Accept")!.click());
       expect(calls).toEqual([DAY_NOTE_SHORTCUT_POOL_ID]);
     } finally {
       await unmount();
     }
   });
 
-  it("hides finding and editing while the global switch is off", async () => {
+  it("explains an empty pool", async () => {
+    const action: NoteShortcutAction = async () => ({ status: "idle", message: "" });
+    const { container, unmount } = await render(<DayNoteShortcutSettings view={view({ state: null, entries: [] })} action={action} />);
+    try {
+      expect(container.textContent).toContain("No suggestions yet.");
+      expect(dayNoteShortcutsSectionState(view({ state: null, entries: [] })).text).toBe("On");
+    } finally {
+      await unmount();
+    }
+  });
+
+  it("hides suggestions and editing while the retained account switch is off", async () => {
     const action: NoteShortcutAction = async () => ({ status: "idle", message: "" });
     const { container, unmount } = await render(<DayNoteShortcutSettings view={view({ globalEnabled: false })} action={action} />);
     try {
-      expect(button(container, "Find repeated day notes")).toBeUndefined();
       expect(button(container, "Edit")).toBeUndefined();
       expect(container.textContent).not.toContain("Rest day");
-      expect(container.textContent).toContain("Enable Note shortcuts above before finding repeated day notes.");
+      expect(container.textContent).toContain("Note shortcuts are turned off for this account.");
+      expect(dayNoteShortcutsSectionState(view({ globalEnabled: false })).text).toBe("Off for this account");
     } finally {
       await unmount();
     }

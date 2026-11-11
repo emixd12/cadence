@@ -67,6 +67,6 @@ it("shows grant metadata, accessible Disconnect and activity without payloads", 
 });
 it("distinguishes empty accounts and load failures", () => {
   const render = (error: string | null) => renderToStaticMarkup(<ConnectedAppsPanel timezone="UTC" action={action} view={{ error, grants: [], activity: [] }} />);
-  expect(render(null)).toContain("No apps connected."); expect(render(null)).toContain("No recent activity.");
-  expect(render("Could not load.")).toContain('role="alert"'); expect(render("Could not load.")).not.toContain("No apps connected.");
+  expect(render(null)).toContain("No apps connected yet."); expect(render(null)).toContain("No recent activity.");
+  expect(render("Could not load.")).toContain('role="alert"'); expect(render("Could not load.")).not.toContain("No apps connected yet.");
 });

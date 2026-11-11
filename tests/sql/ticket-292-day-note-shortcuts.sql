@@ -202,6 +202,14 @@ begin
   context_value := public.read_day_note_shortcut_context();
   assert jsonb_array_length(context_value -> 'notes') = 1, 'Other account sources are wrong';
   assert context_value #>> '{notes,0,note}' = 'Private other day note', 'Other account read a foreign day note';
+
+  -- Ticket 305 applies to the day pool: with no global row and the pool flag false,
+  -- a matching commit (require_enabled) is accepted.
+  assert context_value -> 'globalState' = 'null'::jsonb, 'The other account has a global state';
+  perform public.commit_note_shortcut_state(context_value, jsonb_build_object(
+    'id', 'day_notes', 'user_id', auth.uid(), 'behavior_id', null, 'enabled', false,
+    'entries', '[]'::jsonb, 'excluded_occurrence_ids', '[]'::jsonb,
+    'revision', 1, 'updated_at', '2026-11-11T12:00:00Z'), true);
 end
 $$;
 

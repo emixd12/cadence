@@ -156,6 +156,62 @@ export async function geocodeGoogleAddress(
     : { kind: "ambiguous" };
 }
 
+export type DevicePosition = Readonly<{ latitude: number; longitude: number }>;
+
+/** Ticket 308: street-level result types that can stand as a Home address. */
+const HOME_ADDRESS_TYPES = ["street_address", "premise", "subpremise"] as const;
+const GEOCODE_LOCATION_V4_FIELD_MASK = "results.formattedAddress,results.types";
+const MAX_HOME_ADDRESS_LENGTH = 500;
+
+/**
+ * Ticket 308: one reverse-geocoding request for a device position. It returns the most
+ * specific street address, or null when Google finds none. The position goes only into the
+ * provider request; this function keeps nothing and its errors carry codes only.
+ */
+export async function reverseGeocodeGooglePosition(
+  position: DevicePosition,
+  options: Readonly<{
+    config: TravelProviderConfig;
+    fetch?: typeof fetch;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    maxRetries?: number;
+  }>,
+): Promise<string | null> {
+  assertTravelProviderReady(options.config);
+  if (!Number.isFinite(position.latitude) || !Number.isFinite(position.longitude)
+    || Math.abs(position.latitude) > 90 || Math.abs(position.longitude) > 180) {
+    throw new TypeError("Device position must be finite latitude/longitude values.");
+  }
+  const point = `${position.latitude},${position.longitude}`;
+  const hosted = options.config.authMode === "workload_identity";
+  const accessToken = hosted ? await workloadAccessToken(options.config, options) : null;
+  const url = hosted
+    ? new URL(`/v4/geocode/location/${point}`, GOOGLE_GEOCODE_V4_ORIGIN)
+    : new URL(GOOGLE_GEOCODE_V3_URL);
+  if (hosted) {
+    for (const type of HOME_ADDRESS_TYPES) url.searchParams.append("types", type);
+  } else {
+    url.searchParams.set("latlng", point);
+    url.searchParams.set("result_type", HOME_ADDRESS_TYPES.join("|"));
+    url.searchParams.set("key", options.config.apiKey!);
+  }
+  const body = await requestJson(url, {
+    fetch: options.fetch, signal: options.signal, timeoutMs: options.timeoutMs, maxRetries: options.maxRetries,
+    ...(hosted ? { init: { headers: workloadHeaders(options.config, accessToken!, GEOCODE_LOCATION_V4_FIELD_MASK) } } : {}),
+  });
+  if (!hosted && body.status === "ZERO_RESULTS") return null;
+  if (!hosted && body.status !== "OK") throw new TravelProviderError("provider_unavailable", true);
+  // Results run from most to least specific; take the first street-level one.
+  for (const result of objectArray(body.results)) {
+    const types = stringArray(result.types, 32, 80);
+    if (!types.some((type) => (HOME_ADDRESS_TYPES as readonly string[]).includes(type))) continue;
+    const address = hosted ? result.formattedAddress : result.formatted_address;
+    if (typeof address === "string" && address.trim() && address.length <= MAX_HOME_ADDRESS_LENGTH) return address.trim();
+  }
+  return null;
+}
+
 export async function computeGoogleRoute(
   request: TravelRouteRequest,
   options: Readonly<{

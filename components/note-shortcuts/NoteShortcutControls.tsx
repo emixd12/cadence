@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type {
   NoteShortcutCommand,
@@ -9,6 +9,7 @@ import type {
 import { noteShortcutRevision } from "@cadence/core/resolvers/note-suggestion.resolver";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { DesktopDraftGuard } from "@/lib/desktop-draft";
+import { useSettingsHeading, type SettingsHeadingTag } from "@/components/settings/settings-heading";
 
 export type NoteShortcutActionState = {
   status: "idle" | "success" | "error";
@@ -25,28 +26,29 @@ export type NoteShortcutAction = (
 type NoteShortcutCopy = Readonly<{
   title: string;
   description: string;
-  enableLabel: string;
-  analyzeLabel: string;
-  globalOffHint: string;
+  /** Shown when the pool has no suggestions and no accepted shortcuts. */
+  empty: string;
 }>;
 
 const BEHAVIOR_SHORTCUT_COPY: NoteShortcutCopy = {
   title: "Note shortcuts",
-  description: "Matching uses repeated Notes for this Behavior and runs only when you ask.",
-  enableLabel: "Enable Note shortcuts for this Behavior",
-  analyzeLabel: "Find repeated Notes",
-  globalOffHint: "Enable Note shortcuts in Settings before finding repeated Notes.",
+  description: "When you save the same Note on three Occurrences of this Behavior, Cadence suggests it here. Accept a suggestion to show it above the Note field.",
+  empty: "",
 };
+
+/** Ticket 292: the day-note pool. One line for its Settings drawer. */
+export const DAY_NOTE_SHORTCUTS_PURPOSE = "Suggests a shortcut when you save the same day note on three days.";
 
 const DAY_NOTE_SHORTCUT_COPY: NoteShortcutCopy = {
   title: "Day note shortcuts",
-  description: "Matching uses repeated day notes and runs only when you ask. These shortcuts appear only when you write a day note.",
-  enableLabel: "Enable day note shortcuts",
-  analyzeLabel: "Find repeated day notes",
-  globalOffHint: "Enable Note shortcuts above before finding repeated day notes.",
+  description: "When you save the same day note on three days in the last 90 days, Cadence suggests it here. Accept a suggestion to show it above the day note field.",
+  empty: "No suggestions yet. Accepted shortcuts appear only when you write a day note.",
 };
 
-/** Manages the day-note pool. Web passes a Server Action; desktop can pass a local callback. */
+/**
+ * Reviews the day-note pool (Ticket 292). Web passes a Server Action; desktop passes a
+ * local callback. Inside a Settings drawer the drawer shows the title and purpose.
+ */
 export function DayNoteShortcutSettings({
   view,
   action,
@@ -54,7 +56,9 @@ export function DayNoteShortcutSettings({
   view: NoteShortcutView;
   action: NoteShortcutAction;
 }>) {
-  return <NoteShortcutSettings behaviorId={DAY_NOTE_SHORTCUT_POOL_ID} view={view} action={action} copy={DAY_NOTE_SHORTCUT_COPY} />;
+  const heading = useSettingsHeading();
+  return <NoteShortcutSettings behaviorId={DAY_NOTE_SHORTCUT_POOL_ID} view={view} action={action} copy={DAY_NOTE_SHORTCUT_COPY}
+    heading={heading.show ? heading.Tag : null} />;
 }
 
 export function NoteShortcutSettings({
@@ -62,11 +66,14 @@ export function NoteShortcutSettings({
   view,
   action,
   copy = BEHAVIOR_SHORTCUT_COPY,
+  heading = "h3",
 }: Readonly<{
   behaviorId: string;
   view: NoteShortcutView;
   action: NoteShortcutAction;
   copy?: NoteShortcutCopy;
+  /** `null` drops the title and description when a Settings drawer above shows them. */
+  heading?: SettingsHeadingTag | null;
 }>) {
   const [currentView, setCurrentView] = useState(view);
   const [result, setResult] = useState<NoteShortcutActionState>({
@@ -101,37 +108,28 @@ export function NoteShortcutSettings({
   }
 
   const accepted = currentView.entries.filter((entry) => entry.status === "accepted");
-  const canUseSuggestions = Boolean(currentView.globalEnabled && currentView.available && currentView.state?.enabled);
+  // Ticket 305: on for every active Behavior unless the retained account switch is off.
+  const canUseSuggestions = Boolean(currentView.globalEnabled && currentView.available);
   const proposed = canUseSuggestions
     ? currentView.entries.filter((entry) => entry.status === "proposed")
     : [];
 
+  const HeadingTag = heading ?? "h3";
   return (
-    <section className="border-t border-line pt-4" aria-labelledby={`note-shortcuts-${behaviorId}`} aria-busy={pending}>
+    <section className={heading ? "border-t border-line pt-4" : "py-2"} aria-labelledby={heading ? `note-shortcuts-${behaviorId}` : undefined}
+      aria-label={heading ? undefined : copy.title} aria-busy={pending}>
       <DesktopDraftGuard pending={pending} />
-      <h3 id={`note-shortcuts-${behaviorId}`} className="text-lg leading-tight">{copy.title}</h3>
+      {heading ? <HeadingTag id={`note-shortcuts-${behaviorId}`} className="text-lg leading-tight">{copy.title}</HeadingTag> : null}
       {currentView.unavailable ? <p role="status" className="mt-2 text-sm leading-6">Note shortcuts are temporarily unavailable. You can still write and save Notes. Refresh to try again.</p> : null}
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-readable">
+      {heading ? <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-readable">
         {copy.description}
-      </p>
+      </p> : null}
       <p role={result.status === "error" ? "alert" : "status"} aria-live={result.status === "error" ? "assertive" : "polite"} className="mt-2 text-sm leading-6">
         {pending ? "Saving Note shortcuts…" : result.message}
       </p>
-      {currentView.available ? <label className="mt-4 flex min-h-11 items-center gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={currentView.state?.enabled ?? false}
-          disabled={pending}
-          onChange={(event) => run({ operation: "enable", enabled: event.currentTarget.checked })}
-        />
-        {copy.enableLabel}
-      </label> : null}
-      {canUseSuggestions ? (
-        <button type="button" disabled={pending} onClick={() => run({ operation: "analyze" })} className="product-action product-action-primary mt-3 min-h-11 py-2 text-sm">
-          {copy.analyzeLabel}
-        </button>
-      ) : null}
-      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">{copy.globalOffHint}</p> : null}
+      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">Note shortcuts are turned off for this account. Your Notes and accepted shortcuts stay saved.</p> : null}
+      {copy.empty && canUseSuggestions && !currentView.unavailable && proposed.length === 0 && accepted.length === 0
+        ? <p className="mt-3 text-sm leading-6 text-muted-readable">{copy.empty}</p> : null}
       {proposed.length > 0 ? <div className="mt-4 grid gap-3" aria-label="Proposed Note shortcuts">
         <h4 className="text-sm font-bold">Proposed</h4>
         {proposed.map((entry) => <ShortcutEditor key={entry.key} entry={entry} pending={pending} editing={editing === entry.key}
@@ -186,7 +184,9 @@ function ShortcutEditor({ entry, accepted = false, editable = true, pending, edi
   </div>;
 }
 
-export function GlobalNoteShortcutControl({ view, action, children }: Readonly<{ view: NoteShortcutView; action: NoteShortcutAction; children?: ReactNode }>) {
+// Not rendered since Ticket 305: Note shortcuts are on by default and Settings shows no
+// control. The stored account switch and this control stay so the switch can return.
+export function GlobalNoteShortcutControl({ view, action }: Readonly<{ view: NoteShortcutView; action: NoteShortcutAction }>) {
   const [currentView, setCurrentView] = useState(view);
   const [result, setResult] = useState<NoteShortcutActionState>({ status: "idle", message: "" });
   const [pending, startTransition] = useTransition();
@@ -217,6 +217,5 @@ export function GlobalNoteShortcutControl({ view, action, children }: Readonly<{
       Enable Note shortcuts
     </label>
     <p role={result.status === "error" ? "alert" : "status"} aria-live={result.status === "error" ? "assertive" : "polite"} className="mt-2 text-sm leading-6">{pending ? "Saving Note shortcuts…" : result.message}</p>
-    {children ? <div className="mt-4">{children}</div> : null}
   </section>;
 }

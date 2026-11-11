@@ -26,6 +26,8 @@ export function createLocalCategoryAction(onChanged: () => void): CategoryAction
       onChanged();
       return { status: "success", message: "Categories saved." };
     } catch (error) {
+      // Reload the list so a stale or refused change shows the stored categories. Open drafts keep their own snapshot.
+      onChanged();
       return { status: "error", message: error instanceof Error ? error.message : "Unable to save categories." };
     }
   };

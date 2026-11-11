@@ -365,8 +365,9 @@ contracts; `STATUS.md` owns current state. The owner accepted iCloud custody on 
 
 - **User benefit:** One Settings connector library shows Google Calendar,
   Outlook Calendar, iCloud Calendar, and Hevy workout timing. Timeline shows
-  selected scheduled events and recorded workouts as context. Daily Brief may
-  use each source only after its own disclosure.
+  selected scheduled events and recorded workouts as context. Daily Brief uses
+  a connected source only while its one connected-sources choice is on and the
+  source is not excluded (Ticket 306).
 - **Data direction:** Provider → Cadence only. Write authority is `none` for
   every provider.
 - **Account mapping:** The Supabase user ID owns every connection. New provider
@@ -377,8 +378,12 @@ contracts; `STATUS.md` owns current state. The owner accepted iCloud custody on 
   consent, identity binding, generation, and selection. A validated snapshot owns
   one read. Desktop caches own only the last complete matching copy. Cadence
   owns all tracking records.
-- **Onward disclosure:** Separate default-off Daily Brief disclosure per source.
-  The existing `includeCalendar` grant stays Google-only.
+- **Onward disclosure:** One default-off Daily Brief choice, **Plan around my
+  connected sources**, covers every connected source, including one connected
+  later (owner decision, 2026-11-10; Ticket 306). **Advanced: choose sources**
+  excludes a source; each source keeps its statement of what is sent. The server
+  never reads an excluded source. This supersedes the separate per-source
+  disclosure of Ticket 239.
 - **Explicit exclusions:** Provider writes, invitation responses, automatic
   Behavior completion, workout coaching, exercise analysis, Apple Health,
   EventKit and local-only Mac calendars, multiple accounts per provider,

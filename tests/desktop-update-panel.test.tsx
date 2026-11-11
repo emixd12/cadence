@@ -28,7 +28,7 @@ describe("desktop update actions", () => {
   });
   it("requires explicit discard or continued editing for unsaved drafts", () => {
     const html = markup({ phase: "installed" }, true);
-    expect(html).toContain("Discard drafts and restart");
+    expect(html).toContain("Discard changes and restart");
     expect(html).toContain("Keep editing");
   });
   it("shows a refused restart beside the Restart button", () => {

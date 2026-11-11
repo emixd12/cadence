@@ -124,8 +124,13 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
     ),
     (
         22,
+        "note_shortcuts_on_by_default",
+        include_str!("../../migrations/0022_note_shortcuts_on_by_default.sql"),
+    ),
+    (
+        23,
         "day_note_shortcut_pool",
-        include_str!("../../migrations/0022_day_note_shortcut_pool.sql"),
+        include_str!("../../migrations/0023_day_note_shortcut_pool.sql"),
     ),
 ];
 
