@@ -103,7 +103,9 @@ try {
   assert((await readSnapshot(clients[0], 3)).fingerprint === c3.fingerprint, "the day-note shortcut pool leaves the contract 3 fingerprint unchanged");
   assert(!(await readSnapshot(clients[1], 4)).entities.some(isDayPool), "the day-note shortcut pool stays with its owner");
   assert(c4.fingerprint === entityDigest(c4.entities), "contract 4 fingerprint covers its projection");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 5 }), "unknown read contract");
+  // Contract 5 adds read-only connector completion kinds (Ticket 320); this account has none.
+  assert((await readSnapshot(clients[0], 5)).entities.length === c4.entities.length, "contract 5 reads the contract 4 rows when no connector records exist");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 6 }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
@@ -111,7 +113,7 @@ try {
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: { ...c1Value, travel_place_modes: [] } }], "c1a1".repeat(16)) }),
     "contract 1 cannot write a later field");
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c5c5".repeat(16)), contract: 5 } }), "unknown apply contract");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c6c6".repeat(16)), contract: 6 } }), "unknown apply contract");
   const c1Result = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
   assert(c1Result.fingerprint === entityDigest(c1Merged) && c1Result.snapshot.entities.length === legacy.entities.length, "contract 1 apply returns its projection");
