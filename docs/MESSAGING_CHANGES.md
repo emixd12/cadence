@@ -1191,3 +1191,20 @@ cite has not changed.
 - **Update needed:** add the Home button to the list of location reads and to what is sent
   to Google Maps Platform. Rewrite the Home help text and the user guide line.
 - **Status:** logged.
+
+## P-037: Daily Brief text in Mac builds released before Ticket 307
+
+- **Change:** implemented November 10, 2026 on web and in the Mac source (Ticket 307).
+  Daily Brief reads Google Calendar through the Timeline connection once hosted migration
+  `20261110160000` runs. Installed Cadence for Mac builds released before this change
+  (0.1.9 and earlier) still render the old Daily Brief Settings copy from their own bundle.
+- **Affected:** Tickets 306 and 307. Files: the Daily Brief Settings copy shipped in
+  published Mac builds. Related: P-035 and L-021.
+- **Surfaces:** in-app copy on installed Mac builds; desktop release notes.
+- **Conflicting current text:** published Mac builds say "Your Timeline Google Calendar
+  connection is never used", which becomes false after the migration, and still offer the
+  separate Google Calendar for Daily Brief connection, which the server now refuses.
+- **Update needed:** ship a Mac release with the new panel, and decide whether the release
+  notes or an in-app notice should tell users of older builds. Until then the older text
+  stays on those Macs.
+- **Status:** logged.
