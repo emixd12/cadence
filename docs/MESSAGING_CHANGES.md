@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-037` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-043` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -106,6 +106,11 @@ Status values:
 | [P-034](#p-034-note-shortcuts-on-for-everyone) | Note shortcuts on for everyone | logged | 305 | In-app copy, user guide, Privacy |
 | [P-035](#p-035-one-daily-brief-choice-for-connected-sources-and-one-google-calendar-connection) | One Daily Brief choice for connected sources, and one Google Calendar connection | logged | 306, 307 | Privacy and Terms, in-app copy, user guide, marketing, provider submissions |
 | [P-036](#p-036-home-from-the-current-location) | Home from the current location | logged | 308 | Privacy, in-app copy, user guide |
+| [P-038](#p-038-hevy-workouts-can-complete-linked-behaviors) | Hevy workouts can complete linked Behaviors | logged | 310, 317, 323 | Privacy, in-app copy, user guide, marketing |
+| [P-039](#p-039-stored-hevy-workout-times-and-routine-digests) | Stored Hevy workout times and routine digests | logged | 310, 314, 320, 322 | Privacy, Trust, user guide, marketing |
+| [P-040](#p-040-hevy-routine-titles-shown-in-the-link-form) | Hevy routine titles shown in the link form | logged | 310, 315, 317 | Privacy, in-app copy, user guide |
+| [P-041](#p-041-hevy-is-read-in-the-background-over-30-days) | Hevy is read in the background, over 30 days | logged | 310, 316, 321 | Privacy, in-app copy, user guide |
+| [P-042](#p-042-marketing-claim-log-a-workout-once) | Marketing claim: log a workout once | logged | 310, 323 | Marketing |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1288,4 +1293,116 @@ cite has not changed.
 - **Update needed:** ship a Mac release with the new panel, and decide whether the release
   notes or an in-app notice should tell users of older builds. Until then the older text
   stays on those Macs.
+- **Status:** logged.
+
+## P-038: Hevy workouts can complete linked Behaviors
+
+- **Change:** decided November 10, 2026 (D28). After Tickets 310–324 ship, a Behavior the
+  user links to Hevy is marked Completed when a matching workout is recorded. There is no
+  approval for each completion (D28.1). Each one is labeled "From Hevy", and the user can
+  change it. Cadence never changes a status the user set. No code has shipped; today's
+  text stays accurate until Ticket 323 passes.
+- **Affected:** Tickets 310, 317 and 323. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/HevyPanel.tsx`, `docs/user-guide/privacy-and-account.md`,
+  `docs/user-guide/timeline.md`, `apps/marketing/src/data/faq.ts` ("hevy-timing-limits").
+- **Surfaces:** Privacy, in-app copy, user guide, marketing.
+- **Conflicting current text:**
+  - Privacy, "Outlook Calendar, iCloud Calendar, and Hevy": "Workouts never automatically
+    complete or change a Behavior or Occurrence."
+  - Hevy panel in Settings: "A workout never completes a Behavior."
+  - User guide, privacy and account: "A workout never completes a Behavior or proves free
+    time." Timeline: "A recorded workout never completes a Behavior and never shows when
+    you are free."
+  - FAQ, "What does the Hevy connector use?": "Workouts never automatically complete a
+    Behavior or prove free time."
+- **Update needed:** at release, say a workout completes a Behavior only when the user
+  links that Behavior to Hevy; describe the label, how to change a completion, the 30-day
+  window and that no notification is sent. Add copy entries for the link form (Ticket 317).
+- **Status:** logged.
+
+## P-039: Stored Hevy workout times and routine digests
+
+- **Change:** decided November 10, 2026 (D28.3, D28.6). Cadence will store, with the
+  account: source links (the Behavior, the source and digests of the chosen routine
+  identifiers), source matches (an opaque activity reference, the workout's start and end,
+  and the Occurrence's scheduled time) and a check state for each source. Today Cadence
+  stores no Hevy record on its server except the sealed key.
+  - Routine identifiers are kept only as account-scoped SHA-256 digests. Titles,
+    exercises, sets, weights and notes are still never stored.
+  - Matches are tracking history. Disconnecting Hevy keeps them; deleting the account
+    removes them.
+  - Ticket 320 syncs links and matches to linked Macs, into SQLite and user-created
+    backups.
+  - Status events export with their provenance. Match timing exports only if Ticket 322
+    adds it.
+- **Affected:** Tickets 310, 314, 320 and 322. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/privacy-and-account.md`, `apps/marketing/src/data/faq.ts`. Related legal
+  entry: L-023.
+- **Surfaces:** Privacy, Trust, user guide, marketing.
+- **Conflicting current text:**
+  - Privacy, "Outlook Calendar, iCloud Calendar, and Hevy": "Cadence does not persist
+    these source events or workouts in its hosted database." and "Cadence discards these
+    details and exposes only recorded workout timing and duration."
+  - Privacy, provider table, "Microsoft Graph, Apple iCloud, and Hevy": "Hevy details are
+    discarded after receipt".
+  - User guide, privacy and account: "Cadence discards them and keeps only
+    identity/revision and timing fields needed for normalized snapshots."
+  - FAQ, "What does the Hevy connector use?": "API responses can include exercises, sets,
+    weights, titles, routines and notes; Cadence discards these details."
+- **Update needed:** name the stored fields and where they live; say routine identifiers
+  are kept as digests; state retention on disconnect and on account deletion; add Mac
+  storage and backups after Ticket 320.
+- **Status:** logged.
+
+## P-040: Hevy routine titles shown in the link form
+
+- **Change:** decided November 10, 2026 (D28.3). The Behavior form's routine picker reads
+  routine titles from Hevy and shows them so the user can choose. The titles are not
+  stored or logged. The allowlist of Hevy reads gains `GET /v1/routines`, and
+  `GET /v1/workouts/events` if Ticket 311 selects it.
+- **Affected:** Tickets 310, 315 and 317. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/HevyPanel.tsx`, `docs/user-guide/privacy-and-account.md`.
+- **Surfaces:** Privacy, in-app copy, user guide.
+- **Conflicting current text:**
+  - Privacy, "Outlook Calendar, iCloud Calendar, and Hevy": "Provider responses can
+    contain workout titles, exercises, sets, weights, routines and notes. Cadence discards
+    these details and exposes only recorded workout timing and duration."
+  - Hevy panel in Settings: "Provider responses can contain exercises, titles, notes, sets
+    and weights; Cadence discards these details."
+- **Update needed:** say routine titles are shown in the link form and not kept, and name
+  the added reads.
+- **Status:** logged.
+
+## P-041: Hevy is read in the background, over 30 days
+
+- **Change:** decided November 10, 2026 (D28.5, D28.6). For an account with a source link,
+  a hosted job reads Hevy without Cadence being open: once before a reminder, at intervals
+  after a scheduled start, and once a night. Opening the Timeline also runs a check.
+  Matching covers today and the 30 prior local dates, and a past day can change with no
+  notification. The Hevy panel shows the last successful check time.
+- **Affected:** Tickets 310, 316 and 321. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/HevyPanel.tsx`, `docs/user-guide/timeline.md`. Related legal entry:
+  L-023.
+- **Surfaces:** Privacy, in-app copy, user guide.
+- **Conflicting current text:**
+  - User guide, Timeline: "Choose **Refresh Hevy** to read today's workouts now."
+  - Hevy panel in Settings: "Hevy connected. Recorded workouts from today appear on the
+    Timeline."
+  - No current text says Cadence reads Hevy while the app is closed or reads more than
+    today for display.
+- **Update needed:** say when Cadence reads Hevy for a linked Behavior, that it does so
+  with the app closed, how far back it looks and that past days can change.
+- **Status:** logged.
+
+## P-042: Marketing claim: log a workout once
+
+- **Change:** decided November 10, 2026 (D28). After Ticket 323 passes and the feature is
+  on, marketing may say a workout logged in Hevy completes the linked Behavior in Cadence.
+- **Affected:** Tickets 310 and 323. Files: `apps/marketing/src/data/faq.ts`
+  ("hevy-timing-limits", "new-connector-availability"). Related legal entry: L-023.
+- **Surfaces:** marketing.
+- **Conflicting current text:** FAQ, "What does the Hevy connector use?": "Workouts never
+  automatically complete a Behavior or prove free time."
+- **Update needed:** after release, describe linking a Behavior to Hevy. State that Hevy
+  Pro is required and that the link is opt-in for each Behavior. No claim before release.
 - **Status:** logged.

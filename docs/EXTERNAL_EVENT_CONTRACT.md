@@ -446,6 +446,24 @@ Recorded activity never completes, marks, or changes a Behavior, Occurrence,
 status, Note, reminder, or tracked time. A later feature that suggests a match
 needs its own ticket and explicit user action.
 
+Decision D28 (`docs/DECISIONS.md`, 2026-11-10) is that later feature, planned under
+Tickets 310–324. The paragraph above describes shipped behavior until Ticket 323 passes.
+After it:
+
+- A connector completion may mark an Unresolved Occurrence of a linked Behavior
+  Completed, through its own database functions (Ticket 314). The Behavior's source link
+  is the explicit user action. Pending reminders for that Occurrence are cancelled, as
+  for a manual mark. Notes and tracked time stay untouched.
+- Ticket 312 adds recorded-activity contract `1.1.0` for match reads. It is
+  source-neutral and may carry `selectorKeys`, account-scoped digests of the provider's
+  routine identifier. `1.0.0` stays the display contract, and display reads keep
+  discarding `routine_id`.
+- Titles, descriptions, exercises, sets, weights, reps and notes still never cross the
+  adapter boundary. Routine titles are returned to the link form only, on request, and
+  are never stored.
+- Calendar events stay a separate data type. A scheduled event is not evidence that
+  something happened and never enters the completion path.
+
 ### Separate Daily Brief disclosure
 
 Connection and display never grant Daily Brief disclosure. The existing

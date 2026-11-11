@@ -329,6 +329,22 @@ scans at most 500 workouts globally even for today; count stability is not an
 atomic snapshot. Each source requires its own default-off Daily Brief disclosure.
 Source timing never automatically completes a Behavior.
 
+Decision D28 (November 10, 2026) plans connector completion under Tickets 310–324. It
+is not implemented, and the sentence above describes the Mac until it ships. Planned
+Mac impact, linked mode only:
+
+- Ticket 319: a sync merge rule for a connector completion and a manual mark on the same
+  Occurrence, the "From Hevy" label read from the synced status event, and a reconcile
+  call through the hosted broker. Published 0.1.9 stops syncing on that collision, so a
+  Mac build with Ticket 319 ships before the hosted feature turns on.
+- Ticket 320: source links and source matches sync at a new account sync contract, so
+  the Mac shows workout times offline. Until then the Mac shows the label only.
+- A Mac schedules Behavior reminders locally and learns of a connector completion when
+  it syncs. A reminder can still fire for a logged workout while Cadence for Mac is
+  closed.
+
+Local mode: not applicable; it has no connectors.
+
 ## Travel implementation — Tickets 162–165
 
 `apps/desktop/src/product.tsx` uses the shared Settings and Timeline travel

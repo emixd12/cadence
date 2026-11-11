@@ -17529,6 +17529,7 @@ Platform impact:
 Messaging impact: none.
 
 Verification: the installed-app checks above and `dagger check --progress=report`.
+
 ## Settings regroup and simplification: Tickets 301–309
 
 Owner direction: `docs/DECISIONS.md`, 2026-11-10. The mock is the development-only bench at
@@ -17939,3 +17940,554 @@ Messaging impact: P-033.
 
 Verification: the Settings DOM tests; `npm run interactions:check`; the owner reads the
 before-and-after list.
+
+## Tickets 310–324: connector completion, starting with Hevy
+
+Decision: `docs/DECISIONS.md`, 2026-11-10, D28. Plan:
+`docs/plans/2026-11-10-connector-completion-architecture.md`. Ticket 309 + n is the plan's
+Task n. Each ticket below states its status, scope and acceptance; the plan's task holds
+the files, interfaces and tests. Read both.
+
+Order: 310 first. 311 and 312 follow it. 313 follows 312; 314 follows 313; 315 follows
+311 and 312; 316 follows 314 and 315. 317, 321 and 322 follow 316; 318 follows 317. 319
+can start after 313; 320 follows 319. 323 closes the first release. 324 comes after it.
+
+Terms: a completion source is a connected service whose recorded activity can complete
+Occurrences. A source link is one Behavior's opt-in to one completion source. A source
+match ties one recorded activity to one Occurrence. A connector completion is the status
+change written from a source match. Reconcile is one run of read, match and apply.
+
+## Ticket 310: Record the connector completion decision and tickets
+
+Status: completed November 10, 2026 on branch `connector-completion/tickets`.
+Dependencies: none.
+
+Goal: make the feature permitted and specified before any code.
+
+Scope and acceptance:
+
+- Record D28 with its eight parts in `docs/DECISIONS.md`.
+- File Tickets 310–324 here and commit the plan under `docs/plans/`.
+- `AGENTS.md`: add the in-scope line, narrow the out-of-scope line, name connector
+  completion as the one non-manual status writer, add the five terms and the security
+  rules for stored provider data and the job.
+- Update `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_EVENT_CONTRACT.md`,
+  `docs/INTEGRATION_PLAYBOOK.md` (D28.2 amendment and the capability table),
+  `docs/DESKTOP_PARITY.md` and `docs/FUTURE_UPDATES.md`.
+- Log P-038 to P-042 and L-023. Add the open-work row and a dated entry to `STATUS.md`.
+- No code, and no Privacy, Terms, Trust, user-guide, in-app or marketing text.
+
+References: plan Task 1; plan section 1 (audit of the earlier design).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Documents only. Tickets 312–318, 321 and 322 implement. |
+| Desktop | Documents only. Tickets 319 and 320 implement. |
+| Marketing | Not applicable: no marketing text changes. P-042 logs the future claim. |
+| Future mobile | Not applicable: documents only. |
+
+Messaging impact: P-038, P-039, P-040, P-041 and P-042 logged.
+
+Verification: `npm run agents:check` and `npm run interactions:check`.
+
+## Ticket 311: Live Hevy check for the read strategy
+
+Status: not started.
+Dependencies: Ticket 310.
+
+Goal: decide with live evidence how Cadence reads Hevy for matching.
+
+Scope and acceptance:
+
+- Start with `npm run qa:preflight -- --suite connectors`. Test account A's Hevy Pro key
+  is the vault item `hevy-test-account-a`. Use a local stack. Make read-only API calls
+  only; create, edit and delete test workouts in the Hevy app.
+- Answer the seven questions in plan Task 2: change-feed events for a new, back-dated,
+  edited and deleted workout; what `since` compares; the order of `/v1/workouts`;
+  `routine_id` on routine and empty workouts and after a routine changes; any 429.
+- Record one strategy with evidence labels in `docs/qa/2026-11-hevy-change-feed.md`.
+  A: events cursor. B: newest-first early stop, with the contract revision the playbook
+  requires. C: full scan, limited to accounts with 500 or fewer workouts and disclosed.
+- Read Hevy's terms of service and any developer terms, and update `docs/LEGAL.md` L-023.
+  The entry gates nothing (`docs/DECISIONS.md`, 2026-11-04).
+- This result gates Tickets 315, 316 and 321.
+
+References: plan Task 2; `docs/INTEGRATION_PLAYBOOK.md`, "Hevy workout timing (Ticket
+236)"; `lib/services/hevy-provider.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: evidence for Tickets 315, 316 and 321; nothing ships. |
+| Desktop | Not applicable: no desktop change. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable: evidence only. |
+
+Messaging impact: none.
+
+Verification: the recorded live results and `npm run agents:check`.
+
+## Ticket 312: Recorded-activity contract 1.1
+
+Status: not started.
+Dependencies: Ticket 310.
+
+Goal: make the recorded-activity contract source-neutral and able to carry selector keys.
+
+Scope and acceptance:
+
+- `1.0.0` keeps its exact bytes and stays the display contract.
+- `1.1.0` adds a `source` union, a source-to-adapter-version map and
+  `activities[].selectorKeys`, present only when the read asked for them.
+- The `1.0.0` validator rejects `1.1.0`. The `1.1.0` validator rejects an unknown
+  source, a mismatched adapter version, a non-digest selector key and more than 32 keys.
+- The per-source minimum duration (D28.8: Hevy, 5 minutes) is defined in `packages/core`
+  beside the contract.
+
+References: plan Task 3; `packages/core/src/types/recorded-activity.ts`;
+`docs/EXTERNAL_EVENT_CONTRACT.md`, "Recorded activity snapshot (Hevy)".
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core` types, schema, validation and fixtures. |
+| Desktop | Not applicable: desktop keeps consuming `1.0.0` for display. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Deferred: the contract is reusable. |
+
+Messaging impact: none.
+
+Verification: `npx vitest run tests/recorded-activity-contract.test.ts` and
+`dagger check --progress=report`.
+
+## Ticket 313: Match resolver and connector status plan
+
+Status: not started.
+Dependencies: Ticket 312.
+
+Goal: decide matches and plan connector status events in pure code.
+
+Scope and acceptance:
+
+- `packages/core/src/resolvers/activity-match.resolver.ts` implements the plan's matching
+  rules with `now` and each source's minimum duration injected. It returns `complete`,
+  `attach`, `remove` and `skip` entries, each with a reason code.
+- Which Occurrence an activity belongs to never depends on a status or on processing
+  order. A routine link and the any-workout link each count one activity (D28.4). Two
+  links of the same kind that accept one activity produce a skip for both (D28.7).
+- `resolveConnectorStatusEvent` is separate from `resolveStatusEvent`, so the manual plan
+  type cannot express connector provenance.
+- A pure timing classifier: on time within ±30 minutes of an exact time or inside a
+  range, read from the active match nearest the scheduled start.
+- Tests cover the cases listed in plan Task 4. Register the resolver in
+  `docs/AGENT_RESOLVERS.md`.
+
+References: plan Task 4 and plan section 3, "Matching rules (resolver)".
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core` resolver and tests. |
+| Desktop | Not applicable: the Mac does not run the matcher; Ticket 319 covers sync. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Deferred: the resolver is shared code. |
+
+Messaging impact: none.
+
+Verification: `npm run resolvers:check`, `tests/activity-match.resolver.test.ts`,
+`tests/status.resolver.test.ts` and `dagger check --progress=report`.
+
+## Ticket 314: Connector completion tables and database functions
+
+Status: not started.
+Dependencies: Ticket 313.
+
+Goal: add the three tables and the only write path for connector completions.
+
+Scope and acceptance:
+
+- One migration adds `behavior_source_links`, `occurrence_source_matches` and
+  `connector_completion_state`, each with `user_id`, RLS and cascade on account deletion.
+- `apply_connector_completion`, `attach_source_activity` and `remove_source_match` run as
+  the caller with `auth.uid()` and enforce the plan's safety invariants in the database.
+  A failed precondition returns a stable reason and writes nothing.
+- `apply_occurrence_status_transition` is unchanged and still rejects `derived`.
+- The SQL smoke fixture covers the cases in plan Task 5.
+- Update `docs/DATA_MODEL.md` and the generated database types.
+- The hosted push runs under the standing approval for additive migrations
+  (`docs/DECISIONS.md`, 2026-11-10) when its five conditions hold. A grant to
+  `service_role` is outside that approval and needs the owner's yes.
+
+References: plan Task 5 and plan section 3, "Data model (hosted)" and "Safety invariants";
+`supabase/migrations/20260709203117_add_transactional_occurrence_status_change.sql`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Migration, repositories and SQL fixture. |
+| Desktop | Not applicable in this ticket: Ticket 320 syncs the new tables. |
+| Marketing | Not applicable: P-039 logs the stored data. |
+| Future mobile | Deferred: the hosted functions are reusable. |
+
+Messaging impact: P-039.
+
+Verification: `npm run supabase -- db reset`, the SQL smoke fixture and
+`dagger check --progress=report`.
+
+## Ticket 315: Hevy adapter reads for matching
+
+Status: not started.
+Dependencies: Tickets 311 and 312.
+
+Goal: read what matching needs from Hevy and nothing more.
+
+Scope and acceptance:
+
+- Add `GET /v1/routines` to the allowlist. Add `GET /v1/workouts/events` only if Ticket
+  311 chose strategy A.
+- A match read keeps workout identity, timing and the routine selector digest. Display
+  reads keep discarding `routine_id`.
+- Routine titles go to the link form and are never stored or logged. Read at most 20
+  routine pages; past that, return the first 200 and mark the list incomplete.
+- Every non-allowlisted method and path is refused before the key is attached.
+
+References: plan Task 6; `lib/services/hevy-provider.ts`; `lib/services/hevy.service.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted adapter and service. |
+| Desktop | Not applicable: linked desktop uses the hosted broker. |
+| Marketing | Not applicable: P-040 logs the routine titles in the form. |
+| Future mobile | Not applicable: hosted only. |
+
+Messaging impact: P-040.
+
+Verification: `tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts` and
+`dagger check --progress=report`.
+
+## Ticket 316: Completion-source port, reconcile service and routes
+
+Status: not started.
+Dependencies: Tickets 314 and 315.
+
+Goal: run reconcile on request through one service.
+
+Scope and acceptance:
+
+- `lib/services/completion-sources.ts` holds the port (`readEvidence`, `listSelectors`)
+  and a constant map with one entry, `hevy`.
+- `lib/services/connector-completion.service.ts` reads evidence on the server, never from
+  a client. It covers the 30-day window (D28.6), skips when the last run was under five
+  minutes ago, writes at most 100 matches, repairs reminder coverage after a revert and
+  revalidates `/timeline`.
+- `POST /api/connectors/completions/reconcile` and the link routes call the service. The
+  link service refuses a routine already linked to another Behavior and a second
+  any-workout link for one source.
+- Reconcile does nothing unless `CADENCE_CONNECTOR_COMPLETION` is `on`. Default: off.
+- Update `docs/ROUTE_MAP.md` and `docs/OPERATIONS.md`.
+
+References: plan Task 7; `lib/services/connector-credentials.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted service and routes, off behind the flag. |
+| Desktop | Not applicable in this ticket: Ticket 319 calls reconcile from the Mac. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Deferred: the routes are reusable. |
+
+Messaging impact: none.
+
+Verification: `npm run resolvers:check`, `tests/connector-completion.service.test.ts` and
+`dagger check --progress=report`.
+
+## Ticket 317: Web link form and completion label
+
+Status: not started.
+Dependencies: Ticket 316.
+
+Goal: let the user turn a link on and see what a connector completed.
+
+Scope and acceptance:
+
+- Run the impeccable workflow and the design-system-bench skill first.
+- The Behavior form shows "Complete from Hevy" only when Hevy is connected, off by
+  default. It leads with the routine picker; "Any workout" is the fallback.
+- The form names the Behavior that already holds a routine or the any-workout link, says
+  when a routine workout also counts for the any-workout Behavior, and counts linked
+  routines that are no longer in Hevy when the list was read completely.
+- A connector-completed row shows "From Hevy" while the connector's event is the latest.
+  A row lists each attached workout's start and end time. The existing status buttons
+  change the status; add no new control, route, modal or settings page.
+- The Hevy panel shows the last successful check time. The Hevy source row in Settings
+  (Ticket 301) keeps its state text. No notification announces a connector completion
+  (D28.6).
+- Update `interaction-registry.json`, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md` and
+  `DESIGN.md`. Mobile-responsive.
+
+References: plan Task 8; `components/behaviors/BehaviorForm.tsx`;
+`components/timeline/OccurrenceRow.tsx`; `components/settings/HevyPanel.tsx`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Behavior form, Timeline row and Hevy panel. |
+| Desktop | Shared components; Ticket 319 owns the Mac label and trigger. |
+| Marketing | Not applicable until release (P-042). |
+| Future mobile | 390 px checks on mobile web. |
+
+Messaging impact: P-038 and P-040, plus new entries for the form's and panel's copy.
+
+Verification: `npm run interactions:check`, the DOM tests in plan Task 8, a preview check
+at desktop width and 390 px, and `dagger check --progress=report`.
+
+## Ticket 318: Timing statistics on Behaviors
+
+Status: not started.
+Dependencies: Ticket 317.
+
+Goal: show whether linked Behaviors happen when scheduled.
+
+Scope and acceptance:
+
+- Input is source matches. Only Occurrences that are Completed now count, including ones
+  the user marked that have an attached activity. Each contributes its active match
+  nearest the scheduled start.
+- Output per Behavior: matched count, on-time count and median offset in minutes. Text
+  follows "On schedule 6 of 9. Usually 40 min later."
+- No streaks, scores or charts. Adherence calculations are unchanged.
+
+References: plan Task 9; `packages/core/src/resolvers/analytics.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Analytics resolver, service and the Behaviors list. |
+| Desktop | Follow-up: Ticket 320 syncs matches; until then the Mac shows no timing. |
+| Marketing | Not applicable until release (P-042). |
+| Future mobile | 390 px checks on mobile web. |
+
+Messaging impact: new entries for the statistics' copy.
+
+Verification: `npm run resolvers:check`, `tests/analytics.resolver.test.ts`,
+`tests/analytics.service.test.ts` and `dagger check --progress=report`.
+
+## Ticket 319: Mac sync merge rule and label
+
+Status: not started.
+Dependencies: Ticket 313.
+
+Goal: keep Mac sync working when a connector and the user mark the same Occurrence.
+
+Scope and acceptance:
+
+- Read `docs/plans/2026-10-27-sync-compatibility.md` first.
+- After an Unresolved baseline, a connector root mark on one side and a manual root mark
+  on the other converge. Both events are kept unchanged. Same status: existing
+  latest-event ordering picks display timestamps. Different status: the manual mark's
+  status wins. State in `docs/DESKTOP_BUILD.md` that this is a provenance rule.
+- Two connector marks for one Occurrence still fail. Existing manual-mark tests pass
+  unchanged.
+- The Mac label reads the synced status event's `reason_code`. Until Ticket 320 it shows
+  no workout times or count.
+- The linked Mac calls reconcile through the hosted broker after its Hevy refresh, then
+  syncs.
+- A published Mac build must contain this ticket before Ticket 323 turns the feature on.
+  Published 0.1.9 stops syncing on this collision.
+
+References: plan Task 10 and plan finding F2;
+`packages/core/src/resolvers/account-sync.resolver.ts`; `docs/DESKTOP_BUILD.md`, "Snapshot
+and merge boundary".
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: the shared planner runs on the Mac. |
+| Desktop | Sync planner rule, Timeline label and reconcile trigger. Linked mode only. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable: desktop sync only. |
+
+Messaging impact: none.
+
+Verification: `tests/account-sync.resolver.test.ts`, installed acceptance on a dev-signed
+build with one forced collision (`desktop-acceptance` skill) and
+`dagger check --progress=report`.
+
+## Ticket 320: Sync links and matches to the Mac
+
+Status: not started. Not required for the first release.
+Dependencies: Tickets 314 and 319.
+
+Goal: show link state and workout timing on the Mac, offline.
+
+Scope and acceptance:
+
+- Add `behavior_source_links` and `occurrence_source_matches` as entity kinds at the next
+  account sync contract. Older Macs keep receiving the projection they know.
+- SQLite migration, native row models and `docs/DESKTOP_DATA_MODEL.md`.
+- The Mac row then lists workout times and the count, as the web row does.
+
+References: plan Task 11; `docs/plans/2026-10-27-sync-compatibility.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted sync contract registration for the two kinds. |
+| Desktop | SQLite migration, sync apply and the Timeline row. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable: desktop sync only. |
+
+Messaging impact: P-039 (Mac storage and backups).
+
+Verification: the sync resolver and Rust tests, installed acceptance on a dev-signed
+build and `dagger check --progress=report`.
+
+## Ticket 321: Background completion job
+
+Status: not started.
+Dependencies: Ticket 316. The cadence depends on Ticket 311.
+
+Goal: complete Occurrences and cancel reminders without Cadence being opened.
+
+Scope and acceptance:
+
+- Model it on Tickets 276 and 277. Add a `connector_completion` token channel; do not
+  reuse `mcp` or `leave_reminder`. The service role selects due accounts from
+  `connector_completion_state` and reads nothing else. Every other read and write uses
+  the minted client.
+- The route runs at `7,22,37,52 * * * *`. A pure resolver,
+  `packages/core/src/resolvers/completion-check-schedule.resolver.ts`, computes each
+  account's `next_check_at` under the D28.5 schedule in the plan.
+- Guards: at most 24 checks per account per day; the wait doubles after a failed check,
+  up to 6 hours; `reconnect_required` stops checks. If Ticket 311 chose strategy C, keep
+  only the check before a reminder and the nightly check.
+- Record measured Vercel usage in `docs/COSTS.md`. Update `docs/NOTIFICATION_SPEC.md` and
+  `docs/VERCEL_WORKFLOW.md`.
+
+References: plan Task 12 and plan section 3, "Background check schedule";
+`lib/supabase/integration-token.ts`; `app/api/travel/leave-reminders/process/route.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted job, token channel and schedule resolver. |
+| Desktop | Not applicable: a Mac learns of a completion when it syncs. A Mac reminder already scheduled can still fire. |
+| Marketing | Not applicable until release. P-041 logs the background reads. |
+| Future mobile | Not applicable: server-only. |
+
+Messaging impact: P-041.
+
+Verification: `tests/connector-completion-job.service.test.ts`,
+`tests/completion-check-schedule.resolver.test.ts`, a local-stack run that completes one
+seeded match and `dagger check --progress=report`.
+
+## Ticket 322: Read surfaces for connector completions
+
+Status: not started.
+Dependencies: Ticket 316.
+
+Goal: make connector provenance correct wherever status history is read.
+
+Scope and acceptance:
+
+- `resolveCompletionTiming` excludes Occurrences whose current status came from a
+  connector, so marking patterns stay the user's own.
+- BehaviorLog and JSON exports emit the D28.7 values and `reason_code` unchanged. Update
+  `docs/EXPORT_FORMATS.md`.
+- Document the new status-history values in `docs/MCP_CONTRACT.md`. MCP `get_occurrence`
+  already returns status history.
+- Timing facts in Daily Brief are not in this ticket.
+
+References: plan Task 13 and plan finding F10;
+`packages/core/src/resolvers/completion-timing.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Completion-timing resolver, export resolver and docs. |
+| Desktop | Shared export code; no separate change. |
+| Marketing | Not applicable: developer docs entry if the MCP reference changes. |
+| Future mobile | Not applicable: shared resolvers. |
+
+Messaging impact: none, unless the MCP developer reference text changes; then log it.
+
+Verification: export and completion-timing tests with a connector-completed fixture, and
+`dagger check --progress=report`.
+
+## Ticket 323: Connector completion release acceptance
+
+Status: not started.
+Dependencies: Tickets 311–319, 321 and 322; Ticket 241's release steps 6–7 and installed
+connector acceptance.
+
+Goal: prove the feature live before turning it on.
+
+Scope and acceptance:
+
+- Keep evidence classes separate, as the playbook requires: live provider, deployed web
+  and installed Mac.
+- Run the acceptance matrix in plan Task 14 with test account A.
+- Turn `CADENCE_CONNECTOR_COMPLETION` on only after a Mac build that contains Ticket 319
+  is published.
+- Record evidence in `docs/qa` and `STATUS.md`.
+
+References: plan Task 14; `docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance".
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Deployed acceptance; the flag turns on. |
+| Desktop | Installed acceptance on a published build with Ticket 319. |
+| Marketing | P-042 becomes actionable after this ticket passes. |
+| Future mobile | 390 px checks on mobile web. |
+
+Messaging impact: P-042.
+
+Verification: the acceptance matrix and `dagger check --progress=report`.
+
+## Ticket 324: Count an unlinked workout by hand
+
+Status: not started. After the first release.
+Dependencies: Ticket 323.
+
+Goal: let the user count a logged workout that no link accepted.
+
+Scope and acceptance:
+
+- When a workout that day matches no link, the Occurrence row offers "Count the 6:05 PM
+  Hevy workout".
+- It records the user's own mark through the existing manual path and attaches the
+  workout for timing.
+- It is a new operation and a new interaction: add an interaction registry entry and a
+  rule for a match that has no link.
+
+References: plan Task 15.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Timeline row control and service. |
+| Desktop | Follow-up: needs Ticket 320's synced matches. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | 390 px checks on mobile web. |
+
+Messaging impact: new entries for the control's copy.
+
+Verification: `npm run interactions:check` and `dagger check --progress=report`.

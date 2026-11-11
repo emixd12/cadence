@@ -48,6 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310 complete November 10, 2026 (documents only); 311–324 not started; no code | Ticket 311: live Hevy check with test account A's key (`connectors` preflight). Ticket 312 can start in parallel. A Mac build with Ticket 319 ships before the feature turns on | TICKETS, Tickets 310–324; STATUS, "Tickets 310–324: connector completion filed — November 10, 2026" |
 | Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -188,6 +189,38 @@ token `supabase-access-token` and the pinned CLI 2.105.0 (Go backend).
 
 Platform impact: web hosted database and production deploy. Desktop: none until a Mac release
 (P-037). Marketing and future mobile: not applicable. Messaging impact: none new.
+
+## Tickets 310–324: connector completion filed — November 10, 2026
+
+**On branch `connector-completion/tickets`. Documents only; no code.**
+
+- The owner decided D28 on November 10, 2026: a Behavior can be marked Completed from
+  activity recorded in a connected service, starting with Hevy. Its eight parts, D28.1 to
+  D28.8, are in `docs/DECISIONS.md`.
+- Ticket 310 (complete): records D28, files Tickets 310–324, adds the plan
+  `docs/plans/2026-11-10-connector-completion-architecture.md`, and updates `AGENTS.md`,
+  `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  `docs/DESKTOP_PARITY.md` and `docs/FUTURE_UPDATES.md`. It logs P-038 to P-042 and L-023.
+- The plan began as an audit of an earlier design. Three findings shaped the tickets. The
+  manual status function rejects connector provenance, so Ticket 314 adds separate
+  functions. Published Mac 0.1.9 stops syncing when a connector and the user mark the same
+  Occurrence, so Ticket 319 ships in a Mac build first. Hevy reads cover one day and stop
+  above 500 workouts, so Ticket 311 picks the read strategy.
+- Tickets 311–324 are not started. Ticket 311 needs an owner step only if the `connectors`
+  preflight lists one.
+- Merged with `main` three times on November 11, after PR #205, PR #209 and PR #211. This
+  entry's IDs follow the Tickets 301–309 work's: P-038 after P-037, L-023 after L-022.
+  Ticket 292 took account sync contract 4, SQLite `0023` and MCP contract 1.2.0; Tickets
+  319, 320 and 322 name no contract number, so they take the next free ones.
+- Checks: `agents:check`, `interactions:check`, `resolvers:check`, `lint` and `typecheck`
+  pass under Node 24 after each merge. `build` passed before the merges. The full test
+  suite last ran before them, under Node 26: 5,428 passed, 16 failed in five files (four
+  assert Node 24; `tests/acceptance-web-client.test.mjs` timed out in `afterAll`).
+- Not verified: Hevy's change feed, workout order and terms (Ticket 311, L-023). The
+  5-minute minimum and the job's check counts are estimates.
+- Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only, Tickets
+  319 and 320. Marketing: none until release (P-042). Future mobile: deferred. Messaging
+  impact: P-038 to P-042.
 
 ## Tickets 301–309: Settings regroup implemented — November 10, 2026
 
