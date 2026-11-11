@@ -35,6 +35,8 @@ vi.mock("../lib/services/icloud-calendar.service", () => ({
   getIcloudCalendarConnection: connectors.getIcloudCalendarConnection,
 }));
 vi.mock("../lib/services/connector-credentials", () => ({ getConnectorConnection: connectors.getConnectorConnection }));
+const sourceMatches = vi.hoisted(() => ({ listConnectorMarkedOccurrenceIds: vi.fn() }));
+vi.mock("../lib/db/sourceMatches.repo", () => sourceMatches);
 vi.mock("../lib/db/advisor-context.repo", () => repo);
 vi.mock("../lib/db/advisor-read-admission.repo", () => admission);
 vi.mock("../lib/services/google-calendar.service", () => calendar);
@@ -79,6 +81,7 @@ beforeEach(() => {
   repo.readAdvisorCadenceRevision.mockResolvedValue("revision-1");
   admission.acquireAdvisorDayContextRead.mockResolvedValue({ allowed: true, leaseToken: "14600000-0000-4000-8000-000000000001" });
   admission.releaseAdvisorDayContextRead.mockResolvedValue(true);
+  sourceMatches.listConnectorMarkedOccurrenceIds.mockResolvedValue(new Set());
 });
 
 describe("advisor day-context service", () => {
@@ -535,6 +538,23 @@ it('summarizes completion marks from one snapshot for each selected window and g
   expect((await readAdvisorDayContext(input)).cadence).not.toHaveProperty('historicalCompletionTimes');
   repo.readAdvisorCadenceSnapshot.mockResolvedValue({ ...snapshot, historyOccurrences: historyOccurrences.map(row => ({ id: row.id, behaviorId: row.behaviorId, localDate: row.localDate, status: row.status })) });
   expect((await readAdvisorDayContext({ ...input, includeHistoricalCompletionTimes: true })).cadence.historicalCompletionTimes?.behaviors[0].reason).toBe('source_unavailable');
+});
+
+it('excludes connector completions from marking patterns (Ticket 322)', async () => {
+  const historyOccurrences = ['2026-09-18', '2026-09-17', '2026-09-16', '2026-09-15'].map((localDate, index) => ({
+    id: `history-${index}`, behaviorId: 'behavior-1', localDate, status: 'completed',
+    statusMarkedAt: `${localDate}T12:${['10', '25', '15', '20'][index]}:00Z`,
+  }));
+  repo.readAdvisorCadenceSnapshot.mockResolvedValue({ ...snapshot, historyOccurrences });
+  const input = { caller: { client, user }, authorization, revalidateAuthorization: async () => authorization,
+    includeGoogleCalendar: false, opaqueRefKey: 'k'.repeat(32), includeHistoricalCompletionTimes: true,
+    clock: () => Temporal.Instant.from('2026-09-19T12:00:02Z') };
+  sourceMatches.listConnectorMarkedOccurrenceIds.mockResolvedValueOnce(new Set(['history-3']));
+  const timing = (await readAdvisorDayContext(input)).cadence.historicalCompletionTimes?.behaviors[0];
+  expect(timing).toMatchObject({ sampleCount: 3, exclusions: { missingMark: 1 } });
+  // A failed read of connector marks never counts them as the user's own.
+  sourceMatches.listConnectorMarkedOccurrenceIds.mockRejectedValueOnce(new Error('connector_marks_unavailable'));
+  expect((await readAdvisorDayContext(input)).cadence.historicalCompletionTimes?.behaviors[0].reason).toBe('source_unavailable');
 });
 
 describe("separately disclosed connector sources (Ticket 239)", () => {

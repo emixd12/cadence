@@ -1,4 +1,5 @@
 import { resolveCompletionTiming } from "@cadence/core/resolvers/completion-timing.resolver";
+import { listConnectorMarkedOccurrenceIds } from "@/lib/db/sourceMatches.repo";
 import { createHmac } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
@@ -257,6 +258,10 @@ async function assembleDayContexts(
   }
 
   const occurrenceHistoryCapped = cadenceSnapshot.historyOccurrences.length > ADVISOR_DAY_CONTEXT_LIMITS.historyOccurrences;
+  // Ticket 322 (D28): connector completions are not the user's marking times.
+  const connectorMarks = input.includeHistoricalCompletionTimes && !occurrenceHistoryCapped
+    ? await listConnectorMarkedOccurrenceIds(input.caller.client, authorization.userId, cadenceSnapshot.historyOccurrences).catch(() => null)
+    : new Set<string>();
   const durationHistoryCapped = occurrenceHistoryCapped || cadenceSnapshot.historySessions.length > ADVISOR_DAY_CONTEXT_LIMITS.historySessions;
   const history = durationHistoryCapped ? [] : durationHistory(cadenceSnapshot, authorization.userId);
   const behaviorById = new Map(cadenceSnapshot.behaviors.map((behavior) => [behavior.id, behavior]));
@@ -423,7 +428,8 @@ async function assembleDayContexts(
             behaviorRef: opaqueRef("behavior", behavior.id),
             ...resolveCompletionTiming({ behaviorId: behavior.id, occurrences: cadenceSnapshot.historyOccurrences,
               timezone: cadenceSnapshot.timezone, now, historyDays, complete: !occurrenceHistoryCapped,
-              sourceAvailable: cadenceSnapshot.historyOccurrences.every(item => "statusMarkedAt" in item) }),
+              sourceAvailable: connectorMarks !== null && cadenceSnapshot.historyOccurrences.every(item => "statusMarkedAt" in item),
+              connectorMarkedOccurrenceIds: connectorMarks ?? undefined }),
           })),
         },
       } : {}),

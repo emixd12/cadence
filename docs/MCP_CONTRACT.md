@@ -382,6 +382,8 @@ Output:
 
 **Get Occurrence.** Returns one Occurrence with its note, full status history, measured time sessions, and revision. Use it before changing an Occurrence's status or note.
 
+Connector completions (Ticket 322, D28.7). A status change written from a connected service's recorded activity appears in `status_history` with `semantics` `system_rule_declared` and `capture_method` `derived`; a revert after the activity is deleted at the source carries the same pair with `status` `unresolved`. Both values were already in the enums, so the tool's schema is unchanged. The user's own marks keep `explicit_user_mark` or `explicit_user_correction` with `manual_tap` or `manual_text`. Clients must not describe a `derived` entry as something the user did.
+
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
 - Annotation rationale: Reads account data and changes nothing, so readOnlyHint is true. Claude runs read-only tools without per-call confirmation, and OpenAI asks for readOnlyHint on every read. openWorldHint is false because the tool reaches only the user's own Cadence account.

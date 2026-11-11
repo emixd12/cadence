@@ -67,4 +67,11 @@ describe('historical completion marking patterns', () => {
     }
   });
   it('rejects invalid history windows', () => { expect(() => resolve(morning, { historyDays: 0 })).toThrow(); });
+  it('excludes connector completions so patterns stay the user\'s own (Ticket 322)', () => {
+    const all = resolve(morning);
+    const connector = new Set([morning[0].id]);
+    const excluded = resolve(morning, { connectorMarkedOccurrenceIds: connector });
+    expect(excluded.sampleCount).toBe(all.sampleCount - 1);
+    expect(excluded.exclusions.missingMark).toBe(all.exclusions.missingMark + 1);
+  });
 });

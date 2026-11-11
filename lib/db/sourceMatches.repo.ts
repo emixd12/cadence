@@ -170,3 +170,42 @@ export async function removeSourceMatch(
   const result = data as { removed?: boolean; reverted?: boolean; reason?: string; status_event_id?: string };
   return { ok: result.removed === true, reverted: result.reverted === true, reason: String(result.reason ?? "unknown"), statusEventId: result.status_event_id };
 }
+
+/**
+ * Ticket 322: the Completed Occurrences whose current status is a standing connector
+ * completion the user has not changed. A user re-mark sets a new `status_marked_at`,
+ * so the snapshot matches the connector event's `recorded_at` only while it stands.
+ */
+export async function listConnectorMarkedOccurrenceIds(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly Readonly<{ id: string; status: string; statusMarkedAt?: string | null }>[],
+): Promise<Set<string>> {
+  const completed = occurrences.filter((occurrence) => occurrence.status === "completed" && occurrence.statusMarkedAt);
+  const marked = new Set<string>();
+  for (let index = 0; index < completed.length; index += 100) {
+    const chunk = completed.slice(index, index + 100);
+    const { data: matches, error } = await supabase
+      .from("occurrence_source_matches")
+      .select("occurrence_id,applied_event_id")
+      .eq("user_id", userId)
+      .eq("role", "completion")
+      .is("reverted_event_id", null)
+      .in("occurrence_id", chunk.map((occurrence) => occurrence.id));
+    if (error) throw new Error("connector_marks_unavailable");
+    const eventIds = (matches ?? []).flatMap((match) => match.applied_event_id ? [match.applied_event_id] : []);
+    if (eventIds.length === 0) continue;
+    const { data: events, error: eventError } = await supabase
+      .from("occurrence_status_events")
+      .select("id,occurrence_id,recorded_at")
+      .eq("user_id", userId)
+      .in("id", eventIds);
+    if (eventError) throw new Error("connector_marks_unavailable");
+    const byOccurrence = new Map(chunk.map((occurrence) => [occurrence.id, occurrence.statusMarkedAt!]));
+    for (const event of events ?? []) {
+      const markedAt = byOccurrence.get(event.occurrence_id);
+      if (markedAt && Date.parse(markedAt) === Date.parse(event.recorded_at)) marked.add(event.occurrence_id);
+    }
+  }
+  return marked;
+}
