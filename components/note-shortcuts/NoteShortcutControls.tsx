@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import type {
   NoteShortcutCommand,
   NoteShortcutView,
 } from "@cadence/core/types/note-shortcut";
 import { noteShortcutRevision } from "@cadence/core/resolvers/note-suggestion.resolver";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { DesktopDraftGuard } from "@/lib/desktop-draft";
 
 export type NoteShortcutActionState = {
@@ -21,14 +22,51 @@ export type NoteShortcutAction = (
   expectedRevision: string,
 ) => Promise<NoteShortcutActionState>;
 
+type NoteShortcutCopy = Readonly<{
+  title: string;
+  description: string;
+  enableLabel: string;
+  analyzeLabel: string;
+  globalOffHint: string;
+}>;
+
+const BEHAVIOR_SHORTCUT_COPY: NoteShortcutCopy = {
+  title: "Note shortcuts",
+  description: "Matching uses repeated Notes for this Behavior and runs only when you ask.",
+  enableLabel: "Enable Note shortcuts for this Behavior",
+  analyzeLabel: "Find repeated Notes",
+  globalOffHint: "Enable Note shortcuts in Settings before finding repeated Notes.",
+};
+
+const DAY_NOTE_SHORTCUT_COPY: NoteShortcutCopy = {
+  title: "Day note shortcuts",
+  description: "Matching uses repeated day notes and runs only when you ask. These shortcuts appear only when you write a day note.",
+  enableLabel: "Enable day note shortcuts",
+  analyzeLabel: "Find repeated day notes",
+  globalOffHint: "Enable Note shortcuts above before finding repeated day notes.",
+};
+
+/** Manages the day-note pool. Web passes a Server Action; desktop can pass a local callback. */
+export function DayNoteShortcutSettings({
+  view,
+  action,
+}: Readonly<{
+  view: NoteShortcutView;
+  action: NoteShortcutAction;
+}>) {
+  return <NoteShortcutSettings behaviorId={DAY_NOTE_SHORTCUT_POOL_ID} view={view} action={action} copy={DAY_NOTE_SHORTCUT_COPY} />;
+}
+
 export function NoteShortcutSettings({
   behaviorId,
   view,
   action,
+  copy = BEHAVIOR_SHORTCUT_COPY,
 }: Readonly<{
   behaviorId: string;
   view: NoteShortcutView;
   action: NoteShortcutAction;
+  copy?: NoteShortcutCopy;
 }>) {
   const [currentView, setCurrentView] = useState(view);
   const [result, setResult] = useState<NoteShortcutActionState>({
@@ -71,10 +109,10 @@ export function NoteShortcutSettings({
   return (
     <section className="border-t border-line pt-4" aria-labelledby={`note-shortcuts-${behaviorId}`} aria-busy={pending}>
       <DesktopDraftGuard pending={pending} />
-      <h3 id={`note-shortcuts-${behaviorId}`} className="text-lg leading-tight">Note shortcuts</h3>
+      <h3 id={`note-shortcuts-${behaviorId}`} className="text-lg leading-tight">{copy.title}</h3>
       {currentView.unavailable ? <p role="status" className="mt-2 text-sm leading-6">Note shortcuts are temporarily unavailable. You can still write and save Notes. Refresh to try again.</p> : null}
       <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-readable">
-        Matching uses repeated Notes for this Behavior and runs only when you ask.
+        {copy.description}
       </p>
       <p role={result.status === "error" ? "alert" : "status"} aria-live={result.status === "error" ? "assertive" : "polite"} className="mt-2 text-sm leading-6">
         {pending ? "Saving Note shortcuts…" : result.message}
@@ -86,14 +124,14 @@ export function NoteShortcutSettings({
           disabled={pending}
           onChange={(event) => run({ operation: "enable", enabled: event.currentTarget.checked })}
         />
-        Enable Note shortcuts for this Behavior
+        {copy.enableLabel}
       </label> : null}
       {canUseSuggestions ? (
         <button type="button" disabled={pending} onClick={() => run({ operation: "analyze" })} className="product-action product-action-primary mt-3 min-h-11 py-2 text-sm">
-          Find repeated Notes
+          {copy.analyzeLabel}
         </button>
       ) : null}
-      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">Enable Note shortcuts in Settings before finding repeated Notes.</p> : null}
+      {!currentView.globalEnabled && !currentView.unavailable ? <p className="mt-3 text-sm leading-6 text-muted-readable">{copy.globalOffHint}</p> : null}
       {proposed.length > 0 ? <div className="mt-4 grid gap-3" aria-label="Proposed Note shortcuts">
         <h4 className="text-sm font-bold">Proposed</h4>
         {proposed.map((entry) => <ShortcutEditor key={entry.key} entry={entry} pending={pending} editing={editing === entry.key}
@@ -148,7 +186,7 @@ function ShortcutEditor({ entry, accepted = false, editable = true, pending, edi
   </div>;
 }
 
-export function GlobalNoteShortcutControl({ view, action }: Readonly<{ view: NoteShortcutView; action: NoteShortcutAction }>) {
+export function GlobalNoteShortcutControl({ view, action, children }: Readonly<{ view: NoteShortcutView; action: NoteShortcutAction; children?: ReactNode }>) {
   const [currentView, setCurrentView] = useState(view);
   const [result, setResult] = useState<NoteShortcutActionState>({ status: "idle", message: "" });
   const [pending, startTransition] = useTransition();
@@ -179,5 +217,6 @@ export function GlobalNoteShortcutControl({ view, action }: Readonly<{ view: Not
       Enable Note shortcuts
     </label>
     <p role={result.status === "error" ? "alert" : "status"} aria-live={result.status === "error" ? "assertive" : "polite"} className="mt-2 text-sm leading-6">{pending ? "Saving Note shortcuts…" : result.message}</p>
+    {children ? <div className="mt-4">{children}</div> : null}
   </section>;
 }

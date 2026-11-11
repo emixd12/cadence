@@ -17,7 +17,8 @@ import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
 import { disconnectAppAction } from "./actions";
-import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DayNoteShortcutSettings, GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
@@ -51,9 +52,10 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, noteShortcutView, connectedApps] = await Promise.all([
+  const [categorySettings, noteShortcutView, dayNoteShortcutView, connectedApps] = await Promise.all([
     getCategorySettings(),
     getNoteShortcutViewForCurrentUser(null),
+    getNoteShortcutViewForCurrentUser(DAY_NOTE_SHORTCUT_POOL_ID),
     getConnectedApps(),
   ]);
 
@@ -81,7 +83,9 @@ async function SettingsContent() {
 
       <CategoryPanel {...categorySettings} action={changeCategoryAction} />
 
-      <GlobalNoteShortcutControl view={noteShortcutView} action={manageNoteShortcutAction} />
+      <GlobalNoteShortcutControl view={noteShortcutView} action={manageNoteShortcutAction}>
+        <DayNoteShortcutSettings view={dayNoteShortcutView} action={manageNoteShortcutAction} />
+      </GlobalNoteShortcutControl>
 
       <TrustAndLegalPanel />
 

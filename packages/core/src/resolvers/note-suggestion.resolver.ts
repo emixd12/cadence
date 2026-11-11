@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { sha256 } from "../hash";
+import { DAY_NOTE_SHORTCUT_POOL_ID } from "./day-note.resolver";
 import type { NoteShortcut, NoteShortcutCommand, NoteShortcutContext, NoteShortcutState, NoteSource } from "../types/note-shortcut";
 
 export const NOTE_SHORTCUT_LIMITS = { notes: 100, days: 90, evidence: 3, proposals: 5, characters: 160, sourceCharacters: 2_000, accepted: 20, entries: 128, exclusions: 100_000, revision: 2_147_483_647 } as const;
@@ -9,6 +10,8 @@ const INSTRUCTION = /\b(?:ignore|disregard|override)\b.{0,80}\b(?:previous|instr
 const CONTROL = /[\p{Cc}\p{Cf}]/u;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const onlyKeys = (value: object, keys: string[]) => Object.keys(value).every((key) => keys.includes(key));
+const compareScheduled = (a: string | null, b: string | null) => a && b ? Temporal.Instant.compare(a, b) : a ? 1 : b ? -1 : 0;
+export const isDayNoteShortcutPool = (poolId: string | null): boolean => poolId === DAY_NOTE_SHORTCUT_POOL_ID;
 
 export function normalizeNoteShortcutText(text: string): string {
   return text.normalize("NFKC").trim().replace(/\s+/gu, " ");
@@ -35,15 +38,18 @@ export function validateNoteShortcutText(value: unknown): string {
 export function eligibleNoteSources(input: { context: NoteShortcutContext; userId: string; now: Temporal.Instant }): NoteSource[] {
   const { context, userId, now } = input;
   const behavior = context.behavior;
-  if (!behavior || behavior.user_id !== userId || !behavior.active) return [];
-  const today = now.toZonedDateTimeISO(behavior.timezone).toPlainDate();
+  const dayPool = context.dayPool;
+  // The day-note pool reads only day notes; a Behavior pool reads only that Behavior's Occurrence notes.
+  if (dayPool ? behavior || dayPool.user_id !== userId : !behavior || behavior.user_id !== userId || !behavior.active) return [];
+  const poolBehaviorId = dayPool ? null : behavior!.id;
+  const today = now.toZonedDateTimeISO(dayPool ? dayPool.timezone : behavior!.timezone).toPlainDate();
   const firstDate = today.subtract({ days: NOTE_SHORTCUT_LIMITS.days - 1 }).toString();
   const lastDate = today.toString();
   const excluded = new Set([...(context.state?.excluded_occurrence_ids ?? []), ...context.importedOccurrenceIds]);
   const seen = new Set<string>();
-  return [...context.notes].sort((a, b) => compare(b.local_date, a.local_date) || Temporal.Instant.compare(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id))
+  return [...context.notes].sort((a, b) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id))
     .filter((note) => {
-      if (note.user_id !== userId || note.behavior_id !== behavior.id || seen.has(note.id) || excluded.has(note.id) || note.local_date < firstDate || note.local_date > lastDate || !note.note?.trim() || [...note.note].length > NOTE_SHORTCUT_LIMITS.sourceCharacters) return false;
+      if (note.user_id !== userId || note.behavior_id !== poolBehaviorId || (note.scheduled_for === null) !== Boolean(dayPool) || seen.has(note.id) || excluded.has(note.id) || note.local_date < firstDate || note.local_date > lastDate || !note.note?.trim() || [...note.note].length > NOTE_SHORTCUT_LIMITS.sourceCharacters) return false;
       seen.add(note.id);
       return true;
     }).slice(0, NOTE_SHORTCUT_LIMITS.notes);
@@ -92,19 +98,23 @@ export function resolveNoteShortcutCommand(input: { context: NoteShortcutContext
   if (!onlyKeys(command, commandKeys) || commandKeys.some((key) => !Object.hasOwn(command, key))
     || (command.operation === "enable" && typeof command.enabled !== "boolean")
     || ("key" in command && (typeof command.key !== "string" || !HASH.test(command.key)))) throw new Error("Invalid Note shortcut command.");
-  if (behaviorId && (!context.behavior || context.behavior.id !== behaviorId || context.behavior.user_id !== userId)) throw new Error("Behavior not found.");
+  const dayPool = isDayNoteShortcutPool(behaviorId);
+  const stateBehaviorId = dayPool ? null : behaviorId;
+  if (dayPool && (!context.dayPool || context.dayPool.user_id !== userId || context.behavior)) throw new Error("Day note shortcuts are unavailable.");
+  if (!dayPool && context.dayPool) throw new Error("Invalid Note shortcut context.");
+  if (behaviorId && !dayPool && (!context.behavior || context.behavior.id !== behaviorId || context.behavior.user_id !== userId)) throw new Error("Behavior not found.");
   if (context.state) validateNoteShortcutState(context.state);
   if (context.globalState) validateNoteShortcutState(context.globalState);
-  if (context.state && (context.state.user_id !== userId || context.state.behavior_id !== behaviorId)) throw new Error("Shortcut state belongs to another owner or Behavior.");
+  if (context.state && (context.state.user_id !== userId || context.state.id !== (behaviorId ?? "global") || context.state.behavior_id !== stateBehaviorId)) throw new Error("Shortcut state belongs to another owner or Behavior.");
   if (context.globalState && (context.globalState.user_id !== userId || context.globalState.id !== "global")) throw new Error("Global shortcut state belongs to another owner.");
-  const state: NoteShortcutState = context.state ?? { id: behaviorId ?? "global", behavior_id: behaviorId, user_id: userId, enabled: false, entries: [], excluded_occurrence_ids: [], revision: 0, updated_at: now.toString() };
+  const state: NoteShortcutState = context.state ?? { id: behaviorId ?? "global", behavior_id: stateBehaviorId, user_id: userId, enabled: false, entries: [], excluded_occurrence_ids: [], revision: 0, updated_at: now.toString() };
   if (state.revision === NOTE_SHORTCUT_LIMITS.revision) throw new Error("The Note shortcut revision limit has been reached.");
   let entries = currentNoteShortcuts(input);
   let enabled = state.enabled;
   if (command.operation === "enable") enabled = command.enabled;
   else {
     if (!behaviorId) throw new Error("Choose a Behavior for shortcut management.");
-    if (["analyze", "accept", "edit"].includes(command.operation) && (!context.globalState?.enabled || !state.enabled || !context.behavior?.active)) throw new Error("Enable Note shortcuts globally and for this active Behavior first.");
+    if (["analyze", "accept", "edit"].includes(command.operation) && (!context.globalState?.enabled || !state.enabled || (!dayPool && !context.behavior?.active))) throw new Error(dayPool ? "Enable Note shortcuts globally and for day notes first." : "Enable Note shortcuts globally and for this active Behavior first.");
     if (command.operation === "analyze") entries = resolveNoteSuggestions(input);
     else {
       const entry = entries.find((entry) => entry.key === command.key);
@@ -113,7 +123,7 @@ export function resolveNoteShortcutCommand(input: { context: NoteShortcutContext
         if (entry.status !== (command.operation === "accept" ? "proposed" : "accepted")) throw new Error("This shortcut changed. Refresh and try again.");
         const text = validateNoteShortcutText(command.text);
         if (entries.some((other) => other.key !== entry.key && other.status === "accepted" && other.text && notePatternKey(other.text) === notePatternKey(text))) throw new Error("This shortcut is already accepted.");
-        if (command.operation === "accept" && entries.filter((other) => other.status === "accepted").length >= NOTE_SHORTCUT_LIMITS.accepted) throw new Error("Keep at most 20 accepted shortcuts per Behavior.");
+        if (command.operation === "accept" && entries.filter((other) => other.status === "accepted").length >= NOTE_SHORTCUT_LIMITS.accepted) throw new Error(dayPool ? "Keep at most 20 accepted day note shortcuts." : "Keep at most 20 accepted shortcuts per Behavior.");
         entries = entries.map((other) => other.key === entry.key ? { ...other, text, status: "accepted", evidence: [], expires_at: null } : other);
         entries = entries.filter((other) => other.status !== "proposed" || !other.text || notePatternKey(other.text) !== notePatternKey(text));
       } else {
@@ -148,7 +158,9 @@ export function validateNoteShortcutState(value: unknown): asserts value is Note
   const state = value as NoteShortcutState;
   if (!onlyKeys(state, ["id", "user_id", "behavior_id", "enabled", "entries", "excluded_occurrence_ids", "revision", "updated_at"])) return fail();
   if (!UUID.test(state.user_id) || typeof state.enabled !== "boolean" || !Number.isSafeInteger(state.revision) || state.revision < 0 || state.revision > NOTE_SHORTCUT_LIMITS.revision || !Array.isArray(state.entries) || !Array.isArray(state.excluded_occurrence_ids)) return fail();
-  if (state.id === "global" ? state.behavior_id !== null || state.entries.length > 0 || state.excluded_occurrence_ids.length > 0 : !UUID.test(state.id) || state.behavior_id !== state.id) return fail();
+  if (state.id === "global" ? state.behavior_id !== null || state.entries.length > 0 || state.excluded_occurrence_ids.length > 0
+    : state.id === DAY_NOTE_SHORTCUT_POOL_ID ? state.behavior_id !== null
+    : !UUID.test(state.id) || state.behavior_id !== state.id) return fail();
   if (state.entries.length > NOTE_SHORTCUT_LIMITS.entries || state.excluded_occurrence_ids.length > NOTE_SHORTCUT_LIMITS.exclusions || state.excluded_occurrence_ids.some((id) => typeof id !== "string" || !UUID.test(id)) || new Set(state.excluded_occurrence_ids).size !== state.excluded_occurrence_ids.length) return fail();
   try { Temporal.Instant.from(state.updated_at); } catch { return fail(); }
   const keys = new Set<string>();

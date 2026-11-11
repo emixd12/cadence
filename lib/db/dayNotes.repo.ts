@@ -53,7 +53,17 @@ export async function saveDayNoteIfExpected(
   input: DayNoteSaveCommit,
 ): Promise<DayNoteRecord | null> {
   if (input.usedShortcut) {
-    throw new Error("Day note shortcuts are not available yet.");
+    // Saves the note and excludes it from the day-note shortcut pool atomically.
+    const { data, error } = await supabase
+      .rpc("save_day_note_with_shortcut", {
+        target_local_date: input.localDate,
+        expected_note: input.expectedNote as unknown as string,
+        next_note: input.note as unknown as string,
+        used_shortcut: true,
+      })
+      .maybeSingle();
+    if (error) throw error;
+    return (data as DayNote | null) ?? null;
   }
   const { data, error } = await supabase
     .rpc("save_day_note", {

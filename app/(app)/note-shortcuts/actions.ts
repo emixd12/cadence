@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { NoteShortcutCommand } from "@cadence/core/types/note-shortcut";
+import { isDayNoteShortcutPool } from "@cadence/core/resolvers/note-suggestion.resolver";
 import type { NoteShortcutActionState } from "@/components/note-shortcuts/NoteShortcutControls";
 import {
   getNoteShortcutViewForCurrentUser,
@@ -20,7 +21,7 @@ export async function manageNoteShortcutAction(
     revalidatePath("/timeline");
     revalidatePath("/behaviors");
     revalidatePath("/settings");
-    return { status: "success", message: shortcutMessage(command.operation, view), view };
+    return { status: "success", message: shortcutMessage(command.operation, view, isDayNoteShortcutPool(behaviorId)), view };
   } catch (error) {
     return {
       status: "error",
@@ -29,7 +30,10 @@ export async function manageNoteShortcutAction(
   }
 }
 
-function shortcutMessage(operation: NoteShortcutCommand["operation"], view: Awaited<ReturnType<typeof getNoteShortcutViewForCurrentUser>>): string {
+function shortcutMessage(operation: NoteShortcutCommand["operation"], view: Awaited<ReturnType<typeof getNoteShortcutViewForCurrentUser>>, dayPool: boolean): string {
+  if (operation === "analyze" && dayPool) return view.entries.some((entry) => entry.status === "proposed")
+    ? "Repeated day notes checked."
+    : "No new shortcuts found. Matching needs the same day note on three days in the last 90 days.";
   if (operation === "analyze") return view.entries.some((entry) => entry.status === "proposed")
     ? "Repeated Notes checked."
     : "No new shortcuts found. Matching needs the same Note on three eligible Occurrences.";

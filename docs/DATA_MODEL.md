@@ -2199,6 +2199,25 @@ never feeds adherence, Needs decision, reminders or analytics. Migration:
 `20261110120000_day_notes.sql`; local check `tests/sql/ticket-292-day-notes.sql`.
 Desktop mirrors the table in SQLite (`docs/DESKTOP_DATA_MODEL.md`).
 
+### Day-note shortcut pool (Ticket 292)
+
+Migration `20261111120000_day_note_shortcut_pool.sql` lets `note_shortcut_states`
+hold one more row per user: `id = 'day_notes'` with a null `behavior_id`. RLS and
+grants are unchanged. The row uses the same entry, bound and expiry rules as a
+Behavior pool, but its evidence `occurrence_id` values and `excluded_occurrence_ids`
+are day-note IDs; the field names stay so storage, validators and sync keep one
+shape. `public.read_day_note_shortcut_context()` returns the owner's non-empty day
+notes (`behavior_id` and `scheduled_for` null), day notes with BehaviorLog import
+provenance as exclusions, and a `dayPool` object with the owner and profile
+timezone for the 90-day window. `public.commit_note_shortcut_state` accepts the
+`day_notes` target with that six-key context and requires the global and day-pool
+switches for find, accept and edit. `public.save_day_note_with_shortcut` saves a
+shortcut-assisted day note through `save_day_note` and adds its ID to the pool's
+exclusions in one transaction. Behavior contexts never return day notes, and
+Occurrence notes never read the day pool. Local check
+`tests/sql/ticket-292-day-note-shortcuts.sql`. Account sync and the desktop SQLite
+mirror of the day pool are a separate Ticket 292 slice.
+
 ## Google Calendar connector (Ticket 134)
 
 Migration `20260917002649_google_calendar_connector.sql` adds owner-scoped
