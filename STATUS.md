@@ -48,7 +48,8 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
+| Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
+| Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
@@ -86,6 +87,71 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026
+
+PR #208 merged to `main` as `76b701c7` (12 of 12 checks) and PR #210, the Settings hotfix,
+as `58efe857` (9 of 9). Production serves `58efe857`. The ticket stays open: installed Mac
+acceptance has not run.
+
+- **Live:** the `day_notes` Note shortcuts pool (Settings › General, Day note shortcuts
+  drawer after Categories, `INT-SETTINGS-018`), on by default under Ticket 305; BehaviorLog
+  restore and import of day notes; MCP contract 1.2.0 (`search` and `fetch` return
+  `day_note` records); paged Timeline day-note reads. Mac code: SQLite `0023` and sync
+  contract 4, not yet in a Mac build.
+- **Hosted:** an agent pushed `20261111120000` and `20261111130000` on November 11, 2026
+  with the pinned CLI (2.105.0) and the agents' vault token, under the owner's approval;
+  read back: contract-4 row registry (one `day_notes` row, authenticated SELECT only),
+  contracts 1–3 hide the pool and contract 5 is rejected, Ticket 305's global gate kept,
+  the new day-note shortcut functions execute for authenticated only, and RLS on
+  `note_shortcut_states` and `day_notes` unchanged.
+- **Acceptance** on production as test account A (ledger
+  `.intent/acceptance/t292-day-notes-20261111/ledger.md`):
+  - Passed: 1 web add, edit and clear on today, a future day and a Needs decision day at
+    1280 and 390 px; 2 two-tab conflict message; 3 drawer, suggestion, Accept, chip only
+    in the day-note editor, chip save records the exclusion; 5 MCP 1.2.0 tools for
+    account A, each call seen by `mcp:watch`; 6 sync read: contracts none and 1–3 omit
+    the `day_notes` row, contract 4 carries it; 10 published Mac 0.1.9 (sync contract 2)
+    still syncs with the row present.
+  - Partial: 4 export content and import and restore previews correct; apply not run on
+    account A (import would duplicate 54 records; restore lists 216 destructive actions).
+  - Not run: 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); 7–9 Mac
+    build (no Developer ID certificate in the login Keychain). Both wait on the owner.
+- **Defects found:** D1, the Settings outage (next entry). D2, pre-existing: every web
+  export for account A returns 500 (open-work row above; ledger, D2).
+- **Trust:** an agent set the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to
+  `dpl_bBUrdzM6kWmewcW7W8YsHXvXom5M` (marketing at `58efe857`; the value had named a
+  November 8 deployment) and redeployed the app; production is Ready. This ledger PR's
+  merge stales it again.
+- **Not run:** repo `npm run supabase -- db reset`. The pinned CLI binary fails macOS
+  code-signature validation and is killed (exit 137), and Docker is not installed on this
+  Mac. CI and throwaway-container replays of all 112 migrations cover it.
+- **Follow-ups logged** in `docs/FUTURE_UPDATES.md`: re-import after a failed day-note
+  step, and shortcut evidence limited to past and current days.
+
+Platform impact: web and hosted live; desktop code merged, release pending (items 7–9);
+marketing and future mobile not applicable. Messaging impact: P-028.
+
+## Settings outage on production fixed — November 11, 2026
+
+`/settings` failed for every signed-in user from about 05:29Z to 07:26Z on November 11.
+The server page `app/(app)/settings/page.tsx` called `drawerLabel()` from the client module
+`components/settings/CategoryPanel.tsx`. That code came from Ticket 301 (PR #205). The
+Ticket 292 merge (PR #208) added one more string, `DAY_NOTE_SHORTCUTS_PURPOSE`, with the
+same pattern. Timeline, Behaviors and Export kept loading.
+
+- **Fix:** PR #210 (`58efe857`) moves `drawerLabel` and four drawer purpose strings into
+  `lib/ui/settings-sections.ts`. `tests/server-client-boundary.test.ts` now fails when a
+  server module under `app/` imports a non-component export from a client module.
+- **Verified:** production `/settings` loads for test account A, and Vercel logs show no
+  `drawerLabel` error.
+- **Process note:** branch protection blocks a merge on open code-scanning alerts and open
+  review threads, not only on `verify`. A CodeQL finding in the new test held the merge
+  until `10bb9d65`.
+
+Platform impact: web only. Desktop renders the same drawers from the same modules; no Mac
+release carries the defect. Marketing and future mobile: not applicable. Messaging impact:
+none.
 
 ## Tickets 301–309 hosted rollout — November 11, 2026
 
@@ -233,194 +299,3 @@ fixed.
 Platform impact: web, desktop and MCP through Ticket 292; acceptance tooling through Tickets
 256 and 293; documents only for Tickets 294–300. Marketing and future mobile: not
 applicable. Messaging impact: P-028 to P-032, already logged.
-
-## Ticket 292: day notes in progress — November 10, 2026
-
-Approved by the owner on November 10. Web day notes are implemented in source: the
-`day_notes` table and `save_day_note` function (migration
-`20261110120000_day_notes.sql`), the shared `NoteEditor`, the day-note control under
-every Timeline date, the core resolver and service with tests, and day notes in web
-Full JSON and BehaviorLog exports (one-day `review` records that pass the reference
-validator). Local verification on November 10: a clean local stack (project
-`habit-tracking-app`, network `cadence-local`, through the reviewed Docker proxy)
-applied every migration including `20261110120000`, with every published port on
-`127.0.0.1`. `tests/sql/ticket-292-day-notes.sql` passed: owner-only reads, revoked
-direct writes, compare-and-set saves, clear keeps the row, future days, and no access
-for a second account or `anon`. A catalog read matched the hand-written
-`database.types.ts` entries; `gen types --local` was not run because the proxy policy
-rejects the `postgres-meta` image. MCP contract 1.1.0 adds `list_day_notes`, `update_day_note` and `day_note` on
-`get_timeline` days (migration `20261110130000_day_note_integration_writes.sql`); its
-SQL fixture and the local read and write integration suites (39 tests) pass.
-Desktop: SQLite migration 0021, the native `readDayNotes`/`saveDayNote` commands and
-the desktop Timeline control are implemented; account sync contract 3 adds the
-`day_note` kind (hosted migration `20261110140000`), with same-date merges described in
-`docs/DESKTOP_DATA_MODEL.md`. All 125 Rust tests, the sync resolver tests and the hosted
-account-sync SQL fixtures pass locally. Installed-app acceptance has not run.
-Desktop export includes day notes like web. A clean local start replayed all 99
-migrations with loopback-only ports, and the day-note, account-sync and write-replay SQL
-fixtures passed (November 10).
-Open in this ticket: day-note shortcuts, restore/import of day-note reviews, day notes
-in MCP `search`/`fetch`, and installed-app acceptance. The desktop native
-store and SQL verification need the Rust toolchain and Docker.
-
-Platform impact: web, MCP and desktop (local and sync) implemented in source; marketing not applicable; future mobile deferred. Messaging impact: P-028.
-
-## Agent-architecture run: Tickets 286–291 — November 9, 2026
-
-Owner direction: `docs/DECISIONS.md`, 2026-11-09. Six packages ran as parallel subagents. An
-orchestrating agent checked each diff against the repository before merging it. Delivered in
-one pull request from branch `agentic-architecture`. Details: `docs/TICKETS.md`, Tickets
-286–291.
-
-- **Ticket 286, complete.** `STATUS.md` went from 819,376 bytes to under 40,000. History
-  moved unchanged to `docs/status/archive/`; all 10,837 non-blank lines of the old file are
-  present. `npm run agents:check` enforces the limit and `npm run status:archive` moves old
-  entries.
-- **Ticket 287, complete.** Thirteen stale statements in `AGENTS.md` are fixed or removed,
-  repeated rules are merged, and the reading order names a bounded `STATUS.md` and the
-  `docs/OPERATIONS.md` sections every task reads. No product, security, data or scope rule
-  changed meaning.
-- **Ticket 288, complete in source.** Each Daily Brief model call reports token usage, and
-  each failure carries an internal reason such as `provider_incomplete_max_output_tokens` or
-  `validation_word_limit`. Both reach the `daily_brief.model` performance span and workbench
-  runs. The OpenAI request body and the `/api/advisor/brief` responses are unchanged; tests
-  prove both.
-- **Ticket 289, candidate only.** A "consolidated" Daily Brief prompt states each rule once
-  for recipes 1.1 and 1.2. Mapping, nine resolved conflicts and five owner ambiguities:
-  `docs/qa/daily-brief-prompt-consolidation.md`. Not promoted.
-- **Ticket 290, implemented.** Each workbench candidate can choose a model, a reasoning
-  effort and a prompt variant; runs record what they used. Production stays on
-  `DAILY_BRIEF_MODEL`, low effort and the layered prompt. A test pins the production request
-  bodies, instructions and `DAILY_BRIEF_PROMPT_REVISION` (`5588d260d8e145ad`).
-- **Ticket 291, implemented.** Three headless-client scenarios test the published skills'
-  rule to write nothing before the user confirms. Unit-tested with fakes only.
-
-Verification on the merged branch with Node 24: all 15 checks passed. `agents:check`, `interactions:check`,
-`resolvers:check`, `core:check`, `design-system:check`, `public-source:check`,
-`public-trust:check`, `public-trust:fixtures`, `lint` (0 errors, 1 existing warning),
-`typecheck`, `test` (5,305 passed, 122 skipped; `main` before the run had 5,199 passed and
-122 skipped), `build`, `desktop:build`, `marketing:build` and `marketing:check`.
-
-Not verified: no model call was made, so prompt quality, the candidate models and the
-effort values are untested against the provider. No local-stack or live run of the Ticket
-291 scenarios. The token figures in `docs/COSTS.md` stay assumed. Dagger and Docker are not
-installed on this machine, so the npm commands ran directly.
-
-Platform impact: repository guidance, development tooling and web server diagnostics. The
-web response contract is unchanged; desktop, marketing and future mobile are not applicable.
-Messaging impact: none.
-
-## Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026
-
-**On branch `leave-reminder-send-read`. Not pushed.** Before this change, the hosted leave
-reminder job read Calendar after the send route to name the event. If an Outlook or iCloud read
-failed there, it cancelled that reminder. Fixed: the send and update steps read Calendar once
-per visit before their route. A destination or planned previous stop the read left out is
-released with no route spent,
-and the next visit sends while the leave time is ahead. A plan route that finds the reminder due
-keeps it pending at its reminder time. A send-time read that fails outright, as a Google read
-does, now releases the claims before any route. The three routes of D15 and the D16 update pause
-are unchanged; no migration. Remaining limit: if the route used a different previous stop than
-planned and that stop is missing from the read, it still cancels or closes (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). Tests:
-`tests/leave-reminder-job.service.test.ts` (fails on the base code), `tests/leave-reminder-hosted-port.test.ts`.
-Platform impact: web hosted job only; desktop plans its own reminders and is unchanged;
-marketing and future mobile not applicable. Messaging impact: none.
-
-## Ticket 293: test-access preflight for acceptance runs — November 7, 2026
-
-**Written on branch `accounts-test` as Ticket 286; renumbered to Ticket 293 and merged to
-`main` on November 10, 2026 during branch consolidation. Awaiting verification. No live
-probe has run.**
-
-- Engine installed from `service-connections-bootstrap` (skills commit `5c4baab`, branch
-  `claude/test-access-preflight`) as `.agentic/scripts/test-access-preflight.mjs`. The skill
-  was deployed to `~/.claude/skills` from the same commit at 2026-11-07 22:06Z.
-- `.agentic/test-access.json`: 48 requirements across 12 suites, with the 2026-11-07 owner
-  decisions applied. `npm run qa:preflight -- --suite <suite> --dry-run` works for every suite.
-- Adapters in `scripts/acceptance/access/`. Google Calendar and Outlook connect, test-Mac sign-in,
-  QA Chrome permission grants and travel settings are agent steps without a script yet; the
-  preflight reports them as check errors for an agent.
-- Platform impact: acceptance tooling only. Web, desktop, marketing and future mobile: not
-  applicable. Messaging impact: none.
-
-## Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026
-
-**Written on branch `chatgpt-https` (base `main` at `7c698ecc`) as Tickets 286–292, D25 and
-P-028 to P-031; renumbered to Tickets 294–300, D27 and P-029 to P-032 and merged to `main`
-on November 10, 2026 during branch consolidation.**
-
-- The owner approved the plan on November 7, 2026 (`docs/DECISIONS.md`, D27): signed-in Mac
-  users first; no fallback to Cadence's OpenAI key when the user's plan cannot run a brief;
-  Cadence picks the model from the user's ChatGPT catalog. Deferred: ChatGPT as a Cadence
-  login, plan usage in the hosted web app, billing and any discount.
-- Ticket 294 (completed November 7, docs only; commits `155ee10b` and `d802882f`): records D27, files Tickets 294–300 in
-  `docs/TICKETS.md`, adds the scope lines to `AGENTS.md` and `docs/PRODUCT_SPEC.md`, the
-  follow-ups to `docs/FUTURE_UPDATES.md`, the cost effect to `docs/COSTS.md`, L-017 to L-019
-  and P-029 to P-032. Checks: `agents:check` and `interactions:check` pass. Dagger passed every
-  check but `test`; its six failing files are environmental (missing `.claude` files, Chrome and
-  git access in the container, a timeout) and unrelated to the docs.
-- Ticket 295 (in progress): a development-only spike script that proves the Daily Brief
-  request on a real ChatGPT plan. Mock mode first; the live run needs the owner's ChatGPT
-  sign-in and consent. Results go to `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
-- Tickets 296–300 are not started; Wave 2 waits for the spike's request contract.
-- Owner actions: provide a ChatGPT Plus or Pro account for the spike and acceptance. The owner
-  decides when to submit OpenAI's interest form for web sign-in and hosted plan usage; it is
-  not a step in Tickets 294–300.
-- Platform impact: see Tickets 294–300. Web: hosted prepare and complete only, no ChatGPT
-  controls. Desktop: the connection, UI and acceptance. Marketing: none until release (P-032).
-  Future mobile: not applicable. Messaging impact: P-029 to P-032.
-
-## Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026
-
-**On branch `travel-postdeploy-checks`. Not pushed.** Found after the Wave 6 deploy: once, a
-Behavior Where edit on /behaviors left the tab's `cadence:travel-session` copy, so /timeline kept
-the old leave time as current and made no route request. Cause: the web Timeline's travel source
-key had no Behavior Where, so only the `cadence:travel-changed` event withdrew the kept view, and
-that event never reaches another tab. Fixed: each Timeline row now carries its Behavior's Where
-kind (Home or A place) beside its place text, and `travelSourceKey`, `travelStopRevisions` and
-`travelTomorrowStopKey` use the row's Where when no Behavior list is passed. A place edit in any
-tab changes the key, so the kept view withdraws that trip and routes again at the next refresh.
-The keys stay the same when nothing changed. The Mac already passed its Behavior list and is
-unchanged. Test: `tests/travel-timeline.test.ts` fails on the base code; `tests/travel-navigation.test.ts`
-covers the row's Where kind. Platform impact: web, this fix (shared `lib/ui/travel.ts` and core
-Timeline rows); desktop uses the same shared code with its Behavior list, so no change; marketing
-and future mobile not applicable. Messaging impact: none. Not yet rechecked live.
-
-## Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026
-
-**On branch `travel-postdeploy-checks`. Not pushed.** Found on published 0.1.9: a Calendar event
-added shortly before leaving got a leave line but no Mac leave reminder until the Mac's Calendar
-list refreshed, because the hosted route reads Calendar itself. Fixed: a routed trip ahead whose
-stop the Mac does not list makes the Mac read its Calendar lists again once, and the travel hook
-keeps the routed view current when the new stop is one it already routed, so no route request is
-added. After Codex review on PR #198, that holds only when the response routed the new stop at its
-current start, end and place; an event moved in between gets a new request. Evidence in `docs/qa/travel-release.md`, "Calendar-event activation on published 0.1.9".
-Platform impact: desktop (Calendar re-read and reminder planning); web shares the hook rule, which
-only skips a repeat whole-day request; marketing and future mobile not applicable. Messaging
-impact: none. Not yet rechecked on an installed Mac.
-
-## Cadence for Mac 0.1.9 published — November 7, 2026
-
-**Published November 7, 2026, 23:24–23:30Z** (D24–D26). Built from `7c698ec` (PR #196 merge) with
-the blank-window fix and the travel advisory revamp. Both feeds serve 0.1.9;
-`Cadence_aarch64.dmg` is the 0.1.9 DMG (`93257f4f…`). Packet:
-`docs/qa/2026-11-07-desktop-0.1.9-release-packet.md`.
-
-- Notarization: app `b6040799…` and DMG `de9aac5c…`, both Accepted and stapled; 14 artifact checks
-  in `build` and in standalone `verify`.
-- Test Mac, account A, from the quarantined DMG over 0.1.8: Gatekeeper first open (owner chose
-  Open); no table lost rows; the archive notice and its link render where 0.1.8 was blank;
-  sign-in and Calendar callback replay, reminder coverage to the 30-day target, session renewal,
-  revoked session and Reconnect pass.
-- Check 4 (real updater) passed on the owner's Mac: published 0.1.8's own updater installed 0.1.9
-  after the stable feed moved, and **Restart Cadence** opened it with no lost rows. The test Mac
-  could not run it because 0.1.8 opens blank for account A (D25, D26).
-- 0.1.8 users with an auto-archived Behavior cannot reach the updater; the release body tells
-  them to download 0.1.9.
-- Not established at publication: Calendar-event drawer activation from a leave reminder (Ticket
-  285). It passed later that evening on published 0.1.9 (`docs/qa/travel-release.md`,
-  "Calendar-event activation on published 0.1.9"). macOS 14 not tested.
-- Both Macs now run 0.1.9. The test Mac's 0.1.8 copies and the owner's 0.1.10-dev.1 app are kept
-  in their backup folders.
-- Platform impact: desktop release only. Web, marketing and future mobile: no change.
-  Messaging impact: none.

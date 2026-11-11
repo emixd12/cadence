@@ -17126,8 +17126,12 @@ with claude-code, then a production run with the API clients.
 
 ## Ticket 292: Day notes
 
-Status: approved by the owner on 2026-11-10; in progress. Owner decisions,
-2026-11-10:
+Status: approved by the owner on 2026-11-10; in progress. Code merged and live on web and
+hosted November 11, 2026 (PR #208, `76b701c7`; Settings hotfix PR #210, `58efe857`); hosted
+migrations `20261111120000` and `20261111130000` applied. Acceptance items 1, 2, 3, 5 (account
+A), 6 and 10 passed; item 4 apply step, item 5 isolation with account B and items 7–9
+(dev-signed Mac build) remain (`STATUS.md`, "Ticket 292: day-note shortcuts, restore and MCP
+search live — November 11, 2026"). Owner decisions, 2026-11-10:
 
 1. Web, MCP and desktop (local and linked) ship together in this ticket.
 2. One note per day. The user can edit or clear it at any time.
@@ -17163,16 +17167,19 @@ Scope and acceptance:
   in a Day note shortcuts drawer in General. Evidence and exclusion IDs in this pool are
   day-note IDs.
 - Desktop: SQLite migration, DataStore methods and native store commands for local
-  day notes; account sync adds the `day_note` kind under sync contract 3.
+  day notes; account sync adds the `day_note` kind under sync contract 3. The `day_notes`
+  shortcut pool uses SQLite `0023` and sync contract 4; contracts 1–3 never receive that row.
 - MCP: `list_day_notes` (read) and `update_day_note` (write, `cadence.occurrences.write`),
   a `day_note` field on `get_timeline` days, and `day_note` records in `search` and
   `fetch`. Descriptions say a day note is separate from Occurrence statuses and
-  Occurrence notes. Contract minor version bump.
+  Occurrence notes. Contract minor version bump (1.1.0, then 1.2.0 for `search` and
+  `fetch`; the owner approved 1.2.0 on 2026-11-11).
 - Exports: Full JSON gains `day_notes`. BehaviorLog writes each non-empty day note as a
   one-day `review` record (`review_role: user`, `summary_markdown` = note, a
   `cadence` extension marking it as a day note). Restore and import of Cadence-produced
   day-note reviews write back to `day_notes`.
-- Interaction registry `INT-TIMELINE-012`; required checks pass.
+- Interaction registry `INT-TIMELINE-012` and `INT-SETTINGS-018` (Manage day note
+  shortcuts); required checks pass.
 
 Non-goals: several entries per day, note history, Daily Brief input, the Behaviors
 selected-day review, CSV/JSONL/Markdown changes, model-based shortcut analysis.
@@ -17181,8 +17188,8 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | `components/timeline/DayNoteControl.tsx`, `components/notes/NoteEditor.tsx`, `app/(app)/timeline/actions.ts`, `lib/services/day-note.service.ts`, migration `20261110120000_day_notes.sql`. |
-| Desktop | Shared Timeline components; SQLite migration, DataStore methods, native store and account sync contract 3 in this ticket. |
+| Web | `components/timeline/DayNoteControl.tsx`, `components/notes/NoteEditor.tsx`, `app/(app)/timeline/actions.ts`, `lib/services/day-note.service.ts`, migrations `20261110120000_day_notes.sql`, `20261111120000` (day-note shortcut pool) and `20261111130000` (sync contract 4). Day note shortcuts drawer in Settings › General after Categories (`INT-SETTINGS-018`); the day pool follows Ticket 305 (on by default, off only under a stored global off). MCP contract 1.2.0. Live November 11, 2026. |
+| Desktop | Shared Timeline and Settings components; SQLite migrations through `0023`, DataStore methods, native store, account sync contracts 3 and 4. Merged; no Mac build yet (acceptance items 7–9). |
 | Marketing | Not applicable: no marketing claim changes in this ticket; any copy goes through P-028. |
 | Future mobile | Deferred: no mobile surface. |
 

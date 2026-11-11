@@ -16,6 +16,13 @@ npm run supabase -- --version
 npm run supabase -- <command>
 ```
 
+Known local issue (November 11, 2026, owner's Mac): after `npm ci`, the binary
+`node_modules/@supabase/cli-darwin-arm64/bin/supabase` fails macOS code-signature
+validation (`codesign -v`: "invalid signature"), and macOS kills it, so
+`npm run supabase -- ...` exits 137 (SIGKILL). The Homebrew CLI 3.1.0 rejects this repo's
+config. Local `db reset` did not run there; agents replayed migrations in a throwaway
+Postgres container instead, and CI runs the real CLI.
+
 Examples:
 
 ```bash
