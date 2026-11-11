@@ -14354,7 +14354,9 @@ directory submission.
 
 ## Ticket 220: Record the MCP direction and integration brief
 
-Status: filed October 18, 2026; in progress (wave 1).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: none.
 
 Goal: align governance docs with the owner's MCP direction before runtime work.
@@ -14389,7 +14391,9 @@ Scope and acceptance:
 
 ## Ticket 221: Versioned MCP operation contract
 
-Status: filed October 18, 2026; in progress (wave 1).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: none. The only wave-1 ticket allowed to add a dependency.
 
 Goal: one machine-readable source of truth for every MCP operation, read by the
@@ -14424,7 +14428,9 @@ Scope and acceptance:
 
 ## Ticket 222: OAuth and integration persistence
 
-Status: filed October 18, 2026; in progress (wave 1).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: none.
 
 Goal: database objects for the authorization server and integration bookkeeping.
@@ -14456,7 +14462,9 @@ Scope and acceptance:
 
 ## Ticket 223: RLS-scoped request context for integrations
 
-Status: filed October 18, 2026; in progress (wave 1).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: none.
 
 Goal: let server code act as a verified grant's user through normal RLS, without
@@ -14485,7 +14493,9 @@ Scope and acceptance:
 
 ## Ticket 224: Integration read operations
 
-Status: filed October 18, 2026; planned (wave 2).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 221, 223.
 
 Goal: transport-independent read handlers that return contract-valid results
@@ -14516,7 +14526,9 @@ Scope and acceptance:
 
 ## Ticket 225: Integration write operations
 
-Status: filed October 18, 2026; planned (wave 2).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 221, 222, 223.
 
 Goal: scoped, retry-safe, concurrency-safe write handlers on the web app's write paths.
@@ -14548,7 +14560,9 @@ Scope and acceptance:
 
 ## Ticket 226: OAuth authorization server endpoints
 
-Status: filed October 18, 2026; planned (wave 2).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 222.
 
 Goal: a standards-compliant OAuth 2.1 authorization server for Claude, Claude Code,
@@ -14581,7 +14595,9 @@ Scope and acceptance:
 
 ## Ticket 227: Consent screen and Connected apps settings
 
-Status: filed October 18, 2026; planned (wave 3).
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 222, 226.
 
 Goal: let users approve, narrow, review, and revoke AI client access.
@@ -14611,7 +14627,9 @@ Scope and acceptance:
 
 ## Ticket 228: MCP endpoint
 
-Status: implemented locally October 18, 2026 (wave 3); awaiting independent review.
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Inspector OAuth and all 16 tool happy paths pass; its error-display limitation is
 recorded in `docs/qa/mcp-server.md`.
 Dependencies: 221–226.
@@ -14646,7 +14664,9 @@ Scope and acceptance:
 
 ## Ticket 229: Developer documentation
 
-Status: implemented locally October 18, 2026 (wave 4); awaiting independent review.
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 221, 228.
 
 Goal: public developer docs for every feature of the Cadence MCP server.
@@ -14673,7 +14693,9 @@ Scope and acceptance:
 
 ## Ticket 230: Claude and ChatGPT plugin packages
 
-Status: implemented locally October 18, 2026; awaiting independent wave-4 review.
+Status: complete. Merged to `main`; MCP is live on production since October 29, 2026, and
+Ticket 232 live acceptance completed October 31, 2026 (STATUS, "Ticket 232 live acceptance
+complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 221, 228.
 
 Goal: installable plugins that bundle Cadence skills with the remote MCP server.
@@ -14700,7 +14722,10 @@ Scope and acceptance:
 
 ## Ticket 231: Privacy disclosure and directory submission packet
 
-Status: filed October 18, 2026; planned (wave 4).
+Status: complete. The packet `docs/qa/mcp-directory-submission.md` and the challenge route
+are on `main` (`86da83de`); the approved legal disclosures landed in `43a79dd4`. MCP is live
+since October 29, 2026. Directory submission is out of scope (STATUS, "Ticket 232 live
+acceptance complete — October 31, 2026"). Reconciled November 11, 2026.
 Dependencies: 227, 228.
 
 Goal: legal drafts, the OpenAI challenge route, and the directory submission packet.
@@ -15372,7 +15397,8 @@ applicable.
 
 ## Ticket 252: MCP acceptance skill and guided human steps
 
-Status: in review (wave 3). Adds `.claude/skills/mcp-acceptance/SKILL.md` (tiers,
+Status: complete (wave 3, independently verified; STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"). Merged to `main` with PR #176
+(`89b4a6b6`). Adds `.claude/skills/mcp-acceptance/SKILL.md` (tiers,
 commands, accounts A and B, secrets by 1Password item name, production rules,
 resume from `STATE.md`, client quirks, agent autonomy and stop conditions, recovery)
 with `local-stack.mjs`, an isolated loopback stack for local rehearsals. Adds the
@@ -15408,7 +15434,9 @@ impact: web QA tooling only; desktop, marketing and future mobile not applicable
 
 ## Ticket 256: Automated client retest on production
 
-Status: planned (wave 4). Runs Tickets 249, 251 and 255 against production with test
+Status: complete October 31, 2026. Every client passed on production except ChatGPT step-up;
+results are in Ticket 232's record and `docs/qa/mcp-server.md` (STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026";
+STATUS, "Ticket 232 live acceptance complete — October 31, 2026"). Original plan: Runs Tickets 249, 251 and 255 against production with test
 accounts A and B and the watcher, then ledger-driven cleanup, and records the result
 in Ticket 232's record. Starts after Ticket 252, the Claude web fix deployment and the
 owner's go-ahead; changes no production code, settings or MCP state. Platform impact:
@@ -15417,7 +15445,9 @@ web QA run only; desktop, marketing and future mobile not applicable.
 ## Ticket 259: Consent offers advertised write permissions
 
 Status: implemented and merged October 31, 2026 as PR #175 (`f1392365`);
-hosted migration and deployment verified. Live ChatGPT write acceptance remains.
+hosted migration and deployment verified. Complete: the October 31 Tier 2 ChatGPT web run
+`20261031T230336Z-cf9e6e` completed a write (STATUS, "Ticket 259: consent offers advertised
+write permissions — October 31, 2026").
 Dependencies: Tickets 226–227 (OAuth and consent), the Ticket 232 follow-up
 re-consent union (migration `20261030230000`), and the Ticket 256 finding.
 
@@ -15481,7 +15511,8 @@ at desktop width and 390 px, in both a production build and a development build.
 
 ## Ticket 260: Development-only travel text and route warnings
 
-Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Dependencies: Ticket 263. Tickets 261 and 262 use its flag.
 
 Goal: text meant for developers never reaches a production user, and production
@@ -15530,7 +15561,8 @@ width and 390 px in both modes.
 
 ## Ticket 261: Plain travel timing copy
 
-Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Filed November 4, 2026, and amended the same day.
 
 Implementation notes:
@@ -15639,7 +15671,8 @@ the bench at desktop width and 390 px.
 
 ## Ticket 262: Calendar details dialog metadata
 
-Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Dependencies: Ticket 260 (development-only flag).
 
 Amended November 4, 2026, with C8 and G11.
@@ -15747,8 +15780,7 @@ buttons and email leave reminders; a new paid Google place search; turning weath
 
 ## Ticket 263: File the revamp tickets and rule changes
 
-Status: completed on branch `us-work`, November 4, 2026. Not merged. The merge waits for
-the owner.
+Status: complete. Merged to `main` as PR #189 (`767e5bf`) on November 5, 2026.
 Dependencies: none. PR #182 merged first, as `1a369e4`.
 
 Goal: record the agreed plan in the repository before any code changes.
@@ -15784,7 +15816,8 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 264: Report late trips, trips home and missing estimates
 
-Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Dependencies: Ticket 263.
 
 Goal: the evidence stops going silent when the user needs it most (gaps G1–G4).
@@ -15824,7 +15857,8 @@ tests/travel-provider.test.ts`, `npm run resolvers:check`, `npm run core:check`.
 
 ## Ticket 265: One departure model in core
 
-Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Dependencies: Ticket 264.
 
 Goal: every surface gives the same answer about what to do next.
@@ -15860,7 +15894,8 @@ Verification: the new test file, `npm run resolvers:check`, `npm run core:check`
 
 ## Ticket 266: Bench and tests show real timing
 
-Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #190 (`c599d24`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 1
+deployed — November 5, 2026").
 Filed November 4, 2026.
 
 Implementation notes:
@@ -15910,7 +15945,8 @@ tests/day-progress-bench.dom.test.tsx tests/day-progress-timeline.dom.test.tsx`.
 
 ## Ticket 267: Trip refresh plan replaces the 3-hour window
 
-Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed. The plan is
+Status: implemented November 5, 2026; merged to `main` as PR #191 (`e6a49c8`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 2
+deployed — November 5, 2026"). The plan is
 `resolveTravelRefreshPlan`; Ticket 268 makes the clients follow it. The route adds an optional
 `trips` request field and a `budget` response field, plans no trip home after a last stop at
 Home and routes no leg ready only after its destination ends.
@@ -15953,7 +15989,8 @@ tests/travel-route-refresh.service.test.ts tests/travel-budget.contract.test.ts`
 
 ## Ticket 268: Keep last estimates and apply the refresh plan
 
-Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #191 (`e6a49c8`) on November 5, 2026, and deployed (STATUS, "Travel advisory revamp Wave 2
+deployed — November 5, 2026").
 Dependencies: Ticket 267.
 
 Implementation notes:
@@ -16037,7 +16074,8 @@ Verification: `npx vitest run tests/travel-lifecycle.dom.test.tsx` and
 
 ## Ticket 269: Next-departure line
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed.
+Status: implemented November 5, 2026; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
 Dependencies: Tickets 265, 268 and 261.
 
 Goal: one line at the top of the Timeline answers "when do I leave next?" (proposal P1,
@@ -16073,8 +16111,8 @@ Verification: DOM test with a moving clock, bench at both widths,
 
 ## Ticket 270: Next trip's marker and span
 
-Status: implemented November 6, 2026 on branch `us-work` under owner decision D13. Not merged
-or deployed. The span starts at the leave time; a short magenta leader runs from its top end
+Status: implemented November 6, 2026 under owner decision D13; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`). The D13 marker landed with Wave 3. The span starts at the leave time; a short magenta leader runs from its top end
 into the left rail with a small magenta label at its end. Leave now, late and passed leave
 times use the line's words. Variants B and C, the title-size line and
 `NEXT_TRIP_PRESENTATION` are removed. `DESIGN.md` ("Next trip marker (Ticket 270)") and
@@ -16118,7 +16156,8 @@ tests/day-progress-bench.dom.test.tsx`, bench at both widths,
 
 ## Ticket 271: Drawer and dialog lead with the leave time
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+Status: implemented November 5, 2026; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`). The owner
 approved the "Change for this trip" label on November 6, 2026 (decision D13).
 Dependencies: Tickets 261, 262 and 268.
 
@@ -16160,7 +16199,8 @@ tests/day-progress-timeline.dom.test.tsx`, bench at both widths,
 
 ## Ticket 272: Daily Brief travel block stays useful
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+Status: implemented November 5, 2026; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`). The owner
 approved its three Daily Brief lines on November 6, 2026 (decision D13).
 Dependencies: Tickets 265 and 268.
 
@@ -16195,7 +16235,8 @@ tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 273: A next step for every missing estimate
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Decision
+Status: implemented November 5, 2026; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`). Decision
 D12 removed In person and Remote and reworded two steps. The owner approved the offer, Not now
 and Estimates off (D13) and the two D12 steps (D14) on November 6, 2026.
 Dependencies: Ticket 269.
@@ -16215,7 +16256,7 @@ Scope and acceptance:
 - Each missing-estimate state shows one sentence and one action.
 - Consent still comes only from the Travel estimates toggle.
 
-Decision D12 follow-up (November 5, 2026, implemented on `us-work`, not merged): a Calendar
+Decision D12 follow-up (November 5, 2026; merged with PR #192): a Calendar
 event with a location is in person, and one without a location is not travel. The hosted route
 leaves location-less events out (`calendarCommitmentDrafts`), so they ask nothing, get no route
 and never block a later trip. The needs-attendance state, its phrase, In person and Remote, and
@@ -16245,7 +16286,8 @@ tests/travel-settings.dom.test.tsx`, bench at both widths, `npm run interactions
 
 ## Ticket 274: Leave-time question survives a reload
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Candidates
+Status: implemented November 5, 2026; merged to `main` as PR #192 (`ce8fb6a`) on November 5, 2026; live on web (Ticket 284's production run used
+`9064f5f`). Candidates
 are kept in `sessionStorage` (`cadence:travel-leave-question`) as digests and end times.
 Dependencies: Ticket 263.
 
@@ -16278,8 +16320,10 @@ tests/travel-habits.dom.test.tsx`.
 
 ## Ticket 275: Leave reminder specification and schema
 
-Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
-applied to local Supabase only; the hosted push waits for the owner. Under decision D15
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
+Its migrations are on the hosted database: hosted equals git at 114 migrations (STATUS,
+"Connector completion hosted push and merge — November 11, 2026"). Under decision D15
 the web job routes a trip at most three times (plan, send, and once after sending) and
 sends at most one update; the Mac sends its update from its own estimates
 (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). Under D12, only trips to located
@@ -16322,8 +16366,10 @@ Verification: `npm run supabase -- db reset`, the new migration test, `npm run t
 
 ## Ticket 276: A background job acts as the user
 
-Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
-applied to local Supabase only; the hosted push waits for the owner. The leave reminder
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
+Its migrations are on the hosted database: hosted equals git at 114 migrations (STATUS,
+"Connector completion hosted push and merge — November 11, 2026"). The leave reminder
 token is its own channel with no MCP grant claims. The Google identity comes from
 `public.leave_reminder_google_subject()`. Open for Ticket 277: Vercel's documentation does
 not say whether cron requests carry `x-vercel-oidc-token`; check it in production before
@@ -16368,7 +16414,10 @@ run, `npm run resolvers:check`.
 
 ## Ticket 277: Leave reminder job
 
-Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Off until
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
+Its migrations are on the hosted database: hosted equals git at 114 migrations (STATUS,
+"Connector completion hosted push and merge — November 11, 2026"). Production setting of the flag below: not checked here. Off until
 `CADENCE_LEAVE_REMINDER_JOB=enabled`, and the route reports delivery unavailable until
 Ticket 278. Planner `packages/core/src/services/leave-reminder-plan.ts`, service
 `lib/services/leave-reminder-job.service.ts`, route
@@ -16442,8 +16491,9 @@ tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test
 
 ## Ticket 278: Leave reminders through web push
 
-Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed, and no real
-notification was sent. Delivery `lib/services/leave-reminder-web-push.ts`, wired through
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
+A real web push send is not recorded in this ticket. Delivery `lib/services/leave-reminder-web-push.ts`, wired through
 `createLeaveReminderDelivery`; link helpers `lib/ui/leave-reminder-link.ts`. The sender gains
 optional lifetime and urgency; Behavior reminders keep 24 hours at normal urgency. The link is
 `/timeline?leave=<trip digest>`. The update shares the first notification's tag and alerts
@@ -16484,7 +16534,8 @@ Verification: `npx vitest run` on the push and reminder service tests,
 
 ## Ticket 279: Reminder setting and readiness list
 
-Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alongside
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`). Built alongside
 Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
 saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
 token). It cannot turn on while Travel estimates is off. The owner approved the twelve new
@@ -16524,12 +16575,15 @@ Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
 
 ## Ticket 280: Leave reminders on the Mac
 
-Status: implemented November 6, 2026 on branch `us-work`, not merged or released. A linked Mac
+Status: implemented November 6, 2026; merged to `main` as PR #193 (`29fbee0`) on November 6, 2026; live on web (Ticket 284's production run used
+`9064f5f`).
+Released in Cadence for Mac 0.1.9 on November 7, 2026 (STATUS, "Cadence for Mac 0.1.9
+published — November 7, 2026"). A linked Mac
 schedules `cadence.leave.<trip digest>` notifications from the departure model's last estimate
 (`packages/core/src/services/mac-leave-reminder-plan.ts`,
 `apps/desktop/src/local-leave-reminder.service.ts`), with one D15 update and activation into the
 event's drawer. Behavior reminder coverage is unchanged. The owner approved its three phrases on
-November 6, 2026 (D17). Installed acceptance waits for a dev-signed build; a release waits for the owner.
+November 6, 2026 (D17). Installed acceptance runs under Ticket 285.
 Dependencies: Tickets 265, 268 and 279. Decision D3.
 
 Goal: a native reminder fires from the last estimate, even if the app has quit.
@@ -16566,7 +16620,8 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 
 ## Ticket 281: Remember places and attendance
 
-Status: implemented November 6, 2026 on branch `us-work`; not merged or deployed. Decision
+Status: implemented November 6, 2026; merged to `main` as PR #194 (`9064f5f`) on November 6, 2026; live on web (STATUS, "Travel advisory revamp Wave 6:
+Ticket 284 web acceptance with the real clock — November 6, 2026"). Decision
 D12 (November 5, 2026) removes the attendance part: a located event is in person and nothing
 asks about attendance, so only remembered places remain in scope.
 Dependencies: Ticket 273. Decision D4.
@@ -16619,8 +16674,8 @@ Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
 
 ## Ticket 282: Tomorrow's first trip
 
-Status: implemented and verified November 6, 2026 on branch `us-work`; not merged or
-deployed. No migration. The verifier fixed the Calendar read range for tomorrow and added one
+Status: implemented and verified November 6, 2026; merged to `main` as PR #194 (`9064f5f`) on November 6, 2026; live on web (STATUS, "Travel advisory revamp Wave 6:
+Ticket 284 web acceptance with the real clock — November 6, 2026"). No migration. The verifier fixed the Calendar read range for tomorrow and added one
 retry after a failed request. The line's wording, "Tomorrow: leave by {time} for {event}.", is
 approved as written (decision D20, November 6, 2026).
 Dependencies: Tickets 268 and 269. Decision D4.
@@ -16679,7 +16734,8 @@ Implementation notes (November 6, 2026):
 
 ## Ticket 283: Route Outlook and iCloud events
 
-Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Locations are an
+Status: implemented November 6, 2026; merged to `main` as PR #194 (`9064f5f`) on November 6, 2026; live on web (STATUS, "Travel advisory revamp Wave 6:
+Ticket 284 web acceptance with the real clock — November 6, 2026"). Locations are an
 opt-in read (`fields=location`, `includeLocation`) used by the Timeline, the travel route
 and the leave reminder job, never the Daily Brief; released clients keep the first-slice
 shape. `lib/services/travel-calendar-sources.ts` reads and fences all three Calendars.
@@ -16699,14 +16755,14 @@ the event still cancels that reminder if an Outlook or iCloud read fails there, 
 visit read it successfully; a retry would need a third route before sending, which the
 `travel_leave_reminders_third_route_after_send` check refuses (`docs/NOTIFICATION_SPEC.md`,
 "Leave reminders").
-Follow-up (November 8, 2026, branch `leave-reminder-send-read`, not merged): the send and update
+Follow-up (November 8, 2026; merged as PR #200, `2d16bf12`): the send and update
 steps now read Calendar before their route. A destination or planned previous stop a failed
 Outlook or iCloud read left out is released with no route spent, and the next visit sends while the leave time is ahead. A
 plan route that finds the reminder due keeps it pending at its reminder time instead of
 cancelling. Remaining limit: if the route used a different previous stop than planned
 and that stop is missing from the read, it still cancels the reminder or closes the update check. No migration; D15 and D16 unchanged. Tests:
 `tests/leave-reminder-job.service.test.ts`, `tests/leave-reminder-hosted-port.test.ts`.
-Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
+Decision D18 follow-up (November 6, 2026; merged with PR #194): signed Daily Brief conclusions now
 cover Outlook and iCloud stops. The token names those events by source, and its source key
 binds the Outlook and iCloud connections that took part. The brief accepts it only when each
 named event is in its own context, which holds Outlook or iCloud only under that Calendar's

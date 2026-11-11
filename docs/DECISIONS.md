@@ -2243,7 +2243,7 @@ whether the App Store Connect API can create Developer ID certificates (an Apple
 thread from June 2025 reports it rejecting the G2 type). Ticket 325 tests both.
 
 Platform impact: desktop release tooling only. Web, marketing and future mobile: not
-||||||| 20feeaff
+applicable. Messaging impact: none.
 
 ## 2026-11-11: Hevy testing uses the owner's own Pro account
 

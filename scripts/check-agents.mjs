@@ -241,6 +241,20 @@ if (exists("STATUS.md")) {
     `STATUS.md is ${statusBytes} bytes; the limit is ${STATUS_MAX_BYTES}. Run \`npm run status:archive\` to move older entries into docs/status/archive/.`,
   );
 }
+// Ledger files are merged often by parallel sessions; a stray conflict
+// marker (including a diff3 `|||||||` base line) must fail the check.
+const conflictMarkerLine = /^(<{7}|\|{7}|={7}|>{7})(\s|$)/;
+for (const file of ["STATUS.md", "docs/TICKETS.md", "docs/DECISIONS.md"]) {
+  if (!exists(file)) continue;
+  read(file)
+    .split("\n")
+    .forEach((line, index) => {
+      assert(
+        !conflictMarkerLine.test(line),
+        `${file} line ${index + 1} is a merge conflict marker (\`${line.slice(0, 20)}\`). Resolve the conflict and remove the line.`,
+      );
+    });
+}
 assert(
   exists("docs/status/README.md"),
   "docs/status/README.md must exist; it explains the STATUS.md archive and holds its index.",
