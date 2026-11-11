@@ -15,20 +15,27 @@ export function createDayNoteStore(
   };
 }
 
+// Paged like listAllDayNotes: a Timeline range runs from the oldest Needs
+// decision date to the last future day, so it can hold more than one
+// 1,000-row PostgREST page.
 export async function listDayNotesInRange(
   supabase: AppSupabaseClient,
   userId: string,
   range: { from: string; to: string },
 ): Promise<DayNoteRecord[]> {
-  const { data, error } = await supabase
-    .from("day_notes")
-    .select("*")
-    .eq("user_id", userId)
-    .gte("local_date", range.from)
-    .lte("local_date", range.to)
-    .order("local_date", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as DayNote[];
+  return readAllPostgrestRows<DayNote>({
+    label: "Day notes",
+    getRowKey: (row) => row.id,
+    createQuery: () =>
+      supabase
+        .from("day_notes")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("local_date", range.from)
+        .lte("local_date", range.to)
+        .order("local_date", { ascending: true })
+        .order("id", { ascending: true }),
+  });
 }
 
 export async function listAllDayNotes(
