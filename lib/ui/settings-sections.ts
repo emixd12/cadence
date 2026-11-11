@@ -128,6 +128,22 @@ export function connectorUnavailableSectionState(reason: "local" | "build" | nul
   return state("Unavailable", false);
 }
 
+// Drawer copy and labels. They live here, outside the "use client" panels, because the
+// Settings server page reads them while it renders (a server component cannot call a
+// function or read a value exported from a client module).
+
+export const CATEGORY_PANEL_PURPOSE = "Group Behaviors your way. A category’s description shows in Behavior forms and exports.";
+export const SETTINGS_TRAVEL_PURPOSE = "Know when to leave for events and Behaviors that have a place.";
+export const SETTINGS_DAILY_BRIEF_PURPOSE = "A short briefing the first time you open Timeline each day.";
+/** Ticket 292: the day-note pool. One line for its Settings drawer. */
+export const DAY_NOTE_SHORTCUTS_PURPOSE = "Suggests a shortcut when you save the same day note on three days.";
+
+/** The button that opens the category list (Ticket 304). */
+export function drawerLabel(count: number) {
+  if (count === 0) return "Add a category";
+  return count === 1 ? "Edit 1 category" : `Edit ${count} categories`;
+}
+
 /** Categories load with the page, so their count is always known. */
 export function categoriesSectionState(count: number): SettingsSectionState {
   if (count === 0) return state("No categories", false);

@@ -42,9 +42,9 @@ import {
   ScreenContentLoading,
   ScreenFrame,
 } from "@/components/layout/ScreenFrame";
-import { DAY_NOTE_SHORTCUTS_PURPOSE, DayNoteShortcutSettings, NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { DayNoteShortcutSettings, NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import { SettingsDrawer } from "@/components/settings/SettingsSections";
-import { dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
+import { DAY_NOTE_SHORTCUTS_PURPOSE, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
 import {
   AccountDeletionPanel,
   type DeleteAccountAction,
