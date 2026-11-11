@@ -47,7 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 310–324: connector completion (D28) | 310, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`; 311 blocked on owner steps; 320, 323 and 324 not started | Owner: the `connectors` preflight steps (service-account token, Hevy test key); a yes for migration `20261110210000` (service-role grant). Then Ticket 311, hosted pushes, a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Tickets 312–322: connector completion implemented in source — November 10, 2026" |
+| Tickets 310–324: connector completion (D28) | 310, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`; 311 blocked on owner steps; 320, 323 and 324 not started | Owner: finish or cancel the hanging `op service-account create` so `op` calls run, then the `connectors` preflight vault items (Hevy test key). Migration `20261110210000` approved November 10. Then Ticket 311, hosted pushes, a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Tickets 312–322: connector completion implemented in source — November 10, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -107,7 +107,8 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
   with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
 - Hosted: no migration pushed. `20261110200000` fits the standing approval once a push can
   run; the `cadence-agents` token needs the vault service-account token first.
-  `20261110210000` grants `service_role` a column read and needs the owner's yes.
+  `20261110210000` grants `service_role` a column read; the owner approved its hosted push
+  on November 10, 2026. Both pushes run when the branch merges to `main` (condition 4).
 - Owner steps from `npm run qa:preflight -- --suite connectors` (exit 10): store the Cadence
   Agents service-account token (`docs/qa/agent-secrets.md`, steps 4–5); then the vault items
   it lists, of which Ticket 311 needs `hevy-test-account-a`.

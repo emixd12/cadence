@@ -160,8 +160,8 @@ The connector completion job (Ticket 321, D28.5) runs every 15 minutes at minute
 `CRON_SECRET`, returns `enabled: false` until `CADENCE_CONNECTOR_COMPLETION=on`, and
 visits only accounts whose `next_check_at` has passed (20 per run by default, 100 at
 most, within a 50-second budget). Its service-role selection needs migration
-`20261110210000_connector_completion_job_selection.sql`, which needs the owner's yes
-before a hosted push.
+`20261110210000_connector_completion_job_selection.sql`. The owner approved its hosted
+push on November 10, 2026.
 
 The leave reminder job (Ticket 277) accepts only `CRON_SECRET` and stays off until
 `CADENCE_LEAVE_REMINDER_JOB=enabled`; `docs/ROUTE_MAP.md` has its contract.
