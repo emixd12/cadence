@@ -107,6 +107,14 @@ Found during Ticket 292 review and acceptance on November 11, 2026. Neither is s
 - **Shortcut evidence from future days.** Only day notes dated today or earlier count
   toward a Day note shortcuts suggestion. A note saved on a future day does not count until
   that day arrives. Decide whether future-dated notes should count.
+- **Notes stored with a lone carriage return.** A day note or Occurrence note stored with a
+  lone CR (no LF) still cannot be edited from the web form after PR #213, which normalizes
+  only CRLF so desktop and MCP keep matching old notes. A hosted data cleanup would fix it
+  and needs the owner's authorization.
+- **Mac conflict review for day notes.** The Mac sync conflict review shows raw JSON for
+  both day-note versions.
+- **BehaviorLog day-note apply steps.** Run the import and restore apply steps for day notes
+  on a throwaway test account; Ticket 292 acceptance verified only the previews.
 
 ## Public product surfaces
 

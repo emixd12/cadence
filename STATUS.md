@@ -49,7 +49,6 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (sync contract 5, not required for the first release); Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
-| Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -130,6 +129,41 @@ The owner said on November 11 to merge PR #207 and continue.
   for a new link or connection; the job runs the full schedule. Next: merge PR #207.
 - Not verified: a `deleted` event, a routine rename or deletion, histories above 500
   workouts.
+
+## Ticket 292: day notes complete — November 11, 2026
+
+The owner approved closing Ticket 292 on November 11, 2026. Web, hosted and MCP are live;
+production serves `5e5b5cc7`.
+
+- **Acceptance run** `t292-day-notes-20261111` (ledger
+  `.intent/acceptance/t292-day-notes-20261111/ledger.md`):
+  - Passed: 1, 2, 3, 5 (accounts A and B; B sees none of A's day notes through
+    `list_day_notes`, `get_timeline`, `search` or `fetch`), 6, 7, 8, 9 and 10.
+  - 7–9 ran on the test Mac with dev-signed 0.1.10-dev.2 from `main` at `10cb7dfb`: SQLite
+    20→23 with integrity ok and no rows lost; a local day note persists across quit and
+    relaunch; the synced chip works in the Mac editor; day notes and the shortcut pool sync
+    both ways; a concurrent edit goes to conflict review; two new notes for one date merge.
+  - Partial: 4. Export content and import and restore previews verified; the apply steps
+    did not run, because no throwaway test account exists.
+- **Defect D3, fixed:** multi-line notes could not be re-saved on web; every save showed the
+  conflict message. Occurrence notes had the same defect from before Ticket 292. PR #213
+  (`5e5b5cc7`) normalizes CRLF in the expected text before the compare-and-set. The
+  acceptance agent retested on production as account A: multi-line day notes and
+  Occurrence notes save, edit and clear at 1280 and 390 px, a stale save still conflicts,
+  and a chip save on a multi-line day works.
+- **Mac:** no Mac release was published. SQLite `0023`, day-note shortcuts on Mac and sync
+  contract 4 reach users with the next Mac release. Hosted already supports contract 4.
+- **Still open, outside this ticket:** the web export 500 (open-work row; ledger D2) and
+  P-028 in the messaging track.
+- **Follow-ups logged** in `docs/FUTURE_UPDATES.md`, "Day note follow-ups".
+- **Test fixtures left in place:** account A keeps empty day-note rows (there is no delete
+  path) and a `day_notes` shortcut row with 3 dismissed entries. Account B has one cleared
+  row. The test Mac stays on dev build 0.1.10-dev.2 (schema 23), linked as A; its
+  pre-upgrade backup is `backups/pre-0.1.10-dev.2-20261111T171236Z`. Returning it to 0.1.9
+  needs the owner's instruction.
+
+Platform impact: web and hosted live; desktop merged, ships with the next Mac release;
+marketing and future mobile not applicable. Messaging impact: P-028 (open).
 
 ## Updater signing key rotated — November 11, 2026
 
@@ -252,182 +286,3 @@ token `supabase-access-token` and the pinned CLI 2.105.0 (Go backend).
 
 Platform impact: web hosted database and production deploy. Desktop: none until a Mac release
 (P-037). Marketing and future mobile: not applicable. Messaging impact: none new.
-
-## Tickets 312–322: connector completion implemented in source — November 10, 2026
-
-**On branch `claude/pr-206-tickets-c4834e`, stacked on PR #206. Off in production: every
-path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
-
-- Complete: 312 (recorded-activity contract `1.1.0`, `RECORDED_ACTIVITY_MIN_MATCH_SECONDS`),
-  313 (`activity-match.resolver.ts`, `resolveConnectorStatusEvent`, timing classifier) and
-  322 (connector marks excluded from marking patterns; export and MCP provenance documented).
-- Implemented: 314 (three tables, three security-definer writers, migration
-  `20261111140000`), 315 (routine list and match read with routine digests), 316
-  (completion-source port, reconcile and link services, `/api/connectors/...` routes), 317
-  (Complete from Hevy on web Behaviors, "From Hevy" row line, Hevy panel last check), 318
-  (timing statistics), 319 (sync convergence of a connector mark and the user's first mark,
-  Mac label from the synced event, Mac reconcile after its Hevy refresh) and 321 (schedule
-  resolver, `connector_completion` token channel, job route at minutes 7, 22, 37, 52).
-- Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 5 (4 is day notes), a SQLite
-  migration, native changes and installed acceptance. 323 needs 311, a published Mac build
-  with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
-- Hosted: both migrations pushed November 11 (see "Connector completion hosted push and
-  merge — November 11, 2026").
-- Owner steps from `npm run qa:preflight -- --suite connectors` (exit 10): store the Cadence
-  Agents service-account token (`docs/qa/agent-secrets.md`, steps 4–5); then the vault items
-  it lists, of which Ticket 311 needs `hevy-test-account-a`.
-- Verification: clean local stack replayed all 107 migrations; SQL fixtures for Tickets 314,
-  321, 292 and 275 pass. New and changed Vitest files pass under Node 24. Dagger: agents,
-  interactions, resolvers, lint, typecheck, build, desktop-build, marketing and public-trust
-  pass after the fixes recorded in the PR; `test` results are in the PR.
-- Not verified: live Hevy (change feed, ordering, `routine_id` behavior); the job end to end
-  with a minted token; deployed web; any installed Mac build; Vercel usage.
-- Platform impact: web, Tickets 314–318, 321, 322. Desktop: 319 in source, linked mode only;
-  320 deferred. Marketing: none (P-042). Future mobile: deferred. Messaging impact: P-038 to
-  P-041 apply; P-043 logged for the new in-app copy.
-
-## Tickets 310–324: connector completion filed — November 10, 2026
-
-**On branch `connector-completion/tickets`. Documents only; no code.**
-
-- The owner decided D28 on November 10, 2026: a Behavior can be marked Completed from
-  activity recorded in a connected service, starting with Hevy. Its eight parts, D28.1 to
-  D28.8, are in `docs/DECISIONS.md`.
-- Ticket 310 (complete): records D28, files Tickets 310–324, adds the plan
-  `docs/plans/2026-11-10-connector-completion-architecture.md`, and updates `AGENTS.md`,
-  `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
-  `docs/DESKTOP_PARITY.md` and `docs/FUTURE_UPDATES.md`. It logs P-038 to P-042 and L-023.
-- The plan began as an audit of an earlier design. Three findings shaped the tickets. The
-  manual status function rejects connector provenance, so Ticket 314 adds separate
-  functions. Published Mac 0.1.9 stops syncing when a connector and the user mark the same
-  Occurrence, so Ticket 319 ships in a Mac build first. Hevy reads cover one day and stop
-  above 500 workouts, so Ticket 311 picks the read strategy.
-- Tickets 311–324 are not started. Ticket 311 needs an owner step only if the `connectors`
-  preflight lists one.
-- Merged with `main` three times on November 11, after PR #205, PR #209 and PR #211. This
-  entry's IDs follow the Tickets 301–309 work's: P-038 after P-037, L-023 after L-022.
-  Ticket 292 took account sync contract 4, SQLite `0023` and MCP contract 1.2.0; Tickets
-  319, 320 and 322 name no contract number, so they take the next free ones.
-- Checks: `agents:check`, `interactions:check`, `resolvers:check`, `lint` and `typecheck`
-  pass under Node 24 after each merge. `build` passed before the merges. The full test
-  suite last ran before them, under Node 26: 5,428 passed, 16 failed in five files (four
-  assert Node 24; `tests/acceptance-web-client.test.mjs` timed out in `afterAll`).
-- Not verified: Hevy's change feed, workout order and terms (Ticket 311, L-023). The
-  5-minute minimum and the job's check counts are estimates.
-- Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only, Tickets
-  319 and 320. Marketing: none until release (P-042). Future mobile: deferred. Messaging
-  impact: P-038 to P-042.
-
-## Tickets 301–309: Settings regroup implemented — November 10, 2026
-
-The owner asked on November 10 to carry out Tickets 301–309 and merge PR 205, confirmed the
-three agent proposals and authorized pushing Ticket 307's migration after merge
-(`docs/DECISIONS.md`, 2026-11-10). Seven parallel agents built the tickets on branches off
-`claude/determined-fermi-78a61d`; the orchestrating agent merged and reconciled each one.
-
-- **301:** four groups, a sticky index, source rows with provider icons and state, drawers,
-  pure state functions (`lib/ui/settings-sections.ts`), one line of Privacy, Terms and Trust
-  links, and a quiet Delete account link. Bench fixtures: a new account measures 2,539 px
-  (6,432 before) and Delete account is 22 tab stops away with every source connected.
-- **302:** the Mac uses the same groups plus a "This Mac" group and a self-opening Cadence
-  account drawer; local-mode rows say "Link a Cadence account".
-- **303:** checkboxes and selects save as they change, Home on blur or Enter; one result line
-  per section; failures roll back; Disconnect asks first everywhere. Timezone, opened forms,
-  Connect, Disconnect and Delete account keep explicit actions.
-- **304:** Categories as a closed list with drag, touch and arrow-key reordering; a move is one
-  checked `manage_categories` write. No migration.
-- **305:** Note shortcuts on for everyone; matching runs after each Note save; no Settings
-  control. Migrations `20261110153050` (commit check) and `20261110170000` (turns stored off
-  switches on once; not additive). Desktop SQLite migration 0022.
-- **306:** one **Plan around my connected sources** choice with per-source exclusions under
-  Advanced. Migration `20261110150000` (adds columns and `save_daily_brief_preferences_v4`; it
-  also replaces `daily_brief_calendar_fence_is_current` with a looser caller check).
-- **307:** Daily Brief reads Google Calendar through the Timeline connection. Retirement route
-  `POST /api/google-calendar/agent-grants/retire`, then migration `20261110160000`, which
-  refuses to run while any agent credential remains.
-- **308:** **Use my current location** fills Home from one server-side reverse-geocoding call;
-  the position is never stored or logged. Migration `20261110155000` (rate-limit action).
-  `docs/COSTS.md` updated.
-- **309:** plainer Settings copy, place-name timezones, `PRODUCT.md` voice. Before-and-after
-  list: `docs/qa/2026-11-10-settings-wording.md`.
-- **Logged:** `docs/LEGAL.md` L-022 (storing a geocoded Home address);
-  `docs/MESSAGING_CHANGES.md` P-037 (old Mac builds' Daily Brief text) and Ticket 309's P-033
-  additions.
-
-Verification: each agent ran agents, interactions, resolvers, design-system, lint, typecheck,
-desktop typecheck, build and desktop build (all pass) and the full Vitest suite (only the known
-`acceptance-web-client` `afterAll` timeout plus load-sensitive files that pass alone). The
-306–307 agent ran `db reset` and the new SQL fixtures on the local stack. CI on the merged
-branch through Ticket 303 passed, including `rehearse` (every migration and SQL fixture) and
-`verify`. Not verified: installed Mac checks (Cadence for Mac is not installed on the owner's
-Mac), a signed-in hosted check, a real Google revocation, iPhone Safari, a screen reader.
-
-Platform impact: web and desktop in this change; marketing only through P-035; future mobile
-inherits the web page. Messaging impact: P-033 to P-037.
-
-## Settings regroup: evaluation, mock and Tickets 301–309 — November 10, 2026
-
-Owner direction: `docs/DECISIONS.md`, 2026-11-10. Branch `claude/determined-fermi-78a61d`,
-opened as a draft pull request on November 10.
-
-- **Evaluation, November 9.** The web Settings page was measured from the real components
-  on synthetic data in headless Chrome: 6,470 px, 1,265 visible words and 59 controls for a
-  new account at 1280×800; 8,402 px with every source connected. The production page was not
-  checked: no kept test-account session was available on this Mac.
-- **Mock.** `/design-system?preview=settings-regroup` shows four groups, a section index,
-  source rows with state and provider icons, drawers for Categories, Travel and Daily Brief,
-  a drag-to-reorder Categories sketch and a one-choice Daily Brief sketch. A new account
-  measures 2,537 px, 182 words and 20 controls. `/settings` is unchanged.
-- **Files.** `app/design-system/SettingsRegroupBench.tsx`, `SettingsRegroupFixtures.tsx`,
-  `settings-regroup-bench.module.css`, `app/design-system/page.tsx`,
-  `interaction-registry.json` (bench file excluded), three provider icons and
-  `public/brand/connector-icons-source.md`.
-- **Tickets 301–309 filed, none started.** The branch was rebased onto `main` on November 10,
-  after the consolidation merge that holds Tickets 292–300.
-- **Logged.** `docs/LEGAL.md` L-020 (provider marks) and L-021 (one Daily Brief choice, one
-  Google connection). `docs/MESSAGING_CHANGES.md` P-033 to P-036.
-- **Verification, November 10, after the rebase.** `agents:check`, `interactions:check`,
-  `resolvers:check`, `design-system:check`, lint, typecheck and build pass. `npm run test`:
-  5,428 pass and 16 fail in 5 files this branch does not change. Four files require Node 24
-  (this Mac runs Node 26.13). `tests/acceptance-web-client.test.mjs` passes its 71 tests and
-  then times out in its `afterAll` hook, also when run alone. Dagger did not run: Docker is
-  not installed here.
-- **Not verified.** Safari, an iPhone, a screen reader and the Mac app.
-
-## Branch consolidation into main — November 10, 2026
-
-The owner asked on November 10 for every active branch and open PR to land on `main`, the
-horse avatar to stay out of production, and stale branches pruned. Merged through
-`consolidate/2026-11-10`:
-
-- `horse-avatar-trial`: a bench on `/design-system`, which calls `notFound()` in production
-  builds. Only `public/brand/cadence-horse-avatar.png` is reachable in production.
-- PR #181 (launch-sync bookkeeping in release acceptance), PR #202 (Ticket 292, day notes),
-  Dependabot PRs #183 (ESLint 10), #185 (agentmail-cli 1.10), #186 (MCP client 2.4) and #187
-  (eslint-config-next 16.4.5). PR #184 (`@types/node` 26) was closed: its build failed.
-- `accounts-test` as Ticket 293 and `chatgpt-https` as Tickets 294–300, D27 and P-029 to
-  P-032. Both had used Tickets 286–292, which `main` and day notes already held.
-- `mcp-accept/256`: the cross-process session lock, kept alongside `main`'s exit-45 retries.
-- Acceptance mirrors (`scripts/acceptance/protocol.mjs`, `watch.mjs`) gained the two day-note
-  tools; `read-a` reads `list_day_notes` and checks the `update_day_note` step-up.
-
-Hosted: the owner authorized the three day-notes migrations, and an agent pushed them
-with the pinned CLI (2.105.0) on November 10. Read back on hosted: RLS on `day_notes`,
-`authenticated` holds SELECT only, `save_day_note` executes for `authenticated` only, and
-the contract-3 `day_note` sync kind is registered. The same day the owner approved additive
-migrations in advance (`docs/DECISIONS.md`, 2026-11-10) and added the `cadence-agents`
-Supabase token to the Cadence Agents vault (preflight `vault-supabase-access-token`; it
-needs the vault's service-account token in this Mac's Keychain first).
-
-Pruned: `note-add-backup`, `agentic-architecture` and an empty agent branch. The two
-`backup/*` branches became tags `archive/advisor-analysis-wip-2026-10-22` and
-`archive/ticket-165-reminder-gap-2026-10-08`.
-
-Checks: Dagger agents, interactions, resolvers, lint, typecheck, build, desktop-build,
-marketing and public-trust pass. Dagger `test` fails in the same five container-only files as
-plain `main` (`.claude` files absent, Chrome, `git archive`); the merge-introduced failures are
-fixed.
-
-Platform impact: web, desktop and MCP through Ticket 292; acceptance tooling through Tickets
-256 and 293; documents only for Tickets 294–300. Marketing and future mobile: not
-applicable. Messaging impact: P-028 to P-032, already logged.

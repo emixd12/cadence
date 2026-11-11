@@ -17120,12 +17120,16 @@ with claude-code, then a production run with the API clients.
 
 ## Ticket 292: Day notes
 
-Status: approved by the owner on 2026-11-10; in progress. Code merged and live on web and
-hosted November 11, 2026 (PR #208, `76b701c7`; Settings hotfix PR #210, `58efe857`); hosted
-migrations `20261111120000` and `20261111130000` applied. Acceptance items 1, 2, 3, 5 (account
-A), 6 and 10 passed; item 4 apply step, item 5 isolation with account B and items 7–9
-(dev-signed Mac build) remain (`STATUS.md`, "Ticket 292: day-note shortcuts, restore and MCP
-search live — November 11, 2026"). Owner decisions, 2026-11-10:
+Status: complete on 2026-11-11 (owner approved the close). Code merged and live on web and
+hosted: PR #208 (`76b701c7`), Settings hotfix PR #210 (`58efe857`) and multi-line save fix
+PR #213 (`5e5b5cc7`); hosted migrations `20261111120000` and `20261111130000` applied.
+Acceptance run `t292-day-notes-20261111` passed items 1, 2, 3, 5 (accounts A and B), 6, 7, 8,
+9 and 10; item 4 is partial (export content and import and restore previews verified; the
+apply steps did not run, no throwaway account). Defect D3 (multi-line notes could not be
+re-saved on web; Occurrence notes had the same defect from before this ticket) was fixed by
+PR #213 and retested on production. Mac items ran on dev-signed 0.1.10-dev.2; no Mac release
+was published, so the Mac part ships with the next Mac release (`STATUS.md`, "Ticket 292:
+day notes complete — November 11, 2026"). Owner decisions, 2026-11-10:
 
 1. Web, MCP and desktop (local and linked) ship together in this ticket.
 2. One note per day. The user can edit or clear it at any time.
@@ -17183,11 +17187,11 @@ Platform impact:
 | Platform | Implementation or not-applicable reason |
 |---|---|
 | Web | `components/timeline/DayNoteControl.tsx`, `components/notes/NoteEditor.tsx`, `app/(app)/timeline/actions.ts`, `lib/services/day-note.service.ts`, migrations `20261110120000_day_notes.sql`, `20261111120000` (day-note shortcut pool) and `20261111130000` (sync contract 4). Day note shortcuts drawer in Settings › General after Categories (`INT-SETTINGS-018`); the day pool follows Ticket 305 (on by default, off only under a stored global off). MCP contract 1.2.0. Live November 11, 2026. |
-| Desktop | Shared Timeline and Settings components; SQLite migrations through `0023`, DataStore methods, native store, account sync contracts 3 and 4. Merged; no Mac build yet (acceptance items 7–9). |
+| Desktop | Shared Timeline and Settings components; SQLite migrations through `0023`, DataStore methods, native store, account sync contracts 3 and 4. Merged and accepted on dev-signed 0.1.10-dev.2; ships with the next Mac release. Hosted already supports sync contract 4. |
 | Marketing | Not applicable: no marketing claim changes in this ticket; any copy goes through P-028. |
 | Future mobile | Deferred: no mobile surface. |
 
-Messaging impact: P-028.
+Messaging impact: P-028, still open in the messaging track.
 
 ## Ticket 293: Test-access preflight for acceptance runs
 
