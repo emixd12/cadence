@@ -2,8 +2,8 @@
 
 -- Ticket 292: the day-note Note shortcuts pool. Owner-only reads, writes only
 -- through the guarded RPCs, the full-context compare-and-set, the global and pool
--- switches, shortcut exclusions recorded with the save, and no cross-account
--- access. Synthetic local fixtures only; all changes roll back.
+-- switches, shortcut exclusions recorded with the save, no cross-account
+-- access, and no 'day_notes' state in any account sync snapshot. Synthetic local fixtures only; all changes roll back.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data) values
@@ -16,20 +16,6 @@ insert into public.day_notes (id, user_id, local_date, note) values
   ('29200000-0000-4000-8000-000000000103', '29200000-0000-4000-8000-000000000001', '2026-11-10', 'Travel day'),
   ('29200000-0000-4000-8000-000000000104', '29200000-0000-4000-8000-000000000001', '2026-11-07', null),
   ('29200000-0000-4000-8000-000000000201', '29200000-0000-4000-8000-000000000002', '2026-11-10', 'Private other day note');
-
-insert into public.behaviorlog_import_runs (
-  id, user_id, bundle_format, bundle_fingerprint, import_mode, status
-) values (
-  '29200000-0000-4000-8000-000000000301', '29200000-0000-4000-8000-000000000001',
-  'behaviorlog-bundle', repeat('c', 64), 'preview_only', 'previewed'
-);
-insert into public.behaviorlog_import_record_mappings (
-  id, user_id, import_run_id, record_type, external_id, local_id
-) values (
-  '29200000-0000-4000-8000-000000000302', '29200000-0000-4000-8000-000000000001',
-  '29200000-0000-4000-8000-000000000301', 'note', 'source-day-note',
-  '29200000-0000-4000-8000-000000000101'
-);
 
 create function pg_temp.act_as(owner uuid) returns void language sql as $$
   select set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
@@ -54,6 +40,10 @@ do $$
 declare
   context_value jsonb;
   global_context jsonb;
+  kinds_before jsonb;
+  count_before integer;
+  snapshot_value jsonb;
+  contract_value integer;
   next_value jsonb;
   result_value jsonb;
   saved public.day_notes;
@@ -77,8 +67,8 @@ begin
       or jsonb_typeof(source -> 'behavior_id') <> 'null'
       or jsonb_typeof(source -> 'scheduled_for') <> 'null'
   ), 'Day pool source shape is wrong';
-  assert context_value -> 'importedOccurrenceIds' = '["29200000-0000-4000-8000-000000000101"]'::jsonb,
-    'Imported day note provenance missing';
+  assert context_value -> 'importedOccurrenceIds' = '[]'::jsonb,
+    'Day pool must not exclude imported day notes';
 
   -- The Behavior context RPC never returns day notes.
   global_context := public.read_note_shortcut_context(null);
@@ -92,6 +82,11 @@ begin
   );
   perform public.commit_note_shortcut_state(global_context, next_value, false);
 
+  snapshot_value := cadence_private.account_sync_snapshot();
+  select jsonb_agg(distinct entity ->> 'kind' order by entity ->> 'kind'), count(*)
+  into kinds_before, count_before
+  from jsonb_array_elements(snapshot_value -> 'entities') entity;
+
   context_value := public.read_day_note_shortcut_context();
   next_value := jsonb_build_object(
     'id', 'day_notes', 'user_id', auth.uid(), 'behavior_id', null, 'enabled', true,
@@ -101,6 +96,25 @@ begin
   result_value := public.commit_note_shortcut_state(context_value, next_value, false);
   assert result_value ->> 'id' = 'day_notes' and result_value ->> 'enabled' = 'true',
     'Day pool enable failed';
+
+  -- Sync contracts 1-3 never receive the day pool; every other entity is unchanged.
+  snapshot_value := cadence_private.account_sync_snapshot();
+  assert (select jsonb_agg(distinct entity ->> 'kind' order by entity ->> 'kind')
+    from jsonb_array_elements(snapshot_value -> 'entities') entity) = kinds_before,
+    'Snapshot kinds changed';
+  assert jsonb_array_length(snapshot_value -> 'entities') = count_before,
+    'Snapshot entity count changed';
+  assert exists (select 1 from jsonb_array_elements(snapshot_value -> 'entities') entity
+    where entity ->> 'kind' = 'note_shortcut_state' and entity ->> 'id' = 'global'),
+    'Snapshot lost the global Note shortcut state';
+  assert not exists (select 1 from jsonb_array_elements(public.read_account_sync_snapshot() -> 'entities') entity
+    where entity ->> 'kind' = 'note_shortcut_state' and entity ->> 'id' = 'day_notes'),
+    'Default snapshot carries the day pool';
+  for contract_value in 1..3 loop
+    assert not exists (select 1 from jsonb_array_elements(public.read_account_sync_snapshot(contract_value) -> 'entities') entity
+      where entity ->> 'kind' = 'note_shortcut_state' and entity ->> 'id' = 'day_notes'),
+      format('Contract %s snapshot carries the day pool', contract_value);
+  end loop;
 
   -- The day pool commit rejects a context without its dayPool key.
   context_value := public.read_day_note_shortcut_context();

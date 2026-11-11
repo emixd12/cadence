@@ -6,8 +6,11 @@
 -- excluded_occurrence_ids) stay so validators and account sync keep one shape.
 -- RLS is unchanged: owner-only select, writes only through the guarded RPCs.
 --
--- Account sync still rejects writes of the 'day_notes' state (its ID is not a
--- UUID). Ticket 292's desktop task adds the Mac store and the sync contract.
+-- Account sync: shipped Mac builds (sync contracts 1-3) reject a Note shortcut
+-- state whose ID is not 'global' or a Behavior UUID, so the account snapshot
+-- leaves out the 'day_notes' row (patched at the end of this file). Hosted sync
+-- writes of that ID already fail its UUID check. Ticket 292's desktop task adds
+-- the Mac store and exposes the row under a new sync contract.
 begin;
 
 alter table public.note_shortcut_states
@@ -31,7 +34,6 @@ declare
   state_value jsonb;
   global_state_value jsonb;
   note_values jsonb;
-  imported_ids jsonb;
   source_count bigint;
   source_bytes bigint;
   context_value jsonb;
@@ -81,24 +83,13 @@ begin
   where day_note.user_id = owner_id
     and nullif(btrim(day_note.note), '') is not null;
 
-  -- Day notes written by a BehaviorLog restore or import never count as evidence.
-  select coalesce(jsonb_agg(imported.id::text order by imported.id::text), '[]'::jsonb)
-  into imported_ids
-  from (
-    select distinct day_note.id
-    from public.day_notes day_note
-    join public.behaviorlog_import_record_mappings provenance
-      on provenance.user_id = day_note.user_id
-     and provenance.local_id = day_note.id
-    where day_note.user_id = owner_id
-  ) imported;
-
   context_value := jsonb_build_object(
     'state', coalesce(state_value, 'null'::jsonb),
     'globalState', coalesce(global_state_value, 'null'::jsonb),
     'behavior', 'null'::jsonb,
     'notes', note_values,
-    'importedOccurrenceIds', imported_ids,
+    -- Day-note import writes no provenance rows; imported day notes count like typed ones.
+    'importedOccurrenceIds', '[]'::jsonb,
     'dayPool', jsonb_build_object('user_id', owner_id, 'timezone', owner_timezone)
   );
   if octet_length(context_value::text) > 67108864 then
@@ -332,5 +323,23 @@ revoke all on function public.save_day_note_with_shortcut(date, text, text, bool
   from public, anon, service_role;
 grant execute on function public.save_day_note_with_shortcut(date, text, text, boolean)
   to authenticated;
+
+-- Keep the day-note pool out of every account sync read. All snapshot reads,
+-- apply checks and fingerprints go through cadence_private.account_sync_snapshot(),
+-- so this one filter covers contracts 1-3. Ticket 292's desktop task removes it
+-- when a new sync contract carries the 'day_notes' state.
+do $migration$
+declare
+  definition text;
+  anchor text;
+begin
+  select pg_get_functiondef('cadence_private.account_sync_snapshot()'::regprocedure) into definition;
+  anchor := $a$    union all select 'note_shortcut_state', r.id, cadence_private.normalize_account_sync_row(to_jsonb(r) - 'user_id') from public.note_shortcut_states r where r.user_id = current_user_id$a$;
+  if (length(definition) - length(replace(definition, anchor, ''))) / length(anchor) <> 1 then
+    raise exception 'Account snapshot changed unexpectedly.';
+  end if;
+  execute replace(definition, anchor, anchor || $patch$ and r.id <> 'day_notes'$patch$);
+end
+$migration$;
 
 commit;

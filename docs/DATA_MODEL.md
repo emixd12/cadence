@@ -2207,16 +2207,24 @@ grants are unchanged. The row uses the same entry, bound and expiry rules as a
 Behavior pool, but its evidence `occurrence_id` values and `excluded_occurrence_ids`
 are day-note IDs; the field names stay so storage, validators and sync keep one
 shape. `public.read_day_note_shortcut_context()` returns the owner's non-empty day
-notes (`behavior_id` and `scheduled_for` null), day notes with BehaviorLog import
-provenance as exclusions, and a `dayPool` object with the owner and profile
-timezone for the 90-day window. `public.commit_note_shortcut_state` accepts the
+notes (`behavior_id` and `scheduled_for` null), an empty `importedOccurrenceIds`
+list, and a `dayPool` object with the owner and profile timezone for the 90-day
+window. Day-note import and restore write no provenance mappings, so imported day
+notes count as evidence like typed ones. `public.commit_note_shortcut_state` accepts the
 `day_notes` target with that six-key context and requires the global and day-pool
 switches for find, accept and edit. `public.save_day_note_with_shortcut` saves a
 shortcut-assisted day note through `save_day_note` and adds its ID to the pool's
 exclusions in one transaction. Behavior contexts never return day notes, and
 Occurrence notes never read the day pool. Local check
-`tests/sql/ticket-292-day-note-shortcuts.sql`. Account sync and the desktop SQLite
-mirror of the day pool are a separate Ticket 292 slice.
+`tests/sql/ticket-292-day-note-shortcuts.sql`.
+
+Account sync contracts 1–3 never carry the day pool. Shipped Mac builds reject a
+Note shortcut state whose ID is not `global` or a Behavior UUID, so the same
+migration filters `id <> 'day_notes'` out of the `note_shortcut_state` union in
+`cadence_private.account_sync_snapshot()`. Every snapshot read, apply comparison
+and fingerprint goes through that function, and hosted sync writes of the
+`day_notes` ID already fail its UUID check. Ticket 292's desktop slice adds the
+SQLite mirror and removes the filter under a new sync contract.
 
 ## Google Calendar connector (Ticket 134)
 

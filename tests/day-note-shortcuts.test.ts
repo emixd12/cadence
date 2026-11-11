@@ -66,11 +66,13 @@ describe("Day note shortcut pool", () => {
     expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toHaveLength(1);
   });
 
-  it("excludes day notes written with a shortcut and imported day notes", () => {
+  it("excludes day notes written with a shortcut; imported day notes count like typed ones", () => {
+    // The hosted day pool context always sends no imported IDs: day-note import writes no provenance.
     const ctx = context([dayNote(1), dayNote(2), dayNote(3), dayNote(4)]);
     ctx.state!.excluded_occurrence_ids = [id(1)];
-    ctx.importedOccurrenceIds = [id(2)];
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(3), id(4)]);
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(2), id(3), id(4)]);
+    expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toHaveLength(1);
+    ctx.state!.excluded_occurrence_ids = [id(1), id(2)];
     expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toEqual([]);
   });
 
@@ -165,7 +167,7 @@ describe("Day note shortcut web repository", () => {
   const rpcContext = {
     state: state(), globalState: globalState(), behavior: null,
     notes: [{ id: id(1), user_id: owner, behavior_id: null, note: "Travel day", local_date: "2026-11-09", scheduled_for: null }],
-    importedOccurrenceIds: [id(9)],
+    importedOccurrenceIds: [],
     dayPool: { user_id: owner, timezone: "America/New_York" },
   };
 
