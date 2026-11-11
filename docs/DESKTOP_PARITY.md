@@ -96,6 +96,15 @@ are implemented. The registry is authoritative.
 - Settings supports explicit timezone choice and local timezone detection.
   Timezone changes preserve historical occurrences and append configuration
   history. Desktop adapts first-run setup and notification settings locally.
+- Settings uses the web groups, section index, source rows and drawers (Ticket 302,
+  `apps/desktop/src/settings-screen.tsx`). Shared sections sit in the same group and
+  order as web. Local profile and the Cadence account drawer are in General; Native
+  notifications and Reminder coverage sit where web shows Notifications; Local
+  database, App updates and Setup guide form a fifth group, This Mac, after Account
+  and data. In local mode each source that needs an account shows "Link a Cadence
+  account" as row state. A sync conflict keeps the persistent shell cue and opens
+  the account drawer by itself. Connected apps, legal links and Delete account stay
+  web-only. Sync, reminder and update behaviour are unchanged.
 - Note shortcuts use the shared review controls. Since Ticket 305 they are on by
   default with no Settings or per-Behavior switch; matching runs after each Note save
   in the local Note action. Proposals, accepted quick-fill buttons, and local

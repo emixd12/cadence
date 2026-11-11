@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { desktopUpdater } from "./native-updater";
 import type { DesktopUpdateState } from "./desktop-updater";
+import { SettingsPartHeading, SettingsSectionHeading } from "@/components/settings/settings-heading";
 
 type RestartActions = Readonly<{ onRestart?: () => void; onDiscardAndRestart?: () => void; onCancelRestart?: () => void; restartBlocked?: boolean; restartError?: string }>;
 
@@ -24,7 +25,7 @@ export function DesktopUpdateSection({ state, onCheck, onAutomaticDownloads, onD
   const percent = state.totalBytes && state.totalBytes > 0
     ? Math.min(100, Math.floor((state.downloadedBytes ?? 0) / state.totalBytes * 100)) : undefined;
   return <section className="bg-background py-4" aria-busy={busy} aria-labelledby={titleId}>
-    <h2 id={titleId} className="text-xl leading-tight">App updates</h2>
+    <SettingsSectionHeading id={titleId}>App updates</SettingsSectionHeading>
     <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">
       {state.currentVersion ? `Cadence ${state.currentVersion}. ` : ""}
       Cadence checks for updates daily while open. Installation and restart always require your action.
@@ -45,7 +46,7 @@ export function DesktopUpdateSection({ state, onCheck, onAutomaticDownloads, onD
       {state.phase === "installed" && "The update is installed. Restart Cadence to use it."}
     </p>
     {state.phase === "downloading" ? <progress aria-label="Update download progress" value={percent} max={100} className="mt-3 w-full max-w-md" /> : null}
-    {state.notes ? <div className="mt-4 max-w-2xl"><h3 className="text-sm">Release notes</h3>
+    {state.notes ? <div className="mt-4 max-w-2xl"><SettingsPartHeading className="text-sm">Release notes</SettingsPartHeading>
       <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-readable">{state.notes}</p></div> : null}
     {state.error ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.error}</p> : null}
     <div className="mt-4 flex flex-wrap gap-3">

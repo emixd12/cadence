@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { SettingsHeadingScope, useSettingsHeading } from "@/components/settings/settings-heading";
@@ -21,15 +21,33 @@ export const SETTINGS_GROUPS = [
   { id: "settings-planning", label: "Planning", title: "Planning" },
   { id: "settings-account", label: "Account", title: "Account and data" },
 ] as const;
-export type SettingsGroupId = (typeof SETTINGS_GROUPS)[number]["id"];
+/** Ticket 302: the Mac's own group (database, updates, Setup guide), after Account and data. */
+export const SETTINGS_MAC_GROUP = { id: "settings-mac", label: "Mac", title: "This Mac" } as const;
+export const DESKTOP_SETTINGS_GROUPS = [...SETTINGS_GROUPS, SETTINGS_MAC_GROUP] as const;
+export type SettingsGroupMeta = (typeof DESKTOP_SETTINGS_GROUPS)[number];
+export type SettingsGroupId = SettingsGroupMeta["id"];
 
 /**
- * Clears the sticky index, and on small screens the 4rem app header above it.
- * Also applied to every `section[id]` inside the page, so existing panel anchors
+ * Where the sticky index sits and where anchors land. The default clears the
+ * index, and on small screens the 4rem app header above it. The offsets also
+ * apply to every `section[id]` inside the page, so existing panel anchors
  * (`#timezone`, `#notifications`, `#connected-apps`) land below both.
+ * `shellCue` adds the Mac's 4rem sync-conflict cue above the index (Ticket 302).
  */
-const ANCHOR_OFFSET = "scroll-mt-32 lg:scroll-mt-16";
-const NESTED_ANCHOR_OFFSET = "[&_section[id]]:scroll-mt-32 lg:[&_section[id]]:scroll-mt-16";
+type SettingsLayout = Readonly<{ groups: readonly SettingsGroupMeta[]; indexTop: readonly [string, string]; anchor: string; nestedAnchor: string }>;
+const WEB_LAYOUT: SettingsLayout = {
+  groups: SETTINGS_GROUPS,
+  indexTop: ["top-16", "lg:top-0"],
+  anchor: "scroll-mt-32 lg:scroll-mt-16",
+  nestedAnchor: "[&_section[id]]:scroll-mt-32 lg:[&_section[id]]:scroll-mt-16",
+};
+const CUE_OFFSETS = {
+  indexTop: ["top-32", "lg:top-16"],
+  anchor: "scroll-mt-48 lg:scroll-mt-32",
+  nestedAnchor: "[&_section[id]]:scroll-mt-48 lg:[&_section[id]]:scroll-mt-32",
+} as const;
+const SettingsLayoutContext = createContext<SettingsLayout>(WEB_LAYOUT);
+const useAnchorOffset = () => useContext(SettingsLayoutContext).anchor;
 
 type Report = (state: SettingsSectionState) => void;
 const SettingsSectionReportContext = createContext<Report | null>(null);
@@ -57,6 +75,12 @@ function useSectionState(fixed: SettingsSectionState | undefined): [SettingsSect
   return [fixed ?? reported ?? SETTINGS_SECTION_CHECKING, report];
 }
 
+/** Reports a fixed state from a server-rendered panel, such as a source that cannot connect here. */
+export function SettingsSectionReport({ state }: Readonly<{ state: SettingsSectionState }>) {
+  useReportSettingsSection(state);
+  return null;
+}
+
 /** Opens a row or drawer when its state starts needing action. The person can close it again. */
 function useOpenOnAttention(attention: boolean): RefObject<HTMLDetailsElement | null> {
   const details = useRef<HTMLDetailsElement>(null);
@@ -76,24 +100,33 @@ function StateText({ state }: Readonly<{ state: SettingsSectionState }>) {
   </span>;
 }
 
-/** The whole Settings page body: the sticky section index, the groups, and anchor handling. */
-export function SettingsSections({ children }: Readonly<{ children: ReactNode }>) {
+/**
+ * The whole Settings page body: the sticky section index, the groups, and anchor
+ * handling. Web shows the four groups; the Mac passes `DESKTOP_SETTINGS_GROUPS`
+ * and, while its sync-conflict cue shows, `shellCue` (Ticket 302).
+ */
+export function SettingsSections({ groups = SETTINGS_GROUPS, shellCue = false, children }: Readonly<{
+  groups?: readonly SettingsGroupMeta[]; shellCue?: boolean; children: ReactNode }>) {
   useOpenAnchorTarget();
+  const layout = useMemo<SettingsLayout>(() => ({ ...(shellCue ? CUE_OFFSETS : WEB_LAYOUT), groups }), [groups, shellCue]);
   return (
-    <div className={["grid min-w-0 grid-cols-1 gap-12", NESTED_ANCHOR_OFFSET].join(" ")}>
-      <SettingsSectionIndex />
-      <div className="grid min-w-0 max-w-xl gap-12">{children}</div>
-    </div>
+    <SettingsLayoutContext.Provider value={layout}>
+      <div className={["grid min-w-0 grid-cols-1 gap-12", layout.nestedAnchor].join(" ")}>
+        <SettingsSectionIndex />
+        <div className="grid min-w-0 max-w-xl gap-12">{children}</div>
+      </div>
+    </SettingsLayoutContext.Provider>
   );
 }
 
-/** Four links that stay in view while the page scrolls. On small screens it sits below the app header. */
+/** One link per group that stays in view while the page scrolls. On small screens it sits below the app header. */
 export function SettingsSectionIndex() {
+  const layout = useContext(SettingsLayoutContext);
   return (
     <nav aria-label="Settings sections"
-      className="sticky top-16 z-30 -mx-4 -mt-6 border-b border-line bg-background px-4 sm:-mx-6 sm:px-6 lg:top-0 lg:mx-0 lg:px-0">
+      className={`sticky ${layout.indexTop[0]} z-30 -mx-4 -mt-6 border-b border-line bg-background px-4 sm:-mx-6 sm:px-6 ${layout.indexTop[1]} lg:mx-0 lg:px-0`}>
       <ul className="flex gap-x-4 overflow-x-auto whitespace-nowrap [scrollbar-width:none] sm:gap-x-6 [&::-webkit-scrollbar]:hidden">
-        {SETTINGS_GROUPS.map((group) => <li key={group.id}>
+        {layout.groups.map((group) => <li key={group.id}>
           <a href={`#${group.id}`} className="product-action product-action-secondary min-h-11 text-base">{group.label}</a>
         </li>)}
       </ul>
@@ -101,11 +134,11 @@ export function SettingsSectionIndex() {
   );
 }
 
-/** One of the four groups. Its `text-2xl` title is the page's level-2 heading; sections inside start at level 3. */
+/** One group. Its `text-2xl` title is the page's level-2 heading; sections inside start at level 3. */
 export function SettingsGroup({ id, children }: Readonly<{ id: SettingsGroupId; children: ReactNode }>) {
-  const group = SETTINGS_GROUPS.find((item) => item.id === id)!;
+  const group = DESKTOP_SETTINGS_GROUPS.find((item) => item.id === id)!;
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className={ANCHOR_OFFSET}>
+    <section id={id} aria-labelledby={`${id}-title`} className={useAnchorOffset()}>
       <h2 id={`${id}-title`} className="border-b border-line pb-4 text-2xl leading-tight">{group.title}</h2>
       <div className="mt-8 grid min-w-0 grid-cols-1 divide-y divide-line">
         <SettingsHeadingScope level={3}>{children}</SettingsHeadingScope>
@@ -124,9 +157,10 @@ export function SettingsRow({ title, kind, icon, state: fixed, children }: Reado
   const heading = useSettingsHeading();
   const [state, report] = useSectionState(fixed);
   const details = useOpenOnAttention(state.attention);
+  const anchor = useAnchorOffset();
   return (
     // The browser opens a row itself when a link targets an anchor inside it, before hydration.
-    <details ref={details} data-settings-row suppressHydrationWarning className={["min-w-0", ANCHOR_OFFSET].join(" ")}>
+    <details ref={details} data-settings-row suppressHydrationWarning className={["min-w-0", anchor].join(" ")}>
       <summary className="product-disclosure-trigger flex min-h-11 items-start gap-2 py-4">
         <span aria-hidden="true" className="product-disclosure-indicator mt-2" />
         {icon}
@@ -158,8 +192,9 @@ export function SettingsDrawer({ title, description, label, setupLabel, state: f
   const [state, report] = useSectionState(fixed);
   const details = useOpenOnAttention(state.attention);
   const buttonLabel = setupLabel && !state.on && !isSettingsSectionChecking(state) ? setupLabel : label;
+  const anchor = useAnchorOffset();
   return (
-    <section data-settings-drawer className={["bg-background py-4 first:pt-0 last:pb-0", ANCHOR_OFFSET].join(" ")}>
+    <section data-settings-drawer className={["bg-background py-4 first:pt-0 last:pb-0", anchor].join(" ")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <heading.Tag className="text-xl leading-tight">{title}</heading.Tag>
         <StateText state={state} />
@@ -191,11 +226,12 @@ export function SettingsSourceIcon({ src }: Readonly<{ src: string }>) {
 export const SETTINGS_TRAVEL_PURPOSE = "Know when to leave for events and Behaviors that have a place.";
 export const SETTINGS_DAILY_BRIEF_PURPOSE = "A short briefing the first time you open Timeline each day.";
 
-/** Account and data: the way to Export from Settings. */
-export function SettingsExportEntry() {
+/** Account and data: the way to Export from Settings. The Mac passes `onOpen` to switch to its Export screen. */
+export function SettingsExportEntry({ onOpen }: Readonly<{ onOpen?: () => void }>) {
   return (
     <SettingsPanel title="Export" description="Download your history as JSONL, CSV, full JSON, or a BehaviorLog bundle.">
-      <a href="/export" className="product-action product-action-primary min-h-11 text-sm">Open Export</a>
+      {onOpen ? <button type="button" onClick={onOpen} className="product-action product-action-primary min-h-11 text-sm">Open Export</button>
+        : <a href="/export" className="product-action product-action-primary min-h-11 text-sm">Open Export</a>}
     </SettingsPanel>
   );
 }
@@ -207,6 +243,7 @@ const LEGAL_LINKS = [["/privacy", "Privacy"], ["/terms", "Terms"], ["/trust", "T
  * account as a plain link that opens the existing form.
  */
 export function SettingsPageEnd({ deleteAccount }: Readonly<{ deleteAccount: ReactNode }>) {
+  const anchor = useAnchorOffset();
   return (
     <footer className="grid gap-2 border-t border-line pt-4 text-sm">
       <ul aria-label="Privacy, Terms and Trust" className="flex flex-wrap gap-x-6">
@@ -214,7 +251,7 @@ export function SettingsPageEnd({ deleteAccount }: Readonly<{ deleteAccount: Rea
           <a href={href} className="product-action product-action-secondary min-h-11">{label}</a>
         </li>)}
       </ul>
-      <details id="delete-account" data-settings-row suppressHydrationWarning className={ANCHOR_OFFSET}>
+      <details id="delete-account" data-settings-row suppressHydrationWarning className={anchor}>
         <summary className="product-disclosure-trigger product-action product-action-secondary min-h-11 w-fit">Delete account</summary>
         <div className="pt-2">{deleteAccount}</div>
       </details>
@@ -225,46 +262,52 @@ export function SettingsPageEnd({ deleteAccount }: Readonly<{ deleteAccount: Rea
 const STOP_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
 
 /**
- * Opens the row or drawer that holds the linked anchor and scrolls to it. Panels
- * above keep loading for a moment, so the target is brought back into place
- * until the reader scrolls, types or taps, or for at most 4 seconds.
+ * Opens the row or drawer that holds `target` and scrolls to it. Panels above
+ * keep loading for a moment, so the target is brought back into place until the
+ * reader scrolls, types or taps, or for at most 4 seconds. Returns a function
+ * that stops holding it. The Mac calls this for its in-app navigation anchors
+ * (Ticket 302); `options` is passed to `scrollIntoView`.
  */
+export function revealSettingsTarget(target: HTMLElement, options?: ScrollIntoViewOptions): () => void {
+  const drawer = target.closest<HTMLElement>("[data-settings-drawer]");
+  // `closest` includes the target itself, so `#delete-account` opens its own disclosure.
+  const row = target.closest<HTMLDetailsElement>("details[data-settings-row]")
+    ?? drawer?.querySelector<HTMLDetailsElement>("details[data-settings-row]");
+  if (row) row.open = true;
+  const place = drawer ?? row ?? target;
+  const scroll = () => { if (typeof place.scrollIntoView === "function") place.scrollIntoView(options); };
+  scroll();
+  if (typeof ResizeObserver === "undefined") return () => undefined;
+  let settle: ResizeObserver | null = new ResizeObserver(scroll);
+  settle.observe(document.body);
+  const stop = () => {
+    settle?.disconnect(); settle = null;
+    window.clearTimeout(timer);
+    for (const type of STOP_EVENTS) window.removeEventListener(type, stop);
+  };
+  const timer = window.setTimeout(stop, 4000);
+  for (const type of STOP_EVENTS) window.addEventListener(type, stop, { passive: true });
+  return stop;
+}
+
+/** Opens and holds the row or drawer that holds the page's linked anchor (`#travel`). */
 export function useOpenAnchorTarget(): void {
   useEffect(() => {
-    let settle: ResizeObserver | null = null;
-    let timer: number | undefined;
-    const stop = () => {
-      settle?.disconnect(); settle = null;
-      if (timer !== undefined) window.clearTimeout(timer);
-      timer = undefined;
-    };
+    let stop: () => void = () => undefined;
     const reveal = () => {
       stop();
+      stop = () => undefined;
       const hash = window.location.hash.slice(1);
       if (!hash) return;
       let target: HTMLElement | null = null;
       try { target = document.getElementById(decodeURIComponent(hash)); } catch { return; }
-      if (!target) return;
-      const drawer = target.closest<HTMLElement>("[data-settings-drawer]");
-      // `closest` includes the target itself, so `#delete-account` opens its own disclosure.
-      const row = target.closest<HTMLDetailsElement>("details[data-settings-row]")
-        ?? drawer?.querySelector<HTMLDetailsElement>("details[data-settings-row]");
-      if (row) row.open = true;
-      const place = drawer ?? row ?? target;
-      const scroll = () => { if (typeof place.scrollIntoView === "function") place.scrollIntoView(); };
-      scroll();
-      if (typeof ResizeObserver === "undefined") return;
-      settle = new ResizeObserver(scroll);
-      settle.observe(document.body);
-      timer = window.setTimeout(stop, 4000);
+      if (target) stop = revealSettingsTarget(target);
     };
     reveal();
     window.addEventListener("hashchange", reveal);
-    for (const type of STOP_EVENTS) window.addEventListener(type, stop, { passive: true });
     return () => {
       stop();
       window.removeEventListener("hashchange", reveal);
-      for (const type of STOP_EVENTS) window.removeEventListener(type, stop);
     };
   }, []);
 }

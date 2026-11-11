@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { backupLocalDatabase, deleteStorageRecoveryBackup, readLocalDatabaseInfo, restoreLocalDatabase, revealLocalDatabase, type LocalDatabaseInfo } from "./local-database";
 import { localErrorMessage } from "./local-actions";
+import { SettingsPartHeading, SettingsSectionHeading } from "@/components/settings/settings-heading";
 
 export function LocalDatabaseControls({ onRestored }: Readonly<{ onRestored: () => void }>) {
   const [info, setInfo] = useState<LocalDatabaseInfo | null>(null);
@@ -28,11 +29,11 @@ export function LocalDatabaseSection({ info, confirmation, busy, message, onConf
 }>) {
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   return <section id="local-database" aria-busy={busy} className="bg-background py-4">
-    <h2 className="text-xl leading-tight">Local database</h2>
+    <SettingsSectionHeading>Local database</SettingsSectionHeading>
     <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Cadence stores the live database in its macOS Application Support folder.</p>
     <dl className="mt-4 text-sm leading-6"><div><dt>Exact path</dt><dd className="break-all text-muted-readable">{info?.path ?? "Loading…"}</dd></div></dl>
     {info?.recovery?.after ? <div className="mt-4 text-sm leading-6">
-      <h3 className="text-base">Storage recovery</h3>
+      <SettingsPartHeading className="text-base">Storage recovery</SettingsPartHeading>
       <dl className="mt-2 grid gap-2">
         <div><dt>Before recovery, including WAL</dt><dd>{info.recovery.before.totalBytes.toLocaleString()} bytes</dd></div>
         <div><dt>Current storage, including remaining recovery files</dt><dd>{info.recovery.after.totalBytes.toLocaleString()} bytes</dd></div>

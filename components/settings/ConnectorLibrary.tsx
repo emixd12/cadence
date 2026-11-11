@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
-import { SettingsRow, SettingsSourceIcon } from "@/components/settings/SettingsSections";
+import { SettingsRow, SettingsSectionReport, SettingsSourceIcon } from "@/components/settings/SettingsSections";
 import type { ConnectorProvider } from "@/lib/types/connectors";
-import type { SettingsSectionState } from "@/lib/ui/settings-sections";
+import { connectorUnavailableSectionState, type SettingsSectionState } from "@/lib/ui/settings-sections";
 
 export type ConnectorLibrarySourceId = "google_calendar" | ConnectorProvider;
 
@@ -22,7 +22,7 @@ const SOURCE_DETAILS: Readonly<Record<ConnectorLibrarySourceId, Readonly<{ name:
   icloud_calendar: { name: "iCloud Calendar", kind: "Calendar", icon: "/brand/icloud-calendar.png" },
   hevy: { name: "Hevy", kind: "Recorded activity", icon: "/brand/hevy.png" },
 };
-const UNAVAILABLE_ROW: SettingsSectionState = { text: "Unavailable", attention: false, on: false };
+const UNAVAILABLE_ROW: SettingsSectionState = connectorUnavailableSectionState(null);
 
 /** Desktop copy when a source needs a linked Cadence account or a broker-enabled build. */
 export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
@@ -55,10 +55,16 @@ export function ConnectorLibrary({ sources, rows = false }: Readonly<{ sources: 
   );
 }
 
-export function ConnectorUnavailable({ id, reason }: Readonly<{ id: ConnectorLibrarySourceId; reason: string }>) {
+/**
+ * A source that cannot connect here. Inside a row it reports `state` (Ticket 302:
+ * "Link a Cadence account" on a local Mac), so the row never stays at "Checking…".
+ */
+export function ConnectorUnavailable({ id, reason, state = UNAVAILABLE_ROW }: Readonly<{
+  id: ConnectorLibrarySourceId; reason: string; state?: SettingsSectionState }>) {
   const details = SOURCE_DETAILS[id];
   return (
     <SettingsPanel id={`connector-${id}`} headingLevel={3} title={details.name} description={`${details.kind}.`}>
+      <SettingsSectionReport state={state} />
       <p className="max-w-2xl text-sm leading-6 text-muted-readable">{reason}</p>
     </SettingsPanel>
   );
