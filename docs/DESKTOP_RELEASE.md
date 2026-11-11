@@ -272,33 +272,37 @@ untested live secrets.
 
 ## Persistent updater key handoff
 
-One persistent pair was generated on 2026-08-31 after checking the usual
-`~/.tauri` directory, the release-key directory, and supplied environment.
-Both files belong to the owner, have mode `0600`, and live outside the repository
-in a mode `0700` directory:
+The current key pair was generated on November 11, 2026, from release 0.1.10 on
+(`docs/DECISIONS.md`, 2026-11-11, "Updater signing key rotated"). Both files belong
+to the owner and live outside the repository in a mode `0700` directory:
 
-- Private: `/Users/emi/Library/Application Support/Cadence Release/updater/cadence-updater.key`
-- Public: `/Users/emi/Library/Application Support/Cadence Release/updater/cadence-updater.key.pub`
+- Private (mode `0600`): `/Users/emi/Library/Application Support/Cadence Release/updater-2026-11/cadence-updater.key`
+- Public: `/Users/emi/Library/Application Support/Cadence Release/updater-2026-11/cadence-updater.key.pub`
 - SHA-256 of the decoded 32-byte public key:
-  `71a12820ee0af1e2795f5f0db259d38276d49307597cf889d552ccd671ab9583`
+  `17f412c3d86281b68e427b8238e98416676deab7872d7ebc6614cf2a5f383037`
 
-The private file is encrypted with a generated password. The password is retained
-in the macOS login Keychain, service **Cadence persistent updater signing key**,
-account **emi**. Generation used hidden terminal prompts; no password argument,
-plaintext handoff file, or secret log was created. Actual signing with the retained
-password and independent Minisign verification passed. An empty password failed.
+The private file is encrypted with a password generated in 1Password. The password
+is in the macOS login Keychain, service **Cadence persistent updater signing key**,
+account **emi**, and in the owner's 1Password item **Cadence updater signing key
+2026-11** in the Cadence vault. The owner typed it at hidden prompts; no password
+argument, plaintext file or log holds it. An agent signed a test file with the
+Keychain password, and Minisign verified it against the public key above. Attaching
+both key files and the fingerprint to the 1Password item is an owner step.
+`dev-signed-env.sh` and the release wrapper from `acceptance-0.1.10` on read this
+directory.
 
-For backup, create a secure item in your password manager named **Cadence updater
-signing key**. Attach both files using the file picker; use Go to Folder to enter
-the directory above. Open Keychain Access, select the login keychain, search for
-the service above, and open its item. Select **Show password**, authenticate, and
-copy the password directly into the password manager's protected password field.
-Do not paste it into a terminal, chat, issue, or document. Clear the clipboard
-afterward. Record the fingerprint in the secure item's notes. Verify both
-attachments and the password before removing any backup. Password-manager backup
-is an owner action and is not yet verified. Keep the working key and Keychain item
-for future releases; do not regenerate per version. Losing either prevents signing
-updates for installed copies using this key. See [Tauri updater signing](https://v2.tauri.app/plugin/updater/).
+Keep the key, the Keychain item and the 1Password item for every future release; do
+not regenerate per version. Losing the private file or its password stops signed
+updates for every installed copy that trusts this key. See
+[Tauri updater signing](https://v2.tauri.app/plugin/updater/).
+
+Retired key. Releases up to 0.1.9 trust the key generated on 2026-08-31 in
+`Cadence Release/updater/` (fingerprint
+`71a12820ee0af1e2795f5f0db259d38276d49307597cf889d552ccd671ab9583`). Its password
+was lost when macOS reset the owner's login password on November 9, 2026; the
+password manager backup was never made. Installed copies of 0.1.9 or earlier
+reject updates signed with the new key and show the generic download error. Each
+must install the 0.1.10 DMG by hand once. Keep the retired directory; do not use it.
 
 Downloaded previews may trigger macOS warnings because Apple has not notarized
 them. After attempting to open the app, use System Settings → Privacy & Security
