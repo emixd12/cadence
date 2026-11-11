@@ -66,7 +66,21 @@ Still deferred:
 - Apple Account "supported app" authorization for iCloud, if Apple publishes a
   developer path. It could replace app-specific passwords.
 - Hevy early-stop pagination or change-feed reads, after Hevy documents workout
-  ordering or creation events.
+  ordering or creation events. Ticket 311 tests both live for connector completion.
+- Connector completion follow-ups (decision D28, Tickets 310–324), each needing its own
+  ticket and decision:
+  - A second completion source. Focus Keeper is an unverified candidate. It is the
+    first real test of the shared structure.
+  - Webhook intake for a source that offers it. Hevy does not.
+  - Completion timing facts in Daily Brief, under the Daily Brief choice that covers
+    the source.
+  - A calendar event as a completion suggestion, for example "Therapy" when its event
+    ends. A scheduled event is weaker evidence than a recorded activity, so this would
+    ask first.
+  - Storing a routine's name or contents. D28.3 keeps digests only.
+  - Filling tracked time from a workout's duration.
+  - Completing an Occurrence from a workout on another day.
+  - Sources that report totals or thresholds, such as step counts.
 - Different or multiple accounts per provider for one Cadence account, and
   connector access in account-free desktop mode.
 - New timezone controls and daylight-saving presentation refinements. Existing

@@ -2054,3 +2054,80 @@ hold workflow logic. Details: `docs/OPERATIONS.md`, "Branches and worktrees". Ru
 
 Platform impact: agent tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-10: Connector completion, starting with Hevy (D28)
+
+The owner decided on November 10, 2026 that a Behavior may be marked Completed from
+activity recorded in a connected service. Hevy is the first source. Tickets 310–324
+carry the work. The plan, the audit behind it and the detailed rules are in
+`docs/plans/2026-11-10-connector-completion-architecture.md`.
+
+This reverses the Tickets 233–241 rule that recorded activity never completes a
+Behavior. The owner's reason: people use what they log in other applications and do not
+record the same Behavior twice.
+
+The decision has eight parts. Planning drafts numbered them D1–D8. The owner decided
+D28.1, D28.3, D28.4 and D28.8 in the main planning session. D28.2, D28.5, D28.6 and
+D28.7 were decided in side sessions the same day and relayed to this record.
+
+1. **D28.1: no approval for each completion.** A Behavior's link to a source is a
+   standing grant for one operation: Unresolved to Completed, on the activity's own day,
+   for that Behavior. Each completion is labeled, and the user can change it with the
+   existing status buttons. This is an explicit exception to the approval-per-write rule
+   in `docs/INTEGRATION_PLAYBOOK.md`, section 5.
+2. **D28.2: a Cadence feature that Hevy uses first.** The link, the match record and the
+   completion rules are built once, for any service. Each service supplies its own
+   reader. Calendar events and recorded activity stay separate data types; the owner
+   rejected one data model for every connector. Still excluded: a plugin system,
+   connectors built outside this repository, and skipping the playbook brief for a new
+   service.
+3. **D28.3: routine identifiers are kept as digests.** Cadence stores account-scoped
+   SHA-256 digests of Hevy routine IDs. Routine titles are read live for the link form
+   and never stored. The owner's reason: the stored link lets a Behavior be related
+   later to what is logged in the external app, "connecting the databases".
+4. **D28.4: a routine link and the any-workout link both count one workout.** A routine
+   belongs to one link, and one link per source accepts any workout, so a workout counts
+   for at most two Behaviors. Rejected: one Behavior per workout, and every link
+   independent.
+5. **D28.5: a background job on a per-account schedule.** One check before a reminder;
+   checks after the scheduled start, every 30 minutes for 3 hours and then hourly until
+   local midnight; one nightly check. At most 24 checks per account per day. Estimated,
+   not measured: about 5 checks per linked account per day.
+6. **D28.6: a 30-day window with no notification.** Matching covers today and the 30
+   prior local dates. No notification announces a change to a past day. The owner's
+   reason, as relayed: these changes keep the adherence log faithful and later analysis
+   accurate, so the feature must be trustworthy enough for them to happen unannounced.
+7. **D28.7: provenance.** `status_semantics = system_rule_declared`,
+   `source_capture_method = derived`, `source_confidence = high`,
+   `reason_code = connector:<source>`. Confidence is always `high`, so the matcher never
+   guesses: when two links of the same kind accept one activity, it writes nothing.
+8. **D28.8: a 5-minute minimum for Hevy.** A shorter activity is ignored. The number is
+   a guess with no data behind it.
+
+Rules these decisions depend on. The plan's safety invariants hold the full list.
+
+- A connector changes an Occurrence only when it is Unresolved. It never changes a
+  status the user set, and it never marks Not Completed.
+- After the user changes a connector completion, no activity completes that Occurrence
+  again.
+- One database function writes connector completions. The manual path cannot carry
+  connector provenance, and the connector path cannot carry manual provenance.
+- All tracking writes run as the user under RLS. The job uses its own token channel.
+- Cadence writes nothing to Hevy.
+
+Documents changed with this decision: `AGENTS.md` (scope, status rules, domain language
+and security rules), `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_EVENT_CONTRACT.md`,
+`docs/INTEGRATION_PLAYBOOK.md`, `docs/DESKTOP_PARITY.md` and `docs/FUTURE_UPDATES.md`.
+No code changed. Until Ticket 323 passes, the shipped connector only displays workout
+timing.
+
+Still out of scope: writing to Hevy, exercise or set data, filling tracked time from
+workout duration, completing an Occurrence on another day, Apple Health and Google Fit,
+a second completion source, and notifications about connector completions.
+
+Legal entry L-023 logs Hevy's API terms. Under the 2026-11-04 rule it holds nothing.
+
+Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only, Tickets
+319 and 320; a Mac build with Ticket 319 ships before the feature turns on. Marketing:
+none until release (P-042). Future mobile: deferred; the hosted functions are reusable.
+Messaging impact: P-038 to P-042.

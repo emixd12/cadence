@@ -473,6 +473,9 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - Incremental shared domain code and design tokens, with preserved web APIs
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241
+- Connector completion under Tickets 310–324 (decision D28): a Behavior can opt in to
+  being marked Completed from activity recorded in a connected service, starting with
+  Hevy. Planned; no code has shipped
 - Travel advisory revamp under Tickets 263–285: last estimates and per-trip refresh,
   next-trip marks without hovering, opt-in leave reminders with Cadence closed,
   remembered places (decision D12 drops attendance), tomorrow's first trip, and Outlook and
@@ -598,6 +601,37 @@ not an atomic snapshot. Local Mac calendars and EventKit stay out of
 scope. Generic CalDAV providers and subscription feeds are later coverage. Live
 provider access, Microsoft publisher verification, and deployment remain separate
 gates. Briefs and research: `docs/INTEGRATION_PLAYBOOK.md`.
+
+### Connector completion (Tickets 310–324)
+
+Decided November 10, 2026 (`docs/DECISIONS.md`, D28). Planned; no code has shipped, and
+until Ticket 323 passes a Hevy workout still never completes or changes a Behavior or
+Occurrence. Plan: `docs/plans/2026-11-10-connector-completion-architecture.md`.
+
+The idea: people use what they log in other applications and do not record the same
+Behavior twice. A Behavior can opt in, through a source link, to being marked Completed
+when a matching workout is recorded in Hevy.
+
+- The link names chosen Hevy routines or any workout. A routine belongs to one link, and
+  one link per source accepts any workout. A workout from a linked routine also counts
+  for the any-workout Behavior.
+- A workout counts for the Occurrence of that Behavior on the workout's own day whose
+  scheduled time is nearest. An Unresolved Occurrence becomes Completed. A Completed one
+  gains the workout as timing evidence. Nothing else changes.
+- Cadence never changes a status the user set and never marks Not Completed. After the
+  user changes a connector completion, no workout completes that Occurrence again.
+- Each connector completion is labeled "From Hevy" with the workout's times. No
+  notification announces one. The existing status buttons change it.
+- Matching covers today and the 30 prior local dates. A workout shorter than 5 minutes
+  is ignored.
+- Cadence compares the workout's time with the scheduled time and shows per Behavior how
+  often it happened on schedule.
+- A hosted job checks Hevy on a per-account schedule, so completion and reminder
+  cancellation do not need Cadence to be open.
+- Cadence stores workout times and digests of routine identifiers. It stores no routine
+  titles, exercises, sets or weights, and writes nothing to Hevy.
+- The structure is built once for any completion source. Hevy is the only source in
+  these tickets.
 
 ## In-app daily briefing (Tickets 145–148)
 
@@ -953,8 +987,9 @@ account-free Mac brief, billing and any discount are deferred (`docs/FUTURE_UPDA
 - Two-way Calendar sync and source-event editing; Tickets 132–137 cover only
   gated read-only Google Calendar context, and locally verified read-only
   Outlook and iCloud Calendar context under Tickets 233–241 (release unverified)
-- Workout writes, workout coaching, exercise analysis, and automatic Behavior
-  completion from recorded activity
+- Workout writes, workout coaching and exercise analysis; automatic Behavior completion
+  from recorded activity outside a source link (decision D28); a second completion
+  source; filling tracked time from a workout
 - Apple Health, EventKit, and local-only Mac calendar access
 - PWA offline cache
 - Web offline writes

@@ -47,6 +47,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 310–324: connector completion (D28) | 310 complete November 10, 2026 (documents only); 311–324 not started; no code | Ticket 311: live Hevy check with test account A's key (`connectors` preflight). Ticket 312 can start in parallel. A Mac build with Ticket 319 ships before the feature turns on | TICKETS, Tickets 310–324; STATUS, "Tickets 310–324: connector completion filed — November 10, 2026" |
 | Ticket 292: day notes | Web, MCP (contract 1.1.0) and Mac app (local and sync contract 3) merged to `main` November 10, 2026; hosted migrations `20261110120000`, `20261110130000` and `20261110140000` applied November 10 with owner authorization | Day-note shortcuts, BehaviorLog restore/import, MCP `search`/`fetch`, installed Mac acceptance, live smoke of the Timeline control | TICKETS, Ticket 292; STATUS, "Branch consolidation into main — November 10, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -85,6 +86,37 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 310–324: connector completion filed — November 10, 2026
+
+**On branch `connector-completion/tickets`. Documents only; no code.**
+
+- The owner decided D28 on November 10, 2026: a Behavior can be marked Completed from
+  activity recorded in a connected service, starting with Hevy. Its eight parts, D28.1 to
+  D28.8, are in `docs/DECISIONS.md`.
+- Ticket 310 (complete): records D28, files Tickets 310–324, adds the plan
+  `docs/plans/2026-11-10-connector-completion-architecture.md`, and updates `AGENTS.md`,
+  `docs/PRODUCT_SPEC.md`, `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  `docs/DESKTOP_PARITY.md` and `docs/FUTURE_UPDATES.md`. It logs P-038 to P-042 and L-023.
+- The plan began as an audit of an earlier design. Three findings shaped the tickets. The
+  manual status function rejects connector provenance, so Ticket 314 adds separate
+  functions. Published Mac 0.1.9 stops syncing when a connector and the user mark the same
+  Occurrence, so Ticket 319 ships in a Mac build first. Hevy reads cover one day and stop
+  above 500 workouts, so Ticket 311 picks the read strategy.
+- Tickets 311–324 are not started. Ticket 311 needs an owner step only if the `connectors`
+  preflight lists one.
+- ID gaps on purpose: P-033 to P-037 and L-020 to L-022 belong to Tickets 301–309 on draft
+  PR #205.
+- Checks: `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck` and
+  `build` pass. `npm run test` ran under Node 26: 5,428 passed and 16 failed in five
+  files. Four of those files assert Node 24, which `engines` requires, and
+  `tests/acceptance-web-client.test.mjs` timed out closing its browser. A rerun of the
+  five files under Node 24 had not finished when this entry was written.
+- Not verified: Hevy's change feed, workout order and terms (Ticket 311, L-023). The
+  5-minute minimum and the job's check counts are estimates.
+- Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only, Tickets
+  319 and 320. Marketing: none until release (P-042). Future mobile: deferred. Messaging
+  impact: P-038 to P-042.
 
 ## Branch consolidation into main — November 10, 2026
 

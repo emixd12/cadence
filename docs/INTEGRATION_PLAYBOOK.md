@@ -465,6 +465,10 @@ Research gaps, all **not verified**:
 | Live-access gate | An owner-authorized Hevy Pro test account and key. Not available in this wave. |
 | Public-approval gate | None documented. Hevy terms review is not verified. |
 
+Decision D28 (November 10, 2026) changes this brief once Tickets 310–324 ship: Cadence
+write authority, the allowed calls, the kept fields and the refresh rule. The table above
+stays as the dated Ticket 236 record. See "Connector completion (Tickets 310–324)" below.
+
 ### Outlook Calendar (Ticket 237)
 
 | Item | Decision |
@@ -537,6 +541,13 @@ These are proposals, not observed behavior or accepted scope:
 Do not add a connector SDK, generic provider registry, or common event envelope
 until a second accepted integration proves matching semantics.
 
+Amended by decision D28.2 (`docs/DECISIONS.md`, 2026-11-10) for one capability only.
+Connector completion may have one typed interface, one constant map of its
+implementations, and tables keyed by `source`. Everything else in the rule stands: no
+runtime plugin system, no SDK, no connectors built outside this repository, and no
+envelope shared by calendar events and recorded activity. See "Connector completion
+(Tickets 310–324)" below.
+
 ## Cadence MCP server (Tickets 220–232)
 
 `docs/MCP_INTEGRATION.md` is the completed brief for the remote MCP server and
@@ -545,3 +556,71 @@ the Claude and ChatGPT plugins. Its operation contract is `docs/MCP_CONTRACT.md`
 over one versioned contract. It is not a connector SDK, provider registry, or
 common event envelope, so the rule above still holds. A later REST or webhook
 adapter would reuse the same contract under its own ticket.
+
+## Connector completion (Tickets 310–324)
+
+Status, November 10, 2026: decided (D28) and planned. No code exists. The plan is
+`docs/plans/2026-11-10-connector-completion-architecture.md`; it holds the architecture,
+the safety invariants and the per-ticket detail. This section records what changes in
+this playbook.
+
+### Connector vocabulary
+
+A connector is one connection plus one or more capabilities. Each capability has one
+data model, shared by every service that offers it.
+
+| Capability | Meaning | Sources | Used for |
+|---|---|---|---|
+| Calendar context | A plan: an event scheduled for a time | Google, Outlook, iCloud | Timeline context, overlap cues, leave times |
+| Recorded activity | A fact: something that happened at a time | Hevy | Timeline line, Daily Brief |
+| Completion | Recorded activity that may complete a linked Behavior | Hevy, planned | Connector completion |
+
+Calendar events and recorded activity stay separate data types. A scheduled event is
+not evidence that something happened, and a past workout does not constrain the day.
+The owner rejected one data model for every connector (D28.2).
+
+### Boundary
+
+- **User benefit:** a Behavior the user already logs in another application is marked
+  Completed without a second entry in Cadence.
+- **Data direction:** provider → Cadence only. Provider write authority stays `none`.
+- **Cadence write authority:** one operation. A connector completion marks an Unresolved
+  Occurrence of a linked Behavior Completed, on the activity's own day. It never changes
+  a status the user set and never marks Not Completed.
+- **Grant:** the Behavior's source link. D28.1 makes it a standing grant with no approval
+  for each completion. This is an explicit exception to the write-phase rule in section
+  5. The other requirements of that rule hold: named operations, a distinct grant,
+  stale-source revalidation, conflict handling, idempotency, audit history, revocation
+  fencing and atomic apply.
+- **Stored provider data:** activity start and end instants, an opaque activity
+  reference and account-scoped digests of routine identifiers. No titles, exercise data
+  or raw provider IDs.
+- **Read schedule:** the foreground reconcile and a hosted job on a per-account schedule
+  (D28.5). This replaces "manual and existing foreground refresh only" for completion
+  sources.
+- **Onward disclosure:** unchanged. Daily Brief disclosure stays separate; timing facts
+  in Daily Brief are not in these tickets.
+- **Explicit exclusions:** provider writes, exercise or set data, filling tracked time,
+  completing an Occurrence on another day, a second completion source, webhook intake,
+  and notifications about connector completions.
+
+Hevy brief changes when the tickets ship: allowed calls gain `GET /v1/routines`, and
+`GET /v1/workouts/events` only if Ticket 311 selects it; a match read keeps the routine
+selector digest; display reads are unchanged.
+
+### Adding a completion source later
+
+A new source still needs its own brief from "Reusable integration brief", its own
+capability research and its own ticket. After Tickets 310–324 it then adds:
+
+1. A provider adapter with a fixed request allowlist and fixtures.
+2. The provider literal in the shared connection lifecycle.
+3. One implementation of the completion-source interface, with its minimum duration.
+4. The source literal in the recorded-activity contract and the table checks.
+5. A Settings panel, link form labels, a disclosure and messaging entries.
+
+The match resolver, the database functions, the reconcile service, the Mac sync rule,
+the Timeline label, analytics, export and MCP do not change. This structure comes from
+one example. It fits services that record "an activity happened at a time". It does not
+fit step counts, totals or thresholds without an extension. A second source is the
+first real test of it.

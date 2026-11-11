@@ -53,8 +53,10 @@ web and linked desktop; the hosted connectors run on production since October 23
 installed connector acceptance remain open. Tickets 263–285
 implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Tickets 294–300
 let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
-(`docs/DECISIONS.md`, 2026-11-07, D27). Mobile and broader workspace restructuring remain
-deferred.
+(`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
+Behavior can be marked Completed from activity recorded in a connected service, starting
+with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Ticket 310 recorded the decision; no
+code has shipped. Mobile and broader workspace restructuring remain deferred.
 
 ## Agent operating model
 
@@ -206,7 +208,8 @@ In scope:
 - Recurrence rules
 - Occurrence generation
 - Timeline-first interface
-- Manual statuses: unresolved, completed, not_completed
+- Manual statuses: unresolved, completed, not_completed. Connector completion (D28) is
+  the only non-manual status writer
 - Notes on occurrences
 - Browser reminders enabled by default
 - Optional email reminders per behavior
@@ -218,6 +221,11 @@ In scope:
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241, each with separate Daily Brief disclosure
+- Connector completion under Tickets 310–324 (`docs/DECISIONS.md`, 2026-11-10, D28): a
+  Behavior can opt in, through a source link, to being marked Completed from activity
+  recorded in a connected service, starting with Hevy. Only an Unresolved Occurrence on
+  the activity's own day changes. Each completion is labeled and the user can change it.
+  Cadence writes nothing to the provider
 - Remote MCP server, Cadence-owned OAuth server, consent and Connected apps
   settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
   full tracking-data read plus scoped, user-confirmed writes (Occurrence status
@@ -256,8 +264,9 @@ Out of scope for v1:
   Tickets 233–241
 - Background location tracking; leave times in Daily Brief model input or MCP; snooze,
   notification action buttons and email leave reminders; a new paid Google place search
-- Workout writes, coaching, exercise analysis, and automatic Behavior completion
-  from recorded activity
+- Workout writes, coaching and exercise analysis; automatic Behavior completion from
+  recorded activity outside a source link (D28); a second completion source; filling
+  tracked time from a workout; notifications about connector completions
 - EventKit and local-only Mac calendar access
 - Payment/subscription infrastructure
 - ChatGPT as a Cadence login and ChatGPT plan usage in the hosted web app, until OpenAI
@@ -274,10 +283,17 @@ Use these terms consistently:
 
 - Behavior: a recurring thing the user wants to track.
 - Occurrence: one scheduled instance of a behavior.
-- Unresolved: an occurrence that has not been manually marked.
+- Unresolved: an occurrence that has not been marked, by the user or by a connector
+  completion.
 - Completed: stored status meaning the behavior was completed.
 - Not completed: stored status meaning the user explicitly says it was not completed. Stored as `not_completed` and displayed as Not Completed in the UI.
 - Needs decision: UI group and derived state for unresolved occurrences before today. It is not a stored status.
+- Completion source: a connected service whose recorded activity can complete
+  occurrences. Hevy is the first (D28).
+- Source link: one behavior's opt-in to one completion source.
+- Source match: the stored record that ties one recorded activity to one occurrence.
+- Connector completion: the status change written from a source match.
+- Reconcile: one run of read, match and apply for one account and one completion source.
 
 Do not use “missed” as a stored status in v1.
 
@@ -348,6 +364,9 @@ Rules:
 - Notes can be added or edited.
 - Needs decision is derived from `status === "unresolved"` and `local_date` before the current local date.
 - Unresolved is shown separately and excluded from final adherence calculations.
+- Connector completion (D28) may mark an Unresolved occurrence Completed from a linked
+  source. It never changes a status the user set and never marks Not Completed. After the
+  user changes a connector completion, no activity completes that occurrence again.
 
 ## Date and time rules
 
@@ -636,6 +655,12 @@ Do not expand scope to solve speculative future requirements.
   Ticket 216's user-recorded place markers stay the one stored device position. Read a
   Calendar title for a leave reminder only at send time, in memory. Never send leave
   times to the Daily Brief model.
+- Connector completion (D28) stores workout start and end times and account-scoped
+  digests of routine identifiers. Never store routine titles, exercise data or raw
+  provider IDs. Connector completions reach tracking data only through RLS as the user,
+  through their own database functions; the manual status function never carries
+  connector provenance. The completion job (Ticket 321) follows the leave reminder job's
+  rules with its own token channel. Cadence never writes to a completion source.
 - Use server-side code for privileged operations.
 - Treat provider CLI login output, API keys, and approval codes as secrets.
 

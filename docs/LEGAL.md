@@ -17,7 +17,8 @@ Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHAN
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-020` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-024` is next; L-020 to L-022 belong to Tickets
+   301–309 on draft PR #205). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -67,6 +68,7 @@ Risk levels:
 | [L-017](#l-017-chatgpt-plan-usage-in-a-paid-or-hosted-app) | ChatGPT plan usage in a paid or hosted app | open | medium | 294–300 |
 | [L-018](#l-018-sign-in-with-chatgpt-devkit-licence) | Sign in with ChatGPT DevKit licence | open | low | 295, 297, 299 |
 | [L-019](#l-019-openai-brand-guidelines-for-the-chatgpt-button) | OpenAI brand guidelines for the ChatGPT button | open | low | 299 |
+| [L-023](#l-023-hevy-terms-for-background-reads-and-stored-workout-data) | Hevy terms for background reads and stored workout data | open | not assessed | 310, 311, 321, 323 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -544,3 +546,30 @@ part of L-002.
 - **Status:** open.
 - **Next action:** Ticket 299 reads the guidelines before building the card and records the
   clauses it follows.
+
+## L-023: Hevy terms for background reads and stored workout data
+
+- **Question:** Do Hevy's terms allow Cadence to read a user's Hevy account on a schedule
+  with that user's API key, to store workout times and digests of routine identifiers, and
+  to name Hevy in the product and in marketing?
+- **Affected:** Tickets 310, 311, 315, 321 and 323 (decision D28). Files:
+  `lib/services/hevy-provider.ts`, the planned `lib/services/connector-completion.service.ts`
+  and job. Related messaging entries: P-039, P-041 and P-042.
+- **Provider, clause, source and check date:** Hevy.
+  - Public API document, `https://api.hevyapp.com/docs/swagger-ui-init.js`, read
+    2026-11-10: "we make no guarantees that we won't completely change the structure or
+    abandon the project entirely so use it at your own risk". It lists 14 paths, none a
+    webhook, and states no rate limit and no rule about stored data.
+  - `docs/INTEGRATION_PLAYBOOK.md` (research dated 2026-10-18) records that Hevy asks
+    hourly or daily pollers to avoid the top of the hour.
+  - Hevy's terms of service and any developer terms: not read for this entry.
+- **Current reading:** none for the terms of service. The API document does not forbid
+  scheduled reads or stored timing data, and it promises no stability. The planned job
+  makes about 5 reads per linked account per day (estimated) and runs off the top of the
+  hour.
+- **Risk level:** not assessed; the terms were not read.
+- **Owner decision or risk acceptance:** none.
+- **Status:** open.
+- **Next action:** Ticket 311 reads Hevy's terms of service and any developer terms,
+  records the clauses on automated access, stored data and use of the Hevy name, and
+  updates this entry.
