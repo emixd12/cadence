@@ -19,19 +19,25 @@ insert into public.behaviors (id, user_id, title, recurrence_rule, scheduled_tim
   ('31410000-0000-4000-8000-000000000003', '31400000-0000-4000-8000-000000000001', 'Extra', '{"type":"daily"}', '18:00', 'America/New_York'),
   ('31410000-0000-4000-8000-000000000009', '31400000-0000-4000-8000-000000000002', 'Other', '{"type":"daily"}', '18:00', 'America/New_York');
 
+-- The fixture's day 0 is yesterday in New York, so its afternoon activities have ended
+-- whatever time the rehearsal runs. Day offsets stay inside the 30-day window.
+create function pg_temp.fixture_today() returns date language sql as $$
+  select (now() at time zone 'America/New_York')::date - 1;
+$$;
+
 create function pg_temp.at_local(days_back integer, hour integer) returns timestamptz language sql as $$
-  select ((now() at time zone 'America/New_York')::date - days_back + make_interval(hours => hour)) at time zone 'America/New_York';
+  select (pg_temp.fixture_today() - days_back + make_interval(hours => hour)) at time zone 'America/New_York';
 $$;
 
 -- Occurrences at 18:00 local. O1, O2 today; O3 yesterday (Leg day); O4 two days back
 -- (Gym, Not Completed); O5 40 days back (Leg day); O9 today for B.
 insert into public.occurrences (id, user_id, behavior_id, scheduled_for, local_date, schedule_kind, schedule_start_time, status, status_marked_at) values
-  ('31420000-0000-4000-8000-000000000001', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(0, 18), (now() at time zone 'America/New_York')::date, 'exact', '18:00', 'unresolved', null),
-  ('31420000-0000-4000-8000-000000000002', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000002', pg_temp.at_local(0, 18), (now() at time zone 'America/New_York')::date, 'exact', '18:00', 'unresolved', null),
-  ('31420000-0000-4000-8000-000000000003', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(1, 18), (now() at time zone 'America/New_York')::date - 1, 'exact', '18:00', 'unresolved', null),
-  ('31420000-0000-4000-8000-000000000004', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000002', pg_temp.at_local(2, 18), (now() at time zone 'America/New_York')::date - 2, 'exact', '18:00', 'not_completed', now() - interval '1 day'),
-  ('31420000-0000-4000-8000-000000000005', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(40, 18), (now() at time zone 'America/New_York')::date - 40, 'exact', '18:00', 'unresolved', null),
-  ('31420000-0000-4000-8000-000000000009', '31400000-0000-4000-8000-000000000002', '31410000-0000-4000-8000-000000000009', pg_temp.at_local(0, 18), (now() at time zone 'America/New_York')::date, 'exact', '18:00', 'unresolved', null);
+  ('31420000-0000-4000-8000-000000000001', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(0, 18), pg_temp.fixture_today(), 'exact', '18:00', 'unresolved', null),
+  ('31420000-0000-4000-8000-000000000002', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000002', pg_temp.at_local(0, 18), pg_temp.fixture_today(), 'exact', '18:00', 'unresolved', null),
+  ('31420000-0000-4000-8000-000000000003', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(1, 18), pg_temp.fixture_today() - 1, 'exact', '18:00', 'unresolved', null),
+  ('31420000-0000-4000-8000-000000000004', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000002', pg_temp.at_local(2, 18), pg_temp.fixture_today() - 2, 'exact', '18:00', 'not_completed', now() - interval '1 day'),
+  ('31420000-0000-4000-8000-000000000005', '31400000-0000-4000-8000-000000000001', '31410000-0000-4000-8000-000000000001', pg_temp.at_local(40, 18), pg_temp.fixture_today() - 40, 'exact', '18:00', 'unresolved', null),
+  ('31420000-0000-4000-8000-000000000009', '31400000-0000-4000-8000-000000000002', '31410000-0000-4000-8000-000000000009', pg_temp.at_local(0, 18), pg_temp.fixture_today(), 'exact', '18:00', 'unresolved', null);
 
 insert into public.reminder_deliveries (user_id, occurrence_id, channel, scheduled_send_at, status) values
   ('31400000-0000-4000-8000-000000000001', '31420000-0000-4000-8000-000000000001', 'browser_push', pg_temp.at_local(0, 18), 'pending'),
