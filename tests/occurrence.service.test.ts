@@ -1369,6 +1369,38 @@ describe("updateOccurrenceNoteFromFormData", () => {
     // Ticket 305: repeated Notes are matched after every in-app save.
     expect(matchRepeatedNotesAfterNoteSave).toHaveBeenCalledWith(SUPABASE, "user-1", "behavior-1");
   });
+
+  it("compares a multi-line note that the browser submitted with CRLF line breaks", async () => {
+    const formData = new FormData();
+    formData.set("occurrence_id", FORM_OCCURRENCE_ID);
+    formData.set("expected_note", "First line\r\nSecond line");
+    formData.set("note", "First line\r\nThird line");
+
+    await updateOccurrenceNoteFromFormData(formData);
+
+    expect(updateOccurrenceNoteIfExpected).toHaveBeenCalledWith(SUPABASE, {
+      userId: "user-1",
+      occurrenceId: FORM_OCCURRENCE_ID,
+      expectedNote: "First line\nSecond line",
+      note: "First line\nThird line",
+    });
+  });
+
+  it("clears a multi-line note submitted with CRLF line breaks", async () => {
+    const formData = new FormData();
+    formData.set("occurrence_id", FORM_OCCURRENCE_ID);
+    formData.set("expected_note", "First line\r\n\r\nSecond line");
+    formData.set("note", "");
+
+    await updateOccurrenceNoteFromFormData(formData);
+
+    expect(updateOccurrenceNoteIfExpected).toHaveBeenCalledWith(SUPABASE, {
+      userId: "user-1",
+      occurrenceId: FORM_OCCURRENCE_ID,
+      expectedNote: "First line\n\nSecond line",
+      note: null,
+    });
+  });
 });
 
 function buildBehavior(input: {

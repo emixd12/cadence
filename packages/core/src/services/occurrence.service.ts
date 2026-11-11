@@ -4,6 +4,7 @@ import type { OccurrenceDataStore } from "../data-store";
 import type { OccurrenceStatus } from "../types/database";
 import { resolveReminderDeliveryCancellation } from "../resolvers/reminder.resolver";
 import {
+  resolveExpectedNote,
   resolveNoteUpdate,
   resolveStatusEvent,
   resolveStatusTransition,
@@ -55,7 +56,7 @@ export async function updateOccurrenceNote(
   const update = resolveNoteUpdate({ note: input.note });
   const occurrence = await store.updateOccurrenceNote({
     occurrenceId: input.occurrenceId,
-    expectedNote: input.expectedNote.length > 0 ? input.expectedNote : null,
+    expectedNote: resolveExpectedNote(input.expectedNote),
     note: update.note,
     ...(input.usedShortcut ? { usedShortcut: true } : {}),
   });
