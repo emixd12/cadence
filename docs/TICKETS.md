@@ -17979,7 +17979,7 @@ Verification: `npm run agents:check` and `npm run interactions:check`.
 
 ## Ticket 311: Live Hevy check for the read strategy
 
-Status: blocked November 10, 2026. The `connectors` preflight exited 10: the Cadence Agents service-account token is missing from this Mac's Keychain, so test account A's Hevy key (`hevy-test-account-a`) cannot be read. Owner steps are in STATUS.md. No live Hevy call has run.
+Status: blocked November 11, 2026. The `connectors` preflight's agent steps pass, but the vault has no `hevy-test-account-a` item, so there is no Hevy Pro key for test account A. No live Hevy call has run.
 Dependencies: Ticket 310.
 
 Goal: decide with live evidence how Cadence reads Hevy for matching.
