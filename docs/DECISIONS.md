@@ -2174,6 +2174,38 @@ Platform impact: web, Tickets 312–318, 321 and 322. Desktop: linked mode only,
 none until release (P-042). Future mobile: deferred; the hosted functions are reusable.
 Messaging impact: P-038 to P-042.
 
+## 2026-11-11: Updater signing key rotated; new Developer ID identity
+
+macOS reset the owner's login password on November 9, 2026 and set the old login
+keychain aside. None of the owner's passwords unlocks it. It held the Developer ID
+Application private key, the notarization app-specific password and the updater key's
+password. No backup of the updater password existed, and three candidates from 1Password
+failed against the key on November 11.
+
+The owner decided on November 11, 2026:
+
+1. Rotate the Tauri updater key. The new pair is in `Cadence Release/updater-2026-11/`,
+   fingerprint `17f412c3…3037`. Its password is in the login Keychain and in the owner's
+   1Password item "Cadence updater signing key 2026-11" in the Cadence vault, not the
+   Cadence Agents vault. The retired key stays on disk, unused.
+2. Use a new Developer ID Application certificate, issued November 11, 2026 under Apple's
+   G2 intermediate. It expires December 11, 2027, so it needs renewal before then. The
+   identity name and team are unchanged. The old certificate stays valid and is not revoked,
+   so builds signed with it keep working.
+3. Use a new Developer ID provisioning profile, "Cadence Desktop Developer ID 2026-11", that
+   lists only the new certificate, and a new app-specific notarization password.
+4. Ship the new public key and identity in 0.1.10, notarized and published only on the
+   owner's instruction. Installed copies of 0.1.9 or earlier reject updates signed with the
+   new key, so each installs the 0.1.10 DMG by hand once. The public 0.1.9 assets show one
+   or two downloads, which points to the owner's Mac and the test Mac only (not verified).
+5. Keep signing secrets in the owner's Cadence vault. Agents read them only with the
+   owner's approval for a run, as for notarization.
+
+Details: `docs/DESKTOP_RELEASE.md`, "Persistent updater key handoff".
+
+Platform impact: desktop release tooling and 0.1.10 only. Web, marketing and future mobile:
+not applicable. Messaging impact: none.
+
 ## 2026-11-11: Hevy testing uses the owner's own Pro account
 
 The owner decided on November 11, 2026 not to buy a Hevy Pro test account. Hevy testing,

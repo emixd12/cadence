@@ -6,6 +6,8 @@ import {
   resolveConnectorStatusEvent,
 } from "../packages/core/src/resolvers/status.resolver";
 import {
+  normalizeNoteLineEndings,
+  resolveExpectedNote,
   resolveNoteUpdate,
   resolveStatusEvent,
   resolveStatusTransition,
@@ -266,6 +268,13 @@ describe("resolveNoteUpdate", () => {
     });
   });
 
+  it("keeps a lone CR, like the BehaviorLog import normalizer", () => {
+    expect(resolveNoteUpdate({ note: "First line\rSecond line" })).toEqual({
+      note: "First line\rSecond line",
+    });
+    expect(normalizeNoteLineEndings("a\r\nb\rc\nd")).toBe("a\nb\rc\nd");
+  });
+
   it("stores blank occurrence notes as null", () => {
     expect(resolveNoteUpdate({ note: " \n\t " })).toEqual({
       note: null,
@@ -316,5 +325,23 @@ describe("resolveConnectorStatusEvent (Ticket 313, D28.7)", () => {
     expect(event).toMatchObject({ statusSemantics: "explicit_user_mark", sourceCaptureMethod: "manual_tap" });
     expect(event).not.toHaveProperty("reasonCode");
     expect(isConnectorStatusEvent({ ...event!, reasonCode: "connector:hevy" })).toBe(false);
+  });
+});
+
+describe("resolveExpectedNote", () => {
+  it("matches saved LF text when a browser submits CRLF", () => {
+    expect(resolveExpectedNote("First line\r\nSecond line")).toBe("First line\nSecond line");
+  });
+
+  it("passes a saved lone CR through, as desktop and MCP send it", () => {
+    expect(resolveExpectedNote("First line\rSecond line")).toBe("First line\rSecond line");
+  });
+
+  it("keeps surrounding whitespace so the compare-and-set stays exact", () => {
+    expect(resolveExpectedNote(" Saved ")).toBe(" Saved ");
+  });
+
+  it("treats empty text as no saved note", () => {
+    expect(resolveExpectedNote("")).toBeNull();
   });
 });
