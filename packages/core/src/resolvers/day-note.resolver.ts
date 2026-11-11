@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { resolveNoteUpdate } from "./status.resolver";
+import { resolveExpectedNote, resolveNoteUpdate } from "./status.resolver";
 
 /**
  * A day note is one note about a whole calendar date in the user's timezone.
@@ -59,7 +59,7 @@ export function resolveDayNoteUpdate(input: Readonly<{
   }
   return {
     localDate,
-    expectedNote: input.expectedNote.length > 0 ? input.expectedNote : null,
+    expectedNote: resolveExpectedNote(input.expectedNote),
     note,
   };
 }
