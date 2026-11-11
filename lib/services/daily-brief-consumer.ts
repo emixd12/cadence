@@ -81,9 +81,8 @@ export function adviceRejected(reason: string): DailyBriefError {
   return new DailyBriefError("advisor_unavailable", undefined, reason);
 }
 
-/** Provider-neutral generation. The adapter gets facts, never database or mutation capabilities. */
-export async function generateDailyBrief(context: AdvisorDayContext, input: Readonly<{
-  generate: DailyBriefGenerator;
+/** Inputs shared by `generateDailyBrief` and `prepareDailyBrief`. */
+export type DailyBriefPrepareInput = Readonly<{
   signal: AbortSignal;
   now: () => Temporal.Instant;
   config?: unknown;
@@ -91,8 +90,6 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   planningNow?: string;
   /** Authorized analysis inputs; ignored unless the configuration selects lanes. */
   analysis?: BriefingAnalysisInput;
-  /** Called with the fingerprints to record when validated output includes the tip. */
-  onTip?: (fingerprints: readonly string[]) => void;
   /** Ticket 188: descriptions the caller is authorized to send, keyed by behaviorRef. */
   descriptions?: Readonly<Record<string, string>>;
   /** Ticket 188: the separate estimate call. Without it, durations stay as recorded. */
@@ -103,7 +100,58 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   onUsage?: (usage: DailyBriefCallUsage) => void;
   /** Ticket 290: development workbench only. Production omits it and sends the "layered" text. */
   promptVariant?: DailyBriefPromptVariant;
+}>;
+
+/** The model request: the same two strings every generator receives. */
+export type DailyBriefModelRequest = Readonly<{ instructions: string; facts: string }>;
+
+type PreparedBriefing = ReturnType<typeof prepareBriefing>;
+
+/**
+ * Ticket 296: everything the validate step needs, as plain JSON. It survives
+ * `JSON.stringify` and `JSON.parse` unchanged, so the model call can run elsewhere
+ * (decision D27). It holds no database or mutation capability.
+ */
+export type DailyBriefValidationData = Readonly<{
+  version: typeof DAILY_BRIEF_VALIDATION_VERSION;
+  context: Readonly<{
+    capturedAt: string; expiresAt: string; localDate: string; timezone: string;
+    occurrences: readonly Readonly<{ ref: string; behaviorRef: string; title: string }>[];
+  }>;
+  config: BriefingConfig;
+  configurationRevision: string;
+  pipelineVersion: PreparedBriefing["pipelineVersion"];
+  planningNow: string;
+  facts: PreparedBriefing["facts"];
+  contextControls: PreparedBriefing["contextControls"];
+  references: PreparedBriefing["references"];
+  plan: Pick<PreparedBriefing["plan"], "version" | "route" | "dayEvidence">;
+  offeredOptions: PreparedBriefing["plan"]["options"];
+  analysis: Pick<NonNullable<PreparedBriefing["analysis"]>, "tip" | "modelTip" | "recordFingerprints"> | null;
+}>;
+
+export const DAILY_BRIEF_VALIDATION_VERSION = 1;
+
+export type PreparedDailyBrief = Readonly<{ request: DailyBriefModelRequest; validation: DailyBriefValidationData }>;
+
+/** Provider-neutral generation. The adapter gets facts, never database or mutation capabilities. */
+export async function generateDailyBrief(context: AdvisorDayContext, input: DailyBriefPrepareInput & Readonly<{
+  generate: DailyBriefGenerator;
+  /** Called with the fingerprints to record when validated output includes the tip. */
+  onTip?: (fingerprints: readonly string[]) => void;
 }>): Promise<DailyBriefing> {
+  const { request, validation } = await prepareDailyBrief(context, input);
+  const onBriefUsage = usageReporter(input.onUsage, "brief");
+  const result = await raceBriefAbort(input.generate({ ...request, signal: input.signal, ...(onBriefUsage ? { onUsage: onBriefUsage } : {}) }), input.signal);
+  input.signal.throwIfAborted();
+  return validateDailyBrief(result, validation, { now: input.now, onTip: input.onTip });
+}
+
+/**
+ * Ticket 296 prepare step: estimates, planning and the model request. It may call
+ * the estimate generator but never the brief generator.
+ */
+export async function prepareDailyBrief(context: AdvisorDayContext, input: DailyBriefPrepareInput): Promise<PreparedDailyBrief> {
   const promptVariant = input.promptVariant ?? "layered";
   if (!DAILY_BRIEF_PROMPT_VARIANTS.includes(promptVariant)) throw new DailyBriefError("invalid_request");
   validateVersionedAdvisorDayContext(context);
@@ -145,13 +193,41 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     ...(analysis ? { analysis: { tip: modelTip } } : {}) };
   // Deterministic local-time labels, so the model never converts UTC instants itself.
   const payload = JSON.stringify({ ...body, clock: { timezone: context.timezone, labels: localTimeLabels(body, context.timezone) } });
-  if (Buffer.byteLength(payload, "utf8") > 512 * 1024) throw new DailyBriefError("context_limit_exceeded");
-  const onBriefUsage = usageReporter(input.onUsage, "brief");
-  const result = await raceBriefAbort(input.generate({ instructions, facts: payload, signal: input.signal, ...(onBriefUsage ? { onUsage: onBriefUsage } : {}) }), input.signal);
-  input.signal.throwIfAborted();
+  if (new TextEncoder().encode(payload).byteLength > 512 * 1024) throw new DailyBriefError("context_limit_exceeded");
+  return {
+    request: { instructions, facts: payload },
+    validation: {
+      version: DAILY_BRIEF_VALIDATION_VERSION,
+      context: {
+        capturedAt: context.capturedAt, expiresAt: context.expiresAt, localDate: context.localDate, timezone: context.timezone,
+        occurrences: context.cadence.occurrences.map(({ ref, behaviorRef, title }) => ({ ref, behaviorRef, title })),
+      },
+      config, configurationRevision, pipelineVersion, planningNow, facts, contextControls, references,
+      plan: { version: plan.version, route: plan.route, dayEvidence: plan.dayEvidence },
+      offeredOptions,
+      analysis: analysis ? { tip: analysis.tip, modelTip: analysis.modelTip, recordFingerprints: analysis.recordFingerprints } : null,
+    },
+  };
+}
+
+/**
+ * Ticket 296 validate step: model output to briefing. Checks freshness and the
+ * configuration revision again, then applies every output rule. Rejections throw
+ * `advisor_unavailable` with an internal reason.
+ */
+export function validateDailyBrief(result: unknown, validation: DailyBriefValidationData, input: Readonly<{
+  now: () => Temporal.Instant;
+  /** Called with the fingerprints to record when validated output includes the tip. */
+  onTip?: (fingerprints: readonly string[]) => void;
+}>): DailyBriefing {
+  if (validation.version !== DAILY_BRIEF_VALIDATION_VERSION) throw new DailyBriefError("invalid_request");
+  const { context, config, configurationRevision, pipelineVersion, planningNow, facts, contextControls, references, plan, offeredOptions, analysis } = validation;
+  const v11 = isPlainRecipe(config.recipe);
+  const v12 = isLaneRecipe(config.recipe);
   const now = input.now();
   assertBriefContextFresh(context, now);
   if (briefingConfigurationRevision(config) !== configurationRevision) throw new DailyBriefError("context_changed");
+  const titleOf = (ref: string) => context.occurrences.find((occurrence) => occurrence.ref === ref)?.title;
   // Ticket 288: each rejection keeps the public code and names its internal reason.
   if (!result || typeof result !== "object" || Array.isArray(result)) throw adviceRejected("validation_shape");
   const value = result as Record<string, unknown>;
@@ -183,7 +259,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
       selectedOptionIds.add(option.id);
     }
     // Recipe 1.2 shows the moved Behavior's name in the suggestion's own block.
-    const behavior = v12 && option ? context.cadence.occurrences.find((occurrence) => occurrence.ref === option.occurrenceRef)?.title : undefined;
+    const behavior = v12 && option ? titleOf(option.occurrenceRef) : undefined;
     return { text: v12 && option ? "" : suggestion.text.trim(), occurrenceRefs: suggestion.occurrenceRefs, referenceIds: suggestion.referenceIds, optionId: option?.id ?? null, ...(option ? { option } : {}), ...(behavior ? { behavior } : {}) };
   });
   // Recipe 1.2 fills omitted options only when projected travel permits a fallback.
@@ -191,7 +267,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     const used = new Set(suggestions.map((item) => item.optionId));
     for (const option of offeredOptions) {
       if (used.has(option.id) || !briefingTravelOptionPolicy(facts.travel, option.occurrenceRef).fallback) continue;
-      const behavior = context.cadence.occurrences.find((occurrence) => occurrence.ref === option.occurrenceRef)?.title;
+      const behavior = titleOf(option.occurrenceRef);
       suggestions.push({ text: "", occurrenceRefs: [option.occurrenceRef], referenceIds: [], optionId: option.id, option, ...(behavior ? { behavior } : {}) });
     }
     const order = new Map(offeredOptions.map((option, index) => [option.id, index]));
@@ -201,7 +277,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   const moveOptions = suggestions.flatMap((item) => item.option ? [item.option] : []);
   const text = v12 && !value.text.trim() && moveOptions.length
     ? briefingMoveOverview({ options: moveOptions, plan, planningNow, timezone: context.timezone,
-      titleOf: (ref) => context.cadence.occurrences.find((occurrence) => occurrence.ref === ref)?.title ?? null })
+      titleOf: (ref) => titleOf(ref) ?? null })
     : value.text.trim();
   const tip = validateTip(value.tip ?? null, analysis);
   // Count the text actually shown, including a recipe 1.2 overview Cadence wrote.
@@ -214,7 +290,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     text: tip.text,
     laneId: tipFinding.laneId,
     basis: describeBriefingFinding(tipFinding, {
-      title: context.cadence.occurrences.find((item) => item.behaviorRef === tipFinding.behaviorRef)?.title ?? null,
+      title: context.occurrences.find((item) => item.behaviorRef === tipFinding.behaviorRef)?.title ?? null,
       citedNotes: tip.noteRefs.length || undefined,
       plain: v11,
     }),
@@ -226,7 +302,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   return {
     ...(shownTip ? { tip: shownTip } : {}),
     suggestions, references: references.included.filter((source) => suggestions.some((item) => item.referenceIds.includes(source.id))),
-    ...(v12 ? { behaviorNames: briefingBehaviorNames(context.cadence.occurrences.map((item) => item.title), [text, ...suggestions.map((item) => item.text), ...(shownTip ? [shownTip.text] : [])]) } : {}),
+    ...(v12 ? { behaviorNames: briefingBehaviorNames(context.occurrences.map((item) => item.title), [text, ...suggestions.map((item) => item.text), ...(shownTip ? [shownTip.text] : [])]) } : {}),
     versions: { configuration: configurationRevision, references: references.version, planner: plan.version, pipeline: pipelineVersion, recipe: `${config.recipe.id}@${config.recipe.version}`, policy: DAILY_BRIEF_POLICY_VERSION },
     text, localDate: context.localDate, timezone: context.timezone,
     generatedAt: now.toString(), expiresAt: context.expiresAt, coverage: facts.status,
@@ -292,7 +368,7 @@ async function estimateDurations<T extends AdvisorDayContext>(context: T, config
  * violations reject the brief; unsupported Note themes or quoted Note text
  * drop only the tip.
  */
-function validateTip(value: unknown, analysis: ReturnType<typeof prepareBriefing>["analysis"]): { text: string; noteRefs: string[] } | null {
+function validateTip(value: unknown, analysis: DailyBriefValidationData["analysis"]): { text: string; noteRefs: string[] } | null {
   if (value === null) return null;
   const offered = analysis?.modelTip;
   if (!offered || !value || typeof value !== "object" || Array.isArray(value)) throw adviceRejected("validation_tip");
@@ -344,7 +420,7 @@ function sharesPhrase(text: string, source: string, words: number): boolean {
   return false;
 }
 
-export function assertBriefContextFresh(context: AdvisorDayContext, now: Temporal.Instant): void {
+export function assertBriefContextFresh(context: Pick<AdvisorDayContext, "capturedAt" | "expiresAt" | "localDate" | "timezone">, now: Temporal.Instant): void {
   if (Temporal.Instant.compare(now, Temporal.Instant.from(context.capturedAt)) < 0 ||
       Temporal.Instant.compare(now, Temporal.Instant.from(context.expiresAt)) >= 0 ||
       now.toZonedDateTimeISO(context.timezone).toPlainDate().toString() !== context.localDate) {

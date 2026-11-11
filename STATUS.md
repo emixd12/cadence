@@ -51,7 +51,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (its release branch contains 319 and 320; owner instruction to notarize and publish) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
-| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
+| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode passes); 296 in progress (prepare/validate split done; adapter waits for 295); 297–300 not started | Live spike run needs the owner's ChatGPT Plus or Pro sign-in (owner ask sent November 11) | TICKETS, Tickets 294–300; STATUS, "Ticket 296: Daily Brief prepare and validate split — November 11, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
 | Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
 | Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
@@ -89,6 +89,32 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 296: Daily Brief prepare and validate split — November 11, 2026
+
+**On branch `claude/brief-chatgpt-plan-086210`.**
+
+- `lib/services/daily-brief-consumer.ts` now has `prepareDailyBrief` (estimates, planning,
+  model request) and `validateDailyBrief` (model output to briefing from plain-JSON
+  `DailyBriefValidationData`). `generateDailyBrief` composes them; its signature and
+  behavior are unchanged. The 512 KB payload check uses `TextEncoder`, not `Buffer`.
+- Tests: the 41 existing briefing and Daily Brief test files pass unchanged (619 tests).
+  `tests/daily-brief-prepare-validate.test.ts` adds 39 tests: every preset on 7 fixtures
+  matches `generateDailyBrief` after a JSON round trip, plus unknown-ref, expiry,
+  configuration-revision and version rejections.
+- Assumption, recorded in `docs/AGENT_RESOLVERS.md`: both steps stay server-side, because
+  Ticket 298's routes call them and the Mac runs only the model call. `briefing-pipeline.ts`
+  still uses `node:crypto`, so the ticket's "runs in the browser" line is not met and not
+  needed under D27.
+- No production gate is needed: hosted behavior is unchanged and nothing new is reachable.
+- Still open in Ticket 296: the ChatGPT plan adapter and its error mapping, which wait for
+  the request contract from the live Ticket 295 run.
+- Ticket 295: no preflight suite covers the ChatGPT spike sign-in. The owner ask for the
+  live run (`node scripts/run-chatgpt-plan-spike.mjs --live`) went to the owner on
+  November 11.
+- Platform impact: web, `daily-brief-consumer.ts`, hosted behavior unchanged; desktop,
+  none yet (Ticket 299 wires it); marketing and future mobile, not applicable. Messaging
+  impact: none.
 
 ## Ticket 320: connector records sync to the Mac — November 11, 2026
 
