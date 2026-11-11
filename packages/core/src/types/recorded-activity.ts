@@ -112,3 +112,52 @@ export type RecordedActivityNormalizationResult =
   | Readonly<{ status: "accepted"; activity: RecordedActivity }>
   | Readonly<{ status: "outside_range" }>
   | Readonly<{ status: "quarantined"; reason: RecordedActivityQuarantineReason }>;
+
+/**
+ * Recorded-activity contract `1.1.0` (Ticket 312, D28.2). Source-neutral and
+ * used only for connector-completion match reads. `1.0.0` above keeps its exact
+ * shape and stays the display contract; display reads never carry selector keys.
+ */
+export const RECORDED_ACTIVITY_SCHEMA_VERSION_1_1 = "1.1.0" as const;
+export const HEVY_WORKOUTS_MATCH_ADAPTER_VERSION = "hevy-workouts-v2" as const;
+export const RECORDED_ACTIVITY_SOURCES_1_1 = ["hevy"] as const;
+export type RecordedActivitySourceV1_1 = (typeof RECORDED_ACTIVITY_SOURCES_1_1)[number];
+/** Each source accepts exactly one adapter version under `1.1.0`. */
+export const RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1 = Object.freeze({
+  hevy: HEVY_WORKOUTS_MATCH_ADAPTER_VERSION,
+} as const satisfies Record<RecordedActivitySourceV1_1, string>);
+/** At most 32 selector keys per activity. */
+export const RECORDED_ACTIVITY_MAX_SELECTOR_KEYS = 32;
+/** Version label hashed into every selector key. */
+export const RECORDED_ACTIVITY_SELECTOR_KEY_VERSION = "cadence-selector-v1" as const;
+/**
+ * Shortest activity that can complete or attach to an Occurrence (D28.8), per
+ * source, in seconds. A shorter activity is ignored by matching.
+ */
+export const RECORDED_ACTIVITY_MIN_MATCH_SECONDS = Object.freeze({
+  hevy: 5 * 60,
+} as const satisfies Record<RecordedActivitySourceV1_1, number>);
+
+export type RecordedActivityV1_1 = RecordedActivity & Readonly<{
+  /**
+   * Account-scoped SHA-256 digests of the provider's selector identifiers (Hevy:
+   * `routine_id`). Present on every activity when the read asked for selector
+   * keys, and on none otherwise. Raw provider identifiers never appear.
+   */
+  selectorKeys?: readonly string[];
+}>;
+
+export type RecordedActivitySnapshotV1_1 = Readonly<{
+  schemaVersion: typeof RECORDED_ACTIVITY_SCHEMA_VERSION_1_1;
+  adapterVersion: (typeof RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1)[RecordedActivitySourceV1_1];
+  source: RecordedActivitySourceV1_1;
+  accountId: string;
+  connectionGeneration: number;
+  requestedRange: RecordedActivityRequestedRange;
+  fetchedAt: string;
+  completeness: "complete" | "incomplete";
+  coverage: RecordedActivityCoverage;
+  failures: RecordedActivityFailure[];
+  selectorKeysRequested: boolean;
+  activities: RecordedActivityV1_1[];
+}>;

@@ -271,6 +271,32 @@ normalization, the character limit, read ranges, and Timeline attachment.
 UI, MCP handlers and repositories must not normalize or validate day notes
 themselves. The resolver has no I/O or clock access.
 
+## Connector completion matching (Tickets 313 and 321)
+
+`packages/core/src/resolvers/activity-match.resolver.ts` decides which recorded
+activity completes or attaches to which Occurrence of a Behavior with a source link
+(D28). It implements the matching rules in
+`docs/plans/2026-11-10-connector-completion-architecture.md`, section 3, with `now`,
+the source's minimum duration (`RECORDED_ACTIVITY_MIN_MATCH_SECONDS`), links,
+Occurrences, evidence and prior matches injected. It returns `complete`, `attach`,
+`remove` and `skip` entries, each with a reason code. Which Occurrence an activity
+belongs to never depends on a status or on input order. It also owns the timing
+classifier (`classifyConnectorTiming`: on time within ±30 minutes of an exact time
+or inside a range) and `selectTimingMatch` (the active match nearest the scheduled
+start). Paired test: `tests/activity-match.resolver.test.ts`.
+
+`resolveConnectorStatusEvent` in `packages/core/src/resolvers/status.resolver.ts`
+plans connector status events with the D28.7 values. It is separate from
+`resolveStatusEvent`, whose plan type cannot express connector provenance. Paired
+test: `tests/status.resolver.test.ts`.
+
+Allowed callers: `lib/services/connector-completion.service.ts`, the background job
+service, analytics and Timeline assembly for timing, and tests. Forbidden bypasses:
+components, routes or repositories choosing Occurrences, deciding status effects or
+computing timing; provider adapters writing statuses; the matcher reading clocks,
+providers, Supabase or environment variables. The database functions of Ticket 314
+recheck every precondition and stay the only write path.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

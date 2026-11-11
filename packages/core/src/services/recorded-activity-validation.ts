@@ -4,17 +4,25 @@ import { sha256 } from "../hash";
 import type { ExternalEventErrorCode } from "../types/external-event";
 import {
   HEVY_WORKOUTS_ADAPTER_VERSION,
+  RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1,
   RECORDED_ACTIVITY_MAX_ITEMS,
+  RECORDED_ACTIVITY_MAX_SELECTOR_KEYS,
   RECORDED_ACTIVITY_MAX_PAGES,
   RECORDED_ACTIVITY_MAX_RANGE_DAYS,
   RECORDED_ACTIVITY_PAGE_SIZE,
   RECORDED_ACTIVITY_SCHEMA_VERSION,
+  RECORDED_ACTIVITY_SCHEMA_VERSION_1_1,
+  RECORDED_ACTIVITY_SELECTOR_KEY_VERSION,
   RECORDED_ACTIVITY_SOURCE,
+  RECORDED_ACTIVITY_SOURCES_1_1,
   type RecordedActivity,
   type RecordedActivityNormalizationResult,
   type RecordedActivityRequestedRange,
   type RecordedActivitySnapshotScope,
   type RecordedActivitySnapshotV1,
+  type RecordedActivitySnapshotV1_1,
+  type RecordedActivitySourceV1_1,
+  type RecordedActivityV1_1,
   type RecordedWorkoutTimingInput,
 } from "../types/recorded-activity";
 
@@ -25,6 +33,7 @@ const ERROR_CODES: readonly ExternalEventErrorCode[] = [
   "unsupported_schema_version",
 ];
 const ACTIVITY_ID = /^hevy\/[0-9a-f]{64}$/u;
+const SELECTOR_KEY = /^[0-9a-f]{64}$/u;
 
 export type RecordedActivityValidationErrorCode =
   | "unsupported_schema_version"
@@ -125,6 +134,99 @@ export function validateRecordedActivitySnapshot(
   literal(snapshot.schemaVersion, RECORDED_ACTIVITY_SCHEMA_VERSION, "schemaVersion", "unsupported_schema_version");
   literal(snapshot.adapterVersion, HEVY_WORKOUTS_ADAPTER_VERSION, "adapterVersion", "unsupported_schema_version");
   literal(snapshot.source, RECORDED_ACTIVITY_SOURCE, "source", "unsupported_schema_version");
+  validateSnapshotBody(snapshot, options, { source: RECORDED_ACTIVITY_SOURCE, selectorKeys: false });
+  return value as RecordedActivitySnapshotV1;
+}
+
+/**
+ * Validates recorded-activity contract `1.1.0` (Ticket 312). It rejects `1.0.0`,
+ * an unknown source, an adapter version that is not the source's, a selector key
+ * that is not a SHA-256 hex digest, and more than 32 selector keys. `now` is injected.
+ */
+export function validateRecordedActivitySnapshotV1_1(
+  value: unknown,
+  options: Readonly<{ now: Temporal.Instant }>,
+): RecordedActivitySnapshotV1_1 {
+  const snapshot = object(value, "$snapshot");
+  exactKeys(snapshot, "$snapshot", [
+    "schemaVersion", "adapterVersion", "source", "accountId", "connectionGeneration",
+    "requestedRange", "fetchedAt", "completeness", "coverage", "failures",
+    "selectorKeysRequested", "activities",
+  ]);
+  literal(snapshot.schemaVersion, RECORDED_ACTIVITY_SCHEMA_VERSION_1_1, "schemaVersion", "unsupported_schema_version");
+  if (typeof snapshot.source !== "string"
+    || !(RECORDED_ACTIVITY_SOURCES_1_1 as readonly string[]).includes(snapshot.source)) {
+    fail("source", `must be one of ${RECORDED_ACTIVITY_SOURCES_1_1.join(", ")}`, "unsupported_schema_version");
+  }
+  const source = snapshot.source as RecordedActivitySourceV1_1;
+  literal(snapshot.adapterVersion, RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1[source], "adapterVersion", "unsupported_schema_version");
+  const selectorKeys = boolean(snapshot.selectorKeysRequested, "selectorKeysRequested");
+  validateSnapshotBody(snapshot, options, { source, selectorKeys });
+  return value as RecordedActivitySnapshotV1_1;
+}
+
+/**
+ * Account-scoped selector digest (D28.3): SHA-256 over a version label, the source,
+ * the connection's account digest and the provider key. Raw keys are never stored.
+ */
+export function recordedActivitySelectorKey(input: Readonly<{
+  source: RecordedActivitySourceV1_1;
+  accountDigest: string;
+  providerKey: string;
+}>): string {
+  if (!input.accountDigest || !input.providerKey) {
+    fail("selectorKey", "account digest and provider key are required");
+  }
+  return sha256([
+    RECORDED_ACTIVITY_SELECTOR_KEY_VERSION, input.source, input.accountDigest, input.providerKey,
+  ].join("\0"));
+}
+
+/** Adds selector keys to a normalized activity for a `1.1.0` match read. */
+export function withSelectorKeys(
+  activity: RecordedActivity,
+  selectorKeys: readonly string[] | undefined,
+): RecordedActivityV1_1 {
+  if (selectorKeys === undefined) return activity;
+  return { ...activity, selectorKeys: [...new Set(selectorKeys)].sort() };
+}
+
+export function recordedActivitySnapshotScopeKey(scope: RecordedActivitySnapshotScope): string {
+  return JSON.stringify([
+    scope.source,
+    scope.accountId,
+    scope.connectionGeneration,
+    scope.startLocalDate,
+    scope.endLocalDate,
+    scope.timezone,
+  ]);
+}
+
+export function recordedActivitySnapshotMatchesScope(
+  snapshot: RecordedActivitySnapshotV1,
+  scope: RecordedActivitySnapshotScope,
+): boolean {
+  return recordedActivitySnapshotScopeKey({
+    source: snapshot.source,
+    accountId: snapshot.accountId,
+    connectionGeneration: snapshot.connectionGeneration,
+    startLocalDate: snapshot.requestedRange.startLocalDate,
+    endLocalDate: snapshot.requestedRange.endLocalDate,
+    timezone: snapshot.requestedRange.timezone,
+  }) === recordedActivitySnapshotScopeKey(scope);
+}
+
+type SnapshotBodyOptions = Readonly<{
+  source: RecordedActivitySourceV1_1;
+  /** `false` forbids the field; `true` requires it on every activity. */
+  selectorKeys: boolean;
+}>;
+
+function validateSnapshotBody(
+  snapshot: Record<string, unknown>,
+  options: Readonly<{ now: Temporal.Instant }>,
+  shape: SnapshotBodyOptions,
+): void {
   nonEmptyString(snapshot.accountId, "accountId");
   integer(snapshot.connectionGeneration, "connectionGeneration", 1);
 
@@ -163,36 +265,10 @@ export function validateRecordedActivitySnapshot(
   }
   const ids = new Set<string>();
   activities.forEach((entry, index) => {
-    const activity = validateActivity(entry, `activities[${index}]`, range, fetchedAt);
+    const activity = validateActivity(entry, `activities[${index}]`, range, fetchedAt, shape);
     if (ids.has(activity.id)) fail(`activities[${index}].id`, "must be unique");
     ids.add(activity.id);
   });
-  return value as RecordedActivitySnapshotV1;
-}
-
-export function recordedActivitySnapshotScopeKey(scope: RecordedActivitySnapshotScope): string {
-  return JSON.stringify([
-    scope.source,
-    scope.accountId,
-    scope.connectionGeneration,
-    scope.startLocalDate,
-    scope.endLocalDate,
-    scope.timezone,
-  ]);
-}
-
-export function recordedActivitySnapshotMatchesScope(
-  snapshot: RecordedActivitySnapshotV1,
-  scope: RecordedActivitySnapshotScope,
-): boolean {
-  return recordedActivitySnapshotScopeKey({
-    source: snapshot.source,
-    accountId: snapshot.accountId,
-    connectionGeneration: snapshot.connectionGeneration,
-    startLocalDate: snapshot.requestedRange.startLocalDate,
-    endLocalDate: snapshot.requestedRange.endLocalDate,
-    timezone: snapshot.requestedRange.timezone,
-  }) === recordedActivitySnapshotScopeKey(scope);
 }
 
 type RangeBounds = Readonly<{
@@ -261,14 +337,20 @@ function validateActivity(
   path: string,
   range: RangeBounds,
   fetchedAt: Temporal.Instant,
+  shape: SnapshotBodyOptions,
 ): RecordedActivity {
   const activity = object(value, path);
   exactKeys(activity, path, [
     "id", "kind", "startAt", "endAt", "duration", "localStartDate", "revision", "fieldAvailability",
+    ...(shape.selectorKeys ? ["selectorKeys"] : []),
   ]);
-  if (!ACTIVITY_ID.test(nonEmptyString(activity.id, `${path}.id`))) {
-    fail(`${path}.id`, "must be an opaque hevy/ activity ID");
+  const idPattern = shape.source === RECORDED_ACTIVITY_SOURCE
+    ? ACTIVITY_ID
+    : new RegExp(`^${shape.source}/[0-9a-f]{64}$`, "u");
+  if (!idPattern.test(nonEmptyString(activity.id, `${path}.id`))) {
+    fail(`${path}.id`, `must be an opaque ${shape.source}/ activity ID`);
   }
+  if (shape.selectorKeys) validateSelectorKeys(activity.selectorKeys, `${path}.selectorKeys`);
   literal(activity.kind, "workout", `${path}.kind`);
   const start = instant(activity.startAt, `${path}.startAt`);
   const end = instant(activity.endAt, `${path}.endAt`);
@@ -299,6 +381,21 @@ function validateActivity(
   literal(fields.location, "unsupported", `${path}.fieldAvailability.location`);
   literal(fields.sourceTimezone, "unsupported", `${path}.fieldAvailability.sourceTimezone`);
   return value as RecordedActivity;
+}
+
+function validateSelectorKeys(value: unknown, path: string): void {
+  const keys = array(value, path);
+  if (keys.length > RECORDED_ACTIVITY_MAX_SELECTOR_KEYS) {
+    fail(path, `cannot exceed ${RECORDED_ACTIVITY_MAX_SELECTOR_KEYS} keys`);
+  }
+  const seen = new Set<string>();
+  keys.forEach((key, index) => {
+    if (typeof key !== "string" || !SELECTOR_KEY.test(key)) {
+      fail(`${path}[${index}]`, "must be a SHA-256 hex digest");
+    }
+    if (seen.has(key)) fail(`${path}[${index}]`, "must be unique");
+    seen.add(key);
+  });
 }
 
 function parseProviderInstant(value: unknown): Temporal.Instant | null {

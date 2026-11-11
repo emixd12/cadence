@@ -464,6 +464,27 @@ After it:
 - Calendar events stay a separate data type. A scheduled event is not evidence that
   something happened and never enters the completion path.
 
+#### Recorded activity contract 1.1 (Ticket 312)
+
+`RecordedActivitySnapshotV1_1` in `packages/core/src/types/recorded-activity.ts`,
+validated by `validateRecordedActivitySnapshotV1_1` and described by
+`packages/core/src/recorded-activity-1.1.schema.json`. Fixture:
+`tests/fixtures/recorded-activity-snapshot.1.1.valid.json`. It is the match-read
+contract only. It differs from `1.0.0` in four fields; every other field and rule is
+unchanged.
+
+| Field | Rule |
+|---|---|
+| `schemaVersion` | Exact `1.1.0`. The `1.0.0` validator rejects it, and the `1.1.0` validator rejects `1.0.0`. |
+| `source` | One of `RECORDED_ACTIVITY_SOURCES_1_1`: `hevy` today. Any other value fails with `unsupported_schema_version`. |
+| `adapterVersion` | The source's entry in `RECORDED_ACTIVITY_ADAPTER_VERSIONS_1_1`: `hevy-workouts-v2` for Hevy. Any other value fails with `unsupported_schema_version`. |
+| `selectorKeysRequested` | `true` when the read asked for selector keys. Then every activity carries `selectorKeys`; when `false`, no activity does. |
+| `activities[].selectorKeys` | Sorted, unique, lowercase SHA-256 hex digests, at most 32. `recordedActivitySelectorKey` computes each one over the label `cadence-selector-v1`, the source, the connection's account digest and the provider key (Hevy: `routine_id`). A workout without a routine has an empty list. |
+| `activities[].id` | `<source>/` followed by 64 hex digits. |
+
+`RECORDED_ACTIVITY_MIN_MATCH_SECONDS` sits beside the contract: 300 seconds for Hevy
+(D28.8). Matching ignores a shorter activity; the contract still carries it.
+
 ### Separate Daily Brief disclosure
 
 Connection and display never grant Daily Brief disclosure. The existing

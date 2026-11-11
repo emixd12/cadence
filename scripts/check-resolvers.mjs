@@ -90,6 +90,12 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "connector completion matching",
+    resolver: "packages/core/src/resolvers/activity-match.resolver.ts",
+    test: "tests/activity-match.resolver.test.ts",
+    source: "docs/plans/2026-11-10-connector-completion-architecture.md",
+  },
+  {
     domain: "Note shortcuts",
     resolver: "packages/core/src/resolvers/note-suggestion.resolver.ts",
     test: "tests/note-suggestion.resolver.test.ts",
