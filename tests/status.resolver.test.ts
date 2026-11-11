@@ -2,6 +2,8 @@ import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import {
+  normalizeNoteLineEndings,
+  resolveExpectedNote,
   resolveNoteUpdate,
   resolveStatusEvent,
   resolveStatusTransition,
@@ -262,9 +264,31 @@ describe("resolveNoteUpdate", () => {
     });
   });
 
+  it("turns lone CR line breaks into LF", () => {
+    expect(resolveNoteUpdate({ note: "First line\rSecond line" })).toEqual({
+      note: "First line\nSecond line",
+    });
+    expect(normalizeNoteLineEndings("a\r\nb\rc\nd")).toBe("a\nb\nc\nd");
+  });
+
   it("stores blank occurrence notes as null", () => {
     expect(resolveNoteUpdate({ note: " \n\t " })).toEqual({
       note: null,
     });
+  });
+});
+
+describe("resolveExpectedNote", () => {
+  it("matches saved LF text when a browser submits CRLF or lone CR", () => {
+    expect(resolveExpectedNote("First line\r\nSecond line")).toBe("First line\nSecond line");
+    expect(resolveExpectedNote("First line\rSecond line")).toBe("First line\nSecond line");
+  });
+
+  it("keeps surrounding whitespace so the compare-and-set stays exact", () => {
+    expect(resolveExpectedNote(" Saved ")).toBe(" Saved ");
+  });
+
+  it("treats empty text as no saved note", () => {
+    expect(resolveExpectedNote("")).toBeNull();
   });
 });

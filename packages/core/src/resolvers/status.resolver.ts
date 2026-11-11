@@ -102,10 +102,26 @@ export function resolveStatusEvent(
   };
 }
 
+/** Turns CRLF and lone CR line breaks into LF. */
+export function normalizeNoteLineEndings(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
+}
+
+/**
+ * Plans the compare-and-set value for a note save. Browsers submit form text with
+ * CRLF line breaks, while saved notes use LF, so only line endings change here.
+ * The value is not trimmed: it must equal the saved text, which is already trimmed.
+ * Empty text means the caller saw no note.
+ */
+export function resolveExpectedNote(value: string): string | null {
+  const expected = normalizeNoteLineEndings(value);
+  return expected.length > 0 ? expected : null;
+}
+
 export function resolveNoteUpdate(
   input: ResolveNoteUpdateInput,
 ): OccurrenceNoteUpdatePlan {
-  const note = input.note.replace(/\r\n/g, "\n").trim();
+  const note = normalizeNoteLineEndings(input.note).trim();
 
   return {
     note: note.length > 0 ? note : null,

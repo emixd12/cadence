@@ -49,6 +49,17 @@ describe("day note update planning", () => {
   });
 });
 
+describe("day note expected text", () => {
+  it("normalizes CRLF and lone CR line breaks without trimming", () => {
+    const plan = (expectedNote: string) => resolveDayNoteUpdate({ localDate: "2026-11-10", expectedNote, note: "x" }).expectedNote;
+    expect(plan("line one\r\nline two")).toBe("line one\nline two");
+    expect(plan("line one\rline two")).toBe("line one\nline two");
+    expect(plan("a\r\n\r\nb")).toBe("a\n\nb");
+    expect(plan(" kept as sent ")).toBe(" kept as sent ");
+    expect(plan("")).toBeNull();
+  });
+});
+
 describe("day note ranges and views", () => {
   it("accepts inclusive ranges up to the limit", () => {
     expect(resolveDayNoteRange({ from: "2026-11-01", to: "2026-11-01" })).toEqual({ from: "2026-11-01", to: "2026-11-01" });
@@ -105,6 +116,48 @@ describe("day note service", () => {
     await saveDayNote(store as never, { localDate: "2026-11-10", expectedNote: "Rest day", note: "", usedShortcut: true });
     expect(calls[0]).toHaveProperty("usedShortcut", true);
     expect(calls[1]).not.toHaveProperty("usedShortcut");
+  });
+
+  // Defect D3 (Ticket 292): browsers submit form text with CRLF line breaks, while
+  // the saved note uses LF. This store compares like the hosted save_day_note RPC.
+  function compareAndSetStore(saved: string | null) {
+    const state = { saved };
+    return {
+      state,
+      store: {
+        saveDayNote: async (input: { expectedNote: string | null; note: string | null }) => {
+          if (input.expectedNote !== state.saved) return null;
+          state.saved = input.note;
+          return record(input.note);
+        },
+      },
+    };
+  }
+
+  it.each([
+    ["CRLF", "line one\r\nline two"],
+    ["lone CR", "line one\rline two"],
+  ])("edits a multi-line note when the expected text uses %s line breaks", async (_label, expectedNote) => {
+    const { state, store } = compareAndSetStore("line one\nline two");
+    const result = await saveDayNote(store, { localDate: "2026-11-10", expectedNote, note: "line one\r\nline three" });
+    expect(result).toMatchObject({ note: "line one\nline three", changed: true });
+    expect(state.saved).toBe("line one\nline three");
+  });
+
+  it("clears a multi-line sync-merged note submitted with CRLF line breaks", async () => {
+    const { state, store } = compareAndSetStore("From the Mac\n\nFrom the web");
+    const result = await saveDayNote(store, {
+      localDate: "2026-11-10", expectedNote: "From the Mac\r\n\r\nFrom the web", note: "",
+    });
+    expect(result).toMatchObject({ note: null, changed: true });
+    expect(state.saved).toBeNull();
+  });
+
+  it("still reports a conflict when a multi-line expected note is stale", async () => {
+    const { state, store } = compareAndSetStore("line one\nline two changed");
+    await expect(saveDayNote(store, { localDate: "2026-11-10", expectedNote: "line one\r\nline two", note: "New" }))
+      .rejects.toThrow(DAY_NOTE_CONFLICT_MESSAGE);
+    expect(state.saved).toBe("line one\nline two changed");
   });
 
   it("lists sorted notes inside the requested range", async () => {
