@@ -48,7 +48,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310, 311, 312, 313 and 322 complete; 314–319 and 321 implemented in source, off behind `CADENCE_CONNECTOR_COMPLETION`, reading Hevy by events cursor (strategy A); 320, 323 and 324 not started | Merge PR #207 with both hosted migration pushes (`20261111150000` approved); a Mac build with Ticket 319 | TICKETS, Tickets 310–324; STATUS, "Ticket 311: Hevy read strategy decided — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (sync contract 5, not required for the first release); Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 292: day notes | Code merged and live: PR #208 (`76b701c7`) and Settings hotfix PR #210 (`58efe857`), November 11, 2026; hosted migrations `20261111120000` and `20261111130000` applied November 11; acceptance items 1, 2, 3, 5 (account A), 6 and 10 passed | Item 5 isolation with account B (preflight requirement `vault-google-b`: vault item missing); items 7–9 need a dev-signed Mac build (no Developer ID certificate in the login Keychain); item 4 apply step; owner closes the ticket after those | TICKETS, Ticket 292; STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026" |
 | Web export returns 500 for accounts with camelCase configuration history | Pre-existing, found during Ticket 292 acceptance (defect D2); not investigated or fixed | Every web export for test account A fails: `assembleExportBundle` throws "Invalid configuration schedule_graph" on 6 `behavior_configuration_events` rows with camelCase keys, likely written by the Mac through account sync; the route logs nothing. A separate workspace is proposed | STATUS, "Ticket 292: day-note shortcuts, restore and MCP search live — November 11, 2026"; `.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2 |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -89,6 +89,26 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Connector completion hosted push and merge — November 11, 2026
+
+The owner said on November 11 to merge PR #207 and continue.
+
+- Hosted already had main's `20261111120000` and `20261111130000`, so the connector
+  completion migrations moved, unchanged, from `20261110200000` and `20261110210000` to
+  `20261111140000` and `20261111150000`. Both create only new objects. A clean local start
+  replayed all 114 migrations and all 44 SQL fixtures passed.
+- An agent pushed both with the vault token `supabase-access-token` and CLI 2.105.0, before
+  the merge: `20261111140000` under the standing approval for additive migrations,
+  `20261111150000` (the `service_role` column read) with the owner's November 10 approval.
+- Readback: RLS on `behavior_source_links`, `occurrence_source_matches` and
+  `connector_completion_state`, each with policies for `authenticated` only; no `anon`
+  grants; `service_role` may select only `user_id`, `source` and `next_check_at` on
+  `connector_completion_state`. `apply_connector_completion`, `attach_source_activity` and
+  `remove_source_match` are security definer with an empty search path and execute for
+  `authenticated` only. The six `cadence_private` helpers are revoked from `public`.
+- `migration list`: hosted equals git (114 rows).
+- The feature stays off until `CADENCE_CONNECTOR_COMPLETION` is `on`; this work set no Vercel variable.
 
 ## Ticket 311: Hevy read strategy decided — November 11, 2026
 
@@ -251,10 +271,8 @@ path does nothing unless `CADENCE_CONNECTOR_COMPLETION` is exactly `on`.**
 - Not done: 311 is blocked (below). 320 is deferred: it needs sync contract 5 (4 is day notes), a SQLite
   migration, native changes and installed acceptance. 323 needs 311, a published Mac build
   with 319 (owner instruction) and Ticket 241's steps. 324 follows 323.
-- Hosted: no migration pushed. `20261111140000` fits the standing approval once a push can
-  run; the `cadence-agents` token needs the vault service-account token first.
-  `20261111150000` grants `service_role` a column read; the owner approved its hosted push
-  on November 10, 2026. Both pushes run when the branch merges to `main` (condition 4).
+- Hosted: both migrations pushed November 11 (see "Connector completion hosted push and
+  merge — November 11, 2026").
 - Owner steps from `npm run qa:preflight -- --suite connectors` (exit 10): store the Cadence
   Agents service-account token (`docs/qa/agent-secrets.md`, steps 4–5); then the vault items
   it lists, of which Ticket 311 needs `hevy-test-account-a`.
