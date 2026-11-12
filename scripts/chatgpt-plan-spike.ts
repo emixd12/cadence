@@ -399,6 +399,7 @@ export type StreamOutcome = {
   eventTypes: string[];
   usage: Usage | null;
   allowOrigin: string | null;
+  contentType: string | null;
   /** In memory only; never logged or written. */
   output: unknown[] | null;
 };
@@ -408,7 +409,7 @@ export async function streamResponses(fetchImpl: typeof fetch, endpoints: SpikeE
   const clock = options.clock ?? (() => performance.now());
   const started = clock();
   const outcome: StreamOutcome = { kind: "stream_interrupted", httpStatus: null, requestId: null, errorCode: null, errorParam: null, errorType: null,
-    errorDetail: null, firstByteMs: null, firstDeltaMs: null, totalMs: 0, eventTypes: [], usage: null, allowOrigin: null, output: null };
+    errorDetail: null, firstByteMs: null, firstDeltaMs: null, totalMs: 0, eventTypes: [], usage: null, allowOrigin: null, contentType: null, output: null };
   const finish = (): StreamOutcome => { outcome.totalMs = Math.round(clock() - started); return outcome; };
   let response: Response;
   try {
@@ -424,12 +425,15 @@ export async function streamResponses(fetchImpl: typeof fetch, endpoints: SpikeE
   outcome.httpStatus = response.status;
   outcome.requestId = response.headers.get("x-request-id");
   outcome.allowOrigin = response.headers.get("access-control-allow-origin");
+  outcome.contentType = response.headers.get("content-type");
   if (!response.ok) {
     const parsed: unknown = await response.json().catch(() => null);
     Object.assign(outcome, { kind: "http_error" as const, ...errorOutcome(parsed) });
     return finish();
   }
-  if (!(response.headers.get("content-type") ?? "").includes("text/event-stream")) {
+  // The plan route's streaming 200 carries no Content-Type (live run, November 12, 2026), so only
+  // an explicit JSON type selects the non-streaming path; anything else is read as SSE.
+  if ((response.headers.get("content-type") ?? "").includes("json")) {
     // A non-streaming reply means the server accepted the body as sent (for example stream: false).
     const parsed: unknown = await response.json().catch(() => null);
     outcome.firstByteMs = Math.round(clock() - started);
@@ -456,6 +460,8 @@ export async function streamResponses(fetchImpl: typeof fetch, endpoints: SpikeE
       outcome.kind = "completed";
       outcome.output = Array.isArray(responseBody.output) ? responseBody.output : null;
       outcome.usage = readUsage(responseBody.usage);
+    } else if (event.type === "response.completed") {
+      outcome.errorDetail = "completed_without_response_object";
     } else if (event.type === "response.failed") {
       terminal = true;
       outcome.kind = "failed";
@@ -549,6 +555,8 @@ export const FIELD_PROBES: readonly Probe[] = [
 export type ProbeResult = {
   model: string; probe: ProbeId; expected: Probe["expected"]; accepted: boolean; kind: StreamOutcomeKind; httpStatus: number | null;
   errorCode: string | null; errorParam: string | null; errorDetail: string | null; totalMs: number; requestId: string | null; allowOrigin: string | null;
+  /** Diagnostics only: SSE event type names and the response content type. No bodies. */
+  eventTypes?: string[]; firstByteMs?: number | null; contentType?: string | null;
 };
 
 export type BriefContract = { jsonSchema: boolean; reasoning: boolean; tools: boolean };
@@ -876,7 +884,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeReport> {
           { signal: anySignal(options.signal, AbortSignal.timeout(options.deadlineMs)), origin: probe.origin });
         report.probes.push({ model, probe: probe.id, expected: probe.expected, accepted: outcome.kind === "completed", kind: outcome.kind, httpStatus: outcome.httpStatus,
           errorCode: outcome.errorCode, errorParam: outcome.errorParam, errorDetail: outcome.errorDetail, totalMs: outcome.totalMs, requestId: outcome.requestId,
-          allowOrigin: outcome.allowOrigin });
+          allowOrigin: outcome.allowOrigin, eventTypes: outcome.eventTypes, firstByteMs: outcome.firstByteMs, contentType: outcome.contentType });
         log(`  ${model} probe ${probe.id}: ${outcome.kind}${outcome.errorCode ? ` ${outcome.errorCode}` : ""}${outcome.errorParam ? ` (${outcome.errorParam})` : ""}`);
         if (outcome.errorCode && STOP_CODES.has(outcome.errorCode)) { report.stoppedEarly = outcome.errorCode; break modelLoop; }
       }

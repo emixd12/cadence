@@ -201,7 +201,8 @@ export async function startMockOpenAI(options: MockOptions = {}): Promise<MockOp
     const content = typeof first?.content === "string" ? first.content : "";
     const brief = content.startsWith("{");
     if (brief) state.briefRequests++;
-    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store" });
+    // Like the live plan route (November 12, 2026): the streaming 200 has no Content-Type.
+    response.writeHead(200, { "Cache-Control": "no-store" });
     const send = (event: Record<string, unknown>) => response.write(`event: ${event.type as string}\ndata: ${JSON.stringify(event)}\n\n`);
     const id = `resp_mock_${randomBytes(4).toString("hex")}`;
     send({ type: "response.created", response: { id, status: "in_progress" } });

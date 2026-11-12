@@ -17385,8 +17385,8 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 295: Spike the Daily Brief request on a ChatGPT plan
 
-Status: in progress since November 7, 2026; mock mode merged November 10. The live run
-waits for the owner's ChatGPT sign-in.
+Status: complete, November 12, 2026 (UTC). The live run on the owner's ChatGPT Pro account
+passed; results and recommendations are in `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
 Dependencies: none.
 
 Goal: prove with a real ChatGPT Plus or Pro account that the Daily Brief request works under

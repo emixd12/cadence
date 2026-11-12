@@ -149,6 +149,14 @@ describe("streaming and request contract", () => {
     expect(cut.kind).toBe("stream_interrupted");
     const plain = await streamResponses(reply(new Response(JSON.stringify({ status: "completed", output: [] }), { status: 200, headers: { "Content-Type": "application/json" } })), endpoints, "t", {}, { signal });
     expect(plain.kind).toBe("completed");
+    // The live plan route sends its event stream with no Content-Type header.
+    const untyped = new Response(new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode("event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n"));
+      controller.close();
+    } }), { status: 200 });
+    expect(untyped.headers.get("content-type")).toBeNull();
+    const bare = await streamResponses(reply(untyped), endpoints, "t", {}, { signal });
+    expect(bare).toMatchObject({ kind: "completed", contentType: null, eventTypes: ["response.completed"] });
   });
 
   it("computes median and maximum latency", () => {
