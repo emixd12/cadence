@@ -52,14 +52,14 @@ Check the cited entry before acting on a row.
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
-| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode passes); 296 in progress (prepare/validate split done; adapter waits for 295); 297 implemented on branch `claude/ticket-297-mac-chatgpt`, not merged (mocked tests pass); 298–300 not started | Live spike run needs the owner's ChatGPT Plus or Pro sign-in (owner ask sent November 11) | TICKETS, Tickets 294–300; STATUS, "Ticket 296: Daily Brief prepare and validate split — November 11, 2026"; STATUS, "Ticket 297: Mac app ChatGPT connection — November 12, 2026" |
+| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 and 295 complete; 296 prepare/validate split merged, adapter on PR #238; 297 complete in source (Mac ChatGPT connection, no UI); 298 on PR #240; 299 and 300 not started | Ticket 299 wires the UI and model call; Ticket 300 needs a Mac build (mac-release) | TICKETS, Tickets 294–300; STATUS, "Ticket 297: Mac app ChatGPT connection — November 12, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned; comparison on H1–H10 and S1 prepared November 11 | Owner sets a spend cap (US$2 asked) and optionally names extra models; agents run the comparison; the owner promotes or rejects under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner comparison" |
 | Ticket 291: skill-rule acceptance scenarios | Local-stack run with `claude-code` passed all three scenarios November 11 | Production run with the API clients; needs a spend cap for the QA keys | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "First local run — November 11, 2026" |
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
 | Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Build notarized 0.1.10 on a configured release Mac (authorized November 12); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
-| Ticket 325: release credential backup and restore | `release:credentials` status, verify-backups, restore and backup; preflight checks; runbook; decision D29 | Owner creates the Cadence Release vault, its service account and an App Store Connect API key; agents back up and verify live; notarization switches to the API key; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325 started — November 11, 2026" |
+| Ticket 325: release credential backup and restore | Cadence Release vault and service account in place; identity, notarization and updater backups made and `verify-backups` passes (November 12) | Owner creates the App Store Connect API key; agents back it up and switch notarization to it; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
@@ -106,6 +106,48 @@ Cadence for Mac can connect, refresh and disconnect one ChatGPT account (D27). B
 - Mocked tests pass: 22 new Rust tests (154 Rust lib tests in all) and 6 TypeScript tests,
   including one that scans an export, two backups and the database for ChatGPT values.
   No live sign-in ran. Installed acceptance is Ticket 300.
+
+## Ticket 295: ChatGPT plan spike passed live — November 12, 2026
+
+**On branch `claude/brief-chatgpt-plan-086210`.**
+
+- The owner signed in with ChatGPT Pro three times on November 12 (UTC). The third run
+  passed. Results and recommendations are in `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
+- Sign-in, the `chatgpt.tokens.use.direct` grant, the catalog (10 models), refresh with
+  rotation and revocation work. CORS allows `tauri://localhost` on both endpoints.
+- Daily Brief through Cadence's validation: `gpt-5.6-luna`, `gpt-6.1-terra` and
+  `gpt-6.1-sol` valid on 8 of 8 fixtures; `gpt-6-astra` 7 of 8 (one
+  `server_is_overloaded`). Slowest call 14.3 s; none over 30 s.
+- The plan route rejects `background`, a string `input` and `stream: false` with 400. It
+  accepts strict `json_schema`, `reasoning`, `tools: []` and `max_output_tokens`.
+- Spike fix: the plan route's streaming 200 has no `Content-Type`. The first two runs read
+  those replies as JSON and marked them interrupted. `scripts/chatgpt-plan-spike.ts` now
+  reads any non-JSON reply as SSE; the mock omits the header, and a test covers it. An
+  uncommitted diagnostic edit (event names and content type in the probe report, no
+  bodies) appeared in the worktree during the first run; it is kept and committed here.
+- The owner approved the recommendations on November 12 and set the model order:
+  `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (`gpt-6-luna` untested).
+- Next: the Ticket 296 adapter, then Tickets 297 and 298.
+- Platform impact: none (development script and QA record). Messaging impact: none.
+
+## Ticket 325: live backups verified — November 12, 2026
+
+The owner created the Cadence Release vault and its read/write service account and stored
+the token in the login keychain (service `cadence-release-1password`). With the owner's
+`release-secrets` approval in chat, recorded in `.intent/acceptance/mac-0.1.10-20261111`,
+an agent ran `backup` for the identity, the notarization credential and the updater key.
+
+- **Verified:** `verify-backups` reports all three items complete with matching
+  fingerprints. The `desktop-release` preflight shows `release-vault-token` and
+  `release-backups` ready.
+- **Fixed in `release-credentials.mjs`:** `op item create` ignored a template on Node's
+  stdin pipe (a socket, not a FIFO) and created "Untitled SecureNote" items, so `backup`
+  now passes a 0600 `--template` file and checks the returned title. Attachment names with
+  periods (`identity.p12`, `cadence-updater.key.pub`) are escaped. Two Untitled items and
+  one partial updater item were deleted from the vault. `tests/release-credentials.test.mjs`
+  covers both (14 pass).
+- **Still open:** the App Store Connect API key (owner creates it), switching notarization
+  to it, and the certificate-renewal spike.
 
 ## PR integration review and release access — November 12, 2026
 
@@ -256,7 +298,7 @@ Marketing and future mobile: not applicable. Messaging impact: none.
 
 ## Ticket 296: Daily Brief prepare and validate split — November 11, 2026
 
-**On branch `claude/brief-chatgpt-plan-086210`.**
+**Merged with PR #229.**
 
 - `lib/services/daily-brief-consumer.ts` now has `prepareDailyBrief` (estimates, planning,
   model request) and `validateDailyBrief` (model output to briefing from plain-JSON
