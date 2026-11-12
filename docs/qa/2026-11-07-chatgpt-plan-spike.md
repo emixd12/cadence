@@ -2,10 +2,17 @@
 
 ## State
 
-**Mock mode passes; the live run has not happened.** The live run waits for the owner to
-sign in to ChatGPT with the owner's Pro account and approve consent once. The result
-tables below are empty until then. No secrets, prompts or model output belong in this
-file.
+**The live run passed on November 12, 2026 (UTC), on the owner's ChatGPT Pro account.**
+Sign-in, plan usage, the catalog, refresh and revocation work. All four tested models ran
+the Daily Brief through Cadence's validation: 31 of 32 briefs were valid, and the one
+failure was a provider `server_is_overloaded`. No call took longer than 15 seconds.
+The webview may call both endpoints. No secrets, prompts or model output are in this file.
+
+Two earlier live runs that night found a spike bug, not a provider problem: the plan
+route's streaming HTTP 200 carries no `Content-Type` header, and the script treated any
+reply without `text/event-stream` as JSON. The script now reads every reply as SSE unless
+its type says JSON, and the mock omits the header the same way. Both earlier runs still
+proved sign-in, CORS, the catalog, the three rejected fields, refresh and revocation.
 
 ## What the spike proves
 
@@ -93,91 +100,121 @@ The mock follows the rules in OpenAI's docs. It is not evidence of OpenAI's beha
 
 ## Results (live run)
 
-Paste the tables from the run's `.md` report here; the columns below match it.
+The tables below are the run's `.md` report, unchanged except for the plan name.
 
-Run: — (mode, start time, duration in ms, spike version; add the account plan)
+Run: live, ChatGPT Pro, 2026-11-12T02:56:29.543Z, 326552 ms, spike 2026-11-07.1.
 
 ### Sign-in
 
 | Check | Result |
 | --- | --- |
-| Registration | |
-| Issued client ID returned (oaiapp_ form) | |
-| ID token valid (signature, issuer, audience, nonce, expiry) | |
-| Token scopes | |
-| Callback scopes | |
-| chatgpt.tokens.use.direct granted | |
-| Refresh token issued | |
-| Access token lifetime (s) | |
-| Discovery authorize / token match docs | |
-| Revocation endpoint | |
+| Registration | returning |
+| Issued client ID returned (oaiapp_ form) | no (yes) |
+| ID token valid (signature, issuer, audience, nonce, expiry) | yes |
+| Token scopes | chatgpt.tokens.use.direct email offline_access openid profile resource.invoke |
+| Callback scopes | chatgpt.tokens.use.direct email offline_access openid profile resource.invoke |
+| chatgpt.tokens.use.direct granted | yes |
+| Refresh token issued | yes |
+| Access token lifetime (s) | 3599 |
+| Discovery authorize / token match docs | yes / yes |
+| Revocation endpoint | https://auth.openai.com/api/accounts/oauth/revoke |
 
 ### CORS preflight (Origin tauri://localhost)
 
 | Target | Status | Allow-Origin | Allow-Methods | Allow-Headers | Webview can call |
 | --- | --- | --- | --- | --- | --- |
-| token_endpoint | | | | | |
-| responses | | | | | |
-
-The Allow-Origin on an actual `/v1/responses` request is the `cors_actual` probe in
-"Request fields" (see the JSON report's `allowOrigin`).
+| token_endpoint | 200 | * | DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT | content-type | yes |
+| responses | 200 | * | DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT | authorization,content-type | yes |
 
 ### Model catalog
 
-Status —; model fields: —; gpt-5.6-luna listed: —.
+Status 200; model fields: additional_speed_tiers, allow_only_chatgpt_workspace_executor, allow_only_codex_cloud_agent_orchestrator, apply_patch_tool_type, auto_compact_token_limit, auto_review_model_override, availability_nux, available_access_programs, available_in_plans, base_instructions, comp_hash, context_window, default_reasoning_level, default_reasoning_summary, default_service_tier, default_verbosity, description, display_name, experimental_supported_tools, guardian, include_apps_usage_instructions, include_plugin_usage_instructions, include_skills_usage_instructions, input_modalities, max_context_window, minimal_client_version, model_messages, model_specialty, multi_agent_reasoning_effort, multi_agent_version, node_repl_auto_review_required, node_repl_disabled, prefer_websockets, priority, requires_sandboxed_review, service_tiers, shell_type, slug, support_verbosity, supported_in_api, supported_reasoning_levels, supports_experimental_context, supports_image_detail_original, supports_parallel_tool_calls, supports_reasoning_effort_updates, supports_reasoning_summaries, supports_reasoning_summary_parameter, supports_search_tool, tool_mode, truncation_policy, upgrade, use_responses_lite, visibility, web_search_tool_type; gpt-5.6-luna listed: yes.
 
 | Slug | Display name | Visibility | Tested |
 | --- | --- | --- | --- |
-| | | | |
+| gpt-6.1-sol | GPT-6.1-Sol | list | yes |
+| gpt-6-astra | GPT-6-Astra | list | yes |
+| gpt-6.1-terra | GPT-6.1 Terra | list | yes |
+| gpt-6-sol | GPT-6-Sol | list | no |
+| gpt-reserve | GPT-Reserve | hide | no |
+| gpt-6-luna | GPT-6-Luna | list | no |
+| gpt-5.6-sol | GPT-5.6-Sol | list | no |
+| gpt-5.6-terra | GPT-5.6-Terra | list | no |
+| gpt-5.6-luna | GPT-5.6-Luna | list | yes |
+| codex-auto-review | Codex Auto Review | hide | no |
 
 ### Request fields
 
 | Model | Probe | Expected | Accepted | HTTP | Error code | Param | ms |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| | baseline | accept | | | | | |
-| | json_schema_strict | observe | | | | | |
-| | reasoning_low | observe | | | | | |
-| | tools_none | observe | | | | | |
-| | max_output_tokens | reject | | | | | |
-| | background_false | reject | | | | | |
-| | input_string | reject | | | | | |
-| | stream_false | reject | | | | | |
-| | cors_actual | observe | | | | | |
+| gpt-6.1-sol | baseline | accept | yes | 200 | — | — | 2740 |
+| gpt-6.1-sol | json_schema_strict | observe | yes | 200 | — | — | 2435 |
+| gpt-6.1-sol | reasoning_low | observe | yes | 200 | — | — | 2396 |
+| gpt-6.1-sol | tools_none | observe | yes | 200 | — | — | 2693 |
+| gpt-6.1-sol | max_output_tokens | reject | yes | 200 | — | — | 4884 |
+| gpt-6.1-sol | background_false | reject | no | 400 | — | — | 584 |
+| gpt-6.1-sol | input_string | reject | no | 400 | — | — | 524 |
+| gpt-6.1-sol | stream_false | reject | no | 400 | — | — | 485 |
+| gpt-6.1-sol | cors_actual | observe | yes | 200 | — | — | 4401 |
+| gpt-6-astra | baseline | accept | yes | 200 | — | — | 8863 |
+| gpt-6-astra | json_schema_strict | observe | yes | 200 | — | — | 9512 |
+| gpt-6-astra | reasoning_low | observe | yes | 200 | — | — | 5476 |
+| gpt-6-astra | tools_none | observe | yes | 200 | — | — | 12773 |
+| gpt-6-astra | max_output_tokens | reject | yes | 200 | — | — | 14296 |
+| gpt-6-astra | background_false | reject | no | 400 | — | — | 640 |
+| gpt-6-astra | input_string | reject | no | 400 | — | — | 554 |
+| gpt-6-astra | stream_false | reject | no | 400 | — | — | 470 |
+| gpt-6-astra | cors_actual | observe | yes | 200 | — | — | 9769 |
+| gpt-6.1-terra | baseline | accept | yes | 200 | — | — | 1566 |
+| gpt-6.1-terra | json_schema_strict | observe | yes | 200 | — | — | 2958 |
+| gpt-6.1-terra | reasoning_low | observe | yes | 200 | — | — | 1883 |
+| gpt-6.1-terra | tools_none | observe | yes | 200 | — | — | 1803 |
+| gpt-6.1-terra | max_output_tokens | reject | yes | 200 | — | — | 3085 |
+| gpt-6.1-terra | background_false | reject | no | 400 | — | — | 591 |
+| gpt-6.1-terra | input_string | reject | no | 400 | — | — | 468 |
+| gpt-6.1-terra | stream_false | reject | no | 400 | — | — | 520 |
+| gpt-6.1-terra | cors_actual | observe | yes | 200 | — | — | 1632 |
+| gpt-5.6-luna | baseline | accept | yes | 200 | — | — | 2448 |
+| gpt-5.6-luna | json_schema_strict | observe | yes | 200 | — | — | 1478 |
+| gpt-5.6-luna | reasoning_low | observe | yes | 200 | — | — | 1561 |
+| gpt-5.6-luna | tools_none | observe | yes | 200 | — | — | 1828 |
+| gpt-5.6-luna | max_output_tokens | reject | yes | 200 | — | — | 6487 |
+| gpt-5.6-luna | background_false | reject | no | 400 | — | — | 526 |
+| gpt-5.6-luna | input_string | reject | no | 400 | — | — | 574 |
+| gpt-5.6-luna | stream_false | reject | no | 400 | — | — | 472 |
+| gpt-5.6-luna | cors_actual | observe | yes | 200 | — | — | 1715 |
 
 ### Daily Brief per model
 
 | Model | json_schema | reasoning | tools | Runs | Completed | Valid | Pass rate | Median ms | Max ms | Median first text ms | Over 30 s | Median input tokens | Median output tokens |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | | | | | |
-
-"Over 30 s" counts calls longer than today's hosted model budget
-(`lib/services/daily-brief.service.ts`, 30 seconds inside a 60-second attempt).
+| gpt-6.1-sol | yes | yes | yes | 8 | 8 | 8 | 1 | 4556 | 5951 | 3218 | 0 | 2394 | 69 |
+| gpt-6-astra | yes | yes | yes | 8 | 7 | 7 | 0.875 | 11160 | 14304 | 9386 | 0 | 2392 | 91 |
+| gpt-6.1-terra | yes | yes | yes | 8 | 8 | 8 | 1 | 2853 | 5376 | 1961 | 0 | 2394 | 60 |
+| gpt-5.6-luna | yes | yes | yes | 8 | 8 | 8 | 1 | 7044 | 10809 | 5082 | 0 | 2394 | 300 |
 
 ### Daily Brief failures
 
 | Model | Fixture | Run | Transport | HTTP | Error code | Validation code |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — | — |
+| gpt-6-astra | dense | 1 | failed | 200 | server_is_overloaded | advisor_unavailable |
 
 ### Refresh and revocation
 
 | Step | Attempted | OK | HTTP | Detail |
 | --- | --- | --- | --- | --- |
-| Refresh | | | | rotated —, plan scope kept — |
-| Revoke refresh token | | | | attempts — |
+| Refresh | yes | yes | 200 | rotated yes, plan scope kept yes |
+| Revoke refresh token | yes | yes | 200 | attempts 1 |
 
-### Stops and errors
-
-The report adds this section only when the run stopped early or recorded an error.
-
-## Recommendations (after the live run)
+## Recommendations
 
 | Decision | Recommendation | Evidence |
 | --- | --- | --- |
-| Request contract for Ticket 296 | | |
-| Model selection rule | | |
-| Attempt deadline on the plan route | | |
-| Mac transport: webview or Rust | | |
+| Request contract for Ticket 296 | `stream: true`, `store: false`, `input` as a message list, no `background`. Keep strict `json_schema`, `reasoning`, `tools: []` with `tool_choice: none`, and `max_output_tokens: 2000` from today's hosted body. Read the reply as SSE whatever its `Content-Type`, through `response.completed`, under the 64 KB cap. | All four models accepted the optional fields and `max_output_tokens`. `background`, a string `input` and `stream: false` return 400 with a message and no error code. Streaming 200s had no `Content-Type`. |
+| Model selection rule | Prefer `gpt-5.6-luna`, today's hosted model, when the catalog lists it with visibility `list`. Otherwise take the first listed model in this order: `gpt-6.1-terra`, `gpt-6.1-sol`. Never pick a `hide` model. Brief quality per model was not reviewed; only validation and latency were measured. | `gpt-5.6-luna`, `gpt-6.1-terra` and `gpt-6.1-sol` passed 8 of 8. Terra was fastest (median 2.9 s). Luna keeps the hosted prompt tuning (median 7.0 s, 300 output tokens). |
+| Attempt deadline on the plan route | Keep today's 30-second model budget inside the 60-second attempt. | The slowest brief took 14.3 s (`gpt-6-astra`); none passed 30 s. |
+| Error mapping | Treat `response.failed` with `server_is_overloaded` as retry later. The usage-limit and eligibility codes from the docs were not seen and stay mapped from the docs. | One `gpt-6-astra` brief failed this way. |
+| Mac transport: webview or Rust | CORS allows the webview (`Access-Control-Allow-Origin: *` on the token endpoint and `/v1/responses`). Ticket 297 still decides where tokens live. Doing token-endpoint calls in Rust keeps the refresh token out of the webview, as Keychain-only storage requires. | Preflight 200 for `tauri://localhost` on both; the actual `/v1/responses` request with that origin succeeded on all four models. |
 
 ## Notes for the live run
 
