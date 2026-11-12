@@ -80,7 +80,7 @@ Check the cited entry before acting on a row.
 | Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
 | Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
 | MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
-| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy and Outlook (personal account) passed on production web November 11; cross-tenant Outlook checks skipped by owner decision; PR #239 records 0.1.10 installed and Hevy timing shown without titles | iCloud (240) and its part of 241 step 6: no usable test identity; existing vault item unreadable; owner decides between their own Apple Account and waiting. Remaining installed connector acceptance is open; 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "PR #245 connector acceptance record review — November 12, 2026"; PR #239 release packet |
+| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy and Outlook (personal account) passed on production web November 11 and on installed Mac 0.1.10 November 12; cross-tenant Outlook checks skipped by owner decision | iCloud (240) and its part of 241 step 6: waiting on the owner's Apple Account vault item (app-specific password). Not run on the Mac: Microsoft deep-link completion, sign-out and account-switch cache cleanup, Hevy key entry. 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "Installed connector checks on Mac 0.1.10 — November 12, 2026" |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
 | Google Calendar Timeline (grouped): Tickets 133–137, 141, 150 | In progress; reconciled October 27: still open | Post-approval web and native consent smoke checks; 137 provider-failure, Workspace and installed fixture cases; 150 live custom-name check | TICKETS, Tickets 137, 141, 150 |
@@ -109,6 +109,27 @@ HTTP 500 from `apply_account_sync_plan` twice; Postgres logged a statement timeo
   instead of "Unable to save the local change. Try again." Ships with the next Mac release.
 - Verification: local stack replay of every migration; all 47 `tests/sql` fixtures passed.
 - Open: hosted push, the owner's Mac retry, and its integrity check.
+
+## Installed connector checks on Mac 0.1.10 — November 12, 2026
+
+An agent ran installed connector acceptance on the test Mac (published 0.1.10, account A)
+from 05:40 to 05:55Z. Evidence: `docs/qa/2026-11-11-connector-acceptance.md`, "Installed
+desktop".
+
+- **Passed:** per-source cache fences; complete Hevy and Outlook snapshots at the hosted
+  generation; Settings states match hosted; an Outlook test event refreshed into the cache and
+  onto the Mac Timeline; Hevy recorded-activity line; disconnect from the Mac (confirmation,
+  hosted generation bump, Outlook cache deleted, Hevy cache kept, revocation text); Connect
+  from the Mac opens Microsoft's `common` authorize page with `Calendars.Read`; a reconnect
+  from the web reaches the Mac (generation 5).
+- **Not run:** Microsoft sign-in completion through `cadence://` (no remote browser driving),
+  the Keychain attempt item (not visible to `security` over SSH), sign-out and account-switch
+  cleanup (would unlink the Mac), Hevy key entry on the Mac, and iCloud.
+- **Test Mac handed back** to mac-release for its leave-reminder recheck: Cadence 0.1.10
+  running and linked as A, Outlook and Hevy connected, nothing else changed.
+- **Defects:** none found.
+
+Platform impact: desktop evidence only. Messaging impact: none.
 
 ## PRs 238–245 integration and release review — November 12, 2026
 
