@@ -1054,6 +1054,13 @@ cite has not changed.
   never receives them. The Mac shows the ChatGPT account's email. Disconnect
   revokes the refresh token at OpenAI. Web briefs and Mac briefs without plan usage are
   unchanged.
+  - Ticket 298 (November 12, 2026) sets the server side of this flow. Cadence's server sends
+    the prepared brief facts and model instructions to the signed-in Mac, with a signed
+    envelope that holds the data needed to check the reply. The Mac returns the envelope with
+    the model's reply. The envelope is signed, not encrypted, expires within 75 seconds, and
+    holds only that user's own data; Cadence's server keeps no copy of the prepared request.
+    Disclosures that say Cadence's server sends the facts to OpenAI should say that, on a
+    plan, the server sends them to the user's Mac, and the Mac sends them to OpenAI.
 - **Affected:** Tickets 294, 297, 298 and 299. Files: `components/settings/LegalContent.tsx`
   (Privacy, "Optional Daily Brief", the processor table's OpenAI rows; Trust, "Data
   boundaries"). Related legal entry: L-017.

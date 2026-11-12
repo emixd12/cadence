@@ -219,6 +219,28 @@ The body holds `installationId`, `retry` and, optionally, the signed
 `travelConclusions` token from the latest one-day travel view (Ticket 219 Option A).
 The server alone verifies that token; it never widens what the caller may request.
 
+Ticket 298 (decision D27) adds device-model routes for a linked Mac that runs the
+model call on the user's ChatGPT plan. All use the same authentication, origins and
+`no-store` as `POST /api/advisor/brief`, and `lib/services/daily-brief-device.service.ts`.
+
+| Route | Method | Body | Response |
+|---|---|---|---|
+| `/api/advisor/brief/device/prepare` | POST | As `/api/advisor/brief`: `installationId`, `retry`, optional `travelConclusions` | `{ state: "prepared", request: { instructions, facts }, envelope, expiresAt }`, or `pending` / `already_attempted` |
+| `/api/advisor/brief/device/complete` | POST | Exactly `{ installationId, envelope, output }`, up to about 1.08 MB | `{ state: "ready", briefing }`, as the hosted route |
+| `/api/advisor/brief/device/release` | POST | Exactly `{ installationId, envelope }`, with the same body cap | `{ state: "released" }` after the matching pending lease is released |
+
+Prepare admits the attempt and builds the context; it makes no model call. The signed
+envelope binds the user, installation, lease, preferences, configuration and context
+revisions, and carries only validation data; the server stores no prepared payload.
+Complete verifies the envelope and lease, validates the output and finishes the lease.
+Release verifies the signed envelope and caller binding, then releases only its
+matching pending lease. It never downgrades a completed attempt or resets retry
+quotas; a completed, failed or superseded lease returns `context_changed`.
+`CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates all three; when it is off, all return
+`not_configured`. Errors: `brief_envelope_invalid` (400), `device_recipe_unsupported`
+(503), `context_expired` and `context_changed` (409). `docs/OPERATIONS.md`, "Daily Brief
+device-model mode (Ticket 298)", holds the envelope and time budget.
+
 Require web origin/CSRF checks, exact desktop broker origins, RLS ownership,
 feature/disclosure checks, bounded attempts, output validation and `no-store`.
 No model prompt, owner override or arbitrary URL comes from the caller. Account,

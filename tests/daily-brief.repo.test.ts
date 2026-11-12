@@ -6,6 +6,7 @@ import {
   finishDailyBrief,
   listDailyBriefBehaviorIds,
   readDailyBriefPreferences,
+  releaseDailyBrief,
   saveDailyBriefPreferences,
 } from "@/lib/db/daily-brief.repo";
 
@@ -118,6 +119,18 @@ describe("Daily Brief repository", () => {
       retry: true,
       expectedRevision: 3,
     })).resolves.toEqual({ state: "retry_exhausted" });
+  });
+
+  it("releases a pending lease through the bounded RPC and rejects invalid storage responses", async () => {
+    const signal = new AbortController().signal;
+    const abortSignal = vi.fn().mockResolvedValue({ data: false, error: null });
+    const rpc = vi.fn(() => ({ abortSignal }));
+    const input = { installationId: "14700000-0000-4000-8000-000000000001", leaseToken: "lease", expectedRevision: 3 };
+    await expect(releaseDailyBrief({ rpc } as never, input, signal)).resolves.toBe(false);
+    expect(rpc).toHaveBeenCalledWith("release_daily_brief", { p_installation_id: input.installationId, p_lease_token: "lease", p_expected_revision: 3 });
+    expect(abortSignal).toHaveBeenCalledWith(signal);
+    abortSignal.mockResolvedValueOnce({ data: null, error: null });
+    await expect(releaseDailyBrief({ rpc } as never, input, signal)).rejects.toThrow("invalid result");
   });
 
   it("returns active behavior IDs in stable order and rejects overflow", async () => {
