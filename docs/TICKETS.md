@@ -17467,7 +17467,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 297: Mac app ChatGPT connection
 
-Status: not started.
+Status: implemented November 12, 2026 on PR #241. Review added bounded streaming reads,
+callback deadline enforcement, failed-grant cleanup and stricter ID-token validation.
+The reviewed head requires Desktop native CI; Rust is unavailable in the review executor.
+Live sign-in and installed checks belong to Ticket 300. No UI uses the connection until
+Ticket 299, whose desktop switch stays off by default.
 Dependencies: Ticket 295.
 
 Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
@@ -17493,11 +17497,15 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Not applicable: the web app shows no ChatGPT controls (D27). |
-| Desktop | `apps/desktop/src-tauri` listener and Keychain; `apps/desktop/src` connection client. |
+| Desktop | `apps/desktop/src-tauri/src/chatgpt/` listener, token calls and Keychain items; `apps/desktop/src/chatgpt/connection.ts` connection client. |
 | Marketing | Not applicable: no public claim until release (P-032). |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: P-029 (data flow).
+Messaging impact: P-029 (data flow). The callback page says only "You can close this tab
+and return to Cadence."; Ticket 299 logs the card's copy.
+
+Implementation notes: `docs/DESKTOP_BUILD.md`, "ChatGPT connection (Ticket 297)", and
+`docs/DESKTOP_DATA_MODEL.md`, "ChatGPT connection credentials (Ticket 297)".
 
 Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --progress=report`.
 
@@ -17510,7 +17518,8 @@ Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-
 inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
 added pending-only release, completion replay protection and a final context-expiry check.
 Migration `20261112043335_release_pending_daily_brief.sql` supplies the release RPC.
-Remaining: its hosted push, the Mac client (Ticket 299), and later owner activation.
+Hosted migration applied November 12, 2026. Remaining: the Mac client (Ticket 299) and
+later owner activation.
 The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
 production. Ticket 299 calls release when its model call fails, without waiting for
 the 75-second lease or resetting the normal retry quotas.
@@ -17553,7 +17562,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: not started.
+Status: implemented in source on PR #243, under review, based on merged PRs #240
+and #241. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). The owner paused
+activation after this ticket and deferred installed acceptance (Ticket 300). The OpenAI
+logo on the button (L-019) and messaging review of P-029 to P-031, P-045 and P-046 also
+remain activation gates.
 Dependencies: Tickets 297 and 298.
 
 Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
@@ -17562,12 +17575,17 @@ hidden until the owner turns it on"):
 - Everything below sits behind a desktop switch that is off by default. With it off, the
   Settings card and the plan path do not appear.
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
-  does not wait for the 75-second lease. Ticket 298 supplies the matching release route.
+  does not wait for the 75-second lease. Call Ticket 298's
+  `POST /api/advisor/brief/device/release` with the signed envelope and installation ID.
+  The implementation also releases after cancellation or a lost complete response;
+  the pending-only RPC cannot undo a completed attempt or a replacement lease.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
-- Still required (not a decision): a command that hands the access token to the webview
-  for the model call, and `https://api.openai.com` in the CSP. Update the test that pins it
-  absent (Ticket 297).
+- Implemented: `chatgpt_access_token` hands only the fresh access token to the webview
+  for the model call. Its locked grant check includes refresh-scope changes.
+  The CSP and its pinning test allow exactly `https://api.openai.com`.
+- With plan usage connected and device mode off, show the ChatGPT failure state without
+  falling back to Cadence's key, as the owner confirmed on November 12.
 
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.
@@ -17590,19 +17608,22 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Not applicable: the web app shows none of this (D27). |
-| Desktop | `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `components/briefing/*`. |
+| Web | No web UI (D27). Hosted: `POST /api/advisor/brief/device/release` (`lib/services/daily-brief-device.service.ts`); the device flag stays off in production. |
+| Desktop | `apps/desktop/src/chatgpt/plan-switch.ts`, `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`, `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `apps/desktop/src/account/auth.ts`, `apps/desktop/src-tauri/src/chatgpt/mod.rs` (`chatgpt_access_token`), `components/briefing/ChatGptPlanCard.tsx`, `DailyBriefBubble.tsx`, `DailyBriefLauncher.tsx`. |
 | Marketing | Not applicable until release (P-032). |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: P-030 and P-031, plus new entries for the card's copy.
+Messaging impact: P-030 and P-031 (unchanged text), plus P-045 (card copy) and P-046 (Daily
+Brief plan states).
 
 Verification: `npm run interactions:check`, `dagger check --cadence --progress=report` and bench
 screenshots of each state at narrow widths.
 
 ## Ticket 300: Installed Mac acceptance of the ChatGPT plan Daily Brief
 
-Status: not started.
+Status: deferred, November 12, 2026. Owner decision: the ChatGPT plan Daily Brief stays
+hidden, so installed acceptance waits until the owner decides to turn it on
+(`docs/DECISIONS.md`, 2026-11-12). Work moves to other tickets.
 Dependencies: Tickets 294–299.
 
 Goal: prove the feature on an installed dev-signed build.

@@ -2385,6 +2385,11 @@ in Tickets 294–299 continues, but nothing reaches users until the owner turns 
   refresh token and clears the session from Keychain (owner approval, November 12).
 - The account-free Mac path is a future item (`docs/FUTURE_UPDATES.md`, "ChatGPT plan
   follow-ups").
+- Pause after Ticket 299 (owner, November 12): Tickets 294–299 stay as built and hidden;
+  Ticket 300 is deferred until the owner turns the feature on. The account-free Mac path
+  stays a future item (`docs/FUTURE_UPDATES.md`, "ChatGPT plan follow-ups").
+- With plan usage connected but the server's device mode off, the Mac shows "ChatGPT could
+  not run" and does not use Cadence's key (owner kept the strict D27 reading, November 12).
 
 Platform impact: desktop, Ticket 299 gates its UI; web, the flag stays off; marketing,
 no claim until the owner turns it on (P-032); future mobile, not applicable. Messaging

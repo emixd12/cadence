@@ -1,5 +1,6 @@
 mod auth;
 mod calendar_cache;
+mod chatgpt;
 mod files;
 mod local_store;
 mod location;
@@ -37,6 +38,8 @@ pub fn run() {
     notifications::initialize();
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
+        // Ticket 297: in-memory connection state; tokens stay in Keychain.
+        .manage(chatgpt::ChatGptState::default())
         .setup(|app| {
             let directory = app.path().app_data_dir()?;
             std::fs::create_dir_all(&directory)?;
@@ -71,6 +74,12 @@ pub fn run() {
             auth::auth_account_sync_context,
             auth::auth_complete_account_sync,
             auth::auth_begin_first_link,
+            chatgpt::chatgpt_status,
+            chatgpt::chatgpt_connect,
+            chatgpt::chatgpt_cancel_connect,
+            chatgpt::chatgpt_disconnect,
+            chatgpt::chatgpt_models,
+            chatgpt::chatgpt_access_token,
             calendar_cache::calendar_cache_begin,
             calendar_cache::calendar_cache_read,
             calendar_cache::calendar_cache_read_current,

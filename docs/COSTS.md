@@ -464,7 +464,7 @@ body.
 
 ### Briefs on the user's ChatGPT plan (Tickets 294–300)
 
-Planned, not in source. A signed-in Mac user who connects a ChatGPT plan with plan usage
+Implemented behind the default-off Mac switch in Ticket 299. A signed-in Mac user who connects a ChatGPT plan with plan usage
 runs the Daily Brief model call on that plan (`docs/DECISIONS.md`, 2026-11-07, D27). Such
 a brief costs Cadence no model spend. Cadence's server still prepares the context and
 validates the output, so that hosted compute remains (Vercel and Supabase usage, not

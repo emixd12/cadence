@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { createReleaseBuildEnvironment, createReleaseOverlay, validateReleaseConfiguration, validateSigningEnvironment, decodeUpdaterPublicKey,
   createPreviewBuildEnvironment, createPreviewOverlay, validatePreviewConfiguration, validatePreviewBuildEnvironment,
   createDevBuildEnvironment, createDevOverlay, validateDevConfiguration, validateDevBuildEnvironment, compareVersions,
@@ -60,7 +63,7 @@ describe("desktop release preparation", () => {
     const caller = { PATH: "/release/tools", CI: "false", APPLE_ID: "secret-id", APPLE_PASSWORD: "secret-password",
       APPLE_CERTIFICATE: "secret-certificate", APPLE_API_KEY_PATH: "/private/key", APPLE_SIGNING_IDENTITY: "Developer ID Application: Example",
       TAURI_SIGNING_PRIVATE_KEY: "updater-private-key", TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "updater-password", TAURI_CONFIG: "unreviewed", TAURI_BUNDLER_DMG_IGNORE_CI: "true" };
-    expect(createPreviewBuildEnvironment(caller)).toEqual({ PATH: "/release/tools", CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false",
+    expect(createPreviewBuildEnvironment(caller)).toEqual({ PATH: "/release/tools", CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", VITE_CADENCE_CHATGPT_PLAN: "",
       CADENCE_LEGACY_KEYCHAIN_QA: "1", TAURI_SIGNING_PRIVATE_KEY: "updater-private-key", TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "updater-password" });
     expect(caller.APPLE_PASSWORD).toBe("secret-password");
     const publicAuth = { VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test" };
@@ -104,9 +107,26 @@ describe("desktop release preparation", () => {
   it("disables Finder scripting even when the caller environment overrides CI defaults", () => {
     const caller = { CI: "false", TAURI_BUNDLER_DMG_IGNORE_CI: "true", CADENCE_LEGACY_KEYCHAIN_QA: "1", PATH: "/release/tools" };
     expect([createReleaseBuildEnvironment(caller), caller]).toEqual([
-      { CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", PATH: "/release/tools" },
+      { CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", PATH: "/release/tools", VITE_CADENCE_CHATGPT_PLAN: "" },
       { CI: "false", TAURI_BUNDLER_DMG_IGNORE_CI: "true", CADENCE_LEGACY_KEYCHAIN_QA: "1", PATH: "/release/tools" },
     ]);
+  });
+  it.each([".env.production", ".env.local"])("keeps the published plan switch off when %s enables it", (filename) => {
+    const directory = mkdtempSync(join(tmpdir(), "cadence-plan-release-"));
+    try {
+      writeFileSync(join(directory, filename), "VITE_CADENCE_CHATGPT_PLAN=1\n");
+      const effectiveSwitch = (environment: Record<string, string | undefined>) => {
+        const result = spawnSync(process.execPath, ["--input-type=module", "--eval",
+          'import { loadEnv } from "vite"; process.stdout.write(JSON.stringify(loadEnv("production", process.argv[1], "VITE_").VITE_CADENCE_CHATGPT_PLAN));', directory],
+        { env: { NODE_ENV: "production", ...environment }, encoding: "utf8" });
+        expect(result.status, result.stderr).toBe(0);
+        return JSON.parse(result.stdout);
+      };
+      // Exercise Vite's actual precedence, including a file that would activate an unpinned build.
+      expect(effectiveSwitch({})).toBe("1");
+      expect(effectiveSwitch(createReleaseBuildEnvironment({}))).toBe("");
+      expect(effectiveSwitch(createDevBuildEnvironment({ VITE_CADENCE_CHATGPT_PLAN: "1" }))).toBe("1");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
   it("uses the final identity without mutating active native configuration or copying signing secrets", () => {
     const overlay = createReleaseOverlay(base, { ...env, TAURI_SIGNING_PRIVATE_KEY: "private-value", APPLE_PASSWORD: "private-password" });
@@ -198,5 +218,8 @@ describe("desktop release preparation", () => {
     expect(validateSigningEnvironment(credentials)).toEqual([]);
     expect(validateSigningEnvironment({ ...credentials, APPLE_SIGNING_IDENTITY: "-" })).toHaveLength(1);
     expect(validateSigningEnvironment({ ...credentials, APPLE_PASSWORD: "" }).join(" ")).not.toContain("private@example.org");
+    // Ticket 299: a published build never turns on the hidden ChatGPT plan feature.
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "1" }).join(" ")).toContain("VITE_CADENCE_CHATGPT_PLAN");
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "" })).toEqual([]);
   });
 });

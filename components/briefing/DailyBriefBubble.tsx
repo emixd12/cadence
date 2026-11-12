@@ -8,6 +8,8 @@ import { briefingMoveText, briefingOptionText, briefingReferenceLabel, briefingS
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { departureBriefFooterPhrase, departurePhraseContext } from "@cadence/core/services/departure-phrases";
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
+import type { DailyBriefPlanUsage } from "@/lib/ui/daily-brief";
+import { ContinueWithChatGptButton } from "./ChatGptPlanCard";
 
 type DailyBriefBubbleProps = Readonly<{
   state: "loading" | "ready" | "error";
@@ -20,6 +22,10 @@ type DailyBriefBubbleProps = Readonly<{
   retryDisabled?: boolean;
   /** Deterministic travel guidance from the Timeline (Ticket 170); never model text. */
   travel?: BriefTravelGuidance | null;
+  /** Ticket 299: the primary recovery action of a notice, such as Manage usage; the retry stays secondary. */
+  action?: Readonly<{ label: string; onClick: () => void; chatGpt?: boolean }>;
+  /** Ticket 299 (Mac only, behind its switch): how a ready brief ran on the user's ChatGPT plan. */
+  plan?: Readonly<{ usage: DailyBriefPlanUsage; onManageUsage: () => void; onConnect: () => void }> | null;
 }>;
 
 export function DailyBriefBubble({
@@ -31,6 +37,8 @@ export function DailyBriefBubble({
   retryLabel = "Try again",
   retryDisabled = false,
   travel = null,
+  action,
+  plan = null,
 }: DailyBriefBubbleProps) {
   const developmentBuild = useDevelopmentBuild();
   const ready = state === "ready" && briefing;
@@ -98,10 +106,23 @@ export function DailyBriefBubble({
               Generated <time dateTime={briefing.generatedAt}>{formatBriefingTime(briefing.generatedAt, briefing.timezone)}</time>.
             </p>
             {briefing.warnings.length ? <p className="mt-1 text-xs leading-5 text-muted-readable">{briefing.warnings.join(" ")}</p> : null}
+            {plan?.usage === "plan" ? <p className="mt-2 flex flex-wrap items-center gap-x-3 border-t border-line pt-2 text-xs leading-5" data-brief-plan="plan">
+              <span>Using ChatGPT plan</span>
+              <button type="button" onClick={plan.onManageUsage} className="min-h-11 underline">Manage usage</button>
+            </p> : null}
+            {plan?.usage === "plan_off" ? <div className="mt-2 border-t border-line pt-2" data-brief-plan="plan_off">
+              <p className="text-xs leading-5 text-muted-readable">ChatGPT plan usage is off, so this brief did not use your plan.</p>
+              <ContinueWithChatGptButton onClick={plan.onConnect} className="mt-2" />
+            </div> : null}
           </> : null}
           {state === "error" ? <>
             <p role="status" aria-live="polite" className="mt-1 text-sm leading-6 text-muted-readable">{message ?? "Today’s Daily Brief is unavailable."}</p>
-            {onRetry ? <button type="button" onClick={onRetry} disabled={retryDisabled} className="product-action product-action-secondary mt-3 min-h-11 py-2 text-sm">{retryLabel}</button> : null}
+            {action || onRetry ? <div className="mt-3 flex flex-wrap gap-3">
+              {action ? action.chatGpt
+                ? <ContinueWithChatGptButton onClick={action.onClick} />
+                : <button type="button" onClick={action.onClick} className="product-action product-action-primary min-h-11 py-2 text-sm">{action.label}</button> : null}
+              {onRetry ? <button type="button" onClick={onRetry} disabled={retryDisabled} className="product-action product-action-secondary min-h-11 py-2 text-sm">{retryLabel}</button> : null}
+            </div> : null}
           </> : null}
         </div>
         <button type="button" onClick={onDismiss} aria-label="Dismiss Daily Brief" className="product-action product-action-secondary min-h-11 min-w-11 self-start px-2 py-2 text-sm">Close</button>

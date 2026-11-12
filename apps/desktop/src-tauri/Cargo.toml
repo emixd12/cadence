@@ -32,6 +32,13 @@ rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
 chrono = "=0.4.45"
 icu_normalizer = { version = "=2.3.0", default-features = false, features = ["compiled_data", "utf8_iter"] }
 sha2 = "=0.10.9"
+# Ticket 297 (ChatGPT connection). Each crate is already in Cargo.lock through
+# tauri-plugin-updater (reqwest, rustls with ring) and rustls (ring, base64), so
+# these direct entries add no crate to the build.
+reqwest = { version = "=0.13.4", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring"] }
+ring = "=0.17.14"
+base64 = "=0.22.1"
 
 # Xcode 27.1 strip leaves release proc-macro dylibs that dyld refuses to load
 # ("mis-aligned LINKEDIT string pool") when MACOSX_DEPLOYMENT_TARGET is set.

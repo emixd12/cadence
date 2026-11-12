@@ -11,7 +11,7 @@ const registryPath = registryArgument === -1
 const schemaPath = "interaction-registry.schema.json";
 const journeyPath = "docs/UX_JOURNEY_INVENTORY.md";
 const userGuideDirectory = "docs/user-guide";
-const internalQaInteractionIds = new Set(["INT-AUTH-002", "INT-SHELL-007"]);
+const internalQaInteractionIds = new Set(["INT-AUTH-002", "INT-SHELL-007", "INT-SETTINGS-019", "INT-SETTINGS-020", "INT-SETTINGS-021"]);
 const failures = [];
 const mechanicallyCheckedEntries = [];
 const humanReviewEntries = [];
