@@ -14,22 +14,21 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# The checks run as parallel jobs. Branch protection requires only the last
+# job, `verify`, which fails unless every other job passed. Keep its name.
 jobs:
-  verify:
+  checks:
+    name: Repository checks and typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.x
-          cache: npm
-      - run: npm ci
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
       - run: npm run agents:check
       - run: npm run interactions:check
       - run: npm run resolvers:check
@@ -38,10 +37,94 @@ jobs:
       - run: npm run public-source:check
       - run: npm run public-trust:check
       - run: npm run public-trust:fixtures
-      - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
+      - run: npm run lint
+
+  test:
+    name: Tests (${{ matrix.shard }} of 3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      # Full history: some tests read earlier commits with git.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
+      - run: npm run test -- --shard=${{ matrix.shard }}/3
+
+  build:
+    name: Web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
+      # Pull requests reuse the newest Next.js build cache saved from main.
+      - name: Restore the Next.js build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: next-build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
       - run: npm run build
+      - name: Save the Next.js build cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: next-build-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+
+  sites:
+    name: Desktop frontend and marketing builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
       - run: npm run desktop:build
       - run: npm run marketing:build
       - run: npm run marketing:check
+
+  # `always()` matters: GitHub counts a skipped required check as passing, and
+  # without it this job is skipped when a job it needs fails.
+  verify:
+    name: verify
+    if: always()
+    needs: [checks, lint, test, build, sites]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' > /dev/null
