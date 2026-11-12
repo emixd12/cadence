@@ -209,10 +209,14 @@ dependencies = [
 name = "cadence-desktop-spike"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "cc",
  "chrono",
  "icu_normalizer",
+ "reqwest",
+ "ring",
  "rusqlite",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
