@@ -198,5 +198,8 @@ describe("desktop release preparation", () => {
     expect(validateSigningEnvironment(credentials)).toEqual([]);
     expect(validateSigningEnvironment({ ...credentials, APPLE_SIGNING_IDENTITY: "-" })).toHaveLength(1);
     expect(validateSigningEnvironment({ ...credentials, APPLE_PASSWORD: "" }).join(" ")).not.toContain("private@example.org");
+    // Ticket 299: a published build never turns on the hidden ChatGPT plan feature.
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "1" }).join(" ")).toContain("VITE_CADENCE_CHATGPT_PLAN");
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "" })).toEqual([]);
   });
 });

@@ -17554,7 +17554,10 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: not started.
+Status: implemented in source on branch `claude/ticket-299-plan-ui`, stacked on PRs #240
+and #241; not pushed. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). Open: the
+OpenAI logo on the button (L-019), installed acceptance (Ticket 300) and the messaging
+review of P-029 to P-031, P-045 and P-046 before the owner turns it on.
 Dependencies: Tickets 297 and 298.
 
 Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
@@ -17591,12 +17594,13 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Not applicable: the web app shows none of this (D27). |
-| Desktop | `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `components/briefing/*`. |
+| Web | No web UI (D27). Hosted: `POST /api/advisor/brief/device/release` (`lib/services/daily-brief-device.service.ts`); the device flag stays off in production. |
+| Desktop | `apps/desktop/src/chatgpt/plan-switch.ts`, `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`, `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `apps/desktop/src/account/auth.ts`, `apps/desktop/src-tauri/src/chatgpt/mod.rs` (`chatgpt_access_token`), `components/briefing/ChatGptPlanCard.tsx`, `DailyBriefBubble.tsx`, `DailyBriefLauncher.tsx`. |
 | Marketing | Not applicable until release (P-032). |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: P-030 and P-031, plus new entries for the card's copy.
+Messaging impact: P-030 and P-031 (unchanged text), plus P-045 (card copy) and P-046 (Daily
+Brief plan states).
 
 Verification: `npm run interactions:check`, `dagger check --cadence --progress=report` and bench
 screenshots of each state at narrow widths.

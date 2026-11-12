@@ -535,8 +535,9 @@ part of L-002.
 
 - **Question:** Do the "Continue with ChatGPT" button, the ChatGPT name and any OpenAI logo in
   the Mac app's Settings follow OpenAI's brand and UI guidelines?
-- **Affected:** Ticket 299. Files: the planned Settings card in
-  `apps/desktop/src/settings-screen.tsx`. Related messaging entry: P-032.
+- **Affected:** Ticket 299. Files: `components/briefing/ChatGptPlanCard.tsx` (the card and
+  `ContinueWithChatGptButton`), shown by `apps/desktop/src/settings-screen.tsx`. Related
+  messaging entries: P-032, P-045 and P-046.
 - **Provider, clause, source and check date:** OpenAI, Sign in with ChatGPT UI and UX
   guidelines and brand guidelines.
   `https://developers.openai.com/siwc/ui-ux-guidelines.md`. Not checked for this entry.
@@ -545,8 +546,19 @@ part of L-002.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** none.
 - **Status:** open.
-- **Next action:** Ticket 299 reads the guidelines before building the card and records the
-  clauses it follows.
+- **Ticket 299 reading, November 12, 2026:** Ticket 299 read
+  `https://developers.openai.com/siwc/ui-ux-guidelines.md` and
+  `https://developers.openai.com/siwc/website.md`. The card
+  (`components/briefing/ChatGptPlanCard.tsx`) follows these clauses: "Continue with ChatGPT"
+  starts sign-in, on the black format, with the `data-oai-siwc-button` attribute; a settings
+  card titled "Use your ChatGPT plan" that separates plan usage from the app's own charges;
+  "Using ChatGPT plan" with a "Manage usage" link to `https://chatgpt.com/settings/usage`;
+  "Manage usage" as the primary action of the usage-limit state; and a one-time "You're
+  using your ChatGPT plan" confirmation with "Got it". Gap: every approved button format
+  includes the ChatGPT logo, and Cadence has no approved OpenAI asset yet, so the button is
+  text-only. The feature is hidden until the owner turns it on.
+- **Next action:** add OpenAI's approved ChatGPT logo asset to the button, or confirm a
+  text-only button is acceptable, before the owner turns the feature on.
 
 ## L-020: Provider marks as connected-source icons
 

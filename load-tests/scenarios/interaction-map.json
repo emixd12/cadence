@@ -1384,6 +1384,21 @@
       "reason": "Day note shortcut review needs isolated owner and stale-revision verification."
     },
     {
+      "id": "INT-SETTINGS-019",
+      "classification": "not_load_bearing",
+      "reason": "Hidden Mac-only ChatGPT sign-in runs in Rust against OpenAI; it sends no Cadence HTTP traffic."
+    },
+    {
+      "id": "INT-SETTINGS-020",
+      "classification": "not_load_bearing",
+      "reason": "Manage usage opens ChatGPT settings in the system browser without Cadence HTTP traffic."
+    },
+    {
+      "id": "INT-SETTINGS-021",
+      "classification": "not_load_bearing",
+      "reason": "Disconnect ChatGPT revokes at OpenAI from Rust and clears Keychain without Cadence HTTP traffic."
+    },
+    {
       "id": "INT-CALENDAR-001",
       "classification": "external_provider",
       "reason": "Calendar provider consent and external reads require separate synthetic provider authorization."

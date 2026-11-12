@@ -836,3 +836,35 @@ compact chips (1px `border-line`, `bg-surface` fill, 4px side padding, Ink text)
 overview, move line and tip. Weight stays 400 under the no-bold rule. A Cadence-written
 "Setup tip" uses the same tip block and label style. An empty overview is omitted; an empty brief renders no bubble.
 `DailyBriefBubbleBench` shows the 1.2 state after the 1.1 state.
+
+## ChatGPT plan card and Daily Brief plan states — Ticket 299
+
+Mac only, and hidden: Cadence for Mac renders none of this unless its build sets
+`VITE_CADENCE_CHATGPT_PLAN=1` (owner decision, November 12, 2026). The web app never does.
+
+- **Card:** `ChatGptPlanCard` (`components/briefing/ChatGptPlanCard.tsx`) is a
+  `SettingsPanel` titled "Use your ChatGPT plan", placed in Planning after the Daily Brief
+  drawer (`chatGptPlanControls` in `apps/desktop/src/settings-screen.tsx`). States:
+  disconnected, connecting (one secondary "Cancel ChatGPT sign-in"), connected with plan
+  usage, plan usage off, reconnect. Connected states use the Settings `dl` pattern for the
+  ChatGPT email (wraps anywhere) and the Daily Brief line: Ink Black for "Using ChatGPT plan",
+  the accent text color when plan usage is off or a reconnect is needed. Actions are one row
+  of 44px buttons that wraps at narrow widths.
+- **Continue with ChatGPT:** `ContinueWithChatGptButton` follows OpenAI's black button
+  format: Ink Black (`bg-foreground`) fill and border, Bleached Newsprint
+  (`text-background`) text, square corners, 44px tall, `data-oai-siwc-button`. It is the one
+  filled button in the product, because OpenAI's approved formats require it; every other
+  action keeps the underlined-text styles. OpenAI's ChatGPT logo is not added yet (L-019);
+  the wording is OpenAI's.
+- **Confirmation:** after the first connection with plan usage, a Cold Surface block with a
+  1px Ash Line border shows "You’re using your ChatGPT plan" as a part heading, one
+  sentence and a primary "Got it". It is inline, not a modal, and never shows again on
+  that Mac.
+- **Daily Brief bubble:** a plan brief ends with a hairline-topped `text-xs` line, "Using
+  ChatGPT plan", and an underlined "Manage usage" text action with a 44px target. With
+  plan usage off it ends with one muted sentence and Continue with ChatGPT. Plan failures
+  use the error state: the usage-limit notice puts a primary "Manage usage" before the
+  secondary "Try again"; reconnect offers Continue with ChatGPT; not eligible offers no
+  action. Actions sit in one wrapping row.
+- **Bench:** `ChatGptPlanCardBench` and `DailyBriefPlanStatesBench`
+  (`app/design-system/DailyBriefBench.tsx`) show every state at 352px.
