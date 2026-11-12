@@ -75,6 +75,7 @@ describe('Cadence Release vault', () => {
       [inv.developerId.item]: { password: secret, fingerprint: 'ABC', complete: COMPLETE_MARKER },
       [inv.updater.item]: { password: secret, fingerprint: inv.updater.fingerprint, complete: COMPLETE_MARKER },
       [inv.notarization.passwordItem]: { password: secret, account: secret, complete: COMPLETE_MARKER },
+      [inv.notarization.apiKeyItem]: { 'key id': 'KEYID00001', 'issuer id': secret, complete: COMPLETE_MARKER },
     };
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
