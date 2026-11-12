@@ -53,9 +53,8 @@ Check the cited entry before acting on a row.
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode passes); 296 in progress (prepare/validate split done; adapter waits for 295); 297–300 not started | Live spike run needs the owner's ChatGPT Plus or Pro sign-in (owner ask sent November 11) | TICKETS, Tickets 294–300; STATUS, "Ticket 296: Daily Brief prepare and validate split — November 11, 2026" |
-| Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned | The owner compares candidates on the reserved cases and promotes or rejects one under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md` |
-| Ticket 291: skill-rule acceptance scenarios | Unit-tested with fakes | First local-stack or live run with a real client | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "Skill-rule scenarios — Ticket 291" |
-| Ticket 288: Daily Brief token usage | Recorded per call in the performance log and workbench runs | Measure with `CADENCE_PERF_LOG=1` and replace the assumed figures in `docs/COSTS.md` | TICKETS, Ticket 288 |
+| Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned; comparison on H1–H10 and S1 prepared November 11 | Owner sets a spend cap (US$2 asked) and optionally names extra models; agents run the comparison; the owner promotes or rejects under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner comparison" |
+| Ticket 291: skill-rule acceptance scenarios | Local-stack run with `claude-code` passed all three scenarios November 11 | Production run with the API clients; needs a spend cap for the QA keys | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "First local run — November 11, 2026" |
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
@@ -89,6 +88,35 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 288 and 291: measured usage and local acceptance; 289–290 comparison prepared — November 11, 2026
+
+- **Ticket 288 complete.** Production logs `daily_brief.model` usage (`CADENCE_PERF_LOG=1`
+  is on). The Vercel runtime logs (one-day retention) held two successful briefs: 8,260
+  and 9,106 input tokens, 585 and 376 output tokens, none cached. That is about
+  US$0.0023 per brief at the rechecked `gpt-5.6-luna` price; the assumption was
+  US$0.004. `docs/COSTS.md` now shows Daily Brief at US$0.03 / US$0.07 / US$0.14 a
+  month and records the US$0.02 cached-input price. Two samples is a small base.
+- **Ticket 291:** first local-stack run with a real client. `claude-code` (subscription,
+  no API charge) passed `skill-check-in-unconfirmed`, `skill-routine-unconfirmed` and
+  `skill-routine-confirmed` on test account A; the watcher matched every client call and
+  `check` found all 3 grants revoked. Runs `local-291-t1-1111t193138`, `…193212`,
+  `…193226`. The production run with the API clients remains.
+- Fixed `local-stack.mjs` doing nothing when the checkout path has a space. Documented
+  the Supabase CLI workaround: Homebrew 3.1.0 rejects `[inbucket]`, and the npm 2.105.0
+  binary fails its code signature in a fresh worktree.
+- **Tickets 289–290:** the side-by-side comparison is prepared on reserved cases H1–H10
+  and S1, which have never run. It waits for the owner's spend cap; no model call was made
+  and nothing was promoted.
+- Verification: `dagger check` passed agents, interactions, resolvers, lint, typecheck,
+  build, desktop-build, marketing and public-trust. Its `test` check failed 5 files that
+  read `.claude/` or git history, which the Dagger source excluded at the time;
+  locally the full `npx vitest run` showed no failure, and the local-stack, client-prompts
+  and client-runners tests pass (57 tests). This run preceded the Dagger repairs in PR #231.
+- Review added a subprocess regression for a checkout path containing spaces. It checks
+  that the CLI reports an invalid command instead of silently exiting successfully.
+  The 58 local-stack, client-prompts and client-runners tests pass; agents, interactions
+  and resolvers checks also pass. The original script reproduces the silent exit.
 
 ## Ticket 296: Daily Brief prepare and validate split — November 11, 2026
 
