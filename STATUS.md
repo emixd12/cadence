@@ -79,7 +79,7 @@ Check the cited entry before acting on a row.
 | Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
 | Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
 | MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
-| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy passed on production web November 11; Outlook production OAuth settings checked | Owner creates vault items `outlook-test-account-a` and `icloud-test-account-a`, then agents run iCloud (240), Outlook (242) and the rest of 241 step 6; 242 cross-tenant needs a work or school account outside the home tenant; installed desktop waits on the 0.1.10 install on the test Mac; 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "Connector production acceptance — November 11, 2026" |
+| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy and Outlook (personal account) passed on production web November 11; cross-tenant Outlook checks skipped by owner decision; PR #239 records 0.1.10 installed and Hevy timing shown without titles | iCloud (240) and its part of 241 step 6: no usable test identity; existing vault item unreadable; owner decides between their own Apple Account and waiting. Remaining installed connector acceptance is open; 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "PR #245 connector acceptance record review — November 12, 2026"; PR #239 release packet |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
 | Google Calendar Timeline (grouped): Tickets 133–137, 141, 150 | In progress; reconciled October 27: still open | Post-approval web and native consent smoke checks; 137 provider-failure, Workspace and installed fixture cases; 150 live custom-name check | TICKETS, Tickets 137, 141, 150 |
@@ -114,6 +114,32 @@ Packet: `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md`.
 
 Platform impact: desktop release only. Web, marketing and future mobile: not applicable.
 Messaging impact: none.
+
+## PR #245 connector acceptance record review — November 12, 2026
+
+Follow-up to the November 11 connector entry, which PR #243 archived unchanged.
+The reported Outlook production run passed with a personal Microsoft account: consent,
+calendar selection, timed/all-day fixtures, Timeline at 1280 and 390 px, disconnect and
+reconnect. Cross-tenant consent, `admin_approval_required` and unverified-app-blocking
+tenants remain unexercised under the recorded owner decision. Evidence:
+`docs/qa/2026-11-11-connector-acceptance.md`. No live acceptance or account access ran
+in this documentation review.
+
+- The existing iCloud vault item was unreadable, and no usable Apple test identity was
+  available to that run. Initial missing-item preflight results are marked as historical.
+- PR #239's release packet records 0.1.10 installed and Hevy timing shown on the test Mac.
+  The remaining dependency is installed connector acceptance, not another installation.
+- Outlook remains connected for later runs. Post-run provider-grant revocation remains
+  an open Ticket 241 step 6 follow-up; disconnect/reconnect smoke did not complete it.
+- Ticket 300's deferral and the hidden ChatGPT plan track from PR #244 are unchanged.
+- Integrated reviewed PR #243 commit `e0774ac1`; all product files and archived history
+  remain identical to that candidate.
+- Checks: `npm run agents:check` and `git diff --check` passed. Only the three connector
+  documentation files differ from PR #243; no runtime checks were needed for this record
+  correction.
+
+Platform impact: documentation only across web and desktop; marketing and future mobile
+unchanged. Messaging impact: none; Ticket 241 step 7 remains in the messaging track.
 
 ## PR #243 integration review — November 12, 2026
 
