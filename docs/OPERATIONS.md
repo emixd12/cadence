@@ -2395,6 +2395,10 @@ and makes no model call for these briefs, not even a duration estimate.
 - `POST /api/advisor/brief/device/complete` takes `{ installationId, envelope, output }`.
   It verifies the envelope and its binding, checks the preferences revision, validates
   the output, finishes the lease, checks the stored inputs again and records the tip.
+- `POST /api/advisor/brief/device/release` takes `{ installationId, envelope }` (Ticket 299).
+  The Mac calls it when its model call fails. It verifies the envelope and its binding and
+  finishes the lease without success. An expired envelope or a superseded lease returns
+  `{ state: "released" }` and changes nothing.
 - The envelope is `base64url(raw DEFLATE of JSON).base64url(HMAC-SHA256)`. It binds a
   one-way account digest, the installation ID, the lease token, the preferences and
   configuration revisions and a digest of the stored context inputs, and it carries the

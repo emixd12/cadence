@@ -32,11 +32,12 @@ vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarCo
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud }));
 vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: mocks.hevy }));
 
-import { completeDeviceDailyBrief, prepareDeviceDailyBrief } from "@/lib/services/daily-brief-device.service";
+import { completeDeviceDailyBrief, prepareDeviceDailyBrief, releaseDeviceDailyBrief } from "@/lib/services/daily-brief-device.service";
 import { issueDailyBriefEnvelope, verifyDailyBriefEnvelope } from "@/lib/services/daily-brief-device-envelope";
 import { getDailyBriefSettings, updateDailyBriefSettings } from "@/lib/services/daily-brief.service";
 import { POST as preparePOST } from "@/app/api/advisor/brief/device/prepare/route";
 import { POST as completePOST } from "@/app/api/advisor/brief/device/complete/route";
+import { POST as releasePOST } from "@/app/api/advisor/brief/device/release/route";
 
 const SECRET = "test-only-envelope-secret-0123456789abcdef";
 const OTHER_SECRET = "test-only-other-envelope-secret-0123456789";
@@ -250,6 +251,58 @@ describe("device performance spans", () => {
     for (const secret of [result.request.instructions.slice(0, 40), "walk", ref, result.envelope.slice(0, 40), result.envelope.split(".")[1]!, "lease-1", installationId, SECRET]) {
       expect(serialized).not.toContain(secret);
     }
+  });
+});
+
+describe("device release", () => {
+  it("finishes the lease without success, so a retry can start at once", async () => {
+    const { envelope } = await prepared();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
+    expect(mocks.finish).toHaveBeenCalledTimes(1);
+    expect(mocks.finish).toHaveBeenCalledWith(owner.client, { installationId, leaseToken: "lease-1", success: false, expectedRevision: 1 }, expect.any(AbortSignal));
+  });
+
+  it("is idempotent and harmless for a superseded lease or a second call", async () => {
+    const first = await prepared();
+    currentLease = "lease-2";
+    await prepared();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: first.envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: first.envelope }, { now: at(11) })).resolves.toEqual({ state: "released" });
+    // The database finishes only the current lease, so lease-2 stays open.
+    expect(mocks.finish).not.toHaveBeenCalledWith(owner.client, expect.objectContaining({ leaseToken: "lease-2" }), expect.anything());
+  });
+
+  it("does nothing for an expired envelope", async () => {
+    const { envelope } = await prepared();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(75) })).resolves.toEqual({ state: "released" });
+    expect(mocks.finish).not.toHaveBeenCalled();
+  });
+
+  it("rejects a forged envelope, another user, another installation and a malformed body", async () => {
+    const { envelope } = await prepared();
+    const forged = issueDailyBriefEnvelope({ ...payloadOf(envelope), lease: "lease-other" }, OTHER_SECRET)!;
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: forged }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(stranger, { installationId, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId: otherInstallation, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
+    expect(mocks.finish).not.toHaveBeenCalled();
+  });
+
+  it("returns not configured from the route when the flag is off, and released through the route when on", async () => {
+    vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "");
+    const off = await releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope: "x.y" }) }));
+    expect(off.status).toBe(503);
+    expect(await off.json()).toEqual({ error: "not_configured" });
+    vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "1");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(fixture.capturedAt));
+      const { envelope } = await prepared();
+      const on = await releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope }) }));
+      expect(on.status).toBe(200);
+      expect(await on.json()).toEqual({ state: "released" });
+    } finally { vi.useRealTimers(); }
   });
 });
 

@@ -168,6 +168,40 @@ export async function completeDeviceDailyBrief(caller: CalendarCaller, value: un
   return phase("complete_request", () => raceBriefAbort(work(), signal));
 }
 
+export const DAILY_BRIEF_DEVICE_RELEASE_DEADLINE_MS = 10_000;
+export const DAILY_BRIEF_DEVICE_RELEASE_MAX_BYTES = MAX_DAILY_BRIEF_ENVELOPE_LENGTH + 1_000;
+
+export type DailyBriefDeviceReleaseResponse = Readonly<{ state: "released" }>;
+
+/**
+ * Owner decision, November 12, 2026: the device calls release when its model call fails, so
+ * a retry does not wait for the 75-second lease. It verifies the envelope and its binding as
+ * complete does, then finishes the lease without success. Release is idempotent: the database
+ * finishes only the current lease, so a second call, a superseded lease and an expired
+ * envelope all return `released` and change nothing.
+ */
+export async function releaseDeviceDailyBrief(caller: CalendarCaller, value: unknown, options: DeviceOptions = {}): Promise<DailyBriefDeviceReleaseResponse> {
+  const env = process.env;
+  deviceSecret();
+  if (!record(value) || Object.keys(value).sort().join() !== "envelope,installationId" ||
+      typeof value.installationId !== "string" || !DAILY_BRIEF_INSTALLATION_ID.test(value.installationId) || typeof value.envelope !== "string") {
+    throw new DailyBriefError("invalid_request");
+  }
+  const clock = options.now ?? (() => Temporal.Now.instant());
+  const verified = verifyDailyBriefEnvelope(value.envelope, { secrets: readDailyBriefEnvelopeSecrets(env), now: clock() });
+  // The lease ends with the envelope, so an expired one has nothing left to release.
+  if (!verified.ok && verified.failure === "expired") return { state: "released" };
+  if (!verified.ok) throw new DailyBriefError("brief_envelope_invalid");
+  const envelope = verified.payload;
+  if (envelope.acct !== briefingAccountRef(caller.user.id) || envelope.inst !== value.installationId) throw new DailyBriefError("brief_envelope_invalid");
+  const signal = AbortSignal.timeout(options.deadlineMs ?? DAILY_BRIEF_DEVICE_RELEASE_DEADLINE_MS);
+  // `false` means the lease was already finished or superseded; either way nothing is left to release.
+  await phase("release", () => finishDailyBrief(caller.client, {
+    installationId: value.installationId as string, leaseToken: envelope.lease, success: false, expectedRevision: envelope.prefRev,
+  }, signal));
+  return { state: "released" };
+}
+
 /** `Temporal.Instant` already prints UTC with `Z`; this names the intent. */
 function utc(instant: Temporal.Instant): string {
   return instant.toString();
