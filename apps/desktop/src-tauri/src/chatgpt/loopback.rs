@@ -51,7 +51,7 @@ impl Loopback {
             }
             match self.listener.accept() {
                 Ok((stream, peer)) if peer.ip().is_loopback() => {
-                    if let Some(params) = serve(stream) {
+                    if let Some(params) = serve(stream, deadline, cancel)? {
                         return Ok(params);
                     }
                 }
@@ -63,19 +63,55 @@ impl Loopback {
 }
 
 /// Returns the callback parameters for `GET /auth/callback`; answers 404 otherwise.
-fn serve(mut stream: TcpStream) -> Option<CallbackParams> {
+fn serve(
+    mut stream: TcpStream,
+    deadline: Instant,
+    cancel: &AtomicBool,
+) -> Result<Option<CallbackParams>, Failure> {
     let _ = stream.set_nonblocking(false);
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    // A per-read timeout alone resets with every byte and can outlive the sign-in.
+    let request_deadline = deadline.min(Instant::now() + Duration::from_secs(5));
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(100)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(100)));
     let mut head = Vec::new();
     let mut buffer = [0u8; 2048];
     while !head.windows(4).any(|window| window == b"\r\n\r\n") && head.len() < MAX_REQUEST_HEAD {
-        match stream.read(&mut buffer) {
-            Ok(0) | Err(_) => break,
+        if cancel.load(Ordering::SeqCst) {
+            return Err(Failure::Cancelled);
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(Failure::TimedOut);
+        }
+        if now >= request_deadline {
+            return Ok(None);
+        }
+        let remaining = buffer.len().min(MAX_REQUEST_HEAD - head.len());
+        match stream.read(&mut buffer[..remaining]) {
+            Ok(0) => return Ok(None),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::Interrupted
+                ) => {}
+            Err(_) => return Ok(None),
             Ok(read) => head.extend_from_slice(&buffer[..read]),
         }
     }
-    let text = String::from_utf8_lossy(&head);
+    if cancel.load(Ordering::SeqCst) {
+        return Err(Failure::Cancelled);
+    }
+    if Instant::now() >= deadline {
+        return Err(Failure::TimedOut);
+    }
+    if !head.windows(4).any(|window| window == b"\r\n\r\n") {
+        return Ok(None);
+    }
+    let Ok(text) = std::str::from_utf8(&head) else {
+        return Ok(None);
+    };
     let mut request_line = text.lines().next().unwrap_or_default().split(' ');
     let (method, target) = (request_line.next(), request_line.next());
     let (path, query) = target
@@ -89,10 +125,10 @@ fn serve(mut stream: TcpStream) -> Option<CallbackParams> {
             "text/plain; charset=utf-8",
             "Not found",
         );
-        return None;
+        return Ok(None);
     }
     respond(&mut stream, "200 OK", "text/html; charset=utf-8", DONE_PAGE);
-    Some(CallbackParams::from_query(query))
+    Ok(Some(CallbackParams::from_query(query)))
 }
 
 fn respond(stream: &mut TcpStream, status: &str, content_type: &str, body: &str) {

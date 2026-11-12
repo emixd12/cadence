@@ -533,6 +533,31 @@ imports only types and `daily-brief-schema.ts`, the output schema it shares with
 provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, stream
 parsing, error mapping and the round trip with prepare and validate.
 
+Ticket 297 keeps OAuth discovery, sign-in, token refresh, revocation and catalog reads
+in `apps/desktop/src-tauri/src/chatgpt/`. The TypeScript connection client receives only
+connection state, email and catalog rows. Tokens stay in native-only Keychain items.
+This boundary implements no model-selection or briefing rules; Ticket 299 owns the UI
+and model-call wiring behind its default-off desktop switch.
+
+Ticket 298 owners. `lib/services/daily-brief-device.service.ts` runs admission, the
+shared live capture (`captureLiveDailyBriefContext` in `daily-brief.service.ts`),
+`prepareDailyBrief` without an estimate generator, and later `validateDailyBrief`; it
+imports no model adapter. `lib/services/daily-brief-device-envelope.ts` signs and
+verifies the envelope (HMAC-SHA256, constant-time comparison, current and previous
+secret) and reads the flag and secret; resolvers read neither.
+`readBriefingContextFence` in `briefing-account-context.service.ts` digests the stored
+inputs `assertCurrent` compares, so complete can fence them without a capture in
+memory. The prepare, complete and release routes only call the service.
+Release verifies the same signed binding and calls the repository's pending-only
+`releaseDailyBrief`. Failed completion cleanup uses it too; only the request that
+completed its own lease can undo that completion after a failed final fence.
+`tests/daily-brief-device.test.ts` and the Ticket 298 block of
+`tests/briefing-account-context.test.ts` cover forged, expired and misbound envelopes,
+superseded leases, completion replay, failed-model release, unknown refs, the flag,
+spans and the round trip. `tests/sql/ticket-298-device-brief-release-smoke.sql` checks
+real ownership, current-session enforcement, pending-only mutation and preserved
+retry quotas in Local Supabase rehearsal.
+
 The September 20 in-app correction reopens Ticket 146 for bounded completion
 history, using existing analytics/status rules. Ticket 147 adds first-party
 generation and one server provider adapter over this internal service. The model

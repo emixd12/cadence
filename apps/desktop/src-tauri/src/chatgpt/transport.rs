@@ -74,22 +74,22 @@ impl Https {
     }
 }
 
-async fn read(response: reqwest::Response) -> Result<Reply, NetworkError> {
+async fn read(mut response: reqwest::Response) -> Result<Reply, NetworkError> {
     let status = response.status().as_u16();
     if response
         .content_length()
-        .is_some_and(|length| length as usize > MAX_BODY)
+        .is_some_and(|length| length > MAX_BODY as u64)
     {
         return Err(NetworkError);
     }
-    let body = response.bytes().await.map_err(|_| NetworkError)?;
-    if body.len() > MAX_BODY {
-        return Err(NetworkError);
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| NetworkError)? {
+        if chunk.len() > MAX_BODY - body.len() {
+            return Err(NetworkError);
+        }
+        body.extend_from_slice(&chunk);
     }
-    Ok(Reply {
-        status,
-        body: body.to_vec(),
-    })
+    Ok(Reply { status, body })
 }
 
 impl Http for Https {
@@ -118,5 +118,65 @@ impl Http for Https {
             .await
             .map_err(|_| NetworkError)?;
         read(response).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn a_chunked_body_is_rejected_before_the_server_finishes_it() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let (finished, wait) = std::sync::mpsc::channel();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            stream.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0u8; 1024];
+            while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                let read = stream.read(&mut buffer).unwrap();
+                assert!(read > 0);
+                request.extend_from_slice(&buffer[..read]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            let chunk = vec![b'x'; 64 * 1024];
+            for _ in 0..=MAX_BODY / chunk.len() {
+                let sent = write!(stream, "{:x}\r\n", chunk.len())
+                    .and_then(|_| stream.write_all(&chunk))
+                    .and_then(|_| stream.write_all(b"\r\n"));
+                if sent.is_err() {
+                    break;
+                }
+            }
+            // Keep the response open. A whole-body reader cannot return yet.
+            let rejected = wait.recv_timeout(Duration::from_secs(5)).unwrap_or(false);
+            let _ = stream.write_all(b"0\r\n\r\n");
+            assert!(rejected, "the reader waited for the oversized response to finish");
+        });
+        let result = tauri::async_runtime::block_on(async {
+            // HTTP is only used by this local fixture; production Https stays HTTPS-only.
+            if rustls::crypto::CryptoProvider::get_default().is_none() {
+                let _ = rustls::crypto::ring::default_provider().install_default();
+            }
+            let response = reqwest::Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(15))
+                .build()
+                .unwrap()
+                .get(format!("http://{address}"))
+                .send()
+                .await
+                .unwrap();
+            read(response).await
+        });
+        let _ = finished.send(result.is_err());
+        server.join().unwrap();
+        assert!(result.is_err());
     }
 }

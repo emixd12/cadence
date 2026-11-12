@@ -2476,6 +2476,17 @@ retry restarts a failed/expired attempt. A retry without a saved attempt follows
 normal initial admission. Completion tokens prevent late requests from finishing
 replacement leases; a delivery-fence failure can downgrade its own completion.
 
+Migration `20261112041029_release_pending_daily_brief.sql` (Ticket 298) adds
+`release_daily_brief(installation, lease, preference revision)`. Its public invoker
+wrapper calls a private definer function under the same current-session check and
+owner lock. It changes only the owner's matching pending lease to Failed, clears
+its expiry and records the finish time. It cannot change a completed, failed or
+superseded attempt. It preserves admission counts and account rate limits, so the
+next request must still be a bounded deliberate retry. Device release and failed
+completion cleanup use this RPC. Only a request that completed its own lease uses
+`finish_daily_brief(false)` after its final context fence fails. No table shape or
+synchronization contract changes.
+
 Migration `20260926150000_daily_brief_bounded_recovery.sql` (Ticket 168) adds
 `daily_brief_runs.admissions` (1–4). Server completion does not prove that the
 user saw the brief, so an explicit retry may now replace a completed attempt as

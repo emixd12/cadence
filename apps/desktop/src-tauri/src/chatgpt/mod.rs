@@ -261,16 +261,6 @@ impl<H: Http, S: Secrets> Connection<H, S> {
                 TokenError::Unavailable => Failure::Unavailable,
                 _ => Failure::TokenResponse,
             })?;
-        if attempt.registering {
-            // The issued client ID is reused by every later sign-in on this Mac.
-            self.save(
-                INSTALLATION_ITEM,
-                &Installation {
-                    host_id: installation.host_id.clone(),
-                    client_id: Some(accepted.client_id.clone()),
-                },
-            )?;
-        }
         let Some(refresh_token) = tokens.refresh_token.clone() else {
             return Err(Failure::TokenResponse);
         };
@@ -311,9 +301,32 @@ impl<H: Http, S: Secrets> Connection<H, S> {
                     .await;
                 return Err(Failure::Cancelled);
             }
-            let previous = self.load::<Session>(SESSION_ITEM).ok().flatten();
-            self.save(SESSION_ITEM, &session)?;
-            previous
+            let saved = (|| {
+                // A storage read failure must not silently discard the previous grant.
+                let previous = self.load::<Session>(SESSION_ITEM)?;
+                if attempt.registering {
+                    // Keep the issued client ID only after verifying this grant.
+                    self.save(
+                        INSTALLATION_ITEM,
+                        &Installation {
+                            host_id: installation.host_id.clone(),
+                            client_id: Some(accepted.client_id.clone()),
+                        },
+                    )?;
+                }
+                self.save(SESSION_ITEM, &session)?;
+                Ok(previous)
+            })();
+            match saved {
+                Ok(previous) => previous,
+                Err(failure) => {
+                    drop(_session);
+                    // A failed Keychain write must not strand an active grant.
+                    self.revoke(&endpoints, &accepted.client_id, &refresh_token)
+                        .await;
+                    return Err(failure);
+                }
+            }
         };
         if let Some(previous) = replaced {
             if let Some(old) = previous

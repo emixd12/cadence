@@ -17467,9 +17467,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 297: Mac app ChatGPT connection
 
-Status: implemented November 12, 2026 on branch `claude/ticket-297-mac-chatgpt`, not yet
-merged. Mocked Rust and TypeScript tests pass. Live sign-in and installed checks belong to
-Ticket 300. No UI uses the connection until Ticket 299.
+Status: implemented November 12, 2026 on PR #241. Review added bounded streaming reads,
+callback deadline enforcement, failed-grant cleanup and stricter ID-token validation.
+The reviewed head requires Desktop native CI; Rust is unavailable in the review executor.
+Live sign-in and installed checks belong to Ticket 300. No UI uses the connection until
+Ticket 299, whose desktop switch stays off by default.
 Dependencies: Ticket 295.
 
 Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
@@ -17509,7 +17511,17 @@ Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --p
 
 ## Ticket 298: Hosted Daily Brief prepare and complete for a device model
 
-Status: not started.
+Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-brief`).
+`POST /api/advisor/brief/device/prepare`, `/complete` and `/release` call
+`lib/services/daily-brief-device.service.ts`; the envelope lives in
+`lib/services/daily-brief-device-envelope.ts`; `readBriefingContextFence` fences the stored
+inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
+added pending-only release, completion replay protection and a final context-expiry check.
+Migration `20261112041029_release_pending_daily_brief.sql` supplies the release RPC.
+Remaining: its hosted push, the Mac client (Ticket 299), and later owner activation.
+The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
+production. Ticket 299 calls release when its model call fails, without waiting for
+the 75-second lease or resetting the normal retry quotas.
 Dependencies: Tickets 295 and 296.
 
 Goal: a signed-in Mac gets a prepared brief request from Cadence's server, runs it on the
@@ -17518,12 +17530,14 @@ call for these briefs.
 
 Scope and acceptance:
 
-- Prepare and complete routes under `app/api/advisor/brief`, recorded in `docs/ROUTE_MAP.md`.
+- Prepare, complete and release routes under `app/api/advisor/brief`, recorded in `docs/ROUTE_MAP.md`.
 - Prepare runs today's admission, context and freshness steps and returns the request with a
   short-lived signed envelope. The envelope binds the user, installation, lease, configuration
   and context revisions, and holds only validation data. The server stores no prepared payload.
 - Complete verifies the envelope and the lease, validates the output with Ticket 296's
   validator, finishes the lease, records the tip and returns the briefing.
+- Release authenticates the same envelope and releases only its pending lease after a
+  device model failure. Replayed complete or release requests never downgrade a success.
 - `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode. Settings report device-model availability
   without requiring `OPENAI_API_KEY`.
 - Tests reject forged, expired and mismatched envelopes, a superseded lease and output with
@@ -17547,7 +17561,7 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: not started.
+Status: in progress (reported in the November 12 branch integration).
 Dependencies: Tickets 297 and 298.
 
 Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
@@ -17556,7 +17570,8 @@ hidden until the owner turns it on"):
 - Everything below sits behind a desktop switch that is off by default. With it off, the
   Settings card and the plan path do not appear.
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
-  does not wait for the 75-second lease. Ticket 298's routes need a matching release route.
+  does not wait for the 75-second lease. Call Ticket 298's
+  `POST /api/advisor/brief/device/release` with the signed envelope and installation ID.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
 - Still required (not a decision): a command that hands the access token to the webview
