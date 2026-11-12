@@ -26,7 +26,11 @@ import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
-import { createDesktopDailyBriefClient } from "./daily-brief";
+import { createDesktopDailyBriefClient, type DesktopDailyBriefPlan } from "./daily-brief";
+import { chatGptPlanSwitchOn } from "./chatgpt/plan-switch";
+import { createChatGptConnection } from "./chatgpt/connection";
+import { ChatGptPlanSettings } from "./chatgpt/chatgpt-plan-settings";
+import { CHATGPT_USAGE_URL } from "@/lib/ui/daily-brief";
 import { TimelineScreen } from "./timeline-screen";
 import { DesktopErrorBoundary } from "./desktop-error-boundary";
 import { BehaviorsScreen } from "./behaviors-screen";
@@ -58,6 +62,12 @@ import { scheduleLocalDayRefresh } from "./desktop-lifecycle";
 import { reconcileLocalBehaviorEndDates } from "./local-behavior-lifecycle.service";
 import type { AnalyticsSelection } from "@cadence/core/services/analytics";
 import "./timeline.css";
+
+// Ticket 299: the ChatGPT plan feature exists only when the build turns its switch on (owner decision, November 12, 2026).
+const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;
+const openChatGptUsage = () => { void openCalendarSourceUrl(CHATGPT_USAGE_URL).catch(() => undefined); };
+const dailyBriefPlan: DesktopDailyBriefPlan | null = chatGptPlan
+  ? { connection: chatGptPlan, connect: async () => { await chatGptPlan.connect(); }, openUsage: openChatGptUsage } : null;
 import { AccountConflictReview, AccountDisconnectPanel, AccountPanel, AccountSyncPanel, FirstAccountLinkChoice } from "./account/account-panel";
 import { DesktopAuth, readDesktopAuthConfig, type DesktopAccountState } from "./account/auth";
 import { planAccountSync, synchronizeAccount, synchronizeReviewedAccount, type AccountSyncInputs } from "./account/account-sync";
@@ -326,7 +336,7 @@ export function Product() {
   }, [account.status === "linked" ? account.userId : null, profile?.id]);
   const profileId = profile?.id;
   const accountUserId = account.status === "linked" ? account.userId : null;
-  const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient) : null, [calendarClient, accountUserId]);
+  const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan) : null, [calendarClient, accountUserId]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
     return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
@@ -634,6 +644,7 @@ export function Product() {
         ]} />}
         dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
         dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
+        chatGptPlanControls={chatGptPlan && dailyBriefClient ? <ChatGptPlanSettings key={`chatgpt-${accountUserId}`} connection={chatGptPlan} connect={() => chatGptPlan.connect()} openUsage={openChatGptUsage} /> : undefined}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
           leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}

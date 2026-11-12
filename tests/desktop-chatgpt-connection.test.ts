@@ -60,10 +60,13 @@ describe("desktop ChatGPT connection client", () => {
     expect(auth).toContain('NATIVE_ONLY_KEYS: &[&str] = &["chatgpt-installation", "chatgpt-session"]');
   });
 
-  it("leaves the desktop CSP closed to OpenAI: Rust makes every Ticket 297 call (Ticket 299 owns any change)", () => {
+  it("opens the desktop CSP to exactly https://api.openai.com for the plan model call (Ticket 299); sign-in stays in Rust", () => {
     const config = JSON.parse(readFileSync(new URL("../apps/desktop/src-tauri/tauri.conf.json", import.meta.url), "utf8"));
     for (const policy of [config.app.security.csp, config.app.security.devCsp]) {
-      expect(policy).not.toContain("openai.com");
+      const connect = (policy as string).match(/connect-src ([^;]+)/u)?.[1]?.split(" ") ?? [];
+      expect(connect.filter((source) => source.includes("openai"))).toEqual(["https://api.openai.com"]);
+      expect(policy).not.toContain("auth.openai.com");
+      expect(policy).not.toContain("chatgpt.com");
     }
   });
 });

@@ -1,4 +1,5 @@
 import type {
+  DailyBriefing,
   DailyBriefResponse,
   DailyBriefSettings,
   DailyBriefSourceFlags,
@@ -14,7 +15,27 @@ export function timelineBriefKey(timeline: TimelineView): string {
   ]);
 }
 
+/** OpenAI's ChatGPT usage settings, where "Manage usage" goes (Ticket 299). */
+export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
+
+/** How a delivered brief ran: on the user's ChatGPT plan, or on Cadence's path while plan usage is off. */
+export type DailyBriefPlanUsage = "plan" | "plan_off";
+
+/**
+ * Ticket 299 (decision D27): the Mac's ChatGPT plan controls for the Daily Brief. Only
+ * Cadence for Mac sets them, and only with its ChatGPT plan switch on; the web client
+ * never does.
+ */
+export type DailyBriefPlanControls = Readonly<{
+  usage: (briefing: DailyBriefing) => DailyBriefPlanUsage | null;
+  /** Opens ChatGPT usage settings in the system browser. */
+  manageUsage: () => void;
+  /** Starts ChatGPT sign-in and resolves when it ends. */
+  connect: () => Promise<void>;
+}>;
+
 export type DailyBriefClient = Readonly<{
+  plan?: DailyBriefPlanControls;
   preferences: (signal?: AbortSignal) => Promise<DailyBriefSettings>;
   updatePreferences: (
     input: DailyBriefPreferenceInput,

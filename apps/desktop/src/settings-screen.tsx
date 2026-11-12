@@ -51,6 +51,8 @@ export type SettingsScreenProps = Readonly<{
   accountControls?: ReactNode;
   calendarControls?: ReactNode;
   dailyBriefControls?: ReactNode;
+  /** Ticket 299: the "Use your ChatGPT plan" card; omitted unless the ChatGPT plan switch is on. */
+  chatGptPlanControls?: ReactNode;
   travelControls?: ReactNode;
   categoryControls?: ReactNode;
   /** Shown as the Categories drawer state; omit to render `categoryControls` on its own. */
@@ -96,6 +98,7 @@ export function SettingsScreen({
   accountControls,
   calendarControls,
   dailyBriefControls,
+  chatGptPlanControls,
   travelControls,
   categoryControls,
   categoryCount,
@@ -189,6 +192,7 @@ export function SettingsScreen({
               {dailyBriefControls}
             </SettingsDrawer>
           ) : null}
+          {chatGptPlanControls}
         </SettingsGroup>
 
         <SettingsGroup id="settings-account">

@@ -3,7 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 // Ticket 297 (D27): the Mac app's ChatGPT connection client. Rust owns sign-in, the
 // token endpoint, refresh, revocation and the Keychain items; this client receives only
 // connection state, the ChatGPT email and model catalog rows. It keeps nothing in
-// frontend storage. No UI calls it yet; Ticket 299 adds the Settings card.
+// frontend storage. Ticket 299 adds the Settings card and `accessToken`: the access token
+// for one Daily Brief model call, held only in memory by its caller.
 
 export type ChatGptConnectionState =
   | "disconnected"
@@ -26,6 +27,8 @@ export type ChatGptConnection = Readonly<{
   cancelConnect(): Promise<void>;
   disconnect(): Promise<ChatGptDisconnectOutcome>;
   models(): Promise<ChatGptCatalogModel[]>;
+  /** A fresh access token (Rust refreshes it first if needed). Use it for one call; never store it. */
+  accessToken(): Promise<string>;
 }>;
 
 type Call = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -61,6 +64,12 @@ export function readChatGptCatalog(value: unknown): ChatGptCatalogModel[] {
   });
 }
 
+function readAccessToken(value: unknown): string {
+  const token = record(value) ? optionalText(value.accessToken, 16_384) : null;
+  if (!token) throw new ChatGptConnectionError("Cadence received an invalid ChatGPT access token.");
+  return token;
+}
+
 function readOutcome(value: unknown): ChatGptDisconnectOutcome {
   const outcome = record(value) ? value.outcome : null;
   if (!OUTCOMES.includes(outcome as ChatGptDisconnectOutcome)) {
@@ -87,5 +96,6 @@ export function createChatGptConnection(call: Call = (command, args) => invoke(c
     cancelConnect: () => native(() => call("chatgpt_cancel_connect"), () => undefined),
     disconnect: () => native(() => call("chatgpt_disconnect"), readOutcome),
     models: () => native(() => call("chatgpt_models"), readChatGptCatalog),
+    accessToken: () => native(() => call("chatgpt_access_token"), readAccessToken),
   };
 }

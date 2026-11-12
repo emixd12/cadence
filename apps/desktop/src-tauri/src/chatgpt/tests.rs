@@ -783,6 +783,36 @@ fn concurrent_callers_share_one_refresh_and_the_rotated_token_is_saved() {
 }
 
 #[test]
+fn the_webview_access_token_is_fresh_and_never_carries_the_refresh_token() {
+    let h = harness();
+    assert_eq!(
+        run(h.connection.webview_access_token()).err(),
+        Some(Failure::Disconnected)
+    );
+    connect(&h).unwrap();
+    let first = run(h.connection.webview_access_token()).ok().unwrap();
+    assert_eq!(first.access_token, "at-SECRET-access-1-xxxxxxxx");
+    let serialized = serde_json::to_value(&first).unwrap();
+    assert_eq!(
+        serialized,
+        json!({"accessToken": "at-SECRET-access-1-xxxxxxxx"})
+    );
+    assert!(!serialized.to_string().contains("refresh"));
+    // Near expiry, Rust refreshes before it hands the token over.
+    h.clock.store(NOW + 3599 - 60, Ordering::SeqCst);
+    let refreshed = run(h.connection.webview_access_token()).ok().unwrap();
+    assert_eq!(refreshed.access_token, "at-SECRET-access-2-xxxxxxxx");
+    assert_eq!(h.mock.refreshes.load(Ordering::SeqCst), 1);
+    // A rejected refresh means reconnect, and no token reaches the webview.
+    h.clock.store(NOW + 10_000, Ordering::SeqCst);
+    h.mock.refresh_statuses.lock().unwrap().push_back(400);
+    assert_eq!(
+        run(h.connection.webview_access_token()).err(),
+        Some(Failure::NeedsReconnect)
+    );
+}
+
+#[test]
 fn a_rejected_refresh_means_reconnect_without_leaking_the_token() {
     let h = harness();
     connect(&h).unwrap();

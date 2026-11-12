@@ -174,7 +174,7 @@ export class DesktopAuth {
 
   async disconnect(mode: "keep" | "remove"): Promise<{ backupPath: string | null; databasePath: string }> {
     const result = await disconnectDesktopAccount(mode, () => this.clearLocalSession(), () => pending("remove"),
-      (command) => invoke<{ backupPath: string | null; path: string }>(command));
+      (command) => invoke<{ backupPath: string | null; path: string }>(command), () => invoke("chatgpt_disconnect"));
     this.changed({ status: "local" });
     return { backupPath: result.backupPath, databasePath: result.path };
   }
@@ -260,8 +260,16 @@ export async function clearDesktopCalendarClientState(
   ]);
 }
 
+/**
+ * Owner decision, November 12, 2026: disconnecting the Cadence account also disconnects
+ * ChatGPT. Rust revokes the refresh token at OpenAI, then clears the `chatgpt-session`
+ * Keychain item; the installation item stays. A failed revocation still clears local tokens,
+ * so it never blocks the account disconnect.
+ */
 export async function disconnectDesktopAccount(mode: "keep" | "remove", clearSecrets: () => Promise<void>, clearPending: () => Promise<unknown>,
-  disconnectNative: (command: "disconnect_keep_local_copy" | "disconnect_remove_account_data") => Promise<{ backupPath: string | null; path: string }>) {
+  disconnectNative: (command: "disconnect_keep_local_copy" | "disconnect_remove_account_data") => Promise<{ backupPath: string | null; path: string }>,
+  disconnectChatGpt: () => Promise<unknown> = async () => undefined) {
+  await disconnectChatGpt().catch(() => undefined);
   await clearSecrets();
   await clearPending();
   return disconnectNative(mode === "keep" ? "disconnect_keep_local_copy" : "disconnect_remove_account_data");

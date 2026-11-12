@@ -4,7 +4,9 @@
 //! refresh token never enters the webview. Tokens live only in two native-only Keychain
 //! items, never in SQLite, frontend storage, logs, exports, backups or error text.
 //! The webview gets connection state, the ChatGPT email and the model catalog rows.
-//! No UI uses these commands yet; Ticket 299 adds it.
+//! Ticket 299 adds `chatgpt_access_token`: the webview holds the access token in memory
+//! for one Daily Brief model call to `https://api.openai.com`. The refresh token never
+//! leaves Rust.
 
 pub mod loopback;
 pub mod protocol;
@@ -78,6 +80,14 @@ pub enum DisconnectOutcome {
 #[serde(rename_all = "camelCase")]
 pub struct DisconnectResult {
     pub outcome: DisconnectOutcome,
+}
+
+/// The access token for one webview model call (Ticket 299). No `Debug`: it holds a token.
+/// It never carries the refresh token.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessToken {
+    pub access_token: String,
 }
 
 pub struct Connection<H: Http, S: Secrets> {
@@ -452,6 +462,18 @@ impl<H: Http, S: Secrets> Connection<H, S> {
         }
     }
 
+    // -- webview model call (Ticket 299) ----------------------------------------
+
+    /// A fresh access token for one Daily Brief model call, refreshed here if it is near
+    /// expiry. A session without plan usage gets none: the model call needs that grant.
+    pub async fn webview_access_token(&self) -> Result<AccessToken, Failure> {
+        if self.status()?.state == ConnectionState::ConnectedWithoutPlanUsage {
+            return Err(Failure::Disconnected);
+        }
+        let access_token = self.access_token(None).await?;
+        Ok(AccessToken { access_token })
+    }
+
     // -- disconnect ------------------------------------------------------------
 
     /// Revokes the refresh token at OpenAI, then clears local tokens either way.
@@ -544,6 +566,12 @@ pub async fn chatgpt_disconnect(
     state: State<'_, ChatGptState>,
 ) -> Result<DisconnectResult, String> {
     state.0.disconnect().await.map_err(text)
+}
+
+/// Ticket 299: the webview keeps this token in memory for one model call only.
+#[tauri::command]
+pub async fn chatgpt_access_token(state: State<'_, ChatGptState>) -> Result<AccessToken, String> {
+    state.0.webview_access_token().await.map_err(text)
 }
 
 #[tauri::command]

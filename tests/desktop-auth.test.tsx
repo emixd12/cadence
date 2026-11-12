@@ -105,4 +105,19 @@ describe("desktop authentication", () => {
       throw new Error("native command must not run");
     })).rejects.toThrow("Keychain failed");
   });
+
+  it("disconnects ChatGPT with the Cadence account, and a ChatGPT failure never blocks it (Ticket 299)", async () => {
+    const order: string[] = [];
+    const native = async (command: string) => { order.push(command); return { backupPath: null, path: "/live" }; };
+    await disconnectDesktopAccount("keep", async () => { order.push("secrets"); }, async () => { order.push("pending"); }, native,
+      async () => { order.push("chatgpt"); });
+    expect(order).toEqual(["chatgpt", "secrets", "pending", "disconnect_keep_local_copy"]);
+    order.length = 0;
+    await disconnectDesktopAccount("keep", async () => { order.push("secrets"); }, async () => undefined, native,
+      async () => { throw "macOS Keychain could not save the ChatGPT connection."; });
+    expect(order).toEqual(["secrets", "disconnect_keep_local_copy"]);
+    // DesktopAuth calls the Rust command, which revokes, then clears only the session item.
+    const source = readFileSync("apps/desktop/src/account/auth.ts", "utf8");
+    expect(source).toContain('() => invoke("chatgpt_disconnect")');
+  });
 });
