@@ -121,7 +121,7 @@ Rules:
   secrets are server-only; never prefix them with `NEXT_PUBLIC_` or `VITE_`. The
   mode stays off until the flag and the current secret are both set. Setting them
   in Production or Preview is an owner-gated rollout step; redeploy after a change.
-  Apply migration `20261112041029_release_pending_daily_brief.sql` before activating
+  Apply migration `20261112043335_release_pending_daily_brief.sql` before activating
   the mode. The owner's November 12 decision keeps the production flag unset.
   `docs/OPERATIONS.md`, "Daily Brief device-model mode (Ticket 298)", holds rotation
   and rollback.

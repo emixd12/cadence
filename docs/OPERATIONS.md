@@ -2426,7 +2426,7 @@ and makes no model call for these briefs, not even a duration estimate.
   a new current value and redeploy. Remove the previous value after 75 seconds. The
   previous key only verifies; it never signs, and it never works without a current key.
 - Rollback: clear `CADENCE_DAILY_BRIEF_DEVICE_MODEL`. Hosted briefs are unaffected.
-- Apply `20261112041029_release_pending_daily_brief.sql` before activating this mode.
+- Apply `20261112043335_release_pending_daily_brief.sql` before activating this mode.
   The additive RPC leaves existing hosted briefs and desktop synchronization unchanged.
   The owner's November 12 decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
   production. Provisioning in Vercel is an owner-gated rollout step. Local testing: put generated

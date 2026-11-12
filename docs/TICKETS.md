@@ -17517,8 +17517,9 @@ Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-
 `lib/services/daily-brief-device-envelope.ts`; `readBriefingContextFence` fences the stored
 inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
 added pending-only release, completion replay protection and a final context-expiry check.
-Migration `20261112041029_release_pending_daily_brief.sql` supplies the release RPC.
-Remaining: its hosted push, the Mac client (Ticket 299), and later owner activation.
+Migration `20261112043335_release_pending_daily_brief.sql` supplies the release RPC.
+Hosted migration applied November 12, 2026. Remaining: the Mac client (Ticket 299) and
+later owner activation.
 The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
 production. Ticket 299 calls release when its model call fails, without waiting for
 the 75-second lease or resetting the normal retry quotas.
