@@ -211,9 +211,15 @@ ticket and owner decision.
   callback and tokens kept in the user's own local or self-hosted runtime, and a remotely
   hosted app needs OpenAI's approval
   (`docs/LEGAL.md` L-017). The web Daily Brief keeps Cadence's OpenAI key.
-- **An account-free Mac Daily Brief.** Today the brief context comes from Cadence's server,
-  so the Mac must be linked to an account. A local brief would need the context builder and
-  validator to run on the Mac.
+- **Agentic features on the account-free Mac through ChatGPT.** Owner direction, November
+  12, 2026 (not a priority yet): a Mac in local mode could use the user's ChatGPT account
+  for the in-app agentic features, starting with the Daily Brief. Using them everywhere
+  still needs a Cadence account. Once OpenAI approves ChatGPT sign-in and plan usage,
+  Cadence account users could also apply their OpenAI subscription across Cadence. Today
+  the brief context comes from Cadence's server, so the Mac must be linked to an account.
+  A local brief needs the context builder and validator to run on the Mac (they use
+  `node:crypto` today) and sees only the Mac's own data, since connectors are hosted.
+  Tickets 294–300 stay as built; this adds a second path and needs its own ticket.
 - **Pricing proposal: a discount for bringing a ChatGPT plan.** The Daily Brief model costs
   Cadence about US$0.13 a month for a typical user (`docs/COSTS.md`), so a discount could be
   at most about 13 cents a month. A stronger model or more briefs for plan users may be worth

@@ -2368,3 +2368,24 @@ Revisit at public launch, when a bad merge reaches users.
 
 Platform impact: development process only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-12: Keep the ChatGPT plan Daily Brief hidden until the owner turns it on
+
+The owner decided on November 12, 2026 that the Mac's "Use your ChatGPT plan" path stays
+hidden from users for now. The Daily Brief on Cadence's own OpenAI key costs users nothing
+extra, so few would choose the plan path, and offering both would confuse them. The work
+in Tickets 294–299 continues, but nothing reaches users until the owner turns it on later.
+
+- Hosted: `CADENCE_DAILY_BRIEF_DEVICE_MODEL` stays unset in production (Ticket 298).
+- Mac: Ticket 299 puts its Settings card and Daily Brief wiring behind a desktop switch that
+  is off by default, so a build can ship with the feature dormant.
+- Ticket 299 also adds a step that releases the brief attempt when the Mac's model call
+  fails, so a retry does not wait for the 75-second lease (owner approval, November 12).
+- Disconnecting the Cadence account on the Mac also disconnects ChatGPT: Cadence revokes the
+  refresh token and clears the session from Keychain (owner approval, November 12).
+- The account-free Mac path is a future item (`docs/FUTURE_UPDATES.md`, "ChatGPT plan
+  follow-ups").
+
+Platform impact: desktop, Ticket 299 gates its UI; web, the flag stays off; marketing,
+no claim until the owner turns it on (P-032); future mobile, not applicable. Messaging
+impact: none.

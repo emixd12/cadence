@@ -521,6 +521,18 @@ complete routes call them, and the Mac runs only the model call.
 `briefing-pipeline.ts` still hashes with `node:crypto`, so neither step runs in
 a browser today.
 
+`lib/services/daily-brief-chatgpt-plan.ts` is the ChatGPT plan adapter (Ticket 296).
+The Mac runs it with the user's ChatGPT access token. It picks the model from the
+account's catalog in the owner's order (`gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`)
+and sends the prepared request in the plan contract. It reads the event stream through
+`response.completed`, whatever its Content-Type, and returns the parsed output for
+`validateDailyBrief`. Failures become `ChatGPTPlanError` codes: `usage_limit`,
+`not_eligible`, `reconnect`, `retry_later`, `advisor_unavailable` and `timeout`. It
+imports only types and `daily-brief-schema.ts`, the output schema it shares with
+`daily-brief-openai.ts`, so it runs in the Mac webview. It never logs bodies or keeps
+provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, stream
+parsing, error mapping and the round trip with prepare and validate.
+
 Ticket 298 owners. `lib/services/daily-brief-device.service.ts` runs admission, the
 shared live capture (`captureLiveDailyBriefContext` in `daily-brief.service.ts`),
 `prepareDailyBrief` without an estimate generator, and later `validateDailyBrief`; it

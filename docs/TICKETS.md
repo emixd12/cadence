@@ -17426,10 +17426,13 @@ Verification: `npm run test` (mock mode), the live run with the owner's consent,
 
 ## Ticket 296: Split Daily Brief generation and add the ChatGPT plan adapter
 
-Status: in progress, November 11, 2026. The prepare/validate split is done
-(`prepareDailyBrief`, `validateDailyBrief`). Both steps stay server-side under D27, so
-the browser line below is not needed; `briefing-pipeline.ts` still uses `node:crypto`.
-The adapter and its error mapping can start: Ticket 295 recorded the request contract.
+Status: complete, November 12, 2026. The prepare/validate split merged with PR #229. The
+adapter is `lib/services/daily-brief-chatgpt-plan.ts`. Model order is an owner decision of
+November 12, 2026: `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. Both steps stay
+server-side under D27, so the browser line below is not needed; the adapter itself runs in
+the webview. The stream cap is 256 KB, because the stream repeats the response object; the
+model's output keeps the 64 KB cap. Ticket 298's prepare route enforces recipe 1.0 for
+device mode.
 Dependencies: Ticket 295.
 
 Goal: make the model call separable so a device can run it, with no change to today's hosted
@@ -17547,6 +17550,19 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 Status: not started.
 Dependencies: Tickets 297 and 298.
+
+Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
+hidden until the owner turns it on"):
+
+- Everything below sits behind a desktop switch that is off by default. With it off, the
+  Settings card and the plan path do not appear.
+- Add a call that releases the brief attempt when the Mac's model call fails, so a retry
+  does not wait for the 75-second lease. Ticket 298's routes need a matching release route.
+- Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
+  token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
+- Still required (not a decision): a command that hands the access token to the webview
+  for the model call, and `https://api.openai.com` in the CSP. Update the test that pins it
+  absent (Ticket 297).
 
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.
