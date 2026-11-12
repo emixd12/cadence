@@ -208,10 +208,12 @@ Status 200; model fields: additional_speed_tiers, allow_only_chatgpt_workspace_e
 
 ## Recommendations
 
+The owner approved these on November 12, 2026, with the model order changed as shown.
+
 | Decision | Recommendation | Evidence |
 | --- | --- | --- |
 | Request contract for Ticket 296 | `stream: true`, `store: false`, `input` as a message list, no `background`. Keep strict `json_schema`, `reasoning`, `tools: []` with `tool_choice: none`, and `max_output_tokens: 2000` from today's hosted body. Read the reply as SSE whatever its `Content-Type`, through `response.completed`, under the 64 KB cap. | All four models accepted the optional fields and `max_output_tokens`. `background`, a string `input` and `stream: false` return 400 with a message and no error code. Streaming 200s had no `Content-Type`. |
-| Model selection rule | Prefer `gpt-5.6-luna`, today's hosted model, when the catalog lists it with visibility `list`. Otherwise take the first listed model in this order: `gpt-6.1-terra`, `gpt-6.1-sol`. Never pick a `hide` model. Brief quality per model was not reviewed; only validation and latency were measured. | `gpt-5.6-luna`, `gpt-6.1-terra` and `gpt-6.1-sol` passed 8 of 8. Terra was fastest (median 2.9 s). Luna keeps the hosted prompt tuning (median 7.0 s, 300 output tokens). |
+| Model selection rule | **Owner decision, November 12, 2026:** take the first model the catalog lists with visibility `list`, in this order: `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. Never pick a `hide` model. With none listed, the plan cannot run a brief and there is no fallback (D27). `gpt-6-luna` was listed but not tested in this run. Brief quality per model was not reviewed. | `gpt-6.1-sol` and `gpt-6.1-terra` passed 8 of 8 (medians 4.6 s and 2.9 s). The agent had recommended `gpt-5.6-luna` first; the owner chose this order instead. |
 | Attempt deadline on the plan route | Keep today's 30-second model budget inside the 60-second attempt. | The slowest brief took 14.3 s (`gpt-6-astra`); none passed 30 s. |
 | Error mapping | Treat `response.failed` with `server_is_overloaded` as retry later. The usage-limit and eligibility codes from the docs were not seen and stay mapped from the docs. | One `gpt-6-astra` brief failed this way. |
 | Mac transport: webview or Rust | CORS allows the webview (`Access-Control-Allow-Origin: *` on the token endpoint and `/v1/responses`). Ticket 297 still decides where tokens live. Doing token-endpoint calls in Rust keeps the refresh token out of the webview, as Keychain-only storage requires. | Preflight 200 for `tauri://localhost` on both; the actual `/v1/responses` request with that origin succeeded on all four models. |

@@ -107,6 +107,8 @@ Check the cited entry before acting on a row.
   reads any non-JSON reply as SSE; the mock omits the header, and a test covers it. An
   uncommitted diagnostic edit (event names and content type in the probe report, no
   bodies) appeared in the worktree during the first run; it is kept and committed here.
+- The owner approved the recommendations on November 12 and set the model order:
+  `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (`gpt-6-luna` untested).
 - Next: the Ticket 296 adapter, then Tickets 297 and 298.
 - Platform impact: none (development script and QA record). Messaging impact: none.
 
