@@ -17385,8 +17385,8 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 295: Spike the Daily Brief request on a ChatGPT plan
 
-Status: in progress since November 7, 2026; mock mode merged November 10. The live run
-waits for the owner's ChatGPT sign-in.
+Status: complete, November 12, 2026 (UTC). The live run on the owner's ChatGPT Pro account
+passed; results and recommendations are in `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
 Dependencies: none.
 
 Goal: prove with a real ChatGPT Plus or Pro account that the Daily Brief request works under
@@ -17429,7 +17429,7 @@ Verification: `npm run test` (mock mode), the live run with the owner's consent,
 Status: in progress, November 11, 2026. The prepare/validate split is done
 (`prepareDailyBrief`, `validateDailyBrief`). Both steps stay server-side under D27, so
 the browser line below is not needed; `briefing-pipeline.ts` still uses `node:crypto`.
-The adapter and its error mapping wait for Ticket 295's live run.
+The adapter and its error mapping can start: Ticket 295 recorded the request contract.
 Dependencies: Ticket 295.
 
 Goal: make the model call separable so a device can run it, with no change to today's hosted
