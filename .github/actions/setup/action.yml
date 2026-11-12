@@ -1,0 +1,32 @@
+name: Set up Node.js and dependencies
+description: >-
+  Installs Node.js 24 and the npm dependencies. Restores node_modules from the
+  Actions cache when no package manifest or lockfile changed, and runs npm ci
+  otherwise. Check out the repository before calling this action.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24.x
+    - name: Record the Node.js version
+      id: node
+      shell: bash
+      run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+    # The key covers every manifest npm ci reads, so a manifest that no longer
+    # matches the lockfile misses the cache and fails in npm ci, as before.
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json', 'package.json', 'apps/*/package.json', 'packages/*/package.json') }}
+    - name: Install dependencies
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci

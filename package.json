@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:web-client": "CADENCE_WEB_CLIENT_TEST=1 vitest run tests/acceptance-web-client.test.mjs",
     "mcp:oauth": "node scripts/acceptance/oauth-driver.mjs",
     "mcp:accept:protocol": "node scripts/acceptance/protocol.mjs",
     "desktop:dev": "npm --workspace apps/desktop run dev",

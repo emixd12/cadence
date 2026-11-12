@@ -89,6 +89,25 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## CI checks run in parallel — November 11, 2026
+
+**On branch `ci/parallel-verify`; not merged.** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"CI checks run in parallel".
+
+- **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
+  `tests/acceptance-web-client.test.mjs` took 589 s of it.
+- **Changed:** `npm run test` skips that file; `npm run test:web-client` and the new
+  `Web client runner` workflow run it for changes to the acceptance runner. `ci.yml` runs
+  `checks`, `lint`, `test` (three shards), `build` and `sites` in parallel, and the required
+  `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
+  from the Actions cache.
+- **Not changed:** branch protection, the Dagger module and the web client test's waits.
+- **Open:** the owner's decision on Dagger (retire or repair). `dagger check` fails on
+  unchanged `main` for container reasons and its repeat runs miss the cache.
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.
+
 ## Ledger cleanup — November 11, 2026
 
 - **Merge markers:** removed the stray `||||||| 46016e57` and `||||||| 20feeaff` lines from
