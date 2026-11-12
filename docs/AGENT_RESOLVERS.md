@@ -509,6 +509,18 @@ imports only `lib/services/advisor-auth.service.ts` and never reads context.
 `lib/services/daily-brief-consumer.ts` now owns internal provider-neutral
 generation and output validation; it performs no domain mutation.
 
+Ticket 296 splits that generation into two steps. `prepareDailyBrief` runs the
+estimate call, planning and prompt assembly, and returns the model request
+(`instructions`, `facts`) with `DailyBriefValidationData`. `validateDailyBrief`
+turns model output into a briefing from that data alone. The validation data is
+plain JSON, so it survives serialization and the model call can run on a device
+(decision D27). `generateDailyBrief` composes the two steps and keeps its
+behavior. `tests/daily-brief-prepare-validate.test.ts` proves the composition
+after a JSON round trip. Both steps stay server-side: Ticket 298's prepare and
+complete routes call them, and the Mac runs only the model call.
+`briefing-pipeline.ts` still hashes with `node:crypto`, so neither step runs in
+a browser today.
+
 The September 20 in-app correction reopens Ticket 146 for bounded completion
 history, using existing analytics/status rules. Ticket 147 adds first-party
 generation and one server provider adapter over this internal service. The model

@@ -42,8 +42,8 @@ it("preserves encrypted Web Push requests on Node with a fake HTTPS transport", 
   `], { encoding: "utf8", timeout: 10_000 });
   expect(result.status).toBe(0);
   expect(result.stdout).toContain("encrypted request passed");
-  // Ticket 105: retain the published version until upstream ships the URL fix.
-  // Removing the warning is allowed; unrelated deprecations need investigation.
+  // Ticket 105: web-push 4 uses WHATWG URL parsing. Regressions must not restore
+  // the legacy url.parse() warning or introduce another Node deprecation.
   const warningCodes = [...result.stderr.matchAll(/\[(DEP\d+)\]/g)].map((match) => match[1]);
-  expect(warningCodes.every((code) => code === "DEP0169")).toBe(true);
+  expect(warningCodes).toEqual([]);
 });

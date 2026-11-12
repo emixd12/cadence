@@ -586,6 +586,8 @@ and wraps actions on narrow screens. No token or navigation changes.
 across web and desktop. `ExternalEventDetails` owns persistent preview and native
 dialog presentation. `GoogleCalendarPanel` reuses SettingsPanel and native form
 controls. Synthetic Calendar bench adapters perform no provider or account reads.
+The details dialog opens during layout, before a place action focuses the destination
+field inside its correction disclosure. Web and desktop share that focus order.
 
 Calendar details lead with the travel lines (Ticket 271), then Directions, the journey mode
 choice and the **Change for this trip** disclosure, then Time and Location. The first travel

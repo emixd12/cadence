@@ -154,7 +154,9 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
       void Promise.resolve().then(() => onOpenExternal?.(url)).catch(() => setLinkError(true));
     };
 
-    useEffect(() => {
+    // Open before child effects focus the requested travel destination. A closed
+    // dialog cannot receive focus in browsers or jsdom 31.
+    useLayoutEffect(() => {
       const dialog = dialogRef.current;
       if (!dialog) return;
       if (!event) { if (dialog.open) dialog.close(); return; }

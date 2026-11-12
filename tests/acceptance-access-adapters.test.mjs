@@ -9,7 +9,7 @@ import { classifyPermission, cookieUserId, main as browser } from '../scripts/ac
 import { main as cadenceSession } from '../scripts/acceptance/access/cadence-session.mjs';
 import { classifyConsent, main as calendar } from '../scripts/acceptance/access/calendar.mjs';
 import { main as connection } from '../scripts/acceptance/access/connection.mjs';
-import { linkQuery, main as device } from '../scripts/acceptance/access/device.mjs';
+import { linkQuery, main as device, notificationsAllowed } from '../scripts/acceptance/access/device.mjs';
 import { classifySignIn, main as google } from '../scripts/acceptance/access/google.mjs';
 import { dotenvCandidates, envFileSets, main as host, onPath, profileExpiry } from '../scripts/acceptance/access/host.mjs';
 import { main as keychain } from '../scripts/acceptance/access/keychain.mjs';
@@ -351,6 +351,38 @@ describe('device.mjs', () => {
   it('reads app permissions from Settings text', async () => {
     expect(await device(['app-permissions', '--device', 'test-mac'], { run: proc(0, 'AXStaticText: Notifications: Enabled on this device.\n'), out: () => {} })).toBe(0);
     expect(await device(['app-permissions', '--device', 'test-mac'], { run: proc(0, 'no match'), out: () => {} })).toBe(21);
+  });
+
+  it('reads the regrouped Settings and opens the Travel drawer for the location line', async () => {
+    const calls = [];
+    const run = (_cmd, args) => {
+      calls.push(args.slice(3).join(' '));
+      if (args[3] === 'read') return { status: 0, stdout: 'AXHeading: Notifications\nAXStaticText: macOS permission | macOS permission\nAXStaticText: Allowed | Allowed\n', stderr: '' };
+      if (args[3] === 'press') return { status: 0, stdout: 'pressed\n', stderr: '' };
+      const opened = calls.filter((call) => call.startsWith('press')).length === 1;
+      return { status: 0, stdout: opened ? 'AXStaticText: Device location: allowed.\n' : 'no match\n', stderr: '' };
+    };
+    expect(await device(['app-permissions', '--device', 'test-mac'], { run, out: () => {} })).toBe(0);
+    expect(calls.filter((call) => call.startsWith('press'))).toHaveLength(2);
+    expect(notificationsAllowed({ status: 0, stdout: 'AXStaticText: macOS permission\nAXStaticText: Not allowed\n' }).stdout).toBe('no match\n');
+  });
+
+  it('reads allowed location while Travel is off and restores its setup drawer', async () => {
+    const pressed = [];
+    let open = false;
+    const run = (_cmd, args) => {
+      if (args[3] === 'read') return { status: 0, stdout: 'AXStaticText: macOS permission\nAXStaticText: Allowed\n', stderr: '' };
+      if (args[3] === 'press') {
+        pressed.push(args[5]);
+        if (args[5] !== 'Set up Travel') return { status: 1, stdout: '', stderr: 'not found' };
+        open = !open;
+        return { status: 0, stdout: 'pressed\n', stderr: '' };
+      }
+      return { status: 0, stdout: open ? 'AXStaticText: Device location: allowed.\n' : 'no match\n', stderr: '' };
+    };
+    expect(await device(['app-permissions', '--device', 'test-mac'], { run, out: () => {} })).toBe(0);
+    expect(pressed).toEqual(['Travel settings', 'Set up Travel', 'Set up Travel']);
+    expect(open).toBe(false);
   });
 });
 

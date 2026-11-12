@@ -39,6 +39,7 @@ import { createInterface } from 'node:readline';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 const SUPABASE = process.env.CADENCE_SUPABASE_CLI ?? '/opt/homebrew/bin/supabase';
 const DOCKER_SOCK = join(homedir(), '.docker', 'run', 'docker.sock');
@@ -412,7 +413,7 @@ async function status({ name }) {
   if (!bound.length) say('containers are gone (Docker restart?): run down, then up again');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const { positionals, values } = parseArgs({ allowPositionals: true, options: {
     name: { type: 'string', default: 'cadence-accept-run' }, 'db-base': { type: 'string', default: '56150' }, 'app-port': { type: 'string', default: '4450' },
     run: { type: 'string' }, scenario: { type: 'string', default: 'read-write' }, client: { type: 'string', default: 'all' }, account: { type: 'string', default: 'A' },

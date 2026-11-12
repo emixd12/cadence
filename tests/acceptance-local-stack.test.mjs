@@ -1,6 +1,9 @@
-// Ticket 252: the mcp-acceptance skill's local stack helper. Pure parts only;
-// no Docker, Supabase or app is started.
-import { readFileSync } from 'node:fs';
+// Ticket 252: the mcp-acceptance skill's local stack helper. Pure logic and CLI
+// argument validation; no Docker, Supabase or app is started.
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { assertSafe } from '../scripts/acceptance/ledger.mjs';
 import {
@@ -10,6 +13,21 @@ import {
 const CONFIG = readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8');
 
 describe('local stack helper', () => {
+  it('runs the command-line entry point from a checkout path containing spaces', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadence local-stack '));
+    try {
+      const script = join(dir, 'local-stack.mjs');
+      copyFileSync(new URL('../.claude/skills/mcp-acceptance/local-stack.mjs', import.meta.url), script);
+      const result = spawnSync(process.execPath, [script, 'invalid-command'], { encoding: 'utf8', timeout: 10_000 });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('usage: local-stack.mjs');
+      expect(result.stdout).toBe('');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('moves the project ID and every port off the owner stack', () => {
     const ports = portsFor(56150);
     const out = rewriteConfig(CONFIG, { name: 'cadence-accept-test', ports });

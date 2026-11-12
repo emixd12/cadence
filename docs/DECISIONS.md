@@ -2344,3 +2344,27 @@ Vercel itself and keeps running; it does not read the stored ID.
 
 Platform impact: operations only. Web: Trust page reads Stale until launch. Desktop,
 marketing and future mobile: not applicable. Messaging impact: none.
+
+## 2026-11-11: Auto-merge by default before launch
+
+The owner approved on November 11, 2026 ("yes") that agents turn on auto-merge when they
+open a pull request, without asking each time. `AGENTS.md` already said to merge a small PR
+as soon as checks pass; agents were still asking.
+
+GitHub auto-merge waits only for the required check, `verify`, which takes about 100 s
+since the same day's CI change. Two exceptions follow from that:
+
+1. **A non-required workflow runs on the PR.** `Desktop native` (about 6 minutes),
+   `Local Supabase rehearsal` (about 4) and `Web client runner` (about 11) finish after
+   `verify`. The agent waits for the result and merges the PR itself.
+2. **The PR needs a step or a decision first:** a hosted migration push, a Mac release,
+   an acceptance run or an open owner decision. The agent opens it as a draft.
+
+Accepted risk: the Codex review takes 2 to 4 minutes, so its findings can arrive after the
+merge. The agent that opened the PR fixes a real finding in a follow-up PR. Cadence has no
+users yet, so a bad merge costs a follow-up fix.
+
+Revisit at public launch, when a bad merge reaches users.
+
+Platform impact: development process only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.

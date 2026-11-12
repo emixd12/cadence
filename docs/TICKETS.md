@@ -7975,12 +7975,13 @@ Out of scope:
 
 ## Ticket 105: Browser-push dependency compatibility cleanup
 
-Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open. npm still
-lists web-push 3.6.7 as `latest` (read October 27), so the recheck trigger in
-`docs/OPERATIONS.md` has not fired. No Preview inspection is recorded since.
+Status: in_progress (2026-11-11). PR #218 upgrades web-push to 4.0.0, which replaces
+legacy URL parsing. The real-package encrypted transport check passes on Node 24
+without deprecations; subject, reminder and leave-reminder checks pass (51 tests).
+`npm audit --omit=dev` reports no vulnerabilities. Refreshed CI and deployment
+verification remain required before closure. No real push send ran.
 
-The published dependency has no newer release containing the upstream fix.
-The documented exception and fake-transport checks pass. Preview inspection remains pending.
+The dependency upgrade removes the upstream-blocked exception.
 Evidence: `docs/qa/2026-09-04-tickets-088-091-104-105.md`.
 
 Platform impact:
@@ -14964,6 +14965,8 @@ incomplete, older-fetch, or older-generation result never erases known records.
 
 Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Hevy Pro key. Sealed intake; a complete 31-day read (44 workouts, 5/5 pages, before/after counts equal); timing-only fields; Timeline showed a logged workout with time and duration only; disconnect deleted the key and fenced reads. Not live-testable with this account: over 500 workouts and non-Pro rejection.
 
+Production acceptance (2026-11-11, test account A with the owner's Hevy Pro key, decision 2026-11-11): **passed** on web. A complete 31-day read (5/5 pages, counts equal), timing-only fields, range validation, a new test workout on Timeline at 1280 and 390 px without its title, disconnect (`hevy_api_key` instruction, reads fenced with 409) and reconnect. Installed desktop waits on the 0.1.10 install. Evidence: `docs/qa/2026-11-11-connector-acceptance.md`.
+
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
 
 Acceptance: follow the Hevy brief exactly. Only the three allowlisted `GET` calls
@@ -15158,6 +15161,8 @@ F1–F8 and the final DAV metadata correction. Live acceptance remains unverifie
 
 Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Apple Account and an app-specific password. Sealed intake; 5 calendars; server-expanded recurrence; all-day and other-zone events correct; all-day toggle; disconnect cleanup; the owner revoked the password. Finding: iCloud collections report full VTIMEZONE definitions, so floating events would quarantine by design. Not live-tested: wrong-principal reconnect.
 
+Production acceptance (2026-11-11): **not run**. The vault item `icloud-test-account-a` does not exist yet (owner step); A's production connection is disconnected, generation 0. Installed desktop waits on the 0.1.10 install. See `docs/qa/2026-11-11-connector-acceptance.md`.
+
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
 
@@ -15194,6 +15199,8 @@ open; the owner accepted iCloud custody on 2026-10-19.
 
 Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
+Release step 6 (production smoke, 2026-11-11, `docs/qa/2026-11-11-connector-acceptance.md`): Hevy **passed** on production web; Outlook production OAuth settings checked (authority `common`, `Calendars.Read`, PKCE); Outlook and iCloud connect wait on the vault items `outlook-test-account-a` and `icloud-test-account-a`; installed desktop waits on the 0.1.10 install. Step 7 copy is live on the FAQ and Privacy pages and awaits the owner's review in the messaging track.
+
 Goal: independently verify 221–227 and align public and in-app disclosures.
 
 Acceptance: re-run all required checks and the acceptance matrix in the
@@ -15222,6 +15229,7 @@ disconnected. Live finding: Microsoft co-grants an earlier `Calendars.ReadBasic`
 consent with `Calendars.Read`; it is accepted only alongside `Calendars.Read`
 (`06fc275`). Not exercised: cross-tenant consent, tenants that block unverified
 apps, installed desktop. Details in `STATUS.md`.
+Production (2026-11-11): OAuth settings checked through a started web attempt; connect, cross-tenant consent and installed desktop not run (vault item `outlook-test-account-a` missing; no work or school tenant other than the home tenant). See `docs/qa/2026-11-11-connector-acceptance.md`.
 
 Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
 personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
@@ -16988,8 +16996,9 @@ Verification: `npm run agents:check`, `npm run interactions:check`,
 
 ## Ticket 288: Daily Brief token usage and failure reasons
 
-Status: complete in source November 9, 2026. No live provider measurement was made;
-the token figures in `docs/COSTS.md` stay assumed.
+Status: complete. Implemented November 9, 2026; measured November 11, 2026 from two
+production `daily_brief.model` events (mean 8,683 input and 481 output tokens, about
+US$0.0023 per brief). `docs/COSTS.md` now uses the measured figures.
 Dependencies: Tickets 146–148 (Daily Brief), 161 and 176–177 (workbench), 188
 (estimate call).
 
@@ -17038,7 +17047,9 @@ lint, agents, interactions and resolvers checks; full `npm run test`.
 ## Ticket 289: Consolidated Daily Brief prompt candidate
 
 Status: candidate implemented November 9, 2026. Not promoted. The owner comparison is
-pending and follows Ticket 184's rules.
+prepared (November 11, `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner
+comparison") on reserved cases H1–H10 and S1; its paid runs wait for the owner's spend
+cap. The decision follows Ticket 184's rules.
 Dependencies: Ticket 184 (recipes 1.1 and 1.2), Ticket 219 (travel policy), Ticket 239
 (connector sources policy).
 
@@ -17082,6 +17093,8 @@ Verification: `tests/daily-brief-instructions.test.ts` and `tests/daily-brief-co
 ## Ticket 290: Model, reasoning effort and prompt variant as workbench candidates
 
 Status: implemented November 9, 2026 with provider-free verification. No live model run.
+The effort and model comparisons (E1, M1) are prepared with Ticket 289's on November 11 and
+wait for the owner's spend cap and model choice.
 Dependencies: Tickets 288 and 289.
 
 Goal: let the development briefing workbench compare a different model, reasoning effort or
@@ -17128,8 +17141,10 @@ design-system checks; full `npm run test`.
 
 ## Ticket 291: Skill-rule scenarios for MCP client acceptance
 
-Status: implemented and unit-tested with fakes on November 9, 2026. No local-stack or
-live run yet.
+Status: implemented November 9, 2026. First local-stack run with a real client passed
+on November 11, 2026: all three scenarios with `claude-code` on test account A
+(`docs/qa/mcp-server.md`, "First local run"). The production run with the API clients
+remains and needs a spend cap for the QA keys.
 Dependencies: Tickets 251 and 256; the published skills in `integrations/skills/`.
 
 Goal: check, with real headless clients, that a model following a published Cadence
@@ -17336,7 +17351,7 @@ follow-ups.
 
 ## Ticket 294: Record the ChatGPT plan decision and tickets
 
-Status: completed on branch `chatgpt-https`, November 7, 2026. Not merged.
+Status: completed November 7, 2026; merged to `main` November 10, 2026.
 Dependencies: none.
 
 Goal: record the approved direction in the repository before any code changes.
@@ -17370,7 +17385,8 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 295: Spike the Daily Brief request on a ChatGPT plan
 
-Status: in progress on branch `chatgpt-https`, November 7, 2026.
+Status: in progress since November 7, 2026; mock mode merged November 10. The live run
+waits for the owner's ChatGPT sign-in.
 Dependencies: none.
 
 Goal: prove with a real ChatGPT Plus or Pro account that the Daily Brief request works under
@@ -17410,7 +17426,10 @@ Verification: `npm run test` (mock mode), the live run with the owner's consent,
 
 ## Ticket 296: Split Daily Brief generation and add the ChatGPT plan adapter
 
-Status: not started.
+Status: in progress, November 11, 2026. The prepare/validate split is done
+(`prepareDailyBrief`, `validateDailyBrief`). Both steps stay server-side under D27, so
+the browser line below is not needed; `briefing-pipeline.ts` still uses `node:crypto`.
+The adapter and its error mapping wait for Ticket 295's live run.
 Dependencies: Ticket 295.
 
 Goal: make the model call separable so a device can run it, with no change to today's hosted
@@ -17596,7 +17615,7 @@ do not depend on 301. Ticket 307 follows 306.
 
 ## Ticket 301: Settings groups, section index and state rows (web)
 
-Status: implemented November 10, 2026 on PR 205. Not verified: a signed-in check on the hosted page as a test account.
+Status: complete November 11, 2026. Merged as PR 205; signed-in hosted check as test account A passed at 1280 and 390 px (STATUS, "Tickets 301–309 hosted verification — November 11, 2026").
 Dependencies: none.
 
 Goal: a person finds any setting within four groups and sees what is connected or turned
@@ -17660,7 +17679,7 @@ anchor links; `npm run interactions:check`, `npm run design-system:check`; the b
 
 ## Ticket 302: Mac Settings adopts the groups
 
-Status: implemented November 10, 2026 on PR 205. Not verified: a dev-signed build in local and linked mode (Cadence for Mac is not installed on the owner's Mac); the Mac's WebKit view.
+Status: implemented November 10, 2026 on PR 205. Waiting on the Mac 0.1.10 release (credential backup is Ticket 325): an installed check in local and linked mode and the Mac's WebKit view.
 Dependencies: Ticket 301.
 
 Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
@@ -17830,7 +17849,7 @@ DOM tests that no switch renders and proposals still need Accept;
 
 ## Ticket 306: One Daily Brief choice for every connected source
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000`. Not verified: hosted and installed desktop checks.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000` pushed November 11; hosted `GET /api/advisor/preferences` as test account A returned the version 4 shape. Waiting on the Mac 0.1.10 release for the installed check.
 Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
 change Daily Brief.
 
@@ -17916,7 +17935,7 @@ hosted check as a test account after the migration is authorized.
 
 ## Ticket 308: Set Home from the current location
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000`. Not verified: a hosted lookup within the owner's travel spend cap; iPhone Safari.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000` pushed November 11; the hosted route rejects a missing session and a bad body. Not verified: one paid hosted lookup, waiting on the owner's travel spend cap; iPhone Safari.
 Dependencies: none.
 
 Goal: a person sets Home without typing an address.
@@ -17957,7 +17976,7 @@ account within the travel spend cap the owner sets.
 
 ## Ticket 309: Settings wording pass
 
-Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`, for the owner to read.
+Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`; every "After" string was found in source November 11. Waiting on the owner to read it.
 Dependencies: Ticket 301 for the final section names.
 
 Goal: Settings reads clearly and warmly, and each thing has one name.
@@ -18587,3 +18606,46 @@ Messaging impact: none.
 
 Verification: `npx vitest run tests/release-credentials.test.mjs` and
 `dagger check --cadence --progress=report`.
+
+## Ticket 326: Configuration history in two key shapes (defect D2)
+
+Status: in progress. Started November 11, 2026. The read side is done; the writer is not.
+Dependencies: none. Found during Ticket 292 acceptance (ledger
+`.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2).
+
+Cause: Cadence for Mac stores configuration snapshots in the camelCase shape of
+`BehaviorConfigurationSnapshot` (`local_store/behavior.rs`, `snapshot()`). Account sync
+(`apps/desktop/src/account/account-sync.ts`, `portabilityEntities`) uploads
+`configuration_event` rows unchanged, so hosted `behavior_configuration_events` holds
+camelCase rows next to the web's snake_case rows. Only the first-link path converts them.
+Web export validated the snake_case shape and returned 500 for every format.
+
+Scope and acceptance:
+
+- `toStoredConfigurationSnapshot` in `packages/core/src/services/configuration-payload.ts`
+  reads both shapes and returns the hosted snake_case shape. Export assembly (web and Mac)
+  and `listBehaviorConfigurationEvents` (export, BehaviorLog restore, Daily Brief history)
+  use it. Done.
+- The export route logs failures as `export_download_failed` with the error class and, for
+  export validation failures only, the code-defined label. It never logs the raw message.
+  Done.
+- Account sync uploads configuration snapshots in snake_case and converts hosted rows back
+  to camelCase for the local store. The planner compares both shapes as equal, so rows
+  already uploaded in camelCase do not conflict. Ships with a Mac release. Not done.
+- Optional: a data migration rewrites the existing camelCase hosted rows. It is not
+  additive, so it needs the owner's approval. Not done.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Read-side normalization and route logging (this ticket). |
+| Desktop | Export uses the shared normalizer now; the sync writer fix ships in a later Mac release. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: none.
+
+Verification: `npx vitest run tests/export-camelcase-configuration.test.ts
+tests/export-download-route.test.ts` and `dagger check --cadence --progress=report`. Production: export
+for test account A downloads.

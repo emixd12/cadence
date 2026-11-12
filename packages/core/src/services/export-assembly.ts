@@ -6,6 +6,7 @@ import { resolveExportBundle } from "../resolvers/export.resolver";
 import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
 import { normalizeRecurrenceRule, recurrenceDefaultsFromRule, summarizeRecurrenceRule } from "./behavior-values";
 import { isBehaviorWhereKind, storedBehaviorWhere } from "./behavior-where";
+import { toStoredConfigurationSnapshot } from "./configuration-payload";
 import type { BehaviorWhereKind } from "../types/behavior";
 import { compareScheduleSlots, formatScheduleSlotsSummary, formatOccurrenceScheduleLabel, toScheduleSlotView } from "./schedule";
 import type {
@@ -149,7 +150,10 @@ function toExportBehaviorConfigurationEventInput(
 function parseConfigurationSnapshot(
   value: Json,
 ): ExportBehaviorConfigurationSnapshot {
-  const snapshot = requireJsonObject(value, "configuration snapshot");
+  const snapshot = requireJsonObject(
+    toStoredConfigurationSnapshot(value),
+    "configuration snapshot",
+  );
   const scheduleGraph = requireJsonArray(
     snapshot.schedule_graph,
     "configuration schedule_graph",

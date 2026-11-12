@@ -180,3 +180,35 @@ async function requireUserId(supabase: AppSupabaseClient): Promise<string> {
 function toSyncState(syncState: ExportPageSyncStateRow | null, userId: string): OccurrenceSyncState | null {
   return syncState ? { ...syncState, user_id: userId } : null;
 }
+
+// Match only code-defined labels. A message's spelling cannot prove it contains no user data.
+const EXPORT_VALIDATION_MESSAGES = new Set([
+  "configuration snapshot",
+  "configuration schedule graph",
+  "configuration time entries",
+  "configuration schedule_graph",
+  "configuration schedule",
+  "configuration recurrence_rule",
+  "configuration schedule sort_order",
+  "configuration time_entries",
+  "configuration time entry",
+  "configuration schedule kind",
+  "configuration schedule preset",
+  "configuration schedule start_time",
+  "configuration schedule end_time",
+  "configuration time entry sort_order",
+  "configuration category_id",
+  "configuration location_text",
+  "configuration where_kind",
+  "configuration browser_reminder_enabled",
+  "configuration email_reminder_enabled",
+  "configuration reminder_offset_minutes",
+  "configuration active",
+  "configuration timezone",
+].map((label) => `Invalid ${label}.`));
+
+export function exportFailureLabel(error: unknown): string | null {
+  return error instanceof Error && EXPORT_VALIDATION_MESSAGES.has(error.message)
+    ? error.message
+    : null;
+}

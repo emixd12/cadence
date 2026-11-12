@@ -708,6 +708,14 @@ Implement in small vertical slices.
   `main` or an implicit HEAD.
 - Use one branch per task and merge it through a small PR as soon as checks
   pass. Do not leave finished work on a branch.
+- Turn on auto-merge (merge commit) when you open a PR, without asking the owner
+  (`docs/DECISIONS.md`, 2026-11-11, "Auto-merge by default"). Two exceptions:
+  - The PR triggers `Desktop native`, `Local Supabase rehearsal` or
+    `Web client runner`. Auto-merge waits only for `verify`, so wait for that
+    workflow's result and merge the PR yourself.
+  - The PR needs a step or a decision before it merges: a hosted migration
+    push, a Mac release, an acceptance run or an open owner decision. Open it
+    as a draft, which GitHub does not auto-merge.
 - When the session-start report says your branch is behind `origin/main`,
   rebase onto `origin/main` before new work, a push or a PR.
 - Before a session ends, commit unfinished work and push it as a draft PR. Never
