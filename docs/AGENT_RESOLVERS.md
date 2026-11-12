@@ -541,10 +541,16 @@ verifies the envelope (HMAC-SHA256, constant-time comparison, current and previo
 secret) and reads the flag and secret; resolvers read neither.
 `readBriefingContextFence` in `briefing-account-context.service.ts` digests the stored
 inputs `assertCurrent` compares, so complete can fence them without a capture in
-memory. The prepare and complete routes only call the service.
+memory. The prepare, complete and release routes only call the service.
+Release verifies the same signed binding and calls the repository's pending-only
+`releaseDailyBrief`. Failed completion cleanup uses it too; only the request that
+completed its own lease can undo that completion after a failed final fence.
 `tests/daily-brief-device.test.ts` and the Ticket 298 block of
 `tests/briefing-account-context.test.ts` cover forged, expired and misbound envelopes,
-superseded leases, unknown refs, the flag, spans and the round trip.
+superseded leases, completion replay, failed-model release, unknown refs, the flag,
+spans and the round trip. `tests/sql/ticket-298-device-brief-release-smoke.sql` checks
+real ownership, current-session enforcement, pending-only mutation and preserved
+retry quotas in Local Supabase rehearsal.
 
 The September 20 in-app correction reopens Ticket 146 for bounded completion
 history, using existing analytics/status rules. Ticket 147 adds first-party

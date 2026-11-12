@@ -17504,13 +17504,16 @@ Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --p
 ## Ticket 298: Hosted Daily Brief prepare and complete for a device model
 
 Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-brief`).
-`POST /api/advisor/brief/device/prepare` and `/complete` call
+`POST /api/advisor/brief/device/prepare`, `/complete` and `/release` call
 `lib/services/daily-brief-device.service.ts`; the envelope lives in
 `lib/services/daily-brief-device-envelope.ts`; `readBriefingContextFence` fences the stored
-inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Remaining:
-setting `CADENCE_DAILY_BRIEF_DEVICE_MODEL` and `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET` in
-Vercel (owner-gated), and the Mac client (Ticket 299). A device model failure leaves the
-lease to expire after 75 seconds; Ticket 299 may add an explicit release if needed.
+inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
+added pending-only release, completion replay protection and a final context-expiry check.
+Migration `20261112041029_release_pending_daily_brief.sql` supplies the release RPC.
+Remaining: its hosted push, the Mac client (Ticket 299), and later owner activation.
+The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
+production. Ticket 299 calls release when its model call fails, without waiting for
+the 75-second lease or resetting the normal retry quotas.
 Dependencies: Tickets 295 and 296.
 
 Goal: a signed-in Mac gets a prepared brief request from Cadence's server, runs it on the
@@ -17519,12 +17522,14 @@ call for these briefs.
 
 Scope and acceptance:
 
-- Prepare and complete routes under `app/api/advisor/brief`, recorded in `docs/ROUTE_MAP.md`.
+- Prepare, complete and release routes under `app/api/advisor/brief`, recorded in `docs/ROUTE_MAP.md`.
 - Prepare runs today's admission, context and freshness steps and returns the request with a
   short-lived signed envelope. The envelope binds the user, installation, lease, configuration
   and context revisions, and holds only validation data. The server stores no prepared payload.
 - Complete verifies the envelope and the lease, validates the output with Ticket 296's
   validator, finishes the lease, records the tip and returns the briefing.
+- Release authenticates the same envelope and releases only its pending lease after a
+  device model failure. Replayed complete or release requests never downgrade a success.
 - `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode. Settings report device-model availability
   without requiring `OPENAI_API_KEY`.
 - Tests reject forged, expired and mismatched envelopes, a superseded lease and output with
@@ -17557,7 +17562,7 @@ hidden until the owner turns it on"):
 - Everything below sits behind a desktop switch that is off by default. With it off, the
   Settings card and the plan path do not appear.
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
-  does not wait for the 75-second lease. Ticket 298's routes need a matching release route.
+  does not wait for the 75-second lease. Ticket 298 supplies the matching release route.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
 - Still required (not a decision): a command that hands the access token to the webview

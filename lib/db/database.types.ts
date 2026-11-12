@@ -2596,6 +2596,14 @@ export type Database = {
         Args: { p_client_id: string; p_lease_token: string }
         Returns: boolean
       }
+      release_daily_brief: {
+        Args: {
+          p_expected_revision: number
+          p_installation_id: string
+          p_lease_token: string
+        }
+        Returns: boolean
+      }
       remove_source_match: {
         Args: {
           p_match_id: string

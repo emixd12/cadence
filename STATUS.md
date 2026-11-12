@@ -52,7 +52,7 @@ Check the cited entry before acting on a row.
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
-| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294, 295 and 296 complete; 298 complete in source (device prepare and complete routes, flag off, PR #240); 297 on PR #241; 299 in progress; 300 not started | Hidden until the owner turns it on (`docs/DECISIONS.md`, 2026-11-12): the flag stays unset in production; Ticket 300 needs a Mac build (mac-release) | TICKETS, Tickets 294–300; STATUS, "Ticket 298: Daily Brief device prepare and complete — November 12, 2026" |
+| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294, 295 and 296 complete (296 adapter on PR #238); 297 on PR #241; 298 complete in source on PR #240 (device routes, flag off); 299 in progress; 300 not started | 298: apply the additive release migration before activation; the production flag must stay unset. Ticket 299 wires the hidden UI and model call; Ticket 300 needs a Mac build (mac-release) | TICKETS, Tickets 294–300; STATUS, "Ticket 298: Daily Brief device prepare and complete — November 12, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned; comparison on H1–H10 and S1 prepared November 11 | Owner sets a spend cap (US$2 asked) and optionally names extra models; agents run the comparison; the owner promotes or rejects under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner comparison" |
 | Ticket 291: skill-rule acceptance scenarios | Local-stack run with `claude-code` passed all three scenarios November 11 | Production run with the API clients; needs a spend cap for the QA keys | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "First local run — November 11, 2026" |
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
@@ -88,6 +88,34 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## PR #240 integration review — November 12, 2026
+
+Integrated the device routes with the reviewed PR #238 source (`2601bac8`), including
+PR #242's owner decisions. Earlier status entries and archived history are preserved.
+
+- Added `/api/advisor/brief/device/release` and the authenticated, pending-only
+  `release_daily_brief` RPC. Migration `20261112041029_release_pending_daily_brief.sql`
+  preserves completed attempts, replacement leases, daily admissions and rate limits.
+- Fixed complete-request replay downgrading a successful attempt. Only a request that
+  completed its own lease may undo it after a failed final context fence. Complete also
+  rechecks context expiry after the final fence. No hosted model behavior changes.
+- Fresh `npm ci`, agents, interactions, resolvers, full lint, typecheck and web build
+  passed. Lint retains six existing warnings. The full suite passed 5,729 tests and
+  skipped 230; 29 failed because this executor denies Unix-socket binding (`listen
+  EPERM`) in the unchanged session-broker and Docker-proxy suites. An additional
+  consumer-test failure under a dependency overlay disappeared after fresh `npm ci`;
+  no product change was needed for it.
+- Local `supabase db reset --local` failed before reset because Docker socket access is
+  denied. The SQL ownership, replay and quota regression runs in Local Supabase
+  rehearsal. GitHub CI and that rehearsal remain merge gates. The RPC type is
+  synchronized in source; generation against the applied migration is not verified.
+- Apply the additive migration before activation. The production device-model flag
+  stays unset under PR #242. Ticket 299 wires the hidden client and release call.
+  This change adds no desktop schema or sync-contract change.
+
+Platform impact: web, gated device routes; desktop, Ticket 299 consumes them; marketing
+and future mobile, not applicable. Messaging impact: P-029, unchanged.
 
 ## Ticket 298: Daily Brief device prepare and complete — November 12, 2026
 
