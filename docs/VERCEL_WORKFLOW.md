@@ -204,11 +204,19 @@ Normal production deployment is via the Git integration:
 2. Confirm the production deployment is `READY`.
 3. Confirm deployment metadata points at the intended commit.
 4. Inspect build logs for warnings or failures.
-5. Set the application's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to
-   the new marketing deployment ID, then redeploy the application deployment
-   (`vercel redeploy <app-deployment> --target production`). Both projects
-   rebuild on every `main` push, so the previous value no longer names the live
-   marketing deployment, and Trust provenance fails until the app is redeployed.
+5. Before public launch, stop here. Do not refresh the Trust marketing ID after
+   a merge, and do not offer or ask to (`docs/DECISIONS.md`, 2026-11-11, "No Trust
+   marketing-ID refresh before launch"). The Trust page shows earlier Passed
+   results as Stale, which is accurate.
+
+**Trust marketing-ID refresh (launch gate, or the owner's instruction).** Set the
+application's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to the live
+marketing deployment ID, then redeploy the application deployment
+(`vercel redeploy <app-deployment> --target production`). Both projects rebuild on
+every `main` push, so the stored value stops naming the live marketing deployment,
+and Trust checks read Stale until the app is redeployed and new evidence is
+collected. Before launch, run it once and automate it (`docs/OPERATIONS.md`,
+"Public-product operations").
 
 If using the Vercel CLI locally, link to the existing project only:
 

@@ -70,7 +70,8 @@ Work in your own git worktree, never in Ticket 232's checkout
 - **Local data:** never start, reset or stop `habit-tracking-app` (Emi's local
   stack, ports 553xx). Use the helper below with your own `cadence-accept-<x>` name.
 - **Merges:** nothing from this work merges to main without the coordinator; a main
-  merge rebuilds both Vercel projects and needs a Trust refresh.
+  merge rebuilds both Vercel projects. No Trust refresh before public launch
+  (`docs/VERCEL_WORKFLOW.md`, "Deployment").
 - **Privacy (Emi's ChatGPT and Claude accounts):** the QA Chrome profile may hold
   Emi's own ChatGPT and Claude accounts. Open new chats only. Never open, read or
   search existing chats, projects, memory or history, not even to recover from a

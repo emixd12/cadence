@@ -835,9 +835,9 @@ as rollback copies.
 
 No public Trust check requests a release asset. Its route and artifact checks fetch
 only the named application and marketing deployments, and none of the files they
-digest contains the download link. Every merge to `main` still rebuilds marketing and
-needs the Trust marketing-ID refresh in `docs/VERCEL_WORKFLOW.md`, so release records
-can wait for another merge.
+digest contains the download link. Every merge to `main` rebuilds marketing. The Trust
+marketing-ID refresh in `docs/VERCEL_WORKFLOW.md` is paused until public launch, so a
+release does not need it.
 
 To roll back the download link, copy the previous `Cadence_<version>_aarch64.dmg` to
 `Cadence_aarch64.dmg` the same way. To stop further installs, restore the saved feeds;

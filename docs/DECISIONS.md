@@ -2319,3 +2319,28 @@ and does not replace it.
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-11: No Trust marketing-ID refresh before launch
+
+`docs/VERCEL_WORKFLOW.md` told agents to set the app's Production
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app after every merge to `main`.
+Agents asked the owner for it after almost every merge.
+
+The owner decided on November 11, 2026 to stop this until public launch. Cadence has no
+users yet and nobody reads the Trust page. The owner's words: "the development process, in
+this intensive pre launch phase should not be affected."
+
+- Agents do not refresh the ID after a merge and do not offer or ask to.
+- The gap is tracked as a launch gate, the way `docs/LEGAL.md` and
+  `docs/MESSAGING_CHANGES.md` track their concerns: an open-work row in `STATUS.md` and
+  an item in `docs/OPERATIONS.md`, "Public-product operations". It never blocks
+  development, merges or deployments.
+- The refresh runs before public launch, or on the owner's instruction.
+
+Effect: the Trust page shows earlier Passed results as Stale. That was already true after
+every merge until the next evidence collection, because a merge also changes the source
+commit and the app deployment. The nightly collection resolves the live deployments from
+Vercel itself and keeps running; it does not read the stored ID.
+
+Platform impact: operations only. Web: Trust page reads Stale until launch. Desktop,
+marketing and future mobile: not applicable. Messaging impact: none.
