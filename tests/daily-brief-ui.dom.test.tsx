@@ -72,6 +72,27 @@ describe("Daily Brief UI", () => {
     travelToken.mockReturnValue(null);
   });
 
+  it("shows ChatGPT plan states only with the Mac's plan controls (Ticket 299)", async () => {
+    const { DailyBriefRequestError } = await import("@/lib/ui/daily-brief");
+    const manageUsage = vi.fn();
+    const connect = vi.fn(async () => undefined);
+    const failing = client({ requestBrief: vi.fn(async () => { throw new DailyBriefRequestError("chatgpt_usage_limit"); }),
+      plan: { usage: () => null, manageUsage, connect } });
+    await act(() => root.render(<DailyBriefLauncher client={failing} desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("ChatGPT usage limit reached."));
+    const labels = [...container.querySelectorAll("button")].map((element) => element.textContent);
+    expect(labels.slice(0, 2)).toEqual(["Manage usage", "Try again"]);
+    await act(() => [...container.querySelectorAll("button")].find((element) => element.textContent === "Manage usage")!.click());
+    expect(manageUsage).toHaveBeenCalledOnce();
+    await act(() => root.unmount());
+    root = createRoot(container);
+    localStorage.clear();
+    const ready = client();
+    const planned = { ...ready, plan: { usage: () => "plan" as const, manageUsage, connect } };
+    await act(() => root.render(<DailyBriefLauncher client={planned} desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Using ChatGPT plan"));
+  });
+
   it("starts once, announces ready text politely, and keeps the dismiss control reachable", async () => {
     const adapter = client();
     await act(() => root.render(<DailyBriefLauncher client={adapter} />));

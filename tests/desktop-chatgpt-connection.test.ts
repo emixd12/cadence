@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "chatgpt_models") return [{ slug: "gpt-5.5-mini", visibility: "list", token: "at-SECRET" }, { slug: "" }, { visibility: "list" }, "x"];
     if (command === "chatgpt_disconnect") return { outcome: "revoked" };
     if (command === "chatgpt_cancel_connect") return null;
+    if (command === "chatgpt_access_token") return { accessToken: "at-SECRET-memory-only", refreshToken: "rt-SECRET" };
     throw "ChatGPT is not connected.";
   }),
 }));
@@ -25,6 +26,11 @@ describe("desktop ChatGPT connection client", () => {
     await expect(connection.connect()).rejects.toEqual(new ChatGptConnectionError("ChatGPT is not connected."));
     expect(native.calls).toEqual(["chatgpt_status", "chatgpt_models", "chatgpt_disconnect", "chatgpt_cancel_connect", "chatgpt_connect"]);
     expect(JSON.stringify(await connection.status())).not.toContain("SECRET");
+  });
+
+  it("returns only the access token for one model call (Ticket 299)", async () => {
+    await expect(createChatGptConnection().accessToken()).resolves.toBe("at-SECRET-memory-only");
+    await expect(createChatGptConnection(async () => ({ accessToken: "" })).accessToken()).rejects.toBeInstanceOf(ChatGptConnectionError);
   });
 
   it("accepts each connection state and rejects anything else", () => {
@@ -51,7 +57,7 @@ describe("desktop ChatGPT connection client", () => {
 
   it("registers the native commands and keeps the ChatGPT Keychain items native-only", () => {
     const lib = readFileSync(new URL("../apps/desktop/src-tauri/src/lib.rs", import.meta.url), "utf8");
-    for (const command of ["chatgpt_status", "chatgpt_connect", "chatgpt_cancel_connect", "chatgpt_disconnect", "chatgpt_models"]) {
+    for (const command of ["chatgpt_status", "chatgpt_connect", "chatgpt_cancel_connect", "chatgpt_disconnect", "chatgpt_models", "chatgpt_access_token"]) {
       expect(lib).toContain(`chatgpt::${command}`);
     }
     const auth = readFileSync(new URL("../apps/desktop/src-tauri/src/auth.rs", import.meta.url), "utf8");
