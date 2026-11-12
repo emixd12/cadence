@@ -45,7 +45,13 @@ export type DailyBriefSourceStatus = "ready" | "no_calendars" | "not_connected";
 
 export type DailyBriefSettings = Readonly<{
   accountRef: string;
+  /** Whether the hosted model path can run: Cadence's server has its OpenAI key. */
   available: boolean;
+  /**
+   * Ticket 298: whether this server offers the device-model prepare and complete
+   * routes (decision D27). Absent from older servers and treated as false.
+   */
+  deviceModelAvailable?: boolean;
   enabled: boolean;
   /**
    * Ticket 306: one choice covers every connected source, including one connected

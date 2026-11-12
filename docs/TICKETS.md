@@ -17503,7 +17503,14 @@ Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --p
 
 ## Ticket 298: Hosted Daily Brief prepare and complete for a device model
 
-Status: not started.
+Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-brief`).
+`POST /api/advisor/brief/device/prepare` and `/complete` call
+`lib/services/daily-brief-device.service.ts`; the envelope lives in
+`lib/services/daily-brief-device-envelope.ts`; `readBriefingContextFence` fences the stored
+inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Remaining:
+setting `CADENCE_DAILY_BRIEF_DEVICE_MODEL` and `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET` in
+Vercel (owner-gated), and the Mac client (Ticket 299). A device model failure leaves the
+lease to expire after 75 seconds; Ticket 299 may add an explicit release if needed.
 Dependencies: Tickets 295 and 296.
 
 Goal: a signed-in Mac gets a prepared brief request from Cadence's server, runs it on the

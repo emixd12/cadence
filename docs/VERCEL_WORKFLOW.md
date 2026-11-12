@@ -112,6 +112,17 @@ Rules:
   and names the current Ready marketing deployment. The app combines it with
   Vercel's source-commit and application-deployment system variables before a
   Trust check can remain Passed.
+- Ticket 298 device-model Daily Brief (decision D27), application project only.
+  `CADENCE_DAILY_BRIEF_DEVICE_MODEL` turns on
+  `POST /api/advisor/brief/device/prepare` and `/complete`; it is off unless set
+  to `1` or `true`. `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET` (at least 32 random
+  characters, sensitive) signs the prepare envelope;
+  `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET_PREVIOUS` exists only during rotation. Both
+  secrets are server-only; never prefix them with `NEXT_PUBLIC_` or `VITE_`. The
+  mode stays off until the flag and the current secret are both set. Setting them
+  in Production or Preview is an owner-gated rollout step; redeploy after a change.
+  `docs/OPERATIONS.md`, "Daily Brief device-model mode (Ticket 298)", holds rotation
+  and rollback.
 
 ## Supabase Auth
 

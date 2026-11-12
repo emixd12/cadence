@@ -105,6 +105,26 @@ Check the cited entry before acting on a row.
 - Platform impact: web, none (hosted path unchanged); desktop, the adapter Ticket 299
   wires in; marketing and future mobile, not applicable. Messaging impact: none.
 
+## Ticket 298: Daily Brief device prepare and complete — November 12, 2026
+
+Implemented in source on `claude/ticket-298-device-brief`; not pushed or deployed.
+
+- `POST /api/advisor/brief/device/prepare` admits the attempt, builds the context and
+  returns the model request with a signed envelope. `/complete` verifies the envelope and
+  lease, validates the device's output, finishes the lease and records the tip. The server
+  makes no model call on this path and stores no prepared payload.
+- The envelope is HMAC-SHA256 signed under `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET` and
+  expires with the 75-second lease. It binds the user, installation, lease, preferences,
+  configuration and context revisions. `readBriefingContextFence` lets complete fence the
+  stored inputs without a capture in memory. Recipe 1.0 only.
+- `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode, off by default. Settings report
+  `deviceModelAvailable` without `OPENAI_API_KEY`.
+- Platform impact: web, the hosted routes and flag; desktop, Ticket 299 calls them;
+  marketing and future mobile, not applicable. Messaging impact: P-029 (data flow note).
+- Checks: agents, interactions and resolvers checks, typecheck, lint (six existing
+  warnings) and build passed. Vitest on the 50 Daily Brief, briefing and advisor test
+  files: 769 passed. Dagger was not run. Vercel variables are owner-gated and unset.
+
 ## Ticket 295: ChatGPT plan spike passed live — November 12, 2026
 
 **On branch `claude/brief-chatgpt-plan-086210`.**

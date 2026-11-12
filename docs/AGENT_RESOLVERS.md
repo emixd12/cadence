@@ -533,6 +533,19 @@ imports only types and `daily-brief-schema.ts`, the output schema it shares with
 provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, stream
 parsing, error mapping and the round trip with prepare and validate.
 
+Ticket 298 owners. `lib/services/daily-brief-device.service.ts` runs admission, the
+shared live capture (`captureLiveDailyBriefContext` in `daily-brief.service.ts`),
+`prepareDailyBrief` without an estimate generator, and later `validateDailyBrief`; it
+imports no model adapter. `lib/services/daily-brief-device-envelope.ts` signs and
+verifies the envelope (HMAC-SHA256, constant-time comparison, current and previous
+secret) and reads the flag and secret; resolvers read neither.
+`readBriefingContextFence` in `briefing-account-context.service.ts` digests the stored
+inputs `assertCurrent` compares, so complete can fence them without a capture in
+memory. The prepare and complete routes only call the service.
+`tests/daily-brief-device.test.ts` and the Ticket 298 block of
+`tests/briefing-account-context.test.ts` cover forged, expired and misbound envelopes,
+superseded leases, unknown refs, the flag, spans and the round trip.
+
 The September 20 in-app correction reopens Ticket 146 for bounded completion
 history, using existing analytics/status rules. Ticket 147 adds first-party
 generation and one server provider adapter over this internal service. The model

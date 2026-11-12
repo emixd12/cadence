@@ -14,6 +14,7 @@ import { getHevyConnection } from "./hevy.service";
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
 import { measurePerformanceSpan, type PerformanceTimingCounts } from "./performance-timing";
 import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
+import { dailyBriefDeviceModelAvailable } from "./daily-brief-device-envelope";
 
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
@@ -47,6 +48,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
   return { accountRef: briefingAccountRef(caller.user.id), available: !!process.env.OPENAI_API_KEY,
+    deviceModelAvailable: dailyBriefDeviceModelAvailable(process.env),
     configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled,
     useConnectedSources: preferences.useConnectedSources, excludedSources: preferences.excludedSources, sourceStatus,
     includeReminderHistory: preferences.includeReminderHistory, includeNotes: preferences.includeNotes, revision: preferences.revision,
@@ -68,7 +70,8 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
 export async function updateDailyBriefSettings(caller: CalendarCaller, value: unknown): Promise<DailyBriefSettings> {
   const input = parseDailyBriefSettingsInput(value);
   if (!input) throw new DailyBriefError("invalid_request");
-  if (input.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
+  // Ticket 298: a server that offers only the device model still lets a linked Mac turn the brief on.
+  if (input.enabled && !process.env.OPENAI_API_KEY && !dailyBriefDeviceModelAvailable(process.env)) throw new DailyBriefError("not_configured");
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
@@ -126,18 +129,28 @@ export async function readDailyBriefSourceStatus(caller: CalendarCaller, prefere
   };
 }
 
+export const DAILY_BRIEF_INSTALLATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The attempt body shared by the hosted brief and the device prepare step. Ticket 219
+ * Option A: an optional signed travel token. Its value is never validated here; a token
+ * that fails any later check only leaves travel conclusions unsupplied.
+ */
+export function readDailyBriefAttemptInput(value: unknown): Readonly<{ installationId: string; retry: boolean; travelConclusions?: unknown }> {
+  const keys = record(value) ? Object.keys(value).sort().join() : "";
+  if (!record(value) || (keys !== "installationId,retry" && keys !== "installationId,retry,travelConclusions") || typeof value.installationId !== "string" ||
+      !DAILY_BRIEF_INSTALLATION_ID.test(value.installationId) || typeof value.retry !== "boolean") {
+    throw new DailyBriefError("invalid_request");
+  }
+  return value as { installationId: string; retry: boolean; travelConclusions?: unknown };
+}
+
 export async function requestInAppDailyBrief(caller: CalendarCaller, value: unknown, options: Readonly<{
   generate?: DailyBriefGenerator;
   now?: () => Temporal.Instant;
   deadlineMs?: number;
 }> = {}): Promise<DailyBriefResponse> {
-  // Ticket 219 Option A: an optional signed travel token. Its value is never validated here;
-  // a token that fails any later check only leaves travel conclusions unsupplied.
-  const keys = record(value) ? Object.keys(value).sort().join() : "";
-  if (!record(value) || (keys !== "installationId,retry" && keys !== "installationId,retry,travelConclusions") || typeof value.installationId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.installationId) || typeof value.retry !== "boolean") {
-    throw new DailyBriefError("invalid_request");
-  }
+  const attempt = readDailyBriefAttemptInput(value);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new DailyBriefError("not_configured");
   const configuration = activeBriefingConfig();
@@ -147,12 +160,12 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   // Connector reads end early enough to leave the generation reserve inside the one attempt budget.
   const sourceDeadlineAt = Date.now() + deadlineMs - DAILY_BRIEF_GENERATION_RESERVE_MS;
   const signal = AbortSignal.timeout(deadlineMs);
-  const installationId = value.installationId;
+  const installationId = attempt.installationId;
   const work = async (): Promise<DailyBriefResponse> => {
     const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
     signal.throwIfAborted();
     if (!preferences.enabled) throw new DailyBriefError("access_denied");
-    const admission = await phase("admission", () => beginDailyBrief(caller.client, { installationId, retry: value.retry as boolean, expectedRevision: preferences.revision }, signal));
+    const admission = await phase("admission", () => beginDailyBrief(caller.client, { installationId, retry: attempt.retry, expectedRevision: preferences.revision }, signal));
     if (admission.state === "rate_limited") throw new DailyBriefError("rate_limited", admission.retryAfterSeconds);
     if (admission.state === "retry_exhausted") throw new DailyBriefError("retry_exhausted");
     if (admission.state === "pending") return admission.retryAfterSeconds ? { state: "pending", retryAfterSeconds: admission.retryAfterSeconds } : { state: "pending" };
@@ -161,22 +174,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
     let successful = false;
     try {
       signal.throwIfAborted();
-      const prepared = await phase("context", () => prepareAccountBriefingContexts(caller, {
-        historyDays: [configuration.scope.historyDays],
-        includeCalendar: configuration.scope.includeCalendar,
-        // Only this live path reads separately disclosed sources; workbench and history never do.
-        connectorSources: { calendars: configuration.scope.includeCalendar, recordedActivity: true, deadlineAt: sourceDeadlineAt },
-        includeRecordedElapsedDurations: configuration.context.includeRecordedElapsedDurations,
-        includeHistoricalCompletionTimes: configuration.context.includeHistoricalCompletionTimes,
-        signal,
-        clock,
-        preferences,
-        localDate: admission.localDate,
-        travelConclusions: { token: value.travelConclusions ?? null, secrets: readTravelConclusionsSecrets(process.env) },
-        ...(configuration.analysis.lanes.length ? { analysis: {
-          includeReminders: configuration.analysis.lanes.includes("reminder-effectiveness"),
-          includeNotes: configuration.analysis.lanes.includes("notes-failure-themes"),
-        } } : {}),
+      const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
+        configuration, preferences, localDate: admission.localDate, travelConclusions: attempt.travelConclusions, sourceDeadlineAt, signal, clock,
       }));
       const context = prepared.contexts[0]!;
       const shown = configuration.analysis.maxTips ? await phase("tip_history", () => readDailyBriefTipHistory(caller.client, signal)) : [];
@@ -214,6 +213,39 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
     }
   };
   return phase("request", () => raceAbort(work(), signal));
+}
+
+/**
+ * The live Daily Brief capture, shared by the hosted path and the Ticket 298 device
+ * prepare step. Only these live paths read separately disclosed sources; workbench
+ * and history never do.
+ */
+export function captureLiveDailyBriefContext(caller: CalendarCaller, input: Readonly<{
+  configuration: ReturnType<typeof activeBriefingConfig>;
+  preferences: DailyBriefPreferences;
+  localDate: string;
+  travelConclusions: unknown;
+  sourceDeadlineAt: number;
+  signal: AbortSignal;
+  clock: () => Temporal.Instant;
+}>) {
+  const { configuration } = input;
+  return prepareAccountBriefingContexts(caller, {
+    historyDays: [configuration.scope.historyDays],
+    includeCalendar: configuration.scope.includeCalendar,
+    connectorSources: { calendars: configuration.scope.includeCalendar, recordedActivity: true, deadlineAt: input.sourceDeadlineAt },
+    includeRecordedElapsedDurations: configuration.context.includeRecordedElapsedDurations,
+    includeHistoricalCompletionTimes: configuration.context.includeHistoricalCompletionTimes,
+    signal: input.signal,
+    clock: input.clock,
+    preferences: input.preferences,
+    localDate: input.localDate,
+    travelConclusions: { token: input.travelConclusions ?? null, secrets: readTravelConclusionsSecrets(process.env) },
+    ...(configuration.analysis.lanes.length ? { analysis: {
+      includeReminders: configuration.analysis.lanes.includes("reminder-effectiveness"),
+      includeNotes: configuration.analysis.lanes.includes("notes-failure-themes"),
+    } } : {}),
+  });
 }
 
 /**
