@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md`; installed Mac check (302) waits on the Mac 0.1.10 release (credential backup is Ticket 325) | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (its release branch contains 319 and 320; owner instruction to notarize and publish) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode passes); 296 in progress (prepare/validate split done; adapter waits for 295); 297–300 not started | Live spike run needs the owner's ChatGPT Plus or Pro sign-in (owner ask sent November 11) | TICKETS, Tickets 294–300; STATUS, "Ticket 296: Daily Brief prepare and validate split — November 11, 2026" |
@@ -58,7 +58,7 @@ Check the cited entry before acting on a row.
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
-| Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Notarized 0.1.10 (owner's instruction); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
+| Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Build notarized 0.1.10 on a configured release Mac (authorized November 12); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
 | Ticket 325: release credential backup and restore | `release:credentials` status, verify-backups, restore and backup; preflight checks; runbook; decision D29 | Owner creates the Cadence Release vault, its service account and an App Store Connect API key; agents back up and verify live; notarization switches to the API key; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325 started — November 11, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
@@ -85,9 +85,38 @@ Check the cited entry before acting on a row.
 | Google Calendar Timeline (grouped): Tickets 133–137, 141, 150 | In progress; reconciled October 27: still open | Post-approval web and native consent smoke checks; 137 provider-failure, Workspace and installed fixture cases; 150 live custom-name check | TICKETS, Tickets 137, 141, 150 |
 | Earlier travel tickets (grouped): 160, 162–164, 166, 167, 170, 171 | Implemented in source or discovery complete | Release gates sit in Tickets 165 and 174; owner re-acceptance for 166–167 | TICKETS, each listed ticket |
 | Desktop release follow-ups (grouped): Tickets 142, 143 | Complete in source; web deployed September 18 | Installed-native release acceptance | TICKETS, Tickets 142–143 |
-| Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
+| Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## PR integration review and release access — November 12, 2026
+
+Reviewed PRs #218–224, #226–229 and #234 in one protected integration candidate,
+based on `d3314e33`, preserving each original PR head. The uploaded source stage
+`22c792f0` matches the checked local tree. Findings, merge order, implementation
+fixes and deployment steps are recorded in `docs/qa/pr-integration-2026-11-11.md`.
+
+- Fixed export snapshot fixtures and private-error logging (#226), a spaced-checkout
+  acceptance entrypoint (#228), dialog focus ordering (#220), dependency manifest
+  and compiler alignment (#219, #222), broker test port collisions (#234), and the
+  Travel-off permission probe (#223). The Daily Brief validation contract remains
+  trusted server data (#229); client signing is still Ticket 298.
+- Fresh `npm ci`, lint, typecheck, web build, desktop frontend build, marketing
+  build/check, public source check and Trust checks/fixtures passed. Lint retains
+  six existing warnings. Full tests: 5,660 passed, 230 skipped, 29 failed solely
+  on unavailable Unix sockets (`listen EPERM`: 21 broker and eight proxy tests).
+  Per-stage governance passed. Dagger and Docker are unavailable here.
+- Source integration is not deployment acceptance. The final GitHub `verify`,
+  Desktop native, Local Supabase rehearsal and Web client runner results must pass
+  before merge. Both production sites are Ready at baseline `d3314e33`; signed-in
+  export and deployed push delivery remain unverified.
+- The owner authorized release in this review. Mac 0.1.10 source is prepared;
+  notarized artifacts and publication remain pending. `desktop-release` preflight
+  exits 10: this Linux workspace lacks release-Mac, test-device and credential
+  access. Published 0.1.9 remains current. Existing installations need one manual
+  upgrade after the updater-key rotation. Installed acceptance must preserve data
+  through inherited SQLite migrations 21–24 and verify linked sessions under the
+  new signing identity. Existing activation and Trust-refresh gates stay unchanged.
 
 ## Cadence for Mac 0.1.10 prepared — November 11, 2026
 
