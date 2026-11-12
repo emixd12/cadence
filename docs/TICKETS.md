@@ -17612,7 +17612,9 @@ screenshots of each state at narrow widths.
 
 ## Ticket 300: Installed Mac acceptance of the ChatGPT plan Daily Brief
 
-Status: not started.
+Status: deferred, November 12, 2026. Owner decision: the ChatGPT plan Daily Brief stays
+hidden, so installed acceptance waits until the owner decides to turn it on
+(`docs/DECISIONS.md`, 2026-11-12). Work moves to other tickets.
 Dependencies: Tickets 294–299.
 
 Goal: prove the feature on an installed dev-signed build.
