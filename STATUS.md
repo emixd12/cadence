@@ -77,7 +77,8 @@ Check the cited entry before acting on a row.
 | Ticket 188: duration estimates from descriptions | Implementation started; recovered for owner review October 22 | Landing decision: unclear — see source | TICKETS, Ticket 188; STATUS, "Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026" |
 | Ticket 130: account synchronization | TICKETS says in progress (2026-09-08) | The owner decides its state | TICKETS, Ticket 130; STATUS, "Ticket ledger reconciled with production — October 27, 2026" |
 | Account sync timezone rule | PR #159 merged October 28; hosted push authorized | Not verified: a timezone change synced from an installed Mac after the push; authenticated hosted sync against the new rule | STATUS, "Account sync timezone rule for archived Behaviors — October 27, 2026" |
-| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust marketing-ID refresh and app redeploy after every merge to `main`; the ledger cleanup session does one after its PR merges on November 11, 2026, and it must be repeated after later merges. Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026"; STATUS, "Ledger cleanup — November 11, 2026" |
+| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
+| Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
 | MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
 | Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Locally verified and independently approved | Live providers, installed desktop and release (241); live Hevy Pro (236); iCloud live acceptance (240); 242 cross-tenant and installed desktop not exercised | TICKETS, Tickets 236, 240, 241, 242 |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
@@ -88,6 +89,17 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Trust marketing-ID refresh paused until launch — November 11, 2026
+
+The owner decided that the pre-launch development process must not include the Trust
+marketing-ID refresh (`docs/DECISIONS.md`, 2026-11-11). `docs/VERCEL_WORKFLOW.md`,
+"Deployment", no longer asks for it after a merge. The open item is the launch-gate row in
+"Open work" and the list in `docs/OPERATIONS.md`, "Public-product operations". The stored
+ID was last set on November 11 and is stale now; nobody needs to act on that.
+
+Platform impact: operations docs only. Web: the Trust page shows Stale until launch.
+Desktop, marketing and future mobile: not applicable. Messaging impact: none.
 
 ## Dagger repairs — November 11, 2026
 

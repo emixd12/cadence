@@ -399,7 +399,7 @@ session. Every command in the session can read an environment variable.
 | Provider | Network secret host | Header | Cloud use |
 | --- | --- | --- | --- |
 | Supabase Management API | `api.supabase.com` | `Authorization: Bearer` | Read-only diagnostics and migration inventory (see `docs/SUPABASE_WORKFLOW.md`) |
-| Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments, logs and the Trust refresh after a `main` merge |
+| Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments and logs; the Trust refresh at launch |
 | Sequenzy | `api.sequenzy.com` | `Authorization: Bearer` | Template inspection; real sends follow `docs/SEQUENZY_WORKFLOW.md` |
 | Cloudflare | `api.cloudflare.com` | `Authorization: Bearer` | DNS reads and verification |
 | OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes |
@@ -1249,7 +1249,11 @@ Before broad public launch, scope and verify:
 - basic abuse protections and validation,
 - monitoring/error reporting without sensitive behavior payloads,
 - Terms of Service, Privacy Policy, and privacy/trust content,
-- owner mapping for Vercel, Supabase, Sequenzy, VAPID, and cron secrets.
+- owner mapping for Vercel, Supabase, Sequenzy, VAPID, and cron secrets,
+- Trust evidence binding: the marketing-ID refresh is paused before launch
+  (`docs/DECISIONS.md`, 2026-11-11), so the Trust page reads Stale. Before launch,
+  automate the refresh after each production deploy, run it once, collect
+  Production evidence and confirm the page shows Passed.
 
 Implemented baseline:
 
