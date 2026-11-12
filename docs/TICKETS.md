@@ -17607,7 +17607,7 @@ do not depend on 301. Ticket 307 follows 306.
 
 ## Ticket 301: Settings groups, section index and state rows (web)
 
-Status: implemented November 10, 2026 on PR 205. Not verified: a signed-in check on the hosted page as a test account.
+Status: complete November 11, 2026. Merged as PR 205; signed-in hosted check as test account A passed at 1280 and 390 px (STATUS, "Tickets 301–309 hosted verification — November 11, 2026").
 Dependencies: none.
 
 Goal: a person finds any setting within four groups and sees what is connected or turned
@@ -17671,7 +17671,7 @@ anchor links; `npm run interactions:check`, `npm run design-system:check`; the b
 
 ## Ticket 302: Mac Settings adopts the groups
 
-Status: implemented November 10, 2026 on PR 205. Not verified: a dev-signed build in local and linked mode (Cadence for Mac is not installed on the owner's Mac); the Mac's WebKit view.
+Status: implemented November 10, 2026 on PR 205. Waiting on the Mac 0.1.10 release (credential backup is Ticket 325): an installed check in local and linked mode and the Mac's WebKit view.
 Dependencies: Ticket 301.
 
 Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
@@ -17841,7 +17841,7 @@ DOM tests that no switch renders and proposals still need Accept;
 
 ## Ticket 306: One Daily Brief choice for every connected source
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000`. Not verified: hosted and installed desktop checks.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000` pushed November 11; hosted `GET /api/advisor/preferences` as test account A returned the version 4 shape. Waiting on the Mac 0.1.10 release for the installed check.
 Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
 change Daily Brief.
 
@@ -17927,7 +17927,7 @@ hosted check as a test account after the migration is authorized.
 
 ## Ticket 308: Set Home from the current location
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000`. Not verified: a hosted lookup within the owner's travel spend cap; iPhone Safari.
+Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000` pushed November 11; the hosted route rejects a missing session and a bad body. Not verified: one paid hosted lookup, waiting on the owner's travel spend cap; iPhone Safari.
 Dependencies: none.
 
 Goal: a person sets Home without typing an address.
@@ -17968,7 +17968,7 @@ account within the travel spend cap the owner sets.
 
 ## Ticket 309: Settings wording pass
 
-Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`, for the owner to read.
+Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`; every "After" string was found in source November 11. Waiting on the owner to read it.
 Dependencies: Ticket 301 for the final section names.
 
 Goal: Settings reads clearly and warmly, and each thing has one name.

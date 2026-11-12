@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
+| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md`; installed Mac check (302) waits on the Mac 0.1.10 release (credential backup is Ticket 325) | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026" |
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (its release branch contains 319 and 320; owner instruction to notarize and publish) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -88,6 +88,38 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: recheck when web-push `latest` changes; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 301–309 hosted verification — November 11, 2026
+
+An agent checked production as test account A on November 11. The in-app browser had no
+Cadence sign-in, so a headless Chrome script used A's kept session instead. It gave the
+browser A's current access token with a placeholder refresh token, so the kept session
+cannot rotate. Script and evidence: `.intent/acceptance/settings-301-309-20261111/` (not
+committed).
+
+- **`GET /api/advisor/preferences`:** `200` with the version 4 shape: `useConnectedSources`,
+  `excludedSources` for all four sources, `sourceStatus` and `connectorSources`. A's Daily
+  Brief is off.
+- **`/settings` at 1280 and 390 px:** `200`, no console or page errors, no horizontal
+  overflow. Four groups in order: General, Connections, Planning, Account and data. State
+  rows read "9 categories", "On" (Day note shortcuts), "Connected · 1 calendar" (Google
+  Calendar), "Connected" (Hevy), "On · Walking from Home" (Travel) and "Off" (Daily Brief).
+  The 1280 px page is 2,687 px tall.
+- **Section index:** it stays in view at the bottom of the page (top 0 px at 1280, 64 px
+  under the mobile header at 390). The Planning link lands its heading below the index.
+- **Home lookup (308), free checks:** `POST /api/travel/home-lookup` returns `401` without a
+  session and `400 invalid_request` for an extra body key. Both stop before the rate limit
+  and the spend reservation.
+- **Wording (309):** every "After" string in `docs/qa/2026-11-10-settings-wording.md` was
+  found in source (112 rows). The file is ready for the owner.
+- **Not verified:** one paid Home lookup (US$0.005, inside the US$5 monthly ceiling) waits
+  for the owner's spend cap, preflight item `maps-spend-cap`. Drag reorder in a real
+  browser at 390 px (304). The installed Mac (302) waits on the Mac 0.1.10 release track; Ticket 325 owns credential backup and restore.
+- **Preflight:** `web-travel` exited 11. Owner items `qa-oauth-client` and
+  `qa-consent-test-users` and the unscripted QA Chrome steps are not needed for these checks.
+
+Platform impact: web hosted checks only; no code change. Desktop: 302 waits on 0.1.10.
+Marketing and future mobile: not applicable. Messaging impact: none.
 
 ## Tickets 288 and 291: measured usage and local acceptance; 289–290 comparison prepared — November 11, 2026
 
