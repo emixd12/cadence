@@ -118,7 +118,9 @@ Desktop, marketing and future mobile: not applicable. Messaging impact: none.
   `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
 - **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
   first run was not re-measured.
-- **Owner step:** raise Docker Desktop's memory above 8 GB.
+- **Docker memory:** an agent raised Docker Desktop's VM from 8 GB to 16 GB on November 11
+  at the owner's request. After the restart, ten checks passed from the main checkout in
+  42 s.
 ## CI checks run in parallel — November 11, 2026
 
 **Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
