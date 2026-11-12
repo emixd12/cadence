@@ -658,3 +658,47 @@ Google credentials remain on the server. The separate disposable event cache is
 described in `docs/DESKTOP_DATA_MODEL.md`. Local account-free tracking remains usable.
 Live native consent, source links, offline cache, minimization, and prior-version
 upgrade acceptance remain required under `docs/qa/day-progress-release.md`.
+
+## ChatGPT connection (Ticket 297)
+
+Decision D27 (`docs/DECISIONS.md`, 2026-11-07) lets a signed-in Mac run the Daily Brief
+model call on the user's ChatGPT plan. Ticket 297 adds only the connection; it has no UI.
+Ticket 299 adds the Settings card and the Daily Brief wiring.
+
+- `apps/desktop/src-tauri/src/chatgpt/` owns sign-in, the token endpoint, refresh,
+  revocation and the model catalog. The client follows OpenAI's public docs and the
+  Ticket 295 spike (`scripts/chatgpt-plan-spike.ts`). It uses no DevKit code.
+- Sign-in reads OpenID discovery from `https://auth.openai.com`. It accepts only
+  endpoints on that origin and requires a revocation endpoint. It opens the authorize
+  URL in the system browser with PKCE S256, `state`, `nonce`, `resource`, the host ID and
+  the documented scopes. The first sign-in sends `client_id=dynamic_agent_client` and
+  `agent_name_hint=Cadence`. Later sign-ins reuse the issued `oaiapp_` client ID.
+- A one-shot listener binds `127.0.0.1` on an OS-chosen port and serves only
+  `GET /auth/callback`. It checks `state`, stops after 5 minutes or on cancel, and
+  closes after one callback. Incomplete requests cannot extend the deadline or block
+  cancellation. Other paths get 404. The callback page reflects nothing.
+- Rust exchanges the code and validates the RS256 ID token against the JWKS: issuer,
+  audience (the issued client ID), authorized party when present, issued-at, nonce and
+  expiry. Plan usage requires the granted scope `chatgpt.tokens.use.direct`. Cadence
+  revokes a grant it cannot verify or persist to Keychain.
+- Refresh is single-flight. One async lock covers read, refresh and save, so concurrent
+  callers share one refresh. Each rotated refresh token is saved before the new access
+  token is used. A rejected refresh drops the tokens and sets needs reconnect.
+- Disconnect revokes the refresh token at OpenAI, with up to three attempts for network
+  errors and 5xx. Then it clears local tokens, even when revocation failed, and reports
+  the outcome.
+- Connection states: disconnected, connected without plan usage, connected with plan
+  usage, and needs reconnect.
+- Rust reads the catalog, `GET https://api.openai.com/v1/models`. The webview receives
+  `slug` and `visibility` rows only. Model selection is not part of this ticket.
+- Commands: `chatgpt_status`, `chatgpt_connect`, `chatgpt_cancel_connect`,
+  `chatgpt_disconnect` and `chatgpt_models`. The TypeScript client is
+  `apps/desktop/src/chatgpt/connection.ts`. App commands need no capability entry in
+  this build, like the existing `auth_*` commands. The CSP is unchanged because the
+  webview makes no OpenAI request. Ticket 299 owns any CSP change for its model call.
+- HTTPS uses `reqwest` with `rustls` and `ring`, the build `tauri-plugin-updater`
+  already ships. Responses stop at 2 MiB while streaming, including responses with no
+  Content-Length. The new direct dependencies add no crate to `Cargo.lock`.
+- Tokens stay in two native-only Keychain items (`docs/DESKTOP_DATA_MODEL.md`, "ChatGPT
+  connection credentials"). They never reach SQLite, frontend storage, logs, exports,
+  backups or error text. The webview secret commands refuse both item names.

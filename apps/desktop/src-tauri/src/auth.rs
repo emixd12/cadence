@@ -20,6 +20,11 @@ extern "C" {
     fn cadence_auth_free(value: *mut c_char);
 }
 
+/// Keychain items (same service) that only native code reads and writes. The webview
+/// secret commands refuse these names, so ChatGPT tokens never cross the IPC boundary
+/// (Ticket 297).
+pub(crate) const NATIVE_ONLY_KEYS: &[&str] = &["chatgpt-installation", "chatgpt-session"];
+
 fn key(value: &str) -> Result<CString, String> {
     if !ALLOWED_KEYS.contains(&value) {
         return Err("Unknown secure storage key.".into());
@@ -27,8 +32,15 @@ fn key(value: &str) -> Result<CString, String> {
     CString::new(value).map_err(|_| "Invalid secure storage key.".into())
 }
 
-#[tauri::command]
-pub fn auth_open_url(url: String) -> Result<(), String> {
+fn native_key(value: &str) -> Result<CString, String> {
+    if !NATIVE_ONLY_KEYS.contains(&value) {
+        return Err("Unknown secure storage key.".into());
+    }
+    CString::new(value).map_err(|_| "Invalid secure storage key.".into())
+}
+
+/// Opens an HTTPS URL in the system browser.
+pub(crate) fn open_https_url(url: &str) -> Result<(), String> {
     if !url.starts_with("https://") || url.len() > 8192 {
         return Err("Cadence refused an invalid authentication URL.".into());
     }
@@ -41,23 +53,24 @@ pub fn auth_open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn auth_secret_get(name: String) -> Result<Option<String>, String> {
-    let name = key(&name)?;
+pub fn auth_open_url(url: String) -> Result<(), String> {
+    open_https_url(&url)
+}
+
+fn secret_get(name: &CString) -> Option<String> {
     let pointer = unsafe { cadence_auth_secret_get(name.as_ptr()) };
     if pointer.is_null() {
-        return Ok(None);
+        return None;
     }
     let value = unsafe { CStr::from_ptr(pointer).to_string_lossy().into_owned() };
     unsafe { cadence_auth_free(pointer) };
-    Ok(Some(value))
+    Some(value)
 }
 
-#[tauri::command]
-pub fn auth_secret_set(name: String, value: String) -> Result<(), String> {
+fn secret_set(name: &CString, value: String) -> Result<(), String> {
     if value.len() > 64 * 1024 {
         return Err("The authentication session is too large.".into());
     }
-    let name = key(&name)?;
     let value = CString::new(value).map_err(|_| "The authentication session is invalid.")?;
     if unsafe { cadence_auth_secret_set(name.as_ptr(), value.as_ptr()) } {
         Ok(())
@@ -66,14 +79,39 @@ pub fn auth_secret_set(name: String, value: String) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-pub fn auth_secret_remove(name: String) -> Result<(), String> {
-    let name = key(&name)?;
+fn secret_remove(name: &CString) -> Result<(), String> {
     if unsafe { cadence_auth_secret_remove(name.as_ptr()) } {
         Ok(())
     } else {
         Err("macOS Keychain did not remove the authentication session.".into())
     }
+}
+
+#[tauri::command]
+pub fn auth_secret_get(name: String) -> Result<Option<String>, String> {
+    Ok(secret_get(&key(&name)?))
+}
+
+#[tauri::command]
+pub fn auth_secret_set(name: String, value: String) -> Result<(), String> {
+    secret_set(&key(&name)?, value)
+}
+
+#[tauri::command]
+pub fn auth_secret_remove(name: String) -> Result<(), String> {
+    secret_remove(&key(&name)?)
+}
+
+pub(crate) fn native_secret_get(name: &str) -> Result<Option<String>, String> {
+    Ok(secret_get(&native_key(name)?))
+}
+
+pub(crate) fn native_secret_set(name: &str, value: String) -> Result<(), String> {
+    secret_set(&native_key(name)?, value)
+}
+
+pub(crate) fn native_secret_remove(name: &str) -> Result<(), String> {
+    secret_remove(&native_key(name)?)
 }
 
 #[derive(serde::Serialize)]
@@ -515,6 +553,19 @@ mod tests {
             .unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn webview_secret_commands_refuse_native_only_chatgpt_items() {
+        for name in NATIVE_ONLY_KEYS {
+            assert!(!ALLOWED_KEYS.contains(name));
+            assert!(auth_secret_get((*name).into()).is_err());
+            assert!(auth_secret_set((*name).into(), "value".into()).is_err());
+            assert!(auth_secret_remove((*name).into()).is_err());
+        }
+        for name in ALLOWED_KEYS {
+            assert!(native_key(name).is_err());
+        }
     }
 
     #[test]

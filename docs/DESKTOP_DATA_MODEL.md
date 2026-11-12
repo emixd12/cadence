@@ -680,3 +680,23 @@ Google snapshot always has, so the Mac can route those events (P-026).
 No Google credential, Supabase session, raw provider payload, or sync baseline
 belongs in this file. Existing backup/restore and account sync continue to operate
 on `cadence.sqlite3` only. The cache is disposable and never a restore input.
+
+## ChatGPT connection credentials (Ticket 297)
+
+The ChatGPT connection (decision D27) stores nothing in `cadence.sqlite3`, the
+Calendar cache or frontend storage. It uses two Keychain items under the app's
+existing `app.cadence.desktop.auth` service. Each is a generic password that does not
+synchronize and is readable only after first unlock on this device. Only native code
+reads them: the webview `auth_secret_*` commands refuse both names.
+
+| Keychain account | Contents | Lifetime |
+|---|---|---|
+| `chatgpt-installation` | Host ID (`urn:uuid:`, created once per installation) and the issued `oaiapp_` client ID | Kept across Disconnect, so later sign-ins reuse both |
+| `chatgpt-session` | Client ID, ID-token subject, ChatGPT email, granted scopes, access token, refresh token, access-token expiry and a needs-reconnect flag | Rewritten by each refresh; Disconnect removes it |
+
+The host ID stays on this Mac. Account synchronization, exports, backups and restore
+never carry either item. A Rust test proves that exports, backups and the database
+hold no ChatGPT credential. After a rejected refresh, the session keeps only the
+email, subject, scopes and the needs-reconnect flag, so the app can name the account
+to reconnect. The sign-in `state`, `nonce` and PKCE verifier live only in process
+memory while the callback listener runs.
