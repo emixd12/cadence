@@ -75,6 +75,7 @@ describe('Cadence Release vault', () => {
       [inv.developerId.item]: { password: secret, fingerprint: 'ABC', complete: COMPLETE_MARKER },
       [inv.updater.item]: { password: secret, fingerprint: inv.updater.fingerprint, complete: COMPLETE_MARKER },
       [inv.notarization.passwordItem]: { password: secret, account: secret, complete: COMPLETE_MARKER },
+      [inv.notarization.apiKeyItem]: { 'key id': 'KEYID00001', 'issuer id': secret, complete: COMPLETE_MARKER },
     };
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -174,6 +175,13 @@ describe('Cadence Release vault', () => {
     expect(rows.map((row) => row.state)).toEqual(['ok', 'ok', 'ok']);
     expect(verifyBackups(inv, vault(), 'DEF')[0]).toMatchObject({ state: 'missing', detail: 'fingerprint differs from what is installed' });
     expect(calls.filter((call) => call.args[0] === 'read').every((call) => /\/(fingerprint|complete)$/.test(call.args.at(-1)))).toBe(true);
+  });
+
+  it('requires the API-key backup even when the previous password backup exists', () => {
+    delete items[inv.notarization.apiKeyItem];
+    expect(verifyBackups(inv, vault(), 'ABC').at(-1)).toMatchObject({
+      item: inv.notarization.apiKeyItem, state: 'missing', detail: 'item missing',
+    });
   });
 
   it('restore and backup stop at the approval gate', async () => {

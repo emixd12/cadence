@@ -17467,11 +17467,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 297: Mac app ChatGPT connection
 
-Status: implemented November 12, 2026 on PR #241. Review added bounded streaming reads,
+Status: complete in source and merged November 12, 2026 on PR #241. Review added bounded streaming reads,
 callback deadline enforcement, failed-grant cleanup and stricter ID-token validation.
-The reviewed head requires Desktop native CI; Rust is unavailable in the review executor.
-Live sign-in and installed checks belong to Ticket 300. No UI uses the connection until
-Ticket 299, whose desktop switch stays off by default.
+Desktop native CI passed 159 Rust tests for #241 and 161 after #243's integration.
+Live sign-in and installed checks belong to deferred Ticket 300. Ticket 299's merged
+UI stays hidden, and signed builds pin its desktop switch off.
 Dependencies: Ticket 295.
 
 Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
@@ -17511,15 +17511,15 @@ Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --p
 
 ## Ticket 298: Hosted Daily Brief prepare and complete for a device model
 
-Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-brief`).
+Status: complete in source and merged November 12, 2026 on PR #240.
 `POST /api/advisor/brief/device/prepare`, `/complete` and `/release` call
 `lib/services/daily-brief-device.service.ts`; the envelope lives in
 `lib/services/daily-brief-device-envelope.ts`; `readBriefingContextFence` fences the stored
 inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
 added pending-only release, completion replay protection and a final context-expiry check.
 Migration `20261112043335_release_pending_daily_brief.sql` supplies the release RPC.
-Hosted migration applied November 12, 2026. Remaining: the Mac client (Ticket 299) and
-later owner activation.
+Hosted migration applied November 12, 2026. The Mac client merged in PR #243 (Ticket 299).
+Feature activation remains paused by the owner; Ticket 300 remains deferred.
 The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
 production. Ticket 299 calls release when its model call fails, without waiting for
 the 75-second lease or resetting the normal retry quotas.
@@ -17562,8 +17562,8 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: implemented in source on PR #243, under review, based on merged PRs #240
-and #241. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). The owner paused
+Status: complete in source and merged November 12, 2026 on PR #243, based on merged
+PRs #240 and #241. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). The owner paused
 activation after this ticket and deferred installed acceptance (Ticket 300). The OpenAI
 logo on the button (L-019) and messaging review of P-029 to P-031, P-045 and P-046 also
 remain activation gates.
@@ -17728,7 +17728,7 @@ anchor links; `npm run interactions:check`, `npm run design-system:check`; the b
 
 ## Ticket 302: Mac Settings adopts the groups
 
-Status: implemented November 10, 2026 on PR 205. Waiting on the Mac 0.1.10 release (credential backup is Ticket 325): an installed check in local and linked mode and the Mac's WebKit view.
+Status: complete November 12, 2026. Installed check passed on notarized 0.1.10 in linked mode (test Mac, account A) and local mode (owner's Mac before sign-in): `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md`, "Ticket checks on the installed build".
 Dependencies: Ticket 301.
 
 Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
@@ -18631,14 +18631,19 @@ Scope and acceptance:
   and the updater key, and warns 60 days before an expiry. Done.
 - `verify-backups` compares the vault items' fingerprints with this Mac without reading a
   secret. `restore` and `backup` need the owner's `release-secrets` approval for the run.
-  Done; tested with a fake `op` only.
+  Unit tests use a fake `op`. Live verification passed for the three original backups
+  on November 12; `dd4cb67b` records the API-key backup and successful `status` and
+  `verify-backups` checks. A live restore has not been recorded.
 - The `desktop-release` preflight runs these checks. The profile probe reads the inventory,
   so it no longer checks the retired profile. Done.
 - Live: the owner creates the vault, the service account and the App Store Connect API key;
   agents back up the identity, notarization credential and updater key, and
   `verify-backups` passes. Done November 12, 2026 for the vault, service account and the
-  three backups; the API key is not created yet.
-- Notarization uses the API key in the next release wrapper. Not done.
+  three original backups. The API key is backed up as "Cadence App Store Connect API key",
+  recorded in `dd4cb67b`. The PR review has not independently rerun live credential checks.
+- Notarization uses the API key in the release wrapper. The "Cadence notarization" key
+  (Developer role) notarized the 0.1.10 app and DMG; the inventory method is `api-key`.
+  Evidence: `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` and `dd4cb67b`.
 - Spike: create a Developer ID certificate and a Developer ID profile through the App Store
   Connect API. If the API refuses, agents use the Apple Developer portal in Chrome with
   1Password filling the sign-in. Not done.
