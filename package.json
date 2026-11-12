@@ -118,7 +118,7 @@
   "devDependencies": {
     "@cadence-fixture/supabase-js": "npm:@supabase/supabase-js@2.107.0",
     "@modelcontextprotocol/client": "2.4.0",
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -132,7 +132,7 @@
     "jsdom": "31.0.0",
     "playwright-core": "1.64.1",
     "supabase": "^2.105.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.5",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^5.1.0"
   },
