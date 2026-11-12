@@ -103,6 +103,7 @@ struct Mock {
     nonce: Mutex<Option<String>>,
     challenge: Mutex<Option<String>>,
     token_scope: Mutex<Option<String>>,
+    refresh_scope: Mutex<Option<String>>,
     bad_nonce: AtomicBool,
     refresh_statuses: Mutex<VecDeque<u16>>,
     revoke_replies: Mutex<VecDeque<Option<u16>>>,
@@ -249,8 +250,12 @@ impl Http for MockHttp {
                             );
                         }
                         let (access, refresh) = mock.issue();
-                        reply(200, json!({"access_token":access,"refresh_token":refresh,"expires_in":3599})
-                        .to_string())
+                        let mut response =
+                            json!({"access_token":access,"refresh_token":refresh,"expires_in":3599});
+                        if let Some(scope) = mock.refresh_scope.lock().unwrap().clone() {
+                            response["scope"] = json!(scope);
+                        }
+                        reply(200, response.to_string())
                     }
                     _ => reply(400, "{}"),
                 }
@@ -842,8 +847,8 @@ fn concurrent_callers_share_one_refresh_and_the_rotated_token_is_saved() {
     h.clock.store(NOW + 3599 - 60, Ordering::SeqCst);
     let (one, two) = (h.connection.clone(), h.connection.clone());
     let (first, second) = run(async move {
-        let a = tauri::async_runtime::spawn(async move { one.access_token(None).await });
-        let b = tauri::async_runtime::spawn(async move { two.access_token(None).await });
+        let a = tauri::async_runtime::spawn(async move { one.access_token(None, false).await });
+        let b = tauri::async_runtime::spawn(async move { two.access_token(None, false).await });
         (a.await.unwrap(), b.await.unwrap())
     });
     assert_eq!(h.mock.refreshes.load(Ordering::SeqCst), 1);
@@ -886,6 +891,31 @@ fn the_webview_access_token_is_fresh_and_never_carries_the_refresh_token() {
         run(h.connection.webview_access_token()).err(),
         Some(Failure::NeedsReconnect)
     );
+}
+
+#[test]
+fn the_webview_never_gets_a_token_after_refresh_removes_plan_usage() {
+    let h = harness();
+    connect(&h).unwrap();
+    h.clock.store(NOW + 3599 - 60, Ordering::SeqCst);
+    *h.mock.refresh_scope.lock().unwrap() = Some("openid profile email offline_access".into());
+    assert_eq!(
+        run(h.connection.webview_access_token()).err(),
+        Some(Failure::Disconnected)
+    );
+    assert_eq!(
+        h.connection.status().unwrap().state,
+        ConnectionState::ConnectedWithoutPlanUsage
+    );
+    assert_eq!(
+        h.mock.session().unwrap()["refresh_token"],
+        "rt-SECRET-refresh-2-xxxxxxxx"
+    );
+    assert_eq!(
+        run(h.connection.webview_access_token()).err(),
+        Some(Failure::Disconnected)
+    );
+    assert_eq!(h.mock.refreshes.load(Ordering::SeqCst), 1);
 }
 
 #[test]

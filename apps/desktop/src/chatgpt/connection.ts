@@ -20,6 +20,11 @@ export type ChatGptCatalogModel = Readonly<{ slug: string; visibility: string | 
 /** `revocationFailed` still clears local tokens; the grant may stay listed in ChatGPT. */
 export type ChatGptDisconnectOutcome = "revoked" | "revocationFailed" | "notConnected";
 
+export type ChatGptConnectionChange = Readonly<{
+  kind: "start" | "settled";
+  operation: "connect" | "disconnect" | "cancel";
+}>;
+
 export type ChatGptConnection = Readonly<{
   status(): Promise<ChatGptConnectionStatus>;
   /** Opens the system browser and resolves after the callback, a timeout (5 minutes) or a cancel. */
@@ -29,6 +34,10 @@ export type ChatGptConnection = Readonly<{
   models(): Promise<ChatGptCatalogModel[]>;
   /** A fresh access token (Rust refreshes it first if needed). Use it for one call; never store it. */
   accessToken(): Promise<string>;
+  /** Shared lifecycle only; subscribers never receive tokens or account details. */
+  subscribe(listener: (change: ChatGptConnectionChange) => void): () => void;
+  isConnecting(): boolean;
+  isChanging(): boolean;
 }>;
 
 type Call = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -90,12 +99,71 @@ async function native<T>(run: () => Promise<unknown>, read: (value: unknown) => 
 }
 
 export function createChatGptConnection(call: Call = (command, args) => invoke(command, args)): ChatGptConnection {
+  const listeners = new Set<(change: ChatGptConnectionChange) => void>();
+  let connecting = false;
+  let disconnecting = false;
+  const notify = (change: ChatGptConnectionChange) => listeners.forEach((listener) => {
+    try { listener(change); } catch { /* A UI observer cannot prevent native cancellation or token cleanup. */ }
+  });
+  const mutate = async <T>(operation: ChatGptConnectionChange["operation"], run: () => Promise<T>): Promise<T> => {
+    if ((operation === "connect" && (connecting || disconnecting)) || (operation === "disconnect" && disconnecting)) {
+      throw new ChatGptConnectionError("The ChatGPT connection is changing. Try again when it finishes.");
+    }
+    if (operation === "connect") connecting = true;
+    if (operation === "disconnect") disconnecting = true;
+    notify({ kind: "start", operation });
+    try { return await run(); }
+    finally {
+      if (operation === "connect") connecting = false;
+      if (operation === "disconnect") disconnecting = false;
+      notify({ kind: "settled", operation });
+    }
+  };
   return {
     status: () => native(() => call("chatgpt_status"), readChatGptStatus),
-    connect: () => native(() => call("chatgpt_connect"), readChatGptStatus),
-    cancelConnect: () => native(() => call("chatgpt_cancel_connect"), () => undefined),
-    disconnect: () => native(() => call("chatgpt_disconnect"), readOutcome),
+    connect: () => mutate("connect", () => native(() => call("chatgpt_connect"), readChatGptStatus)),
+    cancelConnect: () => mutate("cancel", () => native(() => call("chatgpt_cancel_connect"), () => undefined)),
+    disconnect: () => mutate("disconnect", () => native(() => call("chatgpt_disconnect"), readOutcome)),
     models: () => native(() => call("chatgpt_models"), readChatGptCatalog),
     accessToken: () => native(() => call("chatgpt_access_token"), readAccessToken),
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    isConnecting: () => connecting,
+    isChanging: () => connecting || disconnecting,
+  };
+}
+
+/** Rejects stale controls synchronously, before an account teardown can trigger a React render. */
+function guardChatGptConnection(connection: ChatGptConnection, currentAccount: () => boolean): ChatGptConnection {
+  const change = async <T>(run: () => Promise<T>): Promise<T> => {
+    if (!currentAccount()) throw new ChatGptConnectionError("The Cadence account changed. Open Settings and try again.");
+    const value = await run();
+    if (!currentAccount()) throw new ChatGptConnectionError("The Cadence account changed. Open Settings and try again.");
+    return value;
+  };
+  return {
+    ...connection,
+    status: () => change(connection.status),
+    models: () => change(connection.models),
+    connect: () => change(connection.connect),
+    cancelConnect: () => change(connection.cancelConnect),
+    disconnect: () => change(connection.disconnect),
+    accessToken: () => change(connection.accessToken),
+  };
+}
+
+/** One app's synchronous account boundary, shared by every ChatGPT entry point. */
+export function createChatGptAccountScope() {
+  let accountId: string | null = null;
+  let transitioning = false;
+  return {
+    setAccount: (next: string | null) => { accountId = next; },
+    beginTransition: () => {
+      if (transitioning) return false;
+      transitioning = true;
+      return true;
+    },
+    endTransition: () => { transitioning = false; },
+    forAccount: (connection: ChatGptConnection, expected: string) =>
+      guardChatGptConnection(connection, () => !transitioning && accountId === expected),
   };
 }

@@ -15,7 +15,7 @@ import type { ChatGptConnection } from "./chatgpt/connection";
  * switch is on. `connect` starts ChatGPT sign-in; `openUsage` opens ChatGPT usage settings.
  */
 export type DesktopDailyBriefPlan = Readonly<{
-  connection: Pick<ChatGptConnection, "status" | "accessToken">;
+  connection: Pick<ChatGptConnection, "status" | "accessToken" | "subscribe" | "isChanging">;
   connect: () => Promise<void>;
   openUsage: () => void;
   /** The model call's fetch; tests pass a fake. */
@@ -60,40 +60,56 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
         usage: (briefing) => this.planBriefs.has(briefing) ? "plan" : this.planOffBriefs.has(briefing) ? "plan_off" : null,
         manageUsage: planPath.openUsage,
         connect: planPath.connect,
+        subscribe: (listener) => planPath.connection.subscribe((event) => listener(event.kind)),
       };
     }
   }
 
-  async preferences(signal?: AbortSignal) {
-    return this.present(await this.request<DailyBriefSettings>("/api/advisor/preferences", {}, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
+  preferences(signal?: AbortSignal) {
+    return this.settingsRequest({}, signal);
   }
 
-  async updatePreferences(input: DailyBriefPreferenceInput, signal?: AbortSignal) {
-    return this.present(await this.request<DailyBriefSettings>("/api/advisor/preferences", { method: "PUT", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
+  updatePreferences(input: DailyBriefPreferenceInput, signal?: AbortSignal) {
+    return this.settingsRequest({ method: "PUT", body: JSON.stringify(input) }, signal);
   }
 
   async requestBrief(input: DailyBriefRequestInput, signal?: AbortSignal): Promise<DailyBriefResponse> {
     const plan = this.planPath;
     if (!plan) return this.hostedBrief(input, signal);
-    const status = await plan.connection.status().catch(() => { throw new DailyBriefRequestError("chatgpt_retry_later"); });
-    // D27: never connected, or connected without plan usage, keeps today's hosted path.
-    if (status.state === "disconnected") return this.hostedBrief(input, signal);
-    if (status.state === "connectedWithoutPlanUsage") {
-      const response = await this.hostedBrief(input, signal);
-      if (response.state === "ready") this.planOffBriefs.add(response.briefing);
-      return response;
+    // A grant change invalidates this request even when its launcher is not mounted.
+    const lifetime = new AbortController();
+    const cancel = () => lifetime.abort();
+    if (signal?.aborted) cancel();
+    signal?.addEventListener("abort", cancel, { once: true });
+    const unsubscribe = plan.connection.subscribe((event) => { if (event.kind === "start") cancel(); });
+    try {
+      return await withDailyBriefDeadline(DAILY_BRIEF_CLIENT_DEADLINES.briefMs, lifetime.signal, async (deadline) => {
+        if (plan.connection.isChanging()) throw new DailyBriefRequestError("chatgpt_retry_later");
+        const status = await plan.connection.status().catch(() => { throw new DailyBriefRequestError("chatgpt_retry_later"); });
+        if (deadline.aborted) throw new DailyBriefRequestError("cancelled");
+        // D27: never connected, or connected without plan usage, keeps today's hosted path.
+        if (status.state === "disconnected") return this.hostedBrief(input, deadline);
+        if (status.state === "connectedWithoutPlanUsage") {
+          const response = await this.hostedBrief(input, deadline);
+          if (response.state === "ready") this.planOffBriefs.add(response.briefing);
+          return response;
+        }
+        // D27: a connected plan that cannot run the brief shows why; Cadence's key never runs it.
+        if (status.state === "needsReconnect") throw new DailyBriefRequestError("chatgpt_reconnect");
+        if (!this.settings?.deviceModelAvailable) throw new DailyBriefRequestError("chatgpt_unavailable");
+        return this.planBrief(plan, input, deadline);
+      });
+    } finally {
+      unsubscribe();
+      signal?.removeEventListener("abort", cancel);
     }
-    // D27: a connected plan that cannot run the brief shows why; Cadence's key never runs it.
-    if (status.state === "needsReconnect") throw new DailyBriefRequestError("chatgpt_reconnect");
-    if (!this.settings?.deviceModelAvailable) throw new DailyBriefRequestError("chatgpt_unavailable");
-    return withDailyBriefDeadline(DAILY_BRIEF_CLIENT_DEADLINES.briefMs, signal, (deadline) => this.planBrief(plan, input, deadline));
   }
 
   private hostedBrief(input: DailyBriefRequestInput, signal?: AbortSignal) {
     return this.request<DailyBriefResponse>("/api/advisor/brief", { method: "POST", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.briefMs, signal);
   }
 
-  /** Prepare, the model call on the user's plan, then complete. A failed model call releases the attempt. */
+  /** Prepare, the model call on the user's plan, then complete. Any later failure releases the pending attempt. */
   private async planBrief(plan: DesktopDailyBriefPlan, input: DailyBriefRequestInput, signal: AbortSignal): Promise<DailyBriefResponse> {
     // Read the token first, so a needed reconnect does not spend an attempt. It stays in this call's memory only.
     const accessToken = await plan.connection.accessToken().catch((error: unknown) => {
@@ -102,42 +118,44 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     });
     const prepared = await this.request<DevicePrepareResponse>("/api/advisor/brief/device/prepare", { method: "POST", body: JSON.stringify(input) }, DEVICE_PREPARE_MS, signal);
     if (prepared.state !== "prepared") return prepared;
-    const model = new AbortController();
-    const stop = () => model.abort();
-    const timer = setTimeout(stop, Math.max(0, Date.parse(prepared.expiresAt) - Date.now() - COMPLETE_RESERVE_MS));
-    signal.addEventListener("abort", stop, { once: true });
-    let output: unknown;
     try {
-      const call = { accessToken, signal: model.signal, ...(plan.fetch ? { fetch: plan.fetch } : {}) };
-      output = await generateChatGPTPlanDailyBrief(prepared.request, { ...call, model: await chooseChatGPTPlanModel(call) });
+      const modelMs = Date.parse(prepared.expiresAt) - Date.now() - COMPLETE_RESERVE_MS;
+      if (!Number.isFinite(modelMs) || modelMs <= 0) throw new DailyBriefRequestError("context_expired");
+      const output = await withDailyBriefDeadline(modelMs, signal, async (modelSignal) => {
+        const call = { accessToken, signal: modelSignal, ...(plan.fetch ? { fetch: plan.fetch } : {}) };
+        return generateChatGPTPlanDailyBrief(prepared.request, { ...call, model: await chooseChatGPTPlanModel(call) });
+      }).catch((error: unknown) => {
+        if (error instanceof DailyBriefRequestError && error.code === "cancelled") throw error;
+        throw new DailyBriefRequestError(`chatgpt_${error instanceof ChatGPTPlanError ? error.code
+          : error instanceof DailyBriefRequestError && error.code === "timeout" ? "timeout" : "retry_later"}`);
+      });
+      const response = await this.request<DailyBriefResponse>("/api/advisor/brief/device/complete", {
+        method: "POST", body: JSON.stringify({ installationId: input.installationId, envelope: prepared.envelope, output }),
+      }, DEVICE_COMPLETE_MS, signal);
+      if (response.state === "ready") this.planBriefs.add(response.briefing);
+      return response;
     } catch (error) {
-      // Owner decision, November 12, 2026: free the lease now, so a retry need not wait for it.
-      // Its own deadline: the brief's signal may already have ended.
+      // The pending-only RPC is safe even if complete succeeded but its response was lost.
+      // Use a separate deadline because cancellation may already have ended this request.
       await this.request("/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId: input.installationId, envelope: prepared.envelope }) }, DEVICE_RELEASE_MS)
         .catch(() => undefined);
-      throw new DailyBriefRequestError(`chatgpt_${error instanceof ChatGPTPlanError ? error.code : "retry_later"}`);
-    } finally {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", stop);
+      throw error;
     }
-    const response = await this.request<DailyBriefResponse>("/api/advisor/brief/device/complete", {
-      method: "POST", body: JSON.stringify({ installationId: input.installationId, envelope: prepared.envelope, output }),
-    }, DEVICE_COMPLETE_MS, signal);
-    if (response.state === "ready") this.planBriefs.add(response.briefing);
-    return response;
   }
 
-  /**
-   * Keeps the server's settings for the plan decision, and shows the brief as available when
-   * this Mac can run it on the plan: the server offers device mode and ChatGPT is connected
-   * with plan usage (or needs reconnecting, so the bubble can say so). The hosted-only check
-   * stays as it was for every other case, including the web app.
-   */
-  private async present(settings: DailyBriefSettings): Promise<DailyBriefSettings> {
-    this.settings = settings;
-    if (settings.available || !settings.deviceModelAvailable || !this.planPath) return settings;
-    const status = await this.planPath.connection.status().catch(() => null);
-    return status?.state === "connectedWithPlanUsage" || status?.state === "needsReconnect" ? { ...settings, available: true } : settings;
+  /** Keep the server's settings for route selection; normalize availability only for this Mac's UI. */
+  private settingsRequest(init: RequestInit, signal?: AbortSignal): Promise<DailyBriefSettings> {
+    return withDailyBriefDeadline(DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal, async (deadline) => {
+      const settings = await this.request<DailyBriefSettings>("/api/advisor/preferences", init, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, deadline);
+      let available = settings.available;
+      if (!available && settings.deviceModelAvailable && this.planPath) {
+        const status = await this.planPath.connection.status().catch(() => null);
+        available = status?.state === "connectedWithPlanUsage" || status?.state === "needsReconnect";
+      }
+      if (deadline.aborted) throw new DailyBriefRequestError("cancelled");
+      this.settings = settings;
+      return available === settings.available ? settings : { ...settings, available };
+    });
   }
 
   /** The deadline covers session lookup, request and body decoding; a caller signal only adds cancellation. */

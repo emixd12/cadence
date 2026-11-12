@@ -378,13 +378,23 @@ impl<H: Http, S: Secrets> Connection<H, S> {
 
     /// Returns a usable access token, refreshing at most once across concurrent
     /// callers. `rejected` forces a refresh only if it is still the stored token.
-    async fn access_token(&self, rejected: Option<&str>) -> Result<String, Failure> {
+    async fn access_token(
+        &self,
+        rejected: Option<&str>,
+        require_plan: bool,
+    ) -> Result<String, Failure> {
         let _session = self.session_lock.lock().await;
         let mut session = self
             .load::<Session>(SESSION_ITEM)?
             .ok_or(Failure::Disconnected)?;
         if session.needs_reconnect {
             return Err(Failure::NeedsReconnect);
+        }
+        let permitted = |session: &Session| {
+            !require_plan || session.scopes.iter().any(|scope| scope == PLAN_SCOPE)
+        };
+        if !permitted(&session) {
+            return Err(Failure::Disconnected);
         }
         let stale = rejected.is_some_and(|token| session.access_token.as_deref() == Some(token));
         if let Some(token) = session.access_token.as_ref() {
@@ -420,6 +430,11 @@ impl<H: Http, S: Secrets> Connection<H, S> {
                 session.access_token = Some(tokens.access_token.clone());
                 // Save the rotated refresh token before anything uses the new access token.
                 self.save(SESSION_ITEM, &session)?;
+                // A refresh may narrow the grant. Keep its rotated token, but do not
+                // hand the webview an access token that no longer permits plan usage.
+                if !permitted(&session) {
+                    return Err(Failure::Disconnected);
+                }
                 Ok(tokens.access_token)
             }
             Err(TokenError::Rejected) => Err(self.mark_reconnect(session)),
@@ -441,14 +456,14 @@ impl<H: Http, S: Secrets> Connection<H, S> {
     // -- catalog ---------------------------------------------------------------
 
     pub async fn models(&self) -> Result<Vec<CatalogModel>, Failure> {
-        let token = self.access_token(None).await?;
+        let token = self.access_token(None, false).await?;
         let mut reply = self
             .http
             .get(CATALOG_URL, Some(&token))
             .await
             .map_err(|_| Failure::Unavailable)?;
         if reply.status == 401 {
-            let refreshed = self.access_token(Some(&token)).await?;
+            let refreshed = self.access_token(Some(&token), false).await?;
             reply = self
                 .http
                 .get(CATALOG_URL, Some(&refreshed))
@@ -480,10 +495,7 @@ impl<H: Http, S: Secrets> Connection<H, S> {
     /// A fresh access token for one Daily Brief model call, refreshed here if it is near
     /// expiry. A session without plan usage gets none: the model call needs that grant.
     pub async fn webview_access_token(&self) -> Result<AccessToken, Failure> {
-        if self.status()?.state == ConnectionState::ConnectedWithoutPlanUsage {
-            return Err(Failure::Disconnected);
-        }
-        let access_token = self.access_token(None).await?;
+        let access_token = self.access_token(None, true).await?;
         Ok(AccessToken { access_token })
     }
 

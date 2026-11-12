@@ -13,7 +13,7 @@ const briefing = { text: "Take time for your walk.", localDate: "2026-11-12" };
 const output = { text: "Take time for your walk.", occurrenceRefs: [], suggestions: [], tip: null };
 const session = { auth: { getSession: async () => ({ data: { session: { access_token: "synthetic-session" } } }) } } as unknown as SupabaseClient;
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 function sse(value: unknown) {
   const event = { type: "response.completed", response: { status: "completed", output: [
@@ -22,7 +22,7 @@ function sse(value: unknown) {
 }
 
 /** Cadence's hosted routes. `calls` records each path and body. */
-function hosted(options: { deviceModelAvailable?: boolean; prepare?: unknown; hostedAvailable?: boolean } = {}) {
+function hosted(options: { deviceModelAvailable?: boolean; prepare?: unknown; hostedAvailable?: boolean; complete?: () => Promise<Response> } = {}) {
   const calls: { path: string; body: unknown }[] = [];
   const fetcher = vi.fn(async (url: string, init: RequestInit = {}) => {
     const path = url.slice(ORIGIN.length);
@@ -30,7 +30,7 @@ function hosted(options: { deviceModelAvailable?: boolean; prepare?: unknown; ho
     if (path === "/api/advisor/preferences") return Response.json({ accountRef: "a", available: options.hostedAvailable ?? true, enabled: true, revision: 1, localDate: "2026-11-12", deviceModelAvailable: options.deviceModelAvailable ?? true });
     if (path === "/api/advisor/brief") return Response.json({ state: "ready", briefing: { ...briefing, text: "Hosted brief." } });
     if (path === "/api/advisor/brief/device/prepare") return Response.json(options.prepare ?? { state: "prepared", request: { instructions: "Synthetic.", facts: "{}" }, envelope: "body.signature", expiresAt: new Date(Date.now() + 60_000).toISOString() });
-    if (path === "/api/advisor/brief/device/complete") return Response.json({ state: "ready", briefing });
+    if (path === "/api/advisor/brief/device/complete") return options.complete ? options.complete() : Response.json({ state: "ready", briefing });
     if (path === "/api/advisor/brief/device/release") return Response.json({ state: "released" });
     return Response.json({ error: "not_found" }, { status: 404 });
   });
@@ -50,7 +50,9 @@ function openai(reply: () => Response = () => sse(output)) {
 }
 
 function plan(state: ChatGptConnectionState, fetch?: typeof globalThis.fetch, accessToken = vi.fn(async () => TOKEN)): DesktopDailyBriefPlan {
-  return { connection: { status: async () => ({ state, email: "person@example.test" }), accessToken }, connect: async () => undefined, openUsage: () => undefined, ...(fetch ? { fetch } : {}) };
+  return { connection: { status: async () => ({ state, email: "person@example.test" }), accessToken,
+    subscribe: () => () => undefined, isChanging: () => false },
+  connect: async () => undefined, openUsage: () => undefined, ...(fetch ? { fetch } : {}) };
 }
 
 describe("ChatGPT plan switch", () => {
@@ -70,7 +72,7 @@ describe("ChatGPT plan switch", () => {
     // The app creates no ChatGPT connection and no plan client when the switch is off.
     const product = readFileSync("apps/desktop/src/product.tsx", "utf8");
     expect(product).toContain("const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;");
-    expect(product).toContain("chatGptPlanControls={chatGptPlan && dailyBriefClient ?");
+    expect(product).toContain("chatGptPlanControls={accountChatGpt && dailyBriefClient && !accountBusy ?");
   });
 });
 
@@ -89,6 +91,25 @@ describe("Daily Brief availability on a device-only server", () => {
     await expect(createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage"))!.preferences()).resolves.toMatchObject({ available: false });
     hosted({ hostedAvailable: false, deviceModelAvailable: true });
     await expect(createDesktopDailyBriefClient(session, ORIGIN, null)!.preferences()).resolves.toMatchObject({ available: false });
+  });
+
+  it("uses the device route after normalizing availability, without a hosted fallback", async () => {
+    const { calls } = hosted({ hostedAvailable: false, deviceModelAvailable: true });
+    const client = createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage", openai().fetch))!;
+    await expect(client.preferences()).resolves.toMatchObject({ available: true });
+    await expect(client.requestBrief(input)).resolves.toMatchObject({ state: "ready" });
+    expect(calls.map(({ path }) => path)).toEqual(["/api/advisor/preferences", "/api/advisor/brief/device/prepare", "/api/advisor/brief/device/complete"]);
+  });
+
+  it("bounds native status normalization by the preferences deadline", async () => {
+    vi.useFakeTimers();
+    hosted({ hostedAvailable: false, deviceModelAvailable: true });
+    const pending = plan("connectedWithPlanUsage");
+    const client = createDesktopDailyBriefClient(session, ORIGIN, { ...pending,
+      connection: { ...pending.connection, status: vi.fn(() => new Promise<never>(() => undefined)) } })!;
+    const failure = expect(client.preferences()).rejects.toMatchObject({ code: "timeout" });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await failure;
   });
 });
 
@@ -171,5 +192,96 @@ describe("Daily Brief on the ChatGPT plan", () => {
   it("keeps the token out of storage and logs", () => {
     const source = readFileSync("apps/desktop/src/daily-brief.ts", "utf8");
     for (const forbidden of ["localStorage", "sessionStorage", "indexedDB", "console.", "localCommand", "invoke("]) expect(source).not.toContain(forbidden);
+  });
+
+  it("bounds a stalled native status read before spending an attempt", async () => {
+    vi.useFakeTimers();
+    const { calls } = hosted();
+    const pending = plan("connectedWithPlanUsage");
+    const client = createDesktopDailyBriefClient(session, ORIGIN, { ...pending,
+      connection: { ...pending.connection, status: vi.fn(() => new Promise<never>(() => undefined)) } })!;
+    const failure = expect(client.requestBrief(input)).rejects.toMatchObject({ code: "timeout" });
+    await vi.advanceTimersByTimeAsync(75_000);
+    await failure;
+    expect(calls).toEqual([]);
+  });
+
+  it("does not send a late native status result after cancellation", async () => {
+    const { calls } = hosted();
+    const controller = new AbortController();
+    const model = openai();
+    const pending = plan("connectedWithPlanUsage", model.fetch);
+    let finish: (value: Awaited<ReturnType<DesktopDailyBriefPlan["connection"]["status"]>>) => void = () => undefined;
+    const client = createDesktopDailyBriefClient(session, ORIGIN, { ...pending,
+      connection: { ...pending.connection, status: () => new Promise((resolve) => { finish = resolve; }) } })!;
+    await client.preferences();
+    const failure = expect(client.requestBrief(input, controller.signal)).rejects.toMatchObject({ code: "cancelled" });
+    controller.abort();
+    await failure;
+    finish({ state: "connectedWithPlanUsage", email: null });
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    expect(calls.map(({ path }) => path)).toEqual(["/api/advisor/preferences"]);
+    expect(model.fetch).not.toHaveBeenCalled();
+  });
+
+  it("releases a pending attempt when completion transport fails", async () => {
+    const { calls } = hosted({ complete: async () => { throw new Error("connection ended"); } });
+    const client = createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage", openai().fetch))!;
+    await client.preferences();
+    await expect(client.requestBrief(input)).rejects.toMatchObject({ code: "brief_unavailable" });
+    expect(calls.map(({ path }) => path)).toEqual(["/api/advisor/preferences", "/api/advisor/brief/device/prepare", "/api/advisor/brief/device/complete", "/api/advisor/brief/device/release"]);
+  });
+
+  it("releases with a fresh deadline when cancellation interrupts completion", async () => {
+    const controller = new AbortController();
+    const { calls } = hosted({ complete: async () => { controller.abort(); return new Promise(() => undefined); } });
+    const client = createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage", openai().fetch))!;
+    await client.preferences();
+    await expect(client.requestBrief(input, controller.signal)).rejects.toMatchObject({ code: "cancelled" });
+    await vi.waitFor(() => expect(calls.at(-1)?.path).toBe("/api/advisor/brief/device/release"));
+  });
+
+  it("never starts a provider call for an expired prepared envelope", async () => {
+    const { calls } = hosted({ prepare: { state: "prepared", request: { instructions: "Synthetic.", facts: "{}" }, envelope: "body.signature", expiresAt: new Date(Date.now() - 1).toISOString() } });
+    const model = openai();
+    const client = createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage", model.fetch))!;
+    await client.preferences();
+    await expect(client.requestBrief(input)).rejects.toMatchObject({ code: "context_expired" });
+    expect(model.fetch).not.toHaveBeenCalled();
+    expect(calls.at(-1)?.path).toBe("/api/advisor/brief/device/release");
+  });
+
+  it("releases an unresponsive provider call before its envelope expires", async () => {
+    vi.useFakeTimers();
+    const { calls } = hosted();
+    let started: () => void = () => undefined;
+    const modelStarted = new Promise<void>((resolve) => { started = resolve; });
+    const model = vi.fn(async () => { started(); return new Promise<Response>(() => undefined); }) as typeof fetch;
+    const client = createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage", model))!;
+    await client.preferences();
+    const failure = expect(client.requestBrief(input)).rejects.toMatchObject({ code: "chatgpt_timeout" });
+    await modelStarted;
+    await vi.advanceTimersByTimeAsync(52_000);
+    await failure;
+    expect(calls.at(-1)?.path).toBe("/api/advisor/brief/device/release");
+  });
+
+  it("cancels an in-flight plan request when the ChatGPT grant changes", async () => {
+    const { calls } = hosted();
+    let changed: Parameters<DesktopDailyBriefPlan["connection"]["subscribe"]>[0] = () => undefined;
+    let started: () => void = () => undefined;
+    const modelStarted = new Promise<void>((resolve) => { started = resolve; });
+    const model = vi.fn(async () => { started(); return new Promise<Response>(() => undefined); }) as typeof fetch;
+    const pending = plan("connectedWithPlanUsage", model);
+    const unsubscribed = vi.fn();
+    const client = createDesktopDailyBriefClient(session, ORIGIN, { ...pending,
+      connection: { ...pending.connection, subscribe: (listener) => { changed = listener; return unsubscribed; } } })!;
+    await client.preferences();
+    const failure = expect(client.requestBrief(input)).rejects.toMatchObject({ code: "cancelled" });
+    await modelStarted;
+    changed({ kind: "start", operation: "disconnect" });
+    await failure;
+    await vi.waitFor(() => expect(calls.at(-1)?.path).toBe("/api/advisor/brief/device/release"));
+    expect(unsubscribed).toHaveBeenCalledOnce();
   });
 });

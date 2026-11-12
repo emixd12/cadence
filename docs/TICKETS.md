@@ -17562,10 +17562,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: implemented in source on branch `claude/ticket-299-plan-ui`, PR #243
-(PRs #240 and #241 merged). Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). Open: the
-OpenAI logo on the button (L-019), installed acceptance (Ticket 300) and the messaging
-review of P-029 to P-031, P-045 and P-046 before the owner turns it on.
+Status: implemented in source on PR #243, under review, based on merged PRs #240
+and #241. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). The owner paused
+activation after this ticket and deferred installed acceptance (Ticket 300). The OpenAI
+logo on the button (L-019) and messaging review of P-029 to P-031, P-045 and P-046 also
+remain activation gates.
 Dependencies: Tickets 297 and 298.
 
 Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
@@ -17576,11 +17577,15 @@ hidden until the owner turns it on"):
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
   does not wait for the 75-second lease. Call Ticket 298's
   `POST /api/advisor/brief/device/release` with the signed envelope and installation ID.
+  The implementation also releases after cancellation or a lost complete response;
+  the pending-only RPC cannot undo a completed attempt or a replacement lease.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
-- Still required (not a decision): a command that hands the access token to the webview
-  for the model call, and `https://api.openai.com` in the CSP. Update the test that pins it
-  absent (Ticket 297).
+- Implemented: `chatgpt_access_token` hands only the fresh access token to the webview
+  for the model call. Its locked grant check includes refresh-scope changes.
+  The CSP and its pinning test allow exactly `https://api.openai.com`.
+- With plan usage connected and device mode off, show the ChatGPT failure state without
+  falling back to Cadence's key, as the owner confirmed on November 12.
 
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.

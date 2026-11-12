@@ -1452,9 +1452,11 @@ cite has not changed.
   "ChatGPT is disconnected."; "ChatGPT is disconnected on this Mac. OpenAI did not confirm
   it, so Cadence may still be listed in your ChatGPT settings."; and the one-time
   confirmation "You’re using your ChatGPT plan", "The Daily Brief on this Mac now uses your
-  ChatGPT plan. You can manage usage in ChatGPT settings." and "Got it".
+  ChatGPT plan. You can manage usage in ChatGPT settings." and "Got it". Stale account
+  controls show "The Cadence account changed. Open Settings and try again." Concurrent
+  connection changes show "The ChatGPT connection is changing. Try again when it finishes."
 - **Affected:** Ticket 299. Files: `components/briefing/ChatGptPlanCard.tsx`,
-  `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`.
+  `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`, `apps/desktop/src/chatgpt/connection.ts`.
 - **Surfaces:** in-app copy (Mac), user guide.
 - **Conflicting current text:** none shown today; the feature is hidden. The description's
   claim that Cadence prepares and checks each brief relates to P-029 and P-030, which still

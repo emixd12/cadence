@@ -32,6 +32,8 @@ export type DailyBriefPlanControls = Readonly<{
   manageUsage: () => void;
   /** Starts ChatGPT sign-in and resolves when it ends. */
   connect: () => Promise<void>;
+  /** Withdraws output when the device's connected ChatGPT account changes. */
+  subscribe?: (listener: (phase: "start" | "settled") => void) => () => void;
 }>;
 
 export type DailyBriefClient = Readonly<{

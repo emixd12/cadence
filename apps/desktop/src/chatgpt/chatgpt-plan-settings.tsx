@@ -17,49 +17,73 @@ const localFlag: Flag = {
 };
 
 export function ChatGptPlanSettings({ connection, connect, openUsage, confirmed = localFlag }: Readonly<{
-  connection: Pick<ChatGptConnection, "status" | "cancelConnect" | "disconnect">;
+  connection: Pick<ChatGptConnection, "status" | "cancelConnect" | "disconnect" | "subscribe" | "isConnecting" | "isChanging">;
   /** Shared with the Daily Brief, so a sign-in from either place refreshes both. */
   connect: () => Promise<ChatGptConnectionStatus>;
   openUsage: () => void;
   confirmed?: Flag;
 }>) {
   const [status, setStatus] = useState<ChatGptConnectionStatus | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(connection.isConnecting);
+  const [busy, setBusy] = useState(() => connection.isChanging() && !connection.isConnecting());
   const [confirmation, setConfirmation] = useState(false);
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  const revision = useRef(0);
+  const actionRevision = useRef(0);
 
   const load = useCallback(() => {
     // A sign-in started from the Daily Brief gets its one-time confirmation here.
-    void connection.status().then((next) => { if (mounted.current) { setStatus(next); if (next.state === "connectedWithPlanUsage" && !confirmed.read()) setConfirmation(true); } },
-      (failure: unknown) => { if (mounted.current) { setStatus({ state: "disconnected", email: null }); setError(text(failure)); } });
+    const current = ++revision.current;
+    void connection.status().then((next) => {
+      if (!mounted.current || current !== revision.current) return;
+      setStatus(next);
+      setConfirmation(next.state === "connectedWithPlanUsage" && !confirmed.read());
+    }, (failure: unknown) => {
+      if (mounted.current && current === revision.current) { setStatus({ state: "disconnected", email: null }); setError(text(failure)); }
+    });
   }, [connection, confirmed]);
-  useEffect(load, [load]);
+  useEffect(() => {
+    mounted.current = true;
+    const unsubscribe = connection.subscribe((change) => {
+      if (change.kind === "start") {
+        revision.current += 1;
+        actionRevision.current += 1;
+        setError(undefined); setMessage(undefined);
+      }
+      setConnecting(connection.isConnecting());
+      setBusy(connection.isChanging() && !connection.isConnecting());
+      if (change.kind === "settled") load();
+    });
+    load();
+    window.addEventListener("focus", load);
+    return () => { mounted.current = false; revision.current += 1; unsubscribe(); window.removeEventListener("focus", load); };
+  }, [connection, load]);
+
+  const failure = (operation: Promise<unknown>) => {
+    const current = actionRevision.current;
+    void operation.catch((reason: unknown) => {
+      if (mounted.current && current === actionRevision.current) setError(text(reason));
+    });
+  };
 
   const onConnect = () => {
-    setConnecting(true); setError(undefined); setMessage(undefined);
-    void connect().then((next) => {
-      if (!mounted.current) return;
-      setStatus(next);
-      // OpenAI's guidelines: confirm plan use once, after the first sign-in with plan usage.
-      if (next.state === "connectedWithPlanUsage" && !confirmed.read()) setConfirmation(true);
-    }, (failure: unknown) => { if (mounted.current) setError(text(failure)); })
-      .finally(() => { if (mounted.current) setConnecting(false); });
+    setError(undefined); setMessage(undefined);
+    failure(connect());
   };
-  const onCancel = () => { void connection.cancelConnect(); };
+  const onCancel = () => { failure(connection.cancelConnect()); };
   const onDisconnect = () => {
     setBusy(true); setError(undefined); setMessage(undefined); setConfirmation(false);
-    void connection.disconnect().then((outcome) => {
-      if (!mounted.current) return;
+    const operation = connection.disconnect();
+    const current = actionRevision.current;
+    failure(operation.then((outcome) => {
+      if (!mounted.current || current !== actionRevision.current) return;
       setStatus({ state: "disconnected", email: null });
       setMessage(outcome === "revocationFailed"
         ? "ChatGPT is disconnected on this Mac. OpenAI did not confirm it, so Cadence may still be listed in your ChatGPT settings."
         : "ChatGPT is disconnected.");
-    }, (failure: unknown) => { if (mounted.current) setError(text(failure)); })
-      .finally(() => { if (mounted.current) setBusy(false); });
+    }).finally(() => { if (mounted.current && current === actionRevision.current) setBusy(false); }));
   };
   const onConfirm = () => { confirmed.write(); setConfirmation(false); };
 

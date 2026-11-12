@@ -6,10 +6,15 @@ export const UPDATER_QA_ENDPOINT = "https://github.com/emixd12/cadence/releases/
 export const STABLE_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json";
 export const DEV_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-dev\.[1-9]\d*$/;
 
-export function createReleaseBuildEnvironment(env) {
+function createBuildEnvironment(env) {
   const buildEnvironment = { ...env, CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false" };
   delete buildEnvironment.CADENCE_LEGACY_KEYCHAIN_QA;
   return buildEnvironment;
+}
+
+export function createReleaseBuildEnvironment(env) {
+  // An explicit empty value outranks Vite's .env files. An absent key does not.
+  return { ...createBuildEnvironment(env), VITE_CADENCE_CHATGPT_PLAN: "" };
 }
 
 export function createPreviewBuildEnvironment(env) {
@@ -21,7 +26,7 @@ export function createPreviewBuildEnvironment(env) {
 export function createDevBuildEnvironment(env) {
   // Tauri gets no Apple credential, so it signs ad hoc and cannot notarize, and no updater key,
   // so it cannot sign release artifacts. release.mjs applies the Developer ID signature afterwards.
-  return createReleaseBuildEnvironment(Object.fromEntries(Object.entries(env)
+  return createBuildEnvironment(Object.fromEntries(Object.entries(env)
     .filter(([key]) => !(key.startsWith("APPLE_") || key.startsWith("TAURI_SIGNING_PRIVATE_KEY") || key === "TAURI_CONFIG"))));
 }
 

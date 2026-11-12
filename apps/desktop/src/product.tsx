@@ -28,9 +28,10 @@ import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { createDesktopDailyBriefClient, type DesktopDailyBriefPlan } from "./daily-brief";
 import { chatGptPlanSwitchOn } from "./chatgpt/plan-switch";
-import { createChatGptConnection } from "./chatgpt/connection";
+import { createChatGptAccountScope, createChatGptConnection } from "./chatgpt/connection";
 import { ChatGptPlanSettings } from "./chatgpt/chatgpt-plan-settings";
 import { CHATGPT_USAGE_URL } from "@/lib/ui/daily-brief";
+import { activateDailyBriefClient, discardDailyBriefAttempt } from "@/lib/ui/daily-brief-session";
 import { TimelineScreen } from "./timeline-screen";
 import { DesktopErrorBoundary } from "./desktop-error-boundary";
 import { BehaviorsScreen } from "./behaviors-screen";
@@ -66,8 +67,6 @@ import "./timeline.css";
 // Ticket 299: the ChatGPT plan feature exists only when the build turns its switch on (owner decision, November 12, 2026).
 const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;
 const openChatGptUsage = () => { void openCalendarSourceUrl(CHATGPT_USAGE_URL).catch(() => undefined); };
-const dailyBriefPlan: DesktopDailyBriefPlan | null = chatGptPlan
-  ? { connection: chatGptPlan, connect: async () => { await chatGptPlan.connect(); }, openUsage: openChatGptUsage } : null;
 import { AccountConflictReview, AccountDisconnectPanel, AccountPanel, AccountSyncPanel, FirstAccountLinkChoice } from "./account/account-panel";
 import { DesktopAuth, readDesktopAuthConfig, type DesktopAccountState } from "./account/auth";
 import { planAccountSync, synchronizeAccount, synchronizeReviewedAccount, type AccountSyncInputs } from "./account/account-sync";
@@ -99,6 +98,7 @@ export function Product() {
     return () => desktopUpdater.stop();
   }, []);
   const [account, setAccount] = useState<DesktopAccountState>({ status: "local" });
+  const chatGptAccountScope = useMemo(() => createChatGptAccountScope(), []);
   // Ticket 280: true once the saved session has been read. Before that, "local" is only the default.
   const [accountKnown, setAccountKnown] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
@@ -271,15 +271,23 @@ export function Product() {
     const config = readDesktopAuthConfig();
     if (!isTauri() || !config) return;
     let active = true;
-    const service = new DesktopAuth(config, (state) => { if (active) { setAccount(state); setAccountKnown(true); setCalendarClient(state.status === "linked" ? service.accountClient() : null); } });
+    const service = new DesktopAuth(config, (state) => {
+      if (!active) return;
+      chatGptAccountScope.setAccount(state.status === "linked" ? state.userId : null);
+      setAccount(state); setAccountKnown(true); setCalendarClient(state.status === "linked" ? service.accountClient() : null);
+    }, chatGptPlan?.disconnect);
     auth.current = service;
     let stop: (() => void) | undefined;
-    void service.initialize().then((value) => { if (active) stop = value; else value(); }).catch(() => { if (active) setAccount({ status: "error", message: "The saved account session could not be read." }); });
-    return () => { active = false; auth.current = null; stop?.(); void service.dispose(); };
-  }, []);
+    void service.initialize().then((value) => { if (active) stop = value; else value(); }).catch(() => {
+      if (active) { chatGptAccountScope.setAccount(null); setAccount({ status: "error", message: "The saved account session could not be read." }); }
+    });
+    return () => { active = false; chatGptAccountScope.setAccount(null); auth.current = null; stop?.(); void service.dispose(); };
+  }, [chatGptAccountScope]);
   const runAccount = (action: () => Promise<void>) => {
+    if (!chatGptAccountScope.beginTransition()) return;
     setAccountBusy(true);
-    void action().catch((failure) => setAccount({ status: "error", message: localErrorMessage(failure) })).finally(() => setAccountBusy(false));
+    void action().catch((failure) => { chatGptAccountScope.setAccount(null); setAccount({ status: "error", message: localErrorMessage(failure) }); })
+      .finally(() => { chatGptAccountScope.endTransition(); setAccountBusy(false); });
   };
   const runFirstLink = (choice: "import" | "ignore" | "hydrate") => {
     if (account.status !== "linked" || !profile || !auth.current) return;
@@ -336,7 +344,17 @@ export function Product() {
   }, [account.status === "linked" ? account.userId : null, profile?.id]);
   const profileId = profile?.id;
   const accountUserId = account.status === "linked" ? account.userId : null;
-  const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan) : null, [calendarClient, accountUserId]);
+  const accountChatGpt = useMemo(() => chatGptPlan && accountUserId ? chatGptAccountScope.forAccount(chatGptPlan, accountUserId) : null,
+    [accountUserId, chatGptAccountScope]);
+  const dailyBriefPlan = useMemo<DesktopDailyBriefPlan | null>(() => accountChatGpt
+    ? { connection: accountChatGpt, connect: async () => { await accountChatGpt.connect(); }, openUsage: openChatGptUsage } : null, [accountChatGpt]);
+  const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan) : null, [calendarClient, accountUserId, dailyBriefPlan]);
+  useEffect(() => {
+    activateDailyBriefClient(dailyBriefClient);
+    if (!dailyBriefClient || !accountChatGpt) return;
+    // Settings can change the grant while the Timeline is unmounted and its attempt is remembered.
+    return accountChatGpt.subscribe((change) => { if (change.kind === "start") discardDailyBriefAttempt(dailyBriefClient); });
+  }, [accountChatGpt, dailyBriefClient]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
     return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
@@ -578,13 +596,14 @@ export function Product() {
     }).finally(() => setAccountBusy(false));
   };
   const disconnect = (mode: "keep" | "remove") => {
-    if (!auth.current) return;
+    if (!auth.current || !chatGptAccountScope.beginTransition()) return;
     setAccountBusy(true); setDisconnectError(""); setDisconnectResult("");
     void auth.current.disconnect(mode).then((result) => {
       setSyncReady(false); setConflictReview(null); setSyncStatus({ state: "offline" });
       setDisconnectResult(mode === "keep" ? `Local copy kept at ${result.databasePath}` : `Account data removed. Safety backup: ${result.backupPath}. Fresh local database: ${result.databasePath}`);
       refresh();
-    }).catch((failure) => setDisconnectError(localErrorMessage(failure))).finally(() => setAccountBusy(false));
+    }).catch((failure) => setDisconnectError(localErrorMessage(failure)))
+      .finally(() => { chatGptAccountScope.endTransition(); setAccountBusy(false); });
   };
   const completeAccountControls = <>{accountControls}
     {conflictReview ? <AccountConflictReview conflicts={conflictReview.conflicts} busy={accountBusy} error={conflictReview.error} onResolve={resolveConflicts} /> : null}
@@ -644,7 +663,7 @@ export function Product() {
         ]} />}
         dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
         dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
-        chatGptPlanControls={chatGptPlan && dailyBriefClient ? <ChatGptPlanSettings key={`chatgpt-${accountUserId}`} connection={chatGptPlan} connect={() => chatGptPlan.connect()} openUsage={openChatGptUsage} /> : undefined}
+        chatGptPlanControls={accountChatGpt && dailyBriefClient && !accountBusy ? <ChatGptPlanSettings key={`chatgpt-${accountUserId}`} connection={accountChatGpt} connect={accountChatGpt.connect} openUsage={openChatGptUsage} /> : undefined}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
           leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}

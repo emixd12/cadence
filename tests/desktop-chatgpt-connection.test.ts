@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { ChatGptConnectionError, createChatGptConnection, readChatGptCatalog, readChatGptStatus } from "../apps/desktop/src/chatgpt/connection";
+import { ChatGptConnectionError, createChatGptAccountScope, createChatGptConnection, readChatGptCatalog, readChatGptStatus, type ChatGptConnectionChange } from "../apps/desktop/src/chatgpt/connection";
 
 // Ticket 297: the webview client sees state, email and catalog rows, never a token.
 const native = vi.hoisted(() => ({ calls: [] as string[] }));
@@ -31,6 +31,72 @@ describe("desktop ChatGPT connection client", () => {
   it("returns only the access token for one model call (Ticket 299)", async () => {
     await expect(createChatGptConnection().accessToken()).resolves.toBe("at-SECRET-memory-only");
     await expect(createChatGptConnection(async () => ({ accessToken: "" })).accessToken()).rejects.toBeInstanceOf(ChatGptConnectionError);
+  });
+
+  it("shares pending sign-in and lifecycle events, and rejects a duplicate sign-in", async () => {
+    let finish!: (value: unknown) => void;
+    const call = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const connection = createChatGptConnection(call);
+    const events: ChatGptConnectionChange[] = [];
+    const stop = connection.subscribe((event) => events.push(event));
+    const pending = connection.connect();
+    expect(connection.isConnecting()).toBe(true);
+    expect(connection.isChanging()).toBe(true);
+    expect(events).toEqual([{ kind: "start", operation: "connect" }]);
+    await expect(connection.connect()).rejects.toThrow("The ChatGPT connection is changing.");
+    expect(call).toHaveBeenCalledOnce();
+    finish({ state: "connectedWithPlanUsage", email: "a@example.test" });
+    await pending;
+    expect(connection.isChanging()).toBe(false);
+    expect(events).toEqual([{ kind: "start", operation: "connect" }, { kind: "settled", operation: "connect" }]);
+    stop();
+  });
+
+  it("blocks a new sign-in while Disconnect is clearing the session", async () => {
+    let finish!: (value: unknown) => void;
+    const call = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const connection = createChatGptConnection(call);
+    const pending = connection.disconnect();
+    expect(connection.isConnecting()).toBe(false);
+    expect(connection.isChanging()).toBe(true);
+    await expect(connection.connect()).rejects.toThrow("The ChatGPT connection is changing.");
+    expect(call).toHaveBeenCalledOnce();
+    finish({ outcome: "revocationFailed" });
+    await expect(pending).resolves.toBe("revocationFailed");
+    expect(connection.isChanging()).toBe(false);
+  });
+
+  it("does not let an observer failure block native cleanup or strand the operation", async () => {
+    const call = vi.fn(async () => ({ outcome: "revoked" }));
+    const connection = createChatGptConnection(call);
+    connection.subscribe(() => { throw new Error("Observer failed"); });
+    const observed = vi.fn();
+    connection.subscribe(observed);
+    await expect(connection.disconnect()).resolves.toBe("revoked");
+    expect(call).toHaveBeenCalledWith("chatgpt_disconnect");
+    expect(observed).toHaveBeenCalledTimes(2);
+    expect(connection.isChanging()).toBe(false);
+  });
+
+  it("rejects stale account controls and teardown calls before native work, including late connect results", async () => {
+    const scope = createChatGptAccountScope();
+    scope.setAccount("a");
+    expect(scope.beginTransition()).toBe(true);
+    expect(scope.beginTransition()).toBe(false);
+    let finish!: (value: unknown) => void;
+    const call = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const connection = scope.forAccount(createChatGptConnection(call), "a");
+    for (const action of [connection.status, connection.models, connection.connect, connection.disconnect, connection.cancelConnect, connection.accessToken]) {
+      await expect(action()).rejects.toThrow("The Cadence account changed.");
+    }
+    expect(call).not.toHaveBeenCalled();
+    scope.endTransition();
+    const pending = connection.connect();
+    scope.setAccount("b");
+    finish({ state: "connectedWithPlanUsage", email: "a@example.test" });
+    await expect(pending).rejects.toThrow("The Cadence account changed.");
+    await expect(connection.connect()).rejects.toThrow("The Cadence account changed.");
+    expect(call).toHaveBeenCalledOnce();
   });
 
   it("accepts each connection state and rejects anything else", () => {

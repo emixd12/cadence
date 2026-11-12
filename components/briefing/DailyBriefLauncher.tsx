@@ -179,12 +179,17 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       setView(HIDDEN);
     };
 
-    const load = (allowStart: boolean) => {
+    const load = (allowStart: boolean, retry = false) => {
       if (desktop && !navigator.onLine) return;
       const loadEpoch = epoch.current;
       void briefClient.preferences().then((settings) => {
         if (!mounted.current || loadEpoch !== epoch.current) return;
         if (!settings.available || !settings.enabled) { withdraw(); return; }
+        if (retry) {
+          settingsRef.current = settings;
+          if (!readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) start(settings, true);
+          return;
+        }
         const previous = settingsRef.current;
         if (previous && dailyBriefFence(previous) !== dailyBriefFence(settings)) {
           // A new local day (or another device's settings change) replaces the old
@@ -198,6 +203,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         if (!previous) evaluate(settings, allowStart);
       }).catch(() => {
         if (!mounted.current || loadEpoch !== epoch.current) return;
+        if (retry) { show({ kind: "notice", message: "Today’s Daily Brief did not finish loading.", retryLabel: TRY_AGAIN }); return; }
         // Enablement is unknown, so stay out of the way; focus or reconnection checks again.
         if (settingsRef.current) withdraw();
         else setView(HIDDEN);
@@ -207,7 +213,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     actions.current = {
       retry: () => {
         const settings = settingsRef.current;
-        if (!settings || !live() || readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) return;
+        if (!live()) return;
+        // A plan change withdrew the previous settings. A deliberate reconnect still gets one fresh retry.
+        if (!settings) { load(false, true); return; }
+        if (readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) return;
         start(settings, true);
       },
       dismiss: () => {
@@ -219,6 +228,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       },
     };
 
+    const stopPlan = briefClient.plan?.subscribe?.((phase) => {
+      if (phase === "start") withdraw();
+      else load(false);
+    });
     load(true);
 
     const onSettings = (event: Event) => {
@@ -245,6 +258,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     window.addEventListener("storage", onStorage);
     return () => {
       mounted.current = false;
+      stopPlan?.();
       for (const timer of pendingTimers) window.clearTimeout(timer);
       window.removeEventListener("cadence:daily-brief-settings", onSettings);
       window.removeEventListener("focus", onFocus);
@@ -265,7 +279,12 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   const shown = view.kind === "ready" && view.attempt.sourceKey !== sourceKey ? staleNotice() : view;
   const planControls = resolvedClient.plan;
   // A cancelled or failed sign-in leaves the notice in place; a finished one retries the brief.
-  const connectPlan = () => { void planControls?.connect().then(() => actions.current.retry(), () => undefined); };
+  const connectPlan = () => {
+    const pending = planControls?.connect();
+    // Starting the sign-in may synchronously withdraw this view. Later account changes must still fence its callback.
+    const current = epoch.current;
+    void pending?.then(() => { if (current === epoch.current) actions.current.retry(); }, () => undefined);
+  };
   if (shown.kind === "ready") {
     const usage = planControls?.usage(shown.briefing) ?? null;
     const plan = planControls && usage ? { usage, onManageUsage: planControls.manageUsage, onConnect: connectPlan } : null;

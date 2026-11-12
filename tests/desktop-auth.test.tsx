@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
 import { readFileSync } from "node:fs";
 import type { Session } from "@supabase/supabase-js";
-import { accountStateFromSession, createKeychainStorage, DESKTOP_AUTH_CALLBACK, desktopAuthRedirect, disconnectDesktopAccount, parseDesktopAuthCallback, readDesktopAuthConfig, reconnectDesktopAccount } from "../apps/desktop/src/account/auth";
+import { accountStateFromSession, cancelDesktopAccountLink, createKeychainStorage, DESKTOP_AUTH_CALLBACK, desktopAuthRedirect, disconnectDesktopAccount, parseDesktopAuthCallback, readDesktopAuthConfig, reconnectDesktopAccount } from "../apps/desktop/src/account/auth";
 import { localErrorMessage } from "../apps/desktop/src/local-actions";
 import { AccountPanel } from "../apps/desktop/src/account/account-panel";
 
@@ -106,18 +106,31 @@ describe("desktop authentication", () => {
     })).rejects.toThrow("Keychain failed");
   });
 
-  it("disconnects ChatGPT with the Cadence account, and a ChatGPT failure never blocks it (Ticket 299)", async () => {
+  it("disconnects ChatGPT before the Cadence account, including an unconfirmed provider revocation", async () => {
     const order: string[] = [];
     const native = async (command: string) => { order.push(command); return { backupPath: null, path: "/live" }; };
     await disconnectDesktopAccount("keep", async () => { order.push("secrets"); }, async () => { order.push("pending"); }, native,
-      async () => { order.push("chatgpt"); });
+      async () => { order.push("chatgpt"); return { outcome: "revocationFailed" }; });
     expect(order).toEqual(["chatgpt", "secrets", "pending", "disconnect_keep_local_copy"]);
     order.length = 0;
-    await disconnectDesktopAccount("keep", async () => { order.push("secrets"); }, async () => undefined, native,
-      async () => { throw "macOS Keychain could not save the ChatGPT connection."; });
-    expect(order).toEqual(["secrets", "disconnect_keep_local_copy"]);
+    await expect(disconnectDesktopAccount("keep", async () => { order.push("secrets"); }, async () => undefined, native,
+      async () => { throw new Error("macOS Keychain could not save the ChatGPT connection."); }))
+      .rejects.toThrow("macOS Keychain could not save the ChatGPT connection.");
+    expect(order).toEqual([]);
     // DesktopAuth calls the Rust command, which revokes, then clears only the session item.
     const source = readFileSync("apps/desktop/src/account/auth.ts", "utf8");
     expect(source).toContain('() => invoke("chatgpt_disconnect")');
+  });
+
+  it("clears ChatGPT before cancelling an unfinished account link and blocks account switching on storage failure", async () => {
+    const order: string[] = [];
+    const clearSecrets = async () => { order.push("secrets"); };
+    const clearMetadata = async () => { order.push("metadata"); };
+    await cancelDesktopAccountLink(clearSecrets, clearMetadata, async () => { order.push("chatgpt"); });
+    expect(order).toEqual(["chatgpt", "secrets", "metadata"]);
+    order.length = 0;
+    await expect(cancelDesktopAccountLink(clearSecrets, clearMetadata, async () => { throw new Error("Keychain unavailable"); }))
+      .rejects.toThrow("Keychain unavailable");
+    expect(order).toEqual([]);
   });
 });

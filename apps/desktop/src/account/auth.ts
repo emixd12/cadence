@@ -116,7 +116,8 @@ export class DesktopAuth {
   private readonly supabase: SupabaseClient;
   private readonly changed: (state: DesktopAccountState) => void;
   private current: DesktopAccountState | null = null;
-  constructor(config: { url: string; key: string }, changed: (state: DesktopAccountState) => void) {
+  constructor(config: { url: string; key: string }, changed: (state: DesktopAccountState) => void,
+    private readonly disconnectChatGpt: () => Promise<unknown> = () => invoke("chatgpt_disconnect")) {
     this.supabase = client(config);
     this.changed = (state) => { this.current = state; changed(state); };
   }
@@ -163,8 +164,8 @@ export class DesktopAuth {
   }
 
   async cancelLink(): Promise<void> {
-    await this.clearLocalSession();
-    await invoke("auth_clear_account_metadata");
+    await cancelDesktopAccountLink(() => this.clearLocalSession(), () => invoke("auth_clear_account_metadata"),
+      this.disconnectChatGpt);
     this.changed({ status: "local" });
   }
 
@@ -174,7 +175,7 @@ export class DesktopAuth {
 
   async disconnect(mode: "keep" | "remove"): Promise<{ backupPath: string | null; databasePath: string }> {
     const result = await disconnectDesktopAccount(mode, () => this.clearLocalSession(), () => pending("remove"),
-      (command) => invoke<{ backupPath: string | null; path: string }>(command), () => invoke("chatgpt_disconnect"));
+      (command) => invoke<{ backupPath: string | null; path: string }>(command), this.disconnectChatGpt);
     this.changed({ status: "local" });
     return { backupPath: result.backupPath, databasePath: result.path };
   }
@@ -263,16 +264,25 @@ export async function clearDesktopCalendarClientState(
 /**
  * Owner decision, November 12, 2026: disconnecting the Cadence account also disconnects
  * ChatGPT. Rust revokes the refresh token at OpenAI, then clears the `chatgpt-session`
- * Keychain item; the installation item stays. A failed revocation still clears local tokens,
- * so it never blocks the account disconnect.
+ * Keychain item; the installation item stays. A failed revocation returns a normal outcome
+ * after clearing local tokens. A storage failure must stop the account change, so another
+ * Cadence account cannot inherit the previous account's ChatGPT session.
  */
 export async function disconnectDesktopAccount(mode: "keep" | "remove", clearSecrets: () => Promise<void>, clearPending: () => Promise<unknown>,
   disconnectNative: (command: "disconnect_keep_local_copy" | "disconnect_remove_account_data") => Promise<{ backupPath: string | null; path: string }>,
   disconnectChatGpt: () => Promise<unknown> = async () => undefined) {
-  await disconnectChatGpt().catch(() => undefined);
+  await disconnectChatGpt();
   await clearSecrets();
   await clearPending();
   return disconnectNative(mode === "keep" ? "disconnect_keep_local_copy" : "disconnect_remove_account_data");
+}
+
+/** Cancelling the first account link also ends the ChatGPT session before another account can sign in. */
+export async function cancelDesktopAccountLink(clearSecrets: () => Promise<void>, clearMetadata: () => Promise<unknown>,
+  disconnectChatGpt: () => Promise<unknown>) {
+  await disconnectChatGpt();
+  await clearSecrets();
+  await clearMetadata();
 }
 
 export async function reconnectDesktopAccount(clearLocalSession: () => Promise<void>, beginOAuth: () => Promise<void>) {
