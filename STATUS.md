@@ -50,6 +50,7 @@ Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
+| First account link times out for a large account | Cause found November 12: `public.apply_account_sync_plan` had no statement timeout of its own, so it ran under the 8 s `authenticated` limit while building the snapshot two or three times; fix on branch `claude/large-account-sync-timeout` (migration `20261112120000`, Mac error text) | Merge, push the hosted migration, retry the owner's Mac first link; the Mac error-text fix ships with the next Mac release | STATUS, "First account link times out for a large account — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294–299 merged; hidden behind `VITE_CADENCE_CHATGPT_PLAN`; 300 deferred | Paused by the owner on November 12: the feature stays hidden and Ticket 300 waits until the owner turns it on. The production device-model flag must stay unset; L-019 logo gap and P-029 to P-031, P-045 and P-046 messaging review remain activation gates | TICKETS, Tickets 294–300; `docs/DECISIONS.md`, 2026-11-12 |
@@ -89,6 +90,25 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## First account link times out for a large account — November 12, 2026
+
+The owner's Mac (published 0.1.10, empty local profile, first link choice `hydrate`) got
+HTTP 500 from `apply_account_sync_plan` twice; Postgres logged a statement timeout.
+
+- Cause: hosted `authenticated` has `statement_timeout=8s`. PostgREST applies the called
+  function's own timeout; `read_account_sync_snapshot` sets 25 s, but
+  `public.apply_account_sync_plan` set none. One snapshot build for the owner's account
+  (about 7,000 entities, 5 MB) took 1.8–2.4 s on hosted, and the apply built it two or
+  three times.
+- Fix: migration `20261112120000_account_sync_apply_large_account.sql` sets 25 s on the
+  public apply wrapper, builds the snapshot once before the compare, reuses it for the
+  older-contract restore, and reuses it as the result when the plan has no hosted writes.
+  Same signature and results. New fixture `tests/sql/account-sync-large-account-apply.sql`
+  (2,500 Occurrences, 2,500 reminder deliveries).
+- Mac: `localErrorMessage` now shows the `message` of plain-object Supabase errors
+  instead of "Unable to save the local change. Try again." Ships with the next Mac release.
+- Verification: local stack replay of every migration; all 47 `tests/sql` fixtures passed.
+- Open: hosted push, the owner's Mac retry, and its integrity check.
 ## Installed connector checks on Mac 0.1.10 — November 12, 2026
 
 An agent ran installed connector acceptance on the test Mac (published 0.1.10, account A)

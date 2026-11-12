@@ -74,7 +74,12 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
 
 export function localErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) return error;
-  return error instanceof Error ? error.message : "Unable to save the local change. Try again.";
+  if (error instanceof Error) return error.message;
+  // Supabase and PostgREST return plain objects ({ message, code, details, hint }).
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+  return "Unable to save the local change. Try again.";
 }
 
 export function createLocalBehaviorActions(profile: Profile, refresh: () => void) {
