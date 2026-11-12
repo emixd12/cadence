@@ -2383,6 +2383,47 @@ local date, expiry and current stored travel inputs before using it.
 - Local testing: put a generated value only in git-ignored `.env.development.local`.
   Tests use inline test-only values.
 
+## Daily Brief device-model mode (Ticket 298)
+
+Decision D27: a linked Mac runs the Daily Brief model call on the user's ChatGPT plan.
+Cadence's server still admits the attempt, builds the context and validates the output,
+and makes no model call for these briefs, not even a duration estimate.
+
+- `POST /api/advisor/brief/device/prepare` runs today's admission, context and freshness
+  steps and returns `{ state: "prepared", request: { instructions, facts }, envelope,
+  expiresAt }`, or the hosted path's `pending` and `already_attempted` states.
+- `POST /api/advisor/brief/device/complete` takes `{ installationId, envelope, output }`.
+  It verifies the envelope and its binding, checks the preferences revision, validates
+  the output, finishes the lease, checks the stored inputs again and records the tip.
+- The envelope is `base64url(raw DEFLATE of JSON).base64url(HMAC-SHA256)`. It binds a
+  one-way account digest, the installation ID, the lease token, the preferences and
+  configuration revisions and a digest of the stored context inputs, and it carries the
+  validation data. The server stores no prepared payload. It is signed, not encrypted:
+  it holds the user's own data, which the request already sends to the same Mac.
+- The envelope expires 75 seconds after admission, the lease length `begin_daily_brief`
+  sets, or at the context expiry if that is sooner. Prepare has 35 seconds, with provider
+  reads ending 5 seconds early. That leaves the Mac at least 40 seconds for the model
+  call and complete. A superseded or expired lease makes complete return
+  `context_changed`.
+- Only recipe 1.0 runs in this mode; another active recipe returns
+  `device_recipe_unsupported` (503). A forged, altered or misbound envelope returns
+  `brief_envelope_invalid` (400); an expired one returns `context_expired`.
+- `CADENCE_DAILY_BRIEF_DEVICE_MODEL` turns the mode on (`1` or `true`); anything else
+  leaves both routes returning `not_configured`. The mode also needs
+  `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET`, at least 32 random characters
+  (`openssl rand -base64 48`). It does not need `OPENAI_API_KEY`.
+  `GET /api/advisor/preferences` reports `deviceModelAvailable`, and a server with only
+  this mode still lets a user turn the brief on.
+- Never prefix the secret with `NEXT_PUBLIC_` or `VITE_`. Never put it in desktop builds,
+  logs, exports, tickets or chat. Performance spans (`daily_brief.device.*`) record
+  names, durations and codes only, never prompts, facts, output or envelopes.
+- Rotation: move the current value to `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET_PREVIOUS`, set
+  a new current value and redeploy. Remove the previous value after 75 seconds. The
+  previous key only verifies; it never signs, and it never works without a current key.
+- Rollback: clear `CADENCE_DAILY_BRIEF_DEVICE_MODEL`. Hosted briefs are unaffected.
+- Provisioning in Vercel is an owner-gated rollout step. Local testing: put generated
+  values only in git-ignored `.env.development.local`. Tests use inline test-only values.
+
 ## Historical completion-time context
 
 Configuration 1.2 replaces the unsupported timestamp placeholder with opt-in
