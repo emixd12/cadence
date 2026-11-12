@@ -24,6 +24,13 @@ describe("desktop authentication", () => {
   it("preserves sanitized native command errors", () => {
     expect(localErrorMessage("macOS Keychain did not save the authentication session.")).toBe("macOS Keychain did not save the authentication session.");
   });
+  it("shows the message of a plain-object Supabase error", () => {
+    expect(localErrorMessage({ message: "canceling statement due to statement timeout", code: "57014", details: null, hint: null }))
+      .toBe("canceling statement due to statement timeout");
+    expect(localErrorMessage({ message: "  ", code: "57014" })).toBe("Unable to save the local change. Try again.");
+    expect(localErrorMessage({ code: "57014" })).toBe("Unable to save the local change. Try again.");
+    expect(localErrorMessage(null)).toBe("Unable to save the local change. Try again.");
+  });
   it("uses the official Tauri deep-link plugin for only the cadence scheme", () => {
     const config = JSON.parse(readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8"));
     const native = readFileSync("apps/desktop/src-tauri/native/auth.m", "utf8");

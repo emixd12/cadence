@@ -2191,6 +2191,13 @@ updates omit the duplicated import ledger until the final response. The import
 RPC receives a bounded 60-second timeout instead of the interactive eight
 seconds. Account snapshot reads allow 25 seconds, inside the existing desktop
 30-second synchronization deadline. The 64 MiB snapshot limit is unchanged.
+Migration `20261112120000_account_sync_apply_large_account.sql` gives
+`public.apply_account_sync_plan(jsonb)` the same 25-second timeout. PostgREST applies
+the timeout set on the called function, so before this migration an apply ran under
+the 8-second `authenticated` limit and timed out on a large account's first link. The
+apply now builds the account snapshot once before its compare. It reuses that snapshot
+for the older-contract restore, and as its result when the plan has no hosted writes.
+Results are unchanged.
 Restore preview ledgers retain action, external ID, and local ID for SQL mapping
 authorization. Full preview records are recomputed and fingerprint-checked before
 apply. Applied replay returns its receipt without claiming a compact ledger is a
