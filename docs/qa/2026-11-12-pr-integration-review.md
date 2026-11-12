@@ -58,6 +58,9 @@ refresh paused under the existing owner decision.
   pending attempt. A duplicate request must leave completed attempts intact.
 - The retained notarized 0.1.10 binary comes from `c67ec4d1`, before these PRs.
   Its evidence cannot establish installed acceptance of new native code.
+- The owner and test Mac already received that 0.1.10 candidate. Use a version
+  newer than 0.1.10 for the rebuilt release so those installations can recognize
+  an upgrade. Keep the old candidate's source and hashes distinct.
 - The 0.1.10 packet still needs session-renewal and revoked-session acceptance.
   Existing installations require one manual upgrade after updater-key rotation.
 - This workspace has no Mac test-device inventory, release credentials, Rust
@@ -303,7 +306,8 @@ data. Feature activation remains a separate owner decision.
 
 On the configured release Mac, verify the retained artifacts and retrieve the
 original `launchSyncChanges` classification. Build a new notarized candidate from
-the reviewed native source, then run the applicable installed acceptance. Resolve
+the reviewed native source with a version newer than 0.1.10, then run the applicable
+installed acceptance. Resolve
 the pending session-renewal, revoked-session and leave-reminder results before
 publishing updater metadata and version-free downloads. Preserve the documented
 one-time manual upgrade from 0.1.9 after updater-key rotation.
