@@ -221,6 +221,11 @@ export function localChecks(inv, deps = {}) {
 
 // ---------- the Cadence Release vault ----------
 
+// op assignment syntax treats ".", "=" and "\\" in a field name as syntax; escape each with a backslash.
+export function escapeOpFieldName(name) {
+  return name.replace(/[\\.=]/g, (character) => `\\${character}`);
+}
+
 export class ReleaseVault {
   constructor(inv, { run = runCommand, env = process.env, cwd = process.cwd(), runDir = null, caller = 'release-credentials', now = Date.now(), readText = (p) => readFileSync(p, 'utf8') } = {}) {
     Object.assign(this, { inv, run, env, cwd, runDir, caller, now, readText });
@@ -340,7 +345,7 @@ export class ReleaseVault {
       throw new CredentialError(EXIT.FAILED, `op created "${made.title}" instead of "${title}"; delete that item and rerun`);
     }
     for (const [name, path] of Object.entries(files)) {
-      const edited = this.op(['item', 'edit', id, '--vault', this.inv.vault, `${name.replace(/\./g, "\\.")}[file]=${path}`]);
+      const edited = this.op(['item', 'edit', id, '--vault', this.inv.vault, `${escapeOpFieldName(name)}[file]=${path}`]);
       if (edited.status !== 0) {
         this.log(title, name, 'failed', classifyOpError(edited.stderr, edited.status));
         throw new CredentialError(EXIT.FAILED, `attaching ${name} failed (${classifyOpError(edited.stderr, edited.status)}); the item exists without it`);

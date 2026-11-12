@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  escapeOpFieldName,
   COMPLETE_MARKER, CredentialError, EXIT, PUBLIC_FIELDS, ReleaseVault, loadInventory, main, missingEntitlements, parseIdentities,
   rateExpiry, updaterFingerprint, verifyBackups, worst,
 } from '../apps/desktop/scripts/release-credentials.mjs';
@@ -188,5 +189,13 @@ describe('Cadence Release vault', () => {
     const code = await main(['probe', 'vault'], { out: (line) => out.push(line), err: () => {}, deps: { run: noToken } });
     expect(code).toBe(21);
     expect(JSON.parse(out.at(-1)).detail).toMatch(/no Cadence Release service-account token/);
+  });
+});
+
+describe('escapeOpFieldName', () => {
+  it('escapes periods, equals signs and backslashes for op assignments', () => {
+    expect(escapeOpFieldName('identity.p12')).toBe('identity\\.p12');
+    expect(escapeOpFieldName('a=b\\c')).toBe('a\\=b\\\\c');
+    expect(escapeOpFieldName('AuthKey')).toBe('AuthKey');
   });
 });
