@@ -563,8 +563,12 @@ npm run build
 Run them with one command from the repository root:
 
 ```bash
-dagger check --progress=report
+dagger check --cadence --progress=report
 ```
+
+`--cadence` limits the run to the Cadence module's ten checks. Dagger never blocks
+work: when it is unavailable, or a check fails for a reason outside your change, run
+the npm commands, note the fault in the pull request and continue.
 
 Dagger runs all of them, plus the desktop, marketing and public-trust CI steps,
 in containers, and returns unchanged checks from cache. A passing run prints one
@@ -572,6 +576,13 @@ line per check. A failing check prints only its own log. Rerun one check with
 `dagger check cadence/<name> --progress=report`. If Docker or the Dagger CLI is
 unavailable, run the npm commands directly. Setup and limits:
 `docs/OPERATIONS.md`, "Dagger checks".
+
+`npm run test` skips `tests/acceptance-web-client.test.mjs`, about ten minutes of
+headless Chrome that covers only the web client acceptance runner. After changing
+`scripts/acceptance/**` or another file that test imports, also run
+`npm run test:web-client`. On GitHub the `Web client runner` workflow runs it for
+those paths. It is not a required check, so read its result before merging. CI
+layout: `docs/OPERATIONS.md`, "GitHub Actions CI".
 
 ## UI and design rules
 

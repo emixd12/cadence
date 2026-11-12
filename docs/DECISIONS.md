@@ -2243,7 +2243,7 @@ whether the App Store Connect API can create Developer ID certificates (an Apple
 thread from June 2025 reports it rejecting the G2 type). Ticket 325 tests both.
 
 Platform impact: desktop release tooling only. Web, marketing and future mobile: not
-||||||| 20feeaff
+applicable. Messaging impact: none.
 
 ## 2026-11-11: Hevy testing uses the owner's own Pro account
 
@@ -2257,3 +2257,90 @@ nothing to Hevy.
 
 Platform impact: test access only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-11: CI checks run in parallel; the web client runner test leaves `verify`
+
+An audit on November 11, 2026 measured GitHub Actions `CI` at 754 s for a passing run
+(median of 160 runs since October 28). `npm run test` took 586 s of that, and one file,
+`tests/acceptance-web-client.test.mjs`, took 589 s of the test step. PR #176 added the file
+on November 1; `CI` on `main` took about 5 minutes before it. The file takes 565 s on the
+owner's Mac as well, so it waits on timers, not on the runner's CPU.
+
+The owner approved two changes ("Yes, do 1 and 2"):
+
+1. **The web client runner test runs only when its code changes.** `npm run test` skips
+   the file. `npm run test:web-client` runs it, and the `Web client runner` workflow runs
+   that command for changes to the runner, the files its test imports, the package
+   manifests and `vitest.config.ts`. The workflow is not a required check. Accepted risk: a
+   change outside those paths that breaks the runner is found at the next run of the
+   workflow or the next acceptance run, not on its own pull request.
+2. **`CI` runs its checks as parallel jobs.** A final job named `verify` fails unless
+   every job passed, so branch protection keeps one required check. Jobs restore
+   `node_modules` and the Next.js build cache from the Actions cache.
+
+Not changed: branch protection still requires `verify` and an up-to-date branch. GitHub
+offers a merge queue only on organization-owned repositories, and this one is user-owned.
+The Dagger decision of 2026-10-24 stands; the audit's Dagger findings wait on the owner.
+Shortening the web client test's waits is not part of this change.
+
+Layout and rules: `docs/OPERATIONS.md`, "GitHub Actions CI".
+## 2026-11-11: Keep Dagger as the local pre-push check; four repairs
+
+An audit on November 11, 2026 found that `dagger check` failed on unchanged `main`, took
+4.5 to 5.5 minutes, missed its cache on an unchanged tree and copied local-only files into
+its containers. The auditing agent recommended retiring Dagger.
+
+The owner decided to keep it, in a side session of the audit session. The decision reached
+the implementing session as a brief relayed by that side session, not as the owner's own
+message there; merging this change confirms it.
+
+- Dagger stays the local pre-push check. GitHub Actions `CI` stays the merge gate.
+- Dagger never blocks work. When it is unavailable or fails for a reason outside the
+  change, agents run the npm checks, note the fault in the pull request and continue.
+- No Dagger Cloud and no self-hosted runner. The CLI stays on v1.0.0-beta.21.
+- Four repairs are made now: the documented command runs only the Cadence checks
+  (`--cadence`); the module stops excluding tracked files under `.claude`; the `test`
+  check gets Git data and skips the test that needs Chrome; and the module excludes every
+  path in the owner's `.git/info/exclude`.
+- Deferred: per-check input filters. Trigger: a full local run after an edit passes about
+  3 minutes.
+
+Design choice made during the repair: the `test` check mounts the Git data of the pinned
+fixture commit, fetched from GitHub, instead of the working tree's `.git`. A worktree's
+`.git` is a file that points outside the Dagger workspace, and most agent work happens in
+worktrees. `public-source:check` stays out of Dagger for the same reason: it needs the full
+local history.
+
+Measured after the repairs, from a worktree on the owner's Mac: ten checks pass in 31 s
+after a change and in 1 s unchanged.
+
+Details: `docs/OPERATIONS.md`, "Dagger checks". This entry adds to the 2026-10-24 decision
+and does not replace it.
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.
+
+## 2026-11-11: No Trust marketing-ID refresh before launch
+
+`docs/VERCEL_WORKFLOW.md` told agents to set the app's Production
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app after every merge to `main`.
+Agents asked the owner for it after almost every merge.
+
+The owner decided on November 11, 2026 to stop this until public launch. Cadence has no
+users yet and nobody reads the Trust page. The owner's words: "the development process, in
+this intensive pre launch phase should not be affected."
+
+- Agents do not refresh the ID after a merge and do not offer or ask to.
+- The gap is tracked as a launch gate, the way `docs/LEGAL.md` and
+  `docs/MESSAGING_CHANGES.md` track their concerns: an open-work row in `STATUS.md` and
+  an item in `docs/OPERATIONS.md`, "Public-product operations". It never blocks
+  development, merges or deployments.
+- The refresh runs before public launch, or on the owner's instruction.
+
+Effect: the Trust page shows earlier Passed results as Stale. That was already true after
+every merge until the next evidence collection, because a merge also changes the source
+commit and the app deployment. The nightly collection resolves the live deployments from
+Vercel itself and keeps running; it does not read the stored ID.
+
+Platform impact: operations only. Web: Trust page reads Stale until launch. Desktop,
+marketing and future mobile: not applicable. Messaging impact: none.

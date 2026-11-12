@@ -1,5 +1,7 @@
 """
 Cadence repository checks: the npm scripts the GitHub Actions CI workflow runs.
+Run them with `dagger check --cadence`; a bare `dagger check` also runs the Dang
+SDK module's slow staleness check.
 
 Each check runs one or more npm scripts from package.json on Node 24, the
 version the engines field and the GitHub Actions workflow use. All checks share
@@ -20,6 +22,13 @@ type Cadence {
   nodeImage: String! = "node:24-bookworm"
 
   """
+  The commit tests/mcp-hosted-fixtures.test.mjs reads with `git archive`:
+  FIXTURE_SOURCE in scripts/build-mcp-hosted-fixtures.mjs. Keep the two equal;
+  tests/dagger-module.test.mjs fails when they differ.
+  """
+  fixtureCommit: String! = "eb5afa5be5c49b43bbad3ffd5a25d6eddff30079"
+
+  """
   The repository without dependencies, build output, or ignored local files.
   """
   pub source: Directory!
@@ -34,7 +43,6 @@ type Cadence {
       "**/node_modules",
       "**/.git",
       ".dagger",
-      ".claude",
       ".local",
       ".next",
       ".vercel",
@@ -45,6 +53,27 @@ type Cadence {
       "apps/desktop/src-tauri/target",
       "load-tests/.venv",
       "*.tsbuildinfo",
+      # Local-only paths. `gitignore: true` reads .gitignore files but not
+      # .git/info/exclude, so every entry of the owner's .git/info/exclude is
+      # repeated here. Tracked files under .claude/skills and
+      # .intent/artifacts stay in, because tests read them.
+      "**/.claude/worktrees",
+      "**/.claude/checkpoints",
+      "**/.claude/mailbox",
+      "**/.claude/routines/.state",
+      "**/.claude/scheduled_tasks.lock",
+      "**/.claude/scheduled_tasks.json",
+      "**/.claude/agent-registry.json",
+      "**/.claude/agent-memory-local",
+      "**/.claude/first-run",
+      "**/.claude/assistant-daemon-state.json",
+      ".claude/fable-codex",
+      ".claude/launch.json",
+      ".intent/acceptance",
+      "apps/desktop/signing",
+      "exports",
+      "public/sounds/YTDown_*",
+      "public/sounds/rare achievement sound.mp3",
     ])
     self.manifests = ws.directory("/", include: [
       "package.json",
@@ -87,10 +116,23 @@ type Cadence {
   The Vitest suite (npm run test). The agent reporter prints only failures and
   the summary, and console output only from failing tests, so a failure log
   stays short enough for an agent to read.
+
+  Two test files call git. The working tree's own .git cannot be used: in a
+  Git worktree it is a file that points outside the workspace. The check
+  mounts the Git data of fixtureCommit instead, fetched once from GitHub and
+  cached. So HEAD in this container is fixtureCommit, not the local commit.
+
+  tests/acceptance-web-client.test.mjs needs installed Google Chrome, which
+  the image lacks, so the check excludes it.
   """
   pub test: Void @check {
     app
-      .withExec(["npm", "run", "test", "--", "--reporter=agent", "--silent=passed-only"])
+      .withDirectory("/src/.git", fixtureGit)
+      .withExec([
+        "npm", "run", "test", "--",
+        "--reporter=agent", "--silent=passed-only",
+        "--exclude", "tests/acceptance-web-client.test.mjs",
+      ])
       .sync
     null
   }
@@ -149,6 +191,16 @@ type Cadence {
       .reduce(app) { ctr, script => ctr.withExec(["npm", "run", script]) }
       .sync
     null
+  }
+
+  """
+  The .git directory of a depth-1 checkout of fixtureCommit.
+  """
+  let fixtureGit: Directory! {
+    git("https://github.com/emixd12/cadence.git")
+      .commit(fixtureCommit)
+      .tree(discardGitDir: false)
+      .directory(".git")
   }
 
   """

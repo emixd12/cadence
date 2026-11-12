@@ -99,6 +99,13 @@ describe("export download response", () => {
       const logged = String(log.mock.calls.at(-1)?.[0]);
       expect(logged).not.toContain("Private note");
       expect(JSON.parse(logged).context.failure).toBeNull();
+
+      // A provider can include user text in a message that resembles a validation label.
+      vi.mocked(getExportDownload).mockRejectedValueOnce(new Error("Invalid private appointment."));
+      await exportDownloadResponse(exportRequest(), "json");
+      const disguised = String(log.mock.calls.at(-1)?.[0]);
+      expect(disguised).not.toContain("private appointment");
+      expect(JSON.parse(disguised).context.failure).toBeNull();
     } finally {
       log.mockRestore();
     }

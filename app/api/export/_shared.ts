@@ -4,6 +4,7 @@ import {
   ExportAuthError,
   ExportRateLimitError,
   getExportDownload,
+  exportFailureLabel,
   type ExportDownloadFormat,
 } from "@/lib/services/export.service";
 import {
@@ -91,13 +92,4 @@ function jsonError(
       },
     },
   );
-}
-
-// Export assembly throws fixed messages such as "Invalid configuration schedule_graph.".
-const EXPORT_VALIDATION_MESSAGE = /^(Invalid|Unsupported) [a-z_ ]{1,80}\.$/;
-
-export function exportFailureLabel(error: unknown): string | null {
-  return error instanceof Error && EXPORT_VALIDATION_MESSAGE.test(error.message)
-    ? error.message
-    : null;
 }

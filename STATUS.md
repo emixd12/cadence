@@ -43,12 +43,13 @@ means `docs/TICKETS.md`; "STATUS" means a dated entry, found here or through
 `docs/status/README.md`. Where an entry and `git log` disagree, the row says so. Older
 owner-gated items are grouped into one row per area (marked "grouped").
 
-Compiled November 9, 2026. Check the cited entry before acting on a row.
+Compiled November 9, 2026; MCP, acceptance tooling and travel rows reconciled November 11, 2026.
+Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired | Owner deletes the vault item `google-calendar-agent-retire-secret`; installed Mac check (302); signed-in hosted check; hosted Home lookup within the travel spend cap; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted rollout — November 11, 2026" |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 implemented in source on branch `claude/ticket-320-mac-source-sync` (contract 5, SQLite schema 24): hosted push of `20261111160000` with its merge, installed acceptance on a dev-signed build; Ticket 323 needs a published Mac build with Ticket 319 (owner instruction) and Ticket 241's release steps 6–7; 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
+| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (its release branch contains 319 and 320; owner instruction to notarize and publish) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294 complete; 295 spike in progress (mock mode); 296–300 not started; merged November 10, 2026 | Live spike run needs the owner's ChatGPT Plus or Pro sign-in | TICKETS, Tickets 294–300; STATUS, "Tickets 294 and 295: Daily Brief on the user's ChatGPT plan started — November 7, 2026" |
@@ -63,7 +64,7 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
-| Travel revamp Tickets 260–283 | TICKETS `Status:` lines say "on branch `us-work`, not merged or deployed"; entries record Waves 1–2 deployed and `git log` shows PRs #192–#196 merged | Reconcile the `Status:` lines; hosted migration state of Tickets 275–276: unclear — see source | TICKETS, Tickets 260–283; STATUS, "Travel advisory revamp Wave 1 deployed — November 5, 2026" and "Travel advisory revamp Wave 2 deployed — November 5, 2026" |
+| Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
 | Ticket 165: travel release acceptance | In progress | Denied state; installed Open Location Services and Check again; installed status-only permission regression. Directions matrix: web rows in Ticket 284, installed Mac row in Ticket 285 | TICKETS, Ticket 165; STATUS, Ticket 284 and Ticket 285 entries (November 6–7) |
 | Ticket 187: agentic Calendar access | Live since October 24, 2026 | Google sensitive-scope verification (Ticket 245); published Mac against the 187 server; installed desktop consent; `P-012` | TICKETS, Ticket 187 |
 | Tickets 245–246: messaging track | Filed October 27; not development tickets | 245: Google verification submission, gated on `P-010` and `P-012`. 246: pre-launch messaging pass | TICKETS, Tickets 245–246; STATUS, "Messaging track — October 27, 2026" |
@@ -76,10 +77,9 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
 | Ticket 188: duration estimates from descriptions | Implementation started; recovered for owner review October 22 | Landing decision: unclear — see source | TICKETS, Ticket 188; STATUS, "Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026" |
 | Ticket 130: account synchronization | TICKETS says in progress (2026-09-08) | The owner decides its state | TICKETS, Ticket 130; STATUS, "Ticket ledger reconciled with production — October 27, 2026" |
 | Account sync timezone rule | PR #159 merged October 28; hosted push authorized | Not verified: a timezone change synced from an installed Mac after the push; authenticated hosted sync against the new rule | STATUS, "Account sync timezone rule for archived Behaviors — October 27, 2026" |
-| MCP Tickets 220–231 | TICKETS `Status:` lines still say filed, planned or awaiting review (October 18); MCP is live and Ticket 232 acceptance is complete | Reconcile the `Status:` lines: unclear — see source | TICKETS, Tickets 220–232; STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
-| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | One Trust marketing-ID refresh and a Trust Preview → Production run after the record merges; done or not: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
-| Ticket 259: consent offers write permissions | Merged October 31 as PR #175 | TICKETS says live ChatGPT write acceptance remains; the entry records a Tier 2 ChatGPT web run that completed the write: unclear — see source | TICKETS, Ticket 259; STATUS, "Ticket 259: consent offers advertised write permissions — October 31, 2026" |
-| MCP acceptance tooling, Tickets 247–258 | Entry: complete except Ticket 253 (on hold); TICKETS still lists 252 in review and 256 planned | Reconcile 252 and 256; consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Tickets 252–256 |
+| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
+| Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
+| MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
 | Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Locally verified and independently approved | Live providers, installed desktop and release (241); live Hevy Pro (236); iCloud live acceptance (240); 242 cross-tenant and installed desktop not exercised | TICKETS, Tickets 236, 240, 241, 242 |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
@@ -109,11 +109,92 @@ Compiled November 9, 2026. Check the cited entry before acting on a row.
   untouched) and an optional rewrite of the existing hosted rows (owner approval).
 - Tests: `tests/export-camelcase-configuration.test.ts` (fails on `main` with "Invalid
   configuration schedule_graph."), `tests/export-download-route.test.ts`.
+- PR review fixed four CI failures by giving repository pagination fixtures valid snapshots;
+  a mixed-shape test checks both revisions and unchanged pagination metadata. The export
+  failure classifier now permits exact code-defined labels only; a provider error that
+  resembles a validation message cannot leak private text. The classifier stays in
+  `lib/services/export.service.ts`, keeping the API route thin.
+- Review verification: agents, interactions, resolvers, lint, typecheck and web build passed; 17 focused
+  tests passed. The full suite passed 5,618 tests and skipped 230; 29 tests failed because
+  this cloud executor denies Unix-socket binding (`listen EPERM`) in the unchanged session
+  broker and Docker-proxy suites. Dagger and Docker are unavailable. GitHub CI remains the
+  merge gate. Production acceptance has not run.
+
+## Trust marketing-ID refresh paused until launch — November 11, 2026
+
+The owner decided that the pre-launch development process must not include the Trust
+marketing-ID refresh (`docs/DECISIONS.md`, 2026-11-11). `docs/VERCEL_WORKFLOW.md`,
+"Deployment", no longer asks for it after a merge. The open item is the launch-gate row in
+"Open work" and the list in `docs/OPERATIONS.md`, "Public-product operations". The stored
+ID was last set on November 11 and is stale now; nobody needs to act on that.
+
+Platform impact: operations docs only. Web: the Trust page shows Stale until launch.
+Desktop, marketing and future mobile: not applicable. Messaging impact: none.
+
+## Dagger repairs — November 11, 2026
+
+**PR #231 (`dagger/repairs`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"Keep Dagger as the local pre-push check".
+
+- **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
+  the Dang SDK's staleness check, which took 268 s and 337 s.
+- **Module:** tracked files under `.claude/skills` and `.intent/artifacts` now reach the
+  container; every path in the owner's `.git/info/exclude` is excluded by name; the `test`
+  check mounts the Git data of the pinned fixture commit and skips
+  `tests/acceptance-web-client.test.mjs`.
+- **Verified from a worktree:** ten checks pass in 31 s after a change and in 1 s
+  unchanged; a deliberately broken test fails `cadence/test` and prints the failure;
+  through the new module, the main checkout's `exports`, `apps/desktop/signing`,
+  `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
+- **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
+  first run was not re-measured.
+- **Owner step:** raise Docker Desktop's memory above 8 GB.
+## CI checks run in parallel — November 11, 2026
+
+**Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"CI checks run in parallel".
+
+- **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
+  `tests/acceptance-web-client.test.mjs` took 589 s of it.
+- **Changed:** `npm run test` skips that file; `npm run test:web-client` and the new
+  `Web client runner` workflow run it for changes to the acceptance runner. `ci.yml` runs
+  `checks`, `lint`, `test` (three shards), `build` and `sites` in parallel, and the required
+  `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
+  from the Actions cache.
+- **Not changed:** branch protection, the Dagger module and the web client test's waits.
+- **Measured after:** `CI` took 145 s on its first run and 100 s with warm caches. The
+  `Web client runner` workflow took 673 s on its own.
+- **Dagger:** decided and repaired in the entry above.
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.
+
+## Ledger cleanup — November 11, 2026
+
+- **Merge markers:** removed the stray `||||||| 46016e57` and `||||||| 20feeaff` lines from
+  STATUS (left by the PR #214 branch merges `109fedf3` and `4c8e2466`; `git show --cc` shows
+  no entry text lost). The same merge replaced the last line of D29 in `docs/DECISIONS.md`
+  with `||||||| 20feeaff`; restored it from `8c3a474c`.
+- **Guard:** `npm run agents:check` now fails on a conflict marker line (`<<<<<<<`,
+  `|||||||`, `=======`, `>>>>>>>`) in STATUS, `docs/TICKETS.md` or `docs/DECISIONS.md`.
+- **TICKETS reconciled:** MCP Tickets 220–231 complete (MCP live since October 29; Ticket 232
+  acceptance complete October 31). Ticket 252 complete (PR #176, `89b4a6b6`); 256 complete
+  (October 31 production retest); 259 complete (Tier 2 ChatGPT web write
+  `20261031T230336Z-cf9e6e`). Travel Tickets 260–283 merged as PRs #189–#194 (November 5–6),
+  live on web; Ticket 280 released in Mac 0.1.9; the 275–277 migrations are on hosted (hosted
+  equals git, 114 rows, per the connector completion push entry). Open-work rows for MCP
+  220–231 and Ticket 259 removed; 232, 247–258 and 260–283 rows refreshed.
+- **Trust marketing-ID refresh:** done by this session right after this PR merges, so this
+  entry cannot record its result. Every later merge to `main` stales it again, so it must be
+  repeated after the other November 11 sessions merge.
+
+Platform impact: docs and governance check only. Web, desktop, marketing and future mobile:
+not applicable. Messaging impact: none.
 
 ## Ticket 320: connector records sync to the Mac — November 11, 2026
 
-**On branch `claude/ticket-320-mac-source-sync`. Not merged, not pushed to hosted, not in
-a Mac build.**
+**PR #216 merged November 11 by the owner. Hosted `20261111160000` applied before the merge.
+In the Mac 0.1.10 release branch; not yet in a published build.**
 
 - Account sync contract 5 (hosted `20261111160000`) adds `behavior_source_link` and
   `occurrence_source_match` as read-only kinds, with only the fields a Mac shows: no
@@ -126,7 +207,25 @@ a Mac build.**
   `ticket-320-connector-completion-sync.sql`, the account-sync contract fixtures and the
   Ticket 292 sync fixture pass. Planner, desktop adapter and Mac Timeline tests pass; 132
   Rust tests pass.
-- Not verified: an installed dev-signed Mac build syncing a real account; the hosted push.
+- Hosted push: an agent applied `20261111160000` with the vault token `supabase-access-token`
+  under the standing approval for additive migrations. Readback: the snapshot carries both
+  kinds without digests or activity references; `apply_account_sync_plan`'s writable list
+  has neither; `account_sync_snapshot()` executes for `authenticated` only; hosted
+  migration history equals git (115 rows).
+- Second readback after the merge (another agent, read-only SQL): contract additions list
+  both kinds at 5; the current contract is 5; projecting a synthetic snapshot keeps both
+  kinds at contract 5 and drops them at 1–4; RLS is on for `behavior_source_links` and
+  `occurrence_source_matches`, with no `anon` or `PUBLIC` table grants; hosted migration
+  history still equals git (117 rows).
+- The pinned CLI 2.105.0 binary fails `codesign -v` straight from the npm registry, so
+  macOS kills it. An ad-hoc signed copy outside the repository ran `migration list`
+  (`docs/SUPABASE_WORKFLOW.md`, "Installed pathway").
+- Not verified: an installed dev-signed Mac build syncing a real account.
+- Ticket 323 waits on: (1) Mac 0.1.10 notarized and published by owner instruction; the
+  release branch contains Tickets 319 and 320 (mac-release track); (2) Ticket 241's
+  release steps 6–7 and installed connector acceptance (connector acceptance track);
+  (3) the acceptance matrix in plan Task 14 as test account A; (4) the owner's instruction
+  to set `CADENCE_CONNECTOR_COMPLETION` in production. Ticket 324 waits on 323.
 
 ## Ticket 325 started: release credential backup and restore — November 11, 2026
 
@@ -145,8 +244,6 @@ vault that a write-capable service account reaches, with the owner's approval pe
   live backup and `verify-backups`; notarization through the API key; the certificate
   renewal spike. The owner reports having stored the Developer ID `.p12`, the notarization
   password and the updater key in the Cadence vault; not verified by an agent.
-||||||| 46016e57
-||||||| 20feeaff
 
 ## Connector completion hosted push and merge — November 11, 2026
 
