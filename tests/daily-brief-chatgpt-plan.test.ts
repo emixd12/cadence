@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { afterEach } from "vitest";
+import { MOCK_MODELS, startMockOpenAI, type MockOpenAI } from "../scripts/chatgpt-plan-spike-mock";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
@@ -212,6 +214,35 @@ describe("with the prepare and validate steps", () => {
       { accessToken: "t", model: "gpt-6.1-sol", signal: signal(), fetch: fetchOnce(streamReply(sse(completedEvent())), seen) });
     expect(JSON.parse(String(seen.init?.body))).toMatchObject({ instructions: prepared.request.instructions, input: [{ role: "user", content: prepared.request.facts }] });
     expect(validateDailyBrief(result, JSON.parse(JSON.stringify(prepared.validation)), { now })).toMatchObject({ text: output.text, localDate: context.localDate });
+  });
+});
+
+describe("against the plan mock", () => {
+  const mocks: MockOpenAI[] = [];
+  afterEach(async () => { await Promise.all(mocks.splice(0).map((item) => item.close())); });
+
+  it("sends a body the plan mock accepts and returns its brief", async () => {
+    const target = await startMockOpenAI();
+    mocks.push(target);
+    target.state.liveAccessTokens.add("token_mock");
+    const config = activeBriefingConfig();
+    const context = briefingFixture("sparse", config);
+    const now = () => Temporal.Instant.from(context.capturedAt);
+    const prepared = await prepareDailyBrief(context, { config, now, signal: signal() });
+    const result = await generateChatGPTPlanDailyBrief(prepared.request,
+      { accessToken: "token_mock", model: MOCK_MODELS[0].slug, signal: signal(), apiBase: target.endpoints.apiBase });
+    expect(validateDailyBrief(result, prepared.validation, { now }).text).toBe("Synthetic mock brief for a quiet day.");
+    expect(target.state.briefRequests).toBe(1);
+  });
+
+  it("maps the mock's usage limit and an unknown token", async () => {
+    const target = await startMockOpenAI({ usageLimitAfter: 0 });
+    mocks.push(target);
+    target.state.liveAccessTokens.add("token_mock");
+    const options = { accessToken: "token_mock", model: MOCK_MODELS[0].slug, signal: signal(), apiBase: target.endpoints.apiBase };
+    const brief = { instructions: "Synthetic.", facts: "{\"synthetic\":true}" };
+    expect(await failure(generateChatGPTPlanDailyBrief(brief, options))).toMatchObject({ code: "usage_limit" });
+    expect(await failure(generateChatGPTPlanDailyBrief(brief, { ...options, accessToken: "token_unknown" }))).toMatchObject({ code: "reconnect" });
   });
 });
 

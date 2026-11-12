@@ -210,7 +210,8 @@ describe("mock-mode spike runs", () => {
     expect(report.catalog.modelKeys).toContain("slug");
     const rejected = report.probes.filter((probe) => probe.expected === "reject");
     expect(rejected.every((probe) => !probe.accepted && probe.errorCode === "subscription_sharing_unsupported_capability")).toBe(true);
-    expect(rejected.map((probe) => probe.errorParam)).toContain("max_output_tokens");
+    expect(rejected.map((probe) => probe.errorParam)).toContain("background");
+    expect(report.probes.filter((probe) => probe.probe === "max_output_tokens").every((probe) => probe.accepted)).toBe(true);
     expect(report.briefs).toHaveLength(6);
     expect(report.summary.map((row) => [row.model, row.passRate])).toEqual([["gpt-mock-fast", 1], ["gpt-mock-think", 1]]);
     expect(report.refresh).toMatchObject({ ok: true, rotated: true, scopesKept: true });

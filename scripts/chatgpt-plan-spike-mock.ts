@@ -47,7 +47,8 @@ export const MOCK_MODELS = [
   { slug: "gpt-mock-hidden", display_name: "Mock Hidden", visibility: "hide", context_window: 128000 },
 ] as const;
 
-const UNSUPPORTED_FIELDS = ["background", "conversation", "max_output_tokens", "max_tool_calls", "metadata", "moderation", "multi_agent", "prompt",
+// `max_output_tokens` is accepted: the live plan route took it on all four tested models (November 12, 2026).
+const UNSUPPORTED_FIELDS = ["background", "conversation", "max_tool_calls", "metadata", "moderation", "multi_agent", "prompt",
   "prompt_cache_retention", "safety_identifier", "temperature", "top_logprobs", "top_p", "truncation", "user", "previous_response_id"];
 
 export async function startMockOpenAI(options: MockOptions = {}): Promise<MockOpenAI> {
