@@ -18605,7 +18605,9 @@ Scope and acceptance:
   agents back up the identity, notarization credential and updater key, and
   `verify-backups` passes. Done November 12, 2026 for the vault, service account and the
   three backups; the API key is not created yet.
-- Notarization uses the API key in the next release wrapper. Not done.
+- Notarization uses the API key in the next release wrapper. Done November 12, 2026: key
+  "Cadence notarization" (Developer role) notarized 0.1.10, is backed up as "Cadence App Store
+  Connect API key", and the inventory method is `api-key`.
 - Spike: create a Developer ID certificate and a Developer ID profile through the App Store
   Connect API. If the API refuses, agents use the Apple Developer portal in Chrome with
   1Password filling the sign-in. Not done.
