@@ -59,7 +59,7 @@ Check the cited entry before acting on a row.
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
 | Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Build notarized 0.1.10 on a configured release Mac (authorized November 12); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
-| Ticket 325: release credential backup and restore | `release:credentials` status, verify-backups, restore and backup; preflight checks; runbook; decision D29 | Owner creates the Cadence Release vault, its service account and an App Store Connect API key; agents back up and verify live; notarization switches to the API key; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325 started — November 11, 2026" |
+| Ticket 325: release credential backup and restore | Cadence Release vault and service account in place; identity, notarization and updater backups made and `verify-backups` passes (November 12) | Owner creates the App Store Connect API key; agents back it up and switch notarization to it; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
@@ -108,6 +108,25 @@ Implemented in source on `claude/ticket-298-device-brief`; not pushed or deploye
 - Checks: agents, interactions and resolvers checks, typecheck, lint (six existing
   warnings) and build passed. Vitest on the 50 Daily Brief, briefing and advisor test
   files: 769 passed. Dagger was not run. Vercel variables are owner-gated and unset.
+
+## Ticket 325: live backups verified — November 12, 2026
+
+The owner created the Cadence Release vault and its read/write service account and stored
+the token in the login keychain (service `cadence-release-1password`). With the owner's
+`release-secrets` approval in chat, recorded in `.intent/acceptance/mac-0.1.10-20261111`,
+an agent ran `backup` for the identity, the notarization credential and the updater key.
+
+- **Verified:** `verify-backups` reports all three items complete with matching
+  fingerprints. The `desktop-release` preflight shows `release-vault-token` and
+  `release-backups` ready.
+- **Fixed in `release-credentials.mjs`:** `op item create` ignored a template on Node's
+  stdin pipe (a socket, not a FIFO) and created "Untitled SecureNote" items, so `backup`
+  now passes a 0600 `--template` file and checks the returned title. Attachment names with
+  periods (`identity.p12`, `cadence-updater.key.pub`) are escaped. Two Untitled items and
+  one partial updater item were deleted from the vault. `tests/release-credentials.test.mjs`
+  covers both (14 pass).
+- **Still open:** the App Store Connect API key (owner creates it), switching notarization
+  to it, and the certificate-renewal spike.
 
 ## PR integration review and release access — November 12, 2026
 

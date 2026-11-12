@@ -29,7 +29,7 @@
 // mismatched.
 import { spawnSync } from 'node:child_process';
 import { X509Certificate, createHash, randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -221,6 +221,11 @@ export function localChecks(inv, deps = {}) {
 
 // ---------- the Cadence Release vault ----------
 
+// op assignment syntax treats ".", "=" and "\\" in a field name as syntax; escape each with a backslash.
+export function escapeOpFieldName(name) {
+  return name.replace(/[\\.=]/g, (character) => `\\${character}`);
+}
+
 export class ReleaseVault {
   constructor(inv, { run = runCommand, env = process.env, cwd = process.cwd(), runDir = null, caller = 'release-credentials', now = Date.now(), readText = (p) => readFileSync(p, 'utf8') } = {}) {
     Object.assign(this, { inv, run, env, cwd, runDir, caller, now, readText });
@@ -317,15 +322,30 @@ export class ReleaseVault {
       throw new CredentialError(EXIT.REFUSED, `"${title}" already exists in "${this.inv.vault}"; backups are never overwritten. Rename the old item first.`);
     }
     const template = { title, category: 'SECURE_NOTE', fields: fields.map(({ label, value, secret }) => ({ id: label.replace(/\W+/g, '_'), label, type: secret ? 'CONCEALED' : 'STRING', value })) };
-    const created = this.op(['item', 'create', '--vault', this.inv.vault, '--format', 'json', '-'], { input: JSON.stringify(template) });
+    // op reads a piped template only from a FIFO; Node's stdin pipe is a socket, so op ignored it
+    // and created "Untitled SecureNote" items. Write the template to a private 0600 file instead.
+    const templateDir = mkdtempSync(join(tmpdir(), 'cadence-release-item-'));
+    const templatePath = join(templateDir, 'item.json');
+    let created;
+    try {
+      writeFileSync(templatePath, JSON.stringify(template), { mode: 0o600 });
+      created = this.op(['item', 'create', '--vault', this.inv.vault, '--template', templatePath, '--format', 'json']);
+    } finally {
+      rmSync(templateDir, { recursive: true, force: true });
+    }
     if (created.status !== 0) {
       this.log(title, null, 'failed', classifyOpError(created.stderr, created.status));
       throw new CredentialError(EXIT.FAILED, `op item create failed (${classifyOpError(created.stderr, created.status)})`);
     }
     for (const field of fields) this.log(title, field.label, 'written');
-    const id = JSON.parse(created.stdout.toString('utf8')).id;
+    const made = JSON.parse(created.stdout.toString('utf8'));
+    const id = made.id;
+    if (made.title !== title) {
+      this.log(title, null, 'failed', 'title_mismatch');
+      throw new CredentialError(EXIT.FAILED, `op created "${made.title}" instead of "${title}"; delete that item and rerun`);
+    }
     for (const [name, path] of Object.entries(files)) {
-      const edited = this.op(['item', 'edit', id, '--vault', this.inv.vault, `${name}[file]=${path}`]);
+      const edited = this.op(['item', 'edit', id, '--vault', this.inv.vault, `${escapeOpFieldName(name)}[file]=${path}`]);
       if (edited.status !== 0) {
         this.log(title, name, 'failed', classifyOpError(edited.stderr, edited.status));
         throw new CredentialError(EXIT.FAILED, `attaching ${name} failed (${classifyOpError(edited.stderr, edited.status)}); the item exists without it`);
