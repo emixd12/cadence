@@ -177,6 +177,13 @@ describe('Cadence Release vault', () => {
     expect(calls.filter((call) => call.args[0] === 'read').every((call) => /\/(fingerprint|complete)$/.test(call.args.at(-1)))).toBe(true);
   });
 
+  it('requires the API-key backup even when the previous password backup exists', () => {
+    delete items[inv.notarization.apiKeyItem];
+    expect(verifyBackups(inv, vault(), 'ABC').at(-1)).toMatchObject({
+      item: inv.notarization.apiKeyItem, state: 'missing', detail: 'item missing',
+    });
+  });
+
   it('restore and backup stop at the approval gate', async () => {
     const err = [];
     const code = await main(['restore', '--run', runDir], { out: () => {}, err: (line) => err.push(line), deps: { run, now: NOW } });
