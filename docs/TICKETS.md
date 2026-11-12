@@ -17336,7 +17336,7 @@ follow-ups.
 
 ## Ticket 294: Record the ChatGPT plan decision and tickets
 
-Status: completed on branch `chatgpt-https`, November 7, 2026. Not merged.
+Status: completed November 7, 2026; merged to `main` November 10, 2026.
 Dependencies: none.
 
 Goal: record the approved direction in the repository before any code changes.
@@ -17370,7 +17370,8 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 295: Spike the Daily Brief request on a ChatGPT plan
 
-Status: in progress on branch `chatgpt-https`, November 7, 2026.
+Status: in progress since November 7, 2026; mock mode merged November 10. The live run
+waits for the owner's ChatGPT sign-in.
 Dependencies: none.
 
 Goal: prove with a real ChatGPT Plus or Pro account that the Daily Brief request works under
@@ -17410,7 +17411,10 @@ Verification: `npm run test` (mock mode), the live run with the owner's consent,
 
 ## Ticket 296: Split Daily Brief generation and add the ChatGPT plan adapter
 
-Status: not started.
+Status: in progress, November 11, 2026. The prepare/validate split is done
+(`prepareDailyBrief`, `validateDailyBrief`). Both steps stay server-side under D27, so
+the browser line below is not needed; `briefing-pipeline.ts` still uses `node:crypto`.
+The adapter and its error mapping wait for Ticket 295's live run.
 Dependencies: Ticket 295.
 
 Goal: make the model call separable so a device can run it, with no change to today's hosted
