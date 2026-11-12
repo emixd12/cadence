@@ -7975,12 +7975,13 @@ Out of scope:
 
 ## Ticket 105: Browser-push dependency compatibility cleanup
 
-Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open. npm still
-lists web-push 3.6.7 as `latest` (read October 27), so the recheck trigger in
-`docs/OPERATIONS.md` has not fired. No Preview inspection is recorded since.
+Status: in_progress (2026-11-11). PR #218 upgrades web-push to 4.0.0, which replaces
+legacy URL parsing. The real-package encrypted transport check passes on Node 24
+without deprecations; subject, reminder and leave-reminder checks pass (51 tests).
+`npm audit --omit=dev` reports no vulnerabilities. Refreshed CI and deployment
+verification remain required before closure. No real push send ran.
 
-The published dependency has no newer release containing the upstream fix.
-The documented exception and fake-transport checks pass. Preview inspection remains pending.
+The dependency upgrade removes the upstream-blocked exception.
 Evidence: `docs/qa/2026-09-04-tickets-088-091-104-105.md`.
 
 Platform impact:

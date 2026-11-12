@@ -89,6 +89,21 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## PR 218: browser-push compatibility review — November 11, 2026
+
+- Upgraded web-push to 4.0.0 and removed Ticket 105's obsolete upstream-blocked
+  exception. Cadence's named service APIs remain compatible on Node 24.
+- The real encrypted-transport test now rejects every Node deprecation. All 51
+  push and reminder tests pass; `npm audit --omit=dev` reports zero vulnerabilities.
+- Verification: agents, interactions, resolvers, lint and typecheck pass. The full
+  suite passes 5,610 tests; all 29 failures come from this environment denying Unix
+  socket creation in the session-broker and Docker-proxy tests. Dagger and Docker
+  are unavailable. Refreshed GitHub CI remains the merge gate.
+- Ticket 105 stays open until deployment verification. No real push send ran.
+
+Platform impact: web dependency only. Desktop uses native reminders; marketing and
+future mobile are not affected. Messaging impact: none.
+
 ## Connector production acceptance — November 11, 2026
 
 Run `conn-accept-20261111`, as test account A on production. Evidence:

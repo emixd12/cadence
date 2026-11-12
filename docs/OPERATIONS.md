@@ -1929,22 +1929,20 @@ Ticket 099 message does not substitute for a new test.
 
 ## Ticket 105 browser-push compatibility exception
 
-The npm registry still publishes web-push 3.6.7 as latest (2026-09-04). The
-installed direct dependency calls legacy `url.parse()` in
-`src/web-push-lib.js` during VAPID audience construction and HTTPS request
-construction. Node 24 reports DEP0169 on that path. Upstream issue
-https://github.com/web-push-libs/web-push/issues/943 is closed by the merged
-https://github.com/web-push-libs/web-push/pull/948, but the fix has no newer
-published npm release. Keep the installed version and lockfile unchanged.
+PR #218 upgrades web-push from 3.6.7 to 4.0.0. The older version used legacy
+`url.parse()` for VAPID audiences and HTTPS requests, producing DEP0169 on Node
+24. Version 4 uses WHATWG `URL` and preserves the named `sendNotification` and
+`WebPushError` APIs used by Cadence. Its ESM package also loads from the real
+package regression test's `require()` on the supported Node 24 runtime.
 Do not patch node_modules, suppress warnings, or replace the push provider.
 
-The repository owner owns rechecking when npm publishes a newer stable version
-or a supported Node upgrade changes this warning into a failure. Run
+For later dependency upgrades, run
 `npx vitest run tests/web-push-compatibility.test.ts tests/web-push-subject.test.ts tests/reminder.service.test.ts`,
 then the full release checks and an authorized Preview deployment. The real
 package test uses generated synthetic keys and a fake HTTPS transport. It
 checks encryption, VAPID, endpoint/query preservation, TTL, and successful
-response handling without network traffic.
+response handling without network traffic. It rejects every Node deprecation,
+including a reintroduced DEP0169. A real push send requires separate authorization.
 
 ## Note shortcut rollout (Tickets 126–128)
 
