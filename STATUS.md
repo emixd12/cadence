@@ -109,6 +109,7 @@ HTTP 500 from `apply_account_sync_plan` twice; Postgres logged a statement timeo
   instead of "Unable to save the local change. Try again." Ships with the next Mac release.
 - Verification: local stack replay of every migration; all 47 `tests/sql` fixtures passed.
 - Open: hosted push, the owner's Mac retry, and its integrity check.
+
 ## Installed connector checks on Mac 0.1.10 — November 12, 2026
 
 An agent ran installed connector acceptance on the test Mac (published 0.1.10, account A)
