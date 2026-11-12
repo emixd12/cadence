@@ -259,37 +259,16 @@ Marketing and future mobile: not applicable. Messaging impact: none.
 
 ## Ticket 296: Daily Brief prepare and validate split — November 11, 2026
 
-**On branch `claude/brief-chatgpt-plan-086210`.**
+**Merged with PR #229.**
 
-- `lib/services/daily-brief-consumer.ts` now has `prepareDailyBrief` (estimates, planning,
-  model request) and `validateDailyBrief` (model output to briefing from plain-JSON
-  `DailyBriefValidationData`). `generateDailyBrief` composes them; its signature and
-  behavior are unchanged. The 512 KB payload check uses `TextEncoder`, not `Buffer`.
-- Tests: the 41 existing briefing and Daily Brief test files pass unchanged (619 tests).
-  `tests/daily-brief-prepare-validate.test.ts` adds 39 tests: every preset on 7 fixtures
-  matches `generateDailyBrief` after a JSON round trip, plus unknown-ref, expiry,
-  configuration-revision and version rejections.
-- Assumption, recorded in `docs/AGENT_RESOLVERS.md`: both steps stay server-side, because
-  Ticket 298's routes call them and the Mac runs only the model call. `briefing-pipeline.ts`
-  still uses `node:crypto`, so the ticket's "runs in the browser" line is not met and not
-  needed under D27.
-- No production gate is needed: hosted behavior is unchanged and nothing new is reachable.
-- PR review reconciled this branch with current `main` and documented that validation data
-  is trusted server output. Ticket 298 must authenticate its signed envelope before calling
-  `validateDailyBrief` with data returned by a device.
-- Review verification: agents, interactions, resolvers, lint, typecheck and web build passed;
-  92 focused consumer, prepare/validate, analysis and recipe tests passed. The full suite
-  passed 5,649 tests and skipped 230; 29 tests failed because this cloud executor denies
-  Unix-socket binding (`listen EPERM`) in the unchanged session-broker and Docker-proxy
-  suites. Dagger and Docker are unavailable. GitHub CI remains the merge gate.
-- Still open in Ticket 296: the ChatGPT plan adapter and its error mapping, which wait for
-  the request contract from the live Ticket 295 run.
-- Ticket 295: no preflight suite covers the ChatGPT spike sign-in. The owner ask for the
-  live run (`node scripts/run-chatgpt-plan-spike.mjs --live`) went to the owner on
-  November 11.
-- Platform impact: web, `daily-brief-consumer.ts`, hosted behavior unchanged; desktop,
-  none yet (Ticket 299 wires it); marketing and future mobile, not applicable. Messaging
-  impact: none.
+- `daily-brief-consumer.ts`: `prepareDailyBrief` returns the model request and plain-JSON
+  `DailyBriefValidationData`; `validateDailyBrief` turns output into a briefing from it.
+  `generateDailyBrief` composes both; hosted behavior is unchanged.
+- `tests/daily-brief-prepare-validate.test.ts` (39 tests) proves the composition after a
+  JSON round trip; the 41 existing briefing test files pass unchanged.
+- Both steps stay server-side (Ticket 298 calls them); `briefing-pipeline.ts` still uses
+  `node:crypto` (`docs/AGENT_RESOLVERS.md`). Open in 296: the adapter and error mapping.
+- Platform impact: web only, unchanged behavior. Messaging impact: none.
 
 ## Ticket 326: web export reads Mac-written configuration history — November 11, 2026
 
