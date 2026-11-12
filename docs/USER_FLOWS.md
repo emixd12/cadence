@@ -224,6 +224,14 @@ setup read carries only whether each value exists and whether estimates are on, 
 Home text. On
 desktop the row needs a linked account to ask the deployment; local mode omits
 it, and Travel settings still saves both values offline.
+
+Planned onboarding items (not built; each needs a ticket before it is added):
+
+- **Choose whether to turn on the Daily Brief.** Owner direction, November 12, 2026. The
+  brief is off by default, and turning it on is the user's consent to send the day's data
+  to the model. The row would open the Daily Brief setting and count a choice either way as
+  done.
+
 If browser notifications are denied or already blocked, that permission state
 counts as a completed onboarding decision because the app cannot unblock it from
 inside Cadence. The user can still use the tracker and may re-enable browser
