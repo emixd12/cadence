@@ -231,37 +231,70 @@ curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=1.0.0-beta.21
 Run from the repository root:
 
 ```bash
-dagger check                          # every check, concurrently
-dagger check -l                       # list checks
+dagger check --cadence                # the ten Cadence checks, concurrently
+dagger check -l --cadence             # list them
 dagger check cadence/typecheck        # one check
 dagger check cadence/lint cadence/test
-dagger check -i                       # open a shell where an exec fails
+dagger check --cadence -i             # open a shell where an exec fails
 dagger call cadence shell terminal    # shell in the checks' container
 ```
 
-Agents run `dagger check --progress=report` before every push. A passing run
+Agents run `dagger check --cadence --progress=report` before every push. Always
+pass `--cadence`. A bare `dagger check` also runs `dang-sdk/generate/stale`, a
+check that belongs to the Dang SDK module; it took 268 s and 337 s in two runs
+on November 11, 2026, against about 30 s for the ten Cadence checks. A passing run
 prints one line per check. A failing check prints only its own log; the `test`
 check uses Vitest's `agent` reporter, so a failure prints the failing tests and
-the summary, not all 340 files. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
-sign-up hint from the output. If Docker or the Dagger CLI is unavailable, run
-the npm commands above.
+the summary, not every test file. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
+sign-up hint from the output.
+
+Dagger never blocks work (`docs/DECISIONS.md`, 2026-11-11, "Keep Dagger"). When
+Docker or the Dagger CLI is unavailable, or a check fails for a reason outside
+your change, run the npm commands above, note the fault in the pull request and
+continue. GitHub Actions `CI` stays the merge gate.
 
 The engine caches every step by its inputs. An unchanged check finishes from
 cache. Only a change to a `package.json` or `package-lock.json` reinstalls
 dependencies. Cadence checks run on `node:24-bookworm`, which ships the `git`
-and `python3` that some tests call. The module reads the working tree with
-`.gitignore` rules and also excludes `.env*` files, `node_modules`, `.next`,
-`.claude`, `.local` and `.vercel`.
+and `python3` that some tests call.
 
-Dagger covers every GitHub Actions `CI` step except `public-source:check`, which
-needs full Git history. GitHub Actions `CI` stays the merge gate. Dagger runs
-only on local machines: do not enable Dagger Cloud, Cloud Checks or Cloud
-engines (`docs/DECISIONS.md`, 2026-10-24).
+**What the container sees.** The module reads the working tree with `.gitignore`
+rules and also excludes `.env*` files, `node_modules`, `.next`, `.local`,
+`.vercel` and `.dagger`. Dagger does not read `.git/info/exclude`, so the module
+lists each of the owner's entries there by name: the local Claude state under
+`.claude` (`worktrees`, `checkpoints`, `mailbox` and the rest), `.intent/acceptance`,
+`apps/desktop/signing`, `exports` and the two local files under `public/sounds`.
+Tracked files under `.claude/skills` and `.intent/artifacts` stay in, because
+tests read them. When you add a local-only path to `.git/info/exclude`, add it to
+the exclude list in `main.dang` as well. Otherwise Dagger copies it into the
+check containers and the engine cache, and every change to it reruns all checks.
+
+**Git in the `test` check.** Two test files call `git`. A working tree's own
+`.git` cannot be mounted: in a Git worktree it is a file that points outside the
+workspace, and Dagger cannot open this repository because of its `worktreeConfig`
+extension. The `test` check mounts the Git data of one pinned commit instead,
+`fixtureCommit` in `main.dang`. Dagger fetches it once from GitHub and caches it.
+It must equal `FIXTURE_SOURCE` in `scripts/build-mcp-hosted-fixtures.mjs`;
+`tests/dagger-module.test.mjs` fails when they differ. Inside the container,
+`HEAD` is that commit, not your local commit. The other nine checks have no
+`.git`. This works the same from the main checkout and from a worktree.
+
+**Not covered.** `public-source:check` needs the full local history, and
+`tests/acceptance-web-client.test.mjs` needs installed Google Chrome, which the
+image lacks; containers on the owner's Mac cannot `apt-get` it. GitHub Actions
+runs both. Dagger runs only on local machines: do not enable Dagger Cloud, Cloud
+Checks or Cloud engines (`docs/DECISIONS.md`, 2026-10-24).
 
 Each check reads the whole working tree, minus the excluded paths. So any edit,
-even to a doc, reruns every check, but not the dependency install. On the
-owner's Mac, the first run took 217 s, mostly image pulls and `npm ci`. A run
-after a source edit took 45 s, and an unchanged run took 1 s.
+even to a doc, reruns every check, but not the dependency install. Per-check
+input filters are deferred until a full run after an edit passes about 3
+minutes. Measured on the owner's Mac from a worktree on November 11, 2026, with
+dependencies already installed in the engine: 31 s after a change (`build` 30 s,
+`lint` 24 s, `test` 24 s) and 1 s unchanged. The first run on a machine took
+217 s in October, mostly image pulls and `npm ci`.
+
+Owner step: Docker Desktop gives its VM 8 GB of the Mac's 128 GB. Raise it under
+Settings › Resources so ten concurrent checks do not run short of memory.
 
 For UI changes, also run the app and inspect at least:
 

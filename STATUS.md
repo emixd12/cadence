@@ -89,6 +89,28 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Dagger repairs — November 11, 2026
+
+**On branch `dagger/repairs`; not merged.** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"Keep Dagger as the local pre-push check".
+
+- **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
+  the Dang SDK's staleness check, which took 268 s and 337 s.
+- **Module:** tracked files under `.claude/skills` and `.intent/artifacts` now reach the
+  container; every path in the owner's `.git/info/exclude` is excluded by name; the `test`
+  check mounts the Git data of the pinned fixture commit and skips
+  `tests/acceptance-web-client.test.mjs`.
+- **Verified from a worktree:** ten checks pass in 31 s after a change and in 1 s
+  unchanged; a deliberately broken test fails `cadence/test` and prints the failure;
+  through the new module, the main checkout's `exports`, `apps/desktop/signing`,
+  `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
+- **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
+  first run was not re-measured.
+- **Owner step:** raise Docker Desktop's memory above 8 GB.
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
+applicable. Messaging impact: none.
+
 ## Ledger cleanup — November 11, 2026
 
 - **Merge markers:** removed the stray `||||||| 46016e57` and `||||||| 20feeaff` lines from

@@ -563,8 +563,12 @@ npm run build
 Run them with one command from the repository root:
 
 ```bash
-dagger check --progress=report
+dagger check --cadence --progress=report
 ```
+
+`--cadence` limits the run to the Cadence module's ten checks. Dagger never blocks
+work: when it is unavailable, or a check fails for a reason outside your change, run
+the npm commands, note the fault in the pull request and continue.
 
 Dagger runs all of them, plus the desktop, marketing and public-trust CI steps,
 in containers, and returns unchanged checks from cache. A passing run prints one
