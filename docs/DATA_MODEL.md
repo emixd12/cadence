@@ -2476,7 +2476,7 @@ retry restarts a failed/expired attempt. A retry without a saved attempt follows
 normal initial admission. Completion tokens prevent late requests from finishing
 replacement leases; a delivery-fence failure can downgrade its own completion.
 
-Migration `20261112041029_release_pending_daily_brief.sql` (Ticket 298) adds
+Migration `20261112043335_release_pending_daily_brief.sql` (Ticket 298) adds
 `release_daily_brief(installation, lease, preference revision)`. Its public invoker
 wrapper calls a private definer function under the same current-session check and
 owner lock. It changes only the owner's matching pending lease to Failed, clears
