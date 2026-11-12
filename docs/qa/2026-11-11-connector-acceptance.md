@@ -114,10 +114,48 @@ mean the provider grant was revoked after the run.
 | Hevy | Passed (above) | The owner's key stays connected to account A by design (decision 2026-11-11); the owner decides whether to regenerate it |
 | iCloud Calendar | Not run: the existing vault item's fields were unreadable, and no usable test identity was available. Awaiting the owner's account choice | — |
 | Outlook Calendar | Passed (above) | The test identity stays connected to account A for later runs; it is an agent test identity, not the owner's |
-| Installed desktop | 0.1.10 installation and Hevy timing display recorded in the PR #239 release packet; remaining installed connector acceptance is open | — |
+| Installed desktop | Passed on published 0.1.10 on the test Mac for Hevy and Outlook (below), except the Microsoft deep-link completion, account switch and sign-out cleanup, and Hevy key entry on the Mac | — |
 
 Step 7 (public disclosure copy) belongs to the messaging track. The copy that Ticket 241
 wrote is live: `cadence-me.com/faq` serves the Hevy Pro and 500-workout answer, and
 `app.cadence-me.com/privacy` serves the iCloud app-specific-password custody text. What
 remains is the owner's review of that copy against this evidence; no copy was changed here.
 Connector completion copy (D28) is tracked separately in P-038 to P-043.
+
+## Installed desktop: Cadence for Mac 0.1.10 on the test Mac (November 12, 2026, 05:40–05:55Z)
+
+mac-release handed the test Mac over after publishing 0.1.10 (linked as account A, schema
+24, contract 5). The agent drove it over Tailscale SSH with `scripts/test-device.mjs`:
+read-only SQLite on `calendar-cache.sqlite3` (counts, generations and completeness only), and
+the window's accessibility tree. The `desktop-test-mac` preflight listed one owner step,
+Notifications and Location for Cadence. These checks do not need it, so it was not asked.
+
+| Check | Result |
+|---|---|
+| Device | macOS 27.2.1 (26B131), arm64, Cadence 0.1.10 running |
+| Cache before the window opened | `connector_fence` has one row per source (Outlook, iCloud, Hevy); no snapshots. Fences rise on every refresh of a disconnected source, which clears that source's cache |
+| Cache after the window opened | Complete snapshots for Hevy and Outlook, each at the hosted connection generation (3); iCloud fence bumped (disconnected) |
+| Settings › Connections (accessibility) | Google "Connected · 1 calendar", Outlook "Connected · 1 calendar", iCloud "Not connected", Hevy "Connected", matching the hosted state |
+| Outlook event on the Mac | The agent added "QA Outlook Mac timed" (Nov 12, 3:00–3:30 PM ET) in Outlook web. **Refresh Outlook Calendar** on the Mac showed "Outlook Calendar refreshed."; the cache held 1 event; Timeline showed "Preview Outlook Calendar event: QA Outlook Mac timed" |
+| Hevy on the Mac | Timeline "Recorded activity · Hevy", "No recorded workouts today." (none logged on Nov 12); Hevy snapshot complete |
+| Disconnect from the Mac | A confirmation ("Disconnect Outlook Calendar?") with **Disconnect** and **Cancel**. After **Disconnect**: hosted `disconnected`, generation 4; the Outlook snapshot was deleted and its fence bumped; the Hevy snapshot stayed; the panel showed the Microsoft revocation instruction and **Connect Outlook Calendar** |
+| Connect from the Mac | **Connect Outlook Calendar** opened Chrome on the test Mac at `login.microsoftonline.com/common/oauth2/v2.0/authorize`, scope `openid offline_access Calendars.Read`, redirect the hosted `/auth/outlook-calendar/callback` (which hands a desktop attempt to `cadence://outlook-calendar/callback`). The agent closed that tab |
+| Reconnect elsewhere | The agent reconnected A from the web (generation 5) and chose Calendar again. The Mac then showed "Connected · 1 calendar", its cache held generation 5 with 1 event, and the event was back on the Mac Timeline |
+
+Not run on the Mac:
+
+- Finishing the Microsoft sign-in in the test Mac's Chrome and the `cadence://` completion:
+  `test-device.mjs click` acts only while Cadence is frontmost, so a browser sign-in cannot
+  be driven over SSH.
+- The `pending-outlook-calendar-attempt` Keychain item: `security find-generic-password`
+  over SSH did not find it, before or after Connect. The app may keep it where `security`
+  cannot see it; not verified either way.
+- Cache cleanup on sign-out and account switch: it would unlink the test Mac, which
+  mac-release still needs for a leave-reminder check.
+- Hevy key entry from the Mac: it would pass the owner's key through a remote text field.
+  The hosted intake is the same route the web uses (verified above).
+- iCloud: not connected (Ticket 240 waits on the owner's Apple Account item).
+
+The test Mac is left as found: Cadence 0.1.10 running and linked as A; Outlook connected
+(generation 5, Calendar selected), Hevy connected (generation 3), iCloud not connected.
+
