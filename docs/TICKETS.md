@@ -17467,7 +17467,9 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 297: Mac app ChatGPT connection
 
-Status: not started.
+Status: implemented November 12, 2026 on branch `claude/ticket-297-mac-chatgpt`, not yet
+merged. Mocked Rust and TypeScript tests pass. Live sign-in and installed checks belong to
+Ticket 300. No UI uses the connection until Ticket 299.
 Dependencies: Ticket 295.
 
 Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
@@ -17493,11 +17495,15 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Not applicable: the web app shows no ChatGPT controls (D27). |
-| Desktop | `apps/desktop/src-tauri` listener and Keychain; `apps/desktop/src` connection client. |
+| Desktop | `apps/desktop/src-tauri/src/chatgpt/` listener, token calls and Keychain items; `apps/desktop/src/chatgpt/connection.ts` connection client. |
 | Marketing | Not applicable: no public claim until release (P-032). |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: P-029 (data flow).
+Messaging impact: P-029 (data flow). The callback page says only "You can close this tab
+and return to Cadence."; Ticket 299 logs the card's copy.
+
+Implementation notes: `docs/DESKTOP_BUILD.md`, "ChatGPT connection (Ticket 297)", and
+`docs/DESKTOP_DATA_MODEL.md`, "ChatGPT connection credentials (Ticket 297)".
 
 Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --progress=report`.
 
