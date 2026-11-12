@@ -15161,7 +15161,7 @@ F1–F8 and the final DAV metadata correction. Live acceptance remains unverifie
 
 Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Apple Account and an app-specific password. Sealed intake; 5 calendars; server-expanded recurrence; all-day and other-zone events correct; all-day toggle; disconnect cleanup; the owner revoked the password. Finding: iCloud collections report full VTIMEZONE definitions, so floating events would quarantine by design. Not live-tested: wrong-principal reconnect.
 
-Production acceptance (2026-11-11): **not run**. The vault item `icloud-test-account-a` does not exist yet (owner step); A's production connection is disconnected, generation 0. Installed desktop waits on the 0.1.10 install. See `docs/qa/2026-11-11-connector-acceptance.md`.
+Production acceptance (2026-11-11): **not run**. Apple refused to create a test Apple Account, and no Apple test-account path for iCloud is known; the owner decides between their own Apple Account (custody decision 2026-10-19) and leaving this waiting. A's production connection is disconnected, generation 0. Installed desktop waits on the 0.1.10 install. See `docs/qa/2026-11-11-connector-acceptance.md`.
 
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
@@ -15199,7 +15199,7 @@ open; the owner accepted iCloud custody on 2026-10-19.
 
 Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
-Release step 6 (production smoke, 2026-11-11, `docs/qa/2026-11-11-connector-acceptance.md`): Hevy **passed** on production web; Outlook production OAuth settings checked (authority `common`, `Calendars.Read`, PKCE); Outlook and iCloud connect wait on the vault items `outlook-test-account-a` and `icloud-test-account-a`; installed desktop waits on the 0.1.10 install. Step 7 copy is live on the FAQ and Privacy pages and awaits the owner's review in the messaging track.
+Release step 6 (production smoke, 2026-11-11, `docs/qa/2026-11-11-connector-acceptance.md`): Hevy and Outlook (personal account) **passed** on production web; iCloud waits on an owner decision (no Apple test account could be created); installed desktop waits on the 0.1.10 install. Step 7 copy is live on the FAQ and Privacy pages and awaits the owner's review in the messaging track.
 
 Goal: independently verify 221–227 and align public and in-app disclosures.
 
@@ -15229,7 +15229,7 @@ disconnected. Live finding: Microsoft co-grants an earlier `Calendars.ReadBasic`
 consent with `Calendars.Read`; it is accepted only alongside `Calendars.Read`
 (`06fc275`). Not exercised: cross-tenant consent, tenants that block unverified
 apps, installed desktop. Details in `STATUS.md`.
-Production (2026-11-11): OAuth settings checked through a started web attempt; connect, cross-tenant consent and installed desktop not run (vault item `outlook-test-account-a` missing; no work or school tenant other than the home tenant). See `docs/qa/2026-11-11-connector-acceptance.md`.
+Production (2026-11-11): personal account **passed** on web: connect from Settings, consent (unverified app, `Calendars.Read`), calendar list and selection, a complete read of a timed and an all-day QA event with titles and times only, Timeline at 1280 and 390 px, disconnect (`microsoft_account_permissions`, reads fenced with 409) and reconnect. Cross-tenant consent, `admin_approval_required` and unverified-app-blocking tenants are not exercised by owner decision (2026-11-11); wrong-account reconnect and installed desktop not run. See `docs/qa/2026-11-11-connector-acceptance.md`.
 
 Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
 personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
