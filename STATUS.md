@@ -89,9 +89,27 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Dagger repairs — November 11, 2026
+
+**PR #231 (`dagger/repairs`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"Keep Dagger as the local pre-push check".
+
+- **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
+  the Dang SDK's staleness check, which took 268 s and 337 s.
+- **Module:** tracked files under `.claude/skills` and `.intent/artifacts` now reach the
+  container; every path in the owner's `.git/info/exclude` is excluded by name; the `test`
+  check mounts the Git data of the pinned fixture commit and skips
+  `tests/acceptance-web-client.test.mjs`.
+- **Verified from a worktree:** ten checks pass in 31 s after a change and in 1 s
+  unchanged; a deliberately broken test fails `cadence/test` and prints the failure;
+  through the new module, the main checkout's `exports`, `apps/desktop/signing`,
+  `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
+- **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
+  first run was not re-measured.
+- **Owner step:** raise Docker Desktop's memory above 8 GB.
 ## CI checks run in parallel — November 11, 2026
 
-**On branch `ci/parallel-verify`; not merged.** Decision: `docs/DECISIONS.md`, 2026-11-11,
+**Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
 "CI checks run in parallel".
 
 - **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
@@ -102,8 +120,9 @@ Check the cited entry before acting on a row.
   `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
   from the Actions cache.
 - **Not changed:** branch protection, the Dagger module and the web client test's waits.
-- **Open:** the owner's decision on Dagger (retire or repair). `dagger check` fails on
-  unchanged `main` for container reasons and its repeat runs miss the cache.
+- **Measured after:** `CI` took 145 s on its first run and 100 s with warm caches. The
+  `Web client runner` workflow took 673 s on its own.
+- **Dagger:** decided and repaired in the entry above.
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
