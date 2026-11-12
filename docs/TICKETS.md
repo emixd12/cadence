@@ -17541,6 +17541,14 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 Status: not started.
 Dependencies: Tickets 297 and 298.
 
+Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
+hidden until the owner turns it on"):
+
+- Everything below sits behind a desktop switch that is off by default. With it off, the
+  Settings card and the plan path do not appear.
+- Add a call that releases the brief attempt when the Mac's model call fails, so a retry
+  does not wait for the 75-second lease. Ticket 298's routes need a matching release route.
+
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.
 
