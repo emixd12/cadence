@@ -17426,10 +17426,13 @@ Verification: `npm run test` (mock mode), the live run with the owner's consent,
 
 ## Ticket 296: Split Daily Brief generation and add the ChatGPT plan adapter
 
-Status: in progress, November 11, 2026. The prepare/validate split is done
-(`prepareDailyBrief`, `validateDailyBrief`). Both steps stay server-side under D27, so
-the browser line below is not needed; `briefing-pipeline.ts` still uses `node:crypto`.
-The adapter and its error mapping wait for Ticket 295's live run.
+Status: complete, November 12, 2026. The prepare/validate split merged with PR #229. The
+adapter is `lib/services/daily-brief-chatgpt-plan.ts`. Model order is an owner decision of
+November 12, 2026: `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. Both steps stay
+server-side under D27, so the browser line below is not needed; the adapter itself runs in
+the webview. The stream cap is 256 KB, because the stream repeats the response object; the
+model's output keeps the 64 KB cap. Ticket 298's prepare route enforces recipe 1.0 for
+device mode.
 Dependencies: Ticket 295.
 
 Goal: make the model call separable so a device can run it, with no change to today's hosted
