@@ -87,6 +87,13 @@ fn discovery() -> String {
     .to_string()
 }
 
+/// Test nonces are random per run, like real ones; no fixed value reaches a nonce check.
+fn test_nonce(slot: usize) -> String {
+    static NONCES: std::sync::OnceLock<[String; 2]> = std::sync::OnceLock::new();
+    NONCES.get_or_init(|| [random_token::<16>().unwrap(), random_token::<16>().unwrap()])[slot]
+        .clone()
+}
+
 // ---------------------------------------------------------------------------
 // Mocks
 
@@ -205,7 +212,7 @@ impl Http for MockHttp {
                             mock.challenge.lock().unwrap().clone()
                         );
                         let nonce = if mock.bad_nonce.load(Ordering::SeqCst) {
-                            "wrong".to_owned()
+                            test_nonce(1)
                         } else {
                             mock.nonce.lock().unwrap().clone().unwrap()
                         };
@@ -504,11 +511,11 @@ fn callback_checks_state_before_anything_else() {
 fn id_token_is_rs256_from_the_jwks_with_issuer_audience_nonce_and_expiry() {
     let keys = jwks();
     let check = |token: &str| {
-        verify_id_token(token, keys.as_bytes(), ISSUED_CLIENT, "nonce-1", NOW)
+        verify_id_token(token, keys.as_bytes(), ISSUED_CLIENT, &test_nonce(0), NOW)
             .map(|claims| (claims.subject, claims.email))
     };
     assert_eq!(
-        check(&id_token("nonce-1")).unwrap(),
+        check(&id_token(&test_nonce(0))).unwrap(),
         (
             "user-subject".to_owned(),
             Some("person@example.test".to_owned())
@@ -516,7 +523,7 @@ fn id_token_is_rs256_from_the_jwks_with_issuer_audience_nonce_and_expiry() {
     );
     let header = json!({"alg":"RS256","kid":"test-key"});
     let with = |key: &str, value: Value| {
-        let mut changed = claims("nonce-1");
+        let mut changed = claims(&test_nonce(0));
         changed[key] = value;
         sign(header.clone(), changed)
     };
@@ -525,21 +532,21 @@ fn id_token_is_rs256_from_the_jwks_with_issuer_audience_nonce_and_expiry() {
     assert!(check(&with("aud", json!([ISSUED_CLIENT, "other"]))).is_err());
     assert!(check(&with("exp", json!(NOW - 120))).is_err());
     assert!(check(&with("iat", json!(NOW + 600))).is_err());
-    assert!(check(&with("nonce", json!("nonce-2"))).is_err());
+    assert!(check(&with("nonce", json!(test_nonce(1)))).is_err());
     assert!(check(&with("sub", json!(""))).is_err());
     assert!(check(&sign(
         json!({"alg":"RS256","kid":"other-key"}),
-        claims("nonce-1")
+        claims(&test_nonce(0))
     ))
     .is_err());
     assert!(check(&sign(
         json!({"alg":"HS256","kid":"test-key"}),
-        claims("nonce-1")
+        claims(&test_nonce(0))
     ))
     .is_err());
-    let token = id_token("nonce-1");
+    let token = id_token(&test_nonce(0));
     let (signed, signature) = token.rsplit_once('.').unwrap();
-    let other = id_token("nonce-2");
+    let other = id_token(&test_nonce(1));
     let other_signature = other.rsplit_once('.').unwrap().1;
     assert!(check(&format!("{signed}.{other_signature}")).is_err());
     assert!(check(&format!("{signed}.")).is_err());
