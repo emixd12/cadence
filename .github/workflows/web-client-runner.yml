@@ -1,0 +1,54 @@
+name: Web client runner
+
+# The headless-Chrome tests for the ChatGPT web and Claude web acceptance
+# runner take about ten minutes. They run here, only when the runner or a file
+# it imports changes, and not in the CI workflow's required `verify` check.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/web-client-runner.yml
+      - .github/actions/setup/**
+      - scripts/acceptance/**
+      - scripts/mcp-acceptance-cleanup.mjs
+      - scripts/mcp-fixture-cleanup.mjs
+      - scripts/mcp-session-broker.mjs
+      - tests/acceptance-web-client.test.mjs
+      - package.json
+      - package-lock.json
+      - vitest.config.ts
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/web-client-runner.yml
+      - .github/actions/setup/**
+      - scripts/acceptance/**
+      - scripts/mcp-acceptance-cleanup.mjs
+      - scripts/mcp-fixture-cleanup.mjs
+      - scripts/mcp-session-broker.mjs
+      - tests/acceptance-web-client.test.mjs
+      - package.json
+      - package-lock.json
+      - vitest.config.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-client-runner-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-client:
+    name: Web client runner tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
+      - run: npm run test:web-client

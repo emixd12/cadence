@@ -211,6 +211,50 @@ npm run test
 npm run build
 ```
 
+`npm run test` skips `tests/acceptance-web-client.test.mjs`. After changing
+`scripts/acceptance/**`, `scripts/mcp-acceptance-cleanup.mjs`,
+`scripts/mcp-fixture-cleanup.mjs`, `scripts/mcp-session-broker.mjs` or that test,
+also run `npm run test:web-client`. It needs installed Google Chrome and takes
+about ten minutes.
+
+### GitHub Actions CI
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`.
+Its checks run as parallel jobs:
+
+| Job | Runs |
+| --- | --- |
+| `checks` | `agents:check`, `interactions:check`, `resolvers:check`, the full-history check, `public-source:check`, `public-trust:check`, `public-trust:fixtures`, `typecheck` |
+| `lint` | `lint` |
+| `test` | `npm run test` in three shards (`--shard=N/3`), one runner each |
+| `build` | `build`, with the Next.js build cache |
+| `sites` | `desktop:build`, `marketing:build`, `marketing:check` |
+| `verify` | Nothing itself. It fails unless every job above passed |
+
+Branch protection on `main` requires only the check named `verify`. Do not rename
+that job or remove its `if: always()`: GitHub counts a skipped required check as
+passing, and without `always()` the job is skipped when a job it needs fails. A new
+job blocks merges only after it is added to `verify`'s `needs` list.
+
+Every job calls `.github/actions/setup`. It installs Node.js 24 and restores
+`node_modules` from the Actions cache. The cache key covers the lockfile and every
+`package.json`, so any manifest change runs `npm ci` instead. The `build` job
+restores `.next/cache` from the newest cache saved on `main`; only pushes to `main`
+save it. Lint runs without the ESLint cache: lint is not the slowest job, so the
+cache would not shorten a run.
+
+`.github/workflows/web-client-runner.yml` runs `npm run test:web-client` when a pull
+request or a push to `main` changes the web client acceptance runner, a file its
+test imports, the package manifests or `vitest.config.ts`. The test drives headless
+Chrome against stub chat sites and took about ten minutes of each 12.5-minute CI
+run while it was part of `npm run test`. The workflow is not a required check, like
+`desktop-native.yml` and `supabase-rehearsal.yml`. Read its result before merging a
+change to those paths. Decision: `docs/DECISIONS.md`, 2026-11-11, "CI checks run in
+parallel".
+
+Measured on November 11, 2026: `CI` took 754 s before the split (median of 160
+runs), 145 s on the first run after it and 100 s with warm caches.
+
 ### Dagger checks
 
 Dagger runs the CI checks in containers on a local machine.

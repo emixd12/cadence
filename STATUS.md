@@ -91,7 +91,7 @@ Check the cited entry before acting on a row.
 
 ## Dagger repairs — November 11, 2026
 
-**On branch `dagger/repairs`; not merged.** Decision: `docs/DECISIONS.md`, 2026-11-11,
+**PR #231 (`dagger/repairs`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
 "Keep Dagger as the local pre-push check".
 
 - **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
@@ -107,6 +107,22 @@ Check the cited entry before acting on a row.
 - **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
   first run was not re-measured.
 - **Owner step:** raise Docker Desktop's memory above 8 GB.
+## CI checks run in parallel — November 11, 2026
+
+**Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"CI checks run in parallel".
+
+- **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
+  `tests/acceptance-web-client.test.mjs` took 589 s of it.
+- **Changed:** `npm run test` skips that file; `npm run test:web-client` and the new
+  `Web client runner` workflow run it for changes to the acceptance runner. `ci.yml` runs
+  `checks`, `lint`, `test` (three shards), `build` and `sites` in parallel, and the required
+  `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
+  from the Actions cache.
+- **Not changed:** branch protection, the Dagger module and the web client test's waits.
+- **Measured after:** `CI` took 145 s on its first run and 100 s with warm caches. The
+  `Web client runner` workflow took 673 s on its own.
+- **Dagger:** decided and repaired in the entry above.
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.

@@ -412,7 +412,8 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   the composer's plugin search inserts an inline app mention (the developer-mode
   toggle is gone), so the prompt text goes after the mention; finished turns carry
   `data-talvt-turn-state=complete` (`data-message-author-role` is gone); the chat
-  menu is "Chat actions". `tests/acceptance-web-client.test.mjs` stubs this layout.
+  menu is "Chat actions". `tests/acceptance-web-client.test.mjs` stubs this layout;
+  run it with `npm run test:web-client`, because `npm run test` skips it.
   When the site changes again the runner stops with `page-changed` or
   `reply-timeout`; fix the selectors in `scripts/acceptance/web-sites.mjs` with a
   stub test, never by opening other chats.

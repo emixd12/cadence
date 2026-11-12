@@ -2258,6 +2258,32 @@ nothing to Hevy.
 Platform impact: test access only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
 
+## 2026-11-11: CI checks run in parallel; the web client runner test leaves `verify`
+
+An audit on November 11, 2026 measured GitHub Actions `CI` at 754 s for a passing run
+(median of 160 runs since October 28). `npm run test` took 586 s of that, and one file,
+`tests/acceptance-web-client.test.mjs`, took 589 s of the test step. PR #176 added the file
+on November 1; `CI` on `main` took about 5 minutes before it. The file takes 565 s on the
+owner's Mac as well, so it waits on timers, not on the runner's CPU.
+
+The owner approved two changes ("Yes, do 1 and 2"):
+
+1. **The web client runner test runs only when its code changes.** `npm run test` skips
+   the file. `npm run test:web-client` runs it, and the `Web client runner` workflow runs
+   that command for changes to the runner, the files its test imports, the package
+   manifests and `vitest.config.ts`. The workflow is not a required check. Accepted risk: a
+   change outside those paths that breaks the runner is found at the next run of the
+   workflow or the next acceptance run, not on its own pull request.
+2. **`CI` runs its checks as parallel jobs.** A final job named `verify` fails unless
+   every job passed, so branch protection keeps one required check. Jobs restore
+   `node_modules` and the Next.js build cache from the Actions cache.
+
+Not changed: branch protection still requires `verify` and an up-to-date branch. GitHub
+offers a merge queue only on organization-owned repositories, and this one is user-owned.
+The Dagger decision of 2026-10-24 stands; the audit's Dagger findings wait on the owner.
+Shortening the web client test's waits is not part of this change.
+
+Layout and rules: `docs/OPERATIONS.md`, "GitHub Actions CI".
 ## 2026-11-11: Keep Dagger as the local pre-push check; four repairs
 
 An audit on November 11, 2026 found that `dagger check` failed on unchanged `main`, took

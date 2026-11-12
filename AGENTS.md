@@ -577,6 +577,13 @@ line per check. A failing check prints only its own log. Rerun one check with
 unavailable, run the npm commands directly. Setup and limits:
 `docs/OPERATIONS.md`, "Dagger checks".
 
+`npm run test` skips `tests/acceptance-web-client.test.mjs`, about ten minutes of
+headless Chrome that covers only the web client acceptance runner. After changing
+`scripts/acceptance/**` or another file that test imports, also run
+`npm run test:web-client`. On GitHub the `Web client runner` workflow runs it for
+those paths. It is not a required check, so read its result before merging. CI
+layout: `docs/OPERATIONS.md`, "GitHub Actions CI".
+
 ## UI and design rules
 
 The interface should be sparse.
