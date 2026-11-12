@@ -383,7 +383,9 @@ describe('Ticket 232 QA session broker', () => {
   it('refuses a live socket, never removes another broker socket, and replaces only a stale one', async () => {
     const t = await setup();
     await t.signIn('A', ACCOUNTS.A);
-    const second = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: t.socketPath, fetchImpl: t.auth.fetchImpl });
+    // These brokers exercise only private sockets. Let the OS assign their unrelated
+    // HTTP ports so loopback clients cannot collide with a later fixture port.
+    const second = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: 0, socketPath: t.socketPath, fetchImpl: t.auth.fetchImpl });
     await expect(second.start()).rejects.toThrow('socket-in-use');
     await second.teardown('test');
     expect(existsSync(t.socketPath)).toBe(true);
@@ -391,12 +393,12 @@ describe('Ticket 232 QA session broker', () => {
     const dir = mkdtempSync(join(tmpdir(), 'qa232-'));
     const stale = join(dir, 's.sock');
     execFileSync('python3', ['-I', '-c', 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])', stale]);
-    const third = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: stale, fetchImpl: t.auth.fetchImpl });
+    const third = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: 0, socketPath: stale, fetchImpl: t.auth.fetchImpl });
     await third.start();
     expect((await brokerRequest(stale, { command: 'status' })).ok).toBe(true);
     await third.teardown('test');
     expect(existsSync(stale)).toBe(false);
-    const fifth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: stale, fetchImpl: t.auth.fetchImpl });
+    const fifth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: 0, socketPath: stale, fetchImpl: t.auth.fetchImpl });
     await fifth.start();
     rmSync(stale);
     execFileSync('python3', ['-I', '-c', 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])', stale]);
@@ -404,7 +406,7 @@ describe('Ticket 232 QA session broker', () => {
     expect(existsSync(stale)).toBe(true);
     const occupied = join(dir, 'f.sock');
     writeFileSync(occupied, 'x');
-    const fourth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: occupied, fetchImpl: t.auth.fetchImpl });
+    const fourth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: 0, socketPath: occupied, fetchImpl: t.auth.fetchImpl });
     await expect(fourth.start()).rejects.toThrow('socket-path-occupied');
     expect(readFileSync(occupied, 'utf8')).toBe('x');
     rmSync(dir, { recursive: true, force: true });
