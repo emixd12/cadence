@@ -533,6 +533,12 @@ imports only types and `daily-brief-schema.ts`, the output schema it shares with
 provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, stream
 parsing, error mapping and the round trip with prepare and validate.
 
+Ticket 297 keeps OAuth discovery, sign-in, token refresh, revocation and catalog reads
+in `apps/desktop/src-tauri/src/chatgpt/`. The TypeScript connection client receives only
+connection state, email and catalog rows. Tokens stay in native-only Keychain items.
+This boundary implements no model-selection or briefing rules; Ticket 299 owns the UI
+and model-call wiring behind its default-off desktop switch.
+
 Ticket 298 owners. `lib/services/daily-brief-device.service.ts` runs admission, the
 shared live capture (`captureLiveDailyBriefContext` in `daily-brief.service.ts`),
 `prepareDailyBrief` without an estimate generator, and later `validateDailyBrief`; it

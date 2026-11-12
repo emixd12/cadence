@@ -481,25 +481,29 @@ pub fn verify_id_token(
     }
     let audiences: Vec<&str> = match payload.get("aud") {
         Some(Value::String(one)) => vec![one.as_str()],
-        Some(Value::Array(many)) => many.iter().filter_map(Value::as_str).collect(),
+        Some(Value::Array(many)) => many
+            .iter()
+            .map(Value::as_str)
+            .collect::<Option<Vec<_>>>()
+            .ok_or(Failure::IdToken)?,
         _ => vec![],
     };
     if !audiences.contains(&client_id) {
         return Err(Failure::IdToken);
     }
-    if audiences.len() > 1 && payload.get("azp").and_then(Value::as_str) != Some(client_id) {
+    let authorized_party = payload.get("azp");
+    if (audiences.len() > 1 || authorized_party.is_some())
+        && authorized_party.and_then(Value::as_str) != Some(client_id)
+    {
         return Err(Failure::IdToken);
     }
     match payload.get("exp").and_then(Value::as_i64) {
         Some(exp) if exp > now_seconds - ID_TOKEN_SKEW_SECONDS => {}
         _ => return Err(Failure::IdToken),
     }
-    if payload
-        .get("iat")
-        .and_then(Value::as_i64)
-        .is_some_and(|iat| iat > now_seconds + ID_TOKEN_SKEW_SECONDS)
-    {
-        return Err(Failure::IdToken);
+    match payload.get("iat").and_then(Value::as_i64) {
+        Some(iat) if iat <= now_seconds + ID_TOKEN_SKEW_SECONDS => {}
+        _ => return Err(Failure::IdToken),
     }
     match payload.get("nonce").and_then(Value::as_str) {
         Some(value) if same_secret(value, nonce) => {}

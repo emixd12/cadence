@@ -110,6 +110,7 @@ struct Mock {
     issued: AtomicUsize,
     refreshes: AtomicUsize,
     secrets: Mutex<HashMap<String, String>>,
+    failed_saves: Mutex<VecDeque<&'static str>>,
     /// Runs while the authorization-code exchange is in flight.
     during_exchange: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     /// One entry per catalog request; `Some` runs before that reply.
@@ -282,6 +283,12 @@ impl Secrets for MockSecrets {
     fn set(&self, name: &str, value: String) -> Result<(), ()> {
         assert!(crate::auth::NATIVE_ONLY_KEYS.contains(&name));
         self.0.event(format!("keychain set {name}"));
+        let mut failures = self.0.failed_saves.lock().unwrap();
+        if failures.front().copied() == Some(name) {
+            failures.pop_front();
+            return Err(());
+        }
+        drop(failures);
         self.0
             .secrets
             .lock()
@@ -530,8 +537,17 @@ fn id_token_is_rs256_from_the_jwks_with_issuer_audience_nonce_and_expiry() {
     assert!(check(&with("iss", json!("https://evil.example"))).is_err());
     assert!(check(&with("aud", json!("oaiapp_other"))).is_err());
     assert!(check(&with("aud", json!([ISSUED_CLIENT, "other"]))).is_err());
+    assert!(check(&with("aud", json!([ISSUED_CLIENT, 42]))).is_err());
+    assert!(check(&with("azp", json!("oaiapp_other"))).is_err());
+    assert!(check(&with("azp", Value::Null)).is_err());
+    assert!(check(&with("azp", json!(ISSUED_CLIENT))).is_ok());
     assert!(check(&with("exp", json!(NOW - 120))).is_err());
     assert!(check(&with("iat", json!(NOW + 600))).is_err());
+    assert!(check(&with("iat", Value::Null)).is_err());
+    assert!(check(&with("iat", json!("today"))).is_err());
+    let mut missing_issued_at = claims(&test_nonce(0));
+    missing_issued_at.as_object_mut().unwrap().remove("iat");
+    assert!(check(&sign(header.clone(), missing_issued_at)).is_err());
     assert!(check(&with("nonce", json!(test_nonce(1)))).is_err());
     assert!(check(&with("sub", json!(""))).is_err());
     assert!(check(&sign(
@@ -642,6 +658,40 @@ fn loopback_times_out_and_cancels() {
     assert_eq!(CALLBACK_TIMEOUT, Duration::from_secs(300));
 }
 
+#[test]
+fn a_stalled_callback_request_obeys_the_sign_in_deadline_and_cancel() {
+    let loopback = Loopback::bind().unwrap();
+    let mut peer = std::net::TcpStream::connect(address(&loopback.redirect_uri())).unwrap();
+    peer.write_all(b"GET /auth/callback?code=c&state=s HTTP/1.1\r\n")
+        .unwrap();
+    let started = std::time::Instant::now();
+    assert_eq!(
+        loopback
+            .wait(Duration::from_millis(200), &AtomicBool::new(false))
+            .err(),
+        Some(Failure::TimedOut)
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+    drop(peer);
+
+    let loopback = Loopback::bind().unwrap();
+    let peer = std::net::TcpStream::connect(address(&loopback.redirect_uri())).unwrap();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancelling = cancel.clone();
+    let thread = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(100));
+        cancelling.store(true, Ordering::SeqCst);
+    });
+    let started = std::time::Instant::now();
+    assert_eq!(
+        loopback.wait(Duration::from_secs(10), &cancel).err(),
+        Some(Failure::Cancelled)
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+    thread.join().unwrap();
+    drop(peer);
+}
+
 // ---------------------------------------------------------------------------
 // Connection
 
@@ -742,6 +792,32 @@ fn an_unverifiable_id_token_is_revoked_and_never_saved() {
         h.connection.status().unwrap().state,
         ConnectionState::Disconnected
     );
+}
+
+#[test]
+fn a_keychain_failure_revokes_the_new_grant_without_replacing_the_existing_session() {
+    for item in [INSTALLATION_ITEM, SESSION_ITEM] {
+        let h = harness();
+        // The host ID already exists; fail only the write after code exchange.
+        h.connection.installation().unwrap();
+        h.mock.failed_saves.lock().unwrap().push_back(item);
+        assert_eq!(connect(&h).err(), Some(Failure::Storage));
+        assert!(h.mock.session().is_none());
+        assert!(h
+            .mock
+            .events()
+            .contains(&"POST revoke rt-SECRET-refresh-1-xxxxxxxx".to_owned()));
+    }
+
+    let h = harness();
+    connect(&h).unwrap();
+    let previous = h.mock.session().unwrap();
+    h.mock.failed_saves.lock().unwrap().push_back(SESSION_ITEM);
+    assert_eq!(connect(&h).err(), Some(Failure::Storage));
+    assert_eq!(h.mock.session().unwrap(), previous);
+    let events = h.mock.events();
+    assert!(events.contains(&"POST revoke rt-SECRET-refresh-2-xxxxxxxx".to_owned()));
+    assert!(!events.contains(&"POST revoke rt-SECRET-refresh-1-xxxxxxxx".to_owned()));
 }
 
 #[test]

@@ -17467,9 +17467,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 297: Mac app ChatGPT connection
 
-Status: implemented November 12, 2026 on branch `claude/ticket-297-mac-chatgpt`, not yet
-merged. Mocked Rust and TypeScript tests pass. Live sign-in and installed checks belong to
-Ticket 300. No UI uses the connection until Ticket 299.
+Status: implemented November 12, 2026 on PR #241. Review added bounded streaming reads,
+callback deadline enforcement, failed-grant cleanup and stricter ID-token validation.
+The reviewed head requires Desktop native CI; Rust is unavailable in the review executor.
+Live sign-in and installed checks belong to Ticket 300. No UI uses the connection until
+Ticket 299, whose desktop switch stays off by default.
 Dependencies: Ticket 295.
 
 Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
@@ -17516,7 +17518,8 @@ Status: complete in source, November 12, 2026 (branch `claude/ticket-298-device-
 inputs on complete. Device mode runs recipe 1.0 only and makes no estimate call. Review
 added pending-only release, completion replay protection and a final context-expiry check.
 Migration `20261112043335_release_pending_daily_brief.sql` supplies the release RPC.
-Remaining: its hosted push, the Mac client (Ticket 299), and later owner activation.
+Hosted migration applied November 12, 2026. Remaining: the Mac client (Ticket 299) and
+later owner activation.
 The November 12 owner decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
 production. Ticket 299 calls release when its model call fails, without waiting for
 the 75-second lease or resetting the normal retry quotas.
@@ -17559,8 +17562,8 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: implemented in source on branch `claude/ticket-299-plan-ui`, stacked on PRs #240
-and #241; not pushed. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). Open: the
+Status: implemented in source on branch `claude/ticket-299-plan-ui`, PR #243
+(PRs #240 and #241 merged). Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). Open: the
 OpenAI logo on the button (L-019), installed acceptance (Ticket 300) and the messaging
 review of P-029 to P-031, P-045 and P-046 before the owner turns it on.
 Dependencies: Tickets 297 and 298.
@@ -17571,7 +17574,8 @@ hidden until the owner turns it on"):
 - Everything below sits behind a desktop switch that is off by default. With it off, the
   Settings card and the plan path do not appear.
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
-  does not wait for the 75-second lease. Ticket 298 supplies the matching release route.
+  does not wait for the 75-second lease. Call Ticket 298's
+  `POST /api/advisor/brief/device/release` with the signed envelope and installation ID.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
 - Still required (not a decision): a command that hands the access token to the webview
