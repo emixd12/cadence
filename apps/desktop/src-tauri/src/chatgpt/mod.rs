@@ -297,12 +297,20 @@ impl<H: Http, S: Secrets> Connection<H, S> {
             email: claims.email,
             scopes: granted_scopes(tokens.scope.as_deref().or(params.scope.as_deref())),
             access_token: Some(tokens.access_token),
-            refresh_token: Some(refresh_token),
+            refresh_token: Some(refresh_token.clone()),
             expires_at: (self.now)() + tokens.expires_in,
             needs_reconnect: false,
         };
         let replaced = {
             let _session = self.session_lock.lock().await;
+            // A cancel or Disconnect during the exchange wins: never save, and never leave live, this grant.
+            // Disconnect sets the flag before it takes the lock, so it either sees this session or stops it here.
+            if cancel.load(Ordering::SeqCst) {
+                drop(_session);
+                self.revoke(&endpoints, &accepted.client_id, &refresh_token)
+                    .await;
+                return Err(Failure::Cancelled);
+            }
             let previous = self.load::<Session>(SESSION_ITEM).ok().flatten();
             self.save(SESSION_ITEM, &session)?;
             previous
@@ -425,10 +433,16 @@ impl<H: Http, S: Secrets> Connection<H, S> {
                 .map_err(|_| Failure::Unavailable)?;
             if reply.status == 401 {
                 let _session = self.session_lock.lock().await;
-                if let Some(session) = self.load::<Session>(SESSION_ITEM)? {
-                    return Err(self.mark_reconnect(session));
-                }
-                return Err(Failure::Disconnected);
+                return match self.load::<Session>(SESSION_ITEM)? {
+                    // Only the session that owns the rejected token is marked; a replacement stays intact.
+                    Some(session)
+                        if session.access_token.as_deref() == Some(refreshed.as_str()) =>
+                    {
+                        Err(self.mark_reconnect(session))
+                    }
+                    Some(_) => Err(Failure::Unavailable),
+                    None => Err(Failure::Disconnected),
+                };
             }
         }
         match reply.status {

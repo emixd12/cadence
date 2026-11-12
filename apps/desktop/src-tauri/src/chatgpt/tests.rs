@@ -103,6 +103,10 @@ struct Mock {
     issued: AtomicUsize,
     refreshes: AtomicUsize,
     secrets: Mutex<HashMap<String, String>>,
+    /// Runs while the authorization-code exchange is in flight.
+    during_exchange: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    /// One entry per catalog request; `Some` runs before that reply.
+    during_catalog: Mutex<VecDeque<Option<Box<dyn FnOnce(&Mock) + Send>>>>,
 }
 
 impl Mock {
@@ -158,6 +162,10 @@ impl Http for MockHttp {
             JWKS_URL => reply(200, jwks()),
             CATALOG_URL => {
                 assert!(bearer.is_some_and(|token| token.starts_with("at-SECRET-access-")));
+                let hook = mock.during_catalog.lock().unwrap().pop_front().flatten();
+                if let Some(hook) = hook {
+                    hook(mock);
+                }
                 let status = mock
                     .catalog_statuses
                     .lock()
@@ -186,6 +194,9 @@ impl Http for MockHttp {
                 match field("grant_type").as_deref() {
                     Some("authorization_code") => {
                         mock.event("POST token authorization_code".into());
+                        if let Some(hook) = mock.during_exchange.lock().unwrap().take() {
+                            hook();
+                        }
                         assert_eq!(field("client_id").as_deref(), Some(ISSUED_CLIENT));
                         assert_eq!(field("resource").as_deref(), Some(RESOURCE));
                         let verifier = field("code_verifier").unwrap();
@@ -839,6 +850,48 @@ fn the_catalog_lists_slug_and_visibility_and_retries_once_after_a_401() {
         h.connection.status().unwrap().state,
         ConnectionState::NeedsReconnect
     );
+}
+
+#[test]
+fn a_cancel_during_the_code_exchange_revokes_the_new_grant_and_saves_nothing() {
+    let h = harness();
+    let connection = h.connection.clone();
+    *h.mock.during_exchange.lock().unwrap() = Some(Box::new(move || connection.cancel_connect()));
+    assert_eq!(connect(&h).err(), Some(Failure::Cancelled));
+    assert!(h.mock.session().is_none());
+    assert!(h
+        .mock
+        .events()
+        .contains(&"POST revoke rt-SECRET-refresh-1-xxxxxxxx".to_owned()));
+    assert_eq!(
+        h.connection.status().unwrap().state,
+        ConnectionState::Disconnected
+    );
+}
+
+#[test]
+fn a_late_catalog_rejection_leaves_a_replacement_session_intact() {
+    let h = harness();
+    connect(&h).unwrap();
+    h.mock.catalog_statuses.lock().unwrap().extend([401, 401]);
+    // Another sign-in replaces the session while the retried catalog request is in flight.
+    h.mock.during_catalog.lock().unwrap().extend([
+        None,
+        Some(Box::new(|mock: &Mock| {
+            let mut secrets = mock.secrets.lock().unwrap();
+            let mut session: Value = serde_json::from_str(&secrets[SESSION_ITEM]).unwrap();
+            session["access_token"] = json!("at-SECRET-access-replacement-xxxxxxxx");
+            session["refresh_token"] = json!("rt-SECRET-refresh-replacement-xxxxxxxx");
+            secrets.insert(SESSION_ITEM.to_owned(), session.to_string());
+        }) as Box<dyn FnOnce(&Mock) + Send>),
+    ]);
+    assert_eq!(run(h.connection.models()).err(), Some(Failure::Unavailable));
+    let session = h.mock.session().unwrap();
+    assert_eq!(
+        session["access_token"],
+        json!("at-SECRET-access-replacement-xxxxxxxx")
+    );
+    assert_eq!(session["needs_reconnect"], json!(false));
 }
 
 #[test]
