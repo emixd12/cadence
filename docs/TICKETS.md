@@ -17679,7 +17679,7 @@ anchor links; `npm run interactions:check`, `npm run design-system:check`; the b
 
 ## Ticket 302: Mac Settings adopts the groups
 
-Status: implemented November 10, 2026 on PR 205. Waiting on the Mac 0.1.10 release (credential backup is Ticket 325): an installed check in local and linked mode and the Mac's WebKit view.
+Status: complete November 12, 2026. Installed check passed on notarized 0.1.10 in linked mode (test Mac, account A) and local mode (owner's Mac before sign-in): `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md`, "Ticket checks on the installed build".
 Dependencies: Ticket 301.
 
 Goal: Settings on the Mac has the same groups, rows and drawers as the web page.
