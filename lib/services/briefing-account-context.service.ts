@@ -103,6 +103,8 @@ export async function prepareAccountBriefingContexts(
   tipFingerprint: (finding: BriefingFinding) => string;
   /** Descriptions keyed by the contexts' opaque behaviorRef; null when not requested. */
   descriptions: Readonly<Record<string, string>> | null;
+  /** Ticket 298: the inputs `readBriefingContextFence` needs to check this capture's stored inputs later. */
+  fenceSpec: BriefingContextFenceSpec;
 }>> {
   const clock = input.clock ?? (() => Temporal.Now.instant());
   input.signal.throwIfAborted();
@@ -129,49 +131,7 @@ export async function prepareAccountBriefingContexts(
     const current = await readDailyBriefPreferences(caller.client, signal);
     signal.throwIfAborted();
     if (!samePreferences(current, preferences)) throw new DailyBriefError("context_changed");
-    const behaviorIds = await listDailyBriefBehaviorIds(caller.client, caller.user.id, signal);
-    signal.throwIfAborted();
-    let calendar: AdvisorAuthorizationFence["calendar"] = null;
-    // Ticket 307: Google Calendar is the Timeline connection and its selected calendars.
-    if (allowed("googleCalendar") && dailyBriefReadsGoogleCalendar(preferences)) {
-      const connection = await getCalendarConnection(caller);
-      signal.throwIfAborted();
-      if (connection.status === "connected" && connection.preferences.selectedCalendarIds.length > 0) {
-        calendar = {
-          calendarIds: [...connection.preferences.selectedCalendarIds].sort(),
-          connectionGeneration: connection.generation,
-          selectionRevision: connection.selectionRevision,
-        };
-      }
-    }
-    const connectorFence = async (provider: "outlook_calendar" | "icloud_calendar") => {
-      const connection = provider === "outlook_calendar" ? await getOutlookCalendarConnection(caller) : await getConnectorConnection(caller, provider);
-      signal.throwIfAborted();
-      if (connection.status !== "connected" || connection.preferences.selectedSourceIds.length === 0) return null;
-      return {
-        calendarIds: [...connection.preferences.selectedSourceIds].sort(),
-        connectionGeneration: connection.generation,
-        selectionRevision: connection.selectionRevision,
-      };
-    };
-    const outlookCalendar = wantOutlook ? await connectorFence("outlook_calendar") : null;
-    const icloudCalendar = wantIcloud ? await connectorFence("icloud_calendar") : null;
-    let hevy: AdvisorAuthorizationFence["hevy"] = null;
-    if (wantHevy) {
-      const connection = await getConnectorConnection(caller, "hevy");
-      signal.throwIfAborted();
-      if (connection.status === "connected") hevy = { connectionGeneration: connection.generation };
-    }
-    return {
-      userId: caller.user.id,
-      clientId: CLIENT_ID,
-      accountRef: briefingAccountRef(caller.user.id),
-      grantGeneration: preferences.revision,
-      grantExpiresAt,
-      behaviorIds,
-      calendar,
-      ...(sources ? { outlookCalendar, icloudCalendar, hevy } : {}),
-    };
+    return readBriefingAuthorization(caller, preferences, { wantOutlook, wantIcloud, wantHevy, connectorSources: !!sources }, grantExpiresAt, signal);
   };
 
   const authorization = await readAuthorization();
@@ -273,7 +233,127 @@ export async function prepareAccountBriefingContexts(
     input.signal.throwIfAborted();
   };
 
-  return { contexts, assertCurrent, configurationRefs, preferences, calendar: authorization.calendar, analysisSource, tipFingerprint, descriptions };
+  const fenceSpec: BriefingContextFenceSpec = {
+    localDate: firstContext.localDate,
+    connectorSources: sources ? { calendars: sources.calendars, recordedActivity: sources.recordedActivity } : null,
+    analysis: input.analysis ? { includeReminders: input.analysis.includeReminders, includeNotes: input.analysis.includeNotes } : null,
+    travelConclusions: !!supplied && contexts.some((candidate) => candidate.travel?.route.state === "available"),
+  };
+  return { contexts, assertCurrent, configurationRefs, preferences, calendar: authorization.calendar, analysisSource, tipFingerprint, descriptions, fenceSpec };
+}
+
+/**
+ * The authorization fence for one capture: Behavior IDs and each covered source's
+ * connection and selection. The capture and `readBriefingContextFence` share it.
+ */
+async function readBriefingAuthorization(caller: CalendarCaller, preferences: DailyBriefPreferences,
+  want: Readonly<{ wantOutlook: boolean; wantIcloud: boolean; wantHevy: boolean; connectorSources: boolean }>,
+  grantExpiresAt: string, signal: AbortSignal): Promise<AdvisorAuthorizationFence> {
+  const behaviorIds = await listDailyBriefBehaviorIds(caller.client, caller.user.id, signal);
+  signal.throwIfAborted();
+  let calendar: AdvisorAuthorizationFence["calendar"] = null;
+  // Ticket 307: Google Calendar is the Timeline connection and its selected calendars.
+  if (dailyBriefSourceAllowed(preferences, "googleCalendar") && dailyBriefReadsGoogleCalendar(preferences)) {
+    const connection = await getCalendarConnection(caller);
+    signal.throwIfAborted();
+    if (connection.status === "connected" && connection.preferences.selectedCalendarIds.length > 0) {
+      calendar = {
+        calendarIds: [...connection.preferences.selectedCalendarIds].sort(),
+        connectionGeneration: connection.generation,
+        selectionRevision: connection.selectionRevision,
+      };
+    }
+  }
+  const connectorFence = async (provider: "outlook_calendar" | "icloud_calendar") => {
+    const connection = provider === "outlook_calendar" ? await getOutlookCalendarConnection(caller) : await getConnectorConnection(caller, provider);
+    signal.throwIfAborted();
+    if (connection.status !== "connected" || connection.preferences.selectedSourceIds.length === 0) return null;
+    return {
+      calendarIds: [...connection.preferences.selectedSourceIds].sort(),
+      connectionGeneration: connection.generation,
+      selectionRevision: connection.selectionRevision,
+    };
+  };
+  const outlookCalendar = want.wantOutlook ? await connectorFence("outlook_calendar") : null;
+  const icloudCalendar = want.wantIcloud ? await connectorFence("icloud_calendar") : null;
+  let hevy: AdvisorAuthorizationFence["hevy"] = null;
+  if (want.wantHevy) {
+    const connection = await getConnectorConnection(caller, "hevy");
+    signal.throwIfAborted();
+    if (connection.status === "connected") hevy = { connectionGeneration: connection.generation };
+  }
+  return {
+    userId: caller.user.id,
+    clientId: CLIENT_ID,
+    accountRef: briefingAccountRef(caller.user.id),
+    grantGeneration: preferences.revision,
+    grantExpiresAt,
+    behaviorIds,
+    calendar,
+    ...(want.connectorSources ? { outlookCalendar, icloudCalendar, hevy } : {}),
+  };
+}
+
+/**
+ * Ticket 298: what a capture's `assertCurrent` compares, as plain JSON, so a later
+ * request with no capture in memory can check the same stored inputs again.
+ */
+export type BriefingContextFenceSpec = Readonly<{
+  localDate: string;
+  connectorSources: Readonly<{ calendars: boolean; recordedActivity: boolean }> | null;
+  analysis: Readonly<{ includeReminders: boolean; includeNotes: boolean }> | null;
+  /** Whether supplied travel conclusions reached the context, so their source is fenced too. */
+  travelConclusions: boolean;
+}>;
+
+/**
+ * Ticket 298: one digest of the stored inputs `assertCurrent` compares: Daily Brief
+ * preferences, the authorization fence, the Cadence revision, the timezone, stored
+ * travel facts, the travel source when conclusions were supplied, and the analysis
+ * revision when lanes ran. Equal digests mean those inputs did not change. The digest
+ * is one-way, and its refs use a fixed account-scoped key, never the capture's key.
+ * It reads stored rows only and calls no Calendar or workout provider.
+ */
+export async function readBriefingContextFence(caller: CalendarCaller, spec: BriefingContextFenceSpec, input: Readonly<{
+  signal: AbortSignal;
+  clock?: () => Temporal.Instant;
+}>): Promise<string> {
+  const { signal } = input;
+  const clock = input.clock ?? (() => Temporal.Now.instant());
+  signal.throwIfAborted();
+  const preferences = await readDailyBriefPreferences(caller.client, signal);
+  signal.throwIfAborted();
+  const allowed = (source: DailyBriefConnectedSource) => dailyBriefSourceAllowed(preferences, source);
+  const sources = spec.connectorSources;
+  const authorization = await readBriefingAuthorization(caller, preferences, {
+    wantOutlook: !!sources?.calendars && allowed("outlookCalendar"),
+    wantIcloud: !!sources?.calendars && allowed("icloudCalendar"),
+    wantHevy: !!sources?.recordedActivity && allowed("hevy"),
+    connectorSources: !!sources,
+  }, "", signal);
+  const historyStartLocalDate = Temporal.PlainDate.from(spec.localDate).subtract({ days: 90 }).toString();
+  const cadenceRevision = await readAdvisorCadenceRevision(caller.client, {
+    localDate: spec.localDate, historyStartLocalDate, behaviorIds: authorization.behaviorIds, signal,
+  });
+  signal.throwIfAborted();
+  const timezone = await readAdvisorProfileTimezone(caller.client, caller.user.id);
+  signal.throwIfAborted();
+  const fenceKey = createHash("sha256").update(`cadence-daily-brief-fence\0${caller.user.id}`).digest();
+  const travel = await readBriefingTravel(caller, authorization.behaviorIds, createAdvisorOpaqueRef(fenceKey, authorization), spec.localDate);
+  signal.throwIfAborted();
+  const travelSource = spec.travelConclusions ? (await readCurrentTravelSource(caller, spec.localDate, clock())).key : null;
+  const analysisRevision = spec.analysis ? await readAdvisorAnalysisRevision(caller.client, {
+    localDate: spec.localDate, historyStartLocalDate, behaviorIds: authorization.behaviorIds,
+    includeReminders: spec.analysis.includeReminders && preferences.includeReminderHistory,
+    includeNotes: spec.analysis.includeNotes && preferences.includeNotes,
+    signal,
+  }) : null;
+  signal.throwIfAborted();
+  // The grant expiry is a clock value, not a stored input.
+  const stableAuthorization = { ...authorization, grantExpiresAt: null };
+  return createHash("sha256").update(JSON.stringify({
+    v: 1, preferences, authorization: stableAuthorization, cadenceRevision, timezone, travel, travelSource, analysisRevision,
+  })).digest("base64url");
 }
 
 async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly string[], makeOpaqueRef: AdvisorOpaqueRef, localDate: string): Promise<AdvisorTravelContext> {

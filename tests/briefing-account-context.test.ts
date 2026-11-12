@@ -65,6 +65,7 @@ import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 import {
   briefingAccountRef,
   prepareAccountBriefingContexts,
+  readBriefingContextFence,
   workbenchBehaviorRef,
 } from "@/lib/services/briefing-account-context.service";
 
@@ -669,5 +670,60 @@ describe("connected source fences (Tickets 239 and 306)", () => {
     const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources });
     change();
     await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+});
+
+describe("context fence for the device-model brief (Ticket 298)", () => {
+  const disclosed = dailyBriefPreferences({ allow: ["outlookCalendar", "hevy"] });
+  const sources = { calendars: true, recordedActivity: true, deadlineAt: Date.now() + 50_000 };
+  const spec = { localDate: fixture.localDate, connectorSources: { calendars: true, recordedActivity: true }, analysis: null, travelConclusions: false };
+  const travelSettings = { enabled: true, routing_consent_at: "2026-10-01T00:00:00Z", mode: "transit", base_location_text: "1 Main Street",
+    navigation_preference: null, onboarding_completed_at: null, updated_at: "2026-10-01T00:00:00Z" };
+  beforeEach(() => {
+    mocks.preferences.mockResolvedValue(disclosed);
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["b", "a"] } });
+    mocks.connector.mockResolvedValue({ status: "connected", generation: 5, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    mocks.travelSettings.mockResolvedValue(travelSettings);
+    mocks.whereKinds.mockResolvedValue([{ id: "behavior-1", where_kind: "home", location_text: null }]);
+  });
+
+  it("returns plain-JSON fence inputs with the capture", async () => {
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources });
+    expect(JSON.parse(JSON.stringify(prepared.fenceSpec))).toEqual(spec);
+  });
+
+  it("gives one stable digest for unchanged stored inputs without reading any provider snapshot", async () => {
+    mocks.contexts.mockClear();
+    const first = await readBriefingContextFence(caller, spec, { signal, clock: now });
+    const second = await readBriefingContextFence(caller, spec, { signal, clock: () => now().add({ seconds: 30 }) });
+    expect(second).toBe(first);
+    expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(mocks.contexts).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Cadence revision", () => mocks.revision.mockResolvedValue("raw-revision-2")],
+    ["timezone", () => mocks.timezone.mockResolvedValue("America/Chicago")],
+    ["preferences revision", () => mocks.preferences.mockResolvedValue({ ...disclosed, revision: 9 })],
+    ["Behavior set", () => mocks.ids.mockResolvedValue(["behavior-1", "behavior-2"])],
+    ["Outlook selection", () => mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 4, preferences: { selectedSourceIds: ["a", "b"] } })],
+    ["Hevy connection", () => mocks.connector.mockResolvedValue({ status: "disconnected", generation: 6, selectionRevision: 0, preferences: { selectedSourceIds: [] } })],
+    ["Where", () => mocks.whereKinds.mockResolvedValue([{ id: "behavior-1", where_kind: "anywhere", location_text: null }])],
+    ["travel settings", () => mocks.travelSettings.mockResolvedValue({ ...travelSettings, mode: "driving" })],
+  ])("changes the digest when the %s changes", async (_label, change) => {
+    const before = await readBriefingContextFence(caller, spec, { signal, clock: now });
+    change();
+    expect(await readBriefingContextFence(caller, spec, { signal, clock: now })).not.toBe(before);
+  });
+
+  it("fences the analysis revision only when lanes ran", async () => {
+    const lanes = { ...spec, connectorSources: null, analysis: { includeReminders: true, includeNotes: false } };
+    mocks.analysisRevision.mockResolvedValue("analysis-1");
+    const before = await readBriefingContextFence(caller, lanes, { signal, clock: now });
+    mocks.analysisRevision.mockResolvedValue("analysis-2");
+    expect(await readBriefingContextFence(caller, lanes, { signal, clock: now })).not.toBe(before);
+    mocks.analysisRevision.mockClear();
+    await readBriefingContextFence(caller, { ...lanes, analysis: null }, { signal, clock: now });
+    expect(mocks.analysisRevision).not.toHaveBeenCalled();
   });
 });
