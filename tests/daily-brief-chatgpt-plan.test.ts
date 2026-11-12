@@ -10,7 +10,7 @@ import { prepareDailyBrief, validateDailyBrief } from "@/lib/services/daily-brie
 import { dailyBriefRequestBody } from "@/lib/services/daily-brief-openai";
 import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "@/lib/services/daily-brief-schema";
 import {
-  CHATGPT_PLAN_STREAM_LIMIT_BYTES, ChatGPTPlanError, chatGPTPlanBriefBody, chatGPTPlanErrorCode, chooseChatGPTPlanModel, createSseParser,
+  CHATGPT_PLAN_OUTPUT_LIMIT_BYTES, CHATGPT_PLAN_STREAM_LIMIT_BYTES, ChatGPTPlanError, chatGPTPlanBriefBody, chatGPTPlanErrorCode, chooseChatGPTPlanModel, createSseParser,
   generateChatGPTPlanDailyBrief, parseChatGPTPlanCatalog, selectChatGPTPlanModel,
 } from "@/lib/services/daily-brief-chatgpt-plan";
 
@@ -80,6 +80,13 @@ describe("model selection", () => {
     expect(await failure(chooseChatGPTPlanModel({ accessToken: "t", signal: signal(), fetch: fetchOnce(reply({ error: { code: null } }, 401)) })))
       .toMatchObject({ code: "reconnect" });
   });
+
+  it("does not report a malformed catalog as an ineligible account", async () => {
+    for (const text of ["not JSON", "null", "{}", '{"models":null}']) {
+      expect(await failure(chooseChatGPTPlanModel({ accessToken: "t", signal: signal(), fetch: fetchOnce(new Response(text)) })))
+        .toMatchObject({ code: "advisor_unavailable", reason: "provider_shape" });
+    }
+  });
 });
 
 describe("request contract", () => {
@@ -107,6 +114,10 @@ describe("stream parsing", () => {
     const text = sse({ type: "response.created", response: { status: "in_progress" } },
       { type: "response.output_text.delta", delta: "{" }, completedEvent()).replaceAll("\n", "\r\n");
     for (const size of [1, 2, 7, 1 << 20]) await expect(call(fetchOnce(() => Promise.resolve(streamReply(text, size))))).resolves.toEqual(output);
+  });
+
+  it("accepts a completed plain JSON reply", async () => {
+    await expect(call(fetchOnce(Response.json(completedEvent().response)))).resolves.toEqual(output);
   });
 
   it("reports usage once and keeps the result when the callback throws", async () => {
@@ -141,6 +152,13 @@ describe("error mapping", () => {
     expect(chatGPTPlanErrorCode(null, 400)).toBe("advisor_unavailable");
   });
 
+  it("treats inherited object property names as unknown provider codes", () => {
+    for (const code of ["constructor", "toString", "__proto__"]) {
+      expect(chatGPTPlanErrorCode(code, 400)).toBe("advisor_unavailable");
+      expect(chatGPTPlanErrorCode(code, 503)).toBe("retry_later");
+    }
+  });
+
   it("maps HTTP failures and never keeps provider text", async () => {
     const cases: [Response, string, string][] = [
       [json(429, "subscription_sharing_usage_limit_exceeded"), "usage_limit", "provider_subscription_sharing_usage_limit_exceeded"],
@@ -149,6 +167,8 @@ describe("error mapping", () => {
       [json(503, null), "retry_later", "provider_http_503"],
       [json(400, null), "advisor_unavailable", "provider_http_400"],
       [json(400, "Bad Code With Spaces"), "advisor_unavailable", "provider_unrecognized"],
+      [new Response(null, { status: 401 }), "reconnect", "provider_http_401"],
+      [new Response(null, { status: 503 }), "retry_later", "provider_http_503"],
     ];
     for (const [response, code, reason] of cases) {
       const error = await failure(call(fetchOnce(response)));
@@ -182,6 +202,58 @@ describe("error mapping", () => {
     const padding = sse({ type: "response.output_text.delta", delta: "x".repeat(1024) });
     const text = padding.repeat(Math.ceil(CHATGPT_PLAN_STREAM_LIMIT_BYTES / padding.length) + 1) + sse(completedEvent());
     expect(await failure(call(fetchOnce(streamReply(text, 4096))))).toMatchObject({ code: "advisor_unavailable", reason: "provider_body_too_large" });
+  });
+
+  it("caps JSON model, catalog and error bodies before reading the entire response", async () => {
+    const runs = [
+      (response: Response) => call(fetchOnce(response)),
+      (response: Response) => chooseChatGPTPlanModel({ accessToken: "t", signal: signal(), fetch: fetchOnce(response) }),
+      (response: Response) => call(fetchOnce(new Response(response.body, { status: 503 }))),
+    ];
+    for (const run of runs) {
+      let cancelled = false;
+      let reads = 0;
+      const response = new Response(new ReadableStream({
+        pull(controller) {
+          reads += 1;
+          controller.enqueue(new TextEncoder().encode("x".repeat(16 * 1024)));
+          if (reads === 64) controller.close();
+        },
+        cancel() { cancelled = true; },
+      }), { headers: { "Content-Type": "application/json" } });
+      expect(await failure(run(response))).toMatchObject({ code: "advisor_unavailable", reason: "provider_body_too_large" });
+      expect(cancelled).toBe(true);
+      expect(reads).toBeLessThan(64);
+    }
+  });
+
+  it("keeps the output byte cap for both streamed and JSON replies", async () => {
+    const completed = completedEvent({ ...output, text: "é".repeat(CHATGPT_PLAN_OUTPUT_LIMIT_BYTES / 2) });
+    for (const response of [streamReply(sse(completed)), Response.json(completed.response)]) {
+      expect(await failure(call(fetchOnce(response)))).toMatchObject({ code: "advisor_unavailable", reason: "provider_body_too_large" });
+    }
+  });
+
+  it("preserves aborts and interruptions while reading JSON model, catalog and error bodies", async () => {
+    const runs = [
+      (response: Response, abort: AbortSignal) => call(fetchOnce(response), abort),
+      (response: Response, abort: AbortSignal) => chooseChatGPTPlanModel({ accessToken: "t", signal: abort, fetch: fetchOnce(response) }),
+      (response: Response, abort: AbortSignal) => call(fetchOnce(new Response(response.body, { status: 503 })), abort),
+    ];
+    for (const run of runs) {
+      const abort = new AbortController();
+      const response = new Response(new ReadableStream({ start(controller) {
+        controller.enqueue(new TextEncoder().encode("{"));
+        abort.signal.addEventListener("abort", () => controller.error(new DOMException("aborted", "AbortError")));
+      } }), { headers: { "Content-Type": "application/json" } });
+      const pending = run(response, abort.signal);
+      abort.abort();
+      expect(await failure(pending)).toMatchObject({ code: "timeout", reason: "aborted" });
+
+      const interrupted = new Response(new ReadableStream({ start(controller) { controller.error(new TypeError("connection lost")); } }),
+        { headers: { "Content-Type": "application/json" } });
+      expect(await failure(run(interrupted, signal()))).toMatchObject({ code: "retry_later", reason: "stream_interrupted" });
+    }
   });
 
   it("maps network errors, aborts and a missing token", async () => {

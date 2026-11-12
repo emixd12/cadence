@@ -20,7 +20,8 @@ export const CHATGPT_PLAN_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
 /**
  * The event stream repeats the response object (with its instructions) in several
- * events, so the whole stream gets a larger cap than the output.
+ * events, so responses get a larger cap than the output. Catalog, error and plain
+ * JSON bodies use the same cap.
  */
 export const CHATGPT_PLAN_STREAM_LIMIT_BYTES = 256 * 1024;
 
@@ -56,8 +57,9 @@ const CODE_MAP: Readonly<Record<string, ChatGPTPlanErrorCode>> = {
 
 /** Maps a provider error code and HTTP status to what the Mac shows. A known code wins over the status. */
 export function chatGPTPlanErrorCode(code: string | null, status: number | null): ChatGPTPlanErrorCode {
-  const mapped = code ? CODE_MAP[code] ?? (code.startsWith("chatpass_v2_") ? "reconnect" : null) : null;
+  const mapped = code && Object.hasOwn(CODE_MAP, code) ? CODE_MAP[code] : null;
   if (mapped) return mapped;
+  if (code?.startsWith("chatpass_v2_")) return "reconnect";
   if (status === 401) return "reconnect";
   if (status === 429 || status === 408 || (status !== null && status >= 500)) return "retry_later";
   return "advisor_unavailable";
@@ -91,8 +93,9 @@ export type ChatGPTPlanCallOptions = Readonly<{
 /** Reads the account's model catalog and returns the model to use, or throws `not_eligible` when none is listed. */
 export async function chooseChatGPTPlanModel(options: ChatGPTPlanCallOptions): Promise<string> {
   const response = await send(options, "/models", { method: "GET", headers: { Accept: "application/json" } });
-  if (!response.ok) await failFromResponse(response);
-  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) await failFromResponse(response, options.signal);
+  const body = await readJsonResponse(response, options.signal);
+  if (!record(body) || (!Array.isArray(body.models) && !Array.isArray(body.data))) throw new ChatGPTPlanError("advisor_unavailable", "provider_shape");
   const model = selectChatGPTPlanModel(parseChatGPTPlanCatalog(body));
   if (!model) throw new ChatGPTPlanError("not_eligible", "catalog_no_supported_model");
   return model;
@@ -124,7 +127,7 @@ export async function generateChatGPTPlanDailyBrief(request: DailyBriefModelRequ
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
     body: chatGPTPlanBriefBody(request, options.model),
   });
-  if (!response.ok) await failFromResponse(response);
+  if (!response.ok) await failFromResponse(response, options.signal);
   const completed = await readCompletedResponse(response, options.signal);
   if (options.onUsage) {
     const usage = parseUsage(completed.usage);
@@ -148,11 +151,43 @@ async function send(options: ChatGPTPlanCallOptions, path: string, init: Request
   }
 }
 
-async function failFromResponse(response: Response): Promise<never> {
-  // Error bodies are small JSON; only the code is kept.
-  const body: unknown = await response.json().catch(() => null);
+async function failFromResponse(response: Response, signal: AbortSignal): Promise<never> {
+  // Bound error bodies as well; only the code is kept.
+  const body = await readJsonResponse(response, signal);
   const code = errorCodeOf(body);
   throw new ChatGPTPlanError(chatGPTPlanErrorCode(code, response.status), code ? `provider_${safe(code)}` : `provider_http_${response.status}`);
+}
+
+/** Every response uses the same byte limit, cancellation and transport-error rules. */
+async function* readBody(response: Response, signal: AbortSignal): AsyncGenerator<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new ChatGPTPlanError("advisor_unavailable", "provider_body_missing");
+  let bytes = 0;
+  try {
+    for (;;) {
+      if (signal.aborted) throw new ChatGPTPlanError("timeout", "aborted");
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try { chunk = await reader.read(); }
+      catch { throw signal.aborted ? new ChatGPTPlanError("timeout", "aborted") : new ChatGPTPlanError("retry_later", "stream_interrupted"); }
+      if (signal.aborted) throw new ChatGPTPlanError("timeout", "aborted");
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > CHATGPT_PLAN_STREAM_LIMIT_BYTES) throw new ChatGPTPlanError("advisor_unavailable", "provider_body_too_large");
+      yield chunk.value;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+async function readJsonResponse(response: Response, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) throw new ChatGPTPlanError("timeout", "aborted");
+  if (!response.body) return null;
+  const decoder = new TextDecoder();
+  let text = "";
+  for await (const chunk of readBody(response, signal)) text += decoder.decode(chunk, { stream: true });
+  text += decoder.decode();
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 /**
@@ -162,34 +197,21 @@ async function failFromResponse(response: Response): Promise<never> {
 async function readCompletedResponse(response: Response, signal: AbortSignal): Promise<Record<string, unknown>> {
   if ((response.headers.get("content-type") ?? "").includes("json")) {
     // A plain JSON reply would mean the route ignored `stream: true`; accept a completed one.
-    const body: unknown = await response.json().catch(() => null);
+    const body = await readJsonResponse(response, signal);
     if (record(body) && body.status === "completed") return body;
     throw new ChatGPTPlanError("advisor_unavailable", "provider_shape");
   }
-  const reader = response.body?.getReader();
-  if (!reader) throw new ChatGPTPlanError("advisor_unavailable", "provider_body_missing");
   const decoder = new TextDecoder();
   const parser = createSseParser();
-  let bytes = 0;
   let result: Record<string, unknown> | null = null;
-  try {
-    for (;;) {
-      let chunk: ReadableStreamReadResult<Uint8Array>;
-      try { chunk = await reader.read(); }
-      catch { throw signal.aborted ? new ChatGPTPlanError("timeout", "aborted") : new ChatGPTPlanError("retry_later", "stream_interrupted"); }
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > CHATGPT_PLAN_STREAM_LIMIT_BYTES) throw new ChatGPTPlanError("advisor_unavailable", "provider_body_too_large");
-      for (const data of parser.push(decoder.decode(chunk.value, { stream: true }))) {
-        result = handleEvent(data);
-        if (result) break;
-      }
+  for await (const chunk of readBody(response, signal)) {
+    for (const data of parser.push(decoder.decode(chunk, { stream: true }))) {
+      result = handleEvent(data);
       if (result) break;
     }
-    if (!result) for (const data of [...parser.push(decoder.decode()), ...parser.end()]) result ??= handleEvent(data);
-  } finally {
-    await reader.cancel().catch(() => undefined);
+    if (result) break;
   }
+  if (!result) for (const data of [...parser.push(decoder.decode()), ...parser.end()]) result ??= handleEvent(data);
   if (!result) throw signal.aborted ? new ChatGPTPlanError("timeout", "aborted") : new ChatGPTPlanError("retry_later", "stream_interrupted");
   return result;
 }
