@@ -65,11 +65,11 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
   }
 
   async preferences(signal?: AbortSignal) {
-    return this.remember(await this.request<DailyBriefSettings>("/api/advisor/preferences", {}, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
+    return this.present(await this.request<DailyBriefSettings>("/api/advisor/preferences", {}, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
   }
 
   async updatePreferences(input: DailyBriefPreferenceInput, signal?: AbortSignal) {
-    return this.remember(await this.request<DailyBriefSettings>("/api/advisor/preferences", { method: "PUT", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
+    return this.present(await this.request<DailyBriefSettings>("/api/advisor/preferences", { method: "PUT", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal));
   }
 
   async requestBrief(input: DailyBriefRequestInput, signal?: AbortSignal): Promise<DailyBriefResponse> {
@@ -127,9 +127,17 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     return response;
   }
 
-  private remember(settings: DailyBriefSettings): DailyBriefSettings {
+  /**
+   * Keeps the server's settings for the plan decision, and shows the brief as available when
+   * this Mac can run it on the plan: the server offers device mode and ChatGPT is connected
+   * with plan usage (or needs reconnecting, so the bubble can say so). The hosted-only check
+   * stays as it was for every other case, including the web app.
+   */
+  private async present(settings: DailyBriefSettings): Promise<DailyBriefSettings> {
     this.settings = settings;
-    return settings;
+    if (settings.available || !settings.deviceModelAvailable || !this.planPath) return settings;
+    const status = await this.planPath.connection.status().catch(() => null);
+    return status?.state === "connectedWithPlanUsage" || status?.state === "needsReconnect" ? { ...settings, available: true } : settings;
   }
 
   /** The deadline covers session lookup, request and body decoding; a caller signal only adds cancellation. */

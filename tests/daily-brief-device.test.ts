@@ -7,13 +7,13 @@ import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 
 // Ticket 298: device-model prepare and complete. Authored model output only; no provider is called.
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(), read: vi.fn(), begin: vi.fn(), finish: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), save: vi.fn(),
+  auth: vi.fn(), read: vi.fn(), begin: vi.fn(), finish: vi.fn(), release: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), save: vi.fn(),
   prepare: vi.fn(), current: vi.fn(), fence: vi.fn(), config: vi.fn(), timezone: vi.fn(),
   openaiBrief: vi.fn(), openaiEstimates: vi.fn(), calendar: vi.fn(), outlook: vi.fn(), icloud: vi.fn(), hevy: vi.fn(),
 }));
 vi.mock("@/lib/services/google-calendar-request", async (original) => ({ ...await original<typeof import("@/lib/services/google-calendar-request")>(), authenticateCalendarRequest: mocks.auth }));
 vi.mock("@/lib/db/daily-brief.repo", async (original) => ({ ...await original<typeof import("@/lib/db/daily-brief.repo")>(),
-  readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: mocks.save, beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
+  readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: mocks.save, beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish, releaseDailyBrief: mocks.release,
   readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
   const actual = await original<typeof import("@/lib/services/briefing-pipeline")>();
@@ -51,6 +51,7 @@ const ref = fixture.cadence.occurrences[0]!.ref;
 const output = { suggestions: [], text: "Take time for your walk.", occurrenceRefs: [ref] };
 const fenceSpec = { localDate: fixture.localDate, connectorSources: { calendars: true, recordedActivity: true }, analysis: null, travelConclusions: false };
 let currentLease = "lease-1";
+let leaseStatus: "pending" | "completed" | "failed" = "pending";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -59,11 +60,25 @@ beforeEach(() => {
   vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "1");
   vi.stubEnv("CADENCE_DAILY_BRIEF_ENVELOPE_SECRET", SECRET);
   currentLease = "lease-1";
+  leaseStatus = "pending";
   mocks.auth.mockResolvedValue(owner);
   mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1 }));
-  mocks.begin.mockImplementation(async () => ({ state: "acquired", leaseToken: currentLease, localDate: fixture.localDate }));
-  // The database finishes only the current lease.
-  mocks.finish.mockImplementation(async (_client, input: { leaseToken: string }) => input.leaseToken === currentLease);
+  mocks.begin.mockImplementation(async () => {
+    leaseStatus = "pending";
+    return { state: "acquired", leaseToken: currentLease, localDate: fixture.localDate };
+  });
+  // Mirror the distinct database operations: completion is single-use; its
+  // rollback can downgrade success; release can change only a pending lease.
+  mocks.finish.mockImplementation(async (_client, input: { leaseToken: string; success: boolean }) => {
+    if (input.leaseToken !== currentLease || (input.success ? leaseStatus !== "pending" : leaseStatus === "failed")) return false;
+    leaseStatus = input.success ? "completed" : "failed";
+    return true;
+  });
+  mocks.release.mockImplementation(async (_client, input: { leaseToken: string }) => {
+    if (input.leaseToken !== currentLease || leaseStatus !== "pending") return false;
+    leaseStatus = "failed";
+    return true;
+  });
   mocks.current.mockResolvedValue(undefined);
   mocks.fence.mockResolvedValue("fence-1");
   mocks.timezone.mockResolvedValue(fixture.timezone);
@@ -224,14 +239,110 @@ describe("device complete", () => {
     const { envelope } = await prepared();
     await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output: { ...output, occurrenceRefs: ["occ_unknown"] } }, { now: at(10) }))
       .rejects.toMatchObject({ code: "advisor_unavailable", reason: "validation_unknown_ref" });
-    expect(mocks.finish).toHaveBeenCalledWith(owner.client, expect.objectContaining({ leaseToken: "lease-1", success: false }));
-    expect(mocks.finish).not.toHaveBeenCalledWith(owner.client, expect.objectContaining({ success: true }), expect.anything());
+    expect(mocks.release).toHaveBeenCalledWith(owner.client, expect.objectContaining({ leaseToken: "lease-1", expectedRevision: 1 }));
+    expect(mocks.finish).not.toHaveBeenCalled();
+  });
+
+  it("cannot downgrade a successful attempt by replaying complete, including invalid output", async () => {
+    const { envelope } = await prepared();
+    await completeDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) });
+    expect(leaseStatus).toBe("completed");
+    await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(11) })).rejects.toMatchObject({ code: "context_changed" });
+    await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output: { ...output, occurrenceRefs: ["occ_unknown"] } }, { now: at(12) }))
+      .rejects.toMatchObject({ code: "advisor_unavailable" });
+    expect(leaseStatus).toBe("completed");
+    expect(mocks.finish.mock.calls.every(([, input]) => input.success)).toBe(true);
+  });
+
+  it("downgrades only its own completion when the final fence fails", async () => {
+    const { envelope } = await prepared();
+    mocks.fence.mockResolvedValueOnce("fence-changed");
+    await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) })).rejects.toMatchObject({ code: "context_changed" });
+    expect(mocks.finish.mock.calls.map(([, input]) => input.success)).toEqual([true, false]);
+    expect(leaseStatus).toBe("failed");
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it("rechecks context freshness after a slow final fence", async () => {
+    const { envelope } = await prepared(at(200));
+    let now = capturedAt.add({ seconds: 210 });
+    mocks.fence.mockImplementationOnce(async () => {
+      now = Temporal.Instant.from(fixture.expiresAt);
+      return "fence-1";
+    });
+    await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output }, { now: () => now })).rejects.toMatchObject({ code: "context_expired" });
+    expect(leaseStatus).toBe("failed");
   });
 
   it("rejects a malformed complete body", async () => {
     const { envelope } = await prepared();
     await expect(completeDeviceDailyBrief(owner, { installationId, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
     await expect(completeDeviceDailyBrief(owner, { installationId, envelope, output, extra: 1 }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
+  });
+});
+
+describe("device release", () => {
+  it("releases the exact pending attempt and permits a deliberate retry without waiting", async () => {
+    const { envelope } = await prepared();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
+    expect(mocks.release).toHaveBeenCalledWith(owner.client, { installationId, leaseToken: "lease-1", expectedRevision: 1 }, expect.any(AbortSignal));
+    expect(leaseStatus).toBe("failed");
+    currentLease = "lease-2";
+    await expect(prepareDeviceDailyBrief(owner, { installationId, retry: true }, { now: at(11) })).resolves.toMatchObject({ state: "prepared" });
+    expect(mocks.begin).toHaveBeenLastCalledWith(owner.client, { installationId, retry: true, expectedRevision: 1 }, expect.any(AbortSignal));
+    expect(mocks.finish).not.toHaveBeenCalled();
+  });
+
+  it("rejects forged, expired, cross-account and cross-installation releases before storage", async () => {
+    const { envelope } = await prepared();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: "bad.signature" }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(75) })).rejects.toMatchObject({ code: "context_expired" });
+    await expect(releaseDeviceDailyBrief(stranger, { installationId, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId: otherInstallation, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it("cannot release completed or superseded attempts", async () => {
+    const { envelope } = await prepared();
+    await completeDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(11) })).rejects.toMatchObject({ code: "context_changed" });
+    expect(leaseStatus).toBe("completed");
+    currentLease = "lease-2";
+    await prepared(at(12));
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(13) })).rejects.toMatchObject({ code: "context_changed" });
+    expect(leaseStatus).toBe("pending");
+  });
+
+  it("can release after the active recipe changes, without capturing context or calling a model", async () => {
+    const { envelope } = await prepared();
+    mocks.config.mockReturnValue(BRIEFING_PRESETS.find((preset) => preset.config.recipe.version === "1.1")!.config);
+    mocks.prepare.mockClear();
+    mocks.fence.mockClear();
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.fence).not.toHaveBeenCalled();
+    expect(mocks.openaiBrief).not.toHaveBeenCalled();
+  });
+
+  it("awaits storage before the release route reports success", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(fixture.capturedAt));
+      const { envelope } = await prepared();
+      let finishRelease!: (result: boolean) => void;
+      mocks.release.mockImplementationOnce(() => new Promise<boolean>((resolve) => { finishRelease = resolve; }));
+      let responded = false;
+      const request = releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope }) }));
+      void request.then(() => { responded = true; });
+      await vi.waitFor(() => expect(mocks.release).toHaveBeenCalled());
+      expect(responded).toBe(false);
+      finishRelease(true);
+      const response = await request;
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await response.json()).toEqual({ state: "released" });
+    } finally { vi.useRealTimers(); }
   });
 });
 
@@ -254,60 +365,8 @@ describe("device performance spans", () => {
   });
 });
 
-describe("device release", () => {
-  it("finishes the lease without success, so a retry can start at once", async () => {
-    const { envelope } = await prepared();
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
-    expect(mocks.finish).toHaveBeenCalledTimes(1);
-    expect(mocks.finish).toHaveBeenCalledWith(owner.client, { installationId, leaseToken: "lease-1", success: false, expectedRevision: 1 }, expect.any(AbortSignal));
-  });
-
-  it("is idempotent and harmless for a superseded lease or a second call", async () => {
-    const first = await prepared();
-    currentLease = "lease-2";
-    await prepared();
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: first.envelope }, { now: at(10) })).resolves.toEqual({ state: "released" });
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: first.envelope }, { now: at(11) })).resolves.toEqual({ state: "released" });
-    // The database finishes only the current lease, so lease-2 stays open.
-    expect(mocks.finish).not.toHaveBeenCalledWith(owner.client, expect.objectContaining({ leaseToken: "lease-2" }), expect.anything());
-  });
-
-  it("does nothing for an expired envelope", async () => {
-    const { envelope } = await prepared();
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope }, { now: at(75) })).resolves.toEqual({ state: "released" });
-    expect(mocks.finish).not.toHaveBeenCalled();
-  });
-
-  it("rejects a forged envelope, another user, another installation and a malformed body", async () => {
-    const { envelope } = await prepared();
-    const forged = issueDailyBriefEnvelope({ ...payloadOf(envelope), lease: "lease-other" }, OTHER_SECRET)!;
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: forged }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
-    await expect(releaseDeviceDailyBrief(stranger, { installationId, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
-    await expect(releaseDeviceDailyBrief(owner, { installationId: otherInstallation, envelope }, { now: at(10) })).rejects.toMatchObject({ code: "brief_envelope_invalid" });
-    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope, output }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
-    await expect(releaseDeviceDailyBrief(owner, { installationId }, { now: at(10) })).rejects.toMatchObject({ code: "invalid_request" });
-    expect(mocks.finish).not.toHaveBeenCalled();
-  });
-
-  it("returns not configured from the route when the flag is off, and released through the route when on", async () => {
-    vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "");
-    const off = await releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope: "x.y" }) }));
-    expect(off.status).toBe(503);
-    expect(await off.json()).toEqual({ error: "not_configured" });
-    vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "1");
-    vi.useFakeTimers({ toFake: ["Date"] });
-    try {
-      vi.setSystemTime(new Date(fixture.capturedAt));
-      const { envelope } = await prepared();
-      const on = await releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope }) }));
-      expect(on.status).toBe(200);
-      expect(await on.json()).toEqual({ state: "released" });
-    } finally { vi.useRealTimers(); }
-  });
-});
-
 describe("device mode flag", () => {
-  it("returns not configured from both routes when the flag is off", async () => {
+  it("returns not configured from every route when the flag is off", async () => {
     vi.stubEnv("CADENCE_DAILY_BRIEF_DEVICE_MODEL", "");
     vi.stubEnv("OPENAI_API_KEY", "synthetic-key");
     const prepare = await preparePOST(new Request("https://cadence.example/api/advisor/brief/device/prepare", { method: "POST", body: JSON.stringify({ installationId, retry: false }) }));
@@ -316,14 +375,19 @@ describe("device mode flag", () => {
     const complete = await completePOST(new Request("https://cadence.example/api/advisor/brief/device/complete", { method: "POST", body: JSON.stringify({ installationId, envelope: "x.y", output }) }));
     expect(complete.status).toBe(503);
     expect(await complete.json()).toEqual({ error: "not_configured" });
+    const release = await releasePOST(new Request("https://cadence.example/api/advisor/brief/device/release", { method: "POST", body: JSON.stringify({ installationId, envelope: "x.y" }) }));
+    expect(release.status).toBe(503);
+    expect(await release.json()).toEqual({ error: "not_configured" });
     expect(mocks.begin).not.toHaveBeenCalled();
     expect(mocks.finish).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
   });
 
   it("stays off when the flag is on but the envelope secret is missing or short", async () => {
     vi.stubEnv("CADENCE_DAILY_BRIEF_ENVELOPE_SECRET", "short");
     await expect(prepareDeviceDailyBrief(owner, { installationId, retry: false })).rejects.toMatchObject({ code: "not_configured" });
     await expect(completeDeviceDailyBrief(owner, { installationId, envelope: "x.y", output })).rejects.toMatchObject({ code: "not_configured" });
+    await expect(releaseDeviceDailyBrief(owner, { installationId, envelope: "x.y" })).rejects.toMatchObject({ code: "not_configured" });
   });
 
   it("maps envelope and recipe errors to route statuses", async () => {

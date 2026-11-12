@@ -130,6 +130,23 @@ export async function finishDailyBrief(
   return data;
 }
 
+/** Releases only a matching pending lease; replay cannot downgrade a completed attempt. */
+export async function releaseDailyBrief(
+  client: AppSupabaseClient,
+  input: Readonly<{ installationId: string; leaseToken: string; expectedRevision: number }>,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const request = client.rpc("release_daily_brief", {
+    p_installation_id: input.installationId,
+    p_lease_token: input.leaseToken,
+    p_expected_revision: input.expectedRevision,
+  });
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  if (typeof data !== "boolean") throw new Error("Daily Brief release returned an invalid result.");
+  return data;
+}
+
 export type DailyBriefTipDelivery = Readonly<{ fingerprint: string; lastShownLocalDate: string }>;
 
 /** Fingerprints and last-shown dates from the last 30 local days. Content-free. */

@@ -22,12 +22,12 @@ function sse(value: unknown) {
 }
 
 /** Cadence's hosted routes. `calls` records each path and body. */
-function hosted(options: { deviceModelAvailable?: boolean; prepare?: unknown } = {}) {
+function hosted(options: { deviceModelAvailable?: boolean; prepare?: unknown; hostedAvailable?: boolean } = {}) {
   const calls: { path: string; body: unknown }[] = [];
   const fetcher = vi.fn(async (url: string, init: RequestInit = {}) => {
     const path = url.slice(ORIGIN.length);
     calls.push({ path, body: init.body ? JSON.parse(String(init.body)) : null });
-    if (path === "/api/advisor/preferences") return Response.json({ accountRef: "a", available: true, enabled: true, revision: 1, localDate: "2026-11-12", deviceModelAvailable: options.deviceModelAvailable ?? true });
+    if (path === "/api/advisor/preferences") return Response.json({ accountRef: "a", available: options.hostedAvailable ?? true, enabled: true, revision: 1, localDate: "2026-11-12", deviceModelAvailable: options.deviceModelAvailable ?? true });
     if (path === "/api/advisor/brief") return Response.json({ state: "ready", briefing: { ...briefing, text: "Hosted brief." } });
     if (path === "/api/advisor/brief/device/prepare") return Response.json(options.prepare ?? { state: "prepared", request: { instructions: "Synthetic.", facts: "{}" }, envelope: "body.signature", expiresAt: new Date(Date.now() + 60_000).toISOString() });
     if (path === "/api/advisor/brief/device/complete") return Response.json({ state: "ready", briefing });
@@ -71,6 +71,24 @@ describe("ChatGPT plan switch", () => {
     const product = readFileSync("apps/desktop/src/product.tsx", "utf8");
     expect(product).toContain("const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;");
     expect(product).toContain("chatGptPlanControls={chatGptPlan && dailyBriefClient ?");
+  });
+});
+
+describe("Daily Brief availability on a device-only server", () => {
+  it("shows the brief as available only when this Mac can run it on the plan", async () => {
+    hosted({ hostedAvailable: false, deviceModelAvailable: true });
+    for (const [state, available] of [["connectedWithPlanUsage", true], ["needsReconnect", true], ["connectedWithoutPlanUsage", false], ["disconnected", false]] as const) {
+      const client = createDesktopDailyBriefClient(session, ORIGIN, plan(state))!;
+      await expect(client.preferences()).resolves.toMatchObject({ available, deviceModelAvailable: true });
+      await expect(client.updatePreferences({ enabled: true, expectedRevision: 1 } as never)).resolves.toMatchObject({ available });
+    }
+  });
+
+  it("keeps the hosted check when the switch is off or the server offers no device mode", async () => {
+    hosted({ hostedAvailable: false, deviceModelAvailable: false });
+    await expect(createDesktopDailyBriefClient(session, ORIGIN, plan("connectedWithPlanUsage"))!.preferences()).resolves.toMatchObject({ available: false });
+    hosted({ hostedAvailable: false, deviceModelAvailable: true });
+    await expect(createDesktopDailyBriefClient(session, ORIGIN, null)!.preferences()).resolves.toMatchObject({ available: false });
   });
 });
 

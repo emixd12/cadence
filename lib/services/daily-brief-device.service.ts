@@ -1,10 +1,10 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { DAILY_BRIEF_RECIPE } from "@cadence/core/types/briefing-config";
 import type { DailyBriefResponse } from "@cadence/core/types/daily-brief";
-import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip } from "@/lib/db/daily-brief.repo";
+import { beginDailyBrief, finishDailyBrief, releaseDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip } from "@/lib/db/daily-brief.repo";
 import { briefingAccountRef, readBriefingContextFence } from "./briefing-account-context.service";
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
-import { DailyBriefError, prepareDailyBrief, raceBriefAbort, validateDailyBrief, type DailyBriefModelRequest } from "./daily-brief-consumer";
+import { assertBriefContextFresh, DailyBriefError, prepareDailyBrief, raceBriefAbort, validateDailyBrief, type DailyBriefModelRequest } from "./daily-brief-consumer";
 import {
   dailyBriefDeviceModelAvailable, issueDailyBriefEnvelope, MAX_DAILY_BRIEF_ENVELOPE_LENGTH, MAX_DAILY_BRIEF_ENVELOPE_TTL_SECONDS,
   readDailyBriefEnvelopeSecrets, verifyDailyBriefEnvelope,
@@ -117,29 +117,23 @@ export async function prepareDeviceDailyBrief(caller: CalendarCaller, value: unk
 }
 
 export async function completeDeviceDailyBrief(caller: CalendarCaller, value: unknown, options: DeviceOptions = {}): Promise<DailyBriefResponse> {
-  const env = process.env;
   deviceSecret();
-  if (!record(value) || Object.keys(value).sort().join() !== "envelope,installationId,output" ||
-      typeof value.installationId !== "string" || !DAILY_BRIEF_INSTALLATION_ID.test(value.installationId) || typeof value.envelope !== "string") {
+  if (!record(value) || Object.keys(value).sort().join() !== "envelope,installationId,output") {
     throw new DailyBriefError("invalid_request");
   }
   const clock = options.now ?? (() => Temporal.Now.instant());
-  const verified = verifyDailyBriefEnvelope(value.envelope, { secrets: readDailyBriefEnvelopeSecrets(env), now: clock() });
-  if (!verified.ok) throw new DailyBriefError(verified.failure === "expired" ? "context_expired" : "brief_envelope_invalid");
-  const envelope = verified.payload;
-  // Binding: this user and this installation. The lease is checked by finishing it.
-  if (envelope.acct !== briefingAccountRef(caller.user.id) || envelope.inst !== value.installationId) throw new DailyBriefError("brief_envelope_invalid");
-  const configuration = deviceConfiguration();
-  const configurationRevision = briefingConfigurationRevision(configuration);
-  if (envelope.cfgRev !== configurationRevision || envelope.validation.configurationRevision !== configurationRevision) throw new DailyBriefError("context_changed");
-  const installationId = value.installationId;
+  const envelope = readDeviceEnvelope(caller, value, clock());
+  const installationId = envelope.inst;
   const leaseToken = envelope.lease;
   const expectedRevision = envelope.prefRev;
   const output = value.output;
   const signal = AbortSignal.timeout(options.deadlineMs ?? DAILY_BRIEF_DEVICE_COMPLETE_DEADLINE_MS);
   const work = async (): Promise<DailyBriefResponse> => {
     let successful = false;
+    let finished = false;
     try {
+      const configurationRevision = briefingConfigurationRevision(deviceConfiguration());
+      if (envelope.cfgRev !== configurationRevision || envelope.validation.configurationRevision !== configurationRevision) throw new DailyBriefError("context_changed");
       const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
       signal.throwIfAborted();
       if (!preferences.enabled || preferences.revision !== expectedRevision) throw new DailyBriefError("context_changed");
@@ -147,11 +141,13 @@ export async function completeDeviceDailyBrief(caller: CalendarCaller, value: un
       const briefing = await phase("validate", async () => validateDailyBrief(output, envelope.validation, {
         now: clock, onTip: (fingerprints) => { tipFingerprints = fingerprints; } }));
       // The lease must still belong to this attempt. A superseded attempt never returns text.
-      const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision }, signal));
+      finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision }, signal));
       if (!finished) throw new DailyBriefError("context_changed");
       // As the hosted path does after finishing: the stored inputs must still be the ones the context used.
       const contextRevision = await phase("fence", () => readBriefingContextFence(caller, envelope.fence, { signal, clock }));
       if (contextRevision !== envelope.ctxRev || briefingConfigurationRevision() !== configurationRevision) throw new DailyBriefError("context_changed");
+      signal.throwIfAborted();
+      assertBriefContextFresh(envelope.validation.context, clock());
       successful = true;
       if (tipFingerprints.length) {
         await phase("tip_record", async () => {
@@ -162,44 +158,45 @@ export async function completeDeviceDailyBrief(caller: CalendarCaller, value: un
       }
       return { state: "ready", briefing };
     } finally {
-      if (!successful) void finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision }).catch(() => undefined);
+      // Only this request's own completion may be downgraded after a failed final
+      // fence. A replay or invalid output can release a pending lease, never a
+      // completion that another request already committed.
+      if (!successful) void (finished
+        ? finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision })
+        : releaseDailyBrief(caller.client, { installationId, leaseToken, expectedRevision })).catch(() => undefined);
     }
   };
   return phase("complete_request", () => raceBriefAbort(work(), signal));
 }
 
-export const DAILY_BRIEF_DEVICE_RELEASE_DEADLINE_MS = 10_000;
-export const DAILY_BRIEF_DEVICE_RELEASE_MAX_BYTES = MAX_DAILY_BRIEF_ENVELOPE_LENGTH + 1_000;
-
-export type DailyBriefDeviceReleaseResponse = Readonly<{ state: "released" }>;
-
-/**
- * Owner decision, November 12, 2026: the device calls release when its model call fails, so
- * a retry does not wait for the 75-second lease. It verifies the envelope and its binding as
- * complete does, then finishes the lease without success. Release is idempotent: the database
- * finishes only the current lease, so a second call, a superseded lease and an expired
- * envelope all return `released` and change nothing.
- */
-export async function releaseDeviceDailyBrief(caller: CalendarCaller, value: unknown, options: DeviceOptions = {}): Promise<DailyBriefDeviceReleaseResponse> {
-  const env = process.env;
+/** A failed device model call releases its pending lease before a deliberate retry. */
+export async function releaseDeviceDailyBrief(caller: CalendarCaller, value: unknown, options: DeviceOptions = {}): Promise<Readonly<{ state: "released" }>> {
   deviceSecret();
-  if (!record(value) || Object.keys(value).sort().join() !== "envelope,installationId" ||
-      typeof value.installationId !== "string" || !DAILY_BRIEF_INSTALLATION_ID.test(value.installationId) || typeof value.envelope !== "string") {
+  if (!record(value) || Object.keys(value).sort().join() !== "envelope,installationId") throw new DailyBriefError("invalid_request");
+  const clock = options.now ?? (() => Temporal.Now.instant());
+  const envelope = readDeviceEnvelope(caller, value, clock());
+  const signal = AbortSignal.timeout(options.deadlineMs ?? DAILY_BRIEF_DEVICE_COMPLETE_DEADLINE_MS);
+  // Configuration or preferences may have changed since prepare. Releasing only
+  // the exact old pending lease remains safe and does not need a fresh context.
+  const work = async () => {
+    const released = await releaseDailyBrief(caller.client, {
+      installationId: envelope.inst, leaseToken: envelope.lease, expectedRevision: envelope.prefRev,
+    }, signal);
+    if (!released) throw new DailyBriefError("context_changed");
+    return { state: "released" } as const;
+  };
+  return phase("release_request", () => raceBriefAbort(work(), signal));
+}
+
+function readDeviceEnvelope(caller: CalendarCaller, value: Record<string, unknown>, now: Temporal.Instant) {
+  if (typeof value.installationId !== "string" || !DAILY_BRIEF_INSTALLATION_ID.test(value.installationId) || typeof value.envelope !== "string") {
     throw new DailyBriefError("invalid_request");
   }
-  const clock = options.now ?? (() => Temporal.Now.instant());
-  const verified = verifyDailyBriefEnvelope(value.envelope, { secrets: readDailyBriefEnvelopeSecrets(env), now: clock() });
-  // The lease ends with the envelope, so an expired one has nothing left to release.
-  if (!verified.ok && verified.failure === "expired") return { state: "released" };
-  if (!verified.ok) throw new DailyBriefError("brief_envelope_invalid");
+  const verified = verifyDailyBriefEnvelope(value.envelope, { secrets: readDailyBriefEnvelopeSecrets(process.env), now });
+  if (!verified.ok) throw new DailyBriefError(verified.failure === "expired" ? "context_expired" : "brief_envelope_invalid");
   const envelope = verified.payload;
   if (envelope.acct !== briefingAccountRef(caller.user.id) || envelope.inst !== value.installationId) throw new DailyBriefError("brief_envelope_invalid");
-  const signal = AbortSignal.timeout(options.deadlineMs ?? DAILY_BRIEF_DEVICE_RELEASE_DEADLINE_MS);
-  // `false` means the lease was already finished or superseded; either way nothing is left to release.
-  await phase("release", () => finishDailyBrief(caller.client, {
-    installationId: value.installationId as string, leaseToken: envelope.lease, success: false, expectedRevision: envelope.prefRev,
-  }, signal));
-  return { state: "released" };
+  return envelope;
 }
 
 /** `Temporal.Instant` already prints UTC with `Z`; this names the intent. */

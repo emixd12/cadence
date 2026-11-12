@@ -2395,10 +2395,11 @@ and makes no model call for these briefs, not even a duration estimate.
 - `POST /api/advisor/brief/device/complete` takes `{ installationId, envelope, output }`.
   It verifies the envelope and its binding, checks the preferences revision, validates
   the output, finishes the lease, checks the stored inputs again and records the tip.
-- `POST /api/advisor/brief/device/release` takes `{ installationId, envelope }` (Ticket 299).
-  The Mac calls it when its model call fails. It verifies the envelope and its binding and
-  finishes the lease without success. An expired envelope or a superseded lease returns
-  `{ state: "released" }` and changes nothing.
+- `POST /api/advisor/brief/device/release` takes `{ installationId, envelope }` after a
+  device model failure. It verifies the envelope and its user/installation binding,
+  awaits `release_daily_brief`, then returns `{ state: "released" }`. Only a matching
+  pending lease changes; completed, failed and superseded leases return
+  `context_changed`. A deliberate retry keeps the normal admission and rate limits.
 - The envelope is `base64url(raw DEFLATE of JSON).base64url(HMAC-SHA256)`. It binds a
   one-way account digest, the installation ID, the lease token, the preferences and
   configuration revisions and a digest of the stored context inputs, and it carries the
@@ -2413,7 +2414,7 @@ and makes no model call for these briefs, not even a duration estimate.
   `device_recipe_unsupported` (503). A forged, altered or misbound envelope returns
   `brief_envelope_invalid` (400); an expired one returns `context_expired`.
 - `CADENCE_DAILY_BRIEF_DEVICE_MODEL` turns the mode on (`1` or `true`); anything else
-  leaves both routes returning `not_configured`. The mode also needs
+  leaves all three routes returning `not_configured`. The mode also needs
   `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET`, at least 32 random characters
   (`openssl rand -base64 48`). It does not need `OPENAI_API_KEY`.
   `GET /api/advisor/preferences` reports `deviceModelAvailable`, and a server with only
@@ -2425,7 +2426,10 @@ and makes no model call for these briefs, not even a duration estimate.
   a new current value and redeploy. Remove the previous value after 75 seconds. The
   previous key only verifies; it never signs, and it never works without a current key.
 - Rollback: clear `CADENCE_DAILY_BRIEF_DEVICE_MODEL`. Hosted briefs are unaffected.
-- Provisioning in Vercel is an owner-gated rollout step. Local testing: put generated
+- Apply `20261112043335_release_pending_daily_brief.sql` before activating this mode.
+  The additive RPC leaves existing hosted briefs and desktop synchronization unchanged.
+  The owner's November 12 decision keeps `CADENCE_DAILY_BRIEF_DEVICE_MODEL` unset in
+  production. Provisioning in Vercel is an owner-gated rollout step. Local testing: put generated
   values only in git-ignored `.env.development.local`. Tests use inline test-only values.
 
 ## Historical completion-time context

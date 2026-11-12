@@ -52,7 +52,7 @@ Check the cited entry before acting on a row.
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
-| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294, 295 and 296 complete (296 merged with PR #238); 297 Mac ChatGPT connection on PR #241; 298 device prepare and complete on PR #240; 299 UI, Daily Brief wiring and release route implemented in source on branch `claude/ticket-299-plan-ui` (stacked on #240 and #241, not pushed), hidden behind `VITE_CADENCE_CHATGPT_PLAN`; 300 not started | Hidden until the owner turns it on (`docs/DECISIONS.md`, 2026-11-12): merge #240, #241, then 299; L-019 logo gap; messaging review (P-029 to P-031, P-045, P-046); `CADENCE_DAILY_BRIEF_DEVICE_MODEL` stays unset in production; Ticket 300 needs a Mac build (mac-release) | TICKETS, Tickets 294–300; STATUS, "Ticket 299: ChatGPT plan UI and Daily Brief wiring — November 12, 2026" |
+| Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294, 295, 296 and 298 complete (merged); 297 on PR #241; 299 on PR #243 (hidden behind `VITE_CADENCE_CHATGPT_PLAN`); 300 not started | Hidden until the owner turns it on (`docs/DECISIONS.md`, 2026-11-12); L-019 logo gap before turning it on; Ticket 300 needs a Mac build (mac-release) | TICKETS, Tickets 294–300; STATUS, "Ticket 299: ChatGPT plan UI and Daily Brief wiring — November 12, 2026" |
 | Tickets 289–290: Daily Brief prompt, model and effort candidates | Candidates in the development workbench; production pinned; comparison on H1–H10 and S1 prepared November 11 | Owner sets a spend cap (US$2 asked) and optionally names extra models; agents run the comparison; the owner promotes or rejects under Ticket 184's rules | TICKETS, Tickets 289–290; `docs/qa/daily-brief-prompt-consolidation.md`, "Prepared owner comparison" |
 | Ticket 291: skill-rule acceptance scenarios | Local-stack run with `claude-code` passed all three scenarios November 11 | Production run with the API clients; needs a spend cap for the QA keys | TICKETS, Ticket 291; `docs/qa/mcp-server.md`, "First local run — November 11, 2026" |
 | Leave reminder send-time Calendar read (follow-up) | Entry says "not pushed"; `git log` shows PR #200 merged as `2d16bf12` | Deployment not recorded: unclear — see source | STATUS, "Follow-up: keep a leave reminder when the send-time Calendar read fails — November 8, 2026" |
@@ -91,15 +91,15 @@ Check the cited entry before acting on a row.
 
 ## Ticket 299: ChatGPT plan UI and Daily Brief wiring — November 12, 2026
 
-Implemented in source on branch `claude/ticket-299-plan-ui`, stacked on PRs #240 and #241
-and merged with `origin/main`; not pushed. Hidden, per the owner's November 12 decision.
+Implemented in source on branch `claude/ticket-299-plan-ui`, stacked on PR #241 and merged
+with `origin/main` (which has PR #240); PR #243. Hidden, per the owner's November 12 decision.
 
 - Switch: `VITE_CADENCE_CHATGPT_PLAN=1` at build time (`apps/desktop/src/chatgpt/plan-switch.ts`).
   A default build creates no ChatGPT connection, renders no card and keeps today's hosted
   Daily Brief. Tests prove both.
-- Release: `POST /api/advisor/brief/device/release` verifies the envelope and binding as
-  complete does and finishes the lease without success. Expired envelopes and superseded
-  leases return `released` and change nothing.
+- Release: the Mac calls main's `POST /api/advisor/brief/device/release` (merged with PR
+  #240) when its model call fails, and ignores a release error. This branch's own release
+  route was dropped in favor of main's pending-only version.
 - Mac: `chatgpt_access_token` returns only a fresh access token, held in memory for one model
   call. The CSP adds exactly `https://api.openai.com`. With plan usage and
   `deviceModelAvailable`, the brief runs prepare, the plan call and complete, and releases on
@@ -117,21 +117,57 @@ and merged with `origin/main`; not pushed. Hidden, per the owner's November 12 d
   point; this branch does not touch it). Rust lib tests: 157 passed. No live sign-in, Tauri
   bundle, Dagger or Vercel change.
 
-## Ticket 296: ChatGPT plan adapter — November 12, 2026
+## Ticket 297: Mac app ChatGPT connection — November 12, 2026
 
-**On branch `claude/ticket-296-plan-adapter`.**
+Cadence for Mac can connect, refresh and disconnect one ChatGPT account (D27). Branch
+`claude/ticket-297-mac-chatgpt`, not merged or pushed. No UI uses it until Ticket 299.
 
-- `lib/services/daily-brief-chatgpt-plan.ts`: catalog read, model choice in the owner's
-  order (`gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`; none listed means not eligible, no
-  fallback), the plan request body, SSE reading without a Content-Type, a 256 KB stream cap
-  and 64 KB output cap, and error mapping to `usage_limit`, `not_eligible`, `reconnect`,
-  `retry_later`, `advisor_unavailable` and `timeout`. Browser-safe; no bodies logged.
-- `lib/services/daily-brief-schema.ts` holds the output schema both adapters share;
-  `daily-brief-openai.ts` imports it, so the hosted request is unchanged.
-- Tests: `tests/daily-brief-chatgpt-plan.test.ts` (16). The briefing, Daily Brief and spike
-  tests pass. Ticket 296 is complete; 297 and 298 can start.
-- Platform impact: web, none (hosted path unchanged); desktop, the adapter Ticket 299
-  wires in; marketing and future mobile, not applicable. Messaging impact: none.
+- Rust (`apps/desktop/src-tauri/src/chatgpt/`) runs discovery, the one-shot `127.0.0.1`
+  callback listener, code exchange, RS256 ID-token validation, the plan-scope check,
+  single-flight refresh, revocation and the catalog read. The webview gets state, email
+  and `slug`/`visibility` rows through `apps/desktop/src/chatgpt/connection.ts`.
+- Tokens and the per-installation host ID stay in two native-only Keychain items,
+  `chatgpt-installation` and `chatgpt-session`. The webview secret commands refuse both.
+  The CSP is unchanged.
+- Direct dependencies `reqwest`, `rustls`, `ring` and `base64` were already in
+  `Cargo.lock` through the updater; the lock adds no crate.
+- Mocked tests pass: 22 new Rust tests (154 Rust lib tests in all) and 6 TypeScript tests,
+  including one that scans an export, two backups and the database for ChatGPT values.
+  No live sign-in ran. Installed acceptance is Ticket 300.
+
+## PR #240 integration review — November 12, 2026
+
+Integrated the device routes with the reviewed PR #238 source (`2601bac8`), including
+PR #242's owner decisions. Earlier status entries and archived history are preserved.
+
+- Added `/api/advisor/brief/device/release` and the authenticated, pending-only
+  `release_daily_brief` RPC. Migration `20261112043335_release_pending_daily_brief.sql`
+  preserves completed attempts, replacement leases, daily admissions and rate limits.
+- Fixed complete-request replay downgrading a successful attempt. Only a request that
+  completed its own lease may undo it after a failed final context fence. Complete also
+  rechecks context expiry after the final fence. No hosted model behavior changes.
+- Fresh `npm ci`, agents, interactions, resolvers, full lint, typecheck and web build
+  passed. Lint retains six existing warnings. The full suite passed 5,729 tests and
+  skipped 230; 29 failed because this executor denies Unix-socket binding (`listen
+  EPERM`) in the unchanged session-broker and Docker-proxy suites. An additional
+  consumer-test failure under a dependency overlay disappeared after fresh `npm ci`;
+  no product change was needed for it.
+- Local `supabase db reset --local` failed before reset because Docker socket access is
+  denied. The SQL ownership, replay and quota regression runs in Local Supabase
+  rehearsal. GitHub CI and Local Supabase rehearsal passed on `968ebeaef`.
+- Applied the reviewed SQL to hosted Supabase as migration `20261112043335` after
+  rehearsal. All 116 migration versions match source. The source filename follows
+  the provider-assigned version; SQL bytes are unchanged. Generated types differ
+  only by the new RPC and match its source type. Hosted grants allow authenticated
+  users only; an authenticated role without a session is rejected. No table shape,
+  RLS policy, admission counter or existing row changed during deployment.
+- The production device-model flag must stay unset under PR #242. No activation
+  occurred; live environment values were not independently verified. Ticket 299
+  wires the hidden client and release call.
+  This change adds no desktop schema or sync-contract change.
+
+Platform impact: web, gated device routes; desktop, Ticket 299 consumes them; marketing
+and future mobile, not applicable. Messaging impact: P-029, unchanged.
 
 ## Ticket 298: Daily Brief device prepare and complete — November 12, 2026
 
@@ -153,23 +189,21 @@ Implemented in source on `claude/ticket-298-device-brief`; not pushed or deploye
   warnings) and build passed. Vitest on the 50 Daily Brief, briefing and advisor test
   files: 769 passed. Dagger was not run. Vercel variables are owner-gated and unset.
 
-## Ticket 297: Mac app ChatGPT connection — November 12, 2026
+## Ticket 296: ChatGPT plan adapter — November 12, 2026
 
-Cadence for Mac can connect, refresh and disconnect one ChatGPT account (D27). Branch
-`claude/ticket-297-mac-chatgpt`, not merged or pushed. No UI uses it until Ticket 299.
+**On branch `claude/ticket-296-plan-adapter`.**
 
-- Rust (`apps/desktop/src-tauri/src/chatgpt/`) runs discovery, the one-shot `127.0.0.1`
-  callback listener, code exchange, RS256 ID-token validation, the plan-scope check,
-  single-flight refresh, revocation and the catalog read. The webview gets state, email
-  and `slug`/`visibility` rows through `apps/desktop/src/chatgpt/connection.ts`.
-- Tokens and the per-installation host ID stay in two native-only Keychain items,
-  `chatgpt-installation` and `chatgpt-session`. The webview secret commands refuse both.
-  The CSP is unchanged.
-- Direct dependencies `reqwest`, `rustls`, `ring` and `base64` were already in
-  `Cargo.lock` through the updater; the lock adds no crate.
-- Mocked tests pass: 22 new Rust tests (154 Rust lib tests in all) and 6 TypeScript tests,
-  including one that scans an export, two backups and the database for ChatGPT values.
-  No live sign-in ran. Installed acceptance is Ticket 300.
+- `lib/services/daily-brief-chatgpt-plan.ts`: catalog read, model choice in the owner's
+  order (`gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`; none listed means not eligible, no
+  fallback), the plan request body, SSE reading without a Content-Type, a 256 KB stream cap
+  and 64 KB output cap, and error mapping to `usage_limit`, `not_eligible`, `reconnect`,
+  `retry_later`, `advisor_unavailable` and `timeout`. Browser-safe; no bodies logged.
+- `lib/services/daily-brief-schema.ts` holds the output schema both adapters share;
+  `daily-brief-openai.ts` imports it, so the hosted request is unchanged.
+- Tests: `tests/daily-brief-chatgpt-plan.test.ts` (16). The briefing, Daily Brief and spike
+  tests pass. Ticket 296 is complete; 297 and 298 can start.
+- Platform impact: web, none (hosted path unchanged); desktop, the adapter Ticket 299
+  wires in; marketing and future mobile, not applicable. Messaging impact: none.
 
 ## Ticket 295: ChatGPT plan spike passed live — November 12, 2026
 
