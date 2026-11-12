@@ -252,6 +252,9 @@ run while it was part of `npm run test`. The workflow is not a required check, l
 change to those paths. Decision: `docs/DECISIONS.md`, 2026-11-11, "CI checks run in
 parallel".
 
+Measured on November 11, 2026: `CI` took 754 s before the split (median of 160
+runs), 145 s on the first run after it and 100 s with warm caches.
+
 ### Dagger checks
 
 Dagger runs the CI checks in containers on a local machine.
@@ -272,37 +275,70 @@ curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=1.0.0-beta.21
 Run from the repository root:
 
 ```bash
-dagger check                          # every check, concurrently
-dagger check -l                       # list checks
+dagger check --cadence                # the ten Cadence checks, concurrently
+dagger check -l --cadence             # list them
 dagger check cadence/typecheck        # one check
 dagger check cadence/lint cadence/test
-dagger check -i                       # open a shell where an exec fails
+dagger check --cadence -i             # open a shell where an exec fails
 dagger call cadence shell terminal    # shell in the checks' container
 ```
 
-Agents run `dagger check --progress=report` before every push. A passing run
+Agents run `dagger check --cadence --progress=report` before every push. Always
+pass `--cadence`. A bare `dagger check` also runs `dang-sdk/generate/stale`, a
+check that belongs to the Dang SDK module; it took 268 s and 337 s in two runs
+on November 11, 2026, against about 30 s for the ten Cadence checks. A passing run
 prints one line per check. A failing check prints only its own log; the `test`
 check uses Vitest's `agent` reporter, so a failure prints the failing tests and
-the summary, not all 340 files. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
-sign-up hint from the output. If Docker or the Dagger CLI is unavailable, run
-the npm commands above.
+the summary, not every test file. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
+sign-up hint from the output.
+
+Dagger never blocks work (`docs/DECISIONS.md`, 2026-11-11, "Keep Dagger"). When
+Docker or the Dagger CLI is unavailable, or a check fails for a reason outside
+your change, run the npm commands above, note the fault in the pull request and
+continue. GitHub Actions `CI` stays the merge gate.
 
 The engine caches every step by its inputs. An unchanged check finishes from
 cache. Only a change to a `package.json` or `package-lock.json` reinstalls
 dependencies. Cadence checks run on `node:24-bookworm`, which ships the `git`
-and `python3` that some tests call. The module reads the working tree with
-`.gitignore` rules and also excludes `.env*` files, `node_modules`, `.next`,
-`.claude`, `.local` and `.vercel`.
+and `python3` that some tests call.
 
-Dagger covers every GitHub Actions `CI` step except `public-source:check`, which
-needs full Git history. GitHub Actions `CI` stays the merge gate. Dagger runs
-only on local machines: do not enable Dagger Cloud, Cloud Checks or Cloud
-engines (`docs/DECISIONS.md`, 2026-10-24).
+**What the container sees.** The module reads the working tree with `.gitignore`
+rules and also excludes `.env*` files, `node_modules`, `.next`, `.local`,
+`.vercel` and `.dagger`. Dagger does not read `.git/info/exclude`, so the module
+lists each of the owner's entries there by name: the local Claude state under
+`.claude` (`worktrees`, `checkpoints`, `mailbox` and the rest), `.intent/acceptance`,
+`apps/desktop/signing`, `exports` and the two local files under `public/sounds`.
+Tracked files under `.claude/skills` and `.intent/artifacts` stay in, because
+tests read them. When you add a local-only path to `.git/info/exclude`, add it to
+the exclude list in `main.dang` as well. Otherwise Dagger copies it into the
+check containers and the engine cache, and every change to it reruns all checks.
+
+**Git in the `test` check.** Two test files call `git`. A working tree's own
+`.git` cannot be mounted: in a Git worktree it is a file that points outside the
+workspace, and Dagger cannot open this repository because of its `worktreeConfig`
+extension. The `test` check mounts the Git data of one pinned commit instead,
+`fixtureCommit` in `main.dang`. Dagger fetches it once from GitHub and caches it.
+It must equal `FIXTURE_SOURCE` in `scripts/build-mcp-hosted-fixtures.mjs`;
+`tests/dagger-module.test.mjs` fails when they differ. Inside the container,
+`HEAD` is that commit, not your local commit. The other nine checks have no
+`.git`. This works the same from the main checkout and from a worktree.
+
+**Not covered.** `public-source:check` needs the full local history, and
+`tests/acceptance-web-client.test.mjs` needs installed Google Chrome, which the
+image lacks; containers on the owner's Mac cannot `apt-get` it. GitHub Actions
+runs both. Dagger runs only on local machines: do not enable Dagger Cloud, Cloud
+Checks or Cloud engines (`docs/DECISIONS.md`, 2026-10-24).
 
 Each check reads the whole working tree, minus the excluded paths. So any edit,
-even to a doc, reruns every check, but not the dependency install. On the
-owner's Mac, the first run took 217 s, mostly image pulls and `npm ci`. A run
-after a source edit took 45 s, and an unchanged run took 1 s.
+even to a doc, reruns every check, but not the dependency install. Per-check
+input filters are deferred until a full run after an edit passes about 3
+minutes. Measured on the owner's Mac from a worktree on November 11, 2026, with
+dependencies already installed in the engine: 31 s after a change (`build` 30 s,
+`lint` 24 s, `test` 24 s) and 1 s unchanged. The first run on a machine took
+217 s in October, mostly image pulls and `npm ci`.
+
+Owner step: Docker Desktop gives its VM 8 GB of the Mac's 128 GB. Raise it under
+Settings › Resources so ten concurrent checks do not run short of memory.
 
 For UI changes, also run the app and inspect at least:
 
@@ -363,7 +399,7 @@ session. Every command in the session can read an environment variable.
 | Provider | Network secret host | Header | Cloud use |
 | --- | --- | --- | --- |
 | Supabase Management API | `api.supabase.com` | `Authorization: Bearer` | Read-only diagnostics and migration inventory (see `docs/SUPABASE_WORKFLOW.md`) |
-| Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments, logs and the Trust refresh after a `main` merge |
+| Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments and logs; the Trust refresh at launch |
 | Sequenzy | `api.sequenzy.com` | `Authorization: Bearer` | Template inspection; real sends follow `docs/SEQUENZY_WORKFLOW.md` |
 | Cloudflare | `api.cloudflare.com` | `Authorization: Bearer` | DNS reads and verification |
 | OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes |
@@ -1213,7 +1249,11 @@ Before broad public launch, scope and verify:
 - basic abuse protections and validation,
 - monitoring/error reporting without sensitive behavior payloads,
 - Terms of Service, Privacy Policy, and privacy/trust content,
-- owner mapping for Vercel, Supabase, Sequenzy, VAPID, and cron secrets.
+- owner mapping for Vercel, Supabase, Sequenzy, VAPID, and cron secrets,
+- Trust evidence binding: the marketing-ID refresh is paused before launch
+  (`docs/DECISIONS.md`, 2026-11-11), so the Trust page reads Stale. Before launch,
+  automate the refresh after each production deploy, run it once, collect
+  Production evidence and confirm the page shows Passed.
 
 Implemented baseline:
 
@@ -1886,22 +1926,20 @@ Ticket 099 message does not substitute for a new test.
 
 ## Ticket 105 browser-push compatibility exception
 
-The npm registry still publishes web-push 3.6.7 as latest (2026-09-04). The
-installed direct dependency calls legacy `url.parse()` in
-`src/web-push-lib.js` during VAPID audience construction and HTTPS request
-construction. Node 24 reports DEP0169 on that path. Upstream issue
-https://github.com/web-push-libs/web-push/issues/943 is closed by the merged
-https://github.com/web-push-libs/web-push/pull/948, but the fix has no newer
-published npm release. Keep the installed version and lockfile unchanged.
+PR #218 upgrades web-push from 3.6.7 to 4.0.0. The older version used legacy
+`url.parse()` for VAPID audiences and HTTPS requests, producing DEP0169 on Node
+24. Version 4 uses WHATWG `URL` and preserves the named `sendNotification` and
+`WebPushError` APIs used by Cadence. Its ESM package also loads from the real
+package regression test's `require()` on the supported Node 24 runtime.
 Do not patch node_modules, suppress warnings, or replace the push provider.
 
-The repository owner owns rechecking when npm publishes a newer stable version
-or a supported Node upgrade changes this warning into a failure. Run
+For later dependency upgrades, run
 `npx vitest run tests/web-push-compatibility.test.ts tests/web-push-subject.test.ts tests/reminder.service.test.ts`,
 then the full release checks and an authorized Preview deployment. The real
 package test uses generated synthetic keys and a fake HTTPS transport. It
 checks encryption, VAPID, endpoint/query preservation, TTL, and successful
-response handling without network traffic.
+response handling without network traffic. It rejects every Node deprecation,
+including a reintroduced DEP0169. A real push send requires separate authorization.
 
 ## Note shortcut rollout (Tickets 126–128)
 

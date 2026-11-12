@@ -77,7 +77,8 @@ Check the cited entry before acting on a row.
 | Ticket 188: duration estimates from descriptions | Implementation started; recovered for owner review October 22 | Landing decision: unclear — see source | TICKETS, Ticket 188; STATUS, "Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026" |
 | Ticket 130: account synchronization | TICKETS says in progress (2026-09-08) | The owner decides its state | TICKETS, Ticket 130; STATUS, "Ticket ledger reconciled with production — October 27, 2026" |
 | Account sync timezone rule | PR #159 merged October 28; hosted push authorized | Not verified: a timezone change synced from an installed Mac after the push; authenticated hosted sync against the new rule | STATUS, "Account sync timezone rule for archived Behaviors — October 27, 2026" |
-| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust marketing-ID refresh and app redeploy after every merge to `main`; the ledger cleanup session does one after its PR merges on November 11, 2026, and it must be repeated after later merges. Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026"; STATUS, "Ledger cleanup — November 11, 2026" |
+| Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
+| Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
 | MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
 | Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Locally verified and independently approved | Live providers, installed desktop and release (241); live Hevy Pro (236); iCloud live acceptance (240); 242 cross-tenant and installed desktop not exercised | TICKETS, Tickets 236, 240, 241, 242 |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
@@ -89,9 +90,53 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## PR 218: browser-push compatibility review — November 11, 2026
+
+- Upgraded web-push to 4.0.0 and removed Ticket 105's obsolete upstream-blocked
+  exception. Cadence's named service APIs remain compatible on Node 24.
+- The real encrypted-transport test now rejects every Node deprecation. All 51
+  push and reminder tests pass; `npm audit --omit=dev` reports zero vulnerabilities.
+- Verification: agents, interactions, resolvers, lint and typecheck pass. The full
+  suite passes 5,610 tests; all 29 failures come from this environment denying Unix
+  socket creation in the session-broker and Docker-proxy tests. Dagger and Docker
+  are unavailable. Refreshed GitHub CI remains the merge gate.
+- Ticket 105 stays open until deployment verification. No real push send ran.
+
+Platform impact: web dependency only. Desktop uses native reminders; marketing and
+future mobile are not affected. Messaging impact: none.
+
+## Trust marketing-ID refresh paused until launch — November 11, 2026
+
+The owner decided that the pre-launch development process must not include the Trust
+marketing-ID refresh (`docs/DECISIONS.md`, 2026-11-11). `docs/VERCEL_WORKFLOW.md`,
+"Deployment", no longer asks for it after a merge. The open item is the launch-gate row in
+"Open work" and the list in `docs/OPERATIONS.md`, "Public-product operations". The stored
+ID was last set on November 11 and is stale now; nobody needs to act on that.
+
+Platform impact: operations docs only. Web: the Trust page shows Stale until launch.
+Desktop, marketing and future mobile: not applicable. Messaging impact: none.
+
+## Dagger repairs — November 11, 2026
+
+**PR #231 (`dagger/repairs`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
+"Keep Dagger as the local pre-push check".
+
+- **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
+  the Dang SDK's staleness check, which took 268 s and 337 s.
+- **Module:** tracked files under `.claude/skills` and `.intent/artifacts` now reach the
+  container; every path in the owner's `.git/info/exclude` is excluded by name; the `test`
+  check mounts the Git data of the pinned fixture commit and skips
+  `tests/acceptance-web-client.test.mjs`.
+- **Verified from a worktree:** ten checks pass in 31 s after a change and in 1 s
+  unchanged; a deliberately broken test fails `cadence/test` and prints the failure;
+  through the new module, the main checkout's `exports`, `apps/desktop/signing`,
+  `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
+- **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
+  first run was not re-measured.
+- **Owner step:** raise Docker Desktop's memory above 8 GB.
 ## CI checks run in parallel — November 11, 2026
 
-**On branch `ci/parallel-verify`; not merged.** Decision: `docs/DECISIONS.md`, 2026-11-11,
+**Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
 "CI checks run in parallel".
 
 - **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
@@ -102,8 +147,9 @@ Check the cited entry before acting on a row.
   `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
   from the Actions cache.
 - **Not changed:** branch protection, the Dagger module and the web client test's waits.
-- **Open:** the owner's decision on Dagger (retire or repair). `dagger check` fails on
-  unchanged `main` for container reasons and its repeat runs miss the cache.
+- **Measured after:** `CI` took 145 s on its first run and 100 s with warm caches. The
+  `Web client runner` workflow took 673 s on its own.
+- **Dagger:** decided and repaired in the entry above.
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.

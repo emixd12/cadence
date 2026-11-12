@@ -7975,12 +7975,13 @@ Out of scope:
 
 ## Ticket 105: Browser-push dependency compatibility cleanup
 
-Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open. npm still
-lists web-push 3.6.7 as `latest` (read October 27), so the recheck trigger in
-`docs/OPERATIONS.md` has not fired. No Preview inspection is recorded since.
+Status: in_progress (2026-11-11). PR #218 upgrades web-push to 4.0.0, which replaces
+legacy URL parsing. The real-package encrypted transport check passes on Node 24
+without deprecations; subject, reminder and leave-reminder checks pass (51 tests).
+`npm audit --omit=dev` reports no vulnerabilities. Refreshed CI and deployment
+verification remain required before closure. No real push send ran.
 
-The published dependency has no newer release containing the upstream fix.
-The documented exception and fake-transport checks pass. Preview inspection remains pending.
+The dependency upgrade removes the upstream-blocked exception.
 Evidence: `docs/qa/2026-09-04-tickets-088-091-104-105.md`.
 
 Platform impact:
@@ -15812,7 +15813,7 @@ Platform impact:
 Messaging impact: P-015 corrected; P-016, P-017, P-018, P-019, P-020 and P-021 logged.
 
 Verification: `npm run agents:check`, `npm run interactions:check` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 264: Report late trips, trips home and missing estimates
 
@@ -16848,7 +16849,7 @@ Platform impact:
 
 Messaging impact: none. Open entries still hold public launch and provider submissions.
 
-Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=report`.
+Verification: evidence in `docs/qa/travel-release.md`, `dagger check --cadence --progress=report`.
 
 ## Ticket 285: Installed Mac acceptance
 
@@ -17366,7 +17367,7 @@ Platform impact:
 Messaging impact: P-029, P-030, P-031 and P-032 logged.
 
 Verification: `npm run agents:check`, `npm run interactions:check` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 295: Spike the Daily Brief request on a ChatGPT plan
 
@@ -17406,7 +17407,7 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npm run test` (mock mode), the live run with the owner's consent, and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 296: Split Daily Brief generation and add the ChatGPT plan adapter
 
@@ -17441,7 +17442,7 @@ Platform impact:
 
 Messaging impact: none.
 
-Verification: `npm run resolvers:check`, `npm run test` and `dagger check --progress=report`.
+Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cadence --progress=report`.
 
 ## Ticket 297: Mac app ChatGPT connection
 
@@ -17477,7 +17478,7 @@ Platform impact:
 
 Messaging impact: P-029 (data flow).
 
-Verification: desktop TypeScript and Rust tests, and `dagger check --progress=report`.
+Verification: desktop TypeScript and Rust tests, and `dagger check --cadence --progress=report`.
 
 ## Ticket 298: Hosted Daily Brief prepare and complete for a device model
 
@@ -17515,7 +17516,7 @@ Platform impact:
 
 Messaging impact: P-029 (data flow).
 
-Verification: `npm run resolvers:check`, `npm run test` and `dagger check --progress=report`.
+Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cadence --progress=report`.
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
@@ -17550,7 +17551,7 @@ Platform impact:
 
 Messaging impact: P-030 and P-031, plus new entries for the card's copy.
 
-Verification: `npm run interactions:check`, `dagger check --progress=report` and bench
+Verification: `npm run interactions:check`, `dagger check --cadence --progress=report` and bench
 screenshots of each state at narrow widths.
 
 ## Ticket 300: Installed Mac acceptance of the ChatGPT plan Daily Brief
@@ -17582,7 +17583,7 @@ Platform impact:
 
 Messaging impact: none.
 
-Verification: the installed-app checks above and `dagger check --progress=report`.
+Verification: the installed-app checks above and `dagger check --cadence --progress=report`.
 
 ## Settings regroup and simplification: Tickets 301–309
 
@@ -18116,7 +18117,7 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npx vitest run tests/recorded-activity-contract.test.ts` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 313: Match resolver and connector status plan
 
@@ -18154,7 +18155,7 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npm run resolvers:check`, `tests/activity-match.resolver.test.ts`,
-`tests/status.resolver.test.ts` and `dagger check --progress=report`.
+`tests/status.resolver.test.ts` and `dagger check --cadence --progress=report`.
 
 ## Ticket 314: Connector completion tables and database functions
 
@@ -18192,7 +18193,7 @@ Platform impact:
 Messaging impact: P-039.
 
 Verification: `npm run supabase -- db reset`, the SQL smoke fixture and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 315: Hevy adapter reads for matching
 
@@ -18225,7 +18226,7 @@ Platform impact:
 Messaging impact: P-040.
 
 Verification: `tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 316: Completion-source port, reconcile service and routes
 
@@ -18262,7 +18263,7 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npm run resolvers:check`, `tests/connector-completion.service.test.ts` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 317: Web link form and completion label
 
@@ -18303,7 +18304,7 @@ Platform impact:
 Messaging impact: P-038 and P-040, plus new entries for the form's and panel's copy.
 
 Verification: `npm run interactions:check`, the DOM tests in plan Task 8, a preview check
-at desktop width and 390 px, and `dagger check --progress=report`.
+at desktop width and 390 px, and `dagger check --cadence --progress=report`.
 
 ## Ticket 318: Timing statistics on Behaviors
 
@@ -18335,7 +18336,7 @@ Platform impact:
 Messaging impact: new entries for the statistics' copy.
 
 Verification: `npm run resolvers:check`, `tests/analytics.resolver.test.ts`,
-`tests/analytics.service.test.ts` and `dagger check --progress=report`.
+`tests/analytics.service.test.ts` and `dagger check --cadence --progress=report`.
 
 ## Ticket 319: Mac sync merge rule and label
 
@@ -18377,7 +18378,7 @@ Messaging impact: none.
 
 Verification: `tests/account-sync.resolver.test.ts`, installed acceptance on a dev-signed
 build with one forced collision (`desktop-acceptance` skill) and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 320: Sync links and matches to the Mac
 
@@ -18407,7 +18408,7 @@ Platform impact:
 Messaging impact: P-039 (Mac storage and backups).
 
 Verification: the sync resolver and Rust tests, installed acceptance on a dev-signed
-build and `dagger check --progress=report`.
+build and `dagger check --cadence --progress=report`.
 
 ## Ticket 321: Background completion job
 
@@ -18447,7 +18448,7 @@ Messaging impact: P-041.
 
 Verification: `tests/connector-completion-job.service.test.ts`,
 `tests/completion-check-schedule.resolver.test.ts`, a local-stack run that completes one
-seeded match and `dagger check --progress=report`.
+seeded match and `dagger check --cadence --progress=report`.
 
 ## Ticket 322: Read surfaces for connector completions
 
@@ -18481,7 +18482,7 @@ Platform impact:
 Messaging impact: none, unless the MCP developer reference text changes; then log it.
 
 Verification: export and completion-timing tests with a connector-completed fixture, and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.
 
 ## Ticket 323: Connector completion release acceptance
 
@@ -18513,7 +18514,7 @@ Platform impact:
 
 Messaging impact: P-042.
 
-Verification: the acceptance matrix and `dagger check --progress=report`.
+Verification: the acceptance matrix and `dagger check --cadence --progress=report`.
 
 ## Ticket 324: Count an unlinked workout by hand
 
@@ -18544,7 +18545,7 @@ Platform impact:
 
 Messaging impact: new entries for the control's copy.
 
-Verification: `npm run interactions:check` and `dagger check --progress=report`.
+Verification: `npm run interactions:check` and `dagger check --cadence --progress=report`.
 
 ## Ticket 325: Release credential backup, restore and renewal
 
@@ -18586,4 +18587,4 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npx vitest run tests/release-credentials.test.mjs` and
-`dagger check --progress=report`.
+`dagger check --cadence --progress=report`.

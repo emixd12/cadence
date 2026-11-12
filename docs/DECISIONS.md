@@ -2284,6 +2284,63 @@ The Dagger decision of 2026-10-24 stands; the audit's Dagger findings wait on th
 Shortening the web client test's waits is not part of this change.
 
 Layout and rules: `docs/OPERATIONS.md`, "GitHub Actions CI".
+## 2026-11-11: Keep Dagger as the local pre-push check; four repairs
+
+An audit on November 11, 2026 found that `dagger check` failed on unchanged `main`, took
+4.5 to 5.5 minutes, missed its cache on an unchanged tree and copied local-only files into
+its containers. The auditing agent recommended retiring Dagger.
+
+The owner decided to keep it, in a side session of the audit session. The decision reached
+the implementing session as a brief relayed by that side session, not as the owner's own
+message there; merging this change confirms it.
+
+- Dagger stays the local pre-push check. GitHub Actions `CI` stays the merge gate.
+- Dagger never blocks work. When it is unavailable or fails for a reason outside the
+  change, agents run the npm checks, note the fault in the pull request and continue.
+- No Dagger Cloud and no self-hosted runner. The CLI stays on v1.0.0-beta.21.
+- Four repairs are made now: the documented command runs only the Cadence checks
+  (`--cadence`); the module stops excluding tracked files under `.claude`; the `test`
+  check gets Git data and skips the test that needs Chrome; and the module excludes every
+  path in the owner's `.git/info/exclude`.
+- Deferred: per-check input filters. Trigger: a full local run after an edit passes about
+  3 minutes.
+
+Design choice made during the repair: the `test` check mounts the Git data of the pinned
+fixture commit, fetched from GitHub, instead of the working tree's `.git`. A worktree's
+`.git` is a file that points outside the Dagger workspace, and most agent work happens in
+worktrees. `public-source:check` stays out of Dagger for the same reason: it needs the full
+local history.
+
+Measured after the repairs, from a worktree on the owner's Mac: ten checks pass in 31 s
+after a change and in 1 s unchanged.
+
+Details: `docs/OPERATIONS.md`, "Dagger checks". This entry adds to the 2026-10-24 decision
+and does not replace it.
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
 applicable. Messaging impact: none.
+
+## 2026-11-11: No Trust marketing-ID refresh before launch
+
+`docs/VERCEL_WORKFLOW.md` told agents to set the app's Production
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app after every merge to `main`.
+Agents asked the owner for it after almost every merge.
+
+The owner decided on November 11, 2026 to stop this until public launch. Cadence has no
+users yet and nobody reads the Trust page. The owner's words: "the development process, in
+this intensive pre launch phase should not be affected."
+
+- Agents do not refresh the ID after a merge and do not offer or ask to.
+- The gap is tracked as a launch gate, the way `docs/LEGAL.md` and
+  `docs/MESSAGING_CHANGES.md` track their concerns: an open-work row in `STATUS.md` and
+  an item in `docs/OPERATIONS.md`, "Public-product operations". It never blocks
+  development, merges or deployments.
+- The refresh runs before public launch, or on the owner's instruction.
+
+Effect: the Trust page shows earlier Passed results as Stale. That was already true after
+every merge until the next evidence collection, because a merge also changes the source
+commit and the app deployment. The nightly collection resolves the live deployments from
+Vercel itself and keeps running; it does not read the stored ID.
+
+Platform impact: operations only. Web: Trust page reads Stale until launch. Desktop,
+marketing and future mobile: not applicable. Messaging impact: none.
