@@ -50,7 +50,7 @@ Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
 | Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged to `main` with PR #207 on November 11, 2026, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations `20261111140000` and `20261111150000` applied November 11; Hevy read by events cursor (strategy A) | Ticket 320 (contract 5, SQLite schema 24) merged with PR #216, hosted `20261111160000` applied: installed acceptance on a dev-signed build. Ticket 323 waits on published Mac 0.1.10 (includes 319 and 320; release authorized in the November 12 PR review; configured release Mac required) and Ticket 241's release steps 6–7 and installed connector acceptance; then the flag turns on by owner instruction. 324 after 323 | TICKETS, Tickets 310–324; STATUS, "Connector completion hosted push and merge — November 11, 2026" |
-| First account link times out for a large account | Cause found November 12: `public.apply_account_sync_plan` had no statement timeout of its own, so it ran under the 8 s `authenticated` limit while building the snapshot two or three times; fix on branch `claude/large-account-sync-timeout` (migration `20261112120000`, Mac error text) | Merge, push the hosted migration, retry the owner's Mac first link; the Mac error-text fix ships with the next Mac release | STATUS, "First account link times out for a large account — November 12, 2026" |
+| First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
 | Tickets 294–300: Daily Brief on the user's ChatGPT plan | 294–299 merged; hidden behind `VITE_CADENCE_CHATGPT_PLAN`; 300 deferred | Paused by the owner on November 12: the feature stays hidden and Ticket 300 waits until the owner turns it on. The production device-model flag must stay unset; L-019 logo gap and P-029 to P-031, P-045 and P-046 messaging review remain activation gates | TICKETS, Tickets 294–300; `docs/DECISIONS.md`, 2026-11-12 |
@@ -89,6 +89,16 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Owner's Mac first link after the hosted fix — November 12, 2026
+
+After PR #247 and hosted migration `20261112120000`, an agent quit and reopened Cadence 0.1.10 on
+the owner's Mac (still linked, empty local profile), which reran the `hydrate` first link. It
+synced at 05:52:12Z: 42 Behaviors, 2,486 Occurrences, 0 pending writes, one account-sync
+baseline, integrity `ok`, 0 foreign-key errors. The first-link timeout is closed; the Mac's
+error-text change waits for the next Mac release.
+
+Platform impact: desktop verification only; no code change. Messaging impact: none.
 
 ## First account link times out for a large account — November 12, 2026
 
