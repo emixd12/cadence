@@ -3,10 +3,11 @@
 // that no secret value reaches the ledger, stdout or a command's arguments.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  escapeOpFieldName,
   COMPLETE_MARKER, CredentialError, EXIT, PUBLIC_FIELDS, ReleaseVault, loadInventory, main, missingEntitlements, parseIdentities,
   rateExpiry, updaterFingerprint, verifyBackups, worst,
 } from '../apps/desktop/scripts/release-credentials.mjs';
@@ -80,21 +81,26 @@ describe('Cadence Release vault', () => {
 
   const token = `ops_${'x'.repeat(300)}`;
   const run = (command, args, options = {}) => {
-    calls.push({ command, args, input: options.input === undefined ? undefined : String(options.input) });
+    const templateAt = args.indexOf('--template');
+    const template = templateAt >= 0 && existsSync(args[templateAt + 1]) ? readFileSync(args[templateAt + 1], 'utf8') : undefined;
+    calls.push({ command, args, input: options.input === undefined ? undefined : String(options.input), template });
     const ok = (text) => ({ status: 0, stdout: Buffer.from(text), stderr: '' });
     if (command === '/usr/bin/security' && args[0] === 'find-generic-password') return args.includes('-w') ? ok(`${token}\n`) : ok('');
     if (command !== 'op') return { status: 1, stdout: Buffer.alloc(0), stderr: '' };
     if (args[0] === 'vault') return ok(JSON.stringify(vaults.map((name) => ({ name }))));
     if (args[0] === 'item' && args[1] === 'list') return ok(JSON.stringify(Object.keys(items).map((title) => ({ title }))));
     if (args[0] === 'item' && args[1] === 'create') {
-      // Like the real CLI: a piped template is read only when '-' is an argument.
-      if (!args.includes('-')) return { status: 1, stdout: Buffer.alloc(0), stderr: '[ERROR] no template' };
-      const template = JSON.parse(String(options.input));
-      items[template.title] = Object.fromEntries(template.fields.map((field) => [field.label, field.value]));
-      return ok(JSON.stringify({ id: template.title }));
+      // Like the real CLI under Node: a socket on stdin is ignored, so only --template works.
+      if (template === undefined) return ok(JSON.stringify({ id: 'untitled', title: 'Untitled SecureNote' }));
+      const parsed = JSON.parse(template);
+      items[parsed.title] = Object.fromEntries(parsed.fields.map((field) => [field.label, field.value]));
+      return ok(JSON.stringify({ id: parsed.title, title: parsed.title }));
     }
     if (args[0] === 'item' && args[1] === 'edit') {
-      const [name, value] = args.at(-1).split(/\[\w+\]=/);
+      const [escaped, value] = args.at(-1).split(/\[\w+\]=/);
+      // op treats an unescaped period as a section separator.
+      if (escaped.split(/(?<!\\)\./).length > 2) return { status: 1, stdout: Buffer.alloc(0), stderr: '[ERROR] more than 1 unescaped period' };
+      const name = escaped.replace(/\\\./g, '.');
       if (name === failAttach) return { status: 1, stdout: Buffer.alloc(0), stderr: '[ERROR] upload failed' };
       if (items[args[2]]) items[args[2]][name] = value;
       return ok('{}');
@@ -133,14 +139,15 @@ describe('Cadence Release vault', () => {
     expect(() => vault().titles()).toThrow(/must reach only "Cadence Release"/);
   });
 
-  it('creates backups from a template on stdin and never replaces an item', () => {
+  it('creates backups from a private template file and never replaces an item', () => {
     approve();
     expect(() => vault().createItem(inv.developerId.item, [{ label: 'password', value: secret, secret: true }])).toThrow(/already exists/);
     vault().createItem('Cadence new item', [{ label: 'password', value: secret, secret: true }, { label: 'fingerprint', value: 'F' }], { 'identity.p12': '/tmp/identity.p12' });
     const create = calls.find((call) => call.args[0] === 'item' && call.args[1] === 'create');
-    expect(create.input).toContain(secret);
+    expect(create.template).toContain(secret);
+    expect(existsSync(create.args[create.args.indexOf('--template') + 1])).toBe(false);
     for (const call of calls) expect(call.args.join(' ')).not.toContain(secret);
-    expect(calls.find((call) => call.args[1] === 'edit').args).toContain('identity.p12[file]=/tmp/identity.p12');
+    expect(calls.find((call) => call.args[1] === 'edit').args).toContain('identity\\.p12[file]=/tmp/identity.p12');
     expect(ledger()).not.toContain(secret);
   });
 
@@ -159,7 +166,7 @@ describe('Cadence Release vault', () => {
     vault().createItem('Cadence new item', [{ label: 'fingerprint', value: 'F' }], { 'identity.p12': '/tmp/identity.p12' });
     expect(items['Cadence new item'].complete).toBe(COMPLETE_MARKER);
     const edits = calls.filter((call) => call.args[1] === 'edit').map((call) => call.args.at(-1));
-    expect(edits).toEqual(['identity.p12[file]=/tmp/identity.p12', `complete[text]=${COMPLETE_MARKER}`]);
+    expect(edits).toEqual(['identity\\.p12[file]=/tmp/identity.p12', `complete[text]=${COMPLETE_MARKER}`]);
   });
 
   it('verifies backups by fingerprint without reading a secret', () => {
@@ -182,5 +189,13 @@ describe('Cadence Release vault', () => {
     const code = await main(['probe', 'vault'], { out: (line) => out.push(line), err: () => {}, deps: { run: noToken } });
     expect(code).toBe(21);
     expect(JSON.parse(out.at(-1)).detail).toMatch(/no Cadence Release service-account token/);
+  });
+});
+
+describe('escapeOpFieldName', () => {
+  it('escapes periods, equals signs and backslashes for op assignments', () => {
+    expect(escapeOpFieldName('identity.p12')).toBe('identity\\.p12');
+    expect(escapeOpFieldName('a=b\\c')).toBe('a\\=b\\\\c');
+    expect(escapeOpFieldName('AuthKey')).toBe('AuthKey');
   });
 });

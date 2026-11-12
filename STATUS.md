@@ -59,7 +59,7 @@ Check the cited entry before acting on a row.
 | Behavior place edit withdraws its leave time (web) | Entry says "not pushed"; `git log` shows PR #198 merged as `d643a6e7` | Not yet rechecked live | STATUS, "Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026" |
 | Mac leave reminders for newly added Calendar events | Entry says "not pushed"; `git log` shows PR #198 merged | Not yet rechecked on an installed Mac | STATUS, "Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026" |
 | Updater key rotation and new Developer ID identity | New key, certificate, profile and notarization password in place; release `check` passes | Build notarized 0.1.10 on a configured release Mac (authorized November 12); hand install on both Macs; publish `latest.json`; owner attaches key files to 1Password; renew the certificate before December 11, 2027 | DECISIONS, 2026-11-11; STATUS, "Updater signing key rotated — November 11, 2026" |
-| Ticket 325: release credential backup and restore | `release:credentials` status, verify-backups, restore and backup; preflight checks; runbook; decision D29 | Owner creates the Cadence Release vault, its service account and an App Store Connect API key; agents back up and verify live; notarization switches to the API key; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325 started — November 11, 2026" |
+| Ticket 325: release credential backup and restore | Cadence Release vault and service account in place; identity, notarization and updater backups made and `verify-backups` passes (November 12) | Owner creates the App Store Connect API key; agents back it up and switch notarization to it; certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026" |
 | Cadence for Mac 0.1.9 | Published November 7, 2026 | macOS 14 not tested; 0.1.8 users with an auto-archived Behavior must download 0.1.9 | STATUS, "Cadence for Mac 0.1.9 published — November 7, 2026" |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
@@ -111,6 +111,25 @@ Check the cited entry before acting on a row.
   `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (`gpt-6-luna` untested).
 - Next: the Ticket 296 adapter, then Tickets 297 and 298.
 - Platform impact: none (development script and QA record). Messaging impact: none.
+
+## Ticket 325: live backups verified — November 12, 2026
+
+The owner created the Cadence Release vault and its read/write service account and stored
+the token in the login keychain (service `cadence-release-1password`). With the owner's
+`release-secrets` approval in chat, recorded in `.intent/acceptance/mac-0.1.10-20261111`,
+an agent ran `backup` for the identity, the notarization credential and the updater key.
+
+- **Verified:** `verify-backups` reports all three items complete with matching
+  fingerprints. The `desktop-release` preflight shows `release-vault-token` and
+  `release-backups` ready.
+- **Fixed in `release-credentials.mjs`:** `op item create` ignored a template on Node's
+  stdin pipe (a socket, not a FIFO) and created "Untitled SecureNote" items, so `backup`
+  now passes a 0600 `--template` file and checks the returned title. Attachment names with
+  periods (`identity.p12`, `cadence-updater.key.pub`) are escaped. Two Untitled items and
+  one partial updater item were deleted from the vault. `tests/release-credentials.test.mjs`
+  covers both (14 pass).
+- **Still open:** the App Store Connect API key (owner creates it), switching notarization
+  to it, and the certificate-renewal spike.
 
 ## PR integration review and release access — November 12, 2026
 
@@ -263,189 +282,32 @@ Marketing and future mobile: not applicable. Messaging impact: none.
 
 **Merged with PR #229.**
 
-- `daily-brief-consumer.ts`: `prepareDailyBrief` returns the model request and plain-JSON
-  `DailyBriefValidationData`; `validateDailyBrief` turns output into a briefing from it.
-  `generateDailyBrief` composes both; hosted behavior is unchanged.
-- `tests/daily-brief-prepare-validate.test.ts` (39 tests) proves the composition after a
-  JSON round trip; the 41 existing briefing test files pass unchanged.
-- Both steps stay server-side (Ticket 298 calls them); `briefing-pipeline.ts` still uses
-  `node:crypto` (`docs/AGENT_RESOLVERS.md`). Open in 296: the adapter and error mapping.
-- Platform impact: web only, unchanged behavior. Messaging impact: none.
-
-## Ticket 326: web export reads Mac-written configuration history — November 11, 2026
-
-**On branch `claude/fix-export-camelcase-60ae30`. Not merged; production not rechecked.**
-
-- Cause of defect D2: Cadence for Mac stores configuration snapshots in camelCase, and
-  account sync (`apps/desktop/src/account/account-sync.ts`) uploads `configuration_event`
-  rows unchanged. Only the first-link path converted them. Export assembly validated the
-  snake_case shape, so every web export for test account A returned 500.
-- `toStoredConfigurationSnapshot` (`packages/core/src/services/configuration-payload.ts`)
-  reads both shapes. Export assembly and `listBehaviorConfigurationEvents` use it, which
-  covers web and Mac export, BehaviorLog restore and Daily Brief history (it read reminder
-  flags as false for camelCase rows). The Mac export dropped its own copy of the mapping.
-  MCP does not read configuration history.
-- The export route now logs `export_download_failed` with the error class, the format and,
-  for export validation failures only, the code-defined label. No raw messages or note text.
-- Not done: the Mac sync writer (Ticket 326, later Mac release; `account-sync.resolver.ts`
-  untouched) and an optional rewrite of the existing hosted rows (owner approval).
-- Tests: `tests/export-camelcase-configuration.test.ts` (fails on `main` with "Invalid
-  configuration schedule_graph."), `tests/export-download-route.test.ts`.
-- PR review fixed four CI failures by giving repository pagination fixtures valid snapshots;
-  a mixed-shape test checks both revisions and unchanged pagination metadata. The export
-  failure classifier now permits exact code-defined labels only; a provider error that
-  resembles a validation message cannot leak private text. The classifier stays in
-  `lib/services/export.service.ts`, keeping the API route thin.
-- Review verification: agents, interactions, resolvers, lint, typecheck and web build passed; 17 focused
-  tests passed. The full suite passed 5,618 tests and skipped 230; 29 tests failed because
-  this cloud executor denies Unix-socket binding (`listen EPERM`) in the unchanged session
-  broker and Docker-proxy suites. Dagger and Docker are unavailable. GitHub CI remains the
-  merge gate. Production acceptance has not run.
-
-## Trust marketing-ID refresh paused until launch — November 11, 2026
-
-The owner decided that the pre-launch development process must not include the Trust
-marketing-ID refresh (`docs/DECISIONS.md`, 2026-11-11). `docs/VERCEL_WORKFLOW.md`,
-"Deployment", no longer asks for it after a merge. The open item is the launch-gate row in
-"Open work" and the list in `docs/OPERATIONS.md`, "Public-product operations". The stored
-ID was last set on November 11 and is stale now; nobody needs to act on that.
-
-Platform impact: operations docs only. Web: the Trust page shows Stale until launch.
-Desktop, marketing and future mobile: not applicable. Messaging impact: none.
-
-## Dagger repairs — November 11, 2026
-
-**PR #231 (`dagger/repairs`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
-"Keep Dagger as the local pre-push check".
-
-- **Command:** `dagger check --cadence --progress=report`. A bare `dagger check` also runs
-  the Dang SDK's staleness check, which took 268 s and 337 s.
-- **Module:** tracked files under `.claude/skills` and `.intent/artifacts` now reach the
-  container; every path in the owner's `.git/info/exclude` is excluded by name; the `test`
-  check mounts the Git data of the pinned fixture commit and skips
-  `tests/acceptance-web-client.test.mjs`.
-- **Verified from a worktree:** ten checks pass in 31 s after a change and in 1 s
-  unchanged; a deliberately broken test fails `cadence/test` and prints the failure;
-  through the new module, the main checkout's `exports`, `apps/desktop/signing`,
-  `.intent/acceptance`, `.claude/worktrees` and local sound files are absent.
-- **Not done:** per-check input filters (deferred); `public-source:check` in Dagger; a cold
-  first run was not re-measured.
-- **Docker memory:** an agent raised Docker Desktop's VM from 8 GB to 16 GB on November 11
-  at the owner's request. After the restart, ten checks passed from the main checkout in
-  42 s.
-
-## CI checks run in parallel — November 11, 2026
-
-**Merged November 11 as PR #230 (`58577086`).** Decision: `docs/DECISIONS.md`, 2026-11-11,
-"CI checks run in parallel".
-
-- **Measured before:** a passing `CI` run took 754 s (median of 160 runs since October 28).
-  `tests/acceptance-web-client.test.mjs` took 589 s of it.
-- **Changed:** `npm run test` skips that file; `npm run test:web-client` and the new
-  `Web client runner` workflow run it for changes to the acceptance runner. `ci.yml` runs
-  `checks`, `lint`, `test` (three shards), `build` and `sites` in parallel, and the required
-  `verify` job fails unless all passed. `.github/actions/setup` restores `node_modules`
-  from the Actions cache.
-- **Not changed:** branch protection, the Dagger module and the web client test's waits.
-- **Measured after:** `CI` took 145 s on its first run and 100 s with warm caches. The
-  `Web client runner` workflow took 673 s on its own.
-- **Dagger:** decided and repaired in the entry above.
-
-Platform impact: development tooling only. Web, desktop, marketing and future mobile: not
-applicable. Messaging impact: none.
-
-## Ledger cleanup — November 11, 2026
-
-- **Merge markers:** removed the stray `||||||| 46016e57` and `||||||| 20feeaff` lines from
-  STATUS (left by the PR #214 branch merges `109fedf3` and `4c8e2466`; `git show --cc` shows
-  no entry text lost). The same merge replaced the last line of D29 in `docs/DECISIONS.md`
-  with `||||||| 20feeaff`; restored it from `8c3a474c`.
-- **Guard:** `npm run agents:check` now fails on a conflict marker line (`<<<<<<<`,
-  `|||||||`, `=======`, `>>>>>>>`) in STATUS, `docs/TICKETS.md` or `docs/DECISIONS.md`.
-- **TICKETS reconciled:** MCP Tickets 220–231 complete (MCP live since October 29; Ticket 232
-  acceptance complete October 31). Ticket 252 complete (PR #176, `89b4a6b6`); 256 complete
-  (October 31 production retest); 259 complete (Tier 2 ChatGPT web write
-  `20261031T230336Z-cf9e6e`). Travel Tickets 260–283 merged as PRs #189–#194 (November 5–6),
-  live on web; Ticket 280 released in Mac 0.1.9; the 275–277 migrations are on hosted (hosted
-  equals git, 114 rows, per the connector completion push entry). Open-work rows for MCP
-  220–231 and Ticket 259 removed; 232, 247–258 and 260–283 rows refreshed.
-- **Trust marketing-ID refresh:** done by this session right after this PR merges, so this
-  entry cannot record its result. Every later merge to `main` stales it again, so it must be
-  repeated after the other November 11 sessions merge.
-
-Platform impact: docs and governance check only. Web, desktop, marketing and future mobile:
-not applicable. Messaging impact: none.
-
-## Ticket 320: connector records sync to the Mac — November 11, 2026
-
-**PR #216 merged November 11 by the owner. Hosted `20261111160000` applied before the merge.
-In the Mac 0.1.10 release branch; not yet in a published build.**
-
-- Account sync contract 5 (hosted `20261111160000`) adds `behavior_source_link` and
-  `occurrence_source_match` as read-only kinds, with only the fields a Mac shows: no
-  routine digests, account digest or activity references. Contracts 1–4 receive neither.
-- The planner (`account-sync.resolver.ts`) lets the hosted row win, never writes them to
-  the hosted account, and drops a row whose Behavior or Occurrence leaves the merge.
-- SQLite schema 24 (`0024_connector_completion_records.sql`) stores them; account sync is
-  the only writer. The Mac Timeline row lists workout times, as the web row does.
-- Verification: a clean local stack replayed all 115 migrations; the new fixture
-  `ticket-320-connector-completion-sync.sql`, the account-sync contract fixtures and the
-  Ticket 292 sync fixture pass. Planner, desktop adapter and Mac Timeline tests pass; 132
-  Rust tests pass.
-- Hosted push: an agent applied `20261111160000` with the vault token `supabase-access-token`
-  under the standing approval for additive migrations. Readback: the snapshot carries both
-  kinds without digests or activity references; `apply_account_sync_plan`'s writable list
-  has neither; `account_sync_snapshot()` executes for `authenticated` only; hosted
-  migration history equals git (115 rows).
-- Second readback after the merge (another agent, read-only SQL): contract additions list
-  both kinds at 5; the current contract is 5; projecting a synthetic snapshot keeps both
-  kinds at contract 5 and drops them at 1–4; RLS is on for `behavior_source_links` and
-  `occurrence_source_matches`, with no `anon` or `PUBLIC` table grants; hosted migration
-  history still equals git (117 rows).
-- The pinned CLI 2.105.0 binary fails `codesign -v` straight from the npm registry, so
-  macOS kills it. An ad-hoc signed copy outside the repository ran `migration list`
-  (`docs/SUPABASE_WORKFLOW.md`, "Installed pathway").
-- Not verified: an installed dev-signed Mac build syncing a real account.
-- Ticket 323 waits on: (1) Mac 0.1.10 notarized and published by owner instruction; the
-  release branch contains Tickets 319 and 320 (mac-release track); (2) Ticket 241's
-  release steps 6–7 and installed connector acceptance (connector acceptance track);
-  (3) the acceptance matrix in plan Task 14 as test account A; (4) the owner's instruction
-  to set `CADENCE_CONNECTOR_COMPLETION` in production. Ticket 324 waits on 323.
-
-## Ticket 325 started: release credential backup and restore — November 11, 2026
-
-Decision D29 (`docs/DECISIONS.md`, 2026-11-11) moves release secrets into a Cadence Release
-vault that a write-capable service account reaches, with the owner's approval per run.
-
-- **Done:** `apps/desktop/release-credentials.json` (non-secret inventory);
-  `npm run release:credentials` with `status`, `probe`, `verify-backups`, `restore` and
-  `backup`; preflight requirements `updater-signing-key`, `notarization-credential`,
-  `release-vault-token` and `release-backups`. The `developer-id` and
-  `provisioning-profile` probes now read the inventory, so the preflight no longer checks
-  the retired profile. Runbook: `docs/DESKTOP_RELEASE.md`, "Signing credentials".
-- **Verified:** `status` passes on the owner's Mac, and it reports the retired profile as
-  not listing the installed identity. Unit tests use a fake `op`.
-- **Not done:** the vault, service account and App Store Connect API key (owner steps);
-  live backup and `verify-backups`; notarization through the API key; the certificate
-  renewal spike. The owner reports having stored the Developer ID `.p12`, the notarization
-  password and the updater key in the Cadence vault; not verified by an agent.
-
-## Connector completion hosted push and merge — November 11, 2026
-
-The owner said on November 11 to merge PR #207 and continue.
-
-- Hosted already had main's `20261111120000` and `20261111130000`, so the connector
-  completion migrations moved, unchanged, from `20261110200000` and `20261110210000` to
-  `20261111140000` and `20261111150000`. Both create only new objects. A clean local start
-  replayed all 114 migrations and all 44 SQL fixtures passed.
-- An agent pushed both with the vault token `supabase-access-token` and CLI 2.105.0, before
-  the merge: `20261111140000` under the standing approval for additive migrations,
-  `20261111150000` (the `service_role` column read) with the owner's November 10 approval.
-- Readback: RLS on `behavior_source_links`, `occurrence_source_matches` and
-  `connector_completion_state`, each with policies for `authenticated` only; no `anon`
-  grants; `service_role` may select only `user_id`, `source` and `next_check_at` on
-  `connector_completion_state`. `apply_connector_completion`, `attach_source_activity` and
-  `remove_source_match` are security definer with an empty search path and execute for
-  `authenticated` only. The six `cadence_private` helpers are revoked from `public`.
-- `migration list`: hosted equals git (114 rows).
-- The feature stays off until `CADENCE_CONNECTOR_COMPLETION` is `on`; this work set no Vercel variable.
+- `lib/services/daily-brief-consumer.ts` now has `prepareDailyBrief` (estimates, planning,
+  model request) and `validateDailyBrief` (model output to briefing from plain-JSON
+  `DailyBriefValidationData`). `generateDailyBrief` composes them; its signature and
+  behavior are unchanged. The 512 KB payload check uses `TextEncoder`, not `Buffer`.
+- Tests: the 41 existing briefing and Daily Brief test files pass unchanged (619 tests).
+  `tests/daily-brief-prepare-validate.test.ts` adds 39 tests: every preset on 7 fixtures
+  matches `generateDailyBrief` after a JSON round trip, plus unknown-ref, expiry,
+  configuration-revision and version rejections.
+- Assumption, recorded in `docs/AGENT_RESOLVERS.md`: both steps stay server-side, because
+  Ticket 298's routes call them and the Mac runs only the model call. `briefing-pipeline.ts`
+  still uses `node:crypto`, so the ticket's "runs in the browser" line is not met and not
+  needed under D27.
+- No production gate is needed: hosted behavior is unchanged and nothing new is reachable.
+- PR review reconciled this branch with current `main` and documented that validation data
+  is trusted server output. Ticket 298 must authenticate its signed envelope before calling
+  `validateDailyBrief` with data returned by a device.
+- Review verification: agents, interactions, resolvers, lint, typecheck and web build passed;
+  92 focused consumer, prepare/validate, analysis and recipe tests passed. The full suite
+  passed 5,649 tests and skipped 230; 29 tests failed because this cloud executor denies
+  Unix-socket binding (`listen EPERM`) in the unchanged session-broker and Docker-proxy
+  suites. Dagger and Docker are unavailable. GitHub CI remains the merge gate.
+- Still open in Ticket 296: the ChatGPT plan adapter and its error mapping, which wait for
+  the request contract from the live Ticket 295 run.
+- Ticket 295: no preflight suite covers the ChatGPT spike sign-in. The owner ask for the
+  live run (`node scripts/run-chatgpt-plan-spike.mjs --live`) went to the owner on
+  November 11.
+- Platform impact: web, `daily-brief-consumer.ts`, hosted behavior unchanged; desktop,
+  none yet (Ticket 299 wires it); marketing and future mobile, not applicable. Messaging
+  impact: none.
