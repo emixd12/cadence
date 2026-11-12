@@ -69,3 +69,49 @@ the preview.
 **Keyboard and viewport:** In the mobile drawer, focus remains trapped until
 the link navigates. The link works with Tab plus Enter in expanded and
 collapsed desktop navigation and at mobile widths.
+
+## INT-SETTINGS-019: Connect ChatGPT to use your ChatGPT plan
+
+**Prerequisites:** A Cadence for Mac build made with `VITE_CADENCE_CHATGPT_PLAN=1`, linked
+to a Cadence test account. The switch is off by default and stays off in shipped builds
+(owner decision, November 12, 2026). Hosted plan briefs also need
+`CADENCE_DAILY_BRIEF_DEVICE_MODEL` on the target deployment, which stays unset in
+production. Use only a test ChatGPT account.
+
+1. Open **Settings › Planning** and find **Use your ChatGPT plan**.
+2. Activate **Continue with ChatGPT**. ChatGPT sign-in opens in the system browser; the
+   card shows **Finish signing in to ChatGPT in your browser.** and **Cancel ChatGPT
+   sign-in**.
+3. Finish sign-in. The card shows the ChatGPT email and **Using ChatGPT plan**. The first
+   connection with plan usage shows **You’re using your ChatGPT plan** with **Got it**.
+4. The Daily Brief's reconnect and plan-usage-off states offer the same **Continue with
+   ChatGPT** control; a finished sign-in there retries the brief.
+
+**Result and persistence:** Rust keeps the tokens in the `chatgpt-session` Keychain item.
+The webview sees only the state and email, and holds the access token in memory for one
+model call. The one-time confirmation sets a local flag with no account data.
+
+**Recovery and cleanup:** A cancel, timeout or denial saves nothing. Disconnect with
+**Disconnect ChatGPT** after QA.
+
+## INT-SETTINGS-020: Manage ChatGPT usage
+
+**Prerequisites:** As INT-SETTINGS-019, with ChatGPT connected with plan usage.
+
+1. Activate **Manage usage** on the card, on the Daily Brief's **Using ChatGPT plan** line,
+   or as the primary action of the Daily Brief's usage-limit notice.
+2. Confirm that `https://chatgpt.com/settings/usage` opens in the system browser.
+
+**Result and persistence:** Only the system browser opens. Cadence sends nothing.
+
+## INT-SETTINGS-021: Disconnect ChatGPT
+
+**Prerequisites:** As INT-SETTINGS-019, with ChatGPT connected.
+
+1. Activate **Disconnect ChatGPT**.
+2. Confirm **ChatGPT is disconnected.** and that **Continue with ChatGPT** returns.
+
+**Result and persistence:** Rust revokes the refresh token at OpenAI, then removes the
+`chatgpt-session` Keychain item; the installation item stays. Disconnecting the Cadence
+account does the same first. If OpenAI does not confirm the revocation, the local tokens
+are still removed and the card says Cadence may still be listed in ChatGPT settings.

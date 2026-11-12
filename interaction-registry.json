@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-10",
+  "updated": "2026-11-12",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -128,6 +128,115 @@
   ],
   "source_inventory": [
     {
+      "path": "app/(auth)/login/GoogleLoginButton.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-AUTH-001"
+      ]
+    },
+    {
+      "path": "app/(auth)/login/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 5,
+      "interaction_ids": [
+        "INT-AUTH-002",
+        "INT-AUTH-003"
+      ]
+    },
+    {
+      "path": "app/design-system/BriefingDays.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 40,
+      "interaction_ids": [],
+      "reason": "Development-only historical exploration and chronological review under Tickets 182–183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
+    },
+    {
+      "path": "app/design-system/BriefingReview.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 43,
+      "interaction_ids": [],
+      "reason": "Development-only Daily Brief review components for Tickets 175–177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
+    },
+    {
+      "path": "app/design-system/BriefingWorkbenchGuide.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 15,
+      "interaction_ids": [],
+      "reason": "Development-only glossary and canonical repository document previews. Search, contract/related-term links, editor links, copy paths, document downloads and original reference links; no account data, generation or filesystem-write API."
+    },
+    {
+      "path": "app/design-system/CalendarBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 12,
+      "interaction_ids": [],
+      "reason": "Development-only synthetic Calendar bench; no provider or account access."
+    },
+    {
+      "path": "app/design-system/ConnectorBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 2,
+      "interaction_ids": [],
+      "reason": "Ticket 238 development-only synthetic connector bench. No production interaction, provider, account, Keychain, or cache access."
+    },
+    {
+      "path": "app/design-system/DailyBriefBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 104,
+      "interaction_ids": [],
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175–177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182–183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Ticket 219 adds travel_day and travel_unknown synthetic selections whose travel facts come from invented places and routes, never Maps content. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case. Ticket 290 adds a per-configuration Generation group (Model, Reasoning effort, Prompt) filled from the server's allowed values, and shows each run's generation, token usage and failure reason."
+    },
+    {
+      "path": "app/design-system/DayProgressBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 27,
+      "interaction_ids": [],
+      "reason": "Ticket 132 development-only synthetic comparison bench. No production interaction or provider access."
+    },
+    {
+      "path": "app/design-system/DepartureStatesBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 8,
+      "interaction_ids": [],
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
+    },
+    {
+      "path": "app/design-system/HorseAvatarTrial.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 9,
+      "interaction_ids": [],
+      "reason": "Development-only trial of an animated advisor horse avatar with sample advice. Not a product surface; no account or provider access."
+    },
+    {
+      "path": "app/design-system/SettingsRegroupBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 28,
+      "interaction_ids": [],
+      "reason": "Development-only Settings regroup bench (usability evaluation, 2026-11-09 and 2026-11-10): layout and account-state toggles over the real Ticket 301 Settings groups, index, rows and drawers on synthetic clients, plus non-saving sketches of the Categories list (Ticket 304) and Daily Brief controls (Tickets 306-307). No provider call, account access or product write."
+    },
+    {
+      "path": "app/design-system/TravelBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only travel benches with bench-only habit saves and a caption link to the travel timing states bench. No provider call or account access."
+    },
+    {
+      "path": "app/design-system/page.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 30,
+      "interaction_ids": [],
+      "reason": "Local dev-only component bench, not a product surface."
+    },
+    {
+      "path": "app/oauth/consent/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-OAUTH-004"
+      ]
+    },
+    {
       "path": "apps/desktop/src/account/account-panel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 27,
@@ -142,104 +251,6 @@
         "INT-AUTH-012",
         "INT-AUTH-013",
         "INT-AUTH-014"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/local-database-controls.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 12,
-      "interaction_ids": [
-        "INT-DATABASE-001",
-        "INT-DATABASE-002",
-        "INT-DATABASE-003",
-        "INT-DATABASE-004"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/desktop-update-panel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 20,
-      "interaction_ids": [
-        "INT-DESKTOP-002"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/export-screen.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 2,
-      "interaction_ids": [
-        "INT-DESKTOP-001",
-        "INT-EXPORT-001",
-        "INT-EXPORT-002",
-        "INT-EXPORT-003",
-        "INT-EXPORT-004",
-        "INT-EXPORT-005",
-        "INT-EXPORT-006",
-        "INT-EXPORT-007",
-        "INT-EXPORT-008",
-        "INT-EXPORT-009",
-        "INT-EXPORT-010",
-        "INT-EXPORT-011",
-        "INT-EXPORT-012",
-        "INT-EXPORT-013",
-        "INT-EXPORT-014",
-        "INT-EXPORT-015",
-        "INT-EXPORT-016",
-        "INT-EXPORT-017",
-        "INT-EXPORT-019",
-        "INT-EXPORT-018"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/settings-screen.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 6,
-      "interaction_ids": [
-        "INT-SETTINGS-004",
-        "INT-ONBOARD-001",
-        "INT-SETTINGS-001",
-        "INT-SETTINGS-003",
-        "INT-SETTINGS-002",
-        "INT-SETTINGS-010",
-        "INT-SETTINGS-011",
-        "INT-SETTINGS-012",
-        "INT-SETTINGS-013",
-        "INT-SETTINGS-015",
-        "INT-SETTINGS-016",
-        "INT-SETTINGS-017",
-        "INT-SETTINGS-018"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/onboarding-guide.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 6,
-      "interaction_ids": [
-        "INT-ONBOARD-001",
-        "INT-ONBOARD-002"
-      ]
-    },
-    {
-      "path": "components/layout/WebRuntimeProvider.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 1,
-      "interaction_ids": [
-        "INT-BEHAVIOR-001",
-        "INT-BEHAVIOR-002"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/desktop-app.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 21,
-      "interaction_ids": [
-        "INT-SHELL-001",
-        "INT-SHELL-002",
-        "INT-SHELL-004",
-        "INT-SHELL-005",
-        "INT-SHELL-006",
-        "INT-AUTH-010",
-        "INT-SHELL-003"
       ]
     },
     {
@@ -282,6 +293,90 @@
         "INT-PLACE-008",
         "INT-PLACE-009",
         "INT-PLACE-010"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/desktop-app.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 21,
+      "interaction_ids": [
+        "INT-SHELL-001",
+        "INT-SHELL-002",
+        "INT-SHELL-004",
+        "INT-SHELL-005",
+        "INT-SHELL-006",
+        "INT-AUTH-010",
+        "INT-SHELL-003"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/desktop-error-boundary.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-DESKTOP-001"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/desktop-update-panel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 20,
+      "interaction_ids": [
+        "INT-DESKTOP-002"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/export-screen.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-DESKTOP-001",
+        "INT-EXPORT-001",
+        "INT-EXPORT-002",
+        "INT-EXPORT-003",
+        "INT-EXPORT-004",
+        "INT-EXPORT-005",
+        "INT-EXPORT-006",
+        "INT-EXPORT-007",
+        "INT-EXPORT-008",
+        "INT-EXPORT-009",
+        "INT-EXPORT-010",
+        "INT-EXPORT-011",
+        "INT-EXPORT-012",
+        "INT-EXPORT-013",
+        "INT-EXPORT-014",
+        "INT-EXPORT-015",
+        "INT-EXPORT-016",
+        "INT-EXPORT-017",
+        "INT-EXPORT-019",
+        "INT-EXPORT-018"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/local-database-controls.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 12,
+      "interaction_ids": [
+        "INT-DATABASE-001",
+        "INT-DATABASE-002",
+        "INT-DATABASE-003",
+        "INT-DATABASE-004"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/main.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 28,
+      "interaction_ids": [],
+      "reason": "Ticket 108 developer-only native boundary bench, not a desktop tracking implementation."
+    },
+    {
+      "path": "apps/desktop/src/onboarding-guide.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-ONBOARD-001",
+        "INT-ONBOARD-002"
       ]
     },
     {
@@ -332,7 +427,37 @@
         "INT-TRAVEL-011",
         "INT-TRAVEL-012",
         "INT-TRAVEL-013",
-        "INT-TRAVEL-014"
+        "INT-TRAVEL-014",
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020",
+        "INT-SETTINGS-021"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/settings-bench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 4,
+      "interaction_ids": [],
+      "reason": "Synthetic developer-only Settings fixtures; no native updates or file mutations."
+    },
+    {
+      "path": "apps/desktop/src/settings-screen.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-SETTINGS-004",
+        "INT-ONBOARD-001",
+        "INT-SETTINGS-001",
+        "INT-SETTINGS-003",
+        "INT-SETTINGS-002",
+        "INT-SETTINGS-010",
+        "INT-SETTINGS-011",
+        "INT-SETTINGS-012",
+        "INT-SETTINGS-013",
+        "INT-SETTINGS-015",
+        "INT-SETTINGS-016",
+        "INT-SETTINGS-017",
+        "INT-SETTINGS-018"
       ]
     },
     {
@@ -365,66 +490,6 @@
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
     {
-      "path": "apps/desktop/src/desktop-error-boundary.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 2,
-      "interaction_ids": [
-        "INT-DESKTOP-001"
-      ]
-    },
-    {
-      "path": "apps/desktop/src/settings-bench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 4,
-      "interaction_ids": [],
-      "reason": "Synthetic developer-only Settings fixtures; no native updates or file mutations."
-    },
-    {
-      "path": "apps/desktop/src/main.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 28,
-      "interaction_ids": [],
-      "reason": "Ticket 108 developer-only native boundary bench, not a desktop tracking implementation."
-    },
-    {
-      "path": "app/(auth)/login/GoogleLoginButton.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 2,
-      "interaction_ids": [
-        "INT-AUTH-001"
-      ]
-    },
-    {
-      "path": "app/(auth)/login/page.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 5,
-      "interaction_ids": [
-        "INT-AUTH-002",
-        "INT-AUTH-003"
-      ]
-    },
-    {
-      "path": "app/design-system/DayProgressBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 27,
-      "interaction_ids": [],
-      "reason": "Ticket 132 development-only synthetic comparison bench. No production interaction or provider access."
-    },
-    {
-      "path": "app/design-system/HorseAvatarTrial.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 9,
-      "interaction_ids": [],
-      "reason": "Development-only trial of an animated advisor horse avatar with sample advice. Not a product surface; no account or provider access."
-    },
-    {
-      "path": "app/design-system/page.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 30,
-      "interaction_ids": [],
-      "reason": "Local dev-only component bench, not a product surface."
-    },
-    {
       "path": "apps/marketing/src/layouts/BaseLayout.astro",
       "classification": "cataloged",
       "interaction_marker_count": 13,
@@ -435,6 +500,15 @@
         "INT-MKT-005",
         "INT-MKT-010",
         "INT-MKT-012"
+      ]
+    },
+    {
+      "path": "apps/marketing/src/layouts/DeveloperLayout.astro",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-MKT-013",
+        "INT-MKT-014"
       ]
     },
     {
@@ -572,6 +646,45 @@
       ]
     },
     {
+      "path": "components/behaviors/SourceLinkSettings.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 10,
+      "interaction_ids": [
+        "INT-BEHAVIOR-032"
+      ]
+    },
+    {
+      "path": "components/briefing/ChatGptPlanCard.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 12,
+      "interaction_ids": [
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020",
+        "INT-SETTINGS-021"
+      ]
+    },
+    {
+      "path": "components/briefing/DailyBriefBubble.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 11,
+      "interaction_ids": [
+        "INT-BRIEF-002",
+        "INT-BRIEF-003",
+        "INT-BRIEF-005",
+        "INT-WEATHER-001",
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020"
+      ]
+    },
+    {
+      "path": "components/briefing/DailyBriefSettingsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 12,
+      "interaction_ids": [
+        "INT-BRIEF-004"
+      ]
+    },
+    {
       "path": "components/export/BehaviorLogImportPanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 25,
@@ -656,6 +769,45 @@
       ]
     },
     {
+      "path": "components/layout/WebRuntimeProvider.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-BEHAVIOR-001",
+        "INT-BEHAVIOR-002"
+      ]
+    },
+    {
+      "path": "components/note-shortcuts/NoteShortcutControls.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 14,
+      "interaction_ids": [
+        "INT-TIMELINE-011",
+        "INT-BEHAVIOR-029",
+        "INT-SETTINGS-018"
+      ]
+    },
+    {
+      "path": "components/notes/NoteEditor.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 10,
+      "interaction_ids": [
+        "INT-TIMELINE-008",
+        "INT-TIMELINE-011",
+        "INT-TIMELINE-012"
+      ]
+    },
+    {
+      "path": "components/oauth/ConsentForm.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-OAUTH-001",
+        "INT-OAUTH-002",
+        "INT-OAUTH-003"
+      ]
+    },
+    {
       "path": "components/onboarding/FirstRunOnboardingPanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 5,
@@ -676,6 +828,76 @@
       ]
     },
     {
+      "path": "components/settings/CategoryPanel.tsx",
+      "classification": "cataloged",
+      "interaction_ids": [
+        "INT-SETTINGS-010",
+        "INT-SETTINGS-011",
+        "INT-SETTINGS-012",
+        "INT-SETTINGS-013",
+        "INT-BRIEF-004"
+      ],
+      "interaction_marker_count": 22
+    },
+    {
+      "path": "components/settings/ConnectedAppsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 5,
+      "interaction_ids": [
+        "INT-OAUTH-004",
+        "INT-OAUTH-005",
+        "INT-MKT-013"
+      ]
+    },
+    {
+      "path": "components/settings/GoogleCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 20,
+      "interaction_ids": [
+        "INT-CALENDAR-001",
+        "INT-CALENDAR-002",
+        "INT-CALENDAR-003",
+        "INT-CALENDAR-004"
+      ]
+    },
+    {
+      "path": "components/settings/HevyPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-CONNECTOR-001",
+        "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "components/settings/HomeCurrentLocation.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TRAVEL-014"
+      ]
+    },
+    {
+      "path": "components/settings/IcloudCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 14,
+      "interaction_ids": [
+        "INT-CALENDAR-012",
+        "INT-CALENDAR-013",
+        "INT-CALENDAR-014",
+        "INT-CALENDAR-015"
+      ]
+    },
+    {
+      "path": "components/settings/LeaveReminderSetting.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 3,
+      "interaction_ids": [
+        "INT-TRAVEL-013"
+      ]
+    },
+    {
       "path": "components/settings/LegalContent.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 5,
@@ -685,19 +907,41 @@
       ]
     },
     {
-      "path": "components/trust/TrustEvidencePanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 6,
-      "interaction_ids": [
-        "INT-LEGAL-003"
-      ]
-    },
-    {
       "path": "components/settings/NotificationPermissionPanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 2,
       "interaction_ids": [
         "INT-SETTINGS-004"
+      ]
+    },
+    {
+      "path": "components/settings/OutlookCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 9,
+      "interaction_ids": [
+        "INT-CALENDAR-008",
+        "INT-CALENDAR-009",
+        "INT-CALENDAR-010",
+        "INT-CALENDAR-011"
+      ]
+    },
+    {
+      "path": "components/settings/SettingsDisconnect.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-CALENDAR-004",
+        "INT-CALENDAR-011",
+        "INT-CALENDAR-015",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "components/settings/SettingsPanels.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-SETTINGS-005"
       ]
     },
     {
@@ -712,14 +956,6 @@
       ]
     },
     {
-      "path": "components/settings/SettingsPanels.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 1,
-      "interaction_ids": [
-        "INT-SETTINGS-005"
-      ]
-    },
-    {
       "path": "components/settings/TimezonePanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 8,
@@ -727,6 +963,61 @@
         "INT-SETTINGS-001",
         "INT-SETTINGS-002",
         "INT-SETTINGS-003"
+      ]
+    },
+    {
+      "path": "components/settings/TravelHabitsSection.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-TRAVEL-010"
+      ]
+    },
+    {
+      "path": "components/settings/TravelSettingsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 11,
+      "interaction_ids": [
+        "INT-TRAVEL-001",
+        "INT-TRAVEL-002",
+        "INT-PLACE-006",
+        "INT-TRAVEL-006",
+        "INT-TRAVEL-007",
+        "INT-TRAVEL-013",
+        "INT-TRAVEL-014"
+      ]
+    },
+    {
+      "path": "components/timeline/DayNoteControl.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-TIMELINE-012"
+      ]
+    },
+    {
+      "path": "components/timeline/DayProgressTimeline.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 8,
+      "interaction_ids": [
+        "INT-TIMELINE-001",
+        "INT-CALENDAR-005",
+        "INT-CALENDAR-006",
+        "INT-TRAVEL-004",
+        "INT-TRAVEL-008"
+      ]
+    },
+    {
+      "path": "components/timeline/ExternalEventDetails.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 23,
+      "interaction_ids": [
+        "INT-CALENDAR-005",
+        "INT-CALENDAR-006",
+        "INT-CALENDAR-007",
+        "INT-TRAVEL-003",
+        "INT-WEATHER-001",
+        "INT-TRAVEL-009"
       ]
     },
     {
@@ -744,16 +1035,6 @@
       "interaction_ids": [
         "INT-TIMELINE-002",
         "INT-TIMELINE-003"
-      ]
-    },
-    {
-      "path": "components/note-shortcuts/NoteShortcutControls.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 14,
-      "interaction_ids": [
-        "INT-TIMELINE-011",
-        "INT-BEHAVIOR-029",
-        "INT-SETTINGS-018"
       ]
     },
     {
@@ -792,58 +1073,18 @@
       ]
     },
     {
-      "path": "public/push-service-worker.js",
+      "path": "components/timeline/TravelLeaveQuestion.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 1,
+      "interaction_marker_count": 4,
       "interaction_ids": [
-        "INT-NOTIFICATION-001"
-      ]
-    },
-    {
-      "path": "components/settings/CategoryPanel.tsx",
-      "classification": "cataloged",
-      "interaction_ids": [
-        "INT-SETTINGS-010",
-        "INT-SETTINGS-011",
-        "INT-SETTINGS-012",
-        "INT-SETTINGS-013",
-        "INT-BRIEF-004"
-      ],
-      "interaction_marker_count": 22
-    },
-    {
-      "path": "components/settings/GoogleCalendarPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 20,
-      "interaction_ids": [
-        "INT-CALENDAR-001",
-        "INT-CALENDAR-002",
-        "INT-CALENDAR-003",
-        "INT-CALENDAR-004"
-      ]
-    },
-    {
-      "path": "components/timeline/DayProgressTimeline.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 8,
-      "interaction_ids": [
-        "INT-TIMELINE-001",
-        "INT-CALENDAR-005",
-        "INT-CALENDAR-006",
-        "INT-TRAVEL-004",
         "INT-TRAVEL-008"
       ]
     },
     {
-      "path": "components/timeline/ExternalEventDetails.tsx",
+      "path": "components/timeline/TravelModeChoice.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 23,
+      "interaction_marker_count": 2,
       "interaction_ids": [
-        "INT-CALENDAR-005",
-        "INT-CALENDAR-006",
-        "INT-CALENDAR-007",
-        "INT-TRAVEL-003",
-        "INT-WEATHER-001",
         "INT-TRAVEL-009"
       ]
     },
@@ -858,72 +1099,11 @@
       ]
     },
     {
-      "path": "app/design-system/CalendarBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 12,
-      "interaction_ids": [],
-      "reason": "Development-only synthetic Calendar bench; no provider or account access."
-    },
-    {
-      "path": "app/design-system/DailyBriefBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 104,
-      "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Ticket 219 adds travel_day and travel_unknown synthetic selections whose travel facts come from invented places and routes, never Maps content. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case. Ticket 290 adds a per-configuration Generation group (Model, Reasoning effort, Prompt) filled from the server's allowed values, and shows each run's generation, token usage and failure reason."
-    },
-    {
-      "path": "app/design-system/BriefingReview.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 43,
-      "interaction_ids": [],
-      "reason": "Development-only Daily Brief review components for Tickets 175\u2013177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
-    },
-    {
-      "path": "components/briefing/DailyBriefBubble.tsx",
+      "path": "components/timeline/TravelWeather.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 5,
+      "interaction_marker_count": 4,
       "interaction_ids": [
-        "INT-BRIEF-002",
-        "INT-BRIEF-003",
-        "INT-BRIEF-005",
         "INT-WEATHER-001"
-      ]
-    },
-    {
-      "path": "components/briefing/DailyBriefSettingsPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 12,
-      "interaction_ids": [
-        "INT-BRIEF-004"
-      ]
-    },
-    {
-      "path": "app/design-system/BriefingWorkbenchGuide.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 15,
-      "interaction_ids": [],
-      "reason": "Development-only glossary and canonical repository document previews. Search, contract/related-term links, editor links, copy paths, document downloads and original reference links; no account data, generation or filesystem-write API."
-    },
-    {
-      "path": "components/settings/TravelSettingsPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 11,
-      "interaction_ids": [
-        "INT-TRAVEL-001",
-        "INT-TRAVEL-002",
-        "INT-PLACE-006",
-        "INT-TRAVEL-006",
-        "INT-TRAVEL-007",
-        "INT-TRAVEL-013",
-        "INT-TRAVEL-014"
-      ]
-    },
-    {
-      "path": "components/settings/HomeCurrentLocation.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 2,
-      "interaction_ids": [
-        "INT-TRAVEL-014"
       ]
     },
     {
@@ -944,184 +1124,19 @@
       ]
     },
     {
-      "path": "components/settings/TravelHabitsSection.tsx",
+      "path": "components/trust/TrustEvidencePanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 6,
       "interaction_ids": [
-        "INT-TRAVEL-010"
+        "INT-LEGAL-003"
       ]
     },
     {
-      "path": "components/settings/LeaveReminderSetting.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 3,
-      "interaction_ids": [
-        "INT-TRAVEL-013"
-      ]
-    },
-    {
-      "path": "components/timeline/TravelLeaveQuestion.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 4,
-      "interaction_ids": [
-        "INT-TRAVEL-008"
-      ]
-    },
-    {
-      "path": "components/timeline/TravelModeChoice.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 2,
-      "interaction_ids": [
-        "INT-TRAVEL-009"
-      ]
-    },
-    {
-      "path": "components/oauth/ConsentForm.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 7,
-      "interaction_ids": [
-        "INT-OAUTH-001",
-        "INT-OAUTH-002",
-        "INT-OAUTH-003"
-      ]
-    },
-    {
-      "path": "components/settings/ConnectedAppsPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 5,
-      "interaction_ids": [
-        "INT-OAUTH-004",
-        "INT-OAUTH-005",
-        "INT-MKT-013"
-      ]
-    },
-    {
-      "path": "app/oauth/consent/page.tsx",
+      "path": "public/push-service-worker.js",
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
-        "INT-OAUTH-004"
-      ]
-    },
-    {
-      "path": "apps/marketing/src/layouts/DeveloperLayout.astro",
-      "classification": "cataloged",
-      "interaction_marker_count": 7,
-      "interaction_ids": [
-        "INT-MKT-013",
-        "INT-MKT-014"
-      ]
-    },
-    {
-      "path": "app/design-system/BriefingDays.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 40,
-      "interaction_ids": [],
-      "reason": "Development-only historical exploration and chronological review under Tickets 182\u2013183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
-    },
-    {
-      "path": "components/settings/OutlookCalendarPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 9,
-      "interaction_ids": [
-        "INT-CALENDAR-008",
-        "INT-CALENDAR-009",
-        "INT-CALENDAR-010",
-        "INT-CALENDAR-011"
-      ]
-    },
-    {
-      "path": "components/settings/HevyPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 7,
-      "interaction_ids": [
-        "INT-CONNECTOR-001",
-        "INT-CONNECTOR-002",
-        "INT-CONNECTOR-003"
-      ]
-    },
-    {
-      "path": "components/settings/SettingsDisconnect.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 6,
-      "interaction_ids": [
-        "INT-CALENDAR-004",
-        "INT-CALENDAR-011",
-        "INT-CALENDAR-015",
-        "INT-CONNECTOR-003"
-      ]
-    },
-    {
-      "path": "app/design-system/ConnectorBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 2,
-      "interaction_ids": [],
-      "reason": "Ticket 238 development-only synthetic connector bench. No production interaction, provider, account, Keychain, or cache access."
-    },
-    {
-      "path": "components/settings/IcloudCalendarPanel.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 14,
-      "interaction_ids": [
-        "INT-CALENDAR-012",
-        "INT-CALENDAR-013",
-        "INT-CALENDAR-014",
-        "INT-CALENDAR-015"
-      ]
-    },
-    {
-      "path": "components/timeline/TravelWeather.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 4,
-      "interaction_ids": [
-        "INT-WEATHER-001"
-      ]
-    },
-    {
-      "path": "app/design-system/DepartureStatesBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 8,
-      "interaction_ids": [],
-      "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
-    },
-    {
-      "path": "app/design-system/SettingsRegroupBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 28,
-      "interaction_ids": [],
-      "reason": "Development-only Settings regroup bench (usability evaluation, 2026-11-09 and 2026-11-10): layout and account-state toggles over the real Ticket 301 Settings groups, index, rows and drawers on synthetic clients, plus non-saving sketches of the Categories list (Ticket 304) and Daily Brief controls (Tickets 306-307). No provider call, account access or product write."
-    },
-    {
-      "path": "app/design-system/TravelBench.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 1,
-      "interaction_ids": [],
-      "reason": "Development-only travel benches with bench-only habit saves and a caption link to the travel timing states bench. No provider call or account access."
-    },
-    {
-      "path": "components/notes/NoteEditor.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 10,
-      "interaction_ids": [
-        "INT-TIMELINE-008",
-        "INT-TIMELINE-011",
-        "INT-TIMELINE-012"
-      ]
-    },
-    {
-      "path": "components/timeline/DayNoteControl.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 1,
-      "interaction_ids": [
-        "INT-TIMELINE-012"
-      ]
-    },
-    {
-      "path": "components/behaviors/SourceLinkSettings.tsx",
-      "classification": "cataloged",
-      "interaction_marker_count": 10,
-      "interaction_ids": [
-        "INT-BEHAVIOR-032"
+        "INT-NOTIFICATION-001"
       ]
     }
   ],
@@ -10395,11 +10410,12 @@
         }
       ],
       "availability": "Available while an account is linked, including after session revocation.",
-      "success_result": "Removes Keychain secrets and link state, preserves SQLite product data, and displays the exact database path.",
+      "success_result": "Removes Keychain secrets and link state, preserves SQLite product data, and displays the exact database path. First disconnects ChatGPT (revoke at OpenAI, then clear the chatgpt-session Keychain item; Ticket 299), which never blocks the account disconnect.",
       "failure_result": "Stops before native mutation when secret removal fails; otherwise reports the recoverable native error.",
       "effects": [
         "authentication_session",
-        "database_write"
+        "database_write",
+        "oauth_revocation"
       ],
       "risk": "moderate",
       "confirmation": "none",
@@ -10473,12 +10489,13 @@
         }
       ],
       "availability": "Available after typing REMOVE while an account is linked.",
-      "success_result": "Creates a validated owner-only backup, clears secrets and linked working data, seeds a fresh profile, and displays both exact paths.",
+      "success_result": "Creates a validated owner-only backup, clears secrets and linked working data, seeds a fresh profile, and displays both exact paths. First disconnects ChatGPT (revoke at OpenAI, then clear the chatgpt-session Keychain item; Ticket 299), which never blocks the account disconnect.",
       "failure_result": "Leaves hosted data unchanged and refuses removal when backup creation or secret removal fails.",
       "effects": [
         "authentication_session",
         "filesystem_write",
-        "database_write"
+        "database_write",
+        "oauth_revocation"
       ],
       "risk": "high",
       "confirmation": "typed",
@@ -11929,7 +11946,7 @@
         }
       ],
       "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, Status unavailable after a failed read, or on the Mac a sync conflict, a first-link choice or a revoked session) opens by itself once.",
-      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
+      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking…, Not connected, Connected · N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
       "failure_result": "A failed status read shows Status unavailable and opens the panel, which shows its own error.",
       "effects": [
         "ui_state"
@@ -11956,7 +11973,7 @@
           "tests/desktop-account-section-state.test.ts",
           "tests/desktop-navigation.test.ts"
         ],
-        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
+        "notes": "Unit tests cover every state function; DOM tests cover Checking…, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
       },
       "platforms": {
         "web": {
@@ -12183,6 +12200,267 @@
       }
     },
     {
+      "id": "INT-SETTINGS-019",
+      "name": "Connect ChatGPT to use your ChatGPT plan",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-019-connect-chatgpt-to-use-your-chatgpt-plan"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "timeline"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan",
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Let the Mac run the Daily Brief on the user's own ChatGPT plan (D27).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Continue with ChatGPT (Settings card, or the Daily Brief's plan usage off and reconnect states)"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel ChatGPT sign-in"
+        },
+        {
+          "kind": "activate",
+          "control": "Got it (one-time You're using your ChatGPT plan confirmation)"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Rust opens ChatGPT sign-in in the system browser, takes one 127.0.0.1 callback and keeps the tokens in Keychain. The card shows the ChatGPT email and Using ChatGPT plan, and the first connection with plan usage shows the one-time confirmation. From the Daily Brief, a finished sign-in retries the brief.",
+      "failure_result": "A cancel, timeout, denial or failed verification saves nothing and shows a fixed sentence without token text.",
+      "effects": [
+        "external_navigation",
+        "authentication_session",
+        "network_request",
+        "local_preference"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "components/briefing/DailyBriefLauncher.tsx#DailyBriefLauncher",
+        "apps/desktop/src-tauri/src/chatgpt/mod.rs",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/desktop-chatgpt-connection.test.ts",
+          "tests/daily-brief-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic UI and mocked Rust tests; no live ChatGPT sign-in ran."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "components/briefing/DailyBriefLauncher.tsx#DailyBriefLauncher",
+            "apps/desktop/src-tauri/src/chatgpt/mod.rs"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/desktop-chatgpt-connection.test.ts",
+            "tests/daily-brief-ui.dom.test.tsx"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-020",
+      "name": "Manage ChatGPT usage",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-020-manage-chatgpt-usage"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "timeline"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan",
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Review or change ChatGPT plan usage and limits for Cadence.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Manage usage (Settings card, the Daily Brief's Using ChatGPT plan line, or the usage-limit notice's primary action)"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Opens https://chatgpt.com/settings/usage in the system browser. Cadence sends nothing with it.",
+      "failure_result": "The system browser does not open; Cadence changes nothing.",
+      "effects": [
+        "external_navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/daily-brief-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic UI tests prove each Manage usage control calls the usage opener."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/daily-brief-ui.dom.test.tsx"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-021",
+      "name": "Disconnect ChatGPT",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-021-disconnect-chatgpt"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Stop using the ChatGPT plan on this Mac.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect ChatGPT"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Rust revokes the refresh token at OpenAI, then removes the chatgpt-session Keychain item; the installation item stays. The Daily Brief returns to Cadence's hosted path.",
+      "failure_result": "A failed revocation still removes the local tokens and says Cadence may still be listed in ChatGPT settings.",
+      "effects": [
+        "authentication_session_end",
+        "oauth_revocation",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "apps/desktop/src-tauri/src/chatgpt/mod.rs",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/desktop-chatgpt-connection.test.ts"
+        ],
+        "notes": "Mocked Rust tests prove revoke-then-clear; the UI test proves the control and message."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "apps/desktop/src-tauri/src/chatgpt/mod.rs"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/desktop-chatgpt-connection.test.ts"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
       "id": "INT-CALENDAR-001",
       "name": "Connect or reconnect Google Calendar",
       "user_guidance": {
@@ -12314,7 +12592,7 @@
         }
       ],
       "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "A failed save puts the controls back to their saved values and says so. Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
@@ -12956,7 +13234,7 @@
         }
       ],
       "availability": "Available while Outlook Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
@@ -14108,7 +14386,7 @@
         }
       ],
       "availability": "Existing Settings. Usual travel saves when it changes; Home saves on blur or Enter when its text changed. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
-      "success_result": "Saves the one changed value on the latest saved revision, shows Saving\u2026 then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
+      "success_result": "Saves the one changed value on the latest saved revision, shows Saving… then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
       "failure_result": "Puts the control back to its saved value and says what to do in the same line: try again, or reload Settings if another device changed it. Tracking data is unchanged.",
       "effects": [
         "ui_state",
@@ -14195,7 +14473,7 @@
         }
       ],
       "availability": "Existing Settings after usual travel is chosen; usual travel sits above the toggle. Route estimates remain deployment-gated.",
-      "success_result": "Saves the toggle with consent at once and shows Saving\u2026, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
+      "success_result": "Saves the toggle with consent at once and shows Saving…, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
       "failure_result": "Puts the toggle back to its saved state and says what to do. Tracking data is unchanged.",
       "effects": [
         "ui_state",
@@ -14643,7 +14921,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0\u201330 minutes (travel-habit-defaults@1).",
+      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0–30 minutes (travel-habit-defaults@1).",
       "triggers": [
         {
           "kind": "activate",
@@ -14855,7 +15133,7 @@
         }
       ],
       "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision, one save at a time; there are no separate buffer fields.",
-      "success_result": "Saves the habit, shows Saving\u2026 then Saved in How you travel's one result line, and refreshes estimates once.",
+      "success_result": "Saves the habit, shows Saving… then Saved in How you travel's one result line, and refreshes estimates once.",
       "failure_result": "Puts the choice back to its stored value, says so, and asks the user to reload Settings when another device changed them.",
       "effects": [
         "ui_state",
@@ -15295,7 +15573,7 @@
         }
       ],
       "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section. Ticket 283: Outlook and iCloud events get reminders like Google Calendar events, so the readiness list no longer limits sources.",
-      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving\u2026, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
+      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving…, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
       "failure_result": "Puts the switch back to its stored value and says the reminder setting could not save and the change was undone. A failed load leaves the checkbox unavailable and says so.",
       "effects": [
         "ui_state",
@@ -15710,8 +15988,8 @@
           "control": "Disconnect"
         }
       ],
-      "availability": "Signed in, under Settings \u2192 Connected apps.",
-      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting\u2026, then the result (Ticket 303).",
+      "availability": "Signed in, under Settings → Connected apps.",
+      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting…, then the result (Ticket 303).",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_revocation"
@@ -15790,7 +16068,7 @@
           "control": "Recent activity"
         }
       ],
-      "availability": "Signed in, under Settings \u2192 Connected apps.",
+      "availability": "Signed in, under Settings → Connected apps.",
       "success_result": "Expand or collapse operation, time, and outcome records without payloads.",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
@@ -16124,7 +16402,7 @@
         }
       ],
       "availability": "Available while iCloud Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
