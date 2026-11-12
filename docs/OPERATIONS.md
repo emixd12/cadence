@@ -337,8 +337,11 @@ dependencies already installed in the engine: 31 s after a change (`build` 30 s,
 `lint` 24 s, `test` 24 s) and 1 s unchanged. The first run on a machine took
 217 s in October, mostly image pulls and `npm ci`.
 
-Owner step: Docker Desktop gives its VM 8 GB of the Mac's 128 GB. Raise it under
-Settings › Resources so ten concurrent checks do not run short of memory.
+Docker Desktop's VM has 16 GB of the owner's Mac's 128 GB since November 11, 2026,
+so ten concurrent checks do not run short of memory. The default was 8 GB. The
+value is `MemoryMiB` in Docker Desktop's `settings-store.json`, also shown under
+Settings › Resources. After that restart, ten checks passed from the main checkout
+in 42 s.
 
 For UI changes, also run the app and inspect at least:
 
