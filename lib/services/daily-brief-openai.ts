@@ -1,5 +1,6 @@
 import type { DailyBriefGenerator, DailyBriefModelUsage } from "./daily-brief-consumer";
 import { adviceRejected, DailyBriefError } from "./daily-brief-consumer";
+import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "./daily-brief-schema";
 
 export const DAILY_BRIEF_MODEL = "gpt-5.6-luna";
 /** The production reasoning effort. */
@@ -25,7 +26,7 @@ export async function generateOpenAIDailyBrief(
   input: Parameters<DailyBriefGenerator>[0],
   options: Readonly<{ apiKey: string; fetch?: typeof fetch }> & DailyBriefGenerationOverride,
 ): Promise<unknown> {
-  return requestStructured(input, options, "cadence_daily_brief", DAILY_BRIEF_SCHEMA, { model: options.model, effort: options.effort });
+  return requestStructured(input, options, DAILY_BRIEF_SCHEMA_NAME, DAILY_BRIEF_SCHEMA, { model: options.model, effort: options.effort });
 }
 
 /** Ticket 188 estimate step: same transport and limits, separate strict schema. Always the production model and effort. */
@@ -153,15 +154,3 @@ function statusReason(body: Record<string, unknown>): string {
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
-
-const DAILY_BRIEF_SCHEMA = { type: "object", additionalProperties: false, required: ["text", "occurrenceRefs", "suggestions", "tip"], properties: {
-  text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
-  suggestions: { type: "array", items: { type: "object", additionalProperties: false,
-    required: ["text", "occurrenceRefs", "referenceIds", "optionId"], properties: {
-      text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
-      referenceIds: { type: "array", items: { type: "string" } }, optionId: { type: ["string", "null"] },
-    } } },
-  tip: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["findingId", "text", "noteRefs"], properties: {
-    findingId: { type: "string" }, text: { type: "string" }, noteRefs: { type: "array", items: { type: "string" } },
-  } }] },
-} } as const;

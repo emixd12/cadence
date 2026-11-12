@@ -544,7 +544,8 @@ export const FIELD_PROBES: readonly Probe[] = [
   { id: "json_schema_strict", expected: "observe", build: (model) => ({ ...probeBase(model), text: { format: { type: "json_schema", name: "spike_probe", strict: true, schema: PROBE_SCHEMA } } }) },
   { id: "reasoning_low", expected: "observe", build: (model) => ({ ...probeBase(model), reasoning: { effort: "low" } }) },
   { id: "tools_none", expected: "observe", build: (model) => ({ ...probeBase(model), tools: [], tool_choice: "none" }) },
-  { id: "max_output_tokens", expected: "reject", build: (model) => ({ ...probeBase(model), max_output_tokens: 2_000 }) },
+  // Docs listed it as rejected; the live run on November 12, 2026 accepted it on every model.
+  { id: "max_output_tokens", expected: "observe", build: (model) => ({ ...probeBase(model), max_output_tokens: 2_000 }) },
   { id: "background_false", expected: "reject", build: (model) => ({ ...probeBase(model), background: false }) },
   { id: "input_string", expected: "reject", build: (model) => ({ ...probeBase(model), input: "Synthetic probe. Return {\"ok\": true}." }) },
   { id: "stream_false", expected: "reject", build: (model) => ({ ...probeBase(model), stream: false }) },
