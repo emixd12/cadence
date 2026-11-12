@@ -14965,7 +14965,7 @@ incomplete, older-fetch, or older-generation result never erases known records.
 
 Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Hevy Pro key. Sealed intake; a complete 31-day read (44 workouts, 5/5 pages, before/after counts equal); timing-only fields; Timeline showed a logged workout with time and duration only; disconnect deleted the key and fenced reads. Not live-testable with this account: over 500 workouts and non-Pro rejection.
 
-Production acceptance (2026-11-11, test account A with the owner's Hevy Pro key, decision 2026-11-11): **passed** on web. A complete 31-day read (5/5 pages, counts equal), timing-only fields, range validation, a new test workout on Timeline at 1280 and 390 px without its title, disconnect (`hevy_api_key` instruction, reads fenced with 409) and reconnect. Installed desktop waits on the 0.1.10 install. Evidence: `docs/qa/2026-11-11-connector-acceptance.md`.
+Production acceptance (2026-11-11, test account A with the owner's Hevy Pro key, decision 2026-11-11): **passed** on web. A complete 31-day read (5/5 pages, counts equal), timing-only fields, range validation, a new test workout on Timeline at 1280 and 390 px without its title, disconnect (`hevy_api_key` instruction, reads fenced with 409) and reconnect. PR #239's November 12 release packet records 0.1.10 installed on the test Mac and Hevy timing shown without titles; remaining installed connector checks are open. Evidence: `docs/qa/2026-11-11-connector-acceptance.md` and the PR #239 release packet.
 
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
 
@@ -15161,7 +15161,7 @@ F1–F8 and the final DAV metadata correction. Live acceptance remains unverifie
 
 Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Apple Account and an app-specific password. Sealed intake; 5 calendars; server-expanded recurrence; all-day and other-zone events correct; all-day toggle; disconnect cleanup; the owner revoked the password. Finding: iCloud collections report full VTIMEZONE definitions, so floating events would quarantine by design. Not live-tested: wrong-principal reconnect.
 
-Production acceptance (2026-11-11): **not run**. Apple refused to create a test Apple Account, and no Apple test-account path for iCloud is known; the owner decides between their own Apple Account (custody decision 2026-10-19) and leaving this waiting. A's production connection is disconnected, generation 0. Installed desktop waits on the 0.1.10 install. See `docs/qa/2026-11-11-connector-acceptance.md`.
+Production acceptance (2026-11-11): **not run**. No usable Apple test identity was available after the owner's failed account-creation attempts. The existing `icloud-test-account-a` vault item's fields could not be read (`agent-secret` exit 5). The owner decides between their own Apple Account (custody decision 2026-10-19) and leaving this waiting. A's recorded production connection is disconnected, generation 0. PR #239 records 0.1.10 installed on the test Mac; installed iCloud acceptance remains open. See `docs/qa/2026-11-11-connector-acceptance.md`.
 
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
@@ -15197,9 +15197,9 @@ Status: independently approved at `a10b461` for local implementation and
 synthetic verification. Live providers, installed desktop and release remain
 open; the owner accepted iCloud custody on 2026-10-19.
 
-Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
+Earlier local-stack evidence, before Ticket 242: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live. At that checkpoint, Ticket 115 blocked installed desktop acceptance, and deployment, hosted migration and release remained open. Later production and installed evidence follows.
 
-Release step 6 (production smoke, 2026-11-11, `docs/qa/2026-11-11-connector-acceptance.md`): Hevy and Outlook (personal account) **passed** on production web; iCloud waits on an owner decision (no Apple test account could be created); installed desktop waits on the 0.1.10 install. Step 7 copy is live on the FAQ and Privacy pages and awaits the owner's review in the messaging track.
+Release step 6 (production smoke, 2026-11-11, `docs/qa/2026-11-11-connector-acceptance.md`): Hevy and Outlook (personal account) **passed** on production web; iCloud waits on an owner decision because no usable test identity was available and the existing vault item was unreadable. Outlook remains connected for later runs; post-run provider-grant revocation remains open. The Hevy key stays connected under the recorded owner decision. PR #239 records 0.1.10 installed on the test Mac and Hevy timing shown; remaining installed connector acceptance is open. Step 7 copy is live on the FAQ and Privacy pages and awaits the owner's review in the messaging track.
 
 Goal: independently verify 221–227 and align public and in-app disclosures.
 
@@ -17562,7 +17562,11 @@ Verification: `npm run resolvers:check`, `npm run test` and `dagger check --cade
 
 ## Ticket 299: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
 
-Status: in progress (reported in the November 12 branch integration).
+Status: implemented in source on PR #243, under review, based on merged PRs #240
+and #241. Hidden behind `VITE_CADENCE_CHATGPT_PLAN` (off by default). The owner paused
+activation after this ticket and deferred installed acceptance (Ticket 300). The OpenAI
+logo on the button (L-019) and messaging review of P-029 to P-031, P-045 and P-046 also
+remain activation gates.
 Dependencies: Tickets 297 and 298.
 
 Owner decisions, November 12, 2026 (`docs/DECISIONS.md`, "Keep the ChatGPT plan Daily Brief
@@ -17573,11 +17577,15 @@ hidden until the owner turns it on"):
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
   does not wait for the 75-second lease. Call Ticket 298's
   `POST /api/advisor/brief/device/release` with the signed envelope and installation ID.
+  The implementation also releases after cancellation or a lost complete response;
+  the pending-only RPC cannot undo a completed attempt or a replacement lease.
 - Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
   token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
-- Still required (not a decision): a command that hands the access token to the webview
-  for the model call, and `https://api.openai.com` in the CSP. Update the test that pins it
-  absent (Ticket 297).
+- Implemented: `chatgpt_access_token` hands only the fresh access token to the webview
+  for the model call. Its locked grant check includes refresh-scope changes.
+  The CSP and its pinning test allow exactly `https://api.openai.com`.
+- With plan usage connected and device mode off, show the ChatGPT failure state without
+  falling back to Cadence's key, as the owner confirmed on November 12.
 
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.
@@ -17600,12 +17608,13 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Not applicable: the web app shows none of this (D27). |
-| Desktop | `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `components/briefing/*`. |
+| Web | No web UI (D27). Hosted: `POST /api/advisor/brief/device/release` (`lib/services/daily-brief-device.service.ts`); the device flag stays off in production. |
+| Desktop | `apps/desktop/src/chatgpt/plan-switch.ts`, `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`, `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `apps/desktop/src/account/auth.ts`, `apps/desktop/src-tauri/src/chatgpt/mod.rs` (`chatgpt_access_token`), `components/briefing/ChatGptPlanCard.tsx`, `DailyBriefBubble.tsx`, `DailyBriefLauncher.tsx`. |
 | Marketing | Not applicable until release (P-032). |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: P-030 and P-031, plus new entries for the card's copy.
+Messaging impact: P-030 and P-031 (unchanged text), plus P-045 (card copy) and P-046 (Daily
+Brief plan states).
 
 Verification: `npm run interactions:check`, `dagger check --cadence --progress=report` and bench
 screenshots of each state at narrow widths.

@@ -79,6 +79,7 @@ pub fn run() {
             chatgpt::chatgpt_cancel_connect,
             chatgpt::chatgpt_disconnect,
             chatgpt::chatgpt_models,
+            chatgpt::chatgpt_access_token,
             calendar_cache::calendar_cache_begin,
             calendar_cache::calendar_cache_read,
             calendar_cache::calendar_cache_read_current,

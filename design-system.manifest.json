@@ -601,6 +601,20 @@
       "notes": "Settings enablement and optional Calendar-context disclosure from the separate agent grant; the bench uses a fixture client only."
     },
     {
+      "id": "module.chatgpt-plan-card",
+      "name": "ChatGptPlanCard",
+      "kind": "module",
+      "source": "components/briefing/ChatGptPlanCard.tsx",
+      "exportName": "ChatGptPlanCard",
+      "usageNames": [
+        "ChatGptPlanCard"
+      ],
+      "benchAnchor": "design-system#ds-module-chatgpt-plan-card",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 299 (D27), Mac only and hidden behind VITE_CADENCE_CHATGPT_PLAN (owner decision, November 12, 2026). Use your ChatGPT plan card in the Planning group: disconnected with the black Continue with ChatGPT button (data-oai-siwc-button, foreground fill; the OpenAI logo is not added yet, L-019), connecting with Cancel ChatGPT sign-in, the one-time You're using your ChatGPT plan confirmation with Got it, connected with the ChatGPT email, Using ChatGPT plan, Manage usage and Disconnect ChatGPT, plan usage off and reconnect. The file also exports ContinueWithChatGptButton, which DailyBriefBubble uses for its plan-off and reconnect states. Bench: every state at 352px."
+    },
+    {
       "id": "module.google-calendar-panel",
       "name": "GoogleCalendarPanel",
       "kind": "module",

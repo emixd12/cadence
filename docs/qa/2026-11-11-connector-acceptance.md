@@ -8,17 +8,30 @@ profile for the UI. Output kept statuses, counts, field names and times only.
 Earlier live evidence for these tickets came from a disposable local stack with development
 test-login (October 19–22, 2026). This run is the first on the hosted deployment.
 
+Documentation review, November 12: the results below remain the reporting agent's
+observations. This review did not rerun live acceptance or inspect account credentials.
+The [PR #239 release packet](https://github.com/emixd12/cadence/pull/239) records
+0.1.10 installed on the test Mac. Installed connector acceptance remains open; another
+installation is not its prerequisite.
+
 ## Preflight
 
+Initial result:
+
 `npm run qa:preflight -- --suite connectors --run-dir .intent/acceptance/conn-accept-20261111`
-exited 10: ready 9, owner steps 2, waiting 2. After the owner added `outlook-test-account-a`, the rerun reported `outlook-connection-a` ready once the agent connected it; `icloud-connection-a` still fails (see Ticket 240).
+exited 10: ready 9, owner steps 2, waiting 2.
 
 - Ready: `op-service-token`, `vault-google-a`, `vault-hevy-a` (`hevy-owner`),
   `qa-chrome-profile`, `google-browser-a`, `supabase-session-a`, `cadence-web-a`,
   `gcal-connection-a`, `hevy-connection-a`.
-- Owner steps: the vault items `outlook-test-account-a` and `icloud-test-account-a` are
-  missing.
-- Waiting on them: `outlook-connection-a` and `icloud-connection-a`.
+- Owner steps at that point: the vault items `outlook-test-account-a` and
+  `icloud-test-account-a` were missing.
+- Waiting on them at that point: `outlook-connection-a` and `icloud-connection-a`.
+
+Later results: the owner added `outlook-test-account-a`, and the rerun reported
+`outlook-connection-a` ready after the agent connected it. The iCloud vault item also
+exists, but its fields could not be read (`agent-secret` exit 5). No usable Apple test
+identity was available to this run, so `icloud-connection-a` renewal failed (Ticket 240).
 
 ## Ticket 236: Hevy (owner's Hevy Pro account, decision 2026-11-11)
 
@@ -47,10 +60,8 @@ workouts were already gone before this run (Hevy count 49).
 
 **Not run. Needs an owner decision.**
 
-- Apple refused to create a new Apple Account for testing ("account cannot be created") on
-  each of the owner's attempts. Sandbox Apple Accounts in App Store Connect serve StoreKit
-  purchase testing; they are not believed to work for iCloud.com or CalDAV with an
-  app-specific password (not verified). No other Apple test-account path is known.
+- The owner reported that attempts to create an Apple Account for testing returned
+  "account cannot be created". No usable Apple test identity was available to this run.
 - A vault item named `icloud-test-account-a` now exists, but its fields could not be read
   (`agent-secret` exit 5), so the preflight renewal failed.
 - Production status for A: `disconnected`, generation 0 (never connected on production).
@@ -85,7 +96,8 @@ still came through as November 11 for the New York profile.
 Not exercised, by owner decision (November 11, 2026, relayed from the owner's side chat):
 cross-tenant consent, `admin_approval_required`, and a tenant that blocks unverified apps.
 Also not exercised: wrong-account reconnect (one Microsoft identity only) and installed
-desktop (waits on the 0.1.10 install).
+Outlook acceptance. The PR #239 release packet already records 0.1.10 installed on the
+test Mac; its synthetic callback replay does not establish installed Outlook acceptance.
 
 Account A stays connected to the Outlook test identity with Calendar selected, for later
 runs. The two QA events stay in that calendar.
@@ -93,13 +105,16 @@ runs. The two QA events stay in that calendar.
 ## Ticket 241: release step 6 (production smoke)
 
 Step 6 is a production smoke of each connector, then revoking the test credentials.
+The Hevy key remains connected under the recorded owner decision. Outlook provider-grant
+revocation remains an open follow-up; a successful disconnect/reconnect check does not
+mean the provider grant was revoked after the run.
 
 | Connector | Smoke on production | Credential after the run |
 |---|---|---|
 | Hevy | Passed (above) | The owner's key stays connected to account A by design (decision 2026-11-11); the owner decides whether to regenerate it |
-| iCloud Calendar | Waiting on `icloud-test-account-a` | — |
+| iCloud Calendar | Not run: the existing vault item's fields were unreadable, and no usable test identity was available. Awaiting the owner's account choice | — |
 | Outlook Calendar | Passed (above) | The test identity stays connected to account A for later runs; it is an agent test identity, not the owner's |
-| Installed desktop | Waiting on the 0.1.10 install on the test Mac (mac-release owns it) | — |
+| Installed desktop | 0.1.10 installation and Hevy timing display recorded in the PR #239 release packet; remaining installed connector acceptance is open | — |
 
 Step 7 (public disclosure copy) belongs to the messaging track. The copy that Ticket 241
 wrote is live: `cadence-me.com/faq` serves the Hevy Pro and 500-workout answer, and
