@@ -8,7 +8,15 @@ profile for the UI. Output kept statuses, counts, field names and times only.
 Earlier live evidence for these tickets came from a disposable local stack with development
 test-login (October 19–22, 2026). This run is the first on the hosted deployment.
 
+Documentation review, November 12: the results below remain the reporting agent's
+observations. This review did not rerun live acceptance or inspect account credentials.
+The [PR #239 release packet](https://github.com/emixd12/cadence/pull/239) records
+0.1.10 installed on the test Mac. Installed connector acceptance remains open; another
+installation is not its prerequisite.
+
 ## Preflight
+
+Initial result:
 
 `npm run qa:preflight -- --suite connectors --run-dir .intent/acceptance/conn-accept-20261111`
 exited 10: ready 9, owner steps 2, waiting 2.
@@ -16,9 +24,14 @@ exited 10: ready 9, owner steps 2, waiting 2.
 - Ready: `op-service-token`, `vault-google-a`, `vault-hevy-a` (`hevy-owner`),
   `qa-chrome-profile`, `google-browser-a`, `supabase-session-a`, `cadence-web-a`,
   `gcal-connection-a`, `hevy-connection-a`.
-- Owner steps: the vault items `outlook-test-account-a` and `icloud-test-account-a` are
-  missing.
-- Waiting on them: `outlook-connection-a` and `icloud-connection-a`.
+- Owner steps at that point: the vault items `outlook-test-account-a` and
+  `icloud-test-account-a` were missing.
+- Waiting on them at that point: `outlook-connection-a` and `icloud-connection-a`.
+
+Later results: the owner added `outlook-test-account-a`, and the rerun reported
+`outlook-connection-a` ready after the agent connected it. The iCloud vault item also
+exists, but its fields could not be read (`agent-secret` exit 5). No usable Apple test
+identity was available to this run, so `icloud-connection-a` renewal failed (Ticket 240).
 
 ## Ticket 236: Hevy (owner's Hevy Pro account, decision 2026-11-11)
 
@@ -45,39 +58,63 @@ workouts were already gone before this run (Hevy count 49).
 
 ## Ticket 240: iCloud Calendar
 
-**Not run: waiting on the owner's vault item `icloud-test-account-a`.**
+**Not run. Needs an owner decision.**
 
+- The owner reported that attempts to create an Apple Account for testing returned
+  "account cannot be created". No usable Apple test identity was available to this run.
+- A vault item named `icloud-test-account-a` now exists, but its fields could not be read
+  (`agent-secret` exit 5), so the preflight renewal failed.
 - Production status for A: `disconnected`, generation 0 (never connected on production).
-  The route is configured (not `not_configured`); unauthenticated requests return 401.
-- To run after the item exists: preflight renewal connects A; then calendar list,
-  selection, a 31-day read, Timeline at 1280 and 390 px, the all-day toggle, disconnect with
-  the app-specific-password revocation instruction, and reconnect. Wrong-principal
-  reconnect needs a second Apple Account and stays unexercised unless one exists.
+  The route is configured; unauthenticated requests return 401.
+- Options: run with the owner's own Apple Account and an app-specific password under the
+  2026-10-19 custody decision (owner-run live tests may use real Apple credentials), or keep
+  Ticket 240 live acceptance and the iCloud part of 241 step 6 recorded as waiting.
 
 ## Ticket 242: Outlook Calendar
 
-**Not run: waiting on the owner's vault item `outlook-test-account-a`.**
+**Passed on production web for a personal Microsoft account (rerun, November 11, 23:30–23:59
+ET).** The owner created the identity and the vault item `outlook-test-account-a` and handed
+the whole run, including the test events, to the agent. The preflight then reported
+`vault-outlook-a` ready.
 
-- Production status for A: `disconnected`, generation 0.
-- `POST /api/outlook-calendar/connection` with `{"target":"web"}` returned 200 and an
-  authorize URL on `login.microsoftonline.com/common` with scope
-  `openid offline_access Calendars.Read`, PKCE `S256`, `prompt=select_account` and redirect
-  `app.cadence-me.com/auth/outlook-calendar/callback`. This confirms the production OAuth
-  settings without consent. The unused attempt expires on its own.
-- Cross-tenant consent needs a work or school account in a tenant other than the
-  "Cadence Calendar" app's home tenant. The run has none. `admin_approval_required` and a
-  tenant that blocks unverified apps need such a tenant with the matching policy.
+| Check | Result |
+|---|---|
+| Configuration (before connect) | `POST /api/outlook-calendar/connection` `{"target":"web"}` returned an authorize URL on `login.microsoftonline.com/common`, scope `openid offline_access Calendars.Read`, PKCE `S256`, `prompt=select_account`, redirect `app.cadence-me.com/auth/outlook-calendar/callback` |
+| Connect from Settings in QA Chrome | Microsoft offered a passkey first. The agent gave the page a virtual authenticator with no credential, chose "Use your password", then the authenticator code, all from the vault. The consent screen said "unverified" and listed sign in, maintain access and "Read your calendars". Accept returned to `/settings`: "Connected · No calendars chosen" |
+| Calendar list | 200: Calendar (default), Birthdays, United States holidays |
+| Selection in Settings | Choosing "Calendar (primary)" auto-saved ("Saved", "Connected · 1 calendar", `selectionRevision` 1) |
+| Test events | The agent created "QA Outlook timed" (Nov 11, 4:30–5:00 PM ET) and "QA Outlook all-day" (Nov 11) through Outlook web's compose link |
+| `GET /api/outlook-calendar/events`, today to +30 days | 200, schema `1.1.0`, `complete`, 2 events. Timed: 21:30–22:00Z, zone `America/New_York`, busy. All-day: `2026-11-11` to `2026-11-12`, one calendar day, free. Description, organizer, attendees, conference and attachments `unsupported`; location `unsupported`, or `not_provided` with `fields=location` |
+| Timeline, 1280 and 390 px | "All day: QA Outlook all-day" beside the date; the timed event as a Calendar marker ("Preview Outlook Calendar event: QA Outlook timed") |
+| Disconnect (`DELETE`) | 200, `disconnected`, generation 2, selection cleared, revocation key `microsoft_account_permissions` |
+| Reads after disconnect | Events and calendars 409 `not_connected` |
+| Reconnect | Microsoft returned without a new consent screen; `connected`, generation 3, no calendars chosen. The agent chose Calendar again; today's read `complete` |
+
+Finding, not a defect: Outlook web stored the all-day event with zone `Etc/UTC`; the date
+still came through as November 11 for the New York profile.
+
+Not exercised, by owner decision (November 11, 2026, relayed from the owner's side chat):
+cross-tenant consent, `admin_approval_required`, and a tenant that blocks unverified apps.
+Also not exercised: wrong-account reconnect (one Microsoft identity only) and installed
+Outlook acceptance. The PR #239 release packet already records 0.1.10 installed on the
+test Mac; its synthetic callback replay does not establish installed Outlook acceptance.
+
+Account A stays connected to the Outlook test identity with Calendar selected, for later
+runs. The two QA events stay in that calendar.
 
 ## Ticket 241: release step 6 (production smoke)
 
 Step 6 is a production smoke of each connector, then revoking the test credentials.
+The Hevy key remains connected under the recorded owner decision. Outlook provider-grant
+revocation remains an open follow-up; a successful disconnect/reconnect check does not
+mean the provider grant was revoked after the run.
 
 | Connector | Smoke on production | Credential after the run |
 |---|---|---|
 | Hevy | Passed (above) | The owner's key stays connected to account A by design (decision 2026-11-11); the owner decides whether to regenerate it |
-| iCloud Calendar | Waiting on `icloud-test-account-a` | — |
-| Outlook Calendar | Configuration checked; connect waiting on `outlook-test-account-a` | — |
-| Installed desktop | Waiting on the 0.1.10 install on the test Mac (mac-release owns it) | — |
+| iCloud Calendar | Not run: the existing vault item's fields were unreadable, and no usable test identity was available. Awaiting the owner's account choice | — |
+| Outlook Calendar | Passed (above) | The test identity stays connected to account A for later runs; it is an agent test identity, not the owner's |
+| Installed desktop | 0.1.10 installation and Hevy timing display recorded in the PR #239 release packet; remaining installed connector acceptance is open | — |
 
 Step 7 (public disclosure copy) belongs to the messaging track. The copy that Ticket 241
 wrote is live: `cadence-me.com/faq` serves the Hevy Pro and 500-workout answer, and
