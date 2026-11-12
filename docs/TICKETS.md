@@ -17548,6 +17548,11 @@ hidden until the owner turns it on"):
   Settings card and the plan path do not appear.
 - Add a call that releases the brief attempt when the Mac's model call fails, so a retry
   does not wait for the 75-second lease. Ticket 298's routes need a matching release route.
+- Disconnecting the Cadence account on the Mac also disconnects ChatGPT: revoke the refresh
+  token at OpenAI, then clear the `chatgpt-session` Keychain item. The host ID item stays.
+- Still required (not a decision): a command that hands the access token to the webview
+  for the model call, and `https://api.openai.com` in the CSP. Update the test that pins it
+  absent (Ticket 297).
 
 Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
 limits.

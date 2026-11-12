@@ -2381,6 +2381,8 @@ in Tickets 294–299 continues, but nothing reaches users until the owner turns 
   is off by default, so a build can ship with the feature dormant.
 - Ticket 299 also adds a step that releases the brief attempt when the Mac's model call
   fails, so a retry does not wait for the 75-second lease (owner approval, November 12).
+- Disconnecting the Cadence account on the Mac also disconnects ChatGPT: Cadence revokes the
+  refresh token and clears the session from Keychain (owner approval, November 12).
 - The account-free Mac path is a future item (`docs/FUTURE_UPDATES.md`, "ChatGPT plan
   follow-ups").
 
