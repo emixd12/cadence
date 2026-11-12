@@ -6,7 +6,7 @@ import type { DailyBriefResponse, DailyBriefSettings } from "@cadence/core/types
 
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
-import type { DailyBriefClient } from "@/lib/ui/daily-brief";
+import { DailyBriefRequestError, type DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
@@ -70,6 +70,82 @@ describe("Daily Brief UI", () => {
     expect(vi.mocked(local.requestBrief).mock.calls[0]![0]).not.toHaveProperty("travelConclusions");
     travelToken.mockReset();
     travelToken.mockReturnValue(null);
+  });
+
+  it("shows ChatGPT plan states only with the Mac's plan controls (Ticket 299)", async () => {
+    const { DailyBriefRequestError } = await import("@/lib/ui/daily-brief");
+    const manageUsage = vi.fn();
+    const connect = vi.fn(async () => undefined);
+    const failing = client({ requestBrief: vi.fn(async () => { throw new DailyBriefRequestError("chatgpt_usage_limit"); }),
+      plan: { usage: () => null, manageUsage, connect } });
+    await act(() => root.render(<DailyBriefLauncher client={failing} desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("ChatGPT usage limit reached."));
+    const labels = [...container.querySelectorAll("button")].map((element) => element.textContent);
+    expect(labels.slice(0, 2)).toEqual(["Manage usage", "Try again"]);
+    await act(() => [...container.querySelectorAll("button")].find((element) => element.textContent === "Manage usage")!.click());
+    expect(manageUsage).toHaveBeenCalledOnce();
+    await act(() => root.unmount());
+    root = createRoot(container);
+    localStorage.clear();
+    const ready = client();
+    const planned = { ...ready, plan: { usage: () => "plan" as const, manageUsage, connect } };
+    await act(() => root.render(<DailyBriefLauncher client={planned} desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Using ChatGPT plan"));
+  });
+
+  it("withdraws a pending brief when the connected ChatGPT account changes", async () => {
+    let listener: (phase: "start" | "settled") => void = () => undefined;
+    let signal: AbortSignal | undefined;
+    let finish!: (response: DailyBriefResponse) => void;
+    const requestBrief = vi.fn((_input: Parameters<DailyBriefClient["requestBrief"]>[0], current?: AbortSignal) => { signal = current; return new Promise<DailyBriefResponse>((resolve) => { finish = resolve; }); });
+    const adapter = client({ requestBrief, plan: { usage: () => "plan", manageUsage: () => undefined, connect: async () => undefined,
+      subscribe: (next) => { listener = next; return () => { listener = () => undefined; }; } } });
+    await act(() => root.render(<DailyBriefLauncher client={adapter} desktop />));
+    await vi.waitFor(() => expect(requestBrief).toHaveBeenCalledOnce());
+    await act(() => listener("start"));
+    expect(signal?.aborted).toBe(true);
+    await act(async () => finish(await client().requestBrief({ installationId: "test", retry: false })));
+    expect(container.textContent).not.toContain("Start with water");
+  });
+
+  it("retries once with fresh settings after a deliberate ChatGPT reconnect withdraws the old view", async () => {
+    let listener: (phase: "start" | "settled") => void = () => undefined;
+    let finish!: () => void;
+    const connect = vi.fn(() => {
+      listener("start");
+      return new Promise<void>((resolve) => { finish = resolve; }).then(() => listener("settled"));
+    });
+    const requestBrief = vi.fn(client().requestBrief).mockRejectedValueOnce(new DailyBriefRequestError("chatgpt_reconnect"));
+    const adapter = client({ requestBrief, plan: { usage: () => "plan", manageUsage: () => undefined, connect,
+      subscribe: (next) => { listener = next; return () => { listener = () => undefined; }; } } });
+    await act(() => root.render(<DailyBriefLauncher client={adapter} desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Reconnect ChatGPT"));
+    await act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Continue with ChatGPT")!.click());
+    await act(async () => finish());
+    await vi.waitFor(() => expect(container.textContent).toContain("Start with water"));
+    expect(requestBrief).toHaveBeenCalledTimes(2);
+    expect(requestBrief.mock.calls[1]![0].retry).toBe(true);
+  });
+
+  it("does not let an earlier account's reconnect callback retry a new account's brief", async () => {
+    let listener: (phase: "start" | "settled") => void = () => undefined;
+    let finish!: () => void;
+    const connect = () => {
+      listener("start");
+      return new Promise<void>((resolve) => { finish = resolve; }).then(() => listener("settled"));
+    };
+    const previous = client({ requestBrief: vi.fn(async () => { throw new DailyBriefRequestError("chatgpt_reconnect"); }),
+      plan: { usage: () => null, manageUsage: () => undefined, connect,
+        subscribe: (next) => { listener = next; return () => { listener = () => undefined; }; } } });
+    await act(() => root.render(<DailyBriefLauncher client={previous} sessionKey="account-a" desktop />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Reconnect ChatGPT"));
+    await act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Continue with ChatGPT")!.click());
+    const next = client({ preferences: vi.fn(async () => ({ ...settings, accountRef: "account-b" })) });
+    await act(() => root.render(<DailyBriefLauncher client={next} sessionKey="account-b" desktop />));
+    await vi.waitFor(() => expect(next.requestBrief).toHaveBeenCalledOnce());
+    await act(async () => finish());
+    expect(next.requestBrief).toHaveBeenCalledOnce();
+    expect(previous.requestBrief).toHaveBeenCalledOnce();
   });
 
   it("starts once, announces ready text politely, and keeps the dismiss control reachable", async () => {

@@ -112,6 +112,8 @@ Status values:
 | [P-041](#p-041-hevy-is-read-in-the-background-over-30-days) | Hevy is read in the background, over 30 days | logged | 310, 316, 321 | Privacy, in-app copy, user guide |
 | [P-042](#p-042-marketing-claim-log-a-workout-once) | Marketing claim: log a workout once | logged | 310, 323 | Marketing |
 | [P-043](#p-043-connector-completion-in-app-copy) | Connector completion in-app copy | logged | 317, 318 | In-app copy, user guide |
+| [P-045](#p-045-use-your-chatgpt-plan-card-copy-on-the-mac) | "Use your ChatGPT plan" card copy on the Mac | logged | 299 | In-app copy (Mac), user guide |
+| [P-046](#p-046-daily-brief-chatgpt-plan-states-on-the-mac) | Daily Brief ChatGPT plan states on the Mac | logged | 299 | In-app copy (Mac), user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1434,4 +1436,49 @@ cite has not changed.
   completes a Behavior." (P-038). It is accurate while the flag is off.
 - **Update needed:** review the new strings in the messaging track before Ticket 323
   turns the flag on, together with P-038, and add the user-guide steps.
+- **Status:** logged.
+
+## P-045: "Use your ChatGPT plan" card copy on the Mac
+
+- **Change:** Ticket 299 adds the Mac-only Settings card, hidden unless a build sets
+  `VITE_CADENCE_CHATGPT_PLAN=1` (owner decision, November 12, 2026). Strings: the title
+  "Use your ChatGPT plan"; the description "Run the Daily Brief on this Mac with the usage
+  included in your ChatGPT plan. Cadence still prepares each brief and checks the reply.
+  Cadence itself charges nothing."; "ChatGPT sign-in opens in your browser."; "Continue with
+  ChatGPT"; "Finish signing in to ChatGPT in your browser."; "Cancel ChatGPT sign-in";
+  "ChatGPT account"; "Email not shared"; "Using ChatGPT plan"; "Plan usage is off. The Daily
+  Brief uses Cadence until you turn it on."; "Reconnect ChatGPT to use your plan. The Daily
+  Brief waits until you reconnect or disconnect."; "Manage usage"; "Disconnect ChatGPT";
+  "ChatGPT is disconnected."; "ChatGPT is disconnected on this Mac. OpenAI did not confirm
+  it, so Cadence may still be listed in your ChatGPT settings."; and the one-time
+  confirmation "You’re using your ChatGPT plan", "The Daily Brief on this Mac now uses your
+  ChatGPT plan. You can manage usage in ChatGPT settings." and "Got it". Stale account
+  controls show "The Cadence account changed. Open Settings and try again." Concurrent
+  connection changes show "The ChatGPT connection is changing. Try again when it finishes."
+- **Affected:** Ticket 299. Files: `components/briefing/ChatGptPlanCard.tsx`,
+  `apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx`, `apps/desktop/src/chatgpt/connection.ts`.
+- **Surfaces:** in-app copy (Mac), user guide.
+- **Conflicting current text:** none shown today; the feature is hidden. The description's
+  claim that Cadence prepares and checks each brief relates to P-029 and P-030, which still
+  describe sending facts to OpenAI under Cadence's account only.
+- **Update needed:** review the strings with P-029 to P-031 before the owner turns the
+  feature on; OpenAI's wording ("Continue with ChatGPT", "Using ChatGPT plan", "Manage
+  usage", "You’re using your ChatGPT plan", "Got it") comes from its UI guidelines (L-019).
+- **Status:** logged.
+
+## P-046: Daily Brief ChatGPT plan states on the Mac
+
+- **Change:** Ticket 299 adds hidden Daily Brief bubble states on the Mac: "Using ChatGPT
+  plan" with "Manage usage"; "ChatGPT plan usage is off, so this brief did not use your
+  plan." with "Continue with ChatGPT"; "ChatGPT usage limit reached. Review your plan or
+  Cadence’s limit in ChatGPT settings." with "Manage usage" and "Try again"; "Your ChatGPT
+  plan can’t run the Daily Brief. To use Cadence instead, disconnect ChatGPT in Settings.";
+  "Reconnect ChatGPT to load today’s Daily Brief on your plan." with "Continue with
+  ChatGPT"; and "ChatGPT could not run today’s Daily Brief. Try again later."
+- **Affected:** Ticket 299. Files: `components/briefing/DailyBriefBubble.tsx`,
+  `components/briefing/DailyBriefLauncher.tsx`.
+- **Surfaces:** in-app copy (Mac), user guide.
+- **Conflicting current text:** none shown today; the feature is hidden.
+- **Update needed:** review with P-031's user-guide work before the owner turns the
+  feature on.
 - **Status:** logged.

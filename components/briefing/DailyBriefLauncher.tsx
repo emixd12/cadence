@@ -39,7 +39,10 @@ type View =
   | Readonly<{ kind: "hidden" }>
   | Readonly<{ kind: "loading" }>
   | Readonly<{ kind: "ready"; briefing: DailyBriefing; attempt: DailyBriefAttempt }>
-  | Readonly<{ kind: "notice"; message: string; retryLabel?: string; retryAt?: number }>;
+  | Readonly<{ kind: "notice"; message: string; retryLabel?: string; retryAt?: number; action?: PlanAction }>;
+
+/** Ticket 299: a ChatGPT plan notice's primary action. Only the Mac's plan path produces these codes. */
+type PlanAction = "manage_usage" | "connect";
 
 const HIDDEN: View = { kind: "hidden" };
 const TRY_AGAIN = "Try again";
@@ -176,12 +179,17 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       setView(HIDDEN);
     };
 
-    const load = (allowStart: boolean) => {
+    const load = (allowStart: boolean, retry = false) => {
       if (desktop && !navigator.onLine) return;
       const loadEpoch = epoch.current;
       void briefClient.preferences().then((settings) => {
         if (!mounted.current || loadEpoch !== epoch.current) return;
         if (!settings.available || !settings.enabled) { withdraw(); return; }
+        if (retry) {
+          settingsRef.current = settings;
+          if (!readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) start(settings, true);
+          return;
+        }
         const previous = settingsRef.current;
         if (previous && dailyBriefFence(previous) !== dailyBriefFence(settings)) {
           // A new local day (or another device's settings change) replaces the old
@@ -195,6 +203,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         if (!previous) evaluate(settings, allowStart);
       }).catch(() => {
         if (!mounted.current || loadEpoch !== epoch.current) return;
+        if (retry) { show({ kind: "notice", message: "Today’s Daily Brief did not finish loading.", retryLabel: TRY_AGAIN }); return; }
         // Enablement is unknown, so stay out of the way; focus or reconnection checks again.
         if (settingsRef.current) withdraw();
         else setView(HIDDEN);
@@ -204,7 +213,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     actions.current = {
       retry: () => {
         const settings = settingsRef.current;
-        if (!settings || !live() || readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) return;
+        if (!live()) return;
+        // A plan change withdrew the previous settings. A deliberate reconnect still gets one fresh retry.
+        if (!settings) { load(false, true); return; }
+        if (readDailyBriefPresentation(settings.accountRef, settings.localDate).dismissed) return;
         start(settings, true);
       },
       dismiss: () => {
@@ -216,6 +228,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       },
     };
 
+    const stopPlan = briefClient.plan?.subscribe?.((phase) => {
+      if (phase === "start") withdraw();
+      else load(false);
+    });
     load(true);
 
     const onSettings = (event: Event) => {
@@ -242,6 +258,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     window.addEventListener("storage", onStorage);
     return () => {
       mounted.current = false;
+      stopPlan?.();
       for (const timer of pendingTimers) window.clearTimeout(timer);
       window.removeEventListener("cadence:daily-brief-settings", onSettings);
       window.removeEventListener("focus", onFocus);
@@ -260,12 +277,27 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   if (view.kind === "loading") return <DailyBriefBubble state="loading" onDismiss={onDismiss} />;
   // Delivered text reflects the facts it was prepared from; changed Timeline facts withdraw it.
   const shown = view.kind === "ready" && view.attempt.sourceKey !== sourceKey ? staleNotice() : view;
-  if (shown.kind === "ready") return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} />;
+  const planControls = resolvedClient.plan;
+  // A cancelled or failed sign-in leaves the notice in place; a finished one retries the brief.
+  const connectPlan = () => {
+    const pending = planControls?.connect();
+    // Starting the sign-in may synchronously withdraw this view. Later account changes must still fence its callback.
+    const current = epoch.current;
+    void pending?.then(() => { if (current === epoch.current) actions.current.retry(); }, () => undefined);
+  };
+  if (shown.kind === "ready") {
+    const usage = planControls?.usage(shown.briefing) ?? null;
+    const plan = planControls && usage ? { usage, onManageUsage: planControls.manageUsage, onConnect: connectPlan } : null;
+    return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} />;
+  }
   if (shown.kind !== "notice") return null;
+  const action = planControls && shown.action === "manage_usage" ? { label: "Manage usage", onClick: planControls.manageUsage }
+    : planControls && shown.action === "connect" ? { label: "Continue with ChatGPT", onClick: connectPlan, chatGpt: true } : undefined;
   return (
     <DailyBriefBubble
       state="error"
       message={shown.message}
+      action={action}
       onDismiss={onDismiss}
       onRetry={shown.retryLabel ? () => actions.current.retry() : undefined}
       retryLabel={shown.retryLabel}
@@ -306,6 +338,18 @@ function failureNotice(outcome: Extract<DailyBriefOutcome, { kind: "failed" }>):
       return { kind: "notice", message: "Daily Brief is turned off or unavailable. Check Settings." };
     case "brief_unavailable":
       return { kind: "notice", message: "Today’s Daily Brief is unavailable.", retryLabel: TRY_AGAIN };
+    // Ticket 299 (D27): the Mac's ChatGPT plan could not run the brief. Cadence does not run it another way.
+    case "chatgpt_usage_limit":
+      return { kind: "notice", message: "ChatGPT usage limit reached. Review your plan or Cadence’s limit in ChatGPT settings.", action: "manage_usage", retryLabel: TRY_AGAIN };
+    case "chatgpt_not_eligible":
+      return { kind: "notice", message: "Your ChatGPT plan can’t run the Daily Brief. To use Cadence instead, disconnect ChatGPT in Settings." };
+    case "chatgpt_reconnect":
+      return { kind: "notice", message: "Reconnect ChatGPT to load today’s Daily Brief on your plan.", action: "connect" };
+    case "chatgpt_retry_later":
+    case "chatgpt_timeout":
+    case "chatgpt_advisor_unavailable":
+    case "chatgpt_unavailable":
+      return { kind: "notice", message: "ChatGPT could not run today’s Daily Brief. Try again later.", retryLabel: TRY_AGAIN };
     default:
       return { kind: "notice", message: outcome.recovery ?? "Cadence could not prepare today’s Daily Brief.", retryLabel: TRY_AGAIN };
   }

@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-10",
+  "updated": "2026-11-12",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -332,7 +332,10 @@
         "INT-TRAVEL-011",
         "INT-TRAVEL-012",
         "INT-TRAVEL-013",
-        "INT-TRAVEL-014"
+        "INT-TRAVEL-014",
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020",
+        "INT-SETTINGS-021"
       ]
     },
     {
@@ -881,12 +884,14 @@
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 5,
+      "interaction_marker_count": 11,
       "interaction_ids": [
         "INT-BRIEF-002",
         "INT-BRIEF-003",
         "INT-BRIEF-005",
-        "INT-WEATHER-001"
+        "INT-WEATHER-001",
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020"
       ]
     },
     {
@@ -1122,6 +1127,16 @@
       "interaction_marker_count": 10,
       "interaction_ids": [
         "INT-BEHAVIOR-032"
+      ]
+    },
+    {
+      "path": "components/briefing/ChatGptPlanCard.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 12,
+      "interaction_ids": [
+        "INT-SETTINGS-019",
+        "INT-SETTINGS-020",
+        "INT-SETTINGS-021"
       ]
     }
   ],
@@ -10083,11 +10098,13 @@
         }
       ],
       "availability": "Shown while a first account-link choice is pending.",
-      "success_result": "Clears the local session and incomplete account metadata.",
-      "failure_result": "Shows a recoverable error and does not mutate product data.",
+      "success_result": "Disconnects ChatGPT and clears its local tokens before clearing the local session and incomplete account metadata. A failed provider revocation does not block local account cleanup.",
+      "failure_result": "Blocks account cleanup when local ChatGPT token removal fails. Shows a recoverable error and does not mutate product data.",
       "effects": [
         "authentication_session",
-        "database_write"
+        "database_write",
+        "oauth_revocation",
+        "network_request"
       ],
       "risk": "low",
       "confirmation": "none",
@@ -10395,11 +10412,13 @@
         }
       ],
       "availability": "Available while an account is linked, including after session revocation.",
-      "success_result": "Removes Keychain secrets and link state, preserves SQLite product data, and displays the exact database path.",
-      "failure_result": "Stops before native mutation when secret removal fails; otherwise reports the recoverable native error.",
+      "success_result": "Removes Keychain secrets and link state, preserves SQLite product data, and displays the exact database path. First disconnects ChatGPT and clears its local tokens. A failed provider revocation does not block account disconnect.",
+      "failure_result": "Stops account teardown when local ChatGPT token removal or Cadence secret removal fails; otherwise reports the recoverable native error.",
       "effects": [
         "authentication_session",
-        "database_write"
+        "database_write",
+        "oauth_revocation",
+        "network_request"
       ],
       "risk": "moderate",
       "confirmation": "none",
@@ -10473,12 +10492,14 @@
         }
       ],
       "availability": "Available after typing REMOVE while an account is linked.",
-      "success_result": "Creates a validated owner-only backup, clears secrets and linked working data, seeds a fresh profile, and displays both exact paths.",
-      "failure_result": "Leaves hosted data unchanged and refuses removal when backup creation or secret removal fails.",
+      "success_result": "Creates a validated owner-only backup, clears secrets and linked working data, seeds a fresh profile, and displays both exact paths. First disconnects ChatGPT and clears its local tokens. A failed provider revocation does not block account disconnect.",
+      "failure_result": "Leaves hosted data unchanged and refuses removal when backup creation, local ChatGPT token removal or Cadence secret removal fails.",
       "effects": [
         "authentication_session",
         "filesystem_write",
-        "database_write"
+        "database_write",
+        "oauth_revocation",
+        "network_request"
       ],
       "risk": "high",
       "confirmation": "typed",
@@ -12179,6 +12200,267 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-019",
+      "name": "Connect ChatGPT to use your ChatGPT plan",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-019-connect-chatgpt-to-use-your-chatgpt-plan"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "timeline"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan",
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Let the Mac run the Daily Brief on the user's own ChatGPT plan (D27).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Continue with ChatGPT (Settings card, or the Daily Brief's plan usage off and reconnect states)"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel ChatGPT sign-in"
+        },
+        {
+          "kind": "activate",
+          "control": "Got it (one-time You're using your ChatGPT plan confirmation)"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Rust opens ChatGPT sign-in in the system browser, takes one 127.0.0.1 callback and keeps the tokens in Keychain. The card shows the ChatGPT email and Using ChatGPT plan, and the first connection with plan usage shows the one-time confirmation. Changing the ChatGPT session cancels the current Daily Brief request. From the Daily Brief, a finished sign-in retries the brief.",
+      "failure_result": "A cancel, timeout, denial or failed verification saves nothing and shows a fixed sentence without token text. Account teardown and stale account callbacks cannot start a connection operation.",
+      "effects": [
+        "external_navigation",
+        "authentication_session",
+        "network_request",
+        "local_preference"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "components/briefing/DailyBriefLauncher.tsx#DailyBriefLauncher",
+        "apps/desktop/src-tauri/src/chatgpt/mod.rs",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/desktop-chatgpt-connection.test.ts",
+          "tests/daily-brief-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic UI and mocked Rust tests; no live ChatGPT sign-in ran."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "components/briefing/DailyBriefLauncher.tsx#DailyBriefLauncher",
+            "apps/desktop/src-tauri/src/chatgpt/mod.rs"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/desktop-chatgpt-connection.test.ts",
+            "tests/daily-brief-ui.dom.test.tsx"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-020",
+      "name": "Manage ChatGPT usage",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-020-manage-chatgpt-usage"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "timeline"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan",
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Review or change ChatGPT plan usage and limits for Cadence.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Manage usage (Settings card, the Daily Brief's Using ChatGPT plan line, or the usage-limit notice's primary action)"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Opens https://chatgpt.com/settings/usage in the system browser. Cadence sends nothing with it.",
+      "failure_result": "The system browser does not open; Cadence changes nothing.",
+      "effects": [
+        "external_navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/daily-brief-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic UI tests prove each Manage usage control calls the usage opener."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/daily-brief-ui.dom.test.tsx"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-021",
+      "name": "Disconnect ChatGPT",
+      "user_guidance": {
+        "audience": "internal_qa",
+        "references": [
+          "docs/user-guide/internal-qa.md#int-settings-021-disconnect-chatgpt"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#chatgpt-plan"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Stop using the ChatGPT plan on this Mac.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect ChatGPT"
+        }
+      ],
+      "availability": "Hidden: Cadence for Mac only, in a build with VITE_CADENCE_CHATGPT_PLAN=1, which is off by default (owner decision, 2026-11-12, \"Keep the ChatGPT plan Daily Brief hidden\"). Linked Mac accounts only.",
+      "success_result": "Rust revokes the refresh token at OpenAI, then removes the chatgpt-session Keychain item; the installation item stays. Changing the ChatGPT session cancels the current Daily Brief request. The Daily Brief returns to Cadence's hosted path.",
+      "failure_result": "A failed revocation still removes the local tokens and says Cadence may still be listed in ChatGPT settings. Failed local token removal reports an error. Account teardown and stale account callbacks cannot start a disconnect operation.",
+      "effects": [
+        "authentication_session_end",
+        "oauth_revocation",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/desktop/src/product.tsx#Product",
+        "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+        "apps/desktop/src-tauri/src/chatgpt/mod.rs",
+        "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/desktop-chatgpt-plan.dom.test.tsx",
+          "tests/desktop-chatgpt-connection.test.ts"
+        ],
+        "notes": "Mocked Rust tests prove revoke-then-clear; the UI test proves the control and message."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "D27: the web app shows no ChatGPT controls; OpenAI's program needs a local app."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx#Product",
+            "components/briefing/ChatGptPlanCard.tsx#ChatGptPlanCard",
+            "apps/desktop/src-tauri/src/chatgpt/mod.rs"
+          ],
+          "evidence": [
+            "tests/desktop-chatgpt-plan.dom.test.tsx",
+            "tests/desktop-chatgpt-connection.test.ts"
+          ],
+          "reason": "Gated off by default; installed acceptance is Ticket 300."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "No claim until the owner turns the feature on (P-032)."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Desktop only; native mobile implementation is deferred."
         }
       }
     },

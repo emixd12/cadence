@@ -4,7 +4,9 @@
 //! refresh token never enters the webview. Tokens live only in two native-only Keychain
 //! items, never in SQLite, frontend storage, logs, exports, backups or error text.
 //! The webview gets connection state, the ChatGPT email and the model catalog rows.
-//! No UI uses these commands yet; Ticket 299 adds it.
+//! Ticket 299 adds `chatgpt_access_token`: the webview holds the access token in memory
+//! for one Daily Brief model call to `https://api.openai.com`. The refresh token never
+//! leaves Rust.
 
 pub mod loopback;
 pub mod protocol;
@@ -78,6 +80,14 @@ pub enum DisconnectOutcome {
 #[serde(rename_all = "camelCase")]
 pub struct DisconnectResult {
     pub outcome: DisconnectOutcome,
+}
+
+/// The access token for one webview model call (Ticket 299). No `Debug`: it holds a token.
+/// It never carries the refresh token.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessToken {
+    pub access_token: String,
 }
 
 pub struct Connection<H: Http, S: Secrets> {
@@ -368,13 +378,23 @@ impl<H: Http, S: Secrets> Connection<H, S> {
 
     /// Returns a usable access token, refreshing at most once across concurrent
     /// callers. `rejected` forces a refresh only if it is still the stored token.
-    async fn access_token(&self, rejected: Option<&str>) -> Result<String, Failure> {
+    async fn access_token(
+        &self,
+        rejected: Option<&str>,
+        require_plan: bool,
+    ) -> Result<String, Failure> {
         let _session = self.session_lock.lock().await;
         let mut session = self
             .load::<Session>(SESSION_ITEM)?
             .ok_or(Failure::Disconnected)?;
         if session.needs_reconnect {
             return Err(Failure::NeedsReconnect);
+        }
+        let permitted = |session: &Session| {
+            !require_plan || session.scopes.iter().any(|scope| scope == PLAN_SCOPE)
+        };
+        if !permitted(&session) {
+            return Err(Failure::Disconnected);
         }
         let stale = rejected.is_some_and(|token| session.access_token.as_deref() == Some(token));
         if let Some(token) = session.access_token.as_ref() {
@@ -410,6 +430,11 @@ impl<H: Http, S: Secrets> Connection<H, S> {
                 session.access_token = Some(tokens.access_token.clone());
                 // Save the rotated refresh token before anything uses the new access token.
                 self.save(SESSION_ITEM, &session)?;
+                // A refresh may narrow the grant. Keep its rotated token, but do not
+                // hand the webview an access token that no longer permits plan usage.
+                if !permitted(&session) {
+                    return Err(Failure::Disconnected);
+                }
                 Ok(tokens.access_token)
             }
             Err(TokenError::Rejected) => Err(self.mark_reconnect(session)),
@@ -431,14 +456,14 @@ impl<H: Http, S: Secrets> Connection<H, S> {
     // -- catalog ---------------------------------------------------------------
 
     pub async fn models(&self) -> Result<Vec<CatalogModel>, Failure> {
-        let token = self.access_token(None).await?;
+        let token = self.access_token(None, false).await?;
         let mut reply = self
             .http
             .get(CATALOG_URL, Some(&token))
             .await
             .map_err(|_| Failure::Unavailable)?;
         if reply.status == 401 {
-            let refreshed = self.access_token(Some(&token)).await?;
+            let refreshed = self.access_token(Some(&token), false).await?;
             reply = self
                 .http
                 .get(CATALOG_URL, Some(&refreshed))
@@ -463,6 +488,15 @@ impl<H: Http, S: Secrets> Connection<H, S> {
             429 | 500.. => Err(Failure::Unavailable),
             _ => Err(Failure::Catalog),
         }
+    }
+
+    // -- webview model call (Ticket 299) ----------------------------------------
+
+    /// A fresh access token for one Daily Brief model call, refreshed here if it is near
+    /// expiry. A session without plan usage gets none: the model call needs that grant.
+    pub async fn webview_access_token(&self) -> Result<AccessToken, Failure> {
+        let access_token = self.access_token(None, true).await?;
+        Ok(AccessToken { access_token })
     }
 
     // -- disconnect ------------------------------------------------------------
@@ -557,6 +591,12 @@ pub async fn chatgpt_disconnect(
     state: State<'_, ChatGptState>,
 ) -> Result<DisconnectResult, String> {
     state.0.disconnect().await.map_err(text)
+}
+
+/// Ticket 299: the webview keeps this token in memory for one model call only.
+#[tauri::command]
+pub async fn chatgpt_access_token(state: State<'_, ChatGptState>) -> Result<AccessToken, String> {
+    state.0.webview_access_token().await.map_err(text)
 }
 
 #[tauri::command]

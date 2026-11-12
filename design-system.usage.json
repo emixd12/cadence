@@ -1180,6 +1180,30 @@
       "confidence": "exact"
     },
     {
+      "componentId": "module.chatgpt-plan-card",
+      "file": "apps/desktop/src/chatgpt/chatgpt-plan-settings.tsx",
+      "line": 67,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.chatgpt-plan-card",
+      "file": "tests/desktop-chatgpt-plan.dom.test.tsx",
+      "line": 40,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.chatgpt-plan-card",
+      "file": "tests/desktop-chatgpt-plan.dom.test.tsx",
+      "line": 92,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "module.day-progress-timeline",
       "file": "apps/desktop/src/timeline-screen.tsx",
       "line": 188,

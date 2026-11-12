@@ -534,10 +534,22 @@ provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, str
 parsing, error mapping and the round trip with prepare and validate.
 
 Ticket 297 keeps OAuth discovery, sign-in, token refresh, revocation and catalog reads
-in `apps/desktop/src-tauri/src/chatgpt/`. The TypeScript connection client receives only
-connection state, email and catalog rows. Tokens stay in native-only Keychain items.
-This boundary implements no model-selection or briefing rules; Ticket 299 owns the UI
-and model-call wiring behind its default-off desktop switch.
+in `apps/desktop/src-tauri/src/chatgpt/`. Ticket 299 adds a command returning only a
+fresh access token for one model call, after checking plan usage under the session lock.
+Refresh tokens and persistent token storage stay in native-only Keychain items. The
+connection client's lifecycle notifications contain no tokens or account details.
+This boundary implements no model-selection or briefing rules.
+
+Ticket 299's `apps/desktop/src/daily-brief.ts` coordinates the prepared request, the
+shared plan adapter and hosted completion behind its default-off desktop switch. It
+retains the server's settings for route selection and normalizes device-only availability
+for the Mac UI. Native status, model calls and completion are bounded and cancelled when
+the connection changes. Any failure after preparation attempts pending-only release;
+cleanup cannot undo a completed brief. Account-scoped controls stop new operations before
+account teardown, while the shared launcher discards stale attempts and reloads settings.
+`tests/desktop-chatgpt-plan.test.ts`, the connection and auth tests, and the component
+tests cover these boundaries. Signed release environments pin the switch off before Vite
+loads env files; explicitly enabled development builds remain available for testing.
 
 Ticket 298 owners. `lib/services/daily-brief-device.service.ts` runs admission, the
 shared live capture (`captureLiveDailyBriefContext` in `daily-brief.service.ts`),

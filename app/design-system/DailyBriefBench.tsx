@@ -62,6 +62,7 @@ async function fetchAccount(signal: AbortSignal): Promise<Account> {
 
 import type { DailyBriefClient, DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
+import { ChatGptPlanCard } from "@/components/briefing/ChatGptPlanCard";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
@@ -132,6 +133,37 @@ export function DailyBriefBubbleBench() {
     text: `Your midday walk overlaps a fixed commitment. ${"schedule".repeat(260)}`, localDate: "2026-09-20", timezone: "America/New_York",
     generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2026-09-21T04:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
   }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V12_BENCH_BRIEFING} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("applied")} onDismiss={() => undefined} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("no_position")} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
+}
+
+const PLAN_BENCH_BRIEFING: DailyBriefing = { text: "Your walk fits before the 10:00 meeting.", localDate: "2026-09-20", timezone: "America/New_York",
+  generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2026-09-21T04:00:00Z", coverage: "complete", warnings: [] };
+const PLAN_NARROW = "w-full max-w-[22rem] border border-dashed border-neutral-300 p-2";
+
+/** Ticket 299: the Mac-only ChatGPT plan states of the Daily Brief bubble at a narrow width. Synthetic; no ChatGPT call. */
+export function DailyBriefPlanStatesBench() {
+  return <div className="grid gap-10 bg-background p-3 pt-8">
+    {([["Using ChatGPT plan", <DailyBriefBubble key="plan" state="ready" briefing={PLAN_BENCH_BRIEFING} onDismiss={() => undefined} plan={{ usage: "plan", onManageUsage: () => undefined, onConnect: () => undefined }} />],
+      ["Plan usage off", <DailyBriefBubble key="off" state="ready" briefing={PLAN_BENCH_BRIEFING} onDismiss={() => undefined} plan={{ usage: "plan_off", onManageUsage: () => undefined, onConnect: () => undefined }} />],
+      ["Usage limit", <DailyBriefBubble key="limit" state="error" message="ChatGPT usage limit reached. Review your plan or Cadence’s limit in ChatGPT settings." action={{ label: "Manage usage", onClick: () => undefined }} onRetry={() => undefined} onDismiss={() => undefined} />],
+      ["Not eligible", <DailyBriefBubble key="eligible" state="error" message="Your ChatGPT plan can’t run the Daily Brief. To use Cadence instead, disconnect ChatGPT in Settings." onDismiss={() => undefined} />],
+      ["Reconnect", <DailyBriefBubble key="reconnect" state="error" message="Reconnect ChatGPT to load today’s Daily Brief on your plan." action={{ label: "Continue with ChatGPT", onClick: () => undefined, chatGpt: true }} onDismiss={() => undefined} />],
+    ] as const).map(([label, bubble]) => <div key={label} className={PLAN_NARROW} data-bench-plan-state={label}><p className="mb-6 font-sans text-xs text-neutral-600">{label} · 352px</p>{bubble}</div>)}
+  </div>;
+}
+
+/** Ticket 299: every "Use your ChatGPT plan" card state at a narrow width. */
+export function ChatGptPlanCardBench() {
+  const callbacks = { onConnect: () => undefined, onCancel: () => undefined, onDisconnect: () => undefined, onManageUsage: () => undefined, onConfirm: () => undefined };
+  const states = [
+    ["Disconnected", <ChatGptPlanCard key="d" state="disconnected" {...callbacks} />],
+    ["Connecting", <ChatGptPlanCard key="c" state="connecting" {...callbacks} />],
+    ["First connection", <ChatGptPlanCard key="f" state="connectedWithPlanUsage" email="person@example.test" confirmation {...callbacks} />],
+    ["Using ChatGPT plan", <ChatGptPlanCard key="p" state="connectedWithPlanUsage" email="a-very-long-chatgpt-address@subdomain.example.test" {...callbacks} />],
+    ["Plan usage off", <ChatGptPlanCard key="o" state="connectedWithoutPlanUsage" email="person@example.test" {...callbacks} />],
+    ["Reconnect", <ChatGptPlanCard key="r" state="needsReconnect" email="person@example.test" error="Reconnect ChatGPT to continue." {...callbacks} />],
+  ] as const;
+  return <div className="grid gap-6 bg-background p-3">{states.map(([label, card]) => <div key={label} className={PLAN_NARROW} data-bench-plan-card={label}>
+    <p className="mb-2 font-sans text-xs text-neutral-600">{label} · 352px</p>{card}</div>)}</div>;
 }
 
 export function DailyBriefSettingsBench() {

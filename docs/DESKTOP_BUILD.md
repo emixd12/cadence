@@ -692,10 +692,32 @@ Ticket 299 adds the Settings card and the Daily Brief wiring.
 - Rust reads the catalog, `GET https://api.openai.com/v1/models`. The webview receives
   `slug` and `visibility` rows only. Model selection is not part of this ticket.
 - Commands: `chatgpt_status`, `chatgpt_connect`, `chatgpt_cancel_connect`,
-  `chatgpt_disconnect` and `chatgpt_models`. The TypeScript client is
-  `apps/desktop/src/chatgpt/connection.ts`. App commands need no capability entry in
-  this build, like the existing `auth_*` commands. The CSP is unchanged because the
-  webview makes no OpenAI request. Ticket 299 owns any CSP change for its model call.
+  `chatgpt_disconnect`, `chatgpt_models` and (Ticket 299) `chatgpt_access_token`. The
+  TypeScript client is `apps/desktop/src/chatgpt/connection.ts`. App commands need no
+  capability entry in this build, like the existing `auth_*` commands.
+- Ticket 299: `chatgpt_access_token` returns `{ accessToken }` only, refreshed in Rust when
+  it is near expiry, and nothing for a session without plan usage. The session lock covers
+  the scope check, including scopes returned by refresh. The webview keeps it in
+  memory for one Daily Brief model call and never stores or logs it. The CSP `connect-src`
+  adds exactly `https://api.openai.com` for that call; `auth.openai.com` stays Rust-only.
+- Ticket 299 switch (owner decision, November 12, 2026): the "Use your ChatGPT plan" card
+  and the plan path of the Daily Brief exist only in a build with
+  `VITE_CADENCE_CHATGPT_PLAN=1` (`apps/desktop/src/chatgpt/plan-switch.ts`). Vite inlines
+  the value, so a default build ships the feature dormant. Signed release and preview
+  builds explicitly pin an empty value, overriding activation in Vite env files. For a dev build, run
+  `VITE_CADENCE_CHATGPT_PLAN=1 npm run desktop:dev` (or set it for the dev-signed build);
+  the hosted deployment also needs `CADENCE_DAILY_BRIEF_DEVICE_MODEL`, which stays unset in
+  production.
+- Ticket 299 flow, with the switch on, ChatGPT connected with plan usage and Settings
+  reporting `deviceModelAvailable`: `POST /api/advisor/brief/device/prepare`, the plan
+  model call (`chooseChatGPTPlanModel`, `generateChatGPTPlanDailyBrief`), then
+  `/complete`. A failure after prepare calls the pending-only `/release`, including a
+  completion transport failure. Native reads and the model phase have deadlines, and
+  connection changes cancel the attempt. No
+  fallback to Cadence's key (D27). Not connected, or connected without plan usage, keeps
+  the hosted `POST /api/advisor/brief`. Disconnecting the Cadence account or cancelling
+  its initial link first runs `chatgpt_disconnect`. Failed remote revocation does not
+  block account teardown once local tokens are cleared; a Keychain cleanup error does.
 - HTTPS uses `reqwest` with `rustls` and `ring`, the build `tauri-plugin-updater`
   already ships. Responses stop at 2 MiB while streaming, including responses with no
   Content-Length. The new direct dependencies add no crate to `Cargo.lock`.
