@@ -18590,7 +18590,8 @@ Scope and acceptance:
   so it no longer checks the retired profile. Done.
 - Live: the owner creates the vault, the service account and the App Store Connect API key;
   agents back up the identity, notarization credential and updater key, and
-  `verify-backups` passes. Not done.
+  `verify-backups` passes. Done November 12, 2026 for the vault, service account and the
+  three backups; the API key is not created yet.
 - Notarization uses the API key in the next release wrapper. Not done.
 - Spike: create a Developer ID certificate and a Developer ID profile through the App Store
   Connect API. If the API refuses, agents use the Apple Developer portal in Chrome with
