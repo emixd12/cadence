@@ -3,11 +3,47 @@ import { describe, expect, it, vi } from "vitest";
 import { listBehaviorConfigurationEvents } from "../lib/db/behaviorConfigurationEvents.repo";
 import type { AppSupabaseClient } from "../lib/db/behaviors.repo";
 import type { BehaviorConfigurationEvent } from "../lib/types/database";
+import { storedConfigurationEvent } from "./helpers/export-row-fixture";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const RECORDED_AT = "2026-08-15T03:00:00Z";
 
 describe("behavior configuration events repository", () => {
+  it("normalizes Mac-written snapshots while preserving hosted rows and pagination metadata", async () => {
+    const snapshot = storedConfigurationEvent().next_configuration;
+    const macSnapshot = {
+      categoryId: snapshot.category_id,
+      scheduleGraph: snapshot.schedule_graph.map((schedule) => ({
+        recurrenceRule: schedule.recurrence_rule,
+        sortOrder: schedule.sort_order,
+        timeEntries: schedule.time_entries.map((entry) => ({
+          kind: entry.kind, preset: entry.preset, startTime: entry.start_time,
+          endTime: entry.end_time, sortOrder: entry.sort_order,
+        })),
+      })),
+      browserReminderEnabled: snapshot.browser_reminder_enabled,
+      emailReminderEnabled: snapshot.email_reminder_enabled,
+      reminderOffsetMinutes: snapshot.reminder_offset_minutes,
+      active: snapshot.active,
+      timezone: snapshot.timezone,
+    };
+    const hosted = { ...storedEvent("event-0000"), previous_configuration: null };
+    const mac = { ...storedEvent("event-0001"), previous_configuration: macSnapshot, next_configuration: macSnapshot };
+    const from = vi.fn()
+      .mockReturnValueOnce(queryBuilder({ data: [{ id: mac.id, recorded_at: RECORDED_AT }], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [hosted, mac], error: null }));
+
+    const result = await listBehaviorConfigurationEvents({ from } as unknown as AppSupabaseClient, USER_ID);
+
+    expect(result[0]).toEqual(hosted);
+    expect(result[1]).toEqual({
+      ...mac,
+      previous_configuration: { ...snapshot, location_text: null },
+      next_configuration: { ...snapshot, location_text: null },
+    });
+    expect(mac.next_configuration).toHaveProperty("scheduleGraph");
+  });
+
   it("reads past the Data API row cap with a fixed high-water and keyset cursor", async () => {
     const events = Array.from({ length: 1_001 }, (_, index) =>
       storedEvent(`event-${String(index).padStart(4, "0")}`),
@@ -165,8 +201,8 @@ function storedEvent(id: string): BehaviorConfigurationEvent {
     user_id: USER_ID,
     behavior_id: "22222222-2222-4222-8222-222222222222",
     event_kind: "revision",
-    previous_configuration: {},
-    next_configuration: {},
+    previous_configuration: storedConfigurationEvent().next_configuration,
+    next_configuration: storedConfigurationEvent().next_configuration,
     changed_fields: ["schedule_graph"],
     recorded_at: RECORDED_AT,
     effective_at: RECORDED_AT,

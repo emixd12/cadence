@@ -18587,3 +18587,46 @@ Messaging impact: none.
 
 Verification: `npx vitest run tests/release-credentials.test.mjs` and
 `dagger check --cadence --progress=report`.
+
+## Ticket 326: Configuration history in two key shapes (defect D2)
+
+Status: in progress. Started November 11, 2026. The read side is done; the writer is not.
+Dependencies: none. Found during Ticket 292 acceptance (ledger
+`.intent/acceptance/t292-day-notes-20261111/ledger.md`, D2).
+
+Cause: Cadence for Mac stores configuration snapshots in the camelCase shape of
+`BehaviorConfigurationSnapshot` (`local_store/behavior.rs`, `snapshot()`). Account sync
+(`apps/desktop/src/account/account-sync.ts`, `portabilityEntities`) uploads
+`configuration_event` rows unchanged, so hosted `behavior_configuration_events` holds
+camelCase rows next to the web's snake_case rows. Only the first-link path converts them.
+Web export validated the snake_case shape and returned 500 for every format.
+
+Scope and acceptance:
+
+- `toStoredConfigurationSnapshot` in `packages/core/src/services/configuration-payload.ts`
+  reads both shapes and returns the hosted snake_case shape. Export assembly (web and Mac)
+  and `listBehaviorConfigurationEvents` (export, BehaviorLog restore, Daily Brief history)
+  use it. Done.
+- The export route logs failures as `export_download_failed` with the error class and, for
+  export validation failures only, the code-defined label. It never logs the raw message.
+  Done.
+- Account sync uploads configuration snapshots in snake_case and converts hosted rows back
+  to camelCase for the local store. The planner compares both shapes as equal, so rows
+  already uploaded in camelCase do not conflict. Ships with a Mac release. Not done.
+- Optional: a data migration rewrites the existing camelCase hosted rows. It is not
+  additive, so it needs the owner's approval. Not done.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Read-side normalization and route logging (this ticket). |
+| Desktop | Export uses the shared normalizer now; the sync writer fix ships in a later Mac release. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: none.
+
+Verification: `npx vitest run tests/export-camelcase-configuration.test.ts
+tests/export-download-route.test.ts` and `dagger check --cadence --progress=report`. Production: export
+for test account A downloads.

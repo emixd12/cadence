@@ -4,9 +4,13 @@ import {
   ExportAuthError,
   ExportRateLimitError,
   getExportDownload,
+  exportFailureLabel,
   type ExportDownloadFormat,
 } from "@/lib/services/export.service";
-import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
+import {
+  reportMonitoringError,
+  reportMonitoringEvent,
+} from "@/lib/monitoring/privacy-safe-events";
 import { LaunchCircuitBreakerOpenError } from "@/lib/security/launch-circuit-breakers";
 
 export async function exportDownloadResponse(
@@ -56,6 +60,14 @@ export async function exportDownloadResponse(
       );
     }
 
+    // Log the error class and, for export validation failures, the code-defined label.
+    // Never log the raw message: database and provider errors may carry user data.
+    reportMonitoringError("export_download_failed", error, {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      format,
+      failure: exportFailureLabel(error),
+    });
     return jsonError("Unable to prepare export.", 500);
   }
 }
