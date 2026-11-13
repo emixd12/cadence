@@ -1,47 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
-import {
-  AUTH_CALLBACK_ROUTE,
-  authRequestUrl,
-  buildLoginPath,
-  MISSING_CONFIG_ERROR,
-  normalizeRedirectPath,
-} from "@/lib/auth/redirects";
-import { DEFAULT_APP_ROUTE } from "@/lib/navigation";
-import { readSupabaseRuntimeConfig } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+import { startSignIn } from "@/lib/auth/sign-in-start";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  const requestUrl = authRequestUrl(request);
-  const nextPath = normalizeRedirectPath(
-    requestUrl.searchParams.get("next"),
-    DEFAULT_APP_ROUTE,
-  );
-
-  if (!readSupabaseRuntimeConfig()) {
-    return NextResponse.redirect(
-      new URL(buildLoginPath(nextPath, MISSING_CONFIG_ERROR), requestUrl),
-    );
-  }
-
-  const redirectTo = new URL(AUTH_CALLBACK_ROUTE, requestUrl);
-  redirectTo.searchParams.set("next", nextPath);
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: redirectTo.toString(),
-    },
-  });
-
-  if (error || !data.url) {
-    return NextResponse.redirect(
-      new URL(buildLoginPath(nextPath, "oauth_start_failed"), requestUrl),
-    );
-  }
-
-  return NextResponse.redirect(data.url);
+export function GET(request: NextRequest) {
+  return startSignIn(request, "google");
 }

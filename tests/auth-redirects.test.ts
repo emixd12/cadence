@@ -76,6 +76,31 @@ describe("auth redirects", () => {
     expect(normalizeRedirectPath("//example.com")).toBe("/timeline");
   });
 
+  it.each([
+    "/.//example.com",
+    "/..//example.com",
+    "/a/..//example.com/path",
+    "/./\\example.com",
+    "/\\example.com",
+    "/\t/example.com",
+  ])("rejects %j, which parses to another site", (value) => {
+    const nextPath = normalizeRedirectPath(value);
+
+    expect(nextPath).toBe("/timeline");
+    expect(new URL(nextPath, "https://app.cadence-me.com/login").origin).toBe(
+      "https://app.cadence-me.com",
+    );
+  });
+
+  it("keeps a path with an encoded slash or an inner double slash", () => {
+    expect(normalizeRedirectPath("/%2F%2Fexample.com")).toBe(
+      "/%2F%2Fexample.com",
+    );
+    expect(normalizeRedirectPath("/behaviors//x?day=1#a")).toBe(
+      "/behaviors//x?day=1#a",
+    );
+  });
+
   it("builds login paths with a sanitized next path and optional error", () => {
     expect(buildLoginPath("/behaviors", MISSING_CONFIG_ERROR)).toBe(
       "/login?next=%2Fbehaviors&error=missing_supabase_config",

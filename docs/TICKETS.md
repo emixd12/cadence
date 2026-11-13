@@ -18861,7 +18861,7 @@ Acceptance for the track (Ticket 337 records the evidence):
 
 ## Ticket 331: Login page and routes that support more than one method (web)
 
-Status: not started. Filed November 13, 2026.
+Status: complete (November 13, 2026, PR #264). Filed November 13, 2026.
 Dependencies: none. Decision: D31.
 
 Goal: make the web sign-in surface provider-neutral without turning on a new method.
