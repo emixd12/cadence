@@ -1,4 +1,3 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 import {
   appleIdentityOfThisSignIn,
@@ -11,7 +10,7 @@ import {
   normalizeEmailAddress,
   type EmailSignInError,
 } from "@/lib/auth/email-sign-in";
-import { crossSitePost } from "@/lib/auth/email-sign-in-server";
+import { crossSitePost, sendEmailSignIn } from "@/lib/auth/email-sign-in-server";
 import {
   enabledSignInMethods,
   findEnabledSignInMethod,
@@ -96,14 +95,8 @@ export async function requestDesktopEmailCode(
   const config = readSupabaseRuntimeConfig();
   if (!config) return json(failure("email_unavailable"), 503);
 
-  // No session to keep and no PKCE verifier: the Mac verifies the code with its own client.
-  const supabase = createSupabaseClient(config.url, config.publishableKey, {
-    auth: { autoRefreshToken: false, flowType: "implicit", persistSession: false },
-  });
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { captchaToken, shouldCreateUser: true },
-  });
+  // The Mac verifies the code with its own client, from the person's own address.
+  const { error } = await sendEmailSignIn({ request, config, email, captchaToken });
   if (error) {
     const key = emailRequestErrorKey(error);
     reportMonitoringEvent({

@@ -28,6 +28,9 @@ const mailpitUrl = process.env.CADENCE_LOCAL_MAILPIT_URL ?? "http://127.0.0.1:55
 const dbContainer =
   process.env.CADENCE_LOCAL_SUPABASE_DB_CONTAINER ?? "supabase_db_habit-tracking-app";
 const evidencePath = process.env.CADENCE_EMAIL_SIGN_IN_EVIDENCE;
+// Cloudflare's dummy token: passes with the test secret when Turnstile is on, and is
+// ignored when it is off (Ticket 338 runs this file with Cadence's own check on).
+const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 const run = appUrl && supabaseUrl && serviceKey && publishableKey ? describe : describe.skip;
 
 const evidence: Array<{ case: string; result: string }> = [];
@@ -141,7 +144,9 @@ function storedPasswordLength(email: string) {
 
 async function requestEmail(browser: Browser, email: string, next = "/timeline") {
   const after = Date.now() - 1000;
-  const response = await browser.request("/auth/sign-in/email", { form: { email, next } });
+  const response = await browser.request("/auth/sign-in/email", {
+    form: { email, next, "cf-turnstile-response": TURNSTILE_TEST_TOKEN },
+  });
   return { response, after };
 }
 
@@ -288,7 +293,9 @@ run("Email sign-in end to end (Ticket 332)", () => {
     const browser = new Browser();
     const { after } = await requestEmail(browser, email);
     await waitForMail(email, after);
-    const resend = await browser.request("/auth/sign-in/email", { form: { resend: "1", next: "/timeline" } });
+    const resend = await browser.request("/auth/sign-in/email", {
+      form: { resend: "1", next: "/timeline", "cf-turnstile-response": TURNSTILE_TEST_TOKEN },
+    });
     expect(browser.location(resend)).toBe(
       "/login/email?next=%2Ftimeline&error=email_rate_limited&sent=1",
     );
@@ -341,7 +348,9 @@ run("Email sign-in end to end (Ticket 332)", () => {
     const owner = new Browser();
     const after = Date.now() - 1000;
     await new Promise((resolve) => setTimeout(resolve, 61_000));
-    await owner.request("/auth/sign-in/email", { form: { email: victim, next: "/timeline" } });
+    await owner.request("/auth/sign-in/email", {
+      form: { email: victim, next: "/timeline", "cf-turnstile-response": TURNSTILE_TEST_TOKEN },
+    });
     const mail = await waitForMail(victim, after + 60_000);
     await owner.request("/auth/email/verify", { form: { code: mail.code } });
     expect(owner.signedInUserId()).toBe(victimId);

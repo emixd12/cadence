@@ -67,7 +67,8 @@ Findings, most severe first:
    and the limits never apply per person. `/auth/email/verify` needs only the pending cookie,
    which one solved CAPTCHA gives. Not tested on production because the test would be the
    outage. Check on a test copy, or read Auth logs for the remote address of
-   `/verify` calls.
+   `/verify` calls. Confirmed and fixed inactive under Ticket 338
+   (`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`).
 2. **Replies bounce (medium, user-visible).** Sign-in and reminder email carry
    `Reply-To: Cadence <login@cadence-me.com>`; the domain has no MX record. Already noted in
    P-052 and OPERATIONS.

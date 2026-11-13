@@ -3,6 +3,11 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
+  authForwardingFor,
+  forwardedForHeaders,
+  turnstilePasses,
+} from "@/lib/auth/auth-forwarding";
+import {
   decodePendingEmailSignIn,
   EMAIL_SIGN_IN_COOKIE,
   EMAIL_SIGN_IN_TTL_SECONDS,
@@ -98,6 +103,43 @@ async function readForm(request: NextRequest): Promise<FormData | null> {
   }
 }
 
+type EmailSendFailure = { code?: string; status?: number } | null;
+
+/**
+ * Asks Supabase Auth to send the sign-in email. With forwarding (Ticket 338) Cadence
+ * runs the Turnstile check and Auth counts the request against the person's
+ * address; otherwise Auth runs the check and sees the server's address.
+ */
+export async function sendEmailSignIn(input: {
+  request: { headers: Headers };
+  config: { url: string; publishableKey: string };
+  email: string;
+  captchaToken: string | undefined;
+}): Promise<{ error: EmailSendFailure }> {
+  const forwarding = authForwardingFor(input.request.headers);
+  if (forwarding && !(await turnstilePasses(input.captchaToken, forwarding))) {
+    return { error: { code: "captcha_failed", status: 400 } };
+  }
+  // A plain client: no session to keep, and no PKCE verifier, so the emailed link
+  // and code work in any browser.
+  const supabase = createSupabaseClient(
+    input.config.url,
+    forwarding?.secretKey ?? input.config.publishableKey,
+    {
+      auth: { autoRefreshToken: false, flowType: "implicit", persistSession: false },
+      ...(forwarding ? { global: { headers: forwardedForHeaders(forwarding) } } : {}),
+    },
+  );
+  const { error } = await supabase.auth.signInWithOtp({
+    email: input.email,
+    options: {
+      captchaToken: forwarding ? undefined : input.captchaToken,
+      shouldCreateUser: true,
+    },
+  });
+  return { error };
+}
+
 /**
  * POST /auth/sign-in/email: sends one email with a link and a code. A new address
  * creates the account. `resend=1` reuses the address from the pending cookie.
@@ -137,16 +179,7 @@ export async function requestEmailSignIn(
   if (!email) return back(resend ? "email_missing" : "email_invalid");
 
   const captchaToken = formText(form, TURNSTILE_RESPONSE_FIELD)?.trim() || undefined;
-
-  // A plain client: no session to keep, and no PKCE verifier, so the emailed link
-  // and code work in any browser.
-  const supabase = createSupabaseClient(config.url, config.publishableKey, {
-    auth: { autoRefreshToken: false, flowType: "implicit", persistSession: false },
-  });
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { captchaToken, shouldCreateUser: true },
-  });
+  const { error } = await sendEmailSignIn({ request, config, email, captchaToken });
 
   if (error) {
     const key = emailRequestErrorKey(error);
@@ -194,7 +227,7 @@ export async function verifyEmailCode(
     return seeOther(buildLoginPath(nextPath, MISSING_CONFIG_ERROR), requestUrl);
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ forwarding: authForwardingFor(request.headers) });
   const { error } = await supabase.auth.verifyOtp({
     email: pending.email,
     token,
@@ -243,7 +276,7 @@ export async function confirmEmailLink(
     return seeOther(buildLoginPath(nextPath, MISSING_CONFIG_ERROR), requestUrl);
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ forwarding: authForwardingFor(request.headers) });
   const { error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
     type: "email",

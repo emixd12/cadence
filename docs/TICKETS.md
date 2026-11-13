@@ -19243,3 +19243,50 @@ Messaging impact: none new; P-051 stays open until the messaging track updates c
 
 Verification: `npm run qa:preflight -- --suite <suite>` for the affected suites, then the
 run itself.
+
+## Ticket 338: Email sign-in limits per person, not per server
+
+Status: merged (PR #278) and verified; inactive in production
+until the hosted steps in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. Filed
+November 13, 2026, from finding 1 of `docs/qa/2026-11-13-sign-in-final-verification.md`.
+Dependencies: Ticket 332. Decision: D31.2.
+
+Goal: one person's email requests or wrong codes cannot block email sign-in for others.
+
+Problem: Supabase Auth limits email requests (`/otp`) and code checks (`/verify`) per IP
+address, 30 each per 5 minutes. Cadence calls both from its server, so every person
+shares the server's address. Measured on a loopback copy of hosted Auth's limits: 31
+wrong codes from one person made a second person's right code fail with
+`over_request_rate_limit`, and 29 email requests from one person refused the next
+person's request on the web form and on the Mac's email page.
+
+Scope and acceptance:
+
+- Supabase's supported fix: the `Sb-Forwarded-For` header with the person's address, sent
+  with a secret API key, after the project turns on `security_sb_forwarded_for_enabled`.
+  The email request, the code check, the link check and the Mac's email page use it.
+- A secret key is an admin call, and Supabase skips CAPTCHA for admin calls (measured on
+  hosted). So Cadence runs the Turnstile check itself (Cloudflare siteverify with the
+  person's address) before it asks for the email. No token or a failed check sends
+  nothing.
+- Forwarding is on only when `SUPABASE_SECRET_KEY` (an `sb_secret_` key) and
+  `CADENCE_TURNSTILE_SECRET_KEY` are both set and the request has a valid client address
+  from Vercel's `x-real-ip` or `x-forwarded-for`. Otherwise Cadence calls Auth as before.
+- Settings "Change address" is unchanged: it runs as the signed-in person, needs a recent
+  sign-in, and is not part of the finding.
+- Evidence: `tests/email-sign-in-rate-limit.local-integration.test.ts` with
+  `scripts/auth-rate-limit-local.mjs`, before and after; the QA record above.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/auth/auth-forwarding.ts`, `lib/auth/email-sign-in-server.ts`, `lib/supabase/server.ts`. |
+| Desktop | The Mac's email page (`/auth/email/mac`, `lib/services/desktop-sign-in.service.ts`) uses the same request path. The Mac checks the code itself from the person's own address, so nothing changes in the app. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | A phone app that asks Cadence's server for the email would use the same path; one that calls Auth directly is limited per person already. |
+
+Messaging impact: P-055.
+
+Verification: the two-person test before and after, Ticket 332's email test, an unaliased
+test deployment, `dagger check --cadence --progress=report`.

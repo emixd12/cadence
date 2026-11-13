@@ -1230,6 +1230,15 @@ Production sign-in email (since November 13, 2026):
   starts and the admin API do not. Scripts that request sign-in email against the
   hosted project need a token; the test login and `admin.generateLink` paths do
   not.
+- **Per-person limits (Ticket 338).** Auth limits `/otp` and `/verify` to 30 per
+  5 minutes per IP address, and Cadence calls them from Vercel, so without forwarding
+  everyone shares Vercel's few addresses. With `SUPABASE_SECRET_KEY` (an `sb_secret_`
+  key) and `CADENCE_TURNSTILE_SECRET_KEY` set, Cadence runs the Turnstile check itself
+  and sends the person's address in `Sb-Forwarded-For`; hosted Auth must have
+  `security_sb_forwarded_for_enabled` on. Not set in Production yet. Steps and undo:
+  `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D. Local check:
+  `node scripts/auth-rate-limit-local.mjs up` and
+  `tests/email-sign-in-rate-limit.local-integration.test.ts`.
 - **Change record:** `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
 
 ### Sign in with Apple (Ticket 333)
