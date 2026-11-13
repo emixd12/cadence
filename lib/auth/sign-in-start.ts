@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  APPLE_CALLBACK_PARAM,
+  APPLE_CALLBACK_VALUE,
+} from "@/lib/auth/apple-sign-in";
 import { emailSignInPagePath } from "@/lib/auth/email-sign-in";
 import {
   AUTH_CALLBACK_ROUTE,
@@ -52,6 +56,11 @@ export async function startSignIn(
 
   const redirectTo = new URL(AUTH_CALLBACK_ROUTE, requestUrl);
   redirectTo.searchParams.set("next", nextPath);
+  // Ticket 333: the callback keeps Apple's refresh token for revocation on
+  // deletion. Google's start URL stays as it was.
+  if (method.start.provider === "apple") {
+    redirectTo.searchParams.set(APPLE_CALLBACK_PARAM, APPLE_CALLBACK_VALUE);
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({

@@ -83,20 +83,27 @@ function associatedData(binding: ConnectorSecretBinding): Buffer {
     binding.accountDigest, binding.generation, binding.stateHash ?? null]));
 }
 function seal(config: ConnectorCredentialConfig, value: string, binding: ConnectorSecretBinding): string {
+  return sealServerSecret(config, value, associatedData(binding));
+}
+function open(config: ConnectorCredentialConfig, sealed: string, binding: ConnectorSecretBinding): string {
+  return openServerSecret(config, sealed, associatedData(binding));
+}
+/** AES-256-GCM with the connector key. Ticket 333 also seals Apple's refresh token with it, under its own associated data. */
+export function sealServerSecret(config: ConnectorCredentialConfig, value: string, aad: Buffer): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", config.key, iv);
-  cipher.setAAD(associatedData(binding));
+  cipher.setAAD(aad);
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   return [config.keyId, iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), ciphertext.toString("base64url")].join(".");
 }
-function open(config: ConnectorCredentialConfig, sealed: string, binding: ConnectorSecretBinding): string {
+export function openServerSecret(config: ConnectorCredentialConfig, sealed: string, aad: Buffer): string {
   try {
     const [version, iv, tag, ciphertext, extra] = sealed.split(".");
     if (!version || !iv || !tag || !ciphertext || extra !== undefined) throw new Error();
     const key = version === config.keyId ? config.key : config.decryptionKeys[version];
     if (!key) throw new Error();
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
-    decipher.setAAD(associatedData(binding)); decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    decipher.setAAD(aad); decipher.setAuthTag(Buffer.from(tag, "base64url"));
     return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8");
   } catch { throw new ConnectorError("reconnect_required"); }
 }

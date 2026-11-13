@@ -1990,6 +1990,21 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      apple_sign_in_keep_token: {
+        Args: {
+          apple_subject_digest: string
+          owner_id: string
+          token_ciphertext: string
+        }
+        Returns: undefined
+      }
+      apple_sign_in_read_tokens: {
+        Args: { owner_id: string }
+        Returns: {
+          sealed_refresh_token: string
+          subject_digest: string
+        }[]
+      }
       apply_account_sync_plan: { Args: { sync_payload: Json }; Returns: Json }
       apply_behaviorlog_import: {
         Args: { import_payload: Json }

@@ -131,7 +131,8 @@ describe("sign-in start", () => {
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "apple",
       options: {
-        redirectTo: "http://localhost:3000/auth/callback?next=%2Fbehaviors",
+        redirectTo:
+          "http://localhost:3000/auth/callback?next=%2Fbehaviors&via=apple",
       },
     });
   });
@@ -174,11 +175,10 @@ describe("sign-in start", () => {
   });
 
   it.each([
-    ["apple", "CADENCE_SIGN_IN_APPLE"],
     ["__proto__", "CADENCE_SIGN_IN_APPLE"],
     ["github", "CADENCE_SIGN_IN_APPLE"],
   ])(
-    "the method route refuses %s today, with its flag on or off",
+    "the method route refuses %s, with the Apple flag on or off",
     async (id, flag) => {
       stubConfiguredSupabase();
 

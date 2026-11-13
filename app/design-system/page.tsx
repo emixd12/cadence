@@ -1287,7 +1287,20 @@ function SignInMethodsBench() {
       methods: enabledSignInMethods({}),
     },
     {
-      label: "All methods (after Ticket 333, flags on)",
+      label: "Google and email (Apple flag off)",
+      methods: enabledSignInMethods({ CADENCE_SIGN_IN_EMAIL: "on" }),
+    },
+    {
+      label: "Google and Apple (email flag off)",
+      methods: enabledSignInMethods({ CADENCE_SIGN_IN_APPLE: "on" }),
+    },
+    {
+      label: "All methods (both flags on)",
+      methods: SIGN_IN_METHODS,
+    },
+    {
+      label: "All methods, Supabase not configured",
+      disabled: true,
       methods: SIGN_IN_METHODS,
     },
   ];

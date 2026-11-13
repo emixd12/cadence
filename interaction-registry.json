@@ -1493,7 +1493,7 @@
           "control": "Continue with Google"
         }
       ],
-      "availability": "Available when public Supabase runtime configuration is present. Google has no flag. Email (CADENCE_SIGN_IN_EMAIL, INT-AUTH-015) shows when its flag is exactly on; Apple (CADENCE_SIGN_IN_APPLE) stays hidden until Ticket 333 ships. Both flags are off in production.",
+      "availability": "Available when public Supabase runtime configuration is present. Google has no flag. Email (CADENCE_SIGN_IN_EMAIL, INT-AUTH-015) and Apple (CADENCE_SIGN_IN_APPLE, INT-AUTH-016) show when their flags are exactly on. Both flags are off in production.",
       "success_result": "Starts Supabase Google OAuth and returns the signed-in user to the sanitized next route, normally /timeline.",
       "failure_result": "Returns to /login with a factual, recoverable authentication error that names no provider. A start request for a method that is not enabled returns to /login with sign_in_method_unavailable.",
       "effects": [
@@ -9382,7 +9382,7 @@
         }
       ],
       "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion. On web the form opens from the Delete account link at the end of Settings (Ticket 301).",
-      "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation and global sign-out to clear the current browser session and redirects to the public login confirmation.",
+      "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation, Sign in with Apple token revocation for an account with an Apple identity (Ticket 333), and global sign-out to clear the current browser session and redirects to the public login confirmation.",
       "failure_result": "A validation, service-role verification, or user-deletion failure shows a specific recoverable error and preserves both account and session. A post-deletion sign-out error cannot restore the deleted account and does not block the success redirect.",
       "effects": [
         "authentication_session_end",
@@ -10766,6 +10766,88 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Mobile web uses the same form; native mobile remains unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-AUTH-016",
+      "name": "Sign in or create an account with Apple",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#sign-in-with-google"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "login"
+      ],
+      "routes": [
+        "/login",
+        "/auth/sign-in/apple",
+        "/auth/callback"
+      ],
+      "journeys": [
+        "J03",
+        "J20"
+      ],
+      "intent": "Sign in, or create an account, with an Apple Account through Supabase Auth's Apple provider on the web (Ticket 333, D31.2).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Continue with Apple"
+        }
+      ],
+      "availability": "Only when CADENCE_SIGN_IN_APPLE is exactly on and public Supabase runtime configuration is present. Off in production until the Apple provider is set up and Ticket 337 passes for Apple.",
+      "success_result": "Apple's page signs the person in and Supabase Auth returns to /auth/callback, which signs in and returns to the sanitized next route. A new Apple Account creates an account; one whose shared, verified email matches an existing account reaches that account. A Hide My Email address creates a separate account (Ticket 334 owns the link-a-method path). The callback keeps Apple's refresh token sealed for revocation on account deletion; a failure to keep it never blocks the sign-in.",
+      "failure_result": "Returns to /login with a factual error. When Apple shares no email address, the message says how to share one; every other failure uses the generic sign-in error that names no provider.",
+      "effects": [
+        "external_navigation",
+        "authentication_session",
+        "navigation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "app/(auth)/login/SignInMethods.tsx",
+        "app/auth/sign-in/[method]/route.ts#GET",
+        "app/auth/callback/route.ts#GET",
+        "lib/services/apple-sign-in.service.ts#keepAppleRefreshToken"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/apple-sign-in.local-integration.test.ts",
+          "tests/sign-in-methods.test.ts"
+        ],
+        "notes": "The local-integration test runs a web server against local Supabase behind a stub that plays Apple's part of the code exchange: a new and a returning Apple user, a Hide My Email address, a missing email, a forged via=apple on another provider's sign-in, and revocation against a stub Apple endpoint. Apple's own page and Supabase Auth's Apple provider are checked on production under Ticket 337."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "app/(auth)/login/SignInMethods.tsx",
+            "app/auth/callback/route.ts#GET"
+          ],
+          "evidence": [
+            "tests/apple-sign-in.local-integration.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Ticket 336 adds Apple through the system browser in the Mac account panel."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; P-051 covers sign-in copy."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Mobile web uses the same button; a native app needs native Sign in with Apple under its own ticket (L-024)."
         }
       }
     },

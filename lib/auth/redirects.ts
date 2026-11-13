@@ -93,6 +93,11 @@ export function getAuthErrorMessage(value: RedirectParam) {
     return "The sign-in could not be verified. Try signing in again.";
   }
 
+  // Ticket 333: the one error that names a provider, because the fix is in Apple's settings.
+  if (error === "apple_email_missing") {
+    return "Apple did not share an email address, and Cadence needs one. In your Apple Account settings, stop using Sign in with Apple for Cadence, then try again and share an email.";
+  }
+
   if (error === "sign_in_method_unavailable") {
     return "That sign-in method is not available. Choose another.";
   }
