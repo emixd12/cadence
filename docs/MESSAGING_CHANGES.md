@@ -1698,3 +1698,21 @@ cite has not changed.
   links, that reminders follow the address, and the relay `DELETE` case.
 - **Related:** P-051, P-052.
 - **Status:** logged.
+
+## P-055: Email sign-in sends the person's IP address to Supabase and Cloudflare from Cadence's server
+
+- **Change:** implemented November 13, 2026 (Ticket 338), inactive until the hosted steps in
+  `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When a person asks for a
+  sign-in email or enters a code, Cadence's server sends that person's IP address to
+  Supabase Auth (header `Sb-Forwarded-For`) so Supabase's abuse limits count per person,
+  and to Cloudflare Turnstile's server check. Before, Supabase saw only Cadence's server
+  address for these steps and Cloudflare saw the address only from the browser widget.
+- **Affected:** Ticket 338. Files: `lib/auth/auth-forwarding.ts`,
+  `lib/auth/email-sign-in-server.ts`.
+- **Surfaces:** Privacy (what Supabase and Cloudflare receive during sign-in), Trust if it
+  lists what each provider receives.
+- **Conflicting current text:** none known; Privacy does not yet name Turnstile (P-052).
+- **Update needed:** say that Supabase and Cloudflare receive the IP address during email
+  sign-in, to limit abuse.
+- **Related:** P-052.
+- **Status:** logged.

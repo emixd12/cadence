@@ -49,7 +49,8 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 merged (PR #270); Mac 0.1.11 prepared (PR #276), not published (0.1.10 is current). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
-| Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Reminder email sender reads "Identity Scaffolding" (since June; the address is `hello@cadence-me.com` since November 13): rename Sequenzy sender profile `oqf1lrv9mmvxjkj8admg39cv` to "Cadence" (owner or approved agent). (2) Reply-To `login@cadence-me.com` has no MX, so replies to sign-in and reminder email bounce: owner chooses a mailbox or forwarding. (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history (`account-sync.resolver.ts:821`; proposed workspace). (8) After a refused CAPTCHA the email form clears the typed address. (9) Server-side Auth calls carry Vercel's IP, so Supabase's per-IP OTP and verify limits may be shared by all users (not verified). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production | `docs/qa/2026-11-13-sign-in-final-verification.md` |
+| Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Reminder email sender reads "Identity Scaffolding" (since June; the address is `hello@cadence-me.com` since November 13): rename Sequenzy sender profile `oqf1lrv9mmvxjkj8admg39cv` to "Cadence" (owner or approved agent). (2) Reply-To `login@cadence-me.com` has no MX, so replies to sign-in and reminder email bounce: owner chooses a mailbox or forwarding. (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history (`account-sync.resolver.ts:821`; proposed workspace). (8) After a refused CAPTCHA the email form clears the typed address. (9) Shared per-IP OTP and verify limits: confirmed, fixed inactive under Ticket 338 (next row). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production | `docs/qa/2026-11-13-sign-in-final-verification.md` |
+| Ticket 338: email sign-in limits per person | Shared limit confirmed (local copy of hosted limits; Vercel called out from 2 addresses on a test deployment). Fix on branch `claude/sign-in-email-rate-limit`, draft PR; inactive until hosted steps | Verifier runs `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D: Auth `security_sb_forwarded_for_enabled` on, then Vercel `CADENCE_TURNSTILE_SECRET_KEY` and `SUPABASE_SECRET_KEY` (owner approval for both credentials), redeploy, acceptance | TICKETS, Ticket 338 |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | Current secret made November 13, 2026, 18:58Z; **expires May 12, 2027**; **rotate by April 12, 2027**. Held by the Supabase Apple provider and Vercel Production `APPLE_SIGN_IN_CLIENT_SECRET` | Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)" (owner approves the key read); the same section covers a missed rotation. Update this row with the new dates | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -93,6 +94,24 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 338: email sign-in limits shared by everyone, fixed inactive — November 13, 2026
+
+- **Measured.** Supabase Auth limits `/otp` and `/verify` per IP address; Cadence calls both
+  from its server. On a loopback copy of hosted limits, 31 wrong codes from one address
+  made another address's right code fail (`over_request_rate_limit`), and 29 email requests
+  from one address refused the next person on the web form and the Mac's page. A test
+  deployment called out from 2 addresses in 20 calls. Hosted Auth logs are not readable
+  through the API. Hosted CAPTCHA is skipped for a secret key (3 harmless probes).
+- **Fix (branch `claude/sign-in-email-rate-limit`).** With `SUPABASE_SECRET_KEY` and
+  `CADENCE_TURNSTILE_SECRET_KEY` set, Cadence runs the Turnstile check itself and sends the
+  person's address in `Sb-Forwarded-For` for the email request, code and link checks and
+  the Mac's email page. Unset: unchanged. After the fix the second person signs in and the
+  first stays limited; no token, no email.
+- **Hosted: nothing changed.** Change list for a verifier:
+  `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D.
+
+Platform impact: web and the Mac's email page (Ticket 338). Messaging impact: P-055.
+
 ## Sign-in options: final production check — November 13, 2026
 
 - **Read back, 22:00–22:20Z, read-only.** Vercel Production flags `CADENCE_SIGN_IN_EMAIL`,
@@ -124,6 +143,7 @@ the Reply-To without a mailbox).
 - **Apple setup:** client secret expires May 12, 2027 (rotate by April 12, 2027; Open work
   row). Record: `docs/qa/2026-11-13-ticket-333-production-acceptance.md`.
 - **Messaging:** P-051 notes that Privacy, Terms and the user guide still name Google only.
+
 ## Ticket 332: email sign-in live in production — November 13, 2026
 
 - **Live.** `CADENCE_SIGN_IN_EMAIL` is `on` in Production since 21:35Z; `/login` offers
@@ -238,171 +258,3 @@ Messaging impact: P-051 (existing).
 
 Platform impact: web Auth config and test login; Mac follow-up Ticket 336; marketing not
 applicable; mobile web shares the form. Messaging impact: none new (P-052).
-
-## Ticket 334: sign-in methods in Settings, behind its flag — November 13, 2026
-
-- **Built.** Settings, Account and data, has a Sign-in methods row behind
-  `CADENCE_SIGN_IN_LINKING`: it lists Google, Apple and the email address; **Add Google**
-  and **Add Apple** use Supabase manual identity linking; **Change address** (or **Add
-  email**) moves email sign-in to a new address after a confirmation link, with no
-  password; **Remove** unlinks Google or Apple while another enabled way in remains. The
-  server refuses the last way in and email removal, not only the UI. A Google or Apple
-  account or address that belongs to another account is refused without naming it. Login
-  shows a one-account hint while the flag is on. Delete account asks for `DELETE` with no
-  address or an Apple relay address.
-- **Seam for Ticket 335.** `startAddSignInMethod` in `lib/services/sign-in-methods.service.ts`.
-- **Verifier fixes (November 13).** Two removals at once left an account with no identity
-  (10 of 10). Migration `20261113190000_keep_one_auth_identity.sql` adds a trigger that locks
-  the user row and refuses deleting the last identity; account deletion, the test login and
-  email sign-up still pass. Add, Remove and Change address now need a sign-in within 15
-  minutes (coordinator decision, recorded as an assumption). A taken address gets the same
-  answer as a usable one.
-- **After Ticket 333 merged.** Rebased on `2482fcb1`. Removing Apple revokes its kept token
-  at Apple and forgets the row (migration `20261113200000`); a refused or unconfigured
-  revocation never blocks the removal. An Apple account added from Settings keeps its token
-  too. Ticket 333's suite 9 of 9 with the two new cases; Ticket 334's 10 of 10; Ticket
-  332's 9 of 9.
-- **Verified locally.** `tests/sign-in-methods.local-integration.test.ts`: 10 of 10 (6 at first) against a
-  running server, Mailpit and manual linking on; the same flow by clicks in Chrome at
-  1280 and 390 px, which found and fixed a disabled field dropped from the form
-  (`docs/qa/2026-11-13-ticket-334-sign-in-methods.md`).
-- **Hosted, 18:48Z.** The verifier pushed `20261113190000` (trigger
-  `keep_one_auth_identity`) and `20261113200000` (`apple_sign_in_forget_token`,
-  `service_role` only) and read both back (hosted change list, "Applied"). Verifier
-  re-check: 20 of 20 concurrent removal trials through Cadence and 20 of 20 against
-  Supabase's unlink endpoint kept one identity. Hosted manual linking stays off and
-  `CADENCE_SIGN_IN_LINKING` stays unset; the remaining steps are in
-  `docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`. Local `enable_manual_linking`
-  is on.
-
-Platform impact: web Settings, routes and login hint; Mac shows no row (Ticket 336);
-marketing not applicable; mobile web checked at 390 px. Messaging impact: P-054.
-
-## Ticket 333: Apple sign-in built behind its flag — November 13, 2026
-
-- **Built.** Continue with Apple starts Supabase Auth's Apple provider and returns
-  through `/auth/callback?…&via=apple`. Apple's black custom button on Login (L-024 lists
-  the rules relied on); the method list now has an 8 px gap and email is a secondary
-  action (the Ticket 331 verifier's design note).
-- **Revocation.** Supabase hands Apple's refresh token to the callback once and keeps
-  none, so the callback seals it with the connector key (migration
-  `20261113180000_apple_sign_in_tokens.sql`, service role only). Account deletion reads it
-  first and revokes at Apple after deleting the Auth user; a failure is reported, never a
-  retry. L-025 records the remaining gaps.
-- **Apple's cases.** A missing email gets its own message. A Hide My Email address makes
-  a separate, empty account and shows the relay address in Settings (Ticket 334 owns
-  linking). The name, sent only on the first sign-in, stays in the profile.
-- **Verified locally.** `tests/apple-sign-in.local-integration.test.ts`: 7 of 7 against a
-  running server, local Supabase and a stub that plays Apple
-  (`scripts/apple-sign-in-stub.mjs`). Headless Chrome at 1280 and 390 px. A real-browser
-  bug was fixed: the button's title rendered black on black.
-- **Not done.** Nothing hosted changed. The Apple Developer setup, the provider, relay
-  registration and the production check wait on owner rows 4 and 5:
-  `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`. Rotation runbook and recovery:
-  `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)".
-
-Platform impact: web login, callback, deletion and one migration; Mac follow-up Ticket 336;
-marketing not applicable; mobile web shares the button, checked at 390 px. Messaging
-impact: P-051, P-053.
-
-## Ticket 332: email sign-in built behind its flag — November 13, 2026
-
-- **Built.** Continue with email opens `/login/email`. One email carries a link and a
-  6-digit code; either signs in, and a new address creates the account. The link opens
-  `/login/confirm`, whose button verifies on Cadence's own domain, so it works in another
-  browser and a mail scanner cannot use it up. Wrong, used and expired links and codes,
-  and a second request inside 60 s, each show a plain message with a way forward. Optional
-  Cloudflare Turnstile (`CADENCE_TURNSTILE_SITE_KEY`).
-- **No passwords.** Hosted Auth has no switch for that. Migration
-  `20261113160000_refuse_auth_passwords.sql` drops any new password for a real address,
-  including the random one Auth sets on a code sign-up. Reserved test addresses keep
-  theirs, so the test login still works.
-- **Local parity.** `supabase/config.toml` now has confirmation on, 60 s between emails,
-  TOTP on and the sign-in template, as hosted. Code length stays 6 locally; hosted sends 8.
-  The owner decides (one setting: `EMAIL_SIGN_IN_CODE_LENGTH`).
-- **Verified.** `db reset` replayed every migration. `tests/email-sign-in.local-integration.test.ts`:
-  9 of 9 passed against a running server and the local inbox
-  (`docs/qa/2026-11-13-ticket-332-email-sign-in.md`). CAPTCHA measured locally: code
-  requests, sign-up and password sign-in need a token; verify, refresh and Google do not.
-- **Verified and applied (November 13, verifier).** A login CSRF on `/auth/confirm` was
-  found and fixed (cross-site posts get 403; the confirm page uses `strict-origin`).
-  Hosted steps 1–4 applied: 0 real addresses had a password (4 test ones); migration
-  `20261113160000` pushed and read back; both sign-in templates set. Steps 5–9 wait on the
-  owner. Evidence: both QA records named above.
-
-Platform impact: web form, routes and Auth config; Mac follow-up Ticket 336 (code entry;
-CAPTCHA effect recorded); marketing not applicable; mobile web shares the form, checked at
-390 px. Messaging impact: P-051, P-052.
-
-## Ticket 330: Complete from Hevy on a linked Mac — November 13, 2026
-
-- **Built:** a linked Mac shows Complete from Hevy in Behavior settings and Create behavior,
-  reading and saving through the hosted link route over the authenticated broker. A save
-  syncs first (so a Behavior made on the Mac exists on the account) and again after.
-- **Installed acceptance passed** on the test Mac (0.1.11-dev.2, account A): a settings save
-  and a create-time link both reached hosted and synced back to SQLite. Local mode on the
-  owner's Mac (0.1.11-dev.1) shows no control. Both Macs run dev builds until the next release.
-
-Platform impact: Mac; web unchanged. Messaging impact: P-050.
-
-## Ticket 331: login page and routes for more than one sign-in method — November 13, 2026
-
-- **Built.** `lib/auth/sign-in-methods.ts` lists Google, Apple and email. Login renders the
-  enabled ones; `lib/auth/sign-in-start.ts` starts them from `/auth/google` and the new
-  `/auth/sign-in/[method]`. Sign-in errors name no provider.
-- **Flags.** `CADENCE_SIGN_IN_APPLE` and `CADENCE_SIGN_IN_EMAIL`, on only when exactly `on`.
-  Both are unset everywhere. A flag shows nothing until Ticket 333 or 332 gives the method
-  its start.
-- **Unchanged.** With the flags off, the Login HTML equals `origin/main` `07ce9a03` in five
-  states, apart from the two reworded errors. Test login and MCP consent sign-in untouched.
-- **Verified.** On a local stack next to `origin/main`: same Login HTML, Google start
-  URL, test login and MCP consent return. `dagger check --cadence`: 10 passed.
-- **Fixed in review.** `normalizeRedirectPath` refuses `/.//host` and `/\host`. Before,
-  `/login?next=/.//host` sent a signed-in person to another site.
-
-Platform impact: web login and auth routes; Mac not applicable (Ticket 336); marketing not
-applicable; mobile web shares the page, bench checked at 390 px. Messaging impact: P-051.
-
-## Tickets 331–337 filed: sign-in by email and Apple (D31) — November 13, 2026
-
-- **Decision D31.** Supabase Auth stays; WorkOS is not adopted. Email sign-in uses a link
-  or a 6-digit code, with no password. Apple sign-in uses the web flow. Every method
-  reaches the same account. ChatGPT sign-in is dropped; the D27 deferral stands.
-  Connecting Google Calendar adds that Google account as a sign-in method.
-- **Tickets.** 331 login page and routes, 332 email, 333 Apple, 334 Settings and the
-  one-account rule, 335 Google Calendar, 336 Mac, 337 acceptance. All `not_started`.
-  Ticket 330 is the Mac Hevy link (draft PR #261).
-- **Not verified.** The WorkOS, Supabase, Apple and OpenAI provider facts were not
-  rechecked for the entry; the hosted Auth email settings and custom SMTP on the hosted
-  plan are unread. L-024 and L-025 hold Apple's rules, from memory.
-- **Not changed.** No code and no public copy. P-051 lists the text that names Google
-  sign-in.
-
-Platform impact: documentation only; web Tickets 331–335, Mac Ticket 336, marketing none,
-mobile web shares the login page. Messaging impact: P-051.
-
-## Ticket 329: Complete from Hevy at Behavior creation — November 13, 2026
-
-- **Built:** Create behavior on the web shows the Complete from Hevy choices when the flag is
-  on and Hevy is connected. Save behavior creates the Behavior, then saves the link through
-  the existing route; a refused or failed link keeps the Behavior and says so. The link
-  route's form state accepts an empty `behaviorId` for a Behavior being created.
-- **Owner request:** the link could only be set on an existing Behavior.
-
-Platform impact: web form; Mac follow-up (links are web-only); marketing not applicable;
-mobile web shares the form. Messaging impact: P-049.
-
-## Ticket 328: launch audience research — November 13, 2026
-
-- **Report.** `docs/research/2026-11-13-launch-audience-research.md`: desk research on one
-  day. Sources are one survey of 5,067 U.S. adults read in full, ten competitor home pages
-  and one distribution guide.
-- **Recommendation.** Beta audience: professionals who already use AI agents, with parents
-  in professional jobs and Hevy trainers as variants. Self-improvement practitioners after
-  the iPhone app. No separate executive campaign.
-- **Finding to act on.** Habitify, Todoist and Divitica already offer MCP access, so AI
-  access alone does not set Cadence apart.
-- **Open.** The owner's decision; ten interviews; newsletters, creators and press were not
-  researched.
-
-Platform impact: documentation only. Messaging impact: none.
