@@ -98,7 +98,7 @@ Check the cited entry before acting on a row.
   for it (DKIM `sq1`/`sq2`, return path `rp`/`rp2`, DMARC `p=none`, root SPF). Hosted Auth
   code length 8 → 6. Each change and its recheck: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
 - **Accepted on production Supabase.** New account, link in another browser, 6-digit code,
-  wrong, used and expired values, resend limit, A's Google address reaching A's account,
+  wrong, used and expired values, the one-email-a-minute limit, A's Google address reaching A's account,
   SPF/DKIM/DMARC pass, MCP consent and account deletion for an email-only account
   (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`). Test accounts deleted.
 - **Not on.** `CADENCE_SIGN_IN_EMAIL` stays off and hosted SMTP and CAPTCHA are off. The
