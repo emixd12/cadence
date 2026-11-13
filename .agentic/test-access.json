@@ -77,6 +77,10 @@
     {
       "id": "hosted-migrations",
       "summary": "Hosted Supabase migration list and pushes that docs/DECISIONS.md, 2026-11-10, approves in advance."
+    },
+    {
+      "id": "sign-in",
+      "summary": "Ticket 337: email, Apple and linked sign-in methods on production web and the installed Mac, with hosted Auth settings."
     }
   ],
   "requirements": [
@@ -92,7 +96,8 @@
         "calendar-fixtures",
         "web-travel",
         "connectors",
-        "desktop-test-mac"
+        "desktop-test-mac",
+        "sign-in"
       ],
       "probe": {
         "argv": [
@@ -325,7 +330,8 @@
       "suites": [
         "calendar-fixtures",
         "web-travel",
-        "mcp-web"
+        "mcp-web",
+        "sign-in"
       ],
       "probe": {
         "argv": [
@@ -353,7 +359,8 @@
       "identity": "account-a",
       "suites": [
         "calendar-fixtures",
-        "web-travel"
+        "web-travel",
+        "sign-in"
       ],
       "depends_on": [
         "vault-google-a",
@@ -398,7 +405,8 @@
       "summary": "Test account B signed in to Google in the Cadence QA Chrome profile.",
       "identity": "account-b",
       "suites": [
-        "calendar-fixtures-b"
+        "calendar-fixtures-b",
+        "sign-in"
       ],
       "depends_on": [
         "vault-google-b",
@@ -542,7 +550,8 @@
         "mcp-clients",
         "mcp-web",
         "web-travel",
-        "connectors"
+        "connectors",
+        "sign-in"
       ],
       "depends_on": [
         "google-browser-a",
@@ -582,7 +591,8 @@
       "suites": [
         "mcp-protocol",
         "mcp-clients",
-        "mcp-web"
+        "mcp-web",
+        "sign-in"
       ],
       "depends_on": [
         "google-browser-b",
@@ -1509,7 +1519,8 @@
       "summary": "AgentMail API key name set in .env.local for the QA test inbox.",
       "identity": "owner-mac",
       "suites": [
-        "email"
+        "email",
+        "sign-in"
       ],
       "probe": {
         "argv": [
@@ -1551,7 +1562,8 @@
       "kind": "vault-item",
       "summary": "Supabase personal access token for agent hosted-migration work, Cadence Agents item supabase-access-token (field credential). Account-wide: Supabase tokens cannot be limited to one project.",
       "suites": [
-        "hosted-migrations"
+        "hosted-migrations",
+        "sign-in"
       ],
       "depends_on": [
         "op-service-token"
@@ -1568,6 +1580,221 @@
       },
       "owner_step": "Add the supabase-access-token item (field credential) with a Supabase personal access token to the Cadence Agents vault; revoke and replace it in the Supabase dashboard when it expires.",
       "freshness_seconds": 86400
+    },
+    {
+      "id": "auth-email-recipient",
+      "kind": "owner-approval",
+      "summary": "Owner approval for Supabase sign-in email to reach the AgentMail test inbox on production (Owner blockers row 6, recorded in docs/DECISIONS.md under D31).",
+      "suites": [
+        "sign-in"
+      ],
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/record.mjs",
+          "decision",
+          "--file",
+          "docs/DECISIONS.md",
+          "--contains",
+          "sign-in email may go to the AgentMail test inbox on production"
+        ]
+      },
+      "owner_step": "Approve Supabase sign-in email reaching the AgentMail test inbox on production.",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "vault-sequenzy-smtp-key",
+      "kind": "vault-item",
+      "summary": "Sequenzy transactional key for hosted Supabase SMTP, Cadence Agents item sequenzy-supabase-smtp-key (field credential), from the Identity Scaffolding company.",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "op-service-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/vault.mjs",
+          "--item",
+          "sequenzy-supabase-smtp-key"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "In Sequenzy company Identity Scaffolding, create a transactional_sender key and save it in the Cadence Agents item sequenzy-supabase-smtp-key (field credential).",
+      "freshness_seconds": 86400
+    },
+    {
+      "id": "auth-email-provider",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: email provider on.",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "email-provider"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "auth-email-provider"
+        ],
+        "timeout_seconds": 30
+      },
+      "freshness_seconds": 900
+    },
+    {
+      "id": "auth-smtp-host",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: custom SMTP host set (Sequenzy), so sign-in email reaches people outside the Supabase team.",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token",
+        "vault-sequenzy-smtp-key"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "smtp-host"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Provide the Sequenzy SMTP key from the Identity Scaffolding company (Owner blockers row 11); agents then set hosted SMTP.",
+      "freshness_seconds": 900
+    },
+    {
+      "id": "auth-captcha",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: CAPTCHA on (Cloudflare Turnstile).",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "captcha"
+        ],
+        "timeout_seconds": 90
+      },
+      "owner_step": "Let agents create a Turnstile widget: add Account Turnstile Edit to cloudflare-api-token, or save turnstile-secret-key (Owner blockers row 13); agents then turn CAPTCHA on.",
+      "freshness_seconds": 900
+    },
+    {
+      "id": "auth-apple-provider",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: Apple provider on (Ticket 333).",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "apple"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "auth-apple-provider"
+        ],
+        "timeout_seconds": 30
+      },
+      "freshness_seconds": 900
+    },
+    {
+      "id": "auth-manual-linking",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: manual identity linking on (Ticket 334 step 4).",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "manual-linking"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "auth-manual-linking"
+        ],
+        "timeout_seconds": 30
+      },
+      "freshness_seconds": 900
+    },
+    {
+      "id": "auth-secure-email-change",
+      "kind": "provider-config",
+      "summary": "Hosted Supabase Auth: secure email change on (Ticket 334 step 3).",
+      "suites": [
+        "sign-in"
+      ],
+      "depends_on": [
+        "vault-supabase-access-token"
+      ],
+      "probe_requires_dependencies": true,
+      "probe": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/auth-config.mjs",
+          "--setting",
+          "secure-email-change"
+        ],
+        "timeout_seconds": 90
+      },
+      "renew": {
+        "argv": [
+          "node",
+          "scripts/acceptance/access/agent-step.mjs",
+          "--step",
+          "auth-secure-email-change"
+        ],
+        "timeout_seconds": 30
+      },
+      "freshness_seconds": 900
     }
   ]
 }

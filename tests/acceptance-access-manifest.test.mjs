@@ -22,7 +22,7 @@ describe('Cadence test-access manifest', () => {
     expect(model.project).toBe('cadence');
     expect([...model.suites.keys()]).toEqual([
       'mcp-local', 'mcp-protocol', 'mcp-clients', 'mcp-web', 'calendar-fixtures', 'calendar-fixtures-b', 'web-travel',
-      'connectors', 'desktop-owner-mac', 'desktop-test-mac', 'desktop-release', 'email', 'hosted-migrations',
+      'connectors', 'desktop-owner-mac', 'desktop-test-mac', 'desktop-release', 'email', 'hosted-migrations', 'sign-in',
     ]);
   });
 
@@ -62,7 +62,7 @@ describe('Cadence test-access manifest', () => {
 
   it('every probe that looks for text in a repo file finds it today, so a doc edit fails here instead of asking the owner', () => {
     const textProbes = model.requirements.filter((requirement) => requirement.probe.argv.includes('--contains'));
-    expect(textProbes.map((requirement) => requirement.id)).toEqual(['email-test-recipient']);
+    expect(textProbes.map((requirement) => requirement.id)).toEqual(['email-test-recipient', 'auth-email-recipient']);
     for (const requirement of textProbes) {
       const argv = requirement.probe.argv;
       const file = argv[argv.indexOf('--file') + 1];

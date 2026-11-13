@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { main as agentStep } from '../scripts/acceptance/access/agent-step.mjs';
+import { main as authConfig } from '../scripts/acceptance/access/auth-config.mjs';
 import { classifyPermission, cookieUserId, main as browser } from '../scripts/acceptance/access/browser.mjs';
 import { main as cadenceSession } from '../scripts/acceptance/access/cadence-session.mjs';
 import { classifyConsent, main as calendar } from '../scripts/acceptance/access/calendar.mjs';
@@ -277,6 +278,44 @@ describe('connection.mjs', () => {
       sessions: fakeSessions(), fetchImpl: answer(409, { error: 'reconnect_required' }), out: rejected.out, env: { CONNECTOR_HEVY_API_KEY: FAKE_VALUE },
     })).toBe(3);
     expect(rejected.lines).toEqual(['{"state":"rejected"}']);
+  });
+});
+
+describe('auth-config.mjs', () => {
+  const config = {
+    external_email_enabled: true, smtp_host: `smtp.${FAKE_VALUE}.example`, smtp_pass: FAKE_VALUE, security_captcha_enabled: false,
+    external_apple_enabled: true, external_apple_secret: FAKE_VALUE, security_manual_linking_enabled: false, mailer_secure_email_change_enabled: true,
+  };
+
+  it('the agent-secret child reads hosted Auth once and prints booleans only', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => config }));
+    const io = capture();
+    expect(await authConfig(['--from-env'], { fetchImpl, out: io.out, env: { SUPABASE_ACCESS_TOKEN: FAKE_VALUE } })).toBe(0);
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.supabase.com/v1/projects/qjodzutjxtmtzczbloxa/config/auth');
+    expectNoSecret(io.lines);
+    expect(io.last().settings).toEqual({
+      'email-provider': true, 'smtp-host': true, captcha: false, apple: true, 'manual-linking': false, 'secure-email-change': true,
+    });
+    const refused = capture();
+    expect(await authConfig(['--from-env'], { fetchImpl: vi.fn(async () => ({ ok: false, status: 401 })), out: refused.out, env: { SUPABASE_ACCESS_TOKEN: FAKE_VALUE } })).toBe(3);
+    expect(refused.lines).toEqual(['{"state":"http-401"}']);
+    expect(await authConfig(['--from-env'], { fetchImpl, out: () => {}, env: {} })).toBe(3);
+  });
+
+  it('maps one setting to present, missing or error through agent-secret', async () => {
+    const settings = '{"settings":{"email-provider":true,"smtp-host":false,"captcha":false,"apple":true,"manual-linking":false,"secure-email-change":true}}';
+    const run = proc(0, settings);
+    expect(await authConfig(['--setting', 'apple'], { run, out: () => {} })).toBe(0);
+    const args = run.mock.calls[0][1];
+    expect(args).toContain('SUPABASE_ACCESS_TOKEN=supabase-access-token');
+    expect(args.at(-1)).toBe('--from-env');
+    const off = capture();
+    expect(await authConfig(['--setting', 'manual-linking'], { run, out: off.out })).toBe(21);
+    expect(off.last()).toEqual({ detail: 'manual-linking off', stop: 'setting-off' });
+    expect(await authConfig(['--setting', 'captcha'], { run: proc(3, '{"state":"http-401"}'), out: () => {} })).toBe(1);
+    expect(await authConfig(['--setting', 'captcha'], { run: proc(5), out: () => {} })).toBe(1);
+    expect(await authConfig(['--setting', 'smtp_pass'], { run, out: () => {} })).toBe(2);
+    expect(await authConfig([], { run, out: () => {} })).toBe(2);
   });
 });
 

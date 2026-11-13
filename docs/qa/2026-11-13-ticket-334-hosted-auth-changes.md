@@ -1,6 +1,6 @@
 # Ticket 334: hosted and provider changes for sign-in methods
 
-Written November 13, 2026, for Ticket 334 (D31.3). **Nothing here has been applied.** Steps 2 and 3 come before manual linking (step 4).
+Written November 13, 2026, for Ticket 334 (D31.3). Steps 1–4 are applied (see Applied). Steps 2 and 3 came before manual linking (step 4).
 The Ticket 334 agent changed no hosted setting, provider or Vercel variable. Agents
 apply the steps in order under the coordinator's ruling of November 13, 07:35Z (owner
 blockers row 1, which names "manual identity linking on"): record each before and
@@ -18,11 +18,11 @@ Project `qjodzutjxtmtzczbloxa`. Read and write with the Management API
 
 | # | Change | Before | After | Rollback | State |
 |---|---|---|---|---|---|
-| 1 | Read-only: `security_manual_linking_enabled`, `mailer_secure_email_change_enabled`, `mailer_subjects_email_change`, `mailer_templates_email_change_content`, `uri_allow_list` | Manual linking `false` (16:12Z read); the other four not recorded | Values recorded here | None needed | **Ready** |
+| 1 | Read-only: `security_manual_linking_enabled`, `mailer_secure_email_change_enabled`, `mailer_subjects_email_change`, `mailer_templates_email_change_content`, `uri_allow_list` | Manual linking `false` (16:12Z read); the other four not recorded | Values recorded here | None needed | **Done 20:26:31Z** (Ticket 337 agent; see Applied) |
 | 2 | Push migration `20261113190000_keep_one_auth_identity.sql`: trigger `keep_one_auth_identity` on `auth.identities` locks the user row and refuses deleting the last identity | No trigger | Trigger present and enabled; function owner `postgres`, not security definer, EXECUTE `postgres` only (read back as in Ticket 332 step 2) | A new migration: `drop trigger keep_one_auth_identity on auth.identities; drop function cadence_private.keep_one_auth_identity();` | **Done 18:48:40Z** (verifier, before the merge; see Applied). Before step 4, so the race is closed before linking exists. Authority: owner blockers row 1 (it changes what Auth may delete), not the additive approval alone. Read the Local Supabase rehearsal result first. After it: Google sign-in and the test login on production; a throwaway account's deletion |
 | 2b | Push migration `20261113200000_apple_sign_in_forget_token.sql`: function `apple_sign_in_forget_token`, `service_role` only | No function | Function present; EXECUTE `service_role` and `postgres` only (read back) | A new migration: `drop function public.apple_sign_in_forget_token(uuid, text);` | **Done 18:48:40Z** (verifier, with step 2; see Applied), after Ticket 333's `20261113180000` (pushed 18:20Z). Authority: owner's yes, November 13, 18:18Z, for `service_role` grants on the Apple token functions. Needed before Apple can be removed on production |
-| 3 | Secure address change `mailer_secure_email_change_enabled` | Not recorded (step 1 reads it) | `true` | `PATCH` back to the step 1 value | **Ready after step 1.** If step 1 reads `true`, record "no change". With it on, an address change needs the link sent to the current address too, so a session alone cannot move sign-in to another inbox. Before step 4 |
-| 4 | Turn on manual identity linking: `security_manual_linking_enabled` | `false` | `true` | `PATCH` back to `false`. Identities already linked stay and keep signing in | **Ready after steps 2 and 3** (owner blockers row 1). Effect with the flag off: none in Cadence's UI. Any signed-in person could call Supabase's `/user/identities/authorize` directly with their own session; Supabase still refuses an identity that belongs to another user, so no account merge is possible, and Cadence's 15-minute recent sign-in rule does not cover direct calls. After it: Google sign-in on production |
+| 3 | Secure address change `mailer_secure_email_change_enabled` | Not recorded (step 1 reads it) | `true` | `PATCH` back to the step 1 value | **No change, 20:26:31Z:** step 1 read `true`. If step 1 reads `true`, record "no change". With it on, an address change needs the link sent to the current address too, so a session alone cannot move sign-in to another inbox. Before step 4 |
+| 4 | Turn on manual identity linking: `security_manual_linking_enabled` | `false` | `true` | `PATCH` back to `false`. Identities already linked stay and keep signing in | **Done 20:26:42Z** (Ticket 337 agent; see Applied). Was: Ready after steps 2 and 3 (owner blockers row 1). Effect with the flag off: none in Cadence's UI. Any signed-in person could call Supabase's `/user/identities/authorize` directly with their own session; Supabase still refuses an identity that belongs to another user, so no account merge is possible, and Cadence's 15-minute recent sign-in rule does not cover direct calls. After it: Google sign-in on production |
 | 5 | Redirect allow list `uri_allow_list` | 47 entries, including `https://app.cadence-me.com/auth/callback` | Unchanged | None | **No change.** Linking and the address change return to `/auth/callback?next=…&link=…`, the same path Google sign-in already uses with a query |
 | 6 | Vercel Preview: `CADENCE_SIGN_IN_LINKING=on`, with `CADENCE_SIGN_IN_EMAIL=on` | Unset | `on` | Unset, redeploy | **Waiting: step 4.** For Ticket 337 on Preview. An address change on hosted Auth reaches only Supabase team addresses, 2 an hour, until Ticket 332 steps 6–7 |
 | 7 | Apple linking | Apple provider off | Apple provider on (Ticket 333's own list) | Ticket 333's rollback | **Waiting: Ticket 333** and owner blockers rows 4 and 5. No Ticket 334 setting: Add Apple shows once `CADENCE_SIGN_IN_APPLE=on` and the provider works |
@@ -44,6 +44,26 @@ Project `qjodzutjxtmtzczbloxa`. Read and write with the Management API
   only, `has_function_privilege` false for `anon` and `authenticated`, true for
   `service_role`. `auth.users` triggers unchanged. Production checks after the merge are
   in STATUS.md.
+
+- **Steps 1, 3 and 4, November 13, 2026, 20:26:31–20:26:50Z.** Applied by the Ticket 337
+  agent through the Management API (vault token `supabase-access-token`), under owner
+  blockers row 1. Run folder `.intent/acceptance/t337/` (`auth-before.json`,
+  `auth-linking-on.json`, `evidence.jsonl`, `rechecks.jsonl`).
+  - Step 1 read: `security_manual_linking_enabled` `false`;
+    `mailer_secure_email_change_enabled` `true`; `mailer_subjects_email_change`
+    "Confirm your new email address"; `mailer_templates_email_change_content` 270
+    characters, SHA-256 prefix `97e835167b950082` (Supabase's default template); 48
+    redirect entries, the non-local ones being the four in step 5 plus the Ticket 333 test
+    deployment's `/auth/callback**` entry. Also read: email provider on, Google on, Apple
+    on, SMTP host not set, CAPTCHA off. Auth users 7, none without an identity, none with
+    two Google identities; trigger `keep_one_auth_identity` enabled.
+  - Step 3: no change (already `true`).
+  - Step 4: `PATCH` `security_manual_linking_enabled: true` answered 200. The first read
+    after it still said `false`; the second said `true`. Every other value read back
+    unchanged.
+  - Recheck after step 4 (20:26:50Z): kept sessions A and B refreshed; a fresh Google sign-in
+    to `app.cadence-me.com` as A (cookies cleared first) returned to `/timeline` as A's user
+    ID; the login page still offered only Continue with Google.
 
 ## Notes
 

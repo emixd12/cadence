@@ -260,7 +260,7 @@ npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<
   2 usage or manifest error.
 - Suites: `mcp-local`, `mcp-protocol`, `mcp-clients`, `mcp-web`, `calendar-fixtures` (A),
   `calendar-fixtures-b` (B), `web-travel`, `connectors`, `desktop-owner-mac`,
-  `desktop-test-mac`, `desktop-release`, `email`.
+  `desktop-test-mac`, `desktop-release`, `email`, `hosted-migrations`, `sign-in`.
 - Vault probes call `agent:secret --check` through `scripts/acceptance/access/vault.mjs
   --item <name>`; they list names only. The manifest never carries `--env NAME=item`; the
   engine refuses it.
@@ -309,6 +309,28 @@ First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
 - After the main-checkout fallback, the next run also exited 11: ready 35, owner steps 7, waiting 5,
   error 1 (`travel-settings-a`). `sequenzy-cli` and `agentmail-key` read "name set in main
   checkout" and left the owner list.
+
+### Sign-in suite (Ticket 337)
+
+`npm run qa:preflight -- --suite sign-in` checks what the sign-in acceptance needs: the QA
+Chrome profile, A's and B's Google sessions and kept Cadence sessions, the AgentMail key, the
+owner's approval for sign-in email to the AgentMail inbox (row 6, recorded under D31), the
+vault items `supabase-access-token` and `sequenzy-supabase-smtp-key`, and six hosted Auth
+settings.
+
+- `scripts/acceptance/access/auth-config.mjs --setting <id>` reads
+  `GET /v1/projects/qjodzutjxtmtzczbloxa/config/auth` once, in a child of `agent:secret`
+  that holds `supabase-access-token`. The child prints booleans only; no host name, client
+  ID or secret leaves it. Settings: `email-provider`, `smtp-host`, `captcha`, `apple`,
+  `manual-linking`, `secure-email-change`. On is present (0); off is missing (21).
+- Off settings that agents apply under Owner blockers row 1 (email provider, Apple,
+  manual linking, secure email change) renew through `agent-step.mjs`, so the preflight
+  reports an agent error, never an owner step. SMTP and CAPTCHA stay owner steps: they
+  wait on the Sequenzy key (row 11) and Turnstile access (row 13).
+- A probe reads hosted state, not the production flags. `GET /api/auth/sign-in-methods`
+  on production lists the methods whose flags are on, without a session.
+- Not in the manifest: `apple-test-account-a`. Apple refused to create a test Apple Account
+  for the owner (row 5); the owner's own Apple Account stands in, with the owner present.
 
 Not in the manifest (from the test access inventory), one reason each:
 
