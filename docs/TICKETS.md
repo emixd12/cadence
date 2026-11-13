@@ -19290,3 +19290,50 @@ Messaging impact: P-055.
 
 Verification: the two-person test before and after, Ticket 332's email test, an unaliased
 test deployment, `dagger check --cadence --progress=report`.
+
+## Ticket 339: Session refresh limits per person, and a refused refresh keeps the session
+
+Status: implemented on branch `claude/sign-in-refresh-rate-limit` (draft PR). Part 2 goes
+live on merge; part 1 is inactive in production until the hosted steps of Ticket 338 run.
+Filed November 13, 2026, from finding 11 of the sign-in follow-ups (Ticket 338 QA record,
+section F, row 6). Dependencies: Ticket 338. Decision: D31.2.
+
+Goal: one person's requests cannot sign other people out, and a refresh that Auth refuses
+for now does not end a session.
+
+Problem: `lib/supabase/proxy.ts` refreshes expired sessions from Cadence's server, so
+Supabase Auth's per-address `/token` limit (burst 30) is shared by every person. When Auth
+answered 429, auth-js removed the session and the proxy cleared the cookie and redirected
+to `/login`. Reproduced locally: 24 page loads with a made-up expired cookie, after 6
+earlier refreshes, signed out the next real person.
+
+Scope and acceptance:
+
+- Part 1: the refresh call (`/auth/v1/token?grant_type=refresh_token`) only carries the
+  secret key and `Sb-Forwarded-For` with the person's address, under the same rule as
+  Ticket 338: `SUPABASE_SECRET_KEY` and `CADENCE_TURNSTILE_SECRET_KEY` set and a valid
+  client address. Forwarding for both tickets now also requires `VERCEL=1`, the one host
+  where a client cannot set its own address.
+- Part 2: the last Auth answer during the proxy's session check decides. 400, 401, 403 or
+  404: the session has ended (as before). 429, 5xx or no answer: the proxy keeps the
+  cookie and answers 503 with `Retry-After: 5` (a small page that reloads, JSON for
+  `/api/export/*`); `/login` shows as before without writing cookies.
+- Unchanged: the refresh request without forwarding, sign-in, Sign out, account deletion,
+  the Mac's sessions and MCP.
+- Evidence: `tests/session-refresh-rate-limit.local-integration.test.ts` before and after,
+  unit tests, `docs/qa/2026-11-13-ticket-339-session-refresh-rate-limit.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/supabase/proxy.ts`, `lib/auth/auth-forwarding.ts`. |
+| Desktop | Not applicable: the Mac refreshes its session against Supabase from the person's own address and calls Cadence with a bearer token, outside the proxy. |
+| Marketing | Not applicable: the marketing site has no session. |
+| Future mobile | A phone app would refresh against Supabase directly, like the Mac. |
+
+Messaging impact: P-056.
+
+Verification: the integration test in `shared` and `separate` modes, Ticket 338's
+two-person test, unit tests, a latency comparison, `dagger check --cadence
+--progress=report`, a verifier before merge.

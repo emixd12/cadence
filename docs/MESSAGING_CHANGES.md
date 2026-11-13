@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-055` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-057` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1715,4 +1715,20 @@ cite has not changed.
 - **Update needed:** say that Supabase and Cloudflare receive the IP address during email
   sign-in, to limit abuse.
 - **Related:** P-052.
+- **Status:** logged.
+
+## P-056: Session refresh sends the person's IP address to Supabase from Cadence's server
+
+- **Change:** implemented November 13, 2026 (Ticket 339), inactive until the hosted steps
+  in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When Cadence's server renews
+  a signed-in person's web session, it sends that person's IP address to Supabase Auth
+  (header `Sb-Forwarded-For`) so Supabase's abuse limits count per person. Before, Supabase
+  saw only Cadence's server address for this step on the web.
+- **Affected:** Ticket 339. Files: `lib/supabase/proxy.ts`, `lib/auth/auth-forwarding.ts`.
+- **Surfaces:** Privacy (what Supabase receives while a person is signed in), Trust if it
+  lists what each provider receives.
+- **Conflicting current text:** none known.
+- **Update needed:** with P-055, say that Supabase receives the IP address during sign-in
+  and session renewal, to limit abuse.
+- **Related:** P-055.
 - **Status:** logged.

@@ -86,6 +86,12 @@ not classified as app-screen routes, so anonymous or invalid sessions continue
 to the route handler and receive its JSON `401` response instead of an HTML
 redirect.
 
+When Auth refuses the session refresh for now (429, a server error or no answer), the
+proxy keeps the session cookie and answers `503` with `Retry-After` instead of
+redirecting: a small page that reloads for app screens, `/`, and `/oauth/consent`, and
+JSON `{"error":"auth_unavailable"}` for `/api/export/*`. `/login` renders as usual.
+Only Auth's 400–404 answers end the session (Ticket 339).
+
 The protected app layout also verifies the Supabase user server-side before rendering the app shell. Do not rely on client-only checks for protected app screens.
 
 ## Forbidden route

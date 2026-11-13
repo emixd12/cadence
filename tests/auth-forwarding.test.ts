@@ -30,7 +30,7 @@ import { sendEmailSignIn } from "@/lib/auth/email-sign-in-server";
 
 const SECRET = "sb_secret_test-key";
 const TURNSTILE = "turnstile-secret";
-const both = { SUPABASE_SECRET_KEY: SECRET, CADENCE_TURNSTILE_SECRET_KEY: TURNSTILE };
+const both = { VERCEL: "1", SUPABASE_SECRET_KEY: SECRET, CADENCE_TURNSTILE_SECRET_KEY: TURNSTILE };
 const headers = (values: Record<string, string>) => new Headers(values);
 const forwarding: AuthForwarding = { secretKey: SECRET, turnstileSecret: TURNSTILE, clientAddress: "198.51.100.7" };
 const answer = (body: unknown, status = 200) =>
@@ -60,6 +60,12 @@ describe("authForwardingFor", () => {
     expect(authForwardingFor(withAddress, { ...both, SUPABASE_SECRET_KEY: "eyJhbGciOi.service-role" })).toBeNull();
     expect(authForwardingFor(withAddress, { ...both, CADENCE_TURNSTILE_SECRET_KEY: "  " })).toBeNull();
     expect(authForwardingFor(headers({}), both)).toBeNull();
+  });
+
+  it("is off on any host but Vercel, where a client could set its own address", () => {
+    expect(authForwardingFor(withAddress, { ...both, VERCEL: undefined })).toBeNull();
+    expect(authForwardingFor(withAddress, { ...both, VERCEL: "0" })).toBeNull();
+    expect(authForwardingFor(withAddress, { ...both, VERCEL: "true" })).toBeNull();
   });
 });
 
@@ -121,6 +127,7 @@ describe("sendEmailSignIn", () => {
   });
 
   it("with forwarding, checks Turnstile first, then asks Auth with the secret key and the address", async () => {
+    vi.stubEnv("VERCEL", "1");
     vi.stubEnv("SUPABASE_SECRET_KEY", SECRET);
     vi.stubEnv("CADENCE_TURNSTILE_SECRET_KEY", TURNSTILE);
     await sendEmailSignIn({ request, config, email: "a@example.test", captchaToken: "tok" });
@@ -138,6 +145,7 @@ describe("sendEmailSignIn", () => {
   });
 
   it("with forwarding, a missing or failed check sends nothing", async () => {
+    vi.stubEnv("VERCEL", "1");
     vi.stubEnv("SUPABASE_SECRET_KEY", SECRET);
     vi.stubEnv("CADENCE_TURNSTILE_SECRET_KEY", TURNSTILE);
     expect(await sendEmailSignIn({ request, config, email: "a@example.test", captchaToken: undefined })).toEqual({
