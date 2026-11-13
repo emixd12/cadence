@@ -1990,6 +1990,10 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      apple_sign_in_forget_token: {
+        Args: { apple_subject_digest: string; owner_id: string }
+        Returns: undefined
+      }
       apple_sign_in_keep_token: {
         Args: {
           apple_subject_digest: string

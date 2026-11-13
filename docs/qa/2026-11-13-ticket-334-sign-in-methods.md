@@ -70,7 +70,7 @@ including `20261113190000_keep_one_auth_identity.sql`.
 | Case | Result |
 |---|---|
 | Two removals sent at once for an account with two Google identities | one `removed`, one `last_method`, one identity left. With the trigger dropped: both `removed`, none left (the case fails) |
-| Google beside an Apple identity whose method is off (Supabase alone would allow it) | no Remove shown; a direct post gets `last_method`; both identities stay |
+| Google beside an identity that is not a Cadence method (GitHub; Supabase alone would allow it) | no Remove shown; a direct post gets `last_method`; both identities stay |
 | A session whose last sign-in is 20 minutes old (`auth.mfa_amr_claims` backdated, access token expired so it refreshes) posts add, change address and remove | each is signed out and sent to `/login?next=%2Fsettings%23sign-in-methods&error=reauth_required`; nothing changes |
 | The database refuses deleting the last identity directly; deleting one of two works; Admin API account deletion with two identities cascades; the test login signs in | passed |
 | An address that already has an account | `email_sent`, the same as a usable address; no email to it and no pending change |
@@ -82,10 +82,26 @@ to change how you sign in…", signed in by email code and returned to `/setting
 where **Remove Google** then worked. **Change address**, **Remove**, **Remove Google** and
 **Cancel** all compute to 12 px (before: 16 px for the first two).
 
+## Apple token on removal (after Ticket 333 merged)
+
+Rebased on `origin/main` `2482fcb1`; `db reset` replayed `20261113180000` (Ticket 333),
+`20261113190000` and `20261113200000`. Ticket 333's suite against its Apple stub
+(`scripts/apple-sign-in-stub.mjs`), with Apple, email and linking on: 9 of 9, including two
+new cases:
+- Removing Apple through `/auth/sign-in-methods/remove` on a server with no Apple client
+  secret: removed, only Google left, kept token gone (the revocation failed and did not
+  block).
+- `prepareAppleTokenForget`: a different subject finds nothing; the revoke reaches the stub
+  first with `client_id`, `client_secret`, `token` and `token_type_hint`; then the row is
+  gone. A 400 from Apple throws `provider_refused` and the row is still gone. Anonymous
+  callers cannot call `apple_sign_in_forget_token`.
+
+Chrome: signed in with Apple through the stub, opened Settings, **Remove** → **Remove Apple**:
+"Apple removed. It no longer signs in to this account.", Google left, no kept token.
+
 ## Not run here
 
 - Completing a Google or Apple link needs a real provider sign-in: Ticket 337 on Preview
   after hosted step 2.
-- Apple: no start until Ticket 333; `tests/account-sign-in-methods.test.ts` covers the Apple
-  branches (addable, removable, refused).
+- Completing a real Apple link (Apple's own pages): Ticket 337 after hosted step 4 and Ticket 333's provider steps.
 - The Mac: its Settings does not render the row (Ticket 336).

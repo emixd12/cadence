@@ -267,7 +267,12 @@ by `service_role` only: `apple_sign_in_keep_token(owner_id, apple_subject_digest
 token_ciphertext)` upserts and raises `apple_identity_required` unless the user has an
 Apple identity in `auth.identities`; `apple_sign_in_read_tokens(owner_id)` returns the
 user's rows. Account deletion reads the rows before deleting the Auth user (they cascade)
-and revokes after. Local check: `tests/apple-sign-in.local-integration.test.ts`.
+and revokes after. A third, `apple_sign_in_forget_token(owner_id, apple_subject_digest)`
+(Ticket 334, migration `20261113200000_apple_sign_in_forget_token.sql`, `service_role`
+only, owner's yes November 13, 18:18Z), deletes one row: removing Apple as a sign-in
+method reads that identity's token before the unlink, revokes it at Apple after, and
+forgets the row even when Apple refuses or is unreachable. Local check:
+`tests/apple-sign-in.local-integration.test.ts`.
 
 **At least one Auth identity per user (Ticket 334, D31.3).** Trigger `keep_one_auth_identity`
 (`before delete on auth.identities`, function `cadence_private.keep_one_auth_identity()`,

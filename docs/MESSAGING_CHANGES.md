@@ -1669,6 +1669,8 @@ cite has not changed.
   relay address types `DELETE` to delete the account. Login says that another way can
   start a second account. Changing sign-in methods asks for a sign-in within the last 15
   minutes. An address that already has an account gets the same answer as a usable one.
+  Removing Apple asks Apple to revoke Cadence's Sign in with Apple authorization and
+  deletes the token Cadence kept for it (P-053); adding Apple from Settings keeps one.
 - **Affected:** Ticket 334. Files: `components/settings/SignInMethodsPanel.tsx`,
   `lib/auth/account-sign-in-methods.ts`, `app/(auth)/login/page.tsx`.
 - **Surfaces:** user guide (privacy and account: a sign-in methods section; deletion

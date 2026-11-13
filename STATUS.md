@@ -110,6 +110,11 @@ Check the cited entry before acting on a row.
   email sign-up still pass. Add, Remove and Change address now need a sign-in within 15
   minutes (coordinator decision, recorded as an assumption). A taken address gets the same
   answer as a usable one. Not pushed to hosted.
+- **After Ticket 333 merged.** Rebased on `2482fcb1`. Removing Apple revokes its kept token
+  at Apple and forgets the row (migration `20261113200000`); a refused or unconfigured
+  revocation never blocks the removal. An Apple account added from Settings keeps its token
+  too. Ticket 333's suite 9 of 9 with the two new cases; Ticket 334's 10 of 10; Ticket
+  332's 9 of 9.
 - **Verified locally.** `tests/sign-in-methods.local-integration.test.ts`: 10 of 10 (6 at first) against a
   running server, Mailpit and manual linking on; the same flow by clicks in Chrome at
   1280 and 390 px, which found and fixed a disabled field dropped from the form

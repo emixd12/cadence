@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
+  forgetAppleSignInToken,
   readAppleSignInTokens,
   storeAppleSignInToken,
 } from "@/lib/db/apple-sign-in.repo";
@@ -123,6 +124,42 @@ export async function prepareAppleRevocation(
     );
     const failed = outcomes.find((outcome) => outcome.status === "rejected");
     if (failed) throw (failed as PromiseRejectedResult).reason;
+  };
+}
+
+/**
+ * Ticket 334: removing Apple as a sign-in method. Reads and opens the token kept for
+ * this Apple identity (call it before the unlink) and returns the step to run after
+ * a successful unlink: revoke at Apple, then forget the row. The row is forgotten even
+ * when Apple refuses or is unreachable, because the identity is no longer on the
+ * account; the revocation error is then thrown for the caller to report. Null: nothing
+ * kept for this identity.
+ */
+export async function prepareAppleTokenForget(
+  userId: string,
+  subject: string,
+  deps: AppleRevocationDeps = {},
+): Promise<(() => Promise<void>) | null> {
+  const digest = appleSubjectDigest(subject);
+  const row = (await readAppleSignInTokens(userId)).find((item) => item.subjectDigest === digest);
+  if (!row) return null;
+
+  const env = deps.env ?? process.env;
+  const keyConfig = readConnectorCredentialConfig(env);
+  const apple = readAppleRevocationConfig(env);
+  const token = keyConfig ? openToken(keyConfig, userId, digest, row.sealedRefreshToken) : null;
+
+  return async () => {
+    let revokeError: unknown = null;
+    try {
+      if (!keyConfig || !apple) throw new AppleRevocationError("not_configured");
+      if (token === null) throw new AppleRevocationError("unreadable_token");
+      await revokeAppleRefreshToken(apple, token, deps);
+    } catch (error) {
+      revokeError = error;
+    }
+    await forgetAppleSignInToken(userId, digest);
+    if (revokeError) throw revokeError;
   };
 }
 

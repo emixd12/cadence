@@ -1,7 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 // Ticket 333 (L-025): the sealed Apple refresh token lives in the private schema.
-// Only these two service-role RPCs touch it. The owner ID always comes from the
+// Only these three service-role RPCs touch it. The owner ID always comes from the
 // signed-in session, never from request input. Errors carry no database text.
 
 export type SealedAppleToken = Readonly<{
@@ -10,7 +10,7 @@ export type SealedAppleToken = Readonly<{
 }>;
 
 export class AppleSignInTokenError extends Error {
-  constructor(code: "store_failed" | "read_failed") {
+  constructor(code: "store_failed" | "read_failed" | "forget_failed") {
     super(code);
     this.name = "AppleSignInTokenError";
   }
@@ -46,4 +46,16 @@ export async function readAppleSignInTokens(
     subjectDigest: row.subject_digest,
     sealedRefreshToken: row.sealed_refresh_token,
   }));
+}
+
+/** Ticket 334: drops the kept token for one Apple identity after it is removed. */
+export async function forgetAppleSignInToken(
+  ownerId: string,
+  subjectDigest: string,
+): Promise<void> {
+  const { error } = await createServiceRoleClient().rpc(
+    "apple_sign_in_forget_token",
+    { owner_id: ownerId, apple_subject_digest: subjectDigest },
+  );
+  if (error) throw new AppleSignInTokenError("forget_failed");
 }

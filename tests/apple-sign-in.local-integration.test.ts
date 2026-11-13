@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   appleSubjectDigest,
   prepareAppleRevocation,
+  prepareAppleTokenForget,
 } from "@/lib/services/apple-sign-in.service";
 import {
   openServerSecret,
@@ -28,6 +29,8 @@ import {
 // 6. A missing email shows no way forward.
 // 7. Deletion sends the wrong values to Apple, or a refusal is lost.
 // 8. The token functions are callable by a signed-in person or anonymously.
+// 9. Removing Apple in Settings (Ticket 334) leaves its token kept, skips the
+//    revocation, or is blocked when Apple does not answer.
 //
 // Run: docs/qa/2026-11-13-ticket-333-apple-sign-in.md.
 
@@ -50,14 +53,24 @@ const record = (name: string, result: string) => evidence.push({ case: name, res
 class Browser {
   private jar = new Map<string, string>();
 
-  async request(target: string) {
+  async request(target: string, form?: Record<string, string>) {
     const url = new URL(target, appUrl);
     const sameApp = url.origin === new URL(appUrl!).origin;
     const headers: Record<string, string> = {};
     if (sameApp && this.jar.size) {
       headers.cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join("; ");
     }
-    const response = await fetch(url, { headers, redirect: "manual" });
+    if (form) {
+      headers["content-type"] = "application/x-www-form-urlencoded";
+      headers.origin = new URL(appUrl!).origin;
+      headers["sec-fetch-site"] = "same-origin";
+    }
+    const response = await fetch(url, {
+      method: form ? "POST" : "GET",
+      headers,
+      body: form ? new URLSearchParams(form).toString() : undefined,
+      redirect: "manual",
+    });
     if (sameApp) {
       for (const line of response.headers.getSetCookie()) {
         const [pair, ...attributes] = line.split(";");
@@ -349,6 +362,77 @@ run("Apple sign-in end to end with a stubbed provider (Ticket 333)", () => {
     });
     await expect(unconfigured!()).rejects.toThrow("not_configured");
     record("Apple refuses, or the secret is unset: the error reaches the caller", "passed");
+  });
+
+  it("removing Apple in Settings forgets its token, even when the revocation cannot run (Ticket 334)", async () => {
+    const email = address("remove");
+    createdEmails.push(email);
+    const browser = new Browser();
+    await signInWithApple(browser, { email, subject: subject(), refreshToken: "stub-refresh-remove" });
+    const userId = userIdFor(email);
+    expect(keptTokens(userId)).toHaveLength(1);
+    const googleSub = `google-${randomUUID()}`;
+    sql(
+      `insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
+       values (${literal(googleSub)}, ${literal(userId)}, jsonb_build_object('sub', ${literal(googleSub)}), 'google', now(), now())`,
+    );
+    const appleId = sql(`select id from auth.identities where user_id = ${literal(userId)} and provider = 'apple'`);
+
+    // This server has no Apple Services ID or client secret, so the revocation fails;
+    // the removal and the forget still happen.
+    const removed = await browser.request("/auth/sign-in-methods/remove", { identity_id: appleId });
+    expect(removed.headers.get("location")).toMatch(/\/settings\?sign_in_method=removed&method=apple#sign-in-methods$/);
+    expect(sql(`select string_agg(provider, ',') from auth.identities where user_id = ${literal(userId)}`)).toBe("google");
+    expect(keptTokens(userId)).toHaveLength(0);
+    record("Settings removal of Apple: identity gone, kept token forgotten, failed revocation does not block", "passed");
+  });
+
+  it("forgetting a removed Apple identity's token revokes it at Apple first; a refusal still forgets it", async () => {
+    const env = {
+      ...process.env,
+      APPLE_SIGN_IN_SERVICES_ID: "app.cadence.web.test",
+      APPLE_SIGN_IN_CLIENT_SECRET: "stub-client-secret",
+    };
+    const deps = { env, revokeUrl: `${stubUrl}/auth/revoke` };
+
+    const email = address("forget");
+    createdEmails.push(email);
+    const appleSub = subject();
+    await signInWithApple(new Browser(), { email, subject: appleSub, refreshToken: "stub-refresh-forget" });
+    const userId = userIdFor(email);
+    expect(await prepareAppleTokenForget(userId, `${appleSub}-other`, deps)).toBeNull();
+    const forget = await prepareAppleTokenForget(userId, appleSub, deps);
+    const before = (await stub("/__stub/revocations")) as unknown[];
+    await forget!();
+    const after = (await stub("/__stub/revocations")) as Array<Record<string, string>>;
+    expect(after.slice(before.length)).toEqual([{
+      client_id: "app.cadence.web.test",
+      client_secret: "stub-client-secret",
+      token: "stub-refresh-forget",
+      token_type_hint: "refresh_token",
+    }]);
+    expect(keptTokens(userId)).toHaveLength(0);
+
+    const refusedEmail = address("forget-refused");
+    createdEmails.push(refusedEmail);
+    const refusedSub = subject();
+    await signInWithApple(new Browser(), { email: refusedEmail, subject: refusedSub, refreshToken: "stub-refresh-forget-refused" });
+    const refusedId = userIdFor(refusedEmail);
+    await stub("/__stub/revoke-status", { status: 400 });
+    try {
+      const refused = await prepareAppleTokenForget(refusedId, refusedSub, deps);
+      await expect(refused!()).rejects.toThrow("provider_refused");
+    } finally {
+      await stub("/__stub/revoke-status", { status: 200 });
+    }
+    expect(keptTokens(refusedId)).toHaveLength(0);
+
+    const anon = createClient(supabaseUrl!, publishableKey!, { auth: { persistSession: false } });
+    const forgetAnon = await anon.rpc("apple_sign_in_forget_token" as never, {
+      owner_id: refusedId, apple_subject_digest: "0".repeat(64),
+    } as never);
+    expect(forgetAnon.error).not.toBeNull();
+    record("forget: revoke sent first with the right form; a refusal still forgets; anon refused", "passed");
   });
 
   it("the token functions refuse anonymous and signed-in callers", async () => {

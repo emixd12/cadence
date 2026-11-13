@@ -13003,10 +13003,11 @@
         }
       ],
       "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
-      "success_result": "Unlinks the identity with the person's own session and says it was removed.",
+      "success_result": "Unlinks the identity with the person's own session and says it was removed. Removing Apple also asks Apple to revoke Cadence's authorization and forgets the token Cadence kept for that identity; a failed revocation does not block the removal.",
       "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays.",
       "effects": [
         "authentication_identity_change",
+        "external_api_request",
         "navigation"
       ],
       "risk": "destructive",

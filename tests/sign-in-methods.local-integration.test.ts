@@ -273,10 +273,10 @@ run("Sign-in methods in Settings (Ticket 334)", () => {
     record("taken address answered like a usable one; taken Google account refused; no other account named", "passed");
   });
 
-  it("Cadence keeps Google when the other identity's method is off, though Supabase would allow it", async () => {
+  it("Cadence keeps Google when the other identity cannot sign in to Cadence, though Supabase would allow it", async () => {
     const email = address("rule");
     const userId = await createGoogleUser(email);
-    addIdentity(userId, "apple"); // Apple has no start until Ticket 333, so it cannot sign in.
+    addIdentity(userId, "github"); // Not a Cadence sign-in method, so it is no way in.
     const browser = new Browser();
     await signIn(browser, email);
     expect(await settings(browser)).not.toContain('aria-label="Remove Google"');
@@ -284,8 +284,8 @@ run("Sign-in methods in Settings (Ticket 334)", () => {
     const googleId = sql(`select id from auth.identities where user_id = ${literal(userId)} and provider = 'google'`);
     const refused = await browser.request("/auth/sign-in-methods/remove", { form: { identity_id: googleId } });
     expect(browser.location(refused)).toBe("/settings?sign_in_method=last_method#sign-in-methods");
-    expect(providers(userId)).toEqual(["apple", "google"]);
-    record("enabled-method rule refuses removing Google beside a disabled Apple identity", "passed");
+    expect(providers(userId)).toEqual(["github", "google"]);
+    record("enabled-method rule refuses removing Google beside an identity that is not a Cadence method", "passed");
   });
 
   it("two removals at once leave one identity", async () => {

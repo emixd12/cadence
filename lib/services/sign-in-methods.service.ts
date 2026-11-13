@@ -18,6 +18,8 @@ import {
   type SignInMethodId,
 } from "@/lib/auth/sign-in-methods";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
+import { appleSubject } from "@/lib/auth/apple-sign-in";
+import { prepareAppleTokenForget } from "@/lib/services/apple-sign-in.service";
 import { createClient } from "@/lib/supabase/server";
 
 // Ticket 334 (D31.3): list, add and remove the sign-in methods of the signed-in
@@ -40,6 +42,7 @@ async function readAccount(supabase: ServerClient) {
   if (error || !data.user) return null;
   const identities = data.user.identities ?? [];
   return {
+    userId: data.user.id,
     identities,
     state: {
       identities: identities.map(toAccountIdentity),
@@ -186,6 +189,14 @@ export async function removeSignInMethod(identityId: unknown): Promise<
   if (plan.kind === "refused") return { result: plan.result };
 
   const identity = account.identities.find((item) => item.identity_id === plan.identity.identityId)!;
+  // Ticket 333's kept Apple token is read before the unlink, then revoked and forgotten after.
+  const subject = plan.methodId === "apple" ? appleSubject(identity) : null;
+  const forgetAppleToken = subject
+    ? await prepareAppleTokenForget(account.userId, subject).catch((error: unknown) => {
+        reportAppleForgetFailure(error);
+        return null;
+      })
+    : null;
   const { error } = await supabase.auth.unlinkIdentity(identity);
   if (error) {
     // Supabase's own last-identity check, or the database trigger
@@ -203,5 +214,21 @@ export async function removeSignInMethod(identityId: unknown): Promise<
     });
     return { result: "remove_failed", methodId: plan.methodId };
   }
+  if (forgetAppleToken) {
+    // A failed revocation or forget never undoes or blocks the removal.
+    await forgetAppleToken().catch(reportAppleForgetFailure);
+  }
   return { result: "removed", methodId: plan.methodId };
+}
+
+function reportAppleForgetFailure(error: unknown) {
+  reportMonitoringEvent({
+    name: "apple_sign_in_token_forget_failed",
+    severity: "warning",
+    context: {
+      route: "/auth/sign-in-methods/remove",
+      method: "POST",
+      reason: error instanceof Error ? error.message : "unknown",
+    },
+  });
 }

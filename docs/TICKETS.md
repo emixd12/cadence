@@ -19063,6 +19063,9 @@ As built (November 13, 2026):
 - An address that already has an account gets the same answer as a usable one ("If that
   address can be used, Cadence sent it a confirmation link"), so Settings does not reveal
   which addresses have accounts.
+- Removing Apple revokes the Apple token kept by Ticket 333 and forgets it (function
+  `apple_sign_in_forget_token`, migration `20261113200000`). A failed revocation never
+  blocks the removal; the row goes either way.
 - Shared entry point for Ticket 335: `startAddSignInMethod` in
   `lib/services/sign-in-methods.service.ts` (method, return path, optional scopes);
   `/auth/callback` returns with `sign_in_method` `added`, `taken` or `add_failed`.
