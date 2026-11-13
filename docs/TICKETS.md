@@ -17951,8 +17951,9 @@ later-connected sources; `tests/daily-brief-ui.dom.test.tsx`;
 ## Ticket 307: Daily Brief reads Google Calendar through the Timeline connection
 
 Status: complete November 13, 2026. Grant retired on hosted November 11; no Daily Brief
-Calendar panel on web or installed Mac 0.1.10. The owner deletes the vault item
-`google-calendar-agent-retire-secret` (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
+Calendar panel on web or installed Mac 0.1.10. Runbook step 6 is done: the Vercel values went
+November 11 and the owner deleted the vault item `google-calendar-agent-retire-secret`
+November 13 (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: Ticket 306.
 
 Goal: a person connects Google Calendar once.
