@@ -130,7 +130,7 @@ run("Cadence for Mac email sign-in (local)", { timeout: 120_000 }, () => {
     const page = await openInBrowser(native.opened[0]!, "mac-email-page-sent");
     expect(page.text).toContain(`Cadence sent a 6-digit code to ${email}`);
     expect(new URL(page.location).hash).toBe("");
-    expect(page.requests.some((url) => url.includes("challenges.cloudflare.com"))).toBe(true);
+    expect(page.requests.some((url) => new URL(url).hostname === "challenges.cloudflare.com")).toBe(true);
     expect(page.requests.filter((url) => url.startsWith(appUrl!)).some((url) => url.includes(encodeURIComponent(email)) || url.includes(email))).toBe(false);
     record("page", "Turnstile test widget passed; code sent; fragment removed; address in no request URL");
 
