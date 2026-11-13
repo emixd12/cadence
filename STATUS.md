@@ -48,6 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 331–337: sign-in by email and Apple (D31) | Filed November 13, 2026; all not started; Google stays the only live method | Ticket 331 first. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -89,6 +90,24 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 331–337 filed: sign-in by email and Apple (D31) — November 13, 2026
+
+- **Decision D31.** Supabase Auth stays; WorkOS is not adopted. Email sign-in uses a link
+  or a 6-digit code, with no password. Apple sign-in uses the web flow. Every method
+  reaches the same account. ChatGPT sign-in is dropped; the D27 deferral stands.
+  Connecting Google Calendar adds that Google account as a sign-in method.
+- **Tickets.** 331 login page and routes, 332 email, 333 Apple, 334 Settings and the
+  one-account rule, 335 Google Calendar, 336 Mac, 337 acceptance. All `not_started`.
+  Ticket 330 is the Mac Hevy link (draft PR #261).
+- **Not verified.** The WorkOS, Supabase, Apple and OpenAI provider facts were not
+  rechecked for the entry; the hosted Auth email settings and custom SMTP on the hosted
+  plan are unread. L-024 and L-025 hold Apple's rules, from memory.
+- **Not changed.** No code and no public copy. P-051 lists the text that names Google
+  sign-in.
+
+Platform impact: documentation only; web Tickets 331–335, Mac Ticket 336, marketing none,
+mobile web shares the login page. Messaging impact: P-051.
 
 ## Ticket 329: Complete from Hevy at Behavior creation — November 13, 2026
 

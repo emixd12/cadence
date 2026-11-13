@@ -67,6 +67,8 @@ implement most of it in source; it is not deployed yet.
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
+| Sign-in email (Ticket 332, D31) | Unknown | Unknown | Unknown | Planned, not shipped. One email per email sign-in, sent through Sequenzy's SMTP relay. Volume and price not measured; Ticket 332 records both. Sequenzy's plan is not recorded (fixed costs above) |
+| Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
 
 ### Per-user total at 100 users
 
@@ -623,6 +625,9 @@ arrives, fees reduce the US$5:
   output tokens, about US$0.0023 each. Daily Brief falls to US$0.03 / US$0.07 / US$0.14
   a month and the per-user totals drop by US$0.03–0.11. Recorded the US$0.02 cached-input
   price.
+- 2026-11-13: Decision D31 plans sign-in email through Sequenzy (Ticket 332) and Apple
+  sign-in (Ticket 333). Added two planned rows with unknown or assumed figures. WorkOS was
+  not adopted, so it adds no cost. Totals unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

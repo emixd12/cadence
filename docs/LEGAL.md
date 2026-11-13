@@ -17,7 +17,7 @@ Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHAN
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-024` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-026` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -660,3 +660,51 @@ part of L-002.
 - **Status:** open.
 - **Next action:** recheck the terms and API document before a public listing that names
   Hevy. Ticket 311 recorded the reading on 2026-11-11.
+
+## L-024: Apple's rules for Sign in with Apple
+
+- **Question:** What do Apple's rules require of Cadence when it offers Sign in with Apple
+  on the web, and later in an iPhone app or a Mac App Store build that offers Google
+  sign-in?
+- **Affected:** Tickets 333, 336 and 337 (decision D31). Files: the planned Apple button on
+  `app/(auth)/login/page.tsx` and in `apps/desktop/src/account/account-panel.tsx`. Related
+  messaging entry: P-051.
+- **Provider, clause, source and check date:** Apple.
+  - App Store Review Guidelines, 4.8 (Login Services): an app that uses a third-party
+    login service to set up the user's primary account must also offer an equivalent
+    option with stated privacy properties. From memory. Not checked for this entry.
+  - Human Interface Guidelines, Sign in with Apple: the button's wording, shape and logo
+    use. Not checked for this entry.
+  - Apple's private email relay requires registered sending domains before mail reaches a
+    Hide My Email address. From memory. Not checked for this entry.
+- **Current reading:** none until Ticket 333 reads the sources. The web app and the
+  directly distributed Mac app are not App Store apps, so 4.8 does not bind them today.
+  It will bind the iPhone app and the Mac App Store listing the owner intends (D30.5).
+  Apple sign-in on the web (D31.2) is a step toward that, but a native app needs native
+  Sign in with Apple under its own ticket.
+- **Risk level:** low.
+- **Owner decision or risk acceptance:** owner decision D31, November 13, 2026, adds Apple
+  sign-in on the web and the Mac. It accepts no risk.
+- **Status:** open.
+- **Next action:** Ticket 333 reads Apple's button guidelines and relay rules, and records
+  the clauses and check date here. A mobile or Mac App Store ticket rereads guideline 4.8.
+
+## L-025: Apple token revocation when an account is deleted
+
+- **Question:** Must Cadence revoke a person's Sign in with Apple tokens when that person
+  deletes their Cadence account?
+- **Affected:** Ticket 333 (decision D31). File: `lib/services/account.service.ts`.
+- **Provider, clause, source and check date:** Apple. App Store Review Guidelines,
+  5.1.1(v): an app that supports account creation must let the user delete the account
+  in the app; Apple's guidance for apps that use Sign in with Apple says to revoke the
+  user's tokens through the Sign in with Apple REST API on deletion. From memory. Not
+  checked for this entry.
+- **Current reading:** none until Ticket 333 reads the source. The rule is written for App
+  Store apps. Cadence's web app and directly distributed Mac app are not App Store apps
+  today; the intended iPhone app and Mac App Store listing (D30.5) will be. Ticket 333
+  plans the revocation anyway, so a later App Store build has it.
+- **Risk level:** low.
+- **Owner decision or risk acceptance:** none.
+- **Status:** open.
+- **Next action:** Ticket 333 reads the source, implements revocation in account
+  deletion, or records the gap and the reason here.

@@ -1550,3 +1550,49 @@ cite has not changed.
   Behavior's settings only.
 - **Update needed:** say the link can be chosen while creating a Behavior.
 - **Status:** logged.
+
+## P-051: Sign-in is no longer Google only
+
+- **Change:** decided November 13, 2026 (D31). A person will create an account and sign in
+  with Google, with email (a link or a 6-digit code, no password) or with Apple, on web
+  and the Mac. Connecting Google Calendar will add that Google account as a sign-in
+  method. Auth email will go through Sequenzy. Nothing has shipped: each method is behind
+  a flag that is off in production until Ticket 337 passes for it.
+- **Affected:** Tickets 331–337. Files: `components/settings/LegalContent.tsx`,
+  `README.md`, `docs/user-guide/public-and-sign-in.md`,
+  `docs/user-guide/privacy-and-account.md`, `docs/user-guide/desktop-local.md`,
+  `docs/user-guide/README.md`, `app/(auth)/login/page.tsx`,
+  `apps/desktop/src/account/account-panel.tsx`,
+  `components/settings/GoogleCalendarPanel.tsx`,
+  `components/settings/WebGoogleCalendarPanel.tsx`.
+- **Surfaces:** Privacy, Terms, in-app copy, user guide, README, provider
+  submissions (Google OAuth verification text that describes sign-in; Apple's Sign in
+  with Apple setup). Marketing pages were searched for "Google sign-in" text on November
+  13, 2026 and none was found.
+- **Conflicting current text** (accurate until a method's flag turns on):
+  - Privacy: "Google sign-in can provide an account identifier, email address, and profile
+    information." "Each requires its own Google consent for the same Google account used
+    to sign in."
+  - Privacy, providers table: "User-selected Google sign-in and optional Google Calendar
+    connections, each with its own consent and API access".
+  - Privacy, "Security": "Cadence uses Google sign-in through Supabase Auth". "Users
+    should protect their Google account".
+  - Terms: "Sign-in uses Google through Supabase Auth. The user is responsible for
+    securing the Google account and device".
+  - README: "Google login for independent single-player accounts".
+  - User guide: "Sign in with Google" section and **Continue with Google** steps; "Sign in
+    with Google again to start a new session."; "Sign in with Google if needed." (AI
+    client connection); "Connect a Google account" and **Sign in with Google** on the Mac;
+    "requires the same Google identity" for Calendar.
+  - Mac account panel: "Sign in with the Google account you use for Cadence."
+  - Calendar panel: "Use the same Google account as your Cadence account."
+- **Update needed:** name each live method. Say what Cadence receives from Apple (an
+  account identifier, an email address that may be a Hide My Email relay address, and a
+  name on first sign-in; not rechecked) and from an email sign-in (the address). Say that
+  sign-in emails are sent through Sequenzy and name Apple as a provider. Say that
+  connecting Google Calendar adds that Google account as a sign-in method. Describe adding
+  and removing a sign-in method. In-app text changes inside Tickets 331–336; Privacy,
+  Terms, README and the user guide change in the messaging track. Update
+  `tests/legal-content.test.tsx` with the copy.
+- **Related:** L-024 and L-025.
+- **Status:** logged.
