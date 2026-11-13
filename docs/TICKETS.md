@@ -18856,3 +18856,293 @@ Messaging impact: P-050.
 Verification: `tests/desktop-source-links.test.tsx`, `dagger check --cadence --progress=report`
 and installed acceptance on a dev-signed build.
 
+## Tickets 331–337: sign-in by email and Apple (D31)
+
+Decision: `docs/DECISIONS.md`, 2026-11-13, D31. The owner approved the track and
+independent testing on November 13, 2026. Ticket 330 belongs to the Mac Hevy link (draft
+PR #261), so this track starts at 331. ChatGPT sign-in has no ticket (D31.4).
+
+Order: 331, then 332 and 333 one after the other (both edit the login page), then 334 and
+335, then 336, then 337. Each ticket has its own branch from `origin/main` and its own
+pull request.
+
+Rules for every ticket in the track:
+
+- Each new method has its own flag, off in production until Ticket 337 passes for it. With
+  every new flag off, production sign-in is unchanged (D31.6).
+- Supabase Auth is the only auth provider (D31.1). No password for email accounts (D31.2).
+- Every method reaches the same account (D31.3).
+- A step only the owner can take goes on the track's owner list. Work continues on the
+  rest.
+- No ticket edits Privacy, Terms, Trust, the user guide or marketing text. P-051 lists it.
+
+Acceptance for the track (Ticket 337 records the evidence):
+
+1. Web: a new person creates an account with email, and with Apple, with no Google account.
+2. Web: an email link opened in a different browser signs in. A used or expired link or
+   code does not.
+3. A Google account that adds Apple and email reaches the same data by all three.
+4. A sign-in with an unconfirmed email address cannot reach an existing account.
+5. An account with no Google sign-in connects Google Calendar as D31.5 states. Existing
+   connections need no reconnect.
+6. Mac: links by each enabled method, syncs, and refuses a second account.
+7. MCP consent works for an account that has no Google sign-in.
+8. Account deletion works for each kind of account.
+9. With every new flag off, production sign-in is unchanged.
+
+## Ticket 331: Login page and routes that support more than one method (web)
+
+Status: not started. Filed November 13, 2026.
+Dependencies: none. Decision: D31.
+
+Goal: make the web sign-in surface provider-neutral without turning on a new method.
+
+Scope and acceptance:
+
+- In scope: `app/(auth)/login`, `app/auth/google/route.ts`, `app/auth/callback/route.ts`,
+  `lib/auth/redirects.ts`, one flag per method that is off in production, the
+  design-system bench for the login page and `interaction-registry.json`.
+- The login page lists the enabled methods. With every new flag off it looks and behaves
+  as it does today.
+- Error messages no longer assume Google.
+- The MCP consent sign-in (`app/oauth`) and the test login still work.
+- Use the impeccable and design-system-bench workflows.
+
+Out of scope: turning on email or Apple.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: login page, auth routes and flags. |
+| Desktop | Not applicable: the Mac account panel changes in Ticket 336. |
+| Marketing | Not applicable: no public claim. "Log in" still opens `/login`. |
+| Future mobile | Mobile web uses the same login page; checked at 390 px. |
+
+Messaging impact: P-051.
+
+Verification: `dagger check --cadence --progress=report`; the login bench at 390 px and
+desktop width.
+
+## Ticket 332: Email sign-in and account creation (web)
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Ticket 331. Decision: D31.2 and D31.3.
+
+Goal: a person enters an email address and gets one email with a link and a 6-digit code.
+Either one signs them in. A new address creates the account.
+
+Scope and acceptance:
+
+- First step: read the hosted Supabase Auth email settings and record them (sign-up,
+  confirmation, rate limits). The local config has sign-up on and confirmation off. The
+  hosted values are not verified.
+- Auth email goes through Sequenzy's SMTP relay with a verified sending domain
+  (`docs/SEQUENZY_WORKFLOW.md`). Not verified: that the hosted Supabase plan allows custom
+  SMTP, and Sequenzy's relay setup.
+- Email templates use the in-app voice.
+- A confirm route verifies the link on Cadence's own domain, so the link works when the
+  person opens it in another browser.
+- The email form has bot protection.
+- `supabase/config.toml` matches the hosted settings.
+- Link and code both sign in. A used or expired one shows a plain message and a way to
+  send another.
+- An address that already has a Google account signs in to that same account.
+- An unconfirmed address cannot sign in or take over an existing account.
+- `docs/COSTS.md` records the auth email volume and Sequenzy's price.
+
+Out of scope: passwords. One email carrying both link and code is an assumption the owner
+has not confirmed (D31).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: email form, confirm route, templates and Auth settings. |
+| Desktop | Follow-up: Ticket 336 adds email by code in the Mac account panel. |
+| Marketing | Not applicable: no public claim until the messaging track updates copy (P-051). |
+| Future mobile | Mobile web uses the same form. A native app needs its own ticket. |
+
+Messaging impact: P-051.
+
+Verification: local stack with the local mail inbox; local-integration tests for link,
+code, expiry and reuse; `dagger check --cadence --progress=report`.
+
+## Ticket 333: Apple sign-in (web)
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Ticket 331; Ticket 332 merges first because both edit the login page.
+Decision: D31.2. Legal: L-024 and L-025.
+
+Goal: add Continue with Apple on the web login page.
+
+Scope and acceptance:
+
+- Apple Developer setup: App ID, Services ID and signing key. Agents drive the portal
+  under D29; the owner approves Apple two-factor prompts.
+- The Supabase Apple provider, and the button under Apple's design rules (L-024).
+- A new Apple user gets an account. A returning one reaches the same account.
+- Hide My Email: register the reminder and auth sending domains with Apple's relay. An
+  email reminder reaches a Hide My Email address.
+- Client-secret rotation every 6 months: a runbook entry in `docs/OPERATIONS.md`, a dated
+  row in `STATUS.md`, and a documented recovery for a missed rotation.
+- Deleting an account revokes Cadence's Apple authorization
+  (`lib/services/account.service.ts`), or L-025 records the gap and the reason.
+
+Out of scope: native Sign in with Apple, iPhone and Mac App Store work.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: Apple provider, button, relay domains, rotation and revocation. |
+| Desktop | Follow-up: Ticket 336 adds Apple through the system browser. |
+| Marketing | Not applicable: no public claim until the messaging track updates copy (P-051). |
+| Future mobile | Mobile web uses the same button. A native app needs native Sign in with Apple under its own ticket (L-024). |
+
+Messaging impact: P-051.
+
+Verification: local-integration tests with a stubbed provider; a production check with a
+test Apple Account; `dagger check --cadence --progress=report`.
+
+## Ticket 334: Sign-in methods in Settings and the one-account rule
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Tickets 332 and 333. Decision: D31.3.
+
+Goal: show which methods an account has and let the person add another, so nobody ends
+up with two accounts.
+
+Scope and acceptance:
+
+- A Sign-in methods row in Settings, Account group: list the methods, add a method, and
+  remove a method while another remains.
+- Supabase manual identity linking. The local config has it off today.
+- The login page shows a plain message when a sign-in would create a second account that
+  looks like an existing one.
+- A Google account can add Apple and email, then sign in with each and see the same data.
+- The last remaining method cannot be removed.
+- Account deletion asks for the right confirmation text when the account has no email.
+- The add-a-method path is shared with Ticket 335's Calendar connect.
+- `interaction-registry.json` lists the new interactions.
+
+Out of scope: merging two existing accounts. A Hide My Email address differs from the
+person's other addresses, so automatic linking by email does not cover Apple.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: Settings row, linking and the login message. |
+| Desktop | Desktop Settings uses the same hosted components; Ticket 336 checks the row on the Mac. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Mobile web uses the same Settings row. |
+
+Messaging impact: P-051.
+
+Verification: local-integration tests for link, unlink and last-method refusal;
+`npm run interactions:check`; `dagger check --cadence --progress=report`.
+
+## Ticket 335: Google Calendar for accounts that do not sign in with Google
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Ticket 334 (shared add-a-method path). Decision: D31.5.
+
+Goal: an email or Apple account connects Google Calendar without an error. Connecting adds
+that Google account as a sign-in method, and the same-account check stays.
+
+Scope and acceptance:
+
+- In scope: `calendarGoogleSubject` in `lib/services/google-calendar-oauth.ts`,
+  `lib/services/google-calendar.service.ts`, `lib/integrations/leave-reminder-caller.ts`,
+  the `leave_reminder_google_subject` database function, the Calendar connect text, and
+  `docs/DATA_MODEL.md` when a function changes.
+- An account with no Google sign-in gets D31.5's behavior, not `same_account_required`.
+- A Google account already attached to another Cadence account is refused with a plain
+  message.
+- Existing sealed Calendar credentials are bound to the user ID and the Google subject.
+  They keep opening, with no reconnect.
+- The leave reminder job still reads Calendar for both kinds of account.
+
+Out of scope: a Calendar connection for a Google account that is not a sign-in method.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: Calendar connect service, UI text and the reminder job's identity read. |
+| Desktop | The Mac uses the same server connector; Ticket 336 checks the connect flow on the Mac. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Mobile web uses the same connect flow. |
+
+Messaging impact: P-051 (Privacy and the user guide say Calendar needs the Google account
+used to sign in).
+
+Verification: existing Calendar and leave-reminder tests plus new cases;
+`npm run supabase -- db reset` when a migration is added;
+`dagger check --cadence --progress=report`.
+
+## Ticket 336: Sign-in methods in Cadence for Mac
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Tickets 331–335. Decision: D31.2. Ships with a Mac release.
+
+Goal: the Mac account panel offers the same methods as the web.
+
+Scope and acceptance:
+
+- In scope: `apps/desktop/src/account/auth.ts` and `account-panel.tsx`.
+- A method choice. Google and Apple open the system browser, as Google does today. Email
+  works by typing the 6-digit code in the app.
+- The panel text no longer says "with Google".
+- A Mac links to an account by each enabled method and syncs.
+- The different-account guard still refuses a second account on a linked Mac.
+- Session secrets stay in Keychain.
+
+Out of scope: native Sign in with Apple and Mac App Store work.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: web methods ship in Tickets 331–335. |
+| Desktop | This ticket: account panel, auth client and a Mac release. |
+| Marketing | Not applicable: no public claim until the messaging track updates copy (P-051). |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: P-051 (the user guide's "Connect a Google account" section).
+
+Verification: `tests/desktop-auth-upgrade.test.ts` and new cases; a dev-signed build on
+the test Mac (`.claude/skills/desktop-acceptance`); `dagger check --cadence --progress=report`.
+
+## Ticket 337: Sign-in acceptance on production web and the installed Mac
+
+Status: not started. Filed November 13, 2026.
+Dependencies: Tickets 331–336. Decision: D31.6.
+
+Goal: agents run each method end to end as the test accounts.
+
+Scope and acceptance:
+
+- Test identities in the "Cadence Agents" vault: a test Apple Account and an inbox agents
+  can read. The owner creates the vault items.
+- New entries in `.agentic/test-access.json` and the preflight
+  (`docs/qa/agent-secrets.md`).
+- A QA record under `docs/qa`.
+- Each of the nine acceptance rows under "Tickets 331–337" has recorded evidence, or a
+  named reason it could not run.
+- A method's production flag turns on only after its rows pass.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Production web run for rows 1–5 and 7–9. |
+| Desktop | Installed Mac run for row 6. |
+| Marketing | Not applicable: no public claim. Public copy waits on P-051. |
+| Future mobile | Row 1 and row 2 are also checked at phone width in a browser. |
+
+Messaging impact: none new; P-051 stays open until the messaging track updates copy.
+
+Verification: `npm run qa:preflight -- --suite <suite>` for the affected suites, then the
+run itself.

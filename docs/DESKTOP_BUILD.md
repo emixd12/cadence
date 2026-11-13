@@ -13,7 +13,8 @@ Evidence: `docs/qa/cadence-project-rename.md`.
 The owner activated the local-first macOS track on 2026-08-30. Tickets 107–114
 are complete. Ticket 115 separately owns Apple-trusted distribution and is in progress.
 Tickets 116–122 implement optional Google account linking and offline-capable
-synchronization. This document replaces the earlier unscheduled proposal.
+synchronization. Ticket 336 plans email and Apple sign-in in the account panel
+(`docs/DECISIONS.md`, 2026-11-13, D31); not shipped. This document replaces the earlier unscheduled proposal.
 `STATUS.md` records implementation and verification.
 
 ## Scope and defaults
@@ -165,7 +166,9 @@ protections.
 ## Planned account mode
 
 Account-free local mode remains complete. Optional account mode uses the
-existing Cadence Google account and synchronizes web plus multiple desktop
+existing Cadence Google account (Ticket 336 plans any sign-in method of the account:
+Google or Apple through the system browser, email by a 6-digit code typed in the app)
+and synchronizes web plus multiple desktop
 working copies while each app runs with connectivity. It adds no closed-app
 background helper.
 

@@ -93,7 +93,9 @@ changes an Occurrence status.
 When the deployment configures Calendar, the user opens Settings and chooses
 **Connect Google Calendar**. Google consent is separate from ordinary Cadence
 sign-in. Cadence requires the same Google identity as the signed-in account and
-requests only Calendar-list and event read-only scopes. A different identity,
+requests only Calendar-list and event read-only scopes. Planned under Ticket 335
+(D31.5): for an account with no Google sign-in, connecting adds that Google account as
+a sign-in method. A different identity,
 denied consent, expired attempt, or revoked credential returns a factual state
 without changing local Cadence data.
 
@@ -189,7 +191,8 @@ manifest, sitemap, and robots output for agents and crawlers.
 
 ## First-run onboarding flow
 
-Public web launch includes a minimal onboarding path after Google login.
+Public web launch includes a minimal onboarding path after Google login. Sign-in by
+email and Apple (Tickets 331–337, D31) will lead to the same path. Not shipped.
 
 Steps:
 
@@ -827,6 +830,7 @@ raw restore checks SQLite link state and remains blocked until disconnect.
 
 Settings includes:
 - Profile/email from Google sign-in when available
+- Planned under Ticket 334 (D31): Sign-in methods, to list, add and remove methods
 - Timezone
 - Current-device browser notification status
 - Current-device browser notification enable control
@@ -1040,7 +1044,8 @@ setup (Ticket 212) links to the same Home and usual travel controls at
 
 1. Start a Cadence connection from the AI client.
 2. Cadence validates the request. If signed out, use the existing Google login;
-   Cadence returns to the same browser-bound consent request.
+   Cadence returns to the same browser-bound consent request. Tickets 331–337 plan
+   the same return for email and Apple sign-in (D31).
 3. Check the client name, verified/unverified label, redirect host, and Cadence
    account. Read is required. Both write permissions are offered and start on,
    even if the client asked only to read (Ticket 259). Switch either off to

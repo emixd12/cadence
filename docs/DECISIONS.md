@@ -2461,3 +2461,127 @@ Superseded text:
 
 Platform impact: web, desktop and future mobile, none (no product change); marketing, a
 rewrite under its own ticket. Messaging impact: P-048.
+
+## 2026-11-13: Sign-in by email and Apple on Supabase Auth; WorkOS not adopted (D31)
+
+The owner asked for more ways to create a Cadence account and sign in, and asked whether
+WorkOS would reduce the work. The owner answered four questions on November 13, 2026.
+Google is the only sign-in method until Tickets 331–337 ship.
+
+The four answers are D31.1, the no-password rule in D31.2, D31.4 and the first two
+sentences of D31.5. The rest of D31.2, D31.3, D31.5 and D31.6 comes from the plan the
+owner approved with the tickets.
+
+1. **D31.1: auth provider.** Supabase Auth stays. Cadence does not adopt WorkOS or any
+   other auth vendor.
+2. **D31.2: methods.** A person can create an account and sign in with Google, with email,
+   or with Apple, on web and on the Mac. An email account has no password: Cadence emails
+   a link or a 6-digit code, and either one signs the person in. Apple uses the web flow
+   through the Supabase Apple provider.
+3. **D31.3: one account.** Every method a person uses reaches the same account. A sign-in
+   never reaches an existing account through an unconfirmed email address. An account
+   keeps at least one method. Cadence does not merge two accounts that already exist.
+4. **D31.4: ChatGPT.** ChatGPT sign-in is dropped from this track on web, the Mac and the
+   ChatGPT plugin. The D27 deferral of "ChatGPT as a Cadence login" (2026-11-07) stands.
+   Revisit when OpenAI opens the program. No ticket is filed.
+5. **D31.5: Google Calendar.** Connecting Google Calendar adds that Google account to the
+   Cadence account as a sign-in method. The same-account check stays. A Google account
+   already attached to another Cadence account is refused. Existing Calendar connections
+   need no reconnect.
+6. **D31.6: rollout.** Each new method sits behind its own flag, off in production until
+   its acceptance passes. With every new flag off, production sign-in is unchanged.
+
+The owner approved Tickets 331–337 and independent testing on the same day. Agents collect
+owner-only steps (credentials, consent, Apple two-factor prompts) in one list and continue
+with the rest.
+
+Why not WorkOS. The planning agent read the provider documents on November 13, 2026
+("Sources" below). This entry did not recheck them.
+
+- Supabase Auth already offers each method asked for: email link and code, Apple, and
+  custom OIDC providers. Not rechecked.
+- WorkOS AuthKit adds no method Cadence lacks. Its documents list Google, Microsoft,
+  GitHub and Apple, and no ChatGPT provider. Its Magic Auth is a 6-digit code, not a link.
+  Not rechecked.
+- Replacing Supabase Auth would rewrite the security core. WorkOS user IDs are not UUIDs
+  (not rechecked), so `auth.uid()` would fail. The migrations call `auth.uid()` 232 times
+  (counted on `origin/main` `8bd2e165`, on 224 lines), and every user-owned table points at `auth.users`.
+  The Mac Keychain session, MCP consent, the leave reminder and connector completion job
+  tokens, the Calendar identity check, account deletion and the test login all depend on
+  Supabase Auth. Existing accounts would need migrating.
+- WorkOS in front of Supabase Auth, as one provider, keeps the database but adds a second
+  vendor and a sign-in page on a WorkOS domain (a custom domain is US$99 a month, not
+  rechecked). Supabase would then see every user as a WorkOS identity, which breaks the
+  Google identity check that Calendar relies on.
+- Price did not decide this: AuthKit is free up to 1 million monthly users (not
+  rechecked). WorkOS fits products sold to companies that need SSO and directory sync.
+  Each Cadence account is single-player.
+- No vendor removes the remaining work: Apple's developer setup and secret rotation, auth
+  email delivery, the one-account rule, the Calendar identity check and a Mac release.
+
+Findings the tickets start from:
+
+- Google Calendar is tied to the sign-in identity. `calendarGoogleSubject`
+  (`lib/services/google-calendar-oauth.ts`) throws `same_account_required` for a user
+  without exactly one Google identity. Verified in source.
+- The local Auth config (`supabase/config.toml`) has email sign-up on, confirmation off
+  and manual identity linking off. Verified. The hosted values are not verified; Ticket
+  332 reads them first.
+- Auth email needs a real sender. Supabase's built-in sender allows 2 emails an hour, to
+  team addresses only. Sequenzy documents an SMTP relay for Supabase Auth. Not rechecked.
+  Whether the hosted Supabase plan allows custom SMTP is not verified.
+- Apple's web flow needs a new client secret every 6 months, or sign-in fails. Apple
+  gives the person's name only on the first sign-in. A Hide My Email address differs from
+  the person's Google address, so matching by email does not join the two. Not rechecked.
+- The iPhone app and Mac App Store listing (D30.5) will need Sign in with Apple or an
+  equivalent once they offer Google sign-in (App Store guideline 4.8), and Apple token
+  revocation on account deletion. From memory, not rechecked (`docs/LEGAL.md`, L-024 and
+  L-025).
+- OpenAI offers website sign-in to selected commercial partners through a limited trial,
+  by interest form (OpenAI's documents, read November 13, 2026; not rechecked). OpenAI
+  publishes an OIDC discovery document, so a Supabase custom OIDC provider should fit.
+  Not tested. Recorded for the revisit in D31.4.
+
+Sources, read by the planning agent on November 13, 2026 and not rechecked for this entry:
+
+- OpenAI, Sign in with ChatGPT: `https://developers.openai.com/siwc/llms-full.txt`
+- WorkOS pricing: `https://workos.com/pricing.md`
+- WorkOS, Supabase with AuthKit: `https://workos.com/docs/integrations/supabase-authkit.md`
+- WorkOS social login: `https://workos.com/docs/authkit/social-login.md`
+- WorkOS Magic Auth: `https://workos.com/docs/authkit/magic-auth.md`
+- Supabase custom OAuth and OIDC providers:
+  `https://supabase.com/docs/guides/auth/custom-oauth-providers.md`
+- Supabase WorkOS third-party auth:
+  `https://supabase.com/docs/guides/auth/third-party/workos.md`
+- Supabase identity linking: `https://supabase.com/docs/guides/auth/auth-identity-linking.md`
+- Supabase custom SMTP: `https://supabase.com/docs/guides/auth/auth-smtp.md`
+- Supabase Sign in with Apple:
+  `https://supabase.com/docs/guides/auth/social-login/auth-apple.md`
+- Sequenzy, Supabase custom SMTP: `https://docs.sequenzy.com/guides/supabase-custom-smtp`
+- From memory, with no document read: App Store Review Guidelines 4.8 and 5.1.1(v).
+
+Assumptions. The owner has not confirmed the first two:
+
+- Web ships first. The Mac follows in the next Mac release.
+- One email carries both the link and the code.
+- Agents drive the Apple Developer portal under D29. The owner approves Apple two-factor
+  prompts.
+
+Out of scope: passwords for email accounts, passkeys, two-factor sign-in, SMS, company
+SSO, native Sign in with Apple, iPhone and Mac App Store work, merging two existing
+accounts, changes to MCP grants or tokens, and public copy.
+
+Rollback: each method has its own flag and its own provider switch in Supabase Auth.
+Turning a method off hides it and blocks new sign-ins by it. An account whose only method
+is off cannot sign in until the method returns, so a method is turned off for good only
+after its accounts have a second method. Tickets 331–334 change no existing account or
+table. Ticket 335 keeps existing Calendar credentials readable.
+
+Superseded text: "Google login" as the only sign-in method in `AGENTS.md`,
+`docs/PRODUCT_SPEC.md`, `docs/USER_FLOWS.md`, `docs/ROUTE_MAP.md` and
+`docs/DESKTOP_BUILD.md` now names the planned methods. Product behavior changes only when
+each ticket ships.
+
+Platform impact: web, Tickets 331–335; desktop, Ticket 336; marketing, no change (public
+text is logged in P-051); future mobile, mobile web uses the same login page, and a native
+app needs its own ticket (L-024). Messaging impact: P-051.

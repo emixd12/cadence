@@ -428,7 +428,7 @@ Web offline support, offline writes, and PWA caching remain deferred.
 
 Desktop tracking works offline against SQLite with or without an account. Local
 mode remains complete and requires no login. Tickets 116–122 add optional
-Google account linking, automatic eventual synchronization while the app runs,
+Google account linking (Ticket 336 plans email and Apple, D31), automatic eventual synchronization while the app runs,
 conflict review, and explicit disconnect choices within the four-screen model.
 Account mode synchronizes product records, histories, provenance, hosted
 delivery history, and browser/email reminder preferences. It keeps credentials,
@@ -452,6 +452,9 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 ## In scope
 
 - Google login
+- Sign-in by email (a link or a 6-digit code, no password) and by Apple, planned under
+  Tickets 331–337 (`docs/DECISIONS.md`, 2026-11-13, D31). Every method reaches the same
+  account. Not shipped
 - Many independent single-account users
 - Behavior creation/edit/archive
 - Categories
@@ -508,7 +511,9 @@ It does not receive a Google credential.
 
 The connector requests Calendar-list and event read-only scopes after ordinary
 Cadence sign-in. It accepts only the Google identity already attached to the
-Cadence account. It reads only selected readable calendars and displayed days.
+Cadence account. Ticket 335 (D31.5) plans one change: for an account with no Google
+sign-in, connecting Calendar adds that Google account as a sign-in method; the
+same-account check stays. It reads only selected readable calendars and displayed days.
 It never creates, edits, or deletes a Google event. All-day dismissal changes
 local presentation only. External events never change Behavior schedules,
 Occurrence statuses, Notes, or reminders.
