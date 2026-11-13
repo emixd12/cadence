@@ -1234,7 +1234,9 @@ Production sign-in email (since November 13, 2026):
 Continue with Apple starts Supabase Auth's Apple provider through
 `/auth/sign-in/apple`. Apple returns to Supabase
 (`https://qjodzutjxtmtzczbloxa.supabase.co/auth/v1/callback`), and Supabase returns to
-`/auth/callback?next=…&via=apple`. The redirect allow list needs no new entry. Hosted
+`/auth/callback?next=…&via=apple`. Production needs no allow-list entry, because Supabase
+accepts any redirect on the Site URL's host. Any other host needs
+`https://<host>/auth/callback**`: the allow list matches the whole URL, query included. Hosted
 setup, in order, with before, after and rollback values:
 `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`. Local check:
 `docs/qa/2026-11-13-ticket-333-apple-sign-in.md`.
@@ -1259,7 +1261,8 @@ token), `apple_sign_in_token_not_kept` (connector key unset), `apple_sign_in_tok
 
 **Client-secret rotation (every 5 months).** Apple rejects a client secret after its
 `exp`, at most 15,777,000 seconds (about 182 days) after it was made. Rotate 30 days before
-that. `STATUS.md` "Open work" holds the dated row with the current secret's expiry.
+that. `STATUS.md` "Open work" holds the dated row with the current secret's expiry. The
+first secret was made November 13, 2026: it expires May 12, 2027; rotate by April 12, 2027.
 
 1. Run `npm run qa:preflight -- --suite hosted-migrations` (it checks the Supabase token).
 2. Make a run folder under `.intent/acceptance/` and record the owner's `release-secrets`

@@ -1,7 +1,8 @@
 # Ticket 333: hosted and provider changes for Apple sign-in
 
-Written November 13, 2026, for Ticket 333 (D31.2, L-024, L-025). **Nothing here has been
-applied.** No hosted setting, provider setting or Apple Developer item changed in this
+Written November 13, 2026, for Ticket 333 (D31.2, L-024, L-025). Steps 1–9 are applied;
+see "Applied". Production acceptance: `docs/qa/2026-11-13-ticket-333-production-acceptance.md`.
+Originally: nothing here had been applied. No hosted setting, provider setting or Apple Developer item changed in this
 task. Agents apply the steps in order under the coordinator's ruling of November 13,
 07:35Z (owner blockers rows 1 and 6): record each before and after value in this file,
 read each setting back, and recheck Google sign-in on production after each Auth change.
@@ -27,7 +28,7 @@ blockers note), **Waiting: step N** (an earlier step here).
 | 5 | Make the client secret: `scripts/apple-client-secret.mjs` with the key, Key ID, team `HK26VT477G`, the Services ID and `--days 180` | None | A JWT and its expiry date | None needed | **Waiting: step 4.** Write the expiry into the dated `STATUS.md` row the same day |
 | 6 | Supabase Apple provider: `external_apple_enabled`, `external_apple_client_id`, `external_apple_secret` | `false`, empty, empty | `true`, the Services ID, the step 5 secret | `external_apple_enabled` `false` | **Waiting: step 5.** With the flag unset, no Cadence page offers Apple, but `/auth/v1/authorize?provider=apple` on Supabase works for anyone who builds the URL; that creates an ordinary account, as Google would |
 | 7 | Vercel Production and Preview: `APPLE_SIGN_IN_SERVICES_ID`, `APPLE_SIGN_IN_CLIENT_SECRET` (sensitive) | Unset | The Services ID; the step 5 secret | Unset both | **Waiting: step 5.** `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` and `CONNECTOR_CREDENTIAL_KEY_ID` must already be set (Ticket 235 connectors are live, so they are expected to be; not verified in this task) |
-| 8 | Supabase redirect allow list `uri_allow_list` | 47 entries, including `https://app.cadence-me.com/auth/callback` | Unchanged | None | **No change.** Apple returns through `/auth/callback?next=…&via=apple`; Google already returns with a query on that entry. Confirm on the first Preview run in step 11 |
+| 8 | Supabase redirect allow list `uri_allow_list` | 47 entries, including `https://app.cadence-me.com/auth/callback` | Unchanged for production | None | **No change for production.** Supabase accepts any redirect on the Site URL's host. Corrected November 13: an exact entry does **not** match `/auth/callback?next=…` on any other host (the match includes the query string), so a test deployment needs `https://<host>/auth/callback**` |
 | 9 | Apple portal, Services → Sign in with Apple for Email Communication: register email sources. Domain `cadence-me.com` (SPF and DKIM from owner rows 2 and 3) and the addresses `login@cadence-me.com` (sign-in email) and the reminder sender | None | Each source shows a green SPF check | Remove the source | **Waiting: rows 2, 3 and 4.** The reminder sender address was not read in this task: read it with `npm run sequenzy -- transactional get <SEQUENZY_REMINDER_TEMPLATE_SLUG>` first. Today the only Sequenzy domain is the shared `identityscaffolding.sequenzymail.com`. Apple needs SPF or DKIM that passes for each source, so move the reminder sender to `cadence-me.com` (for example `reminders@cadence-me.com`) once that domain verifies, then register it. Sequenzy's `websites list` has an `appleEmailSources` field to check against |
 | 10 | Vercel Preview: `CADENCE_SIGN_IN_APPLE=on` | Unset | `on` on Preview only | Unset | **Waiting: step 6** |
 | 11 | Production check on a Preview with the test Apple Account (Ticket 337 rows): a new Apple user gets an account and lands on `next`; a returning one reaches the same account; one with "Hide My Email" gets the relay address in Settings; the kept-token row exists (read `apple_sign_in_read_tokens` count only); deleting the account returns 200 from Apple (no `account_deletion_apple_revocation_failed` event) and account.apple.com no longer lists Cadence; an email reminder to the relay address arrives | None | Recorded in Ticket 337's run | None | **Waiting: rows 4 and 5** (test Apple Account); the reminder part waits on step 9 |
@@ -64,3 +65,26 @@ blockers note), **Waiting: step N** (an earlier step here).
   `apple_sign_in_keep_token` and `apple_sign_in_read_tokens` are `security definer` with an
   empty search path, ACL `postgres` and `service_role` only, and `has_function_privilege`
   is false for `anon` and `authenticated` and true for `service_role`.
+
+- **Steps 2–4 and 9, November 13, 17:41–18:08Z.** Done in the Apple portal session (Owner
+  blockers note, "Apple portal session, November 13"): App ID `app.cadence.signin`, Services
+  ID `app.cadence.web`, key `ATZAJU56YW` in the Cadence Release vault item
+  `Cadence Sign in with Apple key 2026-11`, and the email sources `cadence-me.com`,
+  `rp.cadence-me.com`, `rp2.cadence-me.com` and `login@cadence-me.com` (SPF green).
+- **Step 5, 18:58:09Z.** `release-credentials.mjs apple-sign-in-secret --run
+  .intent/acceptance/t333-enable --days 180` with the owner's `release-secrets` approval
+  (18:57Z). The secret expires **2027-05-12T18:58:09Z**. Apple's token endpoint returned
+  `invalid_grant` for a dummy code, so it accepted the client and secret.
+- **Step 6, 18:58Z.** Before: `external_apple_enabled` false, client ID null, secret null,
+  `external_apple_email_optional` false. After (read back twice): enabled true, client ID
+  `app.cadence.web`, secret set. Google and email providers unchanged. Rechecks passed.
+- **Step 7, 18:59Z.** Vercel Production: `APPLE_SIGN_IN_SERVICES_ID` (config) and
+  `APPLE_SIGN_IN_CLIENT_SECRET` (sensitive). Not set on Preview: Preview has no Supabase
+  variables, so no Preview runs Cadence against production. They take effect in
+  Production at the next deployment.
+- **Step 8 (test only), 19:00–19:09Z.** Added
+  `https://cadence-311hbjk9f-emis-projects-4c886aeb.vercel.app/auth/callback` (47 → 48), then
+  replaced it with the same URL plus `**` (see the corrected row). Removed at the end of
+  the run.
+- **Steps 10–11.** Instead of a Preview, an unaliased production-target deployment with the
+  flag on for that deployment only. Rows and results: the production acceptance record.
