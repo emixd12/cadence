@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged with PR #207 and 320 with PR #216, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations through `20261111160000` applied; Mac 0.1.10 with 319 and 320 published November 12 | Ticket 323 matrix in progress; owner decisions of November 12 remove every owner step (`docs/DECISIONS.md`, 2026-11-12, "Finish connector completion"). Flag on after the matrix passes; usage measured after one day (US$5/month ceiling). 324 after 323 | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
+| Tickets 310–324: connector completion (D28) | 310–323 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Ticket 324 in progress | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -89,6 +89,23 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Connector completion turned on in Production — November 13, 2026
+
+- **Flag on.** The owner approved turning `CADENCE_CONNECTOR_COMPLETION` on after the local
+  matrix. Production was redeployed (`dpl_GYPJvtPZFmSEwZ6VL1zgUN4Vy9AT`, commit `5ff760f0`)
+  at 04:30 UTC.
+- **Deployed web passed** as test account A: links saved, the first reconcile completed 12
+  Occurrences and attached 2 workouts with 0 refused, and "From Hevy" shows at 1280 and 390 px.
+- **Installed Mac passed** (0.1.10, test Mac): a forced collision kept both root events on
+  hosted and on the Mac, the manual Not Completed won, and the outbox emptied (Ticket 319).
+  The Mac showed "From Hevy" and the workout time (Ticket 320).
+- **Defect fixed before turning on:** the Timeline's match read sent 200 IDs in one filter
+  and failed with "URI too long", so no label showed (PR #252).
+- **Open:** the owner deletes the Hevy test items; the usage measurement after one day.
+
+Platform impact: web and Mac acceptance; no code in this entry. Messaging impact: none
+(P-042 was logged by Ticket 310).
 
 ## Connector completion: owner decisions and the 0.1.10 ledger — November 12, 2026
 
@@ -269,176 +286,3 @@ Hidden, per the owner's November 12 decision.
   5,882 passed, 1 failed (`tests/acceptance-local-stack.test.mjs`, spaces-in-path entry
   point; this branch does not touch it). Rust lib tests: 157 passed. No live sign-in, Tauri
   bundle, Dagger or Vercel change.
-
-## PR #240 integration review — November 12, 2026
-
-Integrated the device routes with the reviewed PR #238 source (`2601bac8`), including
-PR #242's owner decisions. Earlier status entries and archived history are preserved.
-
-- Added `/api/advisor/brief/device/release` and the authenticated, pending-only
-  `release_daily_brief` RPC. Migration `20261112043335_release_pending_daily_brief.sql`
-  preserves completed attempts, replacement leases, daily admissions and rate limits.
-- Fixed complete-request replay downgrading a successful attempt. Only a request that
-  completed its own lease may undo it after a failed final context fence. Complete also
-  rechecks context expiry after the final fence. No hosted model behavior changes.
-- Fresh `npm ci`, agents, interactions, resolvers, full lint, typecheck and web build
-  passed. Lint retains six existing warnings. The full suite passed 5,729 tests and
-  skipped 230; 29 failed because this executor denies Unix-socket binding (`listen
-  EPERM`) in the unchanged session-broker and Docker-proxy suites. An additional
-  consumer-test failure under a dependency overlay disappeared after fresh `npm ci`;
-  no product change was needed for it.
-- Local `supabase db reset --local` failed before reset because Docker socket access is
-  denied. The SQL ownership, replay and quota regression runs in Local Supabase
-  rehearsal. GitHub CI and Local Supabase rehearsal passed on `968ebeaef`.
-- Applied the reviewed SQL to hosted Supabase as migration `20261112043335` after
-  rehearsal. All 116 migration versions match source. The source filename follows
-  the provider-assigned version; SQL bytes are unchanged. Generated types differ
-  only by the new RPC and match its source type. Hosted grants allow authenticated
-  users only; an authenticated role without a session is rejected. No table shape,
-  RLS policy, admission counter or existing row changed during deployment.
-- The production device-model flag must stay unset under PR #242. No activation
-  occurred; live environment values were not independently verified. Ticket 299
-  wires the hidden client and release call.
-  This change adds no desktop schema or sync-contract change.
-
-Platform impact: web, gated device routes; desktop, Ticket 299 consumes them; marketing
-and future mobile, not applicable. Messaging impact: P-029, unchanged.
-
-## Ticket 297: Mac app ChatGPT connection — November 12, 2026
-
-Cadence for Mac can connect, refresh and disconnect one ChatGPT account (D27). Branch
-`claude/ticket-297-mac-chatgpt`, PR #241. No UI uses it until Ticket 299, whose desktop
-switch stays off by default under the November 12 owner decision.
-
-- Rust (`apps/desktop/src-tauri/src/chatgpt/`) runs discovery, the one-shot `127.0.0.1`
-  callback listener, code exchange, RS256 ID-token validation, the plan-scope check,
-  single-flight refresh, revocation and the catalog read. The webview gets state, email
-  and `slug`/`visibility` rows through `apps/desktop/src/chatgpt/connection.ts`.
-- Tokens and the per-installation host ID stay in two native-only Keychain items,
-  `chatgpt-installation` and `chatgpt-session`. The webview secret commands refuse both.
-  The CSP is unchanged.
-- Direct dependencies `reqwest`, `rustls`, `ring` and `base64` were already in
-  `Cargo.lock` through the updater; the lock adds no crate.
-- Mocked tests pass: 22 new Rust tests (154 Rust lib tests in all) and 6 TypeScript tests,
-  including one that scans an export, two backups and the database for ChatGPT values.
-  No live sign-in ran. Installed acceptance is Ticket 300.
-- PR review added streaming response limits, a callback deadline that incomplete requests
-  cannot extend, grant revocation after failed Keychain persistence, and strict issued-at,
-  audience and authorized-party validation. Three new native regressions cover response
-  limits, stalled callbacks and persistence failures. The six TypeScript connection tests
-  and governance checks passed; Rust is unavailable in the review executor. The reviewed
-  head still requires GitHub Desktop native CI. These changes do not enable the plan path.
-
-## Ticket 298: Daily Brief device prepare and complete — November 12, 2026
-
-Implemented in source on `claude/ticket-298-device-brief`; not pushed or deployed.
-
-- `POST /api/advisor/brief/device/prepare` admits the attempt, builds the context and
-  returns the model request with a signed envelope. `/complete` verifies the envelope and
-  lease, validates the device's output, finishes the lease and records the tip. The server
-  makes no model call on this path and stores no prepared payload.
-- The envelope is HMAC-SHA256 signed under `CADENCE_DAILY_BRIEF_ENVELOPE_SECRET` and
-  expires with the 75-second lease. It binds the user, installation, lease, preferences,
-  configuration and context revisions. `readBriefingContextFence` lets complete fence the
-  stored inputs without a capture in memory. Recipe 1.0 only.
-- `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode, off by default. Settings report
-  `deviceModelAvailable` without `OPENAI_API_KEY`.
-- Platform impact: web, the hosted routes and flag; desktop, Ticket 299 calls them;
-  marketing and future mobile, not applicable. Messaging impact: P-029 (data flow note).
-- Checks: agents, interactions and resolvers checks, typecheck, lint (six existing
-  warnings) and build passed. Vitest on the 50 Daily Brief, briefing and advisor test
-  files: 769 passed. Dagger was not run. Vercel variables are owner-gated and unset.
-
-## Ticket 296: ChatGPT plan adapter — November 12, 2026
-
-**On branch `claude/ticket-296-plan-adapter`.**
-
-- `lib/services/daily-brief-chatgpt-plan.ts`: catalog read, model choice in the owner's
-  order (`gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`; none listed means not eligible, no
-  fallback), the plan request body, SSE reading without a Content-Type, a 256 KB stream cap
-  and 64 KB output cap, and error mapping to `usage_limit`, `not_eligible`, `reconnect`,
-  `retry_later`, `advisor_unavailable` and `timeout`. Browser-safe; no bodies logged.
-- `lib/services/daily-brief-schema.ts` holds the output schema both adapters share;
-  `daily-brief-openai.ts` imports it, so the hosted request is unchanged.
-- Tests: `tests/daily-brief-chatgpt-plan.test.ts` (16). The briefing, Daily Brief and spike
-  tests pass. Ticket 296 is complete; 297 and 298 can start.
-- Platform impact: web, none (hosted path unchanged); desktop, the adapter Ticket 299
-  wires in; marketing and future mobile, not applicable. Messaging impact: none.
-
-## Ticket 295: ChatGPT plan spike passed live — November 12, 2026
-
-**On branch `claude/brief-chatgpt-plan-086210`.**
-
-- The owner signed in with ChatGPT Pro three times on November 12 (UTC). The third run
-  passed. Results and recommendations are in `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
-- Sign-in, the `chatgpt.tokens.use.direct` grant, the catalog (10 models), refresh with
-  rotation and revocation work. CORS allows `tauri://localhost` on both endpoints.
-- Daily Brief through Cadence's validation: `gpt-5.6-luna`, `gpt-6.1-terra` and
-  `gpt-6.1-sol` valid on 8 of 8 fixtures; `gpt-6-astra` 7 of 8 (one
-  `server_is_overloaded`). Slowest call 14.3 s; none over 30 s.
-- The plan route rejects `background`, a string `input` and `stream: false` with 400. It
-  accepts strict `json_schema`, `reasoning`, `tools: []` and `max_output_tokens`.
-- Spike fix: the plan route's streaming 200 has no `Content-Type`. The first two runs read
-  those replies as JSON and marked them interrupted. `scripts/chatgpt-plan-spike.ts` now
-  reads any non-JSON reply as SSE; the mock omits the header, and a test covers it. An
-  uncommitted diagnostic edit (event names and content type in the probe report, no
-  bodies) appeared in the worktree during the first run; it is kept and committed here.
-- The owner approved the recommendations on November 12 and set the model order:
-  `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (`gpt-6-luna` untested).
-- Next: the Ticket 296 adapter, then Tickets 297 and 298.
-- Platform impact: none (development script and QA record). Messaging impact: none.
-
-## Ticket 325: live backups verified — November 12, 2026
-
-The owner created the Cadence Release vault and its read/write service account and stored
-the token in the login keychain (service `cadence-release-1password`). With the owner's
-`release-secrets` approval in chat, recorded in `.intent/acceptance/mac-0.1.10-20261111`,
-an agent ran `backup` for the identity, the notarization credential and the updater key.
-
-- **Verified:** `verify-backups` reports all three items complete with matching
-  fingerprints. The `desktop-release` preflight shows `release-vault-token` and
-  `release-backups` ready.
-- **Fixed in `release-credentials.mjs`:** `op item create` ignored a template on Node's
-  stdin pipe (a socket, not a FIFO) and created "Untitled SecureNote" items, so `backup`
-  now passes a 0600 `--template` file and checks the returned title. Attachment names with
-  periods (`identity.p12`, `cadence-updater.key.pub`) are escaped. Two Untitled items and
-  one partial updater item were deleted from the vault. `tests/release-credentials.test.mjs`
-  covers both (14 pass).
-- **Still open:** the App Store Connect API key (owner creates it), switching notarization
-  to it, and the certificate-renewal spike.
-
-## Cadence for Mac 0.1.10 notarized — November 12, 2026
-
-The owner instructed notarization in chat. An agent built 0.1.10 from `main` at `c67ec4d1`
-(the same app source as PR #223's merge) on the owner's Mac. Apple accepted the app and DMG,
-notarized for the first time with the App Store Connect API key (D29.4). **Not published.**
-Packet: `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md`.
-
-- **Checks 1–3 recorded as passed:** CI, 14 artifact checks, notarization and quarantined download, and the
-  upgrade from published 0.1.9 on the test Mac (schema 20 → 24, no table lost rows). The owner
-  approved returning the test Mac to 0.1.9 first; its dev.2 state is kept in
-  `backups/pre-restore-0.1.9-20261112T031457Z/`.
-- **The Keychain session from 0.1.9 survived the new certificate**, with no prompt; location
-  stayed allowed.
-- **Check 4 cannot run:** 0.1.9 rejects the rotated updater key, so installs upgrade by hand.
-- **Area checks:** Calendar callback replay passes; session renewal and revoked session remain
-  pending. The original run awaited authorization for test-account revocation.
-- **Tickets:** 302 passes in linked and local mode (complete). Ticket 320's schema 24 and
-  contract 5 sync passed; account A had no source links, so completion records were not
-  checked on the Timeline. Hevy timing (236) showed without titles. The leave-reminder
-  recheck for newly added Calendar events was inconclusive.
-- **Owner's Mac:** had no Cadence; 0.1.10 installed from the DMG, local profile; the owner
-  signs in next.
-- **Tooling:** the fixture tool's Google OAuth client is missing from the keychain (lost on
-  November 9); the agent made the test event through Calendar on the web in the QA profile.
-
-PR review follow-up: the owner authorized release work in the current review. Release-Mac
-and test-Mac access, the pending session checks, and the retained acceptance report's
-`launchSyncChanges` evidence remain outstanding. Git confirms the candidate's source and
-the cited CI runs passed. The retained artifacts and installed observations have not been
-independently reverified in this review. A release containing PR #241's native code or
-PR #243's UI requires a new dormant build and ordinary installed release acceptance.
-Ticket 300's separate ChatGPT-plan feature acceptance remains deferred under PR #244.
-
-Platform impact: desktop release only. Web, marketing and future mobile: not applicable.
-Messaging impact: none.
