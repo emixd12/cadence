@@ -45,6 +45,8 @@ export type DesktopConnectorsResult = Readonly<{
   outlookCoordinator: DesktopOutlookCalendarPanelCoordinator | null;
   icloudCoordinator: DesktopIcloudCalendarCoordinator | null;
   hevyCoordinator: DesktopHevyCoordinator | null;
+  /** Ticket 330: the hosted broker while this Mac is linked to an account; null otherwise. */
+  broker: DesktopConnectorBroker | null;
   outlookMessage: string | undefined;
   panelVersion: number;
   outlook: OutlookTimelineState;
@@ -322,7 +324,7 @@ export function useDesktopConnectors(options: DesktopConnectorsOptions): Desktop
     || icloud.snapshot.requestedRange.startLocalDate !== todayLocalDate) ? { ...icloud, snapshot: null } : icloud;
   const ownedHevy = hevy.day && hevy.day.localDate !== todayLocalDate ? { ...hevy, day: null } : hevy;
   const linked = Boolean(broker && accountId);
-  return { outlookCoordinator, icloudCoordinator, hevyCoordinator, outlookMessage, panelVersion, outlook: linked ? ownedOutlook : OUTLOOK_EMPTY, icloud: linked ? ownedIcloud : OUTLOOK_EMPTY, hevy: linked ? ownedHevy : HEVY_EMPTY,
+  return { outlookCoordinator, icloudCoordinator, hevyCoordinator, broker: linked ? broker : null, outlookMessage, panelVersion, outlook: linked ? ownedOutlook : OUTLOOK_EMPTY, icloud: linked ? ownedIcloud : OUTLOOK_EMPTY, hevy: linked ? ownedHevy : HEVY_EMPTY,
     unavailableReason: !broker && client ? "build" : !accountId || !client ? "local" : null, refresh };
 }
 

@@ -1,6 +1,7 @@
 import type { ExternalEventSnapshotV1_1 } from "@cadence/core/types/external-event";
 import type { ConnectorConnectionView, ConnectorPreferences, ConnectorRevocationInstruction } from "@/lib/types/connectors";
 import type { ConnectorCalendarEntry, ConnectorDisconnectResult, ConnectorEventRange } from "@/lib/ui/connectors";
+import type { SourceLinkFormState, SourceLinkMode, SourceLinkSaveResult } from "@/lib/ui/source-links";
 import type { DesktopCalendarBroker } from "./google-calendar";
 
 // Ticket 238: Outlook and Hevy hosted routes over the existing authenticated
@@ -57,6 +58,16 @@ export class DesktopConnectorBroker {
   /** Ticket 319: one hosted reconcile for connector completion; evidence is read on the server. */
   connectorReconcile(source: "hevy"): Promise<{ status: string; counts: { completed: number; attached: number; removed: number } }> {
     return this.transport.request("/api/connectors/completions/reconcile", { method: "POST", body: JSON.stringify({ source }) });
+  }
+
+  /** Ticket 330: one Behavior's Hevy link form state; an empty ID is a Behavior being created. */
+  sourceLinkState(behaviorId: string): Promise<SourceLinkFormState> {
+    return this.transport.request(`/api/connectors/links?${new URLSearchParams({ behaviorId, source: "hevy" })}`);
+  }
+  /** Ticket 330: saves one Behavior's Hevy link on the hosted account. */
+  sourceLinkSave(input: Readonly<{ behaviorId: string; mode: SourceLinkMode; selectorKeys: readonly string[] }>): Promise<SourceLinkSaveResult> {
+    return this.transport.request("/api/connectors/links", { method: "PUT",
+      body: JSON.stringify({ behaviorId: input.behaviorId, source: "hevy", mode: input.mode, selectorKeys: [...input.selectorKeys] }) });
   }
 
   private async disconnect(path: string): Promise<ConnectorDisconnectResult> {

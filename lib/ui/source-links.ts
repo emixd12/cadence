@@ -1,5 +1,7 @@
 import type { SourceLinkFormState, SourceLinkMode, SourceLinkSaveResult } from "@/lib/services/source-links.service";
 
+export type { SourceLinkFormState, SourceLinkMode, SourceLinkSaveResult };
+
 // Ticket 317: the browser side of a Behavior's source link. Routine titles arrive
 // from the hosted route for the picker and are never cached or stored here.
 

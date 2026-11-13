@@ -8,6 +8,7 @@ import {
 import { BehaviorCreateSection } from "@/components/behaviors/BehaviorCreateSection";
 import { BehaviorList } from "@/components/behaviors/BehaviorList";
 import type { BehaviorFormAction } from "@/lib/types/behavior";
+import type { SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { DesktopScreenFrame } from "./desktop-screen-frame";
 
 export type BehaviorReviewSelection = Readonly<{
@@ -24,6 +25,8 @@ export type BehaviorsScreenProps = ComponentProps<typeof BehaviorList> &
     defaultTimezone: string;
     onRefresh: () => void;
     onNavigateReview: NavigateReview;
+    /** Ticket 330: Complete from Hevy while this Mac is linked; null in local mode. */
+    sourceLinkCoordinator?: SourceLinkCoordinator | null;
   }>;
 
 export function BehaviorsScreen({
@@ -31,6 +34,7 @@ export function BehaviorsScreen({
   defaultTimezone,
   onRefresh,
   onNavigateReview,
+  sourceLinkCoordinator = null,
   ...listProps
 }: BehaviorsScreenProps) {
   const hasBehaviors =
@@ -47,8 +51,9 @@ export function BehaviorsScreen({
               defaultTimezone={defaultTimezone}
               defaultOpen={!hasBehaviors}
               reminderRuntime="desktop"
+              sourceLinkCoordinator={sourceLinkCoordinator}
             />
-            <BehaviorList {...listProps} reminderRuntime="desktop" />
+            <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator} />
           </DesktopScreenFrame>
         </RefreshProvider>
       </LinkProvider>

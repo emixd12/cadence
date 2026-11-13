@@ -90,6 +90,15 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 330: Complete from Hevy on a linked Mac — November 13, 2026
+
+- **Built:** a linked Mac shows Complete from Hevy in Behavior settings and Create behavior,
+  reading and saving through the hosted link route over the authenticated broker. A save
+  syncs first (so a Behavior made on the Mac exists on the account) and again after.
+- **Not verified yet:** installed acceptance on a dev-signed build.
+
+Platform impact: Mac; web unchanged. Messaging impact: P-050.
+
 ## Ticket 329: Complete from Hevy at Behavior creation — November 13, 2026
 
 - **Built:** Create behavior on the web shows the Complete from Hevy choices when the flag is
