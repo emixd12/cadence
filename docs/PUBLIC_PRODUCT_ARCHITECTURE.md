@@ -202,7 +202,8 @@ tracker.
 
 Launch auth:
 
-- Google login only.
+- Google login only today. Tickets 331–337 plan email and Apple sign-in
+  (`docs/DECISIONS.md`, 2026-11-13, D31); not shipped.
 - Supabase Auth remains the web identity provider.
 - The default route after login remains `/timeline`.
 - Public registration remains closed until the marketing-content publication
