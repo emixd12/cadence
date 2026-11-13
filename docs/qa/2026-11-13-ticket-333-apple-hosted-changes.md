@@ -20,7 +20,7 @@ blockers note), **Waiting: step N** (an earlier step here).
 
 | # | Change | Before | After | Rollback | State |
 |---|---|---|---|---|---|
-| 1 | Push migration `20261113180000_apple_sign_in_tokens.sql` (table `cadence_calendar_private.apple_sign_in_tokens`, functions `apple_sign_in_keep_token` and `apple_sign_in_read_tokens`, `service_role` only) | Not present | Present; `has_function_privilege('authenticated', …, 'execute')` false for both; RLS on | A new migration: `drop function public.apple_sign_in_keep_token(uuid,text,text); drop function public.apple_sign_in_read_tokens(uuid); drop table cadence_calendar_private.apple_sign_in_tokens;` | **Ready: the owner said yes on November 13, 18:18Z (row 10; `docs/DECISIONS.md`, 2026-11-13, "Service-role functions for the sealed Apple token").** New objects only, but the migration grants `execute` to `service_role`, which the standing approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) excludes; migration `20261111150000` needed the owner's yes for the same reason. Push before or with the merge. Verifier, November 13: `db reset` on a separate local stack applied it; RLS on, no policies, table reachable only through the two functions, `anon` refused, cascade on user deletion. With the flag off, nothing calls the functions; account deletion calls the read only for an account with an Apple identity |
+| 1 | Push migration `20261113180000_apple_sign_in_tokens.sql` (table `cadence_calendar_private.apple_sign_in_tokens`, functions `apple_sign_in_keep_token` and `apple_sign_in_read_tokens`, `service_role` only) | Not present | Present; `has_function_privilege('authenticated', …, 'execute')` false for both; RLS on | A new migration: `drop function public.apple_sign_in_keep_token(uuid,text,text); drop function public.apple_sign_in_read_tokens(uuid); drop table cadence_calendar_private.apple_sign_in_tokens;` | **Done 18:20:17Z (see "Applied").** The owner said yes on November 13, 18:18Z (row 10; `docs/DECISIONS.md`, 2026-11-13, "Service-role functions for the sealed Apple token").** New objects only, but the migration grants `execute` to `service_role`, which the standing approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) excludes; migration `20261111150000` needed the owner's yes for the same reason. Push before or with the merge. Verifier, November 13: `db reset` on a separate local stack applied it; RLS on, no policies, table reachable only through the two functions, `anon` refused, cascade on user deletion. With the flag off, nothing calls the functions; account deletion calls the read only for an account with an Apple identity |
 | 2 | Apple portal: a new primary App ID with Sign in with Apple, for example `app.cadence.signin` ("Cadence sign-in") | Not verified whether one exists | Present, Sign in with Apple enabled as a primary App ID | Remove the capability or delete the App ID | **Waiting: row 4** (A: owner at the Mac for 1Password and two-factor). Do not add the capability to `app.cadence.desktop`: it can invalidate the Developer ID profile Mac releases use |
 | 3 | Apple portal: Services ID, for example `app.cadence.web`, description "Cadence" (the name Apple's page shows). Configure: primary App ID from step 2; domain `qjodzutjxtmtzczbloxa.supabase.co`; return URL `https://qjodzutjxtmtzczbloxa.supabase.co/auth/v1/callback` | None | Present and configured | Remove the domain and return URL, or delete the Services ID | **Waiting: row 4.** The Services ID must not contain the team ID |
 | 4 | Apple portal: a Sign in with Apple key for the primary App ID. Download the `.p8` once; note the Key ID. Store both in the Cadence Release vault as `apple-sign-in-key` | None | Key in the vault | Revoke the key in the portal (every secret made from it stops working) | **Waiting: row 4** (B: who creates the key and where it lives) |
@@ -51,3 +51,16 @@ blockers note), **Waiting: step N** (an earlier step here).
 - **Missing email.** The callback maps Supabase's error description that names the email
   to `apple_email_missing`. The wording of Supabase's description was not read from a real
   Apple sign-in.
+
+## Applied
+
+- **Step 1, November 13, 2026, 18:20:17Z.** Pushed by the Ticket 333 verifier with the vault
+  token `supabase-access-token` and CLI 2.105.0, under the owner's yes of 18:18Z (row 10).
+  Before: `migration list` showed hosted equal to git (119 migrations) except
+  `20261113180000`; the table and both functions were absent. After: `db push` applied
+  `20261113180000_apple_sign_in_tokens.sql`. Readback through the Management API (read-only
+  query): RLS on `cadence_calendar_private.apple_sign_in_tokens`, 0 policies, no table
+  grants, schema ACL unchanged (owner only), foreign key cascades, 0 rows;
+  `apple_sign_in_keep_token` and `apple_sign_in_read_tokens` are `security definer` with an
+  empty search path, ACL `postgres` and `service_role` only, and `has_function_privilege`
+  is false for `anon` and `authenticated` and true for `service_role`.
