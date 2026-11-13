@@ -18,6 +18,10 @@ export const STEPS = Object.freeze({
   'travel-settings-a': "turn on A's Travel estimates, routing consent, Home and leave reminders (docs/qa/travel-release.md)",
   'local-stack-tools': 'install Docker, the Supabase CLI, psql and openssl (docs/qa/mcp-server.md)',
   'dev-signed-env': 'recreate dev-signed-env.sh (docs/DESKTOP_RELEASE.md, Local preparation)',
+  'auth-email-provider': 'turn on the hosted Auth email provider (docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md)',
+  'auth-apple-provider': 'turn on the hosted Auth Apple provider (docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md)',
+  'auth-manual-linking': 'turn on hosted manual identity linking (docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md, step 4)',
+  'auth-secure-email-change': 'turn on hosted secure email change (docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md, step 3)',
 });
 
 export async function main(argv, { out = (line) => process.stdout.write(`${line}\n`) } = {}) {
