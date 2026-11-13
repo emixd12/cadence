@@ -945,6 +945,9 @@ describe('profile guard', () => {
       expect(owns({ 101: ours }, 4431)).toBe(false);
       expect(owns({ 101: ours, 202: '/usr/bin/nc -l 4430' })).toBe(false);
       expect(owns({})).toBe(false);
+      const last = `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --no-first-run --remote-debugging-port=4430 --user-data-dir=${dir}\n`;
+      expect(owns({ 101: last })).toBe(true);
+      expect(owns({ 101: last.replace(dir, `${dir}-copy`) })).toBe(false);
       expect(owns({ 101: `/tmp/fake-chrome --user-data-dir=${dir} --remote-debugging-port=4430` })).toBe(false);
       let connected = false;
       await expect(attachProfile({ profileDir: dir, owns: () => false, connect: async () => { connected = true; } })).rejects.toMatchObject({ reason: 'profile-not-open' });

@@ -172,8 +172,8 @@ export function profileOwnsPort({
   if (!pids.length) return false;
   return pids.every((pid) => {
     let command = '';
-    try { command = commandOf(pid); } catch { return false; }
-    return command.startsWith(`${CHROME_BIN} `) && command.includes(`--user-data-dir=${profileDir} `) && command.includes(`--remote-debugging-port=${port}`);
+    try { command = commandOf(pid).trimEnd(); } catch { return false; }
+    return command.startsWith(`${CHROME_BIN} `) && (command.includes(`--user-data-dir=${profileDir} `) || command.endsWith(`--user-data-dir=${profileDir}`)) && command.includes(`--remote-debugging-port=${port}`);
   });
 }
 
