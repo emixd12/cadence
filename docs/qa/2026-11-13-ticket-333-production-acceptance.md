@@ -1,14 +1,16 @@
 # Ticket 333: production acceptance of Apple sign-in
 
-Run November 13, 2026, 18:35–19:15Z (and continuing), by the Apple enablement agent. Run
+Run November 13, 2026, 18:35–20:44Z, by the Apple enablement agent. Run
 folder (git-ignored): `.intent/acceptance/t333-enable/` in the Intent workspace worktree
 (`evidence.jsonl`, `rechecks.jsonl`, `auth-*.json`, `events.jsonl` for the vault reads).
 No token, client secret, key, cookie or email address was printed or recorded; addresses
 appear only as their domain.
 
-**Result so far: every Apple row run has passed, apart from the Hide My Email relay row,
-which waits on one more owner sign-in.** `CADENCE_SIGN_IN_APPLE` stays off in production
-until that row passes.
+**Result: every Apple row passed. The relay email row was skipped by the owner.**
+`CADENCE_SIGN_IN_APPLE` stays off in production by the coordinator's hold (20:43Z): Apple
+goes on together with `CADENCE_SIGN_IN_LINKING` (Ticket 334), so an existing Google user who
+picks Apple with Hide My Email can join the second account from Settings. The Supabase Apple
+provider and the Vercel Production `APPLE_SIGN_IN_*` values stay set.
 
 ## Setup
 
@@ -24,8 +26,13 @@ until that row passes.
   printed. `app.cadence-me.com` kept serving the production deployment with the flag
   off: Login showed only Continue with Google after every change.
 - **Browser.** The Intent in-app browser tab never mounted, so the agent used the Cadence
-  QA Chrome window. The owner signed in there with their personal Apple Account (Apple
-  refused to create a test account, owner row 5).
+  QA Chrome window for runs 1 and 2. The owner signed in with their personal Apple Account
+  (Apple refused to create a test account, owner row 5). For run 3 the agent used a
+  separate Chrome with its own temporary profile. Two attempts in QA Chrome failed, both
+  before reaching Cadence: at 20:30Z the deployment's access pass had expired, so Vercel's
+  login page caught Apple's return; at 20:38Z another agent's acceptance run was driving
+  the shared window. Lesson: run owner sign-ins in a dedicated browser profile, not the
+  shared QA profile.
 
 ## Rows
 
@@ -35,8 +42,9 @@ until that row passes.
 | Supabase returns `provider_refresh_token`; a sealed row exists | **Passed.** The session after the 19:10:42Z sign-in carried a provider refresh token (presence read only). One row in `apple_sign_in_tokens` for that user, subject digest `638b28a6…`, one Apple identity. No `apple_sign_in_token_missing` event | `who`, `apple-token-rows`, `logs-scan` |
 | Returning sign-in reaches the same account | **Passed.** The 19:10:42Z sign-in reached user `61133341…`, created 19:06:48Z. No second user | `apple-users` |
 | What Settings shows | **Passed.** The email row shows the address Apple shared. On this run that was the owner's real address (`gmail.com`), because Apple's sharing prompt was answered with Share My Email | `settings` read, addresses masked |
-| Relay address (Hide My Email) | **Waiting** on the owner's third sign-in. Apple asks the sharing question only on first authorization. After the deletion below revoked Cadence's authorization, the next sign-in should ask again | — |
-| An email reaches the relay address | **Skipped** by the owner ("skip the test email") | — |
+| Relay address (Hide My Email) | **Passed.** After the deletion revoked Cadence's authorization, Apple asked the sharing question again (20:30Z attempt), and the owner chose Hide My Email. The 20:41:33Z sign-in created a new account `f6f5c0f7…` with one Apple identity, an address on `privaterelay.appleid.com`, no data beyond the 8 default categories, and one sealed token row with the same subject digest as run 1. Settings shows the relay address. No account with a non-relay address has an Apple identity, so nothing joined the owner's Google account. Apple sent no name on this run: the name came with the 20:30Z authorization, which never reached Cadence | `relay-session`, `relay-settings`, `apple-users`, `user-data` |
+| An email reaches the relay address | **Skipped** by the owner ("skip the test email"). The Apple email sources pass SPF (Owner blockers note, "Apple portal session") | — |
+| Deleting the relay account | **Passed.** Settings → Delete account at 20:42:36Z after confirming the account was fresh; session 401; user and token row gone; no warn-level line in the deletion window | `relay-account-deletion`, `relay-logs-scan` |
 | Account deletion revokes at Apple and removes the row | **Passed.** Settings → Delete account (export box checked, the address typed) at 19:12:30Z. Session 401 afterwards; the Auth user and the token row are gone. Runtime logs for the deployment hold no warn or error line in the deletion window, so neither `account_deletion_apple_token_absent` nor `account_deletion_apple_revocation_failed` fired (both log at warn). A successful revoke logs nothing; the fresh consent prompt on the next first sign-in is the Apple-side check | `account-deletion`, `logs-scan` |
 | Google sign-in and kept sessions after each change | **Passed** at baseline (18:42Z) and after the Apple provider (19:00Z): kept sessions A and B refresh; a fresh Google sign-in as A on `app.cadence-me.com` returns A's user ID. Google as A on the test deployment returned to it after the allow-list fix (19:09Z) | `rechecks.jsonl`, `evidence.jsonl` |
 
@@ -52,9 +60,20 @@ URL rule. For any other host (a test deployment, a future custom domain), add
 `https://<host>/auth/callback**`. The test entry was swapped at 19:09Z and is removed
 after the run.
 
-## Cleanup (at the end of the run)
+## Cleanup (done 20:43–20:44Z)
 
-- Remove `https://cadence-311hbjk9f-emis-projects-4c886aeb.vercel.app/auth/callback**`
-  from the allow list and delete the test deployment.
-- Clear `appleid.apple.com` and `apple.com` cookies from Cadence QA Chrome.
-- Delete the owner's third-run Apple account through Settings.
+- Removed `https://cadence-311hbjk9f-emis-projects-4c886aeb.vercel.app/auth/callback**`
+  from the allow list (49 → 48; the remaining extra entry belongs to another agent's test
+  deployment) and deleted the test deployment. The trial deployment was deleted at 18:40Z.
+- Cleared the 4 `apple.com` cookies from Cadence QA Chrome; closed the separate Chrome and
+  deleted its profile.
+- Both test accounts were deleted through Settings; none remain with an Apple identity.
+- Still set, by design: the Supabase Apple provider (enabled, client ID `app.cadence.web`,
+  secret set) and Vercel Production `APPLE_SIGN_IN_SERVICES_ID` and
+  `APPLE_SIGN_IN_CLIENT_SECRET`. `CADENCE_SIGN_IN_APPLE` is unset in Production.
+
+## Remaining step
+
+Set `CADENCE_SIGN_IN_APPLE=on` in Vercel Production with `CADENCE_SIGN_IN_LINKING`, in the
+order the coordinator gives, redeploy, then check `/login` at 390 px and desktop and
+recheck Google sign-in and the kept sessions.
