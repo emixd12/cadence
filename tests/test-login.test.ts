@@ -106,13 +106,14 @@ describe("test login route", () => {
       error: null,
     });
     const deleteUser = vi.fn();
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
+    const generateLink = linkFor();
+    const verifyOtp = vi.fn().mockResolvedValue({ error: null });
 
     vi.mocked(createServiceRoleClient).mockReturnValue({
-      auth: { admin: { createUser, deleteUser } },
+      auth: { admin: { createUser, deleteUser, generateLink } },
     } as unknown as ReturnType<typeof createServiceRoleClient>);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signInWithPassword },
+      auth: { verifyOtp },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
 
     const response = await GET(
@@ -129,9 +130,13 @@ describe("test login route", () => {
         user_metadata: { name: "Cadence Test Login" },
       }),
     );
-    expect(signInWithPassword).toHaveBeenCalledWith({
+    expect(generateLink).toHaveBeenCalledWith({
+      type: "magiclink",
       email: expect.stringMatching(/^cadence-test-.+@example\.invalid$/),
-      password: expect.stringMatching(/^CadenceTestLogin-.+-aA1!$/),
+    });
+    expect(verifyOtp).toHaveBeenCalledWith({
+      token_hash: "hashed-token",
+      type: "email",
     });
     expect(deleteUser).not.toHaveBeenCalled();
     expect(response.headers.get("location")).toBe(
@@ -139,22 +144,23 @@ describe("test login route", () => {
     );
   });
 
-  it("deletes the temporary user when normal sign-in fails", async () => {
+  it("deletes the temporary user when sign-in fails", async () => {
     stubEnabledLocalSupabaseEnv();
     const createUser = vi.fn().mockResolvedValue({
       data: { user: { id: "temporary-user-id" } },
       error: null,
     });
     const deleteUser = vi.fn().mockResolvedValue({ error: null });
-    const signInWithPassword = vi
+    const generateLink = linkFor();
+    const verifyOtp = vi
       .fn()
-      .mockResolvedValue({ error: new Error("bad password") });
+      .mockResolvedValue({ error: new Error("bad token") });
 
     vi.mocked(createServiceRoleClient).mockReturnValue({
-      auth: { admin: { createUser, deleteUser } },
+      auth: { admin: { createUser, deleteUser, generateLink } },
     } as unknown as ReturnType<typeof createServiceRoleClient>);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signInWithPassword },
+      auth: { verifyOtp },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
 
     const response = await GET(
@@ -177,13 +183,14 @@ describe("test login route", () => {
         error: null,
       });
     const deleteUser = vi.fn();
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
+    const generateLink = linkFor();
+    const verifyOtp = vi.fn().mockResolvedValue({ error: null });
 
     vi.mocked(createServiceRoleClient).mockReturnValue({
-      auth: { admin: { createUser, deleteUser } },
+      auth: { admin: { createUser, deleteUser, generateLink } },
     } as unknown as ReturnType<typeof createServiceRoleClient>);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signInWithPassword },
+      auth: { verifyOtp },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
 
     const failed = await GET(
@@ -206,13 +213,14 @@ describe("test login route", () => {
       error: null,
     });
     const deleteUser = vi.fn();
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
+    const generateLink = linkFor();
+    const verifyOtp = vi.fn().mockResolvedValue({ error: null });
 
     vi.mocked(createServiceRoleClient).mockReturnValue({
-      auth: { admin: { createUser, deleteUser } },
+      auth: { admin: { createUser, deleteUser, generateLink } },
     } as unknown as ReturnType<typeof createServiceRoleClient>);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signInWithPassword },
+      auth: { verifyOtp },
     } as unknown as Awaited<ReturnType<typeof createClient>>);
 
     for (let index = 0; index < TEST_LOGIN_CREATION_QUOTA; index += 1) {
@@ -234,6 +242,13 @@ describe("test login route", () => {
     );
   });
 });
+
+function linkFor() {
+  return vi.fn().mockResolvedValue({
+    data: { properties: { hashed_token: "hashed-token" } },
+    error: null,
+  });
+}
 
 function stubEnabledLocalSupabaseEnv() {
   vi.stubEnv("CADENCE_ENABLE_TEST_LOGIN", "1");

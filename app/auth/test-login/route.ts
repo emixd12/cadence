@@ -89,12 +89,24 @@ export async function GET(request: NextRequest) {
   let signInError: unknown;
 
   try {
-    const supabase = await createClient();
-    const result = await supabase.auth.signInWithPassword({
-      email: credentials.email,
-      password: credentials.password,
-    });
-    signInError = result.error;
+    // A password sign-in needs a CAPTCHA token once hosted Auth turns CAPTCHA on;
+    // generating and verifying a link token does not (Ticket 332).
+    const { data: link, error: linkError } =
+      await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: credentials.email,
+      });
+    const tokenHash = link?.properties?.hashed_token;
+    if (linkError || !tokenHash) {
+      signInError = linkError ?? new Error("test_login_link_missing");
+    } else {
+      const supabase = await createClient();
+      const result = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: "email",
+      });
+      signInError = result.error;
+    }
   } catch (error) {
     signInError = error;
   }
