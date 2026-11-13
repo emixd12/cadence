@@ -1202,6 +1202,66 @@ hosted Auth CAPTCHA. The code length is `EMAIL_SIGN_IN_CODE_LENGTH` in
 Auth (an open owner decision: 6 or 8). Local check:
 `docs/qa/2026-11-13-ticket-332-email-sign-in.md`.
 
+### Sign in with Apple (Ticket 333)
+
+Continue with Apple starts Supabase Auth's Apple provider through
+`/auth/sign-in/apple`. Apple returns to Supabase
+(`https://qjodzutjxtmtzczbloxa.supabase.co/auth/v1/callback`), and Supabase returns to
+`/auth/callback?next=…&via=apple`. The redirect allow list needs no new entry. Hosted
+setup, in order, with before, after and rollback values:
+`docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`. Local check:
+`docs/qa/2026-11-13-ticket-333-apple-sign-in.md`.
+
+Values and where they live:
+
+| Value | Where | Notes |
+| --- | --- | --- |
+| Services ID (the OAuth `client_id`) | Supabase Apple provider `external_apple_client_id`; Vercel `APPLE_SIGN_IN_SERVICES_ID` | Not secret. Must not contain the team ID |
+| Client secret (ES256 JWT, at most about 182 days) | Supabase `external_apple_secret`; Vercel `APPLE_SIGN_IN_CLIENT_SECRET` (Production and Preview) | The same value in both places |
+| Sign in with Apple key (`.p8`) and its Key ID | Cadence Release vault (owner blockers row 4B) | Keys do not expire. Each read needs the owner's approval |
+| Team ID | `HK26VT477G` | |
+
+Account deletion revokes Cadence's authorization at Apple
+(`POST https://appleid.apple.com/auth/revoke` with the kept refresh token) after the Auth
+user is deleted. A failed revocation never fails the deletion. Monitoring events, none of
+which carries a token or address: `apple_sign_in_token_missing` (Auth returned no refresh
+token), `apple_sign_in_token_not_kept` (connector key unset), `apple_sign_in_token_store_failed`,
+`account_deletion_apple_token_absent`, `account_deletion_apple_token_read_failed` and
+`account_deletion_apple_revocation_failed` (with `reason`: `not_configured`,
+`unreadable_token`, `provider_refused` or `provider_unavailable`).
+
+**Client-secret rotation (every 5 months).** Apple rejects a client secret after its
+`exp`, at most 15,777,000 seconds (about 182 days) after it was made. Rotate 30 days before
+that. `STATUS.md` "Open work" holds the dated row with the current secret's expiry.
+
+1. Run `npm run qa:preflight -- --suite hosted-migrations` (it checks the Supabase token).
+2. Read the `.p8` and Key ID from the Cadence Release vault. The owner approves the read.
+3. Make the secret, keeping the key in the environment only:
+   `APPLE_SIGN_IN_PRIVATE_KEY="<p8 contents>" node scripts/apple-client-secret.mjs --key-id <Key ID> --team-id HK26VT477G --client-id <Services ID> --days 180 --json`.
+   The output gives the secret and its expiry.
+4. `PATCH /v1/projects/qjodzutjxtmtzczbloxa/config/auth` with `external_apple_secret`
+   (Management API, through `agent:secret` as in the Ticket 332 change list). Read it back
+   twice: a change can take a few seconds to show.
+5. Set `APPLE_SIGN_IN_CLIENT_SECRET` in Vercel Production and Preview to the same value,
+   then redeploy Production.
+6. Sign in with the test Apple Account on a Preview with `CADENCE_SIGN_IN_APPLE=on`
+   (Ticket 337 row), and check that no `auth_callback_provider_error` event follows.
+7. Update the dated row in `STATUS.md` with the new expiry and the next rotate-by date
+   (expiry minus 30 days).
+
+**Missed rotation: what happens and how to recover.** After the secret expires, Apple
+answers `invalid_client`. Every Apple sign-in and sign-up fails: Supabase returns to
+`/auth/callback` with an error, and the person sees "The sign-in could not be verified."
+Google and email sign-in are not affected, and signed-in sessions continue, because
+Supabase refreshes its own sessions without Apple. Account deletion still deletes, but
+its Apple revocation fails with `provider_refused`. To recover, run steps 2–7 at once:
+the same key makes a valid secret, and sign-in works as soon as Supabase holds it. Then
+read the monitoring log for `account_deletion_apple_revocation_failed` events since the
+expiry. Their tokens were deleted with the accounts and cannot be revoked; the person
+can remove Cadence at account.apple.com under Sign in with Apple. Record the count in
+`STATUS.md`. If the key itself was revoked or lost, create a new key in the Apple
+Developer portal (owner blockers row 4), store it in the vault, and run the same steps.
+
 ## Source-of-truth order
 
 1. `AGENTS.md`: operating rules and architecture constraints.

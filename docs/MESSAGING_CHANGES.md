@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-053` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-054` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1631,4 +1631,29 @@ cite has not changed.
   state that email accounts have no password. The sign-in email's own text is in-app
   voice and changes with the template.
 - **Related:** P-051.
+- **Status:** logged.
+
+## P-053: Apple sign-in details: Apple's token kept for revocation, relay addresses
+
+- **Change:** implemented November 13, 2026 behind `CADENCE_SIGN_IN_APPLE` (Ticket 333,
+  D31.2), off in production. Continue with Apple signs in through Apple and Supabase.
+  Apple may share the person's name (first sign-in only) and an email address, which can
+  be a Hide My Email relay address; Cadence shows that address in Settings and sends
+  reminders and sign-in email to it. Cadence keeps Apple's refresh token, encrypted on the
+  server, only to revoke Cadence's access at Apple when the account is deleted. It stores
+  no raw Apple account ID (a one-way digest only). A relay address that differs from the
+  person's Google address creates a separate account.
+- **Affected:** Ticket 333. Files: `app/(auth)/login/SignInMethods.tsx`,
+  `app/auth/callback/route.ts`, `lib/services/apple-sign-in.service.ts`,
+  `lib/services/account.service.ts`.
+- **Surfaces:** Privacy (providers table: Apple; what an Apple sign-in collects; the kept
+  token and why; deletion revokes Cadence at Apple), the user guide's sign-in and account
+  deletion sections, Trust if it lists providers.
+- **Conflicting current text:** Privacy names Supabase and Google for sign-in, lists no
+  Apple data and says nothing about revoking a sign-in provider on deletion.
+- **Update needed:** name Apple as a sign-in provider; list name, email or relay address
+  and the encrypted refresh token; say deletion revokes Cadence's Apple access; tell
+  people who use Hide My Email that a relay address is a separate account until they add
+  Apple to their existing account (Ticket 334).
+- **Related:** P-051, P-052, L-024, L-025.
 - **Status:** logged.

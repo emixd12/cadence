@@ -13,6 +13,8 @@ import {
 
 import { prepareCalendarRevocation } from "@/lib/services/google-calendar.service";
 vi.mock("@/lib/services/google-calendar.service", () => ({ prepareCalendarRevocation: vi.fn() }));
+import { prepareAppleRevocation } from "@/lib/services/apple-sign-in.service";
+vi.mock("@/lib/services/apple-sign-in.service", () => ({ prepareAppleRevocation: vi.fn() }));
 
 const CANARY_ENV = "CADENCE_ACCOUNT_DELETION_FAILURE_CANARY_USER_ID";
 const USER_ID = "00000000-0000-4000-8000-000000000001";
@@ -35,6 +37,7 @@ describe("account deletion service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prepareCalendarRevocation).mockResolvedValue(null);
+    vi.mocked(prepareAppleRevocation).mockResolvedValue(null);
     vi.stubEnv(CANARY_ENV, "");
   });
 
@@ -57,6 +60,29 @@ describe("account deletion service", () => {
       expect(revoke).toHaveBeenCalledOnce();
       expect(deleteUser.mock.invocationCallOrder[0]).toBeLessThan(revoke.mock.invocationCallOrder[0]!);
     }
+  });
+
+  // Ticket 333 (L-025): the kept Apple token is read before deletion (the row
+  // cascades) and revoked after; a refusal never turns deletion into a retry.
+  it.each([false, true])("revokes Apple only after Auth deletion for an Apple account (Apple refuses=%s)", async (refuses) => {
+    const { deleteUser, signOut } = mockSignedInAccount({ identities: ["apple"] });
+    const revoke = refuses
+      ? vi.fn().mockRejectedValue(new Error("provider_refused"))
+      : vi.fn().mockResolvedValue(undefined);
+    vi.mocked(prepareAppleRevocation).mockResolvedValue(revoke);
+
+    await deleteCurrentAccountFromFormData(confirmedDeletionForm());
+
+    expect(prepareAppleRevocation).toHaveBeenCalledWith(USER_ID);
+    expect(vi.mocked(prepareAppleRevocation).mock.invocationCallOrder[0]).toBeLessThan(deleteUser.mock.invocationCallOrder[0]!);
+    expect(deleteUser.mock.invocationCallOrder[0]).toBeLessThan(revoke.mock.invocationCallOrder[0]!);
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("does not read Apple tokens for an account without an Apple identity", async () => {
+    mockSignedInAccount({ identities: ["google"] });
+    await deleteCurrentAccountFromFormData(confirmedDeletionForm());
+    expect(prepareAppleRevocation).not.toHaveBeenCalled();
   });
 
   it("requires the export acknowledgement before deleting", async () => {
@@ -251,7 +277,7 @@ describe("account deletion service", () => {
   });
 });
 
-function mockSignedInAccount(input: { email?: string | null } = {}) {
+function mockSignedInAccount(input: { email?: string | null; identities?: string[] } = {}) {
   const signOut = vi.fn().mockResolvedValue({ error: null });
   const getUserById = vi.fn().mockResolvedValue({
     data: { user: { id: USER_ID } },
@@ -266,6 +292,7 @@ function mockSignedInAccount(input: { email?: string | null } = {}) {
           user: {
             id: USER_ID,
             email: input.email === undefined ? "emi@example.com" : input.email,
+            identities: (input.identities ?? []).map((provider) => ({ provider })),
           },
         },
         error: null,

@@ -254,6 +254,21 @@ with email confirmation on, only a service-role caller can confirm such an addre
 function calls only built-in functions because it runs as the Auth service's role. Local
 check: `tests/email-sign-in.local-integration.test.ts`.
 
+**Apple refresh tokens for revocation (Ticket 333, L-025).** Supabase Auth hands Apple's
+refresh token to the sign-in callback once and keeps none, so Cadence keeps it to revoke
+its Sign in with Apple authorization when the account is deleted. Table
+`cadence_calendar_private.apple_sign_in_tokens` (migration
+`20261113180000_apple_sign_in_tokens.sql`): `user_id` (references `auth.users`, cascade),
+`subject_digest` (SHA-256 of Apple's `sub` with a Cadence prefix, 64 hex characters; no raw
+Apple ID is stored), `sealed_refresh_token` (AES-256-GCM with the connector key, associated
+data bound to the user and digest), `updated_at`; primary key `(user_id, subject_digest)`.
+RLS on, no grants to `anon` or `authenticated`. Two `security definer` functions, executable
+by `service_role` only: `apple_sign_in_keep_token(owner_id, apple_subject_digest,
+token_ciphertext)` upserts and raises `apple_identity_required` unless the user has an
+Apple identity in `auth.identities`; `apple_sign_in_read_tokens(owner_id)` returns the
+user's rows. Account deletion reads the rows before deleting the Auth user (they cascade)
+and revokes after. Local check: `tests/apple-sign-in.local-integration.test.ts`.
+
 ### `categories`
 
 ```sql

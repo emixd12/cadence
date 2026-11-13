@@ -48,7 +48,8 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333 built behind `CADENCE_SIGN_IN_APPLE` on branch `claude/sign-in-333-apple` (draft PR, not merged); 334–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys. 333: push migration `20261113180000` (step 1, ready); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -90,6 +91,33 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 333: Apple sign-in built behind its flag — November 13, 2026
+
+- **Built.** Continue with Apple starts Supabase Auth's Apple provider and returns
+  through `/auth/callback?…&via=apple`. Apple's black custom button on Login (L-024 lists
+  the rules relied on); the method list now has an 8 px gap and email is a secondary
+  action (the Ticket 331 verifier's design note).
+- **Revocation.** Supabase hands Apple's refresh token to the callback once and keeps
+  none, so the callback seals it with the connector key (migration
+  `20261113180000_apple_sign_in_tokens.sql`, service role only). Account deletion reads it
+  first and revokes at Apple after deleting the Auth user; a failure is reported, never a
+  retry. L-025 records the remaining gaps.
+- **Apple's cases.** A missing email gets its own message. A Hide My Email address makes
+  a separate, empty account and shows the relay address in Settings (Ticket 334 owns
+  linking). The name, sent only on the first sign-in, stays in the profile.
+- **Verified locally.** `tests/apple-sign-in.local-integration.test.ts`: 7 of 7 against a
+  running server, local Supabase and a stub that plays Apple
+  (`scripts/apple-sign-in-stub.mjs`). Headless Chrome at 1280 and 390 px. A real-browser
+  bug was fixed: the button's title rendered black on black.
+- **Not done.** Nothing hosted changed. The Apple Developer setup, the provider, relay
+  registration and the production check wait on owner rows 4 and 5:
+  `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`. Rotation runbook and recovery:
+  `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)".
+
+Platform impact: web login, callback, deletion and one migration; Mac follow-up Ticket 336;
+marketing not applicable; mobile web shares the button, checked at 390 px. Messaging
+impact: P-051, P-053.
 
 ## Ticket 332: email sign-in built behind its flag — November 13, 2026
 

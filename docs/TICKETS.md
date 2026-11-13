@@ -18977,7 +18977,11 @@ code, expiry and reuse; `dagger check --cadence --progress=report`.
 
 ## Ticket 333: Apple sign-in (web)
 
-Status: not started. Filed November 13, 2026.
+Status: in progress (November 13, 2026). Built behind `CADENCE_SIGN_IN_APPLE` and checked
+locally with a stubbed provider (`docs/qa/2026-11-13-ticket-333-apple-sign-in.md`). The
+Apple Developer setup, the Supabase Apple provider, relay registration and the production
+check wait on owner blockers rows 4 and 5 (`docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`).
+Filed November 13, 2026.
 Dependencies: Ticket 331; Ticket 332 merges first because both edit the login page.
 Decision: D31.2. Legal: L-024 and L-025.
 

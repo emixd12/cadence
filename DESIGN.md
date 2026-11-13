@@ -464,7 +464,7 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 
 ### Login
 
-- **Sign-in methods (Ticket 331):** `SignInMethods` renders the enabled methods from `lib/auth/sign-in-methods.ts` as primary text actions (44px minimum height, 16px bold, a 1em line icon before the label). One method renders as a single action, as before. Two or more render as a left-aligned list with no gap, so the 44px targets set the rhythm. Every action has the same weight; the list order is Google, Apple, email. With Supabase not configured, each action is a disabled button. Google is the only method on in production; email shows when `CADENCE_SIGN_IN_EMAIL` is on and opens `/login/email`. Bench: `/design-system#ds-flow-sign-in-methods`.
+- **Sign-in methods (Tickets 331 and 333):** `SignInMethods` renders the enabled methods from `lib/auth/sign-in-methods.ts` in the order Google, Apple, email. One method renders as a single action, as before. Two or more render as a left-aligned list with an 8px gap. Google is a primary text action and email a secondary one (44px minimum height, 16px bold, a 1em line icon before the label). Apple follows Apple's custom-button rules (L-024): `.apple-sign-in-action` in `app/globals.css`, a black rectangle 44px tall and at least 140px wide, the white "Left aligned, Medium" logo file from Apple Design Resources at the full button height, then a white 19px medium-weight "Continue with Apple" (43% of the height) and 16px of right padding; hover darkens the fill to #262626. It is the one filled sign-in control on Login because Apple's rules require a black or white fill; the style lives in an unlayered class because the base `a` and `button` rules would override Tailwind utilities. With Supabase not configured, each action is a disabled button (the Apple one at 60% opacity). Google is the only method on in production; email shows when `CADENCE_SIGN_IN_EMAIL` is on and Apple when `CADENCE_SIGN_IN_APPLE` is on. Bench: `/design-system#ds-flow-sign-in-methods`.
 - **Errors:** One accent line above the methods. The text names no provider.
 - **Email sign-in (Ticket 332):** `/login/email` and `/login/confirm` share the login frame (`AuthPageShell`: logo, "Cadence", 22rem column, same top offset). The muted 18px line under the title names the step ("Sign in with email.", "Check your email.", "Sign in from your email."). Fields are a 14px label above a 44px bordered input on the background surface; the code input is monospaced with wide tracking. Each form has one primary text action (44px, 16px bold): **Send sign-in email** with the mail icon, **Sign in**. Secondary text actions (40px, muted) follow: **Send a new email** and **Use a different email** on the code step, **Other ways to sign in** on the address step. Errors are one accent line (`role="alert"`) above the form and always say what to do next. With `CADENCE_TURNSTILE_SITE_KEY` set, Cloudflare's widget sits above the request action at flexible width. Checked at 1280 px and 390 px; a long address wraps. Bench: `/design-system#ds-flow-email-sign-in`.
 
@@ -858,9 +858,10 @@ Mac only, and hidden: Cadence for Mac renders none of this unless its build sets
   of 44px buttons that wraps at narrow widths.
 - **Continue with ChatGPT:** `ContinueWithChatGptButton` follows OpenAI's black button
   format: Ink Black (`bg-foreground`) fill and border, Bleached Newsprint
-  (`text-background`) text, square corners, 44px tall, `data-oai-siwc-button`. It is the one
-  filled button in the product, because OpenAI's approved formats require it; every other
-  action keeps the underlined-text styles. OpenAI's ChatGPT logo is not added yet (L-019);
+  (`text-background`) text, square corners, 44px tall, `data-oai-siwc-button`. It and
+  Continue with Apple on Login (Ticket 333) are the only filled buttons of this kind,
+  because their providers' approved formats require them; every other action keeps the
+  underlined-text styles. OpenAI's ChatGPT logo is not added yet (L-019);
   the wording is OpenAI's.
 - **Confirmation:** after the first connection with plan usage, a Cold Surface block with a
   1px Ash Line border shows "You’re using your ChatGPT plan" as a part heading, one
