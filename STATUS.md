@@ -93,7 +93,7 @@ Check the cited entry before acting on a row.
 
 - **Track complete.** Tickets 303–309 are complete; 301 and 302 were already. The owner set a
   US$5 Google Maps cap for this run (recorded in the run folder), approved the Ticket 309
-  wording list and will delete the vault item `google-calendar-agent-retire-secret`. Run
+  wording list and deleted the vault item `google-calendar-agent-retire-secret`. Run
   folder: `.intent/acceptance/settings-close-20261113/` (not committed).
 - **Web, production, test account A, 390 px with touch (headless Chrome):** a touch drag moved
   Medical to position 3, announced "Medical moved to position 3 of 9.", and kept the order
