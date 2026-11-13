@@ -19054,7 +19054,7 @@ As built (November 13, 2026):
 - Delete account asks for `DELETE` when the account has no address or an Apple relay
   address.
 - The database keeps the last identity: trigger `keep_one_auth_identity` (migration
-  `20261113180000`) locks the user row and refuses deleting an account's last identity, so
+  `20261113190000`) locks the user row and refuses deleting an account's last identity, so
   two removals at once cannot leave none. It must be pushed before hosted manual linking.
 - Assumption (coordinator decision, November 13, 2026; the owner can change it): Add, Remove
   and Change address need a sign-in within the last 15 minutes, read on the server from the

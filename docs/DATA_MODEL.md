@@ -271,7 +271,7 @@ and revokes after. Local check: `tests/apple-sign-in.local-integration.test.ts`.
 
 **At least one Auth identity per user (Ticket 334, D31.3).** Trigger `keep_one_auth_identity`
 (`before delete on auth.identities`, function `cadence_private.keep_one_auth_identity()`,
-migration `20261113180000_keep_one_auth_identity.sql`) locks the user's `auth.users` row
+migration `20261113190000_keep_one_auth_identity.sql`) locks the user's `auth.users` row
 with `FOR UPDATE`, then refuses (`P0001`, `cadence_last_identity`) to delete an identity when
 no other identity of that user remains. Supabase Auth's own last-identity check does not
 lock, so two unlinks at once each passed it and left none; with the lock they run one after

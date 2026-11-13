@@ -105,7 +105,7 @@ Check the cited entry before acting on a row.
   address or an Apple relay address.
 - **Seam for Ticket 335.** `startAddSignInMethod` in `lib/services/sign-in-methods.service.ts`.
 - **Verifier fixes (November 13).** Two removals at once left an account with no identity
-  (10 of 10). Migration `20261113180000_keep_one_auth_identity.sql` adds a trigger that locks
+  (10 of 10). Migration `20261113190000_keep_one_auth_identity.sql` adds a trigger that locks
   the user row and refuses deleting the last identity; account deletion, the test login and
   email sign-up still pass. Add, Remove and Change address now need a sign-in within 15
   minutes (coordinator decision, recorded as an assumption). A taken address gets the same

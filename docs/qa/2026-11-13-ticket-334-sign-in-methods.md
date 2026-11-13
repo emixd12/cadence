@@ -65,7 +65,7 @@ the button, `DELETE` does). Focus moves to the field on **Change address** and t
 ## After the verifier's findings (November 13, about 18:30Z)
 
 The local database was reset (`npm run supabase -- db reset`), which replayed every migration
-including `20261113180000_keep_one_auth_identity.sql`.
+including `20261113190000_keep_one_auth_identity.sql`.
 
 | Case | Result |
 |---|---|
