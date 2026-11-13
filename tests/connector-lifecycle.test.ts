@@ -393,7 +393,9 @@ describe("connector data stays out of tracking surfaces", () => {
   const agentCalendarFence = "supabase/migrations/20261022180000_separate_agent_calendar_grant.sql";
   // Ticket 314: the connector completion functions read connection status and account digest only.
   const completionFence = "supabase/migrations/20261111140000_connector_completion.sql";
-  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence, completionFence]);
+  // Ticket 324: counting a workout by hand reads connection status only.
+  const countFence = "supabase/migrations/20261113050000_count_unlinked_workout.sql";
+  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence, completionFence, countFence]);
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);

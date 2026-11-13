@@ -162,6 +162,25 @@ export async function attachSourceActivity(
   return { ok: result.attached === true, reason: String(result.reason ?? "unknown") };
 }
 
+/** Ticket 324: attaches a workout the user counted by hand. User sessions only; no link. */
+export async function attachUnlinkedSourceActivity(
+  supabase: AppSupabaseClient,
+  input: Omit<ActivityArgs, "linkId"> & Readonly<{ source: string }>,
+): Promise<ConnectorWriteResult> {
+  const { data, error } = await supabase.rpc("attach_unlinked_source_activity", {
+    p_occurrence_id: input.occurrenceId,
+    p_source: input.source,
+    p_activity_ref: input.activityRef,
+    p_activity_start_at: input.activityStartAt,
+    p_activity_end_at: input.activityEndAt,
+    p_activity_revision: input.activityRevision,
+    p_recorded_at: input.recordedAt,
+  });
+  if (error) throw new Error("connector_attach_failed");
+  const result = data as { attached?: boolean; reason?: string };
+  return { ok: result.attached === true, reason: String(result.reason ?? "unknown") };
+}
+
 export async function removeSourceMatch(
   supabase: AppSupabaseClient,
   input: Readonly<{ matchId: string; recordedAt: string }>,

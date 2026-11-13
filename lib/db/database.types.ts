@@ -2075,6 +2075,18 @@ export type Database = {
         }
         Returns: Json
       }
+      attach_unlinked_source_activity: {
+        Args: {
+          p_activity_end_at: string
+          p_activity_ref: string
+          p_activity_revision: string | null
+          p_activity_start_at: string
+          p_occurrence_id: string
+          p_recorded_at: string
+          p_source: string
+        }
+        Returns: Json
+      }
       begin_daily_brief: {
         Args: {
           p_expected_revision: number

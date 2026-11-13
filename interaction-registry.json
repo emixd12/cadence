@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-12",
+  "updated": "2026-11-13",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -1137,6 +1137,14 @@
         "INT-SETTINGS-019",
         "INT-SETTINGS-020",
         "INT-SETTINGS-021"
+      ]
+    },
+    {
+      "path": "components/timeline/CountWorkoutButtons.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TIMELINE-013"
       ]
     }
   ],
@@ -11698,6 +11706,83 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-013",
+      "name": "Count an unlinked Hevy workout by hand",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Mark today's Occurrence Completed from a Hevy workout that no link accepted, and keep the workout's time (Ticket 324).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Count the <time> Hevy workout, in an expanded Unresolved row of today"
+        }
+      ],
+      "availability": "Web, while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected, on today's Unresolved rows whose Behavior has no enabled Hevy link, while no any-workout link exists. Offers each of today's ended workouts of 5 minutes or more that no row in view already shows.",
+      "success_result": "The server reads today's Hevy workouts, records the user's own Completed mark through the manual status path, and attaches the workout for timing with no link. The row refreshes as Completed and lists the workout. Reconcile never removes a hand-counted workout.",
+      "failure_result": "A workout a link accepts, a linked Behavior, an already marked Occurrence, a workout Hevy no longer lists, one under 5 minutes or still running, and a disconnected Hevy are refused with a short message and write nothing.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/CountWorkoutButtons.tsx",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/api/connectors/completions/count/route.ts",
+        "lib/services/source-count.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-completion-ui.dom.test.tsx",
+          "tests/source-count.service.test.ts"
+        ],
+        "notes": "DOM checks cover the button, request body, refresh and refusal message. Service checks cover every refusal. The SQL fixture tests/sql/ticket-324-count-unlinked-workout-smoke.sql covers the database function."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/CountWorkoutButtons.tsx"
+          ],
+          "evidence": [
+            "tests/connector-completion-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Follow-up: the Mac shows synced matches (Ticket 320) but has no count control yet."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
         }
       }
     },

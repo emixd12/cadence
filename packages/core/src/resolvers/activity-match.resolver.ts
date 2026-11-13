@@ -219,7 +219,9 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     });
   };
   for (const match of [...input.matches].sort(compareMatches)) {
-    if (match.state !== "active") continue;
+    // Ticket 324: a workout the user counted by hand has no link. It is the user's own
+    // record, so reconcile never removes it.
+    if (match.state !== "active" || isHandCounted(match)) continue;
     if (deleted.has(match.activityRef)) {
       removeMatch(match, "deleted_at_source");
       continue;
@@ -239,7 +241,7 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
   for (const activity of ordered) {
     for (const behaviorId of new Set(links.map((link) => link.behaviorId))) {
       const existing = matchesByActivityBehavior.get(activityBehaviorKey(activity.id, behaviorId));
-      if (!existing || existing.state !== "active" || removed.has(existing.id)) continue;
+      if (!existing || existing.state !== "active" || removed.has(existing.id) || isHandCounted(existing)) continue;
       const behavior = behaviors.get(behaviorId);
       const existingState = states.get(existing.occurrenceId);
       if (!behavior || !existingState) continue;
@@ -370,6 +372,11 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
       revertedEventId: null,
     };
   }
+}
+
+/** Ticket 324: a match the user counted by hand carries no link (stored `link_id` null). */
+export function isHandCounted(match: Pick<ActivityMatchRecord, "linkId">): boolean {
+  return match.linkId === "";
 }
 
 /** Selects whether a link's selector accepts an activity. */

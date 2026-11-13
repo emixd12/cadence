@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
-| Tickets 310–324: connector completion (D28) | 310–323 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Ticket 324 in progress | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
+| Tickets 310–324: connector completion (D28) | 310–323 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Ticket 324 implemented on the web; hosted migration `20261113050000` and deployed check pending | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -89,6 +89,25 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 324: count an unlinked workout by hand — November 13, 2026
+
+- **Built:** "Count the 6:05 PM Hevy workout" on today's expanded Unresolved rows whose
+  Behavior has no enabled Hevy link, while no any-workout link exists. The server reads
+  today's workouts, refuses a linked Behavior or a workout a link accepts, marks Completed
+  through the manual status path, then attaches the workout with no link through
+  `attach_unlinked_source_activity` (migration `20261113050000`). Reconcile never removes
+  a match with no link.
+- **Verified locally** against the live Hevy account: the control showed only on the two
+  unlinked rows and only for the new 20-minute workout; one click marked the row Completed
+  (`manual_tap`), listed the workout and stored an `attached` match with no link; a repeat
+  returned `not_unresolved`. SQL fixture, service, resolver and DOM tests pass.
+- **Not verified:** the 390 px layout with the control showing (the day ended during the
+  run); the deployed check waits for the hosted push.
+- **Test data:** one more private Hevy workout, `Cadence test 323 W-d`, for the owner to delete.
+
+Platform impact: web control and service; Mac follow-up (no count control); marketing not
+applicable; future mobile through mobile web. Messaging impact: P-047.
 
 ## Connector completion turned on in Production — November 13, 2026
 

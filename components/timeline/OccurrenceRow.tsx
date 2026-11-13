@@ -3,8 +3,9 @@
 import { useCallback, useId, useState, type ReactNode } from "react";
 import type { TimelineOccurrenceContext } from "@cadence/core/types/day-progress";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
-import { sourceEvidenceSummary } from "@cadence/core/services/timeline-source-evidence";
+import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
 
+import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
@@ -36,6 +37,8 @@ type OccurrenceRowProps = Readonly<{
   travelDetails?: ReactNode;
   /** Ticket 270: one muted line while collapsed, when the next trip crowds this Behavior. */
   crowdedLine?: string | null;
+  /** Ticket 324: today's workouts no link accepted, which this row may count by hand. */
+  countableWorkouts?: readonly CountableSourceWorkout[];
 }>;
 
 type KeyedOptimisticStatusState = Readonly<{
@@ -79,6 +82,7 @@ export function OccurrenceRow({
   context,
   travelDetails,
   crowdedLine = null,
+  countableWorkouts = [],
 }: OccurrenceRowProps) {
   const serverStatusKey = [
     occurrence.id,
@@ -238,6 +242,12 @@ export function OccurrenceRow({
                 </li>)}
               </ul>
             </div> : null}
+
+            {!userChangedStatus ? <CountWorkoutButtons
+              occurrenceId={visibleOccurrence.id}
+              source="hevy"
+              workouts={countableWorkouts}
+            /> : null}
 
             <TimeTracker
               occurrenceId={visibleOccurrence.id}

@@ -121,6 +121,41 @@ function renderRow(occurrence: TimelineOccurrenceView) {
     startTimeTrackingAction={noop as never} stopTimeTrackingAction={noop as never} resetTimeTrackingAction={noop as never} /></RefreshProvider>));
 }
 
+describe("Count an unlinked workout (Ticket 324)", () => {
+  const unresolved: TimelineOccurrenceView = { ...occurrenceBase, status: "unresolved", statusMarkedAt: null, statusLabel: "Unresolved",
+    visualTone: "default", showCollapsedStatusLabel: false };
+  const countable = [{ activityRef: `hevy/${"1".repeat(64)}`, startAt: "2026-11-10T23:05:00Z", endAt: "2026-11-10T23:25:00Z", label: "Count the 6:05 PM Hevy workout" }];
+
+  function renderCountRow(occurrence: TimelineOccurrenceView, onRefresh = vi.fn(), workouts = countable) {
+    return act(() => root.render(<RefreshProvider onRefresh={onRefresh}><OccurrenceRow occurrence={occurrence} statusAction={noop as never} noteAction={noop as never}
+      startTimeTrackingAction={noop as never} stopTimeTrackingAction={noop as never} resetTimeTrackingAction={noop as never} countableWorkouts={workouts} /></RefreshProvider>));
+  }
+
+  it("offers the workout on an Unresolved row and posts only its reference", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ counted: true, attached: true, reason: "attached" }), { status: 200 }));
+    const onRefresh = vi.fn();
+    await renderCountRow(unresolved, onRefresh);
+    const button = [...container.querySelectorAll("[data-count-workouts] button")].find((node) => node.textContent === "Count the 6:05 PM Hevy workout");
+    expect(button).toBeDefined();
+    await act(async () => { (button as HTMLButtonElement).click(); });
+    await vi.waitFor(() => expect(onRefresh).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledWith("/api/connectors/completions/count", expect.objectContaining({ method: "POST",
+      body: JSON.stringify({ occurrenceId: "o1", source: "hevy", activityRef: countable[0].activityRef }) }));
+  });
+
+  it("explains a refusal and keeps the row", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ counted: false, reason: "matched_by_link" }), { status: 200 }));
+    await renderCountRow(unresolved);
+    await act(async () => { (container.querySelector("[data-count-workouts] button") as HTMLButtonElement).click(); });
+    await vi.waitFor(() => expect(container.textContent).toContain("A link already uses this workout."));
+  });
+
+  it("shows nothing when no workout is countable (a marked row gets none)", async () => {
+    await renderCountRow(unresolved, vi.fn(), []);
+    expect(container.querySelector("[data-count-workouts]")).toBeNull();
+  });
+});
+
 describe("Timeline connector label (Tickets 317 and 319)", () => {
   const workout = { startAt: "2026-11-10T23:05:00Z", endAt: "2026-11-10T23:50:00Z", label: "6:05 PM–6:50 PM" };
   const evidence = (fromConnector: boolean, workouts = [workout]): TimelineSourceEvidence => ({ source: "hevy", sourceLabel: "Hevy", fromConnector, workouts });
