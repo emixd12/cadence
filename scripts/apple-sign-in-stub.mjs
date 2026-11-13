@@ -133,7 +133,10 @@ function send(response, status, body, headers = {}) {
 }
 
 async function forward(request, response, body) {
-  const url = new URL(request.url, upstream);
+  // Only the path and query come from the request; the origin is always loopback Supabase.
+  const incoming = new URL(request.url, "http://stub.invalid");
+  const url = new URL(`${incoming.pathname}${incoming.search}`, upstream);
+  if (url.origin !== new URL(upstream).origin) throw new Error("refused");
   const headers = { ...request.headers };
   delete headers.host;
   delete headers.connection;
