@@ -137,7 +137,9 @@ Android app is possible later.
 
 ## Audience
 
-Not decided. Persona research comes before audience-specific copy.
+Not decided. Desk research is in `docs/research/2026-11-13-launch-audience-research.md`
+(Ticket 328). It recommends agent-using professionals for the beta and self-improvement
+practitioners after the iPhone app. The owner has not decided, and no interviews have run.
 
 Working hypothesis to test: people who already pay for Claude or ChatGPT and
 have more recurring commitments than they can track unaided. Candidate segments
