@@ -76,11 +76,15 @@ export function getAuthErrorMessage(value: RedirectParam) {
   }
 
   if (error === "missing_auth_code") {
-    return "Google did not return an auth code. Try signing in again.";
+    return "Sign-in did not return an auth code. Try signing in again.";
   }
 
   if (error === "auth_callback_failed") {
-    return "The Google sign-in callback could not be verified. Try signing in again.";
+    return "The sign-in could not be verified. Try signing in again.";
+  }
+
+  if (error === "sign_in_method_unavailable") {
+    return "That sign-in method is not available. Choose another.";
   }
 
   if (error === "test_login_unavailable") {

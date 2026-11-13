@@ -5,12 +5,13 @@ import {
   normalizeRedirectPath,
 } from "@/lib/auth/redirects";
 import { MARKETING_SITE_URL } from "@/lib/marketing-site";
+import { enabledSignInMethods } from "@/lib/auth/sign-in-methods";
 import { DEFAULT_APP_ROUTE } from "@/lib/navigation";
 import { readSupabaseRuntimeConfig } from "@/lib/supabase/env";
 import { shouldShowTestLogin } from "@/lib/auth/test-login";
 import { AccountDeletedNotice } from "./AccountDeletedNotice";
-import { GoogleLoginButton } from "./GoogleLoginButton";
 import { SignedOutNotice } from "./SignedOutNotice";
+import { SignInMethods } from "./SignInMethods";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -74,7 +75,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
 
         <div className="mt-6">
-          <GoogleLoginButton disabled={!isConfigured} nextPath={nextPath} />
+          <SignInMethods
+            disabled={!isConfigured}
+            methods={enabledSignInMethods()}
+            nextPath={nextPath}
+          />
         </div>
 
         <p className="mt-6 text-[0.8rem] leading-5 text-muted-readable">

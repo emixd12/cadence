@@ -462,6 +462,11 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 - **Export entry:** Account and data has one Export section: "Download your history as JSONL, CSV, full JSON, or a BehaviorLog bundle." with a primary **Open Export** text action.
 - **Mac Settings (Ticket 302):** The Mac uses the same groups, index, rows and drawers, plus a fifth group, This Mac (index link "Mac"), after Account and data, holding Local database, App updates and Setup guide. General holds Local profile, a Cadence account drawer ("Link a Cadence account" while not linked, "Account settings" when linked), Timezone, Notifications with Reminder coverage as its level-4 part, and Categories. Sources that need an account show "Link a Cadence account" as muted row state. The sync-conflict cue in the shell is a fixed 4rem bar; while it shows, the index sticks below it (`top-32`, `lg:top-16`) and anchors land 4rem lower (`scroll-mt-48`, `lg:scroll-mt-32`). **Open Export** is a button that opens the Mac's Export screen. There are no legal links or Delete account on the Mac.
 
+### Login
+
+- **Sign-in methods (Ticket 331):** `SignInMethods` renders the enabled methods from `lib/auth/sign-in-methods.ts` as primary text actions (44px minimum height, 16px bold, a 1em line icon before the label). One method renders as a single action, as before. Two or more render as a left-aligned list with no gap, so the 44px targets set the rhythm. Every action has the same weight; the list order is Google, Apple, email. With Supabase not configured, each action is a disabled button. Google is the only enabled method today. Bench: `/design-system#ds-flow-sign-in-methods`.
+- **Errors:** One accent line above the methods. The text names no provider.
+
 ### Public Account Information
 
 - **Routes:** `/terms`, `/privacy`, and `/trust` use the same square, flat product vocabulary as the authenticated app.

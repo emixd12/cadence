@@ -390,7 +390,7 @@
       "reason": "Ticket 108 developer-only native boundary bench, not a desktop tracking implementation."
     },
     {
-      "path": "app/(auth)/login/GoogleLoginButton.tsx",
+      "path": "app/(auth)/login/SignInMethods.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 2,
       "interaction_ids": [
@@ -1467,16 +1467,16 @@
         "J03",
         "J20"
       ],
-      "intent": "Authenticate with Google and enter the protected app.",
+      "intent": "Authenticate with Google and enter the protected app. Google is the only enabled sign-in method; the login page lists enabled methods (Ticket 331, D31).",
       "triggers": [
         {
           "kind": "activate",
           "control": "Continue with Google"
         }
       ],
-      "availability": "Available when public Supabase runtime configuration is present.",
+      "availability": "Available when public Supabase runtime configuration is present. Google has no flag. Apple (CADENCE_SIGN_IN_APPLE) and email (CADENCE_SIGN_IN_EMAIL) stay hidden until Tickets 333 and 332 ship and their flag is exactly on; both flags are off in production.",
       "success_result": "Starts Supabase Google OAuth and returns the signed-in user to the sanitized next route, normally /timeline.",
-      "failure_result": "Returns to /login with a factual, recoverable authentication error.",
+      "failure_result": "Returns to /login with a factual, recoverable authentication error that names no provider. A start request for a method that is not enabled returns to /login with sign_in_method_unavailable.",
       "effects": [
         "external_navigation",
         "authentication_session",
@@ -1485,7 +1485,7 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "app/(auth)/login/GoogleLoginButton.tsx",
+        "app/(auth)/login/SignInMethods.tsx",
         "app/auth/google/route.ts#GET",
         "app/auth/callback/route.ts#GET"
       ],
@@ -1494,14 +1494,14 @@
         "references": [
           "tests/login-interactions-ui.test.tsx"
         ],
-        "notes": "The login test renders the Google control and its sanitized next destination; route behavior is covered separately and provider-owned UI remains outside scope."
+        "notes": "The login test renders the Google control, its sanitized next destination and the unchanged flags-off markup; tests/sign-in-methods.test.ts covers the method list, flags and start routes. Provider-owned UI remains outside scope."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "app/(auth)/login/GoogleLoginButton.tsx",
+            "app/(auth)/login/SignInMethods.tsx",
             "app/auth/google/route.ts#GET",
             "app/auth/callback/route.ts#GET"
           ],

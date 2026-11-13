@@ -74,15 +74,15 @@
       "notes": ""
     },
     {
-      "id": "flow.google-login-button",
-      "name": "GoogleLoginButton",
+      "id": "flow.sign-in-methods",
+      "name": "SignInMethods",
       "kind": "flow",
-      "source": "app/(auth)/login/GoogleLoginButton.tsx",
-      "exportName": "GoogleLoginButton",
+      "source": "app/(auth)/login/SignInMethods.tsx",
+      "exportName": "SignInMethods",
       "usageNames": [
-        "GoogleLoginButton"
+        "SignInMethods"
       ],
-      "benchAnchor": "design-system#ds-flow-google-login-button",
+      "benchAnchor": "design-system#ds-flow-sign-in-methods",
       "trackUsages": "required",
       "status": "active",
       "notes": ""

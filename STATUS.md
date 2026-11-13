@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | Filed November 13, 2026; all not started; Google stays the only live method | Ticket 331 first. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 implemented, awaiting verification (draft PR); 332–337 not started; Google stays the only live method | Verify and merge 331, then 332. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -90,6 +90,21 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 331: login page and routes for more than one sign-in method — November 13, 2026
+
+- **Built.** `lib/auth/sign-in-methods.ts` lists Google, Apple and email. Login renders the
+  enabled ones; `lib/auth/sign-in-start.ts` starts them from `/auth/google` and the new
+  `/auth/sign-in/[method]`. Sign-in errors name no provider.
+- **Flags.** `CADENCE_SIGN_IN_APPLE` and `CADENCE_SIGN_IN_EMAIL`, on only when exactly `on`.
+  Both are unset everywhere. A flag shows nothing until Ticket 333 or 332 gives the method
+  its start.
+- **Unchanged.** With the flags off, the Login HTML equals `origin/main` `07ce9a03` in five
+  states, apart from the two reworded errors. Test login and MCP consent sign-in untouched.
+- **Verification.** `dagger check --cadence --progress=report`: see the pull request.
+
+Platform impact: web login and auth routes; Mac not applicable (Ticket 336); marketing not
+applicable; mobile web shares the page, bench checked at 390 px. Messaging impact: P-051.
 
 ## Tickets 331–337 filed: sign-in by email and Apple (D31) — November 13, 2026
 
