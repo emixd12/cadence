@@ -9,6 +9,12 @@
 //   npm run release:credentials -- restore --run <run-dir> [--only identity,notarization,api-key,updater]
 //   npm run release:credentials -- backup --run <run-dir> --only identity|notarization|updater
 //   npm run release:credentials -- backup --run <run-dir> --only api-key --file <AuthKey.p8> --key-id <id> --issuer <id>
+//   node apps/desktop/scripts/release-credentials.mjs apple-sign-in-secret --run <run-dir> [--days 180]
+//
+// apple-sign-in-secret (Ticket 333) reads the Sign in with Apple key into memory, never to
+// disk, and prints one JSON line to stdout: {secret, issuedAt, expiresAt, keyId, clientId}.
+// Capture it in a variable or pipe it on; do not let it reach a terminal or transcript.
+// Call node directly: npm run adds its own lines to stdout.
 //
 // status, probe and verify-backups read no secret value. verify-backups reads only the
 // fields in PUBLIC_FIELDS from the "Cadence Release" vault. restore and backup read or
@@ -37,6 +43,7 @@ import { classifyOpError, opEnv, recordAccess } from '../../../scripts/acceptanc
 import { APPROVALS_FILE, entryState } from '../../../scripts/acceptance/access/record.mjs';
 import { PROBE, finish, parseFlags } from '../../../scripts/acceptance/access/lib.mjs';
 import { isCliEntry } from '../../../scripts/acceptance/cli-entry.mjs';
+import { AppleClientSecretError, buildAppleClientSecret } from '../../../scripts/apple-client-secret.mjs';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 export const INVENTORY_PATH = join(REPO, 'apps/desktop/release-credentials.json');
@@ -314,6 +321,20 @@ export class ReleaseVault {
     this.log(item, file, 'ok');
   }
 
+  /** Reads one attached text file into memory only (no file is written). Always needs approval. */
+  readFileText(item, file) {
+    this.requireApproval(`reading "${item}/${file}"`);
+    const result = this.op(['read', '--no-newline', this.ref(item, file)]);
+    const value = result.status === 0 ? result.stdout.toString('utf8') : '';
+    if (!value) {
+      const reason = result.status === 0 ? 'empty_value' : classifyOpError(result.stderr, result.status);
+      this.log(item, file, 'failed', reason);
+      throw new CredentialError(reason === 'item_not_found' || reason === 'field_not_found' ? EXIT.MISSING : EXIT.FAILED, `could not read "${item}/${file}" (${reason})`);
+    }
+    this.log(item, file, 'ok');
+    return value;
+  }
+
   /** Creates a Secure Note item from fields, then attaches files. Refuses to replace an item. */
   createItem(title, fields, files = {}) {
     this.requireApproval(`creating "${title}"`);
@@ -541,6 +562,23 @@ export function backup(inv, vault, part, { run = runCommand, home = homedir(), f
 }
 
 
+// ---------- Sign in with Apple client secret (Ticket 333) ----------
+
+export function appleSignInSecret(inv, vault, { days = 180, now = Date.now() } = {}) {
+  const apple = inv.appleSignIn;
+  if (!apple) throw new CredentialError(EXIT.USAGE, 'the inventory has no appleSignIn entry');
+  const keyId = vault.readField(apple.item, 'key id');
+  if (keyId !== apple.keyId) throw new CredentialError(EXIT.MISSING, `the vault item's key id differs from the inventory (${apple.keyId})`);
+  const pem = vault.readFileText(apple.item, apple.file);
+  if (!pem.startsWith(P8_HEADER)) throw new CredentialError(EXIT.FAILED, `"${apple.item}/${apple.file}" is not a .p8 private key`);
+  try {
+    return { ...buildAppleClientSecret({ pem, keyId, teamId: apple.team, clientId: apple.servicesId, days, now }), keyId, clientId: apple.servicesId };
+  } catch (error) {
+    if (error instanceof AppleClientSecretError) throw new CredentialError(EXIT.FAILED, error.message);
+    throw error;
+  }
+}
+
 function probe(inv, name, { out, deps, vaultFor, usage }) {
   try {
     if (name === 'vault') { vaultFor().titles(); return finish(out, PROBE.PRESENT, { detail: `token present; reaches only "${inv.vault}"` }); }
@@ -564,8 +602,8 @@ function probe(inv, name, { out, deps, vaultFor, usage }) {
 export async function main(argv, { out = (line) => process.stdout.write(`${line}\n`), err = (line) => process.stderr.write(`release-credentials: ${line}\n`), deps = {}, inventory = null } = {}) {
   const [command, ...rest] = argv;
   let flags;
-  try { flags = parseFlags(rest, { values: ['run', 'only', 'file', 'key-id', 'issuer'], flags: ['json'] }); } catch { flags = null; }
-  const usage = () => { err('usage: status [--json] | probe <check> | verify-backups | restore --run <dir> [--only …] | backup --run <dir> --only <part> (see the file header)'); return EXIT.USAGE; };
+  try { flags = parseFlags(rest, { values: ['run', 'only', 'file', 'key-id', 'issuer', 'days'], flags: ['json'] }); } catch { flags = null; }
+  const usage = () => { err('usage: status [--json] | probe <check> | verify-backups | restore --run <dir> [--only …] | backup --run <dir> --only <part> | apple-sign-in-secret --run <dir> [--days N] (see the file header)'); return EXIT.USAGE; };
   if (!flags || !command) return usage();
   const inv = inventory ?? loadInventory();
   const vaultFor = () => new ReleaseVault(inv, { ...deps, runDir: flags.run ? resolve(flags.run) : null });
@@ -592,6 +630,12 @@ export async function main(argv, { out = (line) => process.stdout.write(`${line}
     if (command === 'backup') {
       if (!flags.run || !flags.only) return usage();
       backup(inv, vaultFor(), flags.only, { ...deps, flags, say: out });
+      return EXIT.OK;
+    }
+    if (command === 'apple-sign-in-secret') {
+      if (!flags.run) return usage();
+      const days = flags.days === undefined ? 180 : Number(flags.days);
+      out(JSON.stringify(appleSignInSecret(inv, vaultFor(), { days, now: deps.now ?? Date.now() })));
       return EXIT.OK;
     }
     return usage();

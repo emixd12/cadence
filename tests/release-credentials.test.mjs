@@ -2,7 +2,7 @@
 // with a fake command runner. The tests prove that secret reads need the owner's approval and
 // that no secret value reaches the ledger, stdout or a command's arguments.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, verify } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -189,6 +189,57 @@ describe('Cadence Release vault', () => {
     const code = await main(['restore', '--run', runDir], { out: () => {}, err: (line) => err.push(line), deps: { run, now: NOW } });
     expect(code).toBe(EXIT.REFUSED);
     expect(err.join('\n')).toMatch(/owner's approval/);
+  });
+
+  describe('Sign in with Apple client secret (Ticket 333)', () => {
+    const apple = inv.appleSignIn;
+    let pem, publicKey;
+    beforeEach(() => {
+      const pair = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+      pem = pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+      publicKey = pair.publicKey;
+      items[apple.item] = { 'key id': apple.keyId, [apple.file]: pem, complete: COMPLETE_MARKER };
+    });
+
+    it('refuses to read the key without the owner approval', async () => {
+      const out = [];
+      const err = [];
+      const code = await main(['apple-sign-in-secret', '--run', runDir], { out: (line) => out.push(line), err: (line) => err.push(line), deps: { run, now: NOW } });
+      expect(code).toBe(EXIT.REFUSED);
+      expect(out).toEqual([]);
+      expect(calls.some((call) => call.args.at(-1).endsWith(`/${apple.file}`))).toBe(false);
+    });
+
+    it('signs a secret in memory and keeps the key out of files, arguments, logs and output', async () => {
+      approve();
+      const out = [];
+      const code = await main(['apple-sign-in-secret', '--run', runDir, '--days', '180'], { out: (line) => out.push(line), err: () => {}, deps: { run, now: NOW } });
+      expect(code).toBe(EXIT.OK);
+      expect(out).toHaveLength(1);
+      const result = JSON.parse(out[0]);
+      expect(result).toMatchObject({ keyId: apple.keyId, clientId: apple.servicesId, issuedAt: new Date(NOW).toISOString(), expiresAt: new Date(NOW + 180 * DAY).toISOString() });
+      const [header, payload, signature] = result.secret.split('.');
+      expect(JSON.parse(Buffer.from(header, 'base64url').toString())).toEqual({ alg: 'ES256', kid: apple.keyId });
+      expect(JSON.parse(Buffer.from(payload, 'base64url').toString())).toMatchObject({ iss: apple.team, sub: apple.servicesId, aud: 'https://appleid.apple.com' });
+      expect(verify('sha256', Buffer.from(`${header}.${payload}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url'))).toBe(true);
+      const keyBody = pem.split('\n')[1];
+      expect(out[0]).not.toContain(keyBody);
+      expect(ledger()).not.toContain(keyBody);
+      for (const call of calls) {
+        expect(call.args.join(' ')).not.toContain(keyBody);
+        expect(call.args).not.toContain('--out-file');
+      }
+      expect(ledger()).toMatch(new RegExp(`"field":"${apple.file.replace('.', '\\.')}"[^\n]*"outcome":"ok"`));
+    });
+
+    it('refuses more than about 182 days and a key id that differs from the inventory', async () => {
+      approve();
+      const err = [];
+      expect(await main(['apple-sign-in-secret', '--run', runDir, '--days', '200'], { out: () => {}, err: (line) => err.push(line), deps: { run, now: NOW } })).toBe(EXIT.FAILED);
+      expect(err.join('\n')).toMatch(/at most 15777000 seconds/);
+      items[apple.item]['key id'] = 'OTHERKEY01';
+      expect(await main(['apple-sign-in-secret', '--run', runDir], { out: () => {}, err: () => {}, deps: { run, now: NOW } })).toBe(EXIT.MISSING);
+    });
   });
 
   it('reports a missing vault token to the preflight as missing, not as an error', async () => {

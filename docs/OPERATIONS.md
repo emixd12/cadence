@@ -1235,15 +1235,21 @@ token), `apple_sign_in_token_not_kept` (connector key unset), `apple_sign_in_tok
 that. `STATUS.md` "Open work" holds the dated row with the current secret's expiry.
 
 1. Run `npm run qa:preflight -- --suite hosted-migrations` (it checks the Supabase token).
-2. Read the `.p8` and Key ID from the Cadence Release vault. The owner approves the read.
-3. Make the secret, with the key passed only through the environment. Never paste the
-   `.p8` into a command, a file in the repository or a transcript:
-   `APPLE_SIGN_IN_PRIVATE_KEY="$(<reader>)" node scripts/apple-client-secret.mjs --key-id <Key ID> --team-id HK26VT477G --client-id <Services ID> --days 180 --json`,
-   where `<reader>` prints the key from the Cadence Release vault to the pipe only.
-   `agent:secret` never reads that vault (`docs/qa/agent-secrets.md`, "Cadence Release
-   vault"). `npm run release:credentials` does, with the owner's `release-secrets`
-   approval, but has no reader for the Sign in with Apple item yet: add one before the
-   first rotation. The output gives the secret and its expiry.
+2. Make a run folder under `.intent/acceptance/` and record the owner's `release-secrets`
+   approval in it (`node scripts/acceptance/access/record.mjs record --scope run --run-dir
+   <run-dir> --id release-secrets --source "owner approved in chat"`). Each read needs a
+   fresh approval (D29).
+3. Make the secret. The reader takes the `.p8` from the vault item named in
+   `apps/desktop/release-credentials.json` (`appleSignIn`) into memory only, checks its Key
+   ID, signs the secret and prints one JSON line (`secret`, `issuedAt`, `expiresAt`,
+   `keyId`, `clientId`):
+   `SECRET_JSON="$(node apps/desktop/scripts/release-credentials.mjs apple-sign-in-secret --run <run-dir> --days 180)"`.
+   Call node directly (npm adds lines to stdout) and capture the line in a variable in the
+   same shell command that uses it; never print it. The vault ledger
+   (`<run-dir>/events.jsonl`) lists each field read, without values. `agent:secret` never
+   reads that vault (`docs/qa/agent-secrets.md`, "Cadence Release vault").
+   `scripts/apple-client-secret.mjs` still works alone, with the key in
+   `APPLE_SIGN_IN_PRIVATE_KEY`, for a key that is not in the vault.
 4. `PATCH /v1/projects/qjodzutjxtmtzczbloxa/config/auth` with `external_apple_secret`
    (Management API, through `agent:secret` as in the Ticket 332 change list). Read it back
    twice: a change can take a few seconds to show.
