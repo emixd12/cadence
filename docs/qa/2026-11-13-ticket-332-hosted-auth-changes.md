@@ -1,7 +1,8 @@
 # Ticket 332: hosted Auth changes for email sign-in
 
-Written November 13, 2026, for Ticket 332 (D31.2, D31.3). **Nothing on this list was
-done.** Ticket 332 changed no hosted setting. Agents apply the steps in order under the
+Written November 13, 2026, for Ticket 332 (D31.2, D31.3). **Steps 1–4 were applied on
+November 13, 2026, about 17:15–17:20Z, by the verifier** (see "Applied" below); steps 5–9
+wait as marked. Agents apply the steps in order under the
 coordinator's ruling of November 13, 07:35Z (owner blockers rows 1 and 6): record each
 before and after value in this file, read the setting back, and recheck Google sign-in on
 production after each step. `CADENCE_SIGN_IN_EMAIL` stays unset in Production until
@@ -16,10 +17,10 @@ The "Before" column was read on November 13, 2026 at about 16:12Z, read-only.
 
 | # | Change | Before | After | Rollback | State |
 |---|---|---|---|---|---|
-| 1 | Read-only: count hosted users with a stored password whose address is not on a reserved test name (`.test`, `.invalid`, `.example`, `.localhost`, `example.com/net/org`) | Not read | A count, recorded here | None needed | Ready. If the count is above 0, the owner decides whether to clear those passwords; the trigger in step 2 does not remove existing ones |
-| 2 | Push migration `20261113160000_refuse_auth_passwords.sql`: trigger `refuse_auth_password` on `auth.users` drops a new password for a real address | No trigger | Trigger and `cadence_private.refuse_auth_password()` present | A new migration: `drop trigger refuse_auth_password on auth.users; drop function cadence_private.refuse_auth_password();` | Ready. Additive; the standing approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) applies; the coordinator confirms before the push. After it: Google sign-in on production |
-| 3 | Sign-in email for a new address: `mailer_subjects_confirmation`, `mailer_templates_confirmation_content` | `Confirm your email address`; Supabase's content (masked in the read; save the full value to the private run folder before the change) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved subject and content back | Ready |
-| 4 | Sign-in email for a known address: `mailer_subjects_magic_link`, `mailer_templates_magic_link_content` | `Your sign-in link`; Supabase's content (save it as in step 3) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved values back | Ready |
+| 1 | Read-only: count hosted users with a stored password whose address is not on a reserved test name (`.test`, `.invalid`, `.example`, `.localhost`, `example.com/net/org`) | Not read | **17:14Z: 7 users, 4 with a stored password, 0 of them on a real address** | None needed | **Done.** If the count is above 0, the owner decides whether to clear those passwords; the trigger in step 2 does not remove existing ones |
+| 2 | Push migration `20261113160000_refuse_auth_passwords.sql`: trigger `refuse_auth_password` on `auth.users` drops a new password for a real address | No trigger | **Present and enabled (`tgenabled` O), function owner `postgres`, not security definer, EXECUTE `postgres` only; still 4 stored passwords** | A new migration: `drop trigger refuse_auth_password on auth.users; drop function cadence_private.refuse_auth_password();` | **Done 17:16Z.** Authority: owner blockers row 1 (coordinator ruling 07:35Z), not the additive approval alone: the trigger rewrites what Auth writes. Formerly: additive; the standing approval for additive migrations (`docs/DECISIONS.md`, 2026-11-10) applies; the coordinator confirms before the push. After it: Google sign-in on production |
+| 3 | Sign-in email for a new address: `mailer_subjects_confirmation`, `mailer_templates_confirmation_content` | `Confirm your email address`; Supabase's content (masked in the read; save the full value to the private run folder before the change) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved subject and content back | **Done 17:19Z; read back equal to the file** |
+| 4 | Sign-in email for a known address: `mailer_subjects_magic_link`, `mailer_templates_magic_link_content` | `Your sign-in link`; Supabase's content (save it as in step 3) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved values back | **Done 17:19Z; read back equal to the file** |
 | 5 | Code length `mailer_otp_length` | `8` | `6` (D31.2, local config, `EMAIL_SIGN_IN_CODE_LENGTH`) | `8` | **Waiting: owner decision** (6 or 8). If the owner chooses 8: change `EMAIL_SIGN_IN_CODE_LENGTH` and `otp_length` to 8 in one pull request and leave hosted unchanged |
 | 6 | Custom SMTP: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email`, `smtp_sender_name`, `smtp_max_frequency` | All null except `smtp_max_frequency` 60 (built-in sender: 2 an hour, team addresses only) | `smtp.sequenzy.com`, `587`, `api`, the Sequenzy key, `login@cadence-me.com`, `Cadence`, `60` | Set the six values back to null (the built-in sender returns) | **Waiting:** owner rows 2 (sender and `sequenzy-supabase-smtp-key`) and 3 (DNS for `cadence-me.com`) |
 | 7 | Email rate limit `rate_limit_email_sent` | `2` an hour | `30` an hour, then adjust from measured volume (`docs/COSTS.md`) | `2` | **Waiting:** step 6 (Supabase allows a higher limit only with custom SMTP) |
@@ -32,6 +33,18 @@ After step 4, an email sign-in on hosted Auth works only for Supabase team addre
 an hour, until step 6. The emailed link opens `https://app.cadence-me.com/login/confirm`,
 which sends a person to Login while the flag is off. The code works on any deployment
 with the flag on, including a Preview; the link always opens the Site URL.
+
+## Applied
+
+- The full before values of steps 3 and 4 are saved in the gitignored run folder
+  `.intent/acceptance/v332-hosted/auth-before.json` on the verifier's Mac (subjects
+  `Confirm your email address` and `Your sign-in link`; Supabase's default bodies, 184 and
+  173 characters). Rollback: `PATCH` those four values.
+- Unchanged and read back after the steps: `mailer_otp_length` 8, `mailer_autoconfirm`
+  false, `external_email_enabled` true, `disable_signup` false, `smtp_host` null,
+  `rate_limit_email_sent` 2, `security_captcha_enabled` false, Google on.
+- The template PATCH returned 200 and the first read a second later still showed the old
+  values; a later read showed the new ones. Read twice before concluding a change failed.
 
 ## Before turning on CAPTCHA (step 8)
 

@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 in progress (draft PR, built behind `CADENCE_SIGN_IN_EMAIL`, local check passed); 333–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -110,8 +110,11 @@ Check the cited entry before acting on a row.
   9 of 9 passed against a running server and the local inbox
   (`docs/qa/2026-11-13-ticket-332-email-sign-in.md`). CAPTCHA measured locally: code
   requests, sign-up and password sign-in need a token; verify, refresh and Google do not.
-- **Not done.** No hosted setting changed and no migration pushed. The ordered hosted list,
-  with before, after and rollback, is `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
+- **Verified and applied (November 13, verifier).** A login CSRF on `/auth/confirm` was
+  found and fixed (cross-site posts get 403; the confirm page uses `strict-origin`).
+  Hosted steps 1–4 applied: 0 real addresses had a password (4 test ones); migration
+  `20261113160000` pushed and read back; both sign-in templates set. Steps 5–9 wait on the
+  owner. Evidence: both QA records named above.
 
 Platform impact: web form, routes and Auth config; Mac follow-up Ticket 336 (code entry;
 CAPTCHA effect recorded); marketing not applicable; mobile web shares the form, checked at
