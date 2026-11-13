@@ -68,6 +68,30 @@ its login page shows Continue with Google only. Redirect allow-list entry
 | Account deletion | **Passed** for an email-only account with the flag on: E1 deleted through Settings at 390 px (the confirmation text is the address); landed on `/login`, session 401, Auth `GET /user` with the old token 403; no `t337-` user remains | `account-deletion-e1` |
 | 390 px and desktop | **Passed.** The Sign-in methods row for A and E1 at 390 and 1280 px; no horizontal overflow | `shots/` |
 
+## Second pass: freeing test account B (not done)
+
+The coordinator proposed freeing B's Google identity for a while: export B, delete B's Cadence
+account, run the three remaining linking rows with B's Google account, then rebuild B. Checked
+20:55Z, read-only. **B was not touched**, for these reasons:
+
+1. **B's user ID is fixed in code and in retained hosted evidence.** `c05b0d9d-…` is a constant in
+   `scripts/mcp-session-broker.mjs` (`ACCOUNTS.B`), `scripts/acceptance/watch.mjs`,
+   `scripts/mcp-hosted-fixtures.entry.mjs`, `scripts/mcp-fixture-cleanup.mjs`,
+   `scripts/mcp-acceptance-cleanup.mjs`, `tests/mcp-hosted-fixtures.test.mjs` and
+   `docs/qa/mcp-server.md`. A rebuilt B gets a new user ID, so every MCP acceptance tool would
+   refuse B until a code change lands.
+2. **B holds MCP hosted fixtures that must not be replaced.** `mcp-hosted-fixtures.entry.mjs`
+   keeps the October 28 capture for A and B ("never replace that baseline"). Deleting B removes
+   those rows by cascade. An export and BehaviorLog import create new row IDs, so they cannot
+   restore the fixtures. Re-seeding hosted fixtures uses the MCP signing key, which needs the
+   owner's approval each time (`docs/qa/agent-secrets.md`).
+3. **B's Google account is the owner's own address,** not an agent-made test identity.
+   Deleting and recreating a Cadence account on it is not an agent step.
+
+B today: 3 Behaviors, 13 Occurrences, 9 Categories, 4 status events, one Google identity,
+created September 17, 2026. The three rows stay on owner row 16 (a third Google test account).
+Using A instead has the same problems, plus A's Calendar connection and the test Mac's link.
+
 ## Installed Mac (read-only)
 
 The test Mac runs Cadence 0.1.11-dev.4 (production values), signed in as A with the account
