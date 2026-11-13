@@ -23,10 +23,10 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 
-const SOURCE = process.env.CADENCE_LOCAL_AUTH_CONTAINER ?? "supabase_auth_habit-tracking-app";
+const SOURCE = "supabase_auth_habit-tracking-app";
 const NAME = "cadence_t338_auth";
-const AUTH_PORT = Number(process.env.T338_AUTH_PORT ?? 55398);
-const GATEWAY_PORT = Number(process.env.T338_GATEWAY_PORT ?? 55397);
+const AUTH_PORT = 55398;
+const GATEWAY_PORT = 55397;
 const STACK = process.env.CADENCE_LOCAL_SUPABASE_URL ?? "http://127.0.0.1:55341";
 const TURNSTILE_ALWAYS_PASS_SECRET = "1x0000000000000000000000000000000AA";
 
