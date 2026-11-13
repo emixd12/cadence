@@ -106,6 +106,9 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const status = connection?.status ?? "loading";
   const canManage = status === "connected" && preferences !== null;
   const connectLabel = status === "reconnect_required" ? "Reconnect Google Calendar" : "Connect Google Calendar";
+  // Ticket 335: an account without exactly one Google sign-in.
+  const googleSignIn = status === "connected" ? undefined : connection?.googleSignIn;
+  const canConnect = status !== "connected" && status !== "not_configured" && (!googleSignIn || googleSignIn === "add");
   const busy = pending !== null || autosave.saving;
 
   return (
@@ -122,7 +125,8 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
         </p> : null}
         {status === "not_configured" ? <p className="text-muted-readable">This Cadence server cannot connect Google Calendar.</p> : null}
         {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting removes this Calendar connection for this Cadence account. Other devices stop refreshing after they receive this account change.</p> : null}
-        {status !== "connected" && status !== "not_configured" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "connect" ? "Opening Google Calendar…" : connectLabel}</button> : null}
+        {googleSignIn && status !== "not_configured" ? <p className="text-muted-readable">{googleSignInHint(googleSignIn)}</p> : null}
+        {canConnect ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "connect" ? "Opening Google Calendar…" : connectLabel}</button> : null}
         {canManage ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
             <legend className="font-bold text-foreground">Timeline display</legend>
@@ -202,6 +206,13 @@ function CalendarChoice({ calendar, preferences, onChange }: Readonly<{
     <label className="flex min-h-11 items-center gap-2 font-bold"><input type="checkbox" checked={selected} onChange={(event) => update(event.target.checked, hidden)} />{calendar.name}{calendar.primary ? " (primary)" : ""}</label>
     {selected ? <label className="flex min-h-11 items-center gap-2 text-muted-readable"><input type="checkbox" checked={!hidden} aria-label={`Visible on Timeline: ${calendar.name}`} onChange={(event) => update(true, !event.target.checked)} />Visible on Timeline</label> : null}
   </div>;
+}
+
+function googleSignInHint(value: NonNullable<CalendarConnectionView["googleSignIn"]>): string {
+  if (value === "add") return "Connecting adds the Google account you choose as a way to sign in to Cadence.";
+  if (value === "add_on_web") return "Google Calendar connects through a Google sign-in. Add Google under Sign-in methods in Cadence on the web, then connect here.";
+  if (value === "multiple") return "This account signs in with more than one Google account, so Google Calendar cannot choose one. Remove one under Sign-in methods, then connect.";
+  return "Google Calendar connects only through the Google account you sign in with, and this account does not sign in with Google.";
 }
 
 function statusLabel(status: CalendarConnectionView["status"] | "loading"): string {

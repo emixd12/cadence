@@ -46,6 +46,7 @@ import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import { DayNoteShortcutSettings } from "@/components/note-shortcuts/NoteShortcutControls";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
+import { CALENDAR_AFTER_GOOGLE_SIGN_IN } from "@/lib/types/google-calendar";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -137,7 +138,7 @@ async function SettingsContent({ searchParams }: Readonly<{ searchParams: Settin
         {signInMethods ? (
           <SignInMethodsRow
             view={signInMethods}
-            result={signInMethodResultMessage(
+            result={params.calendar === CALENDAR_AFTER_GOOGLE_SIGN_IN ? null : signInMethodResultMessage(
               params[SIGN_IN_METHODS_RESULT_PARAM],
               params[SIGN_IN_METHODS_METHOD_PARAM],
             )}

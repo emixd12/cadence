@@ -185,6 +185,8 @@ export type SignInMethodResult =
   | "reauth_required"
   | "added"
   | "add_failed"
+  | "already_added"
+  | "calendar_connected"
   | "taken"
   | "removed"
   | "remove_failed"
@@ -206,6 +208,8 @@ function messages(name: string): Record<SignInMethodResult, string> {
   return {
     added: `${name} added. You can sign in with it now.`,
     add_failed: `${name} was not added. Try again.`,
+    already_added: `${name} already signs in to this account.`,
+    calendar_connected: `Google Calendar uses this Google account. Disconnect Google Calendar first, then remove ${name}.`,
     taken: `That ${name} account already signs in to a different Cadence account, so it cannot be added here. Cadence does not merge accounts. Choose another ${name} account.`,
     removed: `${name} removed. It no longer signs in to this account.`,
     remove_failed: `${name} was not removed. Try again.`,

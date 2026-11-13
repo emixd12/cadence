@@ -25,7 +25,7 @@ export async function authenticateCalendarRequest(request: Request): Promise<Cal
   }
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw new CalendarConnectionError("unauthenticated");
-  return { client, user: data.user };
+  return { client, user: data.user, via: token ? "bearer" : "cookie" };
 }
 export function calendarResponse(request: Request, body: unknown, status = 200) {
   const origin = request.headers.get("origin");

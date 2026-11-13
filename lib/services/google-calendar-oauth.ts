@@ -46,9 +46,18 @@ export function readCalendarOAuthConfig(env: Record<string, string | undefined> 
 }
 /** The fields the Google subject check reads. A full Auth `User` fits; so does the leave reminder job's caller (Ticket 276). */
 export type CalendarIdentityUser = Readonly<{ id: string; identities?: ReadonlyArray<Pick<UserIdentity, "provider" | "identity_data"> & { provider_id?: unknown }> }>;
+type CalendarIdentity = NonNullable<CalendarIdentityUser["identities"]>[number];
+/** The Google subject of one identity: its provider id, or the `sub` Google returned. */
+export function googleIdentitySubject(identity: CalendarIdentity): unknown {
+  return "provider_id" in identity && typeof identity.provider_id === "string" ? identity.provider_id : identity.identity_data?.sub;
+}
+/** The account's Google sign-ins. Ticket 335: Calendar binds to the one Google sign-in, however the account began. */
+export function googleSignInSubjects(user: CalendarIdentityUser): unknown[] {
+  return user.identities?.filter((identity) => identity.provider === "google").map(googleIdentitySubject) ?? [];
+}
 export function calendarGoogleSubject(user: CalendarIdentityUser): string {
-  const subjects = user.identities?.filter((identity) => identity.provider === "google").map((identity) => "provider_id" in identity && typeof identity.provider_id === "string" ? identity.provider_id : identity.identity_data?.sub);
-  if (!subjects || subjects.length !== 1 || typeof subjects[0] !== "string" || !subjects[0]) throw new CalendarConnectionError("same_account_required");
+  const subjects = googleSignInSubjects(user);
+  if (subjects.length !== 1 || typeof subjects[0] !== "string" || !subjects[0]) throw new CalendarConnectionError("same_account_required");
   return subjects[0];
 }
 export type CalendarSecretBinding = Readonly<{ purpose: "refresh" | "verifier"; userId: string; googleSubject: string; generation: number; stateHash?: string }>;
