@@ -17,6 +17,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // 4. A changed address does not sign in to the same account, or adds a password.
 // 5. A post from another site changes the account.
 // 6. Deletion asks an Apple relay account to type its relay address.
+// 7. Two removals at once leave no identity (the database trigger must serialize them).
+// 8. A session whose last sign-in is old changes sign-in methods.
+// 9. The trigger breaks account deletion, the test login or Supabase's own unlink.
 //
 // Run: docs/qa/2026-11-13-ticket-334-sign-in-methods.md.
 
@@ -68,6 +71,21 @@ class Browser {
     if (!value) return null;
     const url = new URL(value, appUrl);
     return url.origin === new URL(appUrl!).origin ? `${url.pathname}${url.search}${url.hash}` : url.toString();
+  }
+
+  /**
+   * Marks the session's access token expired, so the server refreshes it on the next
+   * request and the new token carries the `amr` times stored in the database.
+   */
+  expireAccessToken() {
+    const names = [...this.jar.keys()].filter((name) => /^sb-.*-auth-token(\.\d+)?$/.test(name)).sort();
+    const raw = names.map((name) => decodeURIComponent(this.jar.get(name)!)).join("");
+    const json = raw.startsWith("base64-") ? Buffer.from(raw.slice(7), "base64url").toString("utf8") : raw;
+    const session = JSON.parse(json) as { expires_at: number };
+    session.expires_at = Math.floor(Date.now() / 1000) - 60;
+    for (const name of names) this.jar.delete(name);
+    const base = names[0].replace(/\.\d+$/, "");
+    this.jar.set(base, `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`);
   }
 
   signedInUserId(): string | null {
@@ -146,15 +164,23 @@ run("Sign-in methods in Settings (Ticket 334)", () => {
     return data.user.id;
   }
 
+  function addIdentity(userId: string, provider: string) {
+    const sub = `${provider}-${randomUUID()}`;
+    sql(
+      `insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+       values (${literal(sub)}, ${literal(userId)}, jsonb_build_object('sub', ${literal(sub)}), ${literal(provider)}, now(), now(), now())`,
+    );
+  }
+
   /** A user whose only identity is Google, as a Google sign-up leaves it. */
   async function createGoogleUser(email: string) {
     const userId = await createUser(email);
     const sub = `google-${randomUUID()}`;
-    sql(`delete from auth.identities where user_id = ${literal(userId)}`);
     sql(
       `insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
        values (${literal(sub)}, ${literal(userId)}, jsonb_build_object('sub', ${literal(sub)}, 'email', ${literal(email)}, 'email_verified', true), 'google', now(), now(), now())`,
     );
+    sql(`delete from auth.identities where user_id = ${literal(userId)} and provider = 'email'`);
     return userId;
   }
 
@@ -226,8 +252,10 @@ run("Sign-in methods in Settings (Ticket 334)", () => {
 
     const after = Date.now() - 1000;
     const response = await browser.request("/auth/sign-in-methods/email", { form: { email: taken } });
-    expect(browser.location(response)).toBe("/settings?sign_in_method=email_taken&method=email#sign-in-methods");
+    // The same answer as for a usable address: Settings does not reveal that it has an account.
+    expect(browser.location(response)).toBe("/settings?sign_in_method=email_sent&method=email#sign-in-methods");
     expect(await mailCount(taken, after)).toBe(0);
+    expect(sql(`select coalesce(email_change, '') from auth.users where email = ${literal(email)}`)).toBe("");
 
     const same = await browser.request("/auth/sign-in-methods/email", { form: { email: email.toUpperCase() } });
     expect(browser.location(same)).toBe("/settings?sign_in_method=email_same&method=email#sign-in-methods");
@@ -242,7 +270,95 @@ run("Sign-in methods in Settings (Ticket 334)", () => {
     expect(html).toContain("That Google account already signs in to a different Cadence account");
     expect(html).not.toContain(taken);
     expect(html).not.toContain("Identity is already linked");
-    record("taken address and taken Google account refused; no other account named", "passed");
+    record("taken address answered like a usable one; taken Google account refused; no other account named", "passed");
+  });
+
+  it("Cadence keeps Google when the other identity's method is off, though Supabase would allow it", async () => {
+    const email = address("rule");
+    const userId = await createGoogleUser(email);
+    addIdentity(userId, "apple"); // Apple has no start until Ticket 333, so it cannot sign in.
+    const browser = new Browser();
+    await signIn(browser, email);
+    expect(await settings(browser)).not.toContain('aria-label="Remove Google"');
+
+    const googleId = sql(`select id from auth.identities where user_id = ${literal(userId)} and provider = 'google'`);
+    const refused = await browser.request("/auth/sign-in-methods/remove", { form: { identity_id: googleId } });
+    expect(browser.location(refused)).toBe("/settings?sign_in_method=last_method#sign-in-methods");
+    expect(providers(userId)).toEqual(["apple", "google"]);
+    record("enabled-method rule refuses removing Google beside a disabled Apple identity", "passed");
+  });
+
+  it("two removals at once leave one identity", async () => {
+    const email = address("race");
+    const userId = await createGoogleUser(email);
+    addIdentity(userId, "google");
+    const browser = new Browser();
+    await signIn(browser, email);
+    const ids = sql(`select id from auth.identities where user_id = ${literal(userId)}`).split("\n");
+    expect(ids).toHaveLength(2);
+
+    const responses = await Promise.all(
+      ids.map((id) => browser.request("/auth/sign-in-methods/remove", { form: { identity_id: id } })),
+    );
+    const results = responses.map((response) => new URL(browser.location(response)!, appUrl).searchParams.get("sign_in_method")).sort();
+    expect(results).toEqual(["last_method", "removed"]);
+    expect(providers(userId)).toEqual(["google"]);
+    record("concurrent removals: one removed, one last_method, one identity left", "passed");
+  });
+
+  it("a session whose last sign-in is older than 15 minutes is sent to sign in again", async () => {
+    const email = address("stale");
+    const userId = await createGoogleUser(email);
+    addIdentity(userId, "google");
+    const staleSession = async () => {
+      const browser = new Browser();
+      await signIn(browser, email);
+      sql(
+        `update auth.mfa_amr_claims set created_at = now() - interval '20 minutes', updated_at = now() - interval '20 minutes'
+         where session_id in (select id from auth.sessions where user_id = ${literal(userId)})`,
+      );
+      browser.expireAccessToken();
+      return browser;
+    };
+
+    const googleId = sql(`select id from auth.identities where user_id = ${literal(userId)} limit 1`);
+    for (const [action, form] of [
+      ["remove", { identity_id: googleId }],
+      ["email", { email: address("stale-new") }],
+      ["add", { method: "google" }],
+    ] as const) {
+      const stale = await staleSession();
+      const response = await stale.request(`/auth/sign-in-methods/${action}`, { form });
+      expect(stale.location(response)).toBe("/login?next=%2Fsettings%23sign-in-methods&error=reauth_required");
+      expect(stale.signedInUserId()).toBeNull();
+    }
+    expect(providers(userId)).toEqual(["google", "google"]);
+    expect(sql(`select coalesce(email_change, '') from auth.users where id = ${literal(userId)}`)).toBe("");
+    const login = await new Browser().request("/login?next=%2Fsettings%23sign-in-methods&error=reauth_required");
+    expect(await login.text()).toContain("Sign in again to change how you sign in.");
+    record("old sign-in: add, change address and remove send the person to sign in again; nothing changes", "passed");
+  });
+
+  it("the database keeps the last identity, and deletion, the test login and Supabase unlink still work", async () => {
+    const email = address("db");
+    const userId = await createGoogleUser(email);
+    expect(() => sql(`delete from auth.identities where user_id = ${literal(userId)}`)).toThrow(/cadence_last_identity/);
+    addIdentity(userId, "email");
+    expect(sql(`delete from auth.identities where user_id = ${literal(userId)} and provider = 'email' returning provider`)).toMatch(/^email/);
+
+    addIdentity(userId, "email");
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    expect(error).toBeNull();
+    expect(sql(`select count(*) from auth.identities where user_id = ${literal(userId)}`)).toBe("0");
+    expect(sql(`select count(*) from auth.users where id = ${literal(userId)}`)).toBe("0");
+
+    const tester = new Browser();
+    const login = await tester.request("/auth/test-login?next=%2Fsettings");
+    expect(tester.location(login)).toBe("/settings");
+    const testUserId = tester.signedInUserId();
+    expect(testUserId).toMatch(/^[0-9a-f-]{36}$/);
+    created.push(testUserId!);
+    record("database refuses the last identity; account deletion cascades; test login signs in", "passed");
   });
 
   it("Add Google starts manual linking with a return to Settings", async () => {

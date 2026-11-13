@@ -152,7 +152,37 @@ export function planRemoveSignInMethod(
   return { kind: "remove", identity, methodId };
 }
 
+/**
+ * Add, Remove and Change address need a sign-in within this many seconds
+ * (coordinator decision, November 13, 2026; the owner can change it), so a stolen
+ * or forgotten session cannot attach the taker's own sign-in.
+ */
+export const RECENT_SIGN_IN_SECONDS = 15 * 60;
+
+/**
+ * True when the session's last authentication is recent. Supabase Auth puts each
+ * authentication of the session in the `amr` claim with its time; a token refresh
+ * keeps those times. A session with no `amr` time counts as not recent.
+ */
+export function signedInRecently(
+  claims: unknown,
+  nowSeconds: number,
+  maxAgeSeconds: number = RECENT_SIGN_IN_SECONDS,
+): boolean {
+  const amr = claims && typeof claims === "object" ? (claims as { amr?: unknown }).amr : null;
+  if (!Array.isArray(amr)) return false;
+  const times = amr
+    .map((entry) => (entry && typeof entry === "object" ? (entry as { timestamp?: unknown }).timestamp : null))
+    .filter((time): time is number => typeof time === "number" && Number.isFinite(time));
+  if (times.length === 0) return false;
+  return nowSeconds - Math.max(...times) <= maxAgeSeconds;
+}
+
+/** `/login` error key for a change refused because the last sign-in is too old. */
+export const REAUTH_REQUIRED_ERROR = "reauth_required";
+
 export type SignInMethodResult =
+  | "reauth_required"
   | "added"
   | "add_failed"
   | "taken"
@@ -183,8 +213,9 @@ function messages(name: string): Record<SignInMethodResult, string> {
     not_removable: "Email stays while this account has an address. You can change the address.",
     not_found: "That sign-in method is no longer on this account. Reload Settings.",
     unavailable: "Sign-in methods cannot be changed right now.",
+    reauth_required: "Sign in again to change how you sign in.",
     email_sent:
-      "Cadence sent a confirmation link to the new address. Open it to finish. If an email also reaches your current address, open that link too.",
+      "If that address can be used, Cadence sent it a confirmation link. Open it to finish. If an email also reaches your current address, open that link too.",
     email_same: "That is already this account's address.",
     email_invalid: "Enter an email address, like name@example.com.",
     email_taken:

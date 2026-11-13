@@ -12809,7 +12809,7 @@
           "control": "Add Apple"
         }
       ],
-      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Each button shows for an enabled method the account does not have yet; Apple needs CADENCE_SIGN_IN_APPLE and Ticket 333.",
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Each button shows for an enabled method the account does not have yet; Apple needs CADENCE_SIGN_IN_APPLE and Ticket 333. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Supabase manual identity linking sends the person to the provider and back through /auth/callback; Settings shows the new method and says it was added.",
       "failure_result": "A provider account that already signs in to another Cadence account is refused with a plain message that names no account; Cadence does not merge accounts. Other failures say the method was not added.",
       "effects": [
@@ -12905,9 +12905,9 @@
           "control": "Cancel"
         }
       ],
-      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Also needs CADENCE_SIGN_IN_EMAIL. Change address shows on the Email row; Add email shows when the account has no confirmed address.",
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Also needs CADENCE_SIGN_IN_EMAIL. Change address shows on the Email row; Add email shows when the account has no confirmed address. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Supabase Auth emails a confirmation link to the new address (and to the current one while secure address change is on). After the links are opened, the account address, email sign-in and email reminders use the new address.",
-      "failure_result": "Refuses an invalid address, the current address, an address that already signs in to another Cadence account (without naming it), a second request inside a minute, and a used or expired link, each with a plain message. The address does not change before confirmation.",
+      "failure_result": "Refuses an invalid address, the current address, a second request inside a minute, and a used or expired link, each with a plain message. An address that already has an account gets the same answer as a usable one and no email. The address does not change before confirmation.",
       "effects": [
         "external_message",
         "authentication_identity_change",
@@ -13002,9 +13002,9 @@
           "control": "Cancel"
         }
       ],
-      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes.",
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Unlinks the identity with the person's own session and says it was removed.",
-      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly, and keeps every identity.",
+      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays.",
       "effects": [
         "authentication_identity_change",
         "navigation"
@@ -13022,7 +13022,7 @@
           "tests/sign-in-methods.local-integration.test.ts",
           "tests/account-sign-in-methods.test.ts"
         ],
-        "notes": "The local-integration test checks that a Google-only account shows no Remove and a direct post is refused, then removes Google after an email identity exists and refuses removing email."
+        "notes": "The local-integration test checks that a Google-only account shows no Remove and a direct post is refused, then removes Google after an email identity exists and refuses removing email. It also sends two removals at once (one removed, one refused, one identity left) and checks Cadence's enabled-method rule beside a disabled Apple identity."
       },
       "platforms": {
         "web": {

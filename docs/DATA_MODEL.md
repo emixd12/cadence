@@ -269,6 +269,23 @@ Apple identity in `auth.identities`; `apple_sign_in_read_tokens(owner_id)` retur
 user's rows. Account deletion reads the rows before deleting the Auth user (they cascade)
 and revokes after. Local check: `tests/apple-sign-in.local-integration.test.ts`.
 
+**At least one Auth identity per user (Ticket 334, D31.3).** Trigger `keep_one_auth_identity`
+(`before delete on auth.identities`, function `cadence_private.keep_one_auth_identity()`,
+migration `20261113180000_keep_one_auth_identity.sql`) locks the user's `auth.users` row
+with `FOR UPDATE`, then refuses (`P0001`, `cadence_last_identity`) to delete an identity when
+no other identity of that user remains. Supabase Auth's own last-identity check does not
+lock, so two unlinks at once each passed it and left none; with the lock they run one after
+the other and the second fails (Auth answers 500, which Cadence shows as "Add another way to
+sign in before removing this one."). Any other identity counts, whatever its provider. A
+confirmed address does not count, although it receives sign-in codes while email sign-in is
+on, because that depends on a flag; the rule can only refuse a deletion, so it never locks
+anyone out. Deleting the user is unaffected: its identities cascade after the user row is
+gone, so the lookup finds no user and lets them through. Automatic linking removes
+unconfirmed identities only after adding the new one. The function is owned by `postgres`,
+is not security definer, has no grant to `anon` or `authenticated`, and names only `auth`
+tables, which the Auth service's role owns. Local check:
+`tests/sign-in-methods.local-integration.test.ts`.
+
 ### `categories`
 
 ```sql

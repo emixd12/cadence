@@ -1667,7 +1667,8 @@ cite has not changed.
   new address. Cadence refuses an account or address that already signs in to another
   Cadence account and never merges accounts. An account with no address or an Apple
   relay address types `DELETE` to delete the account. Login says that another way can
-  start a second account.
+  start a second account. Changing sign-in methods asks for a sign-in within the last 15
+  minutes. An address that already has an account gets the same answer as a usable one.
 - **Affected:** Ticket 334. Files: `components/settings/SignInMethodsPanel.tsx`,
   `lib/auth/account-sign-in-methods.ts`, `app/(auth)/login/page.tsx`.
 - **Surfaces:** user guide (privacy and account: a sign-in methods section; deletion

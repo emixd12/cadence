@@ -1187,7 +1187,10 @@ scrolls; on small screens it sits below the app header.
   **Change address** (or **Add email** when the account has no confirmed address):
   a field, **Send confirmation link** and **Cancel**. **Add Google** and **Add
   Apple** show for enabled methods the account lacks. One result line below the
-  list; a taken account or address is refused without naming the other account.
+  list; a taken account is refused without naming the other account, and a taken
+  address gets the same answer as a usable one. Add, Remove and Change address need a
+  sign-in within 15 minutes; otherwise Login asks the person to sign in again and
+  returns them to the row.
 - Delete account asks for the account address, or `DELETE` when the account has no
   address or an Apple Hide My Email relay address (Ticket 334).
 - The page ends with one line of Privacy, Terms and Trust links, then Delete

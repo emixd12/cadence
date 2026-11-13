@@ -104,7 +104,13 @@ Check the cited entry before acting on a row.
   shows a one-account hint while the flag is on. Delete account asks for `DELETE` with no
   address or an Apple relay address.
 - **Seam for Ticket 335.** `startAddSignInMethod` in `lib/services/sign-in-methods.service.ts`.
-- **Verified locally.** `tests/sign-in-methods.local-integration.test.ts`: 6 of 6 against a
+- **Verifier fixes (November 13).** Two removals at once left an account with no identity
+  (10 of 10). Migration `20261113180000_keep_one_auth_identity.sql` adds a trigger that locks
+  the user row and refuses deleting the last identity; account deletion, the test login and
+  email sign-up still pass. Add, Remove and Change address now need a sign-in within 15
+  minutes (coordinator decision, recorded as an assumption). A taken address gets the same
+  answer as a usable one. Not pushed to hosted.
+- **Verified locally.** `tests/sign-in-methods.local-integration.test.ts`: 10 of 10 (6 at first) against a
   running server, Mailpit and manual linking on; the same flow by clicks in Chrome at
   1280 and 390 px, which found and fixed a disabled field dropped from the form
   (`docs/qa/2026-11-13-ticket-334-sign-in-methods.md`).

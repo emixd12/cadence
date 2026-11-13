@@ -24,7 +24,8 @@ const DANGER = "product-action product-action-danger min-h-11 w-fit px-3 py-2 te
 export type SignInMethodsResult = Readonly<{ text: string; error: boolean }> | null;
 
 function listNames(rows: readonly SignInMethodRow[]): string {
-  const names = rows.map((row, index) => (index === 0 ? row.name : row.name.toLowerCase()));
+  const unique = [...new Set(rows.map((row) => row.name))];
+  const names = unique.map((name, index) => (index === 0 ? name : name.toLowerCase()));
   if (names.length <= 1) return names[0] ?? "None";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
@@ -49,7 +50,7 @@ export function SignInMethodsPanel({ view, result }: Readonly<{ view: SignInMeth
     <section id={SIGN_IN_METHODS_ANCHOR} className="grid min-w-0 gap-4">
       <ul className="grid min-w-0 divide-y divide-line">
         {view.rows.map((row) => (
-          <li key={row.identityId ?? row.methodId} className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 first:pt-0">
+          <li key={row.identityId ?? row.methodId} className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 text-sm first:pt-0">
             <span className="grid min-w-0 gap-0.5">
               <span className="text-base font-bold leading-6">{row.name}</span>
               {row.detail ? <span className="text-sm leading-6 text-muted-readable [overflow-wrap:anywhere]">{row.detail}</span> : null}
@@ -61,7 +62,7 @@ export function SignInMethodsPanel({ view, result }: Readonly<{ view: SignInMeth
       </ul>
 
       {view.addable.length > 0 || (!emailRow && view.emailEnabled) ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm">
           {view.addable.map((methodId) => (
             <form key={methodId} method="post" action="/auth/sign-in-methods/add">
               <input type="hidden" name="method" value={methodId} />
@@ -130,7 +131,7 @@ function EmailAddressForm({ toggleLabel }: Readonly<{ toggleLabel: string }>) {
     return <button ref={trigger} type="button" className={SECONDARY} onClick={() => setOpen(true)}>{toggleLabel}</button>;
   }
   return (
-    <form method="post" action="/auth/sign-in-methods/email" onSubmit={() => setPending(true)} className="grid basis-full gap-2">
+    <form method="post" action="/auth/sign-in-methods/email" onSubmit={() => setPending(true)} className="grid basis-full gap-2 text-sm">
       <label htmlFor="sign-in-method-email" className="text-sm leading-6">New email address</label>
       <input ref={input} id="sign-in-method-email" name="email" type="email" required autoComplete="email" spellCheck={false}
         autoCapitalize="none" readOnly={pending}

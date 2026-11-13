@@ -19053,6 +19053,16 @@ As built (November 13, 2026):
   sign in the way you did before and add other ways in Settings.
 - Delete account asks for `DELETE` when the account has no address or an Apple relay
   address.
+- The database keeps the last identity: trigger `keep_one_auth_identity` (migration
+  `20261113180000`) locks the user row and refuses deleting an account's last identity, so
+  two removals at once cannot leave none. It must be pushed before hosted manual linking.
+- Assumption (coordinator decision, November 13, 2026; the owner can change it): Add, Remove
+  and Change address need a sign-in within the last 15 minutes, read on the server from the
+  session's authentication times. An older session is signed out and sent to sign in again,
+  then returned to the Sign-in methods row.
+- An address that already has an account gets the same answer as a usable one ("If that
+  address can be used, Cadence sent it a confirmation link"), so Settings does not reveal
+  which addresses have accounts.
 - Shared entry point for Ticket 335: `startAddSignInMethod` in
   `lib/services/sign-in-methods.service.ts` (method, return path, optional scopes);
   `/auth/callback` returns with `sign_in_method` `added`, `taken` or `add_failed`.

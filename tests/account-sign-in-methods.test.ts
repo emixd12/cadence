@@ -5,6 +5,7 @@ import {
   buildSignInMethodsView,
   linkCallbackResult,
   planRemoveSignInMethod,
+  signedInRecently,
   signInMethodResultMessage,
   type AccountIdentity,
 } from "@/lib/auth/account-sign-in-methods";
@@ -58,5 +59,14 @@ describe("account sign-in methods", () => {
     expect(accountDeletionConfirmationText("X@PrivateRelay.AppleID.com")).toBe("DELETE");
     expect(accountDeletionConfirmationText(" ")).toBe("DELETE");
     expect(accountDeletionConfirmationText(null)).toBe("DELETE");
+  });
+
+  it("counts a sign-in as recent for 15 minutes from the newest amr time", () => {
+    const now = 1_800_000_000;
+    expect(signedInRecently({ amr: [{ method: "oauth", timestamp: now - 900 }] }, now)).toBe(true);
+    expect(signedInRecently({ amr: [{ method: "oauth", timestamp: now - 901 }] }, now)).toBe(false);
+    expect(signedInRecently({ amr: [{ timestamp: now - 5000 }, { timestamp: now - 60 }] }, now)).toBe(true);
+    expect(signedInRecently({ iat: now }, now)).toBe(false);
+    expect(signedInRecently(null, now)).toBe(false);
   });
 });

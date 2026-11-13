@@ -2,16 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   isSignInMethodId,
+  REAUTH_REQUIRED_ERROR,
   SETTINGS_SIGN_IN_METHODS_PATH,
   SIGN_IN_METHODS_ANCHOR,
   signInMethodReturnPath,
   type SignInMethodResult,
 } from "@/lib/auth/account-sign-in-methods";
 import { crossSitePost } from "@/lib/auth/email-sign-in-server";
-import { authRequestUrl } from "@/lib/auth/redirects";
+import { authRequestUrl, buildLoginPath } from "@/lib/auth/redirects";
 import type { SignInMethodId } from "@/lib/auth/sign-in-methods";
 import {
   changeSignInEmail,
+  endSessionForRecentSignIn,
   removeSignInMethod,
   startAddSignInMethod,
 } from "@/lib/services/sign-in-methods.service";
@@ -23,7 +25,11 @@ export const dynamic = "force-dynamic";
 
 const RETURN_PATH = `${SETTINGS_SIGN_IN_METHODS_PATH}#${SIGN_IN_METHODS_ANCHOR}`;
 
-function backToSettings(requestUrl: URL, result: SignInMethodResult, methodId?: SignInMethodId) {
+async function backToSettings(requestUrl: URL, result: SignInMethodResult, methodId?: SignInMethodId) {
+  if (result === "reauth_required") {
+    await endSessionForRecentSignIn();
+    return NextResponse.redirect(new URL(buildLoginPath(RETURN_PATH, REAUTH_REQUIRED_ERROR), requestUrl), 303);
+  }
   return NextResponse.redirect(
     new URL(signInMethodReturnPath(RETURN_PATH, result, methodId), requestUrl),
     303,

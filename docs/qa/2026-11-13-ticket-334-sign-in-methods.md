@@ -38,7 +38,7 @@ on, and Settings does not offer to remove it; it offers **Change address**.
 
 Without those variables the file is skipped, so `npm run test` does not run it.
 
-## Result: 6 of 6 passed
+## Result: 6 of 6 passed (first run)
 
 | Case | Result |
 |---|---|
@@ -61,6 +61,26 @@ the button, `DELETE` does). Focus moves to the field on **Change address** and t
 - **Found and fixed in the browser:** the address field was disabled on submit, so the
   browser left it out of the form data and the server answered "Enter an email
   address". The HTTP test had not caught it. The field is now read-only while sending.
+
+## After the verifier's findings (November 13, about 18:30Z)
+
+The local database was reset (`npm run supabase -- db reset`), which replayed every migration
+including `20261113180000_keep_one_auth_identity.sql`.
+
+| Case | Result |
+|---|---|
+| Two removals sent at once for an account with two Google identities | one `removed`, one `last_method`, one identity left. With the trigger dropped: both `removed`, none left (the case fails) |
+| Google beside an Apple identity whose method is off (Supabase alone would allow it) | no Remove shown; a direct post gets `last_method`; both identities stay |
+| A session whose last sign-in is 20 minutes old (`auth.mfa_amr_claims` backdated, access token expired so it refreshes) posts add, change address and remove | each is signed out and sent to `/login?next=%2Fsettings%23sign-in-methods&error=reauth_required`; nothing changes |
+| The database refuses deleting the last identity directly; deleting one of two works; Admin API account deletion with two identities cascades; the test login signs in | passed |
+| An address that already has an account | `email_sent`, the same as a usable address; no email to it and no pending change |
+| `tests/sign-in-methods.local-integration.test.ts` | 10 of 10 passed |
+| `tests/email-sign-in.local-integration.test.ts` (Ticket 332) with the trigger in place | 9 of 9 passed |
+
+Chrome, by clicks: an old session pressed **Remove Google**, landed on Login with "Sign in again
+to change how you sign in…", signed in by email code and returned to `/settings#sign-in-methods`,
+where **Remove Google** then worked. **Change address**, **Remove**, **Remove Google** and
+**Cancel** all compute to 12 px (before: 16 px for the first two).
 
 ## Not run here
 
