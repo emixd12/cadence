@@ -67,7 +67,7 @@ implement most of it in source; it is not deployed yet.
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
-| Sign-in email (Ticket 332, D31) | Unknown | Unknown | Unknown | Planned, not shipped. One email per email sign-in, sent through Sequenzy's SMTP relay. Volume and price not measured; Ticket 332 records both. Sequenzy's plan is not recorded (fixed costs above) |
+| Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session; Supabase allows at most one per address per 60 s and the project limit is 2 an hour until custom SMTP (then 30 an hour, step 7 of `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`) | Sequenzy's public free allowance covers about 2,500 sign-in emails a month; volume not measured | US$0 within the free allowance; the account's plan and per-email price are not recorded | Built behind `CADENCE_SIGN_IN_EMAIL`, off in production; no hosted email sent. Sequenzy's SMTP relay waits on the owner (sender, key, DNS). Cloudflare Turnstile is free (not rechecked). Measure the volume in the first week after Ticket 337 |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
 
 ### Per-user total at 100 users
@@ -628,6 +628,10 @@ arrives, fees reduce the US$5:
 - 2026-11-13: Decision D31 plans sign-in email through Sequenzy (Ticket 332) and Apple
   sign-in (Ticket 333). Added two planned rows with unknown or assumed figures. WorkOS was
   not adopted, so it adds no cost. Totals unchanged.
+- 2026-11-13: Ticket 332 built email sign-in behind a flag that is off in production.
+  The sign-in email row now has a volume estimate and the rate limits; price stays
+  unknown until the owner records Sequenzy's plan. Cloudflare Turnstile is free (not
+  rechecked). Totals unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

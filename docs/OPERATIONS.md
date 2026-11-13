@@ -123,7 +123,7 @@ The rehearsal first pulls the seven approved pins sequentially with standard
 Docker through the same proxy. This isolates registry access, reduces concurrent
 pull pressure and caches the images before CLI startup. There is no registry or
 image fallback, registry login step, or package permission. It copies only
-config, the empty seed and tracked
+config, the empty seed, the tracked Auth email templates (Ticket 332) and tracked
 migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
 checks service health before and after `db reset --local`. The tracked migration
 version list must exactly match the applied list; its count is derived from the
@@ -1186,8 +1186,21 @@ keep the standard authenticated redirect behavior.
 
 Sign-in method flags (Ticket 331, D31.6): `CADENCE_SIGN_IN_APPLE` and
 `CADENCE_SIGN_IN_EMAIL`. A method shows on Login and starts only when its flag
-is exactly `on` and its ticket (333, 332) has shipped. Leave both unset in
-Production until Ticket 337 passes for that method. Google has no flag.
+is exactly `on` and its ticket has shipped (email: Ticket 332; Apple: Ticket
+333). Leave both unset in Production until Ticket 337 passes for that method.
+Google has no flag.
+
+Email sign-in (Ticket 332): `/login/email` posts the address to
+`/auth/sign-in/email`, which asks Supabase Auth for one email with a link and a
+code (no PKCE, so either works in any browser). The code posts to
+`/auth/email/verify`. The link opens `/login/confirm`, whose button posts the
+token hash to `/auth/confirm`. An HTTP-only cookie, `cadence_email_sign_in`,
+holds the address and return path for one hour. `CADENCE_TURNSTILE_SITE_KEY`
+adds Cloudflare Turnstile to the request forms; set it only together with
+hosted Auth CAPTCHA. The code length is `EMAIL_SIGN_IN_CODE_LENGTH` in
+`lib/auth/email-sign-in.ts` and must equal `otp_length` locally and on hosted
+Auth (an open owner decision: 6 or 8). Local check:
+`docs/qa/2026-11-13-ticket-332-email-sign-in.md`.
 
 ## Source-of-truth order
 
@@ -1287,11 +1300,17 @@ Completed public-launch sign-off:
 
 Remaining owner decisions before broader launch:
 
-- decide whether to disable hosted email/password authentication, because the
-  product UI exposes Google login only;
+- email/password authentication: settled by D31.2 (2026-11-13). Email sign-in is
+  by link or code and an account has no password. The hosted email provider stays
+  on, because email sign-in needs it; hosted Auth has no setting that turns
+  passwords off alone. Migration `20261113160000_refuse_auth_passwords.sql`
+  (Ticket 332) drops any new password for a real address; addresses on names
+  reserved for testing keep theirs for the test login. Pushing it is step 2 of
+  `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`;
 - decide whether localhost callback URLs remain allow-listed for development;
-- treat CAPTCHA and leaked-password protection as conditional follow-up based
-  on the final Google-only provider posture and accepted launch risk.
+- CAPTCHA: Cloudflare Turnstile is planned for email sign-in (Ticket 332) and is
+  project-wide; its effects on the test login and the Mac are listed in the same
+  file. Leaked-password protection does not apply once no account has a password.
 
 Implemented follow-up:
 

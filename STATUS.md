@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332–337 not started; Google stays the only live method | Ticket 332 next. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 in progress (draft PR, built behind `CADENCE_SIGN_IN_EMAIL`, local check passed); 333–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -90,6 +90,32 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 332: email sign-in built behind its flag — November 13, 2026
+
+- **Built.** Continue with email opens `/login/email`. One email carries a link and a
+  6-digit code; either signs in, and a new address creates the account. The link opens
+  `/login/confirm`, whose button verifies on Cadence's own domain, so it works in another
+  browser and a mail scanner cannot use it up. Wrong, used and expired links and codes,
+  and a second request inside 60 s, each show a plain message with a way forward. Optional
+  Cloudflare Turnstile (`CADENCE_TURNSTILE_SITE_KEY`).
+- **No passwords.** Hosted Auth has no switch for that. Migration
+  `20261113160000_refuse_auth_passwords.sql` drops any new password for a real address,
+  including the random one Auth sets on a code sign-up. Reserved test addresses keep
+  theirs, so the test login still works.
+- **Local parity.** `supabase/config.toml` now has confirmation on, 60 s between emails,
+  TOTP on and the sign-in template, as hosted. Code length stays 6 locally; hosted sends 8.
+  The owner decides (one setting: `EMAIL_SIGN_IN_CODE_LENGTH`).
+- **Verified.** `db reset` replayed every migration. `tests/email-sign-in.local-integration.test.ts`:
+  9 of 9 passed against a running server and the local inbox
+  (`docs/qa/2026-11-13-ticket-332-email-sign-in.md`). CAPTCHA measured locally: code
+  requests, sign-up and password sign-in need a token; verify, refresh and Google do not.
+- **Not done.** No hosted setting changed and no migration pushed. The ordered hosted list,
+  with before, after and rollback, is `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
+
+Platform impact: web form, routes and Auth config; Mac follow-up Ticket 336 (code entry;
+CAPTCHA effect recorded); marketing not applicable; mobile web shares the form, checked at
+390 px. Messaging impact: P-051, P-052.
 
 ## Ticket 330: Complete from Hevy on a linked Mac — November 13, 2026
 
