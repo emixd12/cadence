@@ -73,3 +73,38 @@ error, the code step, a rejected code, a refused resend, the link page and a ref
   disposable stack (`CADENCE_QA_BROKER_LOCAL=1`). Its link reader now rebuilds Auth's
   verify URL from the new email's token hash; that URL was checked by hand on this stack
   (303 to `/auth/callback?code=…`).
+
+## Independent verification, November 13, 2026
+
+Run by the coordinator's verifier on the same local stack (API 55341), against
+`claude/sign-in-332-email`.
+
+- **Login CSRF found and fixed.** A post from another site to `/auth/confirm` with the
+  attacker's own token hash set a Cadence session (login CSRF). The three POST routes now
+  refuse a cross-site post with 403 (`crossSitePost` in `lib/auth/email-sign-in-server.ts`):
+  `Sec-Fetch-Site` decides when present, else `Origin` must be this site; a request with
+  neither is not a browser form and passes.
+- **The first form of that fix broke the link in a real browser.** `/login/confirm` set
+  `referrer: no-referrer`, so Chrome posted `Origin: null` and the origin-only check
+  refused it (blank 403). Fixed two ways: `Sec-Fetch-Site: same-origin` now decides, and
+  the page uses `strict-origin`, which keeps the Origin header and still sends no path (no
+  token) onward. Checked in the in-app Chrome: the button now lands on `/timeline`
+  signed in. The integration test client now sends `Origin` and `Sec-Fetch-Site` like a
+  browser.
+- **Cross-site results on the server:** foreign origin 403; `same-site` 403; same-origin
+  303 with a session; no browser headers 303 with a session. `/auth/sign-in/email` and
+  `/auth/email/verify` with a foreign origin: 403.
+- **End to end:** 9 of 9, twice (before and after the browser-header change).
+- **Flag unset:** `/login/email`, `/login/confirm`, `GET /auth/sign-in/email` 307 to
+  `/login?…error=sign_in_method_unavailable`; `POST /auth/sign-in/email`,
+  `/auth/email/verify`, `/auth/confirm`, `/auth/sign-in/apple` 303 to the same; no user
+  created; `/login` shows only Continue with Google; `/auth/google` starts OAuth.
+- **Trigger, as `supabase_auth_admin`:** eleven row shapes (null email, null and empty
+  password, two `@`, upper case, `attest.com`, `example.com.evil.org`, a non-ASCII domain,
+  bare `test`, `sub.EXAMPLE`) inserted without an error; real addresses lost the password,
+  reserved ones kept it. An existing password survived a no-op update and an email
+  change; a new password on that row was dropped. Delete works. With the trigger disabled a
+  password sign-up stored a 60-character hash; enabled, 0.
+- **Tests are real.** Each break failed tests and was restored: Sec-Fetch-Site ignored
+  (9 failed), flag check removed (4), confirm CSRF check removed (4), `next` not
+  normalized (1), code length 8 against config 6 (1).

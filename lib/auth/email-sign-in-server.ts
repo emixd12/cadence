@@ -41,6 +41,25 @@ function seeOther(path: string, requestUrl: URL) {
   return NextResponse.redirect(new URL(path, requestUrl), SEE_OTHER);
 }
 
+/**
+ * Refuses a form post that another site sent. Without it, a page elsewhere could
+ * post its own token hash to /auth/confirm and sign a visitor in to the wrong
+ * account (login CSRF). Current browsers send Sec-Fetch-Site, which is decisive.
+ * Older ones send only Origin, which must then be this site. A request with neither
+ * is not from a browser form. Origin alone is not enough: a page with a
+ * no-referrer policy posts `Origin: null` even to its own site.
+ */
+export function crossSitePost(request: { url: string; headers: Headers }): boolean {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite) return fetchSite !== "same-origin";
+  const origin = request.headers.get("origin");
+  return origin !== null && origin !== authRequestUrl(request).origin;
+}
+
+function forbidden() {
+  return new NextResponse(null, { status: 403 });
+}
+
 function emailEnabled(methods: readonly SignInMethod[]) {
   return findEnabledSignInMethod("email", process.env, methods)?.start?.kind === "email";
 }
@@ -97,6 +116,7 @@ export async function requestEmailSignIn(
       requestUrl,
     );
   }
+  if (crossSitePost(request)) return forbidden();
 
   const pending = await readPending();
   const resend = form ? formText(form, "resend") === "1" : false;
@@ -155,6 +175,7 @@ export async function verifyEmailCode(
   if (!emailEnabled(methods)) {
     return seeOther(buildLoginPath(undefined, SIGN_IN_METHOD_UNAVAILABLE_ERROR), requestUrl);
   }
+  if (crossSitePost(request)) return forbidden();
 
   const form = await readForm(request);
   const pending = await readPending();
@@ -207,6 +228,7 @@ export async function confirmEmailLink(
   if (!emailEnabled(methods)) {
     return seeOther(buildLoginPath(undefined, SIGN_IN_METHOD_UNAVAILABLE_ERROR), requestUrl);
   }
+  if (crossSitePost(request)) return forbidden();
 
   const form = await readForm(request);
   const pending = await readPending();

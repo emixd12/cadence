@@ -41,7 +41,10 @@ class Browser {
     if (this.jar.size) headers.cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join("; ");
     let body: string | undefined;
     if (init.form) {
+      // What a browser sends with a form post from Cadence's own page.
       headers["content-type"] = "application/x-www-form-urlencoded";
+      headers.origin = new URL(appUrl!).origin;
+      headers["sec-fetch-site"] = "same-origin";
       body = new URLSearchParams(init.form).toString();
     }
     const response = await fetch(new URL(path, appUrl), {

@@ -15,7 +15,9 @@ import { AuthPageShell } from "../AuthPageShell";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  referrer: "no-referrer",
+  // The URL carries the token hash. strict-origin sends only the origin onward,
+  // and keeps the Origin header on the Sign in post (no-referrer sends "null").
+  referrer: "strict-origin",
 };
 
 type ConfirmPageProps = Readonly<{
