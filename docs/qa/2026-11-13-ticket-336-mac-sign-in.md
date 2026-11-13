@@ -47,3 +47,63 @@ reads the fragment once.
 Not covered locally: Supabase Auth with CAPTCHA on (the local stack has it off, so the
 page's token is not checked by Auth here). Expiry after one hour is covered by the unit
 tests in `tests/desktop-auth-upgrade.test.ts`.
+
+## Installed run on the test Mac (November 13, 2026)
+
+Preflight `desktop-test-mac`: 7 ready; one owner item (Notifications and Location
+permissions) does not touch sign-in and was not needed. Run folder
+`.intent/acceptance/2026-11-13-ticket-336-installed/` (ignored).
+
+Backend: this branch's web app (`next build` and `next start`, `CADENCE_SIGN_IN_EMAIL=on`,
+Turnstile always-pass test key) and the local Supabase stack, served to the tailnet only
+over HTTPS with `tailscale serve` (443 for the web app, 8443 for Supabase). Production
+previews sit behind Vercel login, so the Mac cannot use one. The dev build `0.1.11-dev.3`
+(source `fea9ffc4`, executable `384cd1a5…`) compiled those two origins in and, for this
+build only, added them to the content security policy; the edit was reverted after the
+build and is not in the branch.
+
+Install: 0 pending writes, normal quit, `protect-before-install.sh` saved
+`backups/pre-0.1.11-dev.3-ticket336-20261113T185910Z/` (schema 24, 40 Behaviors,
+206 Occurrences, integrity `ok`, rollback ZIP of `0.1.11-dev.2`). Rename swap; signature
+verified; executable hash matched the build report.
+
+| Step | Result |
+|---|---|
+| Launch against the local backend | The saved production session failed to refresh: "Needs reconnection"; the panel read "Signed in as …" with no provider named |
+| Reconnect account | The panel offered **Continue with Google** and **Continue with email**; Apple stayed hidden because the hosted list has it off |
+| Different-account guard | Email with a new address: the page in the test Mac's Chrome passed Turnstile and sent the code; a wrong code showed "That code did not work…" and kept the request; the right code showed "Disconnect the current account before signing in with a different account." The link record's hash matched the protected copy; 40 Behaviors and 0 pending writes stayed |
+| Link by email and sync | After **Disconnect › Keep a local copy**, email with another new address and its code: "Signed in as …", then the first-link choice. **Import** was refused by an existing first-link rule ("The local account snapshot contains branched status history"), not by this ticket, so the run used **Ignore local data and use account data** after cancelling the stale attempt and signing in again: "Account linked", "Account data is current", sync cursor 19:13:15Z, 0 pending writes, protected backup written |
+| Production build, method list | `0.1.11-dev.4` (production values, executable `aa4c2d84…`) after **Keep a local copy**: the panel offered only **Continue with Google**, because production has email and Apple off (the route is not deployed yet, so the Mac fell back to Google alone) |
+| Google through the system browser | Test account A from the Google chooser; the link record matched A's original hash (`812fcdb2…`) |
+| Re-link A | Refused by the existing first-link rule: "The hosted account snapshot contains branched status history" (`account-sync.resolver.ts:821`, Tickets 116–122). Not caused by this ticket |
+
+Tailnet serve was turned off and the local web server stopped after the run.
+
+### State left on the test Mac
+
+`0.1.11-dev.4`, signed in as A, link paused on the error above. Production data is
+untouched. Restoring the protected copy `backups/pre-0.1.11-dev.3-ticket336-…` (A's
+linked database) lets A reconnect without a first link; that restore needs the owner's
+instruction (Owner blockers row 13).
+
+### Finding for a follow-up
+
+Test account A's hosted history has more than one status row for some occurrence, so
+no new Mac can make a first link to A. Branches may come from connector completion
+(Ticket 330) next to manual marks. This needs its own ticket.
+
+### Not run on the installed app
+
+- Apple: the local stack has no Apple provider, and production has Apple off.
+- Email against production: waits for this PR to deploy and `CADENCE_SIGN_IN_EMAIL` to be
+  on (Ticket 337).
+
+## Release-packet notes (for the owner's release instruction)
+
+- Carries: Ticket 336. No SQLite migration (schema 24); no new native command or
+  Keychain slot (the email request reuses `pending-state`).
+- Content security policy unchanged: the Mac talks only to the existing hosted origin.
+- Release acceptance to add: Settings › Account offers exactly the production method list;
+  a linked Mac upgrade keeps its session; a Reconnect after the upgrade works by Google.
+- After the release: Ticket 337 runs email and Apple on the installed release once their
+  production flags are on.

@@ -105,8 +105,15 @@ Check the cited entry before acting on a row.
   are unchanged.
 - **Why the browser for the code request:** `docs/DESKTOP_BUILD.md`, "Sign-in methods
   (Ticket 336)".
-- **Not done.** Installed acceptance on the test Mac and a Mac release, which needs the
-  owner's instruction.
+- **Installed run (test Mac, dev builds 0.1.11-dev.3 and dev.4).** Against this branch's
+  web app and local Supabase over the tailnet: the method list, the email page with
+  Turnstile, wrong and right codes, the different-account refusal, and link plus sync by
+  email passed. Against production: only Google is offered. Record:
+  `docs/qa/2026-11-13-ticket-336-mac-sign-in.md`.
+- **Open.** Re-linking test account A is refused by an existing first-link rule (branched
+  status history on A's hosted account); the test Mac waits on owner row 13 to restore its
+  protected database. Apple on the installed app and email against production wait on
+  Ticket 337. A Mac release needs the owner's instruction (owner row 12).
 
 Platform impact: Mac account panel and auth client; web gains the Mac's email page and
 three routes, no change to web sign-in; marketing not applicable; mobile not applicable.
