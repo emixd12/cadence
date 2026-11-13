@@ -2,6 +2,8 @@
 -- deletion can revoke Cadence's Sign in with Apple authorization. Supabase Auth hands
 -- the token to the sign-in callback once and does not keep it. The row goes with the
 -- Auth user; account deletion reads it first.
+begin;
+
 create table cadence_calendar_private.apple_sign_in_tokens (
   user_id uuid not null references auth.users(id) on delete cascade,
   subject_digest text not null check (subject_digest ~ '^[a-f0-9]{64}$'),
@@ -37,3 +39,5 @@ revoke all on function public.apple_sign_in_keep_token(uuid, text, text) from pu
 revoke all on function public.apple_sign_in_read_tokens(uuid) from public, anon, authenticated;
 grant execute on function public.apple_sign_in_keep_token(uuid, text, text) to service_role;
 grant execute on function public.apple_sign_in_read_tokens(uuid) to service_role;
+
+commit;
