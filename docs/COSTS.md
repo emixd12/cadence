@@ -65,7 +65,7 @@ implement most of it in source; it is not deployed yet.
 | Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
-| Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | Off until Ticket 323; 96 runs a day that return at once while off |
+| Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
 
 ### Per-user total at 100 users
@@ -662,3 +662,10 @@ since the cursor (at most 20). A new link or connection reads in full once (at m
 GETs). Server time is estimated under one second for a change read. The route runs 96 times a day; while the flag is off each run
 returns before any database read. Replace these figures with measured usage after
 Ticket 323's deployed run.
+
+The flag turned on in Production on November 13, 2026 at 04:30 UTC, after Ticket 323's
+matrix passed. Baseline: the route's 96 daily runs returned before any database read
+while the flag was off. Owner rule (`docs/DECISIONS.md`, 2026-11-12): after one full day,
+measure the job's Vercel usage; if it projects over US$5/month above that baseline, turn
+the flag off and tell the owner. Measurement: pending, due after November 14, 2026,
+04:30 UTC.

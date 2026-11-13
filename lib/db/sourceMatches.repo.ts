@@ -48,6 +48,10 @@ export function toActivityMatchRecord(row: SourceMatchRow): ActivityMatchRecord 
   };
 }
 
+// Occurrence IDs per `in` filter. 100 keeps the request URL under the API gateway's
+// limit, as the status-event and time-session reads do; 200 failed with "URI too long".
+export const OCCURRENCE_ID_FILTER_BATCH_SIZE = 100;
+
 export async function listSourceMatchesForOccurrences(
   supabase: AppSupabaseClient,
   userId: string,
@@ -55,8 +59,8 @@ export async function listSourceMatchesForOccurrences(
 ): Promise<SourceMatchRow[]> {
   if (occurrenceIds.length === 0) return [];
   const rows: SourceMatchRow[] = [];
-  for (let index = 0; index < occurrenceIds.length; index += 200) {
-    const chunk = occurrenceIds.slice(index, index + 200);
+  for (let index = 0; index < occurrenceIds.length; index += OCCURRENCE_ID_FILTER_BATCH_SIZE) {
+    const chunk = occurrenceIds.slice(index, index + OCCURRENCE_ID_FILTER_BATCH_SIZE);
     rows.push(...await readAllPostgrestRows<SourceMatchRow>({
       label: "Occurrence source matches",
       getRowKey: (row) => row.id,

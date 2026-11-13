@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
-| Tickets 310–324: connector completion (D28) | 310–319, 321 and 322 merged with PR #207 and 320 with PR #216, off behind `CADENCE_CONNECTOR_COMPLETION`; hosted migrations through `20261111160000` applied; Mac 0.1.10 with 319 and 320 published November 12 | Ticket 323 matrix in progress; owner decisions of November 12 remove every owner step (`docs/DECISIONS.md`, 2026-11-12, "Finish connector completion"). Flag on after the matrix passes; usage measured after one day (US$5/month ceiling). 324 after 323 | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
+| Tickets 310–324: connector completion (D28) | 310–323 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Ticket 324 in progress | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -89,6 +89,23 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Connector completion turned on in Production — November 13, 2026
+
+- **Flag on.** The owner approved turning `CADENCE_CONNECTOR_COMPLETION` on after the local
+  matrix. Production was redeployed (`dpl_GYPJvtPZFmSEwZ6VL1zgUN4Vy9AT`, commit `5ff760f0`)
+  at 04:30 UTC.
+- **Deployed web passed** as test account A: links saved, the first reconcile completed 12
+  Occurrences and attached 2 workouts with 0 refused, and "From Hevy" shows at 1280 and 390 px.
+- **Installed Mac passed** (0.1.10, test Mac): a forced collision kept both root events on
+  hosted and on the Mac, the manual Not Completed won, and the outbox emptied (Ticket 319).
+  The Mac showed "From Hevy" and the workout time (Ticket 320).
+- **Defect fixed before turning on:** the Timeline's match read sent 200 IDs in one filter
+  and failed with "URI too long", so no label showed (PR #252).
+- **Open:** the owner deletes the Hevy test items; the usage measurement after one day.
+
+Platform impact: web and Mac acceptance; no code in this entry. Messaging impact: none
+(P-042 was logged by Ticket 310).
 
 ## iCloud production acceptance — November 12, 2026
 
