@@ -39,6 +39,7 @@ if (!["127.0.0.1", "localhost"].includes(new URL(upstream).hostname)) {
 }
 // Requests forward to this fixed origin; only the path and query come from the request.
 const upstreamPort = Number(new URL(upstream).port || 80);
+const FORWARD_PREFIXES = ["/auth/v1/", "/rest/v1/", "/storage/v1/", "/functions/v1/"];
 
 /** @type {null | Record<string, any>} */
 let nextScenario = null;
@@ -135,9 +136,13 @@ function send(response, status, body, headers = {}) {
 }
 
 async function forward(request, response, body) {
-  // Only the path and query come from the request; the origin is always loopback Supabase.
+  // Forwards only to loopback Supabase, and only under a fixed list of API prefixes.
   const incoming = new URL(request.url, "http://stub.invalid");
-  const url = `http://127.0.0.1:${upstreamPort}/${incoming.pathname.replace(/^\/+/, "")}${incoming.search}`;
+  const prefix = FORWARD_PREFIXES.find((item) => incoming.pathname.startsWith(item));
+  if (!prefix) return send(response, 404, { error: "not_forwarded" });
+  const url = new URL(`http://127.0.0.1:${upstreamPort}${prefix}`);
+  url.pathname += incoming.pathname.slice(prefix.length);
+  url.search = incoming.search;
   const headers = { ...request.headers };
   delete headers.host;
   delete headers.connection;
