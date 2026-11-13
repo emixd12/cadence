@@ -291,7 +291,10 @@ Occurrences, evidence and prior matches injected. It returns `complete`, `attach
 belongs to never depends on a status or on input order. It also owns the timing
 classifier (`classifyConnectorTiming`: on time within ±30 minutes of an exact time
 or inside a range) and `selectTimingMatch` (the active match nearest the scheduled
-start). Paired test: `tests/activity-match.resolver.test.ts`.
+start). A match with no link (`isHandCounted`, Ticket 324) is never removed. Paired
+test: `tests/activity-match.resolver.test.ts`. `countableSourceWorkouts` in
+`packages/core/src/services/timeline-source-evidence.ts` picks the workouts a row may
+count by hand; paired test: `tests/source-count.service.test.ts`.
 
 `resolveConnectorStatusEvent` in `packages/core/src/resolvers/status.resolver.ts`
 plans connector status events with the D28.7 values. It is separate from

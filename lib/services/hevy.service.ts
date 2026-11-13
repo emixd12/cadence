@@ -131,14 +131,17 @@ export type HevyMatchEvidence = Readonly<{
  * from a client. Discarded as `connection_changed` if the connection moved.
  */
 export async function readHevyMatchEvidenceForCaller(caller: ConnectorCaller,
-  options: HevyServiceOptions = {}): Promise<HevyMatchEvidence> {
+  options: HevyServiceOptions & Readonly<{ localDate?: string }> = {}): Promise<HevyMatchEvidence> {
   return withConnectorReadDeadline(options, HEVY_READ_DEADLINE_MS, async (bounded, deadlineAt) => {
     const clock = bounded.clock ?? Date.now;
     const timezone = await profileTimezone(caller, bounded.signal);
     assertConnectorReadActive(bounded, deadlineAt);
     const today = Temporal.Instant.fromEpochMilliseconds(clock()).toZonedDateTimeISO(timezone).toPlainDate();
-    const range = validateRange(today.subtract({ days: RECORDED_ACTIVITY_MAX_RANGE_DAYS - 1 }).toString(), today.toString(), timezone,
-      Temporal.Instant.fromEpochMilliseconds(clock()));
+    // Ticket 324 reads one local date; reconcile reads today and the 30 prior dates.
+    const range = options.localDate
+      ? validateRange(options.localDate, options.localDate, timezone, Temporal.Instant.fromEpochMilliseconds(clock()))
+      : validateRange(today.subtract({ days: RECORDED_ACTIVITY_MAX_RANGE_DAYS - 1 }).toString(), today.toString(), timezone,
+        Temporal.Instant.fromEpochMilliseconds(clock()));
     return withConnectorCredential(caller, "hevy", async (credential, connection) => {
       assertConnectorReadActive(bounded, deadlineAt);
       if (credential.provider !== "hevy" || !connection.accountDigest) throw new ConnectorError("reconnect_required");

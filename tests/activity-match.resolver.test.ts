@@ -324,6 +324,20 @@ describe("activity match resolver: removal", () => {
     expect(plan.remove).toMatchObject([{ matchId: "m1", reason: "deleted_at_source", revertsStatus: true }]);
   });
 
+  it("never removes a workout the user counted by hand (Ticket 324)", () => {
+    const counted = match({ id: "m3", occurrenceId: "l", behaviorId: "legday", activityRef: work.id, linkId: "", role: "attached", appliedEventId: null });
+    const userMarked = { ...completed, latestStatusEventId: "user-1" };
+    expect(run({ occurrences: [userMarked], evidence: evidence([]), matches: [counted] }).remove).toEqual([]);
+    expect(run({ occurrences: [userMarked], evidence: evidence([], { complete: false, deletedActivityRefs: [work.id] }), matches: [counted] }).remove).toEqual([]);
+    const moved = activity("w1", "2026-11-09T22:00:00Z", 45, [LEGS]);
+    expect(run({ occurrences: [userMarked], evidence: evidence([moved]), matches: [counted] }).remove).toEqual([]);
+    // A later link and an edited workout never refresh the counted times.
+    const edited = activity("w1", "2026-11-10T22:05:00Z", 45, [LEGS], "2026-11-10T22:55:00Z");
+    const plan = run({ occurrences: [userMarked], evidence: evidence([edited]), matches: [counted] });
+    expect(plan.attach).toEqual([]);
+    expect(plan.skip).toContainEqual({ activityRef: edited.id, behaviorId: "legday", reason: "already_matched" });
+  });
+
   it("keeps the user's later status when the last match is removed", () => {
     const corrected = { ...completed, latestStatusEventId: "user-2" };
     const plan = run({ occurrences: [corrected], evidence: evidence([]), matches: [completion] });

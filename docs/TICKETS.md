@@ -18585,7 +18585,12 @@ Verification: the acceptance matrix and `dagger check --cadence --progress=repor
 
 ## Ticket 324: Count an unlinked workout by hand
 
-Status: not started. After the first release.
+Status: implemented on the web November 13, 2026. Migration
+`20261113050000_count_unlinked_workout.sql` adds `attach_unlinked_source_activity`.
+Route `POST /api/connectors/completions/count`; control
+`components/timeline/CountWorkoutButtons.tsx`; registry entry INT-TIMELINE-013. Rule for a
+match with no link: it is the user's record, never changes a status, and reconcile never
+removes it. Hosted migration applied November 13, 2026; a deployed click on test account A is not yet recorded.
 Dependencies: Ticket 323.
 
 Goal: let the user count a logged workout that no link accepted.
@@ -18610,9 +18615,10 @@ Platform impact:
 | Marketing | Not applicable: no public claim. |
 | Future mobile | 390 px checks on mobile web. |
 
-Messaging impact: new entries for the control's copy.
+Messaging impact: P-047.
 
-Verification: `npm run interactions:check` and `dagger check --cadence --progress=report`.
+Verification: `npm run interactions:check`, `tests/sql/ticket-324-count-unlinked-workout-smoke.sql`
+and `dagger check --cadence --progress=report`.
 
 ## Ticket 325: Release credential backup, restore and renewal
 

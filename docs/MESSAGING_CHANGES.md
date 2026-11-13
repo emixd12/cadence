@@ -114,6 +114,7 @@ Status values:
 | [P-043](#p-043-connector-completion-in-app-copy) | Connector completion in-app copy | logged | 317, 318 | In-app copy, user guide |
 | [P-045](#p-045-use-your-chatgpt-plan-card-copy-on-the-mac) | "Use your ChatGPT plan" card copy on the Mac | logged | 299 | In-app copy (Mac), user guide |
 | [P-046](#p-046-daily-brief-chatgpt-plan-states-on-the-mac) | Daily Brief ChatGPT plan states on the Mac | logged | 299 | In-app copy (Mac), user guide |
+| [P-047](#p-047-count-an-unlinked-hevy-workout) | Count an unlinked Hevy workout | logged | 324 | In-app copy, user guide, Privacy |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1481,4 +1482,21 @@ cite has not changed.
 - **Conflicting current text:** none shown today; the feature is hidden.
 - **Update needed:** review with P-031's user-guide work before the owner turns the
   feature on.
+- **Status:** logged.
+
+## P-047: Count an unlinked Hevy workout
+
+- **Change:** Ticket 324 adds "Count the 6:05 PM Hevy workout" to today's expanded
+  Unresolved rows on the web, for a workout no link accepted. It marks the row Completed as
+  the user's own mark and keeps the workout's start and end time on the Occurrence. Refusal
+  messages: "A link already uses this workout.", "This was already marked.", "Hevy no longer
+  lists this workout.", "This workout is shorter than 5 minutes.", "Hevy is not connected."
+  "The workout could not be counted. Try again." and "Marked Completed. The workout time was
+  not saved. Try again."
+- **Affected:** Ticket 324. Files: `components/timeline/CountWorkoutButtons.tsx`.
+- **Surfaces:** in-app copy, user guide (connected sources section), Privacy (workout times
+  are stored for a counted workout, as for linked ones).
+- **Conflicting current text:** the user guide describes only linked completions.
+- **Update needed:** describe counting by hand beside "Complete from Hevy"; confirm the
+  Privacy text on stored workout times covers it.
 - **Status:** logged.

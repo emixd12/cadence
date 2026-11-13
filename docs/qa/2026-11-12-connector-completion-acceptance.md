@@ -97,7 +97,7 @@ off.
 ## Owner step
 
 Delete these private workouts in the Hevy app (Hevy's API and website cannot delete):
-`Cadence test 323 W-min`, `W-a`, `W-b`, `W-c`, and the earlier `Cadence test (today)` and
+`Cadence test 323 W-min`, `W-a`, `W-b`, `W-c`, `W-d` (Ticket 324's local check), and the earlier `Cadence test (today)` and
 `Cadence test (back-dated)` from Ticket 311. Delete the six routines
 `Cadence test 323 legs | done | notdone | min | two | off` too. An agent then reruns the
 reconcile to record the `deleted`-event rows.

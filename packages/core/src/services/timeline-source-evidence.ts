@@ -80,6 +80,62 @@ export function attachTimelineSourceEvidence<T extends TimelineView>(view: T, by
   };
 }
 
+/** Ticket 324: one workout a row may count by hand. */
+export type CountableSourceWorkout = Readonly<{
+  activityRef: string;
+  startAt: string;
+  endAt: string;
+  /** "Count the 6:05 PM Hevy workout". */
+  label: string;
+}>;
+
+/**
+ * Ticket 324: the workouts an Unresolved row of today may count by hand. A workout
+ * counts only once it has ended and lasted the source's minimum, and only when no
+ * Occurrence in view already shows it (a link matched it). The server checks again.
+ */
+export function countableSourceWorkouts(input: Readonly<{
+  occurrence: Readonly<{ status: string; localDate: string; sourceCountable?: readonly string[] }>;
+  source: string;
+  todayLocalDate: string;
+  now: Temporal.Instant;
+  timezone: string;
+  minimumDurationSeconds: number;
+  items: readonly Readonly<{ id: string; startAt: string; endAt: string; durationSeconds: number }>[];
+  /** Start instants of every workout already shown on a row in view. */
+  matchedStartAts: ReadonlySet<string>;
+}>): CountableSourceWorkout[] {
+  const { occurrence } = input;
+  if (occurrence.status !== "unresolved" || occurrence.localDate !== input.todayLocalDate
+    || !occurrence.sourceCountable?.includes(input.source)) return [];
+  const label = CONNECTOR_SOURCE_LABELS[input.source] ?? "connected";
+  return input.items
+    .filter((item) => item.durationSeconds >= input.minimumDurationSeconds
+      && Temporal.Instant.compare(Temporal.Instant.from(item.endAt), input.now) <= 0
+      && Temporal.Instant.from(item.startAt).toZonedDateTimeISO(input.timezone).toPlainDate().toString() === input.todayLocalDate
+      && !input.matchedStartAts.has(Temporal.Instant.from(item.startAt).toString()))
+    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt)))
+    .map((item) => ({
+      activityRef: item.id,
+      startAt: item.startAt,
+      endAt: item.endAt,
+      label: `Count the ${clockLabel(item.startAt, input.timezone)} ${label} workout`,
+    }));
+}
+
+/** Ticket 324: marks the rows that may count a source's workouts by hand. */
+export function attachTimelineSourceCountable<T extends TimelineView>(view: T, byId: Readonly<Record<string, readonly string[]>>): T {
+  if (Object.keys(byId).length === 0) return view;
+  const occurrence = (item: TimelineOccurrenceView): TimelineOccurrenceView =>
+    byId[item.id] ? { ...item, sourceCountable: byId[item.id] } : item;
+  const section = (value: TimelineView["daySections"][number]) => ({
+    ...value,
+    occurrences: value.occurrences.map(occurrence),
+    occurrenceGroups: value.occurrenceGroups.map((group) => ({ ...group, occurrences: group.occurrences.map(occurrence) })),
+  });
+  return { ...view, daySections: view.daySections.map(section) };
+}
+
 function clockLabel(instant: string, timezone: string): string {
   const time = Temporal.Instant.from(instant).toZonedDateTimeISO(timezone);
   const hour = time.hour % 12 === 0 ? 12 : time.hour % 12;
