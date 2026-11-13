@@ -254,7 +254,7 @@ describe('connection.mjs', () => {
     expect(await connection(['connect', '--slot', 'A', '--connector', 'icloud-calendar'], { run, out: () => {} })).toBe(0);
     const args = run.mock.calls[0][1];
     expect(args).toContain('CONNECTOR_ICLOUD_APPLE_ID=icloud-test-account-a/username');
-    expect(args).toContain('CONNECTOR_ICLOUD_APP_PASSWORD=icloud-test-account-a/app-specific password');
+    expect(args).toContain('CONNECTOR_ICLOUD_APP_PASSWORD=icloud-test-account-a/password');
     expect(args.at(-1)).toBe('--from-env');
     const io = capture();
     expect(await connection(['connect', '--slot', 'A', '--connector', 'hevy'], { run: proc(3, '{"state":"rejected"}'), out: io.out })).toBe(30);

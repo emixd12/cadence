@@ -80,7 +80,7 @@ Check the cited entry before acting on a row.
 | Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
 | Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
 | MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
-| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy and Outlook (personal account) passed on production web November 11 and on installed Mac 0.1.10 November 12; cross-tenant Outlook checks skipped by owner decision | iCloud (240) and its part of 241 step 6: waiting on the owner's Apple Account vault item (app-specific password). Not run on the Mac: Microsoft deep-link completion, sign-out and account-switch cache cleanup, Hevy key entry. 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "Installed connector checks on Mac 0.1.10 — November 12, 2026" |
+| Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy, Outlook (personal account) and iCloud (owner's Apple Account) passed on production web and installed Mac 0.1.10 (November 11–12); cross-tenant Outlook checks skipped by owner decision | Not verified on production: an iCloud event on Timeline (no events in the selected calendars), the Outlook `cadence://` completion, sign-out and account-switch cache cleanup, Hevy key entry on the Mac. Owner revokes the "Cadence QA" app-specific password when testing ends. 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "iCloud production acceptance — November 12, 2026" |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
 | Google Calendar Timeline (grouped): Tickets 133–137, 141, 150 | In progress; reconciled October 27: still open | Post-approval web and native consent smoke checks; 137 provider-failure, Workspace and installed fixture cases; 150 live custom-name check | TICKETS, Tickets 137, 141, 150 |
@@ -199,6 +199,29 @@ applicable; future mobile through mobile web. Messaging impact: P-047.
 
 Platform impact: web and Mac acceptance; no code in this entry. Messaging impact: none
 (P-042 was logged by Ticket 310).
+
+## iCloud production acceptance — November 12, 2026
+
+Ticket 240 ran on production as test account A with the owner's own Apple Account (Apple
+refused a test account; custody decision 2026-10-19). Evidence:
+`docs/qa/2026-11-11-connector-acceptance.md`, "Ticket 240".
+
+- **Passed on web:** connect, 5 calendars listed, selection auto-saves, a complete 30-day
+  read, the all-day toggle, disconnect (`apple_app_specific_password`, reads fenced with 409)
+  and reconnect. **On the installed Mac 0.1.10:** Settings shows iCloud connected and the
+  cache holds a complete iCloud snapshot at the hosted generation.
+- **Not verified on production:** iCloud events on Timeline. The selected calendars had no
+  events from today through +30 days, and no test events were created in the owner's
+  calendars. Wrong-principal reconnect not run.
+- **241 step 6:** all three connectors passed their production smoke. Step 7 copy awaits the
+  owner's review in the messaging track.
+- **Tooling fix:** the preflight's QA Chrome probe missed a profile launched with
+  `--user-data-dir` last; the iCloud renewal now reads the vault field `password`, because a
+  relabeled built-in password field is read by its id.
+- **Owner:** revoke the "Cadence QA" app-specific password at account.apple.com when testing
+  ends; A's iCloud connection then needs a reconnect.
+
+Platform impact: test evidence and acceptance tooling only. Messaging impact: none.
 
 ## Connector completion: owner decisions and the 0.1.10 ledger — November 12, 2026
 

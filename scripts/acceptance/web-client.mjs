@@ -173,7 +173,9 @@ export function profileOwnsPort({
   return pids.every((pid) => {
     let command = '';
     try { command = commandOf(pid); } catch { return false; }
-    return command.startsWith(`${CHROME_BIN} `) && command.includes(`--user-data-dir=${profileDir} `) && command.includes(`--remote-debugging-port=${port}`);
+    // The profile flag may be the last argument (another launcher's order), so match it
+    // against the command with a trailing space added.
+    return command.startsWith(`${CHROME_BIN} `) && `${command.trim()} `.includes(`--user-data-dir=${profileDir} `) && command.includes(`--remote-debugging-port=${port}`);
   });
 }
 

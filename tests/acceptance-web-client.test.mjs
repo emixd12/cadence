@@ -942,6 +942,11 @@ describe('profile guard', () => {
       expect(owns({ 101: ours })).toBe(true);
       expect(owns({ 101: ours.replace(dir, '/other') })).toBe(false);
       expect(owns({ 101: ours.replace(dir, `${dir}-copy`) })).toBe(false);
+      // Another launcher puts the profile flag last, with no argument after it.
+      const last = `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --no-startup-window --remote-debugging-port=4430 --user-data-dir=${dir}`;
+      expect(owns({ 101: last })).toBe(true);
+      expect(owns({ 101: `${last}\n` })).toBe(true);
+      expect(owns({ 101: `${last}-copy` })).toBe(false);
       expect(owns({ 101: ours }, 4431)).toBe(false);
       expect(owns({ 101: ours, 202: '/usr/bin/nc -l 4430' })).toBe(false);
       expect(owns({})).toBe(false);
