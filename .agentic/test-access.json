@@ -248,7 +248,7 @@
         ],
         "timeout_seconds": 90
       },
-      "owner_step": "Add the icloud-test-account-a item to the Cadence Agents vault: username = the Apple Account email, password = an app-specific password from account.apple.com.",
+      "owner_step": "Add the icloud-test-account-a item to the Cadence Agents vault, with the Apple Account email as its username and an app-specific password from account.apple.com in its built-in password field.",
       "freshness_seconds": 86400
     },
     {
