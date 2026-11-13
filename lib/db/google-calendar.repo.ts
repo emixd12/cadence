@@ -4,8 +4,8 @@ import type { CalendarConnection, CalendarOAuthAttempt, CalendarPreferences, Cal
 import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
 import { CalendarConnectionError } from "@/lib/services/google-calendar-oauth";
 
-// The only privileged Calendar operations are these exact private-credential RPCs and
-// the idle-row rebind below. Ordinary settings reads and updates retain the caller's JWT and RLS.
+// The only privileged Calendar operations are these exact private-credential RPCs.
+// Ordinary settings reads and updates retain the caller's JWT and RLS.
 export async function readCalendarConnection(client: AppSupabaseClient, userId: string, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnection | null> {
   const [{ data, error }, preferences] = await Promise.all([
     client.from(grantPurpose === "agent" ? "google_calendar_agent_connections" : "google_calendar_connections").select("*").eq("user_id", userId).maybeSingle(),
@@ -56,16 +56,6 @@ export async function removeCalendarCredential(connection: CalendarConnection, s
     expected_subject: connection.googleSubject, expected_generation: connection.generation, next_status: status });
   if (error) throw new CalendarConnectionError("provider_unavailable");
   return data;
-}
-/**
- * Ticket 335: a connection row keeps the Google subject of its first connect. When that
- * row holds no credential (disconnected or reconnect_required) and the account's one Google
- * sign-in is now another Google account, the row moves to it. A connected row never moves.
- */
-export async function rebindIdleCalendarConnection(userId: string, fromSubject: string, toSubject: string): Promise<void> {
-  const { error } = await createServiceRoleClient().from("google_calendar_connections").update({ google_subject: toSubject })
-    .eq("user_id", userId).eq("google_subject", fromSubject).neq("status", "connected");
-  if (error) throw new CalendarConnectionError("provider_unavailable");
 }
 export async function readCalendarCallbackUser(userId: string) {
   const { data, error } = await createServiceRoleClient().auth.admin.getUserById(userId);

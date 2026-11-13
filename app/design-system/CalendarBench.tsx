@@ -9,7 +9,7 @@ import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
-import type { CalendarConnectionView } from "@/lib/types/google-calendar";
+import type { CalendarConnectionView, CalendarGoogleSignIn } from "@/lib/types/google-calendar";
 import { validateExternalEventSnapshot, validateVersionedExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
 import fixture from "@/tests/fixtures/external-event-snapshot.valid.json";
 import icloudFixture from "@/tests/fixtures/external-event-snapshot.icloud.valid.json";
@@ -30,9 +30,12 @@ const coordinator: GoogleCalendarCoordinator = {
 };
 export function CalendarSettingsBench() {
   const [status, setStatus] = useState<CalendarConnectionView["status"]>("connected");
-  const fixtureCoordinator = useMemo(() => ({ ...coordinator, getConnection: async () => ({ ...connection, status }) }), [status]);
+  // Ticket 335: what an account without exactly one Google sign-in sees.
+  const [googleSignIn, setGoogleSignIn] = useState<CalendarGoogleSignIn | "one">("one");
+  const fixtureCoordinator = useMemo(() => ({ ...coordinator, getConnection: async () => ({ ...connection, status, ...(googleSignIn === "one" ? {} : { googleSignIn }) }) }), [status, googleSignIn]);
   return <><label className="mb-4 grid gap-2 text-sm">Connection state<select className="min-h-11 border border-line bg-background" value={status} onChange={event => setStatus(event.target.value as CalendarConnectionView["status"])}><option value="connected">Connected</option><option value="disconnected">Disconnected</option><option value="not_configured">Not configured</option><option value="reconnect_required">Reconnect required</option></select></label>
-    <GoogleCalendarPanel key={status} coordinator={fixtureCoordinator} refreshRange={snapshot.requestedRange} /></>;
+    <label className="mb-4 grid gap-2 text-sm">Google sign-in<select className="min-h-11 border border-line bg-background" value={googleSignIn} onChange={event => setGoogleSignIn(event.target.value as CalendarGoogleSignIn | "one")}><option value="one">One Google sign-in</option><option value="add">None, web, linking on (add)</option><option value="add_on_web">None, Mac (add_on_web)</option><option value="unavailable">None, linking off (unavailable)</option><option value="multiple">Two Google sign-ins (multiple)</option></select></label>
+    <GoogleCalendarPanel key={`${status}-${googleSignIn}`} coordinator={fixtureCoordinator} refreshRange={snapshot.requestedRange} /></>;
 }
 const googleTimed = snapshot.events[0]!;
 const googleFull: NormalizedExternalEvent = { ...googleTimed, title: "Afternoon appointment", location: "Synthetic destination",

@@ -38,15 +38,11 @@ describe("calendarGoogleSignIn", () => {
 });
 
 describe("Calendar return after adding Google", () => {
-  it("continues only after Google was added", () => {
-    expect(calendarAfterGoogleSignIn("added", "google").continue).toBe(true);
-    expect(calendarAfterGoogleSignIn("added", "apple").continue).toBe(false);
-    expect(calendarAfterGoogleSignIn("taken", "google")).toEqual({
-      message: expect.stringContaining("already signs in to a different Cadence account"),
-      continue: false,
-    });
-    expect(calendarAfterGoogleSignIn("add_failed", "google").continue).toBe(false);
-    expect(calendarAfterGoogleSignIn(null, null).continue).toBe(false);
+  it("names the next step and never starts consent from the address", () => {
+    expect(calendarAfterGoogleSignIn("added", "google")).toContain("Select Connect Google Calendar");
+    expect(calendarAfterGoogleSignIn("taken", "google")).toContain("already signs in to a different Cadence account");
+    expect(calendarAfterGoogleSignIn("add_failed", "google")).toContain("Google was not added");
+    expect(calendarAfterGoogleSignIn("added", "apple")).toContain("Google was not added");
   });
 });
 

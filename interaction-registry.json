@@ -13043,7 +13043,7 @@
       ],
       "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Unlinks the identity with the person's own session and says it was removed. Removing Apple also asks Apple to revoke Cadence's authorization and forgets the token Cadence kept for that identity; a failed revocation does not block the removal.",
-      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays. Ticket 335: Google is refused while Google Calendar is connected through it; the message says to disconnect Google Calendar first.",
+      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays. Ticket 335: Google is refused while Google Calendar is connected through it, by the server and by the database trigger under the account's row lock; the message says to disconnect Google Calendar first.",
       "effects": [
         "authentication_identity_change",
         "external_api_request",
@@ -13123,7 +13123,7 @@
         }
       ],
       "availability": "Explicit action is available after Cadence sign-in and provider configuration. Each purpose requires its own configured client and same-account grant. Ticket 335 (D31.5): an account with no Google sign-in sees the button only on web while CADENCE_SIGN_IN_LINKING is on, with the sentence that the chosen Google account becomes a way to sign in; with the flag off, on the Mac, or with more than one Google sign-in, a plain sentence replaces the button.",
-      "success_result": "Opens provider consent; same-account verification installs sealed server credentials. Ticket 335: an account with no Google sign-in first adds Google through Supabase manual identity linking (with a sign-in in the last 15 minutes), returns to Settings and continues into Calendar consent for that same Google account.",
+      "success_result": "Opens provider consent; same-account verification installs sealed server credentials. Ticket 335: an account with no Google sign-in first adds Google through Supabase manual identity linking (with a sign-in in the last 15 minutes) and returns to Settings; the next Connect opens Calendar consent for that same Google account. The return address alone starts nothing.",
       "failure_result": "Consent denial, wrong-account selection, and expired state leave Cadence data unchanged. Wrong-account recovery links to Google Account connections and discloses project-wide revocation; Cadence never revokes automatically. A Google account that already signs in to another Cadence account is refused with a plain message that names no account, and Calendar does not connect.",
       "effects": [
         "authentication_session",

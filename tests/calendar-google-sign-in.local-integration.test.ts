@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -90,6 +90,17 @@ function sql(statement: string): string {
   return execFileSync("docker", ["exec", dbContainer, "psql", "-U", "postgres", "-tAc", statement], {
     encoding: "utf8",
   }).trim();
+}
+
+/** Runs statements in one held transaction in its own psql session; resolves when it ends. */
+function heldTransaction(statements: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("docker", ["exec", dbContainer, "psql", "-U", "postgres", "-tA", "-v", "ON_ERROR_STOP=1", "-c", statements]);
+    let output = "";
+    child.stdout.on("data", (chunk) => { output += chunk; });
+    child.stderr.on("data", (chunk) => { output += chunk; });
+    child.on("close", (code) => (code === 0 ? resolve(output) : reject(new Error(output))));
+  });
 }
 
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -290,6 +301,76 @@ run("Google Calendar for accounts that do not sign in with Google (Ticket 335)",
     expect(consent.searchParams.get("login_hint")).toBe(second);
     expect(sql(`select google_subject || ' ' || generation from public.google_calendar_connections where user_id = ${literal(userId)}`)).toBe(`${second} 2`);
     record("Remove Google refused while Calendar connected; after disconnect it is removed; a later Google account rebinds the idle row", "passed");
+  });
+
+  it("removing Google and a Calendar connect at the same moment never leave Calendar connected without Google", async () => {
+    // The database refuses deleting a Google identity a connected Calendar uses.
+    const direct = await createUser(address("race-direct"));
+    const directSub = addGoogle(direct);
+    connectCalendarRow(direct, directSub, "connected");
+    expect(() => sql(`delete from auth.identities where user_id = ${literal(direct)} and provider = 'google'`)).toThrow(/cadence_calendar_connected/);
+    expect(providers(direct)).toEqual(["email", "google"]);
+
+    // Unlink holds the account's row while the Calendar install arrives: the install waits,
+    // then finds the identity gone and installs nothing.
+    const first = await createUser(address("race-unlink-first"));
+    const firstSub = addGoogle(first);
+    connectCalendarRow(first, firstSub, "disconnected", 0);
+    const hash = "c".repeat(64);
+    sql(`update public.google_calendar_connections set attempt_hash = ${literal(hash)} where user_id = ${literal(first)}`);
+    const unlink = heldTransaction(`begin; delete from auth.identities where user_id = ${literal(first)} and provider = 'google'; select pg_sleep(2); commit;`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const install = await admin.rpc("calendar_install_credential", {
+      owner_id: first, expected_subject: firstSub, expected_generation: 0, expected_state_hash: hash, token_ciphertext: "sealed",
+    });
+    await unlink;
+    expect(install.error).toBeNull();
+    expect(install.data).toBe(false);
+    expect(providers(first)).toEqual(["email"]);
+    expect(sql(`select status from public.google_calendar_connections where user_id = ${literal(first)}`)).toBe("disconnected");
+    expect(sql(`select count(*) from cadence_calendar_private.credentials where user_id = ${literal(first)}`)).toBe("0");
+
+    // A Calendar install holds the account's row while Remove Google arrives through Cadence:
+    // Cadence's own check sees no connection yet, the database refuses after the install
+    // commits, and the person sees calendar_connected.
+    const email = address("race-install-first");
+    const second = await createUser(email);
+    const secondSub = addGoogle(second, email);
+    connectCalendarRow(second, secondSub, "disconnected", 0);
+    const browser = new Browser();
+    await signIn(browser, email);
+    const googleId = sql(`select id from auth.identities where user_id = ${literal(second)} and provider = 'google'`);
+    const installHeld = heldTransaction(
+      `begin; select 1 from auth.users where id = ${literal(second)} for update; select pg_sleep(1.5);
+       update public.google_calendar_connections set status = 'connected', generation = 1 where user_id = ${literal(second)}; commit;`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const removed = await browser.request("/auth/sign-in-methods/remove", { form: { identity_id: googleId } });
+    await installHeld;
+    expect(browser.location(removed)).toBe("/settings?sign_in_method=calendar_connected&method=google#sign-in-methods");
+    expect(providers(second)).toEqual(["email", "google"]);
+    record("race: database refuses removing Calendar's Google; held unlink makes install refuse; held install makes Remove answer calendar_connected", "passed");
+  });
+
+  it("Disconnect works with two Google sign-ins, and a crafted return link starts nothing", async () => {
+    const email = address("two");
+    const userId = await createUser(email);
+    const sub = addGoogle(userId, email);
+    connectCalendarRow(userId, sub, "connected", 4);
+    addGoogle(userId);
+    const browser = new Browser();
+    await signIn(browser, email);
+    expect(await connection(browser)).toMatchObject({ status: "connected", googleSignIn: "multiple" });
+    const disconnected = await browser.request("/api/google-calendar/connection", { method: "DELETE" });
+    expect(disconnected.status).toBe(200);
+    expect(await disconnected.json()).toMatchObject({ status: "disconnected" });
+    expect(sql(`select status from public.google_calendar_connections where user_id = ${literal(userId)}`)).toBe("disconnected");
+
+    const flowsBefore = sql(`select count(*) from auth.flow_state where linking_target_id = ${literal(userId)}`);
+    const crafted = await browser.request("/settings?calendar=link&sign_in_method=added&method=google");
+    expect(crafted.status).toBe(200);
+    expect(sql(`select count(*) from auth.flow_state where linking_target_id = ${literal(userId)}`)).toBe(flowsBefore);
+    record("two Google sign-ins: view loads and Disconnect works; the crafted return page starts no linking", "passed");
   });
 
   it("a credential sealed before this change still opens, for a Google account and for an account that added Google", async () => {

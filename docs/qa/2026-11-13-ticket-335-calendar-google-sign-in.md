@@ -3,14 +3,21 @@
 Run November 13, 2026, on branch `claude/sign-in-335-calendar`, against the local Supabase
 stack (CLI 2.105.0, API port 55341, `enable_manual_linking = true`, migrations through
 `20261113200000`) and `next dev` over HTTPS on port 4335 with `CADENCE_SIGN_IN_LINKING=on`,
-`CADENCE_SIGN_IN_EMAIL=on` and a synthetic Google Calendar client. No hosted setting changed,
-no migration was added and Google was never reached for consent: each check stops at the
-provider URL Cadence sends the browser to.
+`CADENCE_SIGN_IN_EMAIL=on`, `CADENCE_ENABLE_TEST_LOGIN=1` and a synthetic Google Calendar
+client. No hosted setting changed and Google was never reached for consent: each check stops
+at the provider URL Cadence sends the browser to.
+
+Second run, after the verifier's findings (PR #271 comment): rebased on `2c7f5c62` (after
+PR #270), `npm run supabase -- db reset` on the local stack applied every migration through
+`20261113210000` cleanly (the CLI's storage step afterwards failed on the stack's known port
+mismatch, not on a migration). Read back: `keep_one_auth_identity` security definer, EXECUTE
+`postgres` only; `calendar_install_credential` and `calendar_begin_attempt` EXECUTE
+`postgres` and `service_role` only, as before.
 
 ## Hosted steps
 
-None. Ticket 335 adds no migration and no setting. It goes live with Ticket 334's hosted
-manual linking and `CADENCE_SIGN_IN_LINKING` (`docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`).
+`docs/qa/2026-11-13-ticket-335-hosted-changes.md`: push `20261113210000` (Ready, no new
+grant) before Ticket 334's manual linking. No setting changes.
 
 ## How to run it
 
@@ -32,7 +39,7 @@ manual linking and `CADENCE_SIGN_IN_LINKING` (`docs/qa/2026-11-13-ticket-334-hos
 
 Without those variables the file is skipped, so `npm run test` does not run it.
 
-## Result: 7 of 7 passed
+## Result: 9 of 9 passed (second run; 7 of 7 in the first)
 
 | Case | Result |
 |---|---|
@@ -43,12 +50,13 @@ Without those variables the file is skipped, so `npm run test` does not run it.
 | A credential sealed with user ID and Google subject opens for a Google account and for an email account that added Google: `/api/google-calendar/calendars` reaches Google's token endpoint (the synthetic client is refused there: `provider_unavailable`), and the credential and `connected` status stay | passed |
 | `leave_reminder_google_subject` with a leave reminder token: no Google → null; added Google → its subject; two Google → null | passed |
 | Mac (bearer token): `googleSignIn: "add_on_web"`; a desktop connect is still refused (`same_account_required`) before any provider step | passed |
+| Race: a direct delete of the Google identity a connected Calendar uses fails with `cadence_calendar_connected`; an unlink holding the account's row makes a concurrent `calendar_install_credential` wait and return false (identity gone, nothing installed); an install holding the row makes a concurrent **Remove Google** through Cadence answer `calendar_connected` with both identities kept | passed; **fails** with the old function bodies applied (checked, then the migration reapplied) |
+| Two Google sign-ins with Calendar connected: the view loads (`multiple`), Disconnect returns 200 and the row is `disconnected`; the crafted return page creates no linking flow | passed |
 
 Also run against the same server and stack:
 
-- `tests/sign-in-methods.local-integration.test.ts` (Ticket 334): 9 of 10. The failing case
-  calls `/auth/test-login`, which needs its own environment variables that this server did
-  not set (`test_login_unavailable`); it is not related to this change.
+- `tests/sign-in-methods.local-integration.test.ts` (Ticket 334): 10 of 10 in the second run
+  (with `CADENCE_ENABLE_TEST_LOGIN=1`; the first run lacked it and failed the test-login case).
 - `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`: passed (rolled back).
 - Unit and DOM: `tests/calendar-google-sign-in.dom.test.tsx` (flag off, Mac, two Google
   sign-ins; the panel hides Connect except for `add`; the return messages) and the existing
@@ -67,12 +75,19 @@ stub so no request reached Google:
    account, so Google Calendar cannot connect it here. Cadence does not merge accounts.
    Choose another Google account." and the address bar is cleaned to
    `/settings#connector-google_calendar`.
-3. After a Google identity was added, the `added` return went straight on to
-   `accounts.google.com/o/oauth2/v2/auth` with `login_hint` equal to the added Google subject.
+3. Second run: the `added` return, opened with a referer from another site, made no request
+   to Google and created no linking flow, for an email-only account and for one with Google.
+   It shows "Google added as a way to sign in. Select Connect Google Calendar to give Cadence
+   access to your calendars." and cleans the address. Selecting **Connect Google Calendar**
+   then opened `accounts.google.com/o/oauth2/v2/auth` with `login_hint` equal to the added
+   Google subject. (First run, now removed: the return continued by itself.)
 4. With Calendar connected, Sign-in methods → **Remove** → **Remove Google** shows "Google
    Calendar uses this Google account. Disconnect Google Calendar first, then remove Google."
    and both identities stay. Checked at 390 px: no horizontal scroll.
 5. The Calendar panel at 390 px: the sentence wraps, no horizontal scroll.
+6. `/design-system?preview=module.google-calendar-panel`: the new "Google sign-in" select
+   shows each sentence (`add`, `add_on_web`, `unavailable`, `multiple`), including the
+   Mac-only `add_on_web` one.
 
 Not checked here: Google's own consent screens and a real linked Google account. Those run
 in Ticket 337's production acceptance with test account A after hosted manual linking is on.

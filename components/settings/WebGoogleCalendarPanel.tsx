@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { GoogleCalendarPanel } from "./GoogleCalendarPanel";
@@ -16,34 +16,26 @@ export function WebGoogleCalendarPanel({ timezone, nested = false }: Readonly<{ 
   const [afterSignIn] = useState(() => result === CALENDAR_AFTER_GOOGLE_SIGN_IN
     ? calendarAfterGoogleSignIn(searchParams?.get(SIGN_IN_METHODS_RESULT_PARAM) ?? null, searchParams?.get(SIGN_IN_METHODS_METHOD_PARAM) ?? null)
     : null);
-  const [continueFailed, setContinueFailed] = useState(false);
-  const started = useRef(false);
-
+  // The address alone never starts anything: a link from another site can set it, so
+  // Calendar consent waits for the person to select Connect Google Calendar.
   useEffect(() => {
-    if (!afterSignIn || started.current) return;
-    started.current = true;
+    if (!afterSignIn) return;
     const url = new URL(window.location.href);
     for (const name of ["calendar", SIGN_IN_METHODS_RESULT_PARAM, SIGN_IN_METHODS_METHOD_PARAM]) url.searchParams.delete(name);
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    if (afterSignIn.continue) webGoogleCalendarCoordinator.beginConnect().catch(() => setContinueFailed(true));
   }, [afterSignIn]);
 
-  const message = continueFailed
-    ? "Google was added, but Google Calendar could not start connecting. Try Connect Google Calendar again."
-    : afterSignIn?.message ?? calendarCallbackMessage(result);
+  const message = afterSignIn ?? calendarCallbackMessage(result);
   return <GoogleCalendarPanel coordinator={webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={message} wrongAccount={result === "same_account_required"} nested={nested} />;
 }
 
-/**
- * Ticket 335 (D31.5): the return from adding Google as a sign-in method before Calendar.
- * `continue` starts Calendar consent for the Google account just added.
- */
-export function calendarAfterGoogleSignIn(result: string | null, method: string | null): { message: string; continue: boolean } {
-  if (result === "added" && method === "google") return { message: "Google added as a way to sign in. Opening Google Calendar…", continue: true };
+/** Ticket 335 (D31.5): the message on return from adding Google as a sign-in method before Calendar. */
+export function calendarAfterGoogleSignIn(result: string | null, method: string | null): string {
+  if (result === "added" && method === "google") return "Google added as a way to sign in. Select Connect Google Calendar to give Cadence access to your calendars.";
   if (result === "taken") {
-    return { message: "That Google account already signs in to a different Cadence account, so Google Calendar cannot connect it here. Cadence does not merge accounts. Choose another Google account.", continue: false };
+    return "That Google account already signs in to a different Cadence account, so Google Calendar cannot connect it here. Cadence does not merge accounts. Choose another Google account.";
   }
-  return { message: "Google was not added, so Google Calendar did not connect. Try again.", continue: false };
+  return "Google was not added, so Google Calendar did not connect. Try again.";
 }
 
 export function calendarCallbackMessage(code: string | null): string | undefined {

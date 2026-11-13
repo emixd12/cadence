@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
-import { beginCalendarAttempt, consumeCalendarAttempt, installCalendarCredential, readCalendarCallbackUser, readCalendarConnection, readCalendarCredential, rebindIdleCalendarConnection, removeCalendarCredential, saveCalendarPreferences } from "@/lib/db/google-calendar.repo";
+import { beginCalendarAttempt, consumeCalendarAttempt, installCalendarCredential, readCalendarCallbackUser, readCalendarConnection, readCalendarCredential, removeCalendarCredential, saveCalendarPreferences } from "@/lib/db/google-calendar.repo";
 import type { CalendarConnection, CalendarConnectionView, CalendarGoogleSignIn, CalendarPreferences, CalendarPurpose } from "@/lib/types/google-calendar";
 import { CALENDAR_AFTER_GOOGLE_SIGN_IN, DEFAULT_CALENDAR_PREFERENCES, GOOGLE_CALENDAR_SETTINGS_PATH } from "@/lib/types/google-calendar";
 import { REAUTH_REQUIRED_ERROR, signInLinkingEnabled } from "@/lib/auth/account-sign-in-methods";
@@ -32,8 +32,9 @@ export async function getCalendarConnection(caller: CalendarReadCaller & { via?:
   const settings = readCalendarOAuthConfig(process.env, undefined, grantPurpose);
   if (!settings) return { accountId: caller.user.id, status: "not_configured", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
-  // A row without a credential keeps its first Google subject until the next connect rebinds it.
-  if (connection?.status === "connected" && connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
+  // A row without a credential keeps its first Google subject until the next connect moves it
+  // (calendar_begin_attempt). A connected row must use one of the account's Google sign-ins.
+  if (connection?.status === "connected" && !googleSignInSubjects(caller.user).includes(connection.googleSubject)) throw new CalendarConnectionError("same_account_required");
   const googleSignIn = calendarGoogleSignIn(caller);
   const hint = googleSignIn ? { googleSignIn } : {};
   return connection ? { accountId: caller.user.id, status: connection.status === "connected" && grantPurpose === "agent" && connection.oauthClientId !== settings.clientId ? "reconnect_required" : connection.status, generation: connection.generation, selectionRevision: connection.selectionRevision, preferences: connection.preferences, ...hint }
@@ -62,11 +63,7 @@ export async function startCalendarConnection(caller: CalendarCaller, target: "w
   if (target === "web" && requestOrigin && calendarGoogleSignIn(caller) === "add") return addGoogleSignInFirst(new URL(requestOrigin));
   const googleSubject = calendarGoogleSubject(caller.user);
   if (target === "desktop" && !/^[a-zA-Z0-9_-]{32,128}$/.test(clientState)) throw new CalendarConnectionError("invalid_request");
-  let existing = await readCalendarConnection(caller.client, caller.user.id);
-  if (existing && existing.status !== "connected" && existing.googleSubject !== googleSubject) {
-    await rebindIdleCalendarConnection(caller.user.id, existing.googleSubject, googleSubject);
-    existing = await readCalendarConnection(caller.client, caller.user.id);
-  }
+  const existing = await readCalendarConnection(caller.client, caller.user.id);
   const generation = existing?.generation ?? 0;
   const flow = createCalendarAuthorization(settings, googleSubject);
   const stateHash = hashCalendarState(flow.state);
@@ -268,8 +265,9 @@ export async function disconnectCalendar(caller: CalendarCaller, grantPurpose: C
   if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
   let revocationFailed = false;
+  // Ticket 335: the account's own connection can always be disconnected and its grant
+  // revoked, whatever its Google sign-ins are now.
   if (connection) {
-    if (connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
     const sealed = await removeCalendarCredential(connection, "disconnected");
     if (sealed) {
       try { await revokeCalendarToken(openCalendarSecret(config(undefined, grantPurpose), sealed, { ...connection, purpose: "refresh" })); }
@@ -296,7 +294,6 @@ export async function prepareCalendarRevocation(caller: CalendarCaller): Promise
       ? await readCalendarConnection(caller.client, caller.user.id, grantPurpose).catch(() => null)
       : await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
     if (!connection || connection.status !== "connected") continue;
-    if (connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
     const sealed = await readCalendarCredential(connection);
     work.push(async () => revokeCalendarToken(openCalendarSecret(settings, sealed, { ...connection, purpose: "refresh" })));
   }
