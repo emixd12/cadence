@@ -18756,3 +18756,34 @@ Platform impact:
 Messaging impact: P-048.
 
 Verification: `npm run agents:check`.
+
+## Ticket 328: Launch audience research
+
+Status: desk research complete November 13, 2026; the recommendation awaits the owner's
+decision. Messaging track. Not a development ticket.
+Dependencies: Ticket 327.
+
+Goal: answer the "Audience" question in `docs/NARRATIVE.md` with evidence.
+
+Scope and acceptance:
+
+- `docs/research/2026-11-13-launch-audience-research.md` tests three candidate audiences,
+  states the evidence and its limits, proposes personas as hypotheses, and lists channels.
+- Every figure names its source. Unverified items are marked.
+- `docs/NARRATIVE.md`, "Audience", points to the report without recording a decision.
+
+Out of scope: interviews, named contact lists, newsletters and creators, the site rewrite
+and any listing submission.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: research only. |
+| Desktop | Not applicable: research only. |
+| Marketing | Follow-up: audience-specific copy after the owner decides. |
+| Future mobile | The second-wave audience depends on the iPhone app (D30.5). |
+
+Messaging impact: none.
+
+Verification: `npm run agents:check`.
