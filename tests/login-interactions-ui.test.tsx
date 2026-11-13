@@ -55,13 +55,17 @@ describe("login interaction controls", () => {
     expect(await renderLogin({ next: "/settings" })).toContain(GOOGLE_DISABLED);
   });
 
-  it("renders the same page when the flag of an unbuilt method is on", async () => {
+  it("adds Continue with Apple after Google when the Apple flag is on (Ticket 333)", async () => {
     stubConfiguredSupabase();
-    const flagsOff = await renderLogin({ next: "/settings" });
-
     vi.stubEnv("CADENCE_SIGN_IN_APPLE", "on");
+    const html = await renderLogin({ next: "/settings" });
 
-    expect(await renderLogin({ next: "/settings" })).toBe(flagsOff);
+    expect(html).toContain(
+      '<a href="/auth/sign-in/apple?next=%2Fsettings" class="apple-sign-in-action">',
+    );
+    expect(html.indexOf("Continue with Google")).toBeLessThan(
+      html.indexOf("Continue with Apple"),
+    );
   });
 
   it("adds Continue with email after Google when the email flag is on (Ticket 332)", async () => {

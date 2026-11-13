@@ -10,7 +10,10 @@ const ICONS: Partial<Record<SignInMethodId, LucideIcon>> = {
   email: Mail,
 };
 
-const TEXT_ACTION_CLASS = "product-action min-h-11 py-2 text-base font-bold";
+const PRIMARY_CLASS =
+  "product-action product-action-primary min-h-11 py-2 text-base font-bold";
+const SECONDARY_CLASS =
+  "product-action product-action-secondary min-h-11 py-2 text-base font-bold";
 
 // Ticket 333 (L-024): Apple's custom-button rules, styled in app/globals.css.
 // Black fill on a light page, white logo and title, rectangular, at least 140 px
@@ -91,9 +94,7 @@ function SignInMethodControl({
   }
 
   const Icon = ICONS[method.id] ?? LogIn;
-  const className = `${TEXT_ACTION_CLASS} ${
-    secondary ? "product-action-secondary" : "product-action-primary"
-  }`;
+  const className = secondary ? SECONDARY_CLASS : PRIMARY_CLASS;
   const content = (
     <>
       <Icon
