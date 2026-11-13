@@ -18407,7 +18407,7 @@ Verification: `npm run resolvers:check`, `tests/analytics.resolver.test.ts`,
 
 ## Ticket 319: Mac sync merge rule and label
 
-Status: implemented in source November 10, 2026. Not yet in a dev-signed or published Mac build; installed acceptance with a forced collision has not run.
+Status: complete November 12, 2026. Published in Mac 0.1.10. Installed acceptance on the test Mac passed with a forced collision: a hosted connector completion and a manual Not Completed on the same Occurrence before the Mac pulled; both root events are kept on both sides and the manual mark wins (`docs/qa/2026-11-12-connector-completion-acceptance.md`).
 Dependencies: Ticket 313.
 
 Goal: keep Mac sync working when a connector and the user mark the same Occurrence.
@@ -18449,7 +18449,7 @@ build with one forced collision (`desktop-acceptance` skill) and
 
 ## Ticket 320: Sync links and matches to the Mac
 
-Status: implemented and merged November 11, 2026 (PR #216). Hosted migration `20261111160000` (contract 5) applied and read back November 11; SQLite schema 24 is in the Mac 0.1.10 release branch, not yet in a published build. Installed acceptance on a dev-signed build is open. Not required for the first release.
+Status: complete November 12, 2026 (PR #216; published in Mac 0.1.10). Installed acceptance on the test Mac passed: 18 matches synced, the row shows "From Hevy", and the expanded row shows "Workout in Hevy" with its time (`docs/qa/2026-11-12-connector-completion-acceptance.md`).
 Dependencies: Tickets 314 and 319.
 
 Goal: show link state and workout timing on the Mac, offline.
@@ -18479,7 +18479,7 @@ build and `dagger check --cadence --progress=report`.
 
 ## Ticket 321: Background completion job
 
-Status: implemented November 10, 2026, off behind the flag. Migration `20261111150000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026, and it was applied on November 11. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. Vercel usage not measured; no local-stack job run.
+Status: implemented November 10, 2026, off behind the flag. Migration `20261111150000_connector_completion_job_selection.sql` grants `service_role` a column read; the owner approved its hosted push on November 10, 2026, and it was applied on November 11. Read strategy `cheap` from November 11 (Ticket 311 chose the events cursor), so the full D28.5 schedule runs. A local-stack job run completed one Occurrence with no session open (November 12). The flag turned on in Production on November 13, 2026, 04:30 UTC; Vercel usage is measured after one full day (`docs/COSTS.md`).
 Dependencies: Ticket 316. The cadence depends on Ticket 311.
 
 Goal: complete Occurrences and cancel reminders without Cadence being opened.
@@ -18553,7 +18553,7 @@ Verification: export and completion-timing tests with a connector-completed fixt
 
 ## Ticket 323: Connector completion release acceptance
 
-Status: blocked. Ticket 311 is complete and the hosted migrations are applied. Needs published Mac 0.1.10, whose release branch contains Tickets 319 and 320 (owner instruction to publish), and Ticket 241's release steps 6–7 and installed connector acceptance.
+Status: complete November 13, 2026. The matrix passed on a local stack against the live Hevy account, then on deployed web and the installed Mac after the flag turned on (`docs/qa/2026-11-12-connector-completion-acceptance.md`). Two rows did not run: the `deleted` event waits for the owner to delete the test workouts in the Hevy app (Hevy's API cannot), and reconnecting another Hevy account needs a second Pro account, which the owner declined (`docs/DECISIONS.md`, 2026-11-12). Database function and service tests cover both.
 Dependencies: Tickets 311–319, 321 and 322; Ticket 241's release steps 6–7 and installed
 connector acceptance.
 
