@@ -19246,7 +19246,7 @@ run itself.
 
 ## Ticket 338: Email sign-in limits per person, not per server
 
-Status: code complete on branch `claude/sign-in-email-rate-limit`; inactive in production
+Status: merged (PR #278) and verified; inactive in production
 until the hosted steps in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. Filed
 November 13, 2026, from finding 1 of `docs/qa/2026-11-13-sign-in-final-verification.md`.
 Dependencies: Ticket 332. Decision: D31.2.

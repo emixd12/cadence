@@ -84,6 +84,15 @@ anyone.
 | 4 | Redeploy production | — | — | Under the normal merge flow. |
 | 5 | Acceptance | — | — | See below. |
 
+Check right after step 1 (agent's Mac only, no email sent): call `/auth/v1/verify` with
+the publishable key, a made-up code for a throwaway address and a different
+`Sb-Forwarded-For` value on each call. The 31st call must get 429. That shows hosted Auth
+ignores the header without a secret key, so step 1 gives nobody a fresh limit. It limits
+only the agent's own address, for up to 5 minutes.
+
+Prefer a new secret key named `cadence-web-auth` for step 3, so it can be revoked without
+touching anything else that uses `default`.
+
 Acceptance after step 4 (agent steps, test accounts and AgentMail; real email):
 
 1. Email sign-in on `app.cadence-me.com` in a real browser with Turnstile: request, code,
@@ -110,8 +119,39 @@ Undo: remove the two Vercel variables and redeploy; set
 - Settings "Change address" still calls Auth from the server without the person's
   address. It needs a signed-in session and a recent sign-in, so abuse is limited to
   the person's own account.
-- Token refresh in `proxy.ts` (150 per 5 minutes per address) is also called from the
-  server for every signed-in page. It was not measured here. If it is shared, many
-  signed-in people at once could be refused a refresh. A follow-up should measure it.
+- Token refresh in `proxy.ts` is shared too, and it can sign other people out today.
+  The verifier measured it (section F, row 6): 31 page loads with a made-up expired
+  session cookie used up the server address's refresh burst, and the next person's
+  valid refresh got 429 and was signed out. This is not caused by this change and needs
+  its own ticket (section F).
 - The Supabase docs do not say whether a secret key with a user's bearer token keeps
   Sb-Forwarded-For. Cadence does not rely on it.
+
+## F. Verifier check (November 13, 2026)
+
+Run folder: `.intent/acceptance/t338-verify/` (Intent workspace worktree). The verifier ran
+its own local stack (project `t338-verify`, ports 566xx), a clean detached worktree with no
+`.env.local`, and its own Auth copy and gateway on ports 56697 and 56698. Nothing hosted
+changed. One preview deployment carried a header echo route and was removed.
+
+| # | What | Result |
+|---|---|---|
+| 1 | Can a client forge its address on Vercel? Preview deployment, route returning the headers and `clientAddressOf`. Sent `X-Real-IP`, `X-Forwarded-For` (single and chained), `X-Vercel-Forwarded-For`, `Forwarded`, and duplicate `X-Real-IP` and `X-Forwarded-For` over HTTP/1.1 | **Not forgeable.** In every case all three headers and `clientAddressOf` were the caller's real address. Vercel replaces the headers; it does not append. `app.cadence-me.com` resolves straight to Vercel (76.76.21.21), with no proxy in front that would make every person look like one address. Under `next start` or `next dev` the headers are whatever the client sends, so forwarding must stay off on any host other than Vercel. |
+| 2 | Both variables unset | Ticket 332 suite 9 of 9, the Mac email suite 4 of 4, and the two-person test in `shared` mode reproduces the shared limit. New unit test: Auth gets exactly the earlier call (publishable key, the CAPTCHA token, no extra header) and Cloudflare is not called. |
+| 3 | Both variables set | Two-person test `separate` 4 of 4; Ticket 332 suite 9 of 9; Mac email suite 4 of 4. |
+| 4 | Fail closed, against Cloudflare's real siteverify with its test secrets, web form and Mac page each | Missing token, refused token (`2x…` secret), spent token (`3x…`, Cloudflare's `timeout-or-duplicate`) and Cloudflare unreachable: every case `email_check_failed`, **0 `/otp` calls, 0 emails**. A good token: 2 `/otp` calls, both with `Sb-Forwarded-For` 198.51.100.77, 2 emails. |
+| 5 | Secret key in the build (built with marker values) | No marker, variable name, `siteverify` or `sb-forwarded-for` in `.next/static`. The secret key is used only for `/otp` (address from the form, `shouldCreateUser` as before) and `/verify` (address from the pending cookie with a typed code, or a link token hash). Neither client makes any other call, and neither reaches PostgREST. Supabase skips CAPTCHA for these calls, which is why Cadence checks Turnstile first. |
+| 6 | Token refresh in `proxy.ts`, both variables irrelevant | **Shared, and it signs people out.** 31 loads of `/timeline` with a made-up session cookie (expired, random refresh token) used up the server address's `/token` burst (30). The next person's valid refresh got 429 `over_request_rate_limit`; Cadence redirected them to `/login` and cleared their session cookie. Control without the attacker: 200, still signed in. |
+| 7 | Settings Change address (`PUT /auth/v1/user`) | 45 calls through the Auth copy: no 429. It shares no per-address limit; it uses only the project-wide email count (section E). |
+| 8 | Tests are real | 10 deliberate breaks in `auth-forwarding.ts` and `sendEmailSignIn` each failed `tests/auth-forwarding.test.ts`. Removing forwarding from the code check made the two-person test fail: Bea's right code was refused. Restored after each. |
+| 9 | CodeQL on the PR | 2 alerts, both in the local test gateway: it built its upstream URL from the request line, so an absolute URL could send it to any host, and it returned error text. Fixed: fixed host, path and query only, and a plain error. |
+
+Turnstile hostname: Cadence does not compare the `hostname` in Cloudflare's answer, and
+neither does Supabase's own check. The widget only issues tokens on its allowed hosts.
+Cloudflare's test secrets answer `example.com`, so a hostname check would also fail every
+local test. Left as is.
+
+Follow-up (not in this ticket): token refresh in `proxy.ts` needs the same treatment. With
+the Ticket 338 variables set, the proxy's client could send `Sb-Forwarded-For` with the
+secret key for the refresh call only. Until then, anyone can sign other people out for up
+to 5 minutes at a time, from one address, with about 30 requests.

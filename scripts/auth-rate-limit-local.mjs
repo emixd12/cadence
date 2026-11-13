@@ -23,17 +23,21 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 
-const SOURCE = "supabase_auth_habit-tracking-app";
-const NAME = "cadence_t338_auth";
-const AUTH_PORT = 55398;
-const GATEWAY_PORT = 55397;
+// Overrides let a verifier run its own stack (another project id and ports).
+const PROJECT = process.env.CADENCE_LOCAL_SUPABASE_PROJECT ?? "habit-tracking-app";
+const WORKDIR = process.env.CADENCE_LOCAL_SUPABASE_WORKDIR;
+const SOURCE = `supabase_auth_${PROJECT}`;
+const NAME = process.env.CADENCE_T338_AUTH_CONTAINER ?? "cadence_t338_auth";
+const AUTH_PORT = Number(process.env.CADENCE_T338_AUTH_PORT ?? 55398);
+const GATEWAY_PORT = Number(process.env.CADENCE_T338_GATEWAY_PORT ?? 55397);
 const STACK = process.env.CADENCE_LOCAL_SUPABASE_URL ?? "http://127.0.0.1:55341";
 const TURNSTILE_ALWAYS_PASS_SECRET = "1x0000000000000000000000000000000AA";
 
 const docker = (...args) => execFileSync("docker", args, { encoding: "utf8" }).trim();
 
 function stackKeys() {
-  const out = execFileSync("npm", ["run", "-s", "supabase", "--", "status", "-o", "env"], {
+  const workdir = WORKDIR ? ["--workdir", WORKDIR] : [];
+  const out = execFileSync("npm", ["run", "-s", "supabase", "--", ...workdir, "status", "-o", "env"], {
     encoding: "utf8",
   });
   const read = (name) => new RegExp(`^${name}="?([^"\\n]+)"?$`, "m").exec(out)?.[1];
@@ -106,8 +110,12 @@ function runGateway(keys) {
     delete headers.connection;
     delete headers["content-length"];
 
-    const isAuth = req.url.startsWith("/auth/v1/");
-    let target = new URL(req.url, STACK);
+    // Only the path and query come from the caller; the host is always fixed, so an
+    // absolute URL in the request line cannot send the gateway elsewhere.
+    const requested = new URL(req.url, "http://gateway.invalid");
+    const path = `${requested.pathname}${requested.search}`;
+    const isAuth = requested.pathname.startsWith("/auth/v1/");
+    let target = new URL(path, STACK);
     if (isAuth) {
       const apikey = headers.apikey ?? "";
       const bearer = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
@@ -116,7 +124,7 @@ function runGateway(keys) {
       }
       if (apikey !== keys.secret) delete headers["sb-forwarded-for"];
       headers["x-forwarded-for"] = req.socket.remoteAddress.replace(/^::ffff:/, "");
-      target = new URL(req.url.slice("/auth/v1".length), `http://127.0.0.1:${AUTH_PORT}`);
+      target = new URL(path.slice("/auth/v1".length), `http://127.0.0.1:${AUTH_PORT}`);
     }
 
     try {
@@ -154,7 +162,8 @@ function runGateway(keys) {
       res.end(text);
     } catch (error) {
       res.writeHead(502);
-      res.end(String(error));
+      console.error(error);
+      res.end("gateway: upstream request failed");
     }
   });
   server.listen(GATEWAY_PORT, "127.0.0.1", () => {
