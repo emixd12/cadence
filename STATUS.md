@@ -48,7 +48,6 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -89,6 +88,43 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Tickets 301–309 closing checks — November 13, 2026
+
+- **Track complete.** Tickets 303–309 are complete; 301 and 302 were already. The owner set a
+  US$5 Google Maps cap for this run (recorded in the run folder), approved the Ticket 309
+  wording list and will delete the vault item `google-calendar-agent-retire-secret`. Run
+  folder: `.intent/acceptance/settings-close-20261113/` (not committed).
+- **Web, production, test account A, 390 px with touch (headless Chrome):** a touch drag moved
+  Medical to position 3, announced "Medical moved to position 3 of 9.", and kept the order
+  after reload; arrow keys restored it (304). One paid Home lookup returned `200` and filled
+  "1523 Broadway, New York, NY 10036, USA" without saving; Home was put back and reloaded
+  unchanged (308). Cost about US$0.005.
+- **iOS Simulator Safari (iPhone 18 Pro, iOS 27.2), local stack with test login:** a touch drag
+  saved the order and announced "Alpha moved to position 4 of 11." (304). With Travel off the
+  panel showed the "turn on Travel estimates first" line; with it on, **Use my current
+  location** showed "Finding your address…", Safari asked for location inside the tap, and
+  the position reached `POST /api/travel/home-lookup` (local `503`, no provider configured;
+  the paid path passed on production) (308). The Simulator replaced iPhone hardware at the
+  owner's choice.
+- **Installed Mac 0.1.10, test Mac, linked as A:** Settings has no Daily Brief Calendar panel
+  (307). Daily Brief shows **Plan around my connected sources**, naming all four sources, and
+  **Advanced: choose sources** (306). Timezone keeps **Save timezone** (303). **Use my current
+  location** filled Home from the Mac's position; the field was set back to the fixture and
+  committed with Enter, and hosted Home stayed the fixture (303, 308). A keyboard move of
+  Medical announced "Medical moved to position 2 of 9.", reached hosted, and moved back (304).
+- **Findings outside this track:** the first Mac lookup failed with "Your device did not
+  share a position." while another app covered Cadence (the reader returns unavailable when the
+  page is hidden); it passed with Cadence in front. `GET /api/outlook-calendar/calendars`
+  returned `409` `timeout` for A while the connection read `connected`. The npm Supabase CLI
+  binary (2.105.0) failed its code-signature check on this Mac and was re-signed ad hoc in one
+  worktree; Docker held a stale binding on local port 55321.
+- **Preflight:** `desktop-test-mac` ready except the `test-mac-app-permissions` probe, which
+  timed out; Notifications and Location read "Allowed" in Cadence on the device.
+
+Platform impact: web and installed Mac checked; marketing not applicable; future mobile web
+checked at 390 px and in iOS Safari. Messaging impact: none (P-033 to P-036 stay with Ticket
+246).
 
 ## Ticket 324: count an unlinked workout by hand — November 13, 2026
 
