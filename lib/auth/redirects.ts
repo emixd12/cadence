@@ -4,6 +4,8 @@ export const LOGIN_ROUTE = "/login";
 export const AUTH_CALLBACK_ROUTE = "/auth/callback";
 export const MISSING_CONFIG_ERROR = "missing_supabase_config";
 
+const REDIRECT_PARSE_BASE = "http://local.invalid";
+
 type RedirectParam = string | string[] | null | undefined;
 
 export function authRequestUrl(request: {
@@ -44,8 +46,16 @@ export function normalizeRedirectPath(
   }
 
   try {
-    const parsed = new URL(nextPath, "http://local.invalid");
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const parsed = new URL(nextPath, REDIRECT_PARSE_BASE);
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+
+    // "/\host" parses to another host, and "/.//host" to the path "//host",
+    // which a browser reads as another site.
+    if (parsed.origin !== REDIRECT_PARSE_BASE || path.startsWith("//")) {
+      return fallbackPath;
+    }
+
+    return path;
   } catch {
     return fallbackPath;
   }
