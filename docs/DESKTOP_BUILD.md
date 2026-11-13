@@ -165,9 +165,8 @@ protections.
 
 ## Planned account mode
 
-Account-free local mode remains complete. Optional account mode uses the
-existing Cadence Google account (Ticket 336 plans any sign-in method of the account:
-Google or Apple through the system browser, email by a 6-digit code typed in the app)
+Account-free local mode remains complete. Optional account mode signs in to the
+person's Cadence account by any method the hosted app has on (Ticket 336, below)
 and synchronizes web plus multiple desktop
 working copies while each app runs with connectivity. It adds no closed-app
 background helper.
@@ -218,6 +217,53 @@ Ad hoc public previews use the existing login-Keychain path and must contain its
 compiled release-verification marker. Preview.15 completed the installed Google
 round trip through that preview-only path. See
 `docs/qa/2026-08-31-desktop-authentication.md`.
+
+### Sign-in methods (Ticket 336)
+
+Ticket 336 (D31.2) offers the web's methods in Settings › Account. The contract
+lives in `lib/auth/desktop-sign-in.ts`, imported by both sides.
+
+1. **Which methods.** The Mac reads `GET /api/auth/sign-in-methods` on the hosted
+   origin (`VITE_CALENDAR_BROKER_ORIGIN`, the same origin as Calendar, Daily Brief
+   and Travel) each time the panel can offer sign-in. The route returns the methods
+   of `enabledSignInMethods` (`lib/auth/sign-in-methods.ts`), so each flag that is
+   off in production hides that method on the Mac with no Mac release. Labels and
+   order match the web login page. The code length comes with the list; a length
+   this build cannot accept hides email. Without the origin, or when the list cannot
+   be read, the Mac offers Google alone, which has no flag.
+2. **Google and Apple.** The system browser and the PKCE callback above. The saved
+   flow records the method. After Apple, the Mac sends Apple's refresh token once to
+   `POST /api/auth/apple-sign-in-token` with the user's JWT; the server seals it for
+   revocation on account deletion (Ticket 333, L-025). A failure never blocks sign-in.
+   The Keychain copy of every session leaves out `provider_token` and
+   `provider_refresh_token`.
+3. **Email.** The person types the address in the panel. The Mac saves the flow
+   (state, time, method, address) in the `pending-state` Keychain item and opens
+   `/login/email/mac` in the system browser, with the state and address in the URL
+   fragment, which no server or log receives. That page passes Turnstile, when the
+   hosted project has it on, and posts to `POST /auth/email/mac`, which calls Supabase
+   Auth's code request with the Turnstile token. Without Turnstile the page sends at
+   once. The person types the 6-digit code in the panel, and the Mac verifies it with
+   its own Supabase client (`verifyOtp`); the session goes to the Keychain like a
+   PKCE session. A wrong code keeps the request so a typo can be fixed; Supabase Auth
+   limits verify attempts. A code request older than one hour, a used request and a
+   restart past that hour need a new code. The request survives a restart within the
+   hour. The page's Return to Cadence link (`cadence://auth/callback?state=…&email_code=sent`)
+   only brings the app forward. Any other callback during an email request is stray:
+   the request stays and the panel shows a notice.
+4. **Guard.** Every method finishes through one step: a session for a different
+   hosted user than the linked profile is removed and refused, and local data,
+   baseline and outbox stay unchanged.
+
+Why the browser for the email code request: CAPTCHA in Supabase Auth applies to every
+client of the project, so the request must carry a Turnstile token. The token can only
+come from a browser challenge on a hostname the widget allows. A Cadence route alone
+cannot produce one, and bypassing CAPTCHA on the server would need the service role and
+would leave the route without bot protection. A widget in the app's webview would need
+Cloudflare's script and frame in the app's content security policy, and Turnstile on the
+`tauri://localhost` origin is not verified. Cadence's own page in the system browser uses
+the widget and hostnames the web already uses, keeps every secret on the server, and
+matches Google and Apple, which also use the browser.
 
 The hosted Auth redirect allowlist requires the narrow dynamic-query entry
 `cadence://auth/callback?state=*`. The base `cadence://auth/callback` remains

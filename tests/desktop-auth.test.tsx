@@ -89,6 +89,22 @@ describe("desktop authentication", () => {
     expect(linked).toContain("Your local data has not been uploaded or replaced");
   });
 
+  it("offers each enabled method and the code entry without naming Google as the account (Ticket 336)", () => {
+    const methods = { methods: [{ id: "google", label: "Continue with Google" }, { id: "apple", label: "Continue with Apple" }, { id: "email", label: "Continue with email" }] as const, emailCodeLength: 6 };
+    const local = renderToStaticMarkup(<AccountPanel state={{ status: "local" }} methods={methods} configured connected={false} busy={false} onSignIn={() => {}} onCancel={() => {}} />);
+    expect(local).toContain("Continue with Apple");
+    expect(local).toContain("Continue with email");
+    expect(local).not.toContain("Sign in with Google");
+    const code = renderToStaticMarkup(<AccountPanel state={{ status: "code", email: "owner@example.test", error: "That code did not work." }} methods={methods} configured connected={false} busy={false} onSignIn={() => {}} onCancel={() => {}} />);
+    expect(code).toContain("owner@example.test");
+    expect(code).toContain("one-time-code");
+    expect(code).toContain("That code did not work.");
+    expect(code).not.toContain("Continue with");
+    const linked = renderToStaticMarkup(<AccountPanel state={{ status: "linked", userId: "hosted", email: null }} configured connected busy={false} onSignIn={() => {}} onCancel={() => {}} />);
+    expect(linked).toContain("Signed in.");
+    expect(linked).not.toContain("Google");
+  });
+
   it("shows the account working-copy contract only after the baseline is connected", () => {
     const html = renderToStaticMarkup(<AccountPanel state={{ status: "error", message: "Session revoked." }} configured connected busy={false} onSignIn={() => {}} onCancel={() => {}} />);
     expect(html).toContain("This Mac is linked to your Cadence account.");

@@ -4,7 +4,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DesktopApp, type DesktopScreen } from "./desktop-app";
-import { openCalendarSourceUrl } from "./calendar/google-calendar";
+import { openCalendarSourceUrl, readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
@@ -69,7 +69,7 @@ import "./timeline.css";
 const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;
 const openChatGptUsage = () => { void openCalendarSourceUrl(CHATGPT_USAGE_URL).catch(() => undefined); };
 import { AccountConflictReview, AccountDisconnectPanel, AccountPanel, AccountSyncPanel, FirstAccountLinkChoice } from "./account/account-panel";
-import { DesktopAuth, readDesktopAuthConfig, type DesktopAccountState } from "./account/auth";
+import { DesktopAuth, fetchDesktopSignInMethods, GOOGLE_ONLY_SIGN_IN, readDesktopAuthConfig, type DesktopAccountState, type DesktopSignInMethods } from "./account/auth";
 import { planAccountSync, synchronizeAccount, synchronizeReviewedAccount, type AccountSyncInputs } from "./account/account-sync";
 import { shouldRetryAccountSync, type SyncStatus } from "./sync-engine";
 import type { AccountSyncConflict, AccountSyncConflictDecision } from "@cadence/core/resolvers/account-sync.resolver";
@@ -103,6 +103,7 @@ export function Product() {
   // Ticket 280: true once the saved session has been read. Before that, "local" is only the default.
   const [accountKnown, setAccountKnown] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
+  const [signInMethods, setSignInMethods] = useState<DesktopSignInMethods>(GOOGLE_ONLY_SIGN_IN);
   const [firstLink, setFirstLink] = useState<{ recognized: boolean; complete?: boolean; backupPath?: string; error?: string } | null>(null);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: "offline" });
@@ -276,7 +277,7 @@ export function Product() {
       if (!active) return;
       chatGptAccountScope.setAccount(state.status === "linked" ? state.userId : null);
       setAccount(state); setAccountKnown(true); setCalendarClient(state.status === "linked" ? service.accountClient() : null);
-    }, chatGptPlan?.disconnect);
+    }, chatGptPlan?.disconnect, readDesktopCalendarBrokerOrigin());
     auth.current = service;
     let stop: (() => void) | undefined;
     void service.initialize().then((value) => { if (active) stop = value; else value(); }).catch(() => {
@@ -284,6 +285,15 @@ export function Product() {
     });
     return () => { active = false; chatGptAccountScope.setAccount(null); auth.current = null; stop?.(); void service.dispose(); };
   }, [chatGptAccountScope]);
+  // Ticket 336: offer only the sign-in methods the hosted app has on, read again whenever
+  // the panel can offer them, so a method turned off in production disappears.
+  const offersSignIn = account.status !== "linked" && account.status !== "waiting" && account.status !== "code";
+  useEffect(() => {
+    if (!isTauri() || !offersSignIn) return;
+    let active = true;
+    void fetchDesktopSignInMethods(readDesktopCalendarBrokerOrigin()).then((value) => { if (active) setSignInMethods(value); });
+    return () => { active = false; };
+  }, [offersSignIn]);
   const runAccount = (action: () => Promise<void>) => {
     if (!chatGptAccountScope.beginTransition()) return;
     setAccountBusy(true);
@@ -569,7 +579,11 @@ export function Product() {
     setNavigationRequest({ anchor });
   };
   const accountControls = <><AccountPanel state={account} configured={readDesktopAuthConfig() !== null} connected={syncReady} busy={accountBusy}
-    onSignIn={() => auth.current && runAccount(() => auth.current!.begin())}
+    methods={signInMethods}
+    onSignIn={(method) => auth.current && runAccount(() => auth.current!.begin(method))}
+    onEmail={(email) => auth.current && runAccount(() => auth.current!.beginEmail(email))}
+    onCode={(code) => auth.current && runAccount(() => auth.current!.verifyEmailCode(code))}
+    onResend={() => auth.current && runAccount(() => auth.current!.resendEmail())}
     onCancel={() => auth.current && runAccount(() => auth.current!.cancel())} />
     {firstLink ? <FirstAccountLinkChoice recognized={firstLink.recognized} complete={firstLink.complete} busy={accountBusy} backupPath={firstLink.backupPath} error={firstLink.error}
       onImport={() => runFirstLink("import")} onIgnore={() => runFirstLink("ignore")}
