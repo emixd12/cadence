@@ -29,6 +29,8 @@ export function MacEmailCodeRequest({
   const [attempt, setAttempt] = useState(0);
   const [retryToken, setRetryToken] = useState<string | null>(null);
   const sending = useRef(false);
+  // Read once: the effect may run twice, and the first run removes the fragment.
+  const fragment = useRef<DesktopEmailFragment | null | undefined>(undefined);
 
   const send = useCallback(async (flow: DesktopEmailFragment, captchaToken?: string) => {
     if (sending.current) return;
@@ -55,7 +57,8 @@ export function MacEmailCodeRequest({
 
   /* eslint-disable react-hooks/set-state-in-effect -- the fragment is readable only after hydration */
   useEffect(() => {
-    const flow = parseDesktopEmailFragment(window.location.hash);
+    if (fragment.current === undefined) fragment.current = parseDesktopEmailFragment(window.location.hash);
+    const flow = fragment.current;
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);
     }
