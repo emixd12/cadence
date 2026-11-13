@@ -99,11 +99,9 @@ function providers(userId: string): string[] {
   return rows ? rows.split("\n") : [];
 }
 
-/** GoTrue's provider URL carries the return address inside its state token. */
-function linkReturnAddress(providerUrl: string): URL {
-  const state = new URL(providerUrl).searchParams.get("state") ?? "";
-  const payload = JSON.parse(Buffer.from(state.split(".")[1] ?? "", "base64url").toString("utf8")) as { referrer?: string };
-  return new URL(payload.referrer ?? "about:blank");
+/** Supabase Auth keeps the return address of a linking flow in `auth.flow_state`. */
+function linkReturnAddress(userId: string): URL {
+  return new URL(sql(`select referrer from auth.flow_state where linking_target_id = ${literal(userId)} order by created_at desc limit 1`));
 }
 
 run("Google Calendar for accounts that do not sign in with Google (Ticket 335)", () => {
@@ -192,7 +190,7 @@ run("Google Calendar for accounts that do not sign in with Google (Ticket 335)",
     expect(start.status).toBe(200);
     const { url } = (await start.json()) as { url: string };
     expect(new URL(url).hostname).toBe("accounts.google.com");
-    const back = linkReturnAddress(url);
+    const back = linkReturnAddress(userId);
     expect(back.pathname).toBe("/auth/callback");
     expect(back.searchParams.get("link")).toBe("google");
     expect(back.searchParams.get("next")).toBe("/settings?calendar=link#connector-google_calendar");
