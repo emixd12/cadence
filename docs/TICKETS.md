@@ -17766,8 +17766,9 @@ dev-signed build checked in local mode and linked mode (`docs/DESKTOP_RELEASE.md
 
 ## Ticket 303: Settings save as they change
 
-Status: implemented November 10, 2026 on PR 205. The owner confirmed the three exceptions below
-on November 10.
+Status: complete November 13, 2026. The owner confirmed the three exceptions below on
+November 10. Installed Mac 0.1.10 kept **Save timezone**, filled Home without saving and
+committed it on Enter (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none. Easier after Ticket 301.
 
 Goal: a person never wonders whether a setting was saved.
@@ -17811,7 +17812,9 @@ confirmation; `npm run interactions:check`; bench at both widths.
 
 ## Ticket 304: Categories drawer with drag reordering
 
-Status: implemented November 10, 2026 on PR 205. Not verified: drag in a real browser at 390 px and on touch hardware.
+Status: complete November 13, 2026. Touch drag passed at 390 px against production and in
+iOS Simulator Safari; a keyboard move on installed Mac 0.1.10 synced to hosted and back
+(STATUS, "Tickets 301–309 closing checks — November 13, 2026"). The Simulator stood in for touch hardware at the owner's choice.
 Dependencies: Ticket 301 for the drawer; can be built first against the current page.
 
 Goal: a person reorders and edits categories in one compact list.
@@ -17854,7 +17857,9 @@ for mouse, touch and keyboard moves and the announcement; `npm run resolvers:che
 
 ## Ticket 305: Note shortcuts on by default
 
-Status: implemented November 10, 2026 on PR 205. Hosted: `20261110153050` relaxes the commit check; `20261110170000` turns stored off switches on once and needs the owner's authorization.
+Status: complete November 13, 2026. Hosted migrations `20261110153050` and
+`20261110170000` pushed November 11; web and Mac show "Day note shortcuts · On"
+(STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none.
 
 Goal: repeated Notes are offered as shortcuts without anyone switching the feature on.
@@ -17898,7 +17903,9 @@ DOM tests that no switch renders and proposals still need Accept;
 
 ## Ticket 306: One Daily Brief choice for every connected source
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000` pushed November 11; hosted `GET /api/advisor/preferences` as test account A returned the version 4 shape. Waiting on the Mac 0.1.10 release for the installed check.
+Status: complete November 13, 2026. Hosted migration `20261110150000` pushed November 11;
+installed Mac 0.1.10 shows **Plan around my connected sources**, its four sources and
+**Advanced: choose sources** (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
 change Daily Brief.
 
@@ -17943,7 +17950,9 @@ later-connected sources; `tests/daily-brief-ui.dom.test.tsx`;
 
 ## Ticket 307: Daily Brief reads Google Calendar through the Timeline connection
 
-Status: implemented November 10, 2026 on PR 205. Hosted runbook in `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)"; the owner authorized the push after merge.
+Status: complete November 13, 2026. Grant retired on hosted November 11; no Daily Brief
+Calendar panel on web or installed Mac 0.1.10. The owner deletes the vault item
+`google-calendar-agent-retire-secret` (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: Ticket 306.
 
 Goal: a person connects Google Calendar once.
@@ -17984,7 +17993,9 @@ hosted check as a test account after the migration is authorized.
 
 ## Ticket 308: Set Home from the current location
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000` pushed November 11; the hosted route rejects a missing session and a bad body. Not verified: one paid hosted lookup, waiting on the owner's travel spend cap; iPhone Safari.
+Status: complete November 13, 2026. One paid hosted lookup as test account A returned an
+address at 390 px; iOS Simulator Safari asked for location inside the tap; installed Mac
+0.1.10 filled the field from its position. Home was restored each time (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none.
 
 Goal: a person sets Home without typing an address.
@@ -18025,7 +18036,8 @@ account within the travel spend cap the owner sets.
 
 ## Ticket 309: Settings wording pass
 
-Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`; every "After" string was found in source November 11. Waiting on the owner to read it.
+Status: complete November 13, 2026. The owner approved
+`docs/qa/2026-11-10-settings-wording.md` in chat.
 Dependencies: Ticket 301 for the final section names.
 
 Goal: Settings reads clearly and warmly, and each thing has one name.
