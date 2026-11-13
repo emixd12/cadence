@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 335–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys. 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); production acceptance of email passed November 13; code length 6 and `cadence-me.com` DNS applied; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 335–337 not started; Google stays the only live method | 332: owner rows 9–11 (an SMTP key from the Sequenzy company that holds `cadence-me.com`; reply-to, click tracking and footer; Turnstile permission on the Cloudflare token), then SMTP, CAPTCHA and the flag (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -92,6 +92,22 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 332: production setup and acceptance of email sign-in — November 13, 2026
+
+- **Applied.** Sequenzy sending domain `cadence-me.com` added and verified; Cloudflare DNS
+  for it (DKIM `sq1`/`sq2`, return path `rp`/`rp2`, DMARC `p=none`, root SPF). Hosted Auth
+  code length 8 → 6. Each change and its recheck: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
+- **Accepted on production Supabase.** New account, link in another browser, 6-digit code,
+  wrong, used and expired values, resend limit, A's Google address reaching A's account,
+  SPF/DKIM/DMARC pass, MCP consent and account deletion for an email-only account
+  (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`). Test accounts deleted.
+- **Not on.** `CADENCE_SIGN_IN_EMAIL` stays off and hosted SMTP and CAPTCHA are off. The
+  vault SMTP key belongs to another Sequenzy company, whose template drops the code; the
+  Cloudflare token cannot create a Turnstile widget. Owner rows 9–11.
+- **Code.** Test login signs in with a link token, so it works with CAPTCHA on (PR #268).
+
+Platform impact: web Auth config and test login; Mac follow-up Ticket 336; marketing not
+applicable; mobile web shares the form. Messaging impact: none new (P-052).
 ## Ticket 334: sign-in methods in Settings, behind its flag — November 13, 2026
 
 - **Built.** Settings, Account and data, has a Sign-in methods row behind
