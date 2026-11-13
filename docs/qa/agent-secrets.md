@@ -341,6 +341,12 @@ Release signing secrets have their own vault and service account (`docs/DECISION
 does, and only with the owner's `release-secrets` approval for the run, except for the
 `fingerprint`, `expires`, `key id`, `issuer id` and `complete` fields.
 
+The vault also holds **Cadence Sign in with Apple key 2026-11** (Ticket 333; attachment
+`AuthKey_ATZAJU56YW.p8`, fields `key id`, `team id`, `services id`, `primary app id`,
+`created`, `complete`). `release:credentials apple-sign-in-secret --run <run-dir>` reads the
+key into memory only and prints the signed client secret; it needs the same approval.
+Runbook: `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)".
+
 Emi's one-time setup:
 
 1. In the 1Password app, create a vault named **Cadence Release**. Move or rename these
