@@ -8,9 +8,12 @@ appear only as their domain.
 
 **Result: every Apple row passed (the relay email row was skipped by the owner). Apple is
 live on production web since 21:36Z,** turned on together with `CADENCE_SIGN_IN_LINKING`
-(Ticket 334) on the coordinator's go, after every linking row passed. Linking going on with
-Apple means an existing Google user who picks Apple with Hide My Email can join the second
-account from Settings. See "Go-live".
+(Ticket 334) on the coordinator's go, after every linking row passed. With linking on, an
+existing Google user can add Apple from Settings › Sign-in methods in their own account before
+signing in with Apple. It does not join two accounts that already exist: if that person first
+signs in with Apple using Hide My Email, Apple starts a second account, and adding that Apple
+identity from the first account is refused as taken. Merging existing accounts is out of scope
+(D31). The one-account hint on Login is the guard. See "Go-live".
 
 ## Setup
 
