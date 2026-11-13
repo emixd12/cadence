@@ -38,7 +38,7 @@ if (!["127.0.0.1", "localhost"].includes(new URL(upstream).hostname)) {
   process.exit(2);
 }
 // Requests forward to this fixed origin; only the path and query come from the request.
-const upstreamOrigin = new URL(upstream).origin;
+const upstreamPort = Number(new URL(upstream).port || 80);
 
 /** @type {null | Record<string, any>} */
 let nextScenario = null;
@@ -137,7 +137,7 @@ function send(response, status, body, headers = {}) {
 async function forward(request, response, body) {
   // Only the path and query come from the request; the origin is always loopback Supabase.
   const incoming = new URL(request.url, "http://stub.invalid");
-  const url = `${upstreamOrigin}/${incoming.pathname.replace(/^\/+/, "")}${incoming.search}`;
+  const url = `http://127.0.0.1:${upstreamPort}/${incoming.pathname.replace(/^\/+/, "")}${incoming.search}`;
   const headers = { ...request.headers };
   delete headers.host;
   delete headers.connection;
