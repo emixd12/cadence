@@ -134,10 +134,18 @@ printf 'Supabase CLI 2.105.0 image registry: %s (pinned service images).\n' "$SU
 begin_phase 'preparing the unlinked workdir'
 CADENCE_DOCKER_PROXY_DIR="$(mktemp -d "$RUNNER_TEMP/cadence-sql.XXXXXX")"
 export SUPABASE_WORKDIR="$CADENCE_DOCKER_PROXY_DIR/work"
-mkdir -p "$SUPABASE_WORKDIR/supabase/migrations" "$SUPABASE_WORKDIR/supabase/templates"
+mkdir -p "$SUPABASE_WORKDIR/supabase/migrations"
 cp supabase/config.toml supabase/seed.sql "$SUPABASE_WORKDIR/supabase/"
-# Ticket 332: config.toml names the Auth email templates by path.
-git ls-files -z 'supabase/templates/*.html' | xargs -0 -I{} cp {} "$SUPABASE_WORKDIR/supabase/templates/"
+# Ticket 332: the CLI bind-mounts Auth email templates, and the Docker proxy refuses
+# every host mount. The rehearsal checks migrations and database contracts only, so its
+# copy of config.toml drops the template sections.
+python3 - "$SUPABASE_WORKDIR/supabase/config.toml" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+text = re.sub(r"^\[auth\.email\.template\.[a-z_]+\]\n(?:[^\[\n].*\n)*", "", text, flags=re.M)
+open(path, "w").write(text)
+PY
 mapfile -t migrations < <(git ls-files 'supabase/migrations/*.sql')
 migration_count=${#migrations[@]}
 test "$migration_count" -gt 0

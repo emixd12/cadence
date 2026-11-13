@@ -123,7 +123,7 @@ The rehearsal first pulls the seven approved pins sequentially with standard
 Docker through the same proxy. This isolates registry access, reduces concurrent
 pull pressure and caches the images before CLI startup. There is no registry or
 image fallback, registry login step, or package permission. It copies only
-config, the empty seed, the tracked Auth email templates (Ticket 332) and tracked
+config (without the Auth email template sections, Ticket 332), the empty seed and tracked
 migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
 checks service health before and after `db reset --local`. The tracked migration
 version list must exactly match the applied list; its count is derived from the
