@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 335–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys. 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); production acceptance of email passed November 13; code length 6 and `cadence-me.com` DNS applied; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 335–337 not started; Google stays the only live method | 332: owner rows 11–13 (an SMTP key from the Sequenzy company that holds `cadence-me.com`; reply-to, click tracking and footer; Turnstile permission on the Cloudflare token), then SMTP, CAPTCHA and the flag (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -92,6 +92,23 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 332: production setup and acceptance of email sign-in — November 13, 2026
+
+- **Applied.** Sequenzy sending domain `cadence-me.com` added and verified; Cloudflare DNS
+  for it (DKIM `sq1`/`sq2`, return path `rp`/`rp2`, DMARC `p=none`, root SPF). Hosted Auth
+  code length 8 → 6. Each change and its recheck: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
+- **Accepted on production Supabase.** New account, link in another browser, 6-digit code,
+  wrong, used and expired values, the one-email-a-minute limit, A's Google address reaching A's account,
+  SPF/DKIM/DMARC pass, MCP consent and account deletion for an email-only account
+  (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`). Test accounts deleted.
+- **Not on.** `CADENCE_SIGN_IN_EMAIL` stays off and hosted SMTP and CAPTCHA are off. The
+  vault SMTP key belongs to another Sequenzy company, whose template drops the code; the
+  Cloudflare token cannot create a Turnstile widget. Owner rows 11–13.
+- **Code.** Test login signs in with a link token, so it works with CAPTCHA on (PR #268).
+
+Platform impact: web Auth config and test login; Mac follow-up Ticket 336; marketing not
+applicable; mobile web shares the form. Messaging impact: none new (P-052).
+
 ## Ticket 334: sign-in methods in Settings, behind its flag — November 13, 2026
 
 - **Built.** Settings, Account and data, has a Sign-in methods row behind
@@ -130,6 +147,7 @@ Check the cited entry before acting on a row.
 
 Platform impact: web Settings, routes and login hint; Mac shows no row (Ticket 336);
 marketing not applicable; mobile web checked at 390 px. Messaging impact: P-054.
+
 ## Ticket 333: Apple sign-in built behind its flag — November 13, 2026
 
 - **Built.** Continue with Apple starts Supabase Auth's Apple provider and returns
@@ -258,143 +276,3 @@ mobile web shares the form. Messaging impact: P-049.
   researched.
 
 Platform impact: documentation only. Messaging impact: none.
-
-## Ticket 327: launch narrative accepted — November 13, 2026
-
-- **Decision D30.** The owner set the public positioning: Cadence is a "behavioral
-  remodeling assistant". Free during the beta with no public price; MCP and plugins lead
-  the AI story; marketing may be promotional in an elegant, scientific register; the
-  narrative assumes an iPhone app and a Mac App Store listing near launch.
-- **Source.** `docs/NARRATIVE.md` holds the core sentence, three claims, the register, and
-  a claims table with proof and state. `AGENTS.md` and `PRODUCT.md` point to it.
-- **Not changed.** No marketing, README, listing or in-app copy. P-048 lists the public
-  text that now conflicts, including three statements that are already false.
-- **Accepted.** The owner accepted the draft as written (PR #257). Production was not checked
-  for the claims table.
-
-Platform impact: documentation only; marketing rewrite is a follow-up. Messaging impact:
-P-048.
-
-## Tickets 301–309 closing checks — November 13, 2026
-
-- **Track complete.** Tickets 303–309 are complete; 301 and 302 were already. The owner set a
-  US$5 Google Maps cap for this run (recorded in the run folder), approved the Ticket 309
-  wording list and deleted the vault item `google-calendar-agent-retire-secret`. Run
-  folder: `.intent/acceptance/settings-close-20261113/` (not committed).
-- **Web, production, test account A, 390 px with touch (headless Chrome):** a touch drag moved
-  Medical to position 3, announced "Medical moved to position 3 of 9.", and kept the order
-  after reload; arrow keys restored it (304). One paid Home lookup returned `200` and filled
-  "1523 Broadway, New York, NY 10036, USA" without saving; Home was put back and reloaded
-  unchanged (308). Cost about US$0.005.
-- **iOS Simulator Safari (iPhone 18 Pro, iOS 27.2), local stack with test login:** a touch drag
-  saved the order and announced "Alpha moved to position 4 of 11." (304). With Travel off the
-  panel showed the "turn on Travel estimates first" line; with it on, **Use my current
-  location** showed "Finding your address…", Safari asked for location inside the tap, and
-  the position reached `POST /api/travel/home-lookup` (local `503`, no provider configured;
-  the paid path passed on production) (308). The Simulator replaced iPhone hardware at the
-  owner's choice.
-- **Installed Mac 0.1.10, test Mac, linked as A:** Settings has no Daily Brief Calendar panel
-  (307). Daily Brief shows **Plan around my connected sources**, naming all four sources, and
-  **Advanced: choose sources** (306). Timezone keeps **Save timezone** (303). **Use my current
-  location** filled Home from the Mac's position; the field was set back to the fixture and
-  committed with Enter, and hosted Home stayed the fixture (303, 308). A keyboard move of
-  Medical announced "Medical moved to position 2 of 9.", reached hosted, and moved back (304).
-- **Findings outside this track:** the first Mac lookup failed with "Your device did not
-  share a position." while another app covered Cadence (the reader returns unavailable when the
-  page is hidden); it passed with Cadence in front. `GET /api/outlook-calendar/calendars`
-  returned `409` `timeout` for A while the connection read `connected`. The npm Supabase CLI
-  binary (2.105.0) failed its code-signature check on this Mac and was re-signed ad hoc in one
-  worktree; Docker held a stale binding on local port 55321.
-- **Preflight:** `desktop-test-mac` ready except the `test-mac-app-permissions` probe, which
-  timed out; Notifications and Location read "Allowed" in Cadence on the device.
-
-Platform impact: web and installed Mac checked; marketing not applicable; future mobile web
-checked at 390 px and in iOS Safari. Messaging impact: none (P-033 to P-036 stay with Ticket
-246).
-
-## Ticket 324: count an unlinked workout by hand — November 13, 2026
-
-- **Built:** "Count the 6:05 PM Hevy workout" on today's expanded Unresolved rows whose
-  Behavior has no enabled Hevy link, while no any-workout link exists. The server reads
-  today's workouts, refuses a linked Behavior or a workout a link accepts, marks Completed
-  through the manual status path, then attaches the workout with no link through
-  `attach_unlinked_source_activity` (migration `20261113050000`). Reconcile never removes
-  a match with no link.
-- **Verified locally** against the live Hevy account: the control showed only on the two
-  unlinked rows and only for the new 20-minute workout; one click marked the row Completed
-  (`manual_tap`), listed the workout and stored an `attached` match with no link; a repeat
-  returned `not_unresolved`. SQL fixture, service, resolver and DOM tests pass.
-- **Hosted push:** `20261113050000` applied under the standing approval after the PR's
-  Local Supabase rehearsal passed; read back: `authenticated` calls it, `anon` gets 404.
-- **Deployed check passed** on test account A after PR #254 merged: one click on "Evening
-  walk" stored a `manual_tap` Completed event and an `attached` match with no link; the
-  button is 44 px tall at 390 px with no horizontal scroll. Account A's "Read 20 pages"
-  link is now off.
-- **Review fixes before merge:** a link's timing refresh skips a hand-counted match, and a
-  failed attachment after the mark is retryable.
-- **Test data:** two more private Hevy workouts, `Cadence test 323 W-d` and `W-e`, for the owner to delete.
-
-Platform impact: web control and service; Mac follow-up (no count control); marketing not
-applicable; future mobile through mobile web. Messaging impact: P-047.
-
-## Connector completion turned on in Production — November 13, 2026
-
-- **Flag on.** The owner approved turning `CADENCE_CONNECTOR_COMPLETION` on after the local
-  matrix. Production was redeployed (`dpl_GYPJvtPZFmSEwZ6VL1zgUN4Vy9AT`, commit `5ff760f0`)
-  at 04:30 UTC.
-- **Deployed web passed** as test account A: links saved, the first reconcile completed 12
-  Occurrences and attached 2 workouts with 0 refused, and "From Hevy" shows at 1280 and 390 px.
-- **Installed Mac passed** (0.1.10, test Mac): a forced collision kept both root events on
-  hosted and on the Mac, the manual Not Completed won, and the outbox emptied (Ticket 319).
-  The Mac showed "From Hevy" and the workout time (Ticket 320).
-- **Defect fixed before turning on:** the Timeline's match read sent 200 IDs in one filter
-  and failed with "URI too long", so no label showed (PR #252).
-- **Open:** the owner deletes the Hevy test items; the usage measurement after one day.
-
-Platform impact: web and Mac acceptance; no code in this entry. Messaging impact: none
-(P-042 was logged by Ticket 310).
-
-## iCloud production acceptance — November 12, 2026
-
-Ticket 240 ran on production as test account A with the owner's own Apple Account (Apple
-refused a test account; custody decision 2026-10-19). Evidence:
-`docs/qa/2026-11-11-connector-acceptance.md`, "Ticket 240".
-
-- **Passed on web:** connect, 5 calendars listed, selection auto-saves, a complete 30-day
-  read, the all-day toggle, disconnect (`apple_app_specific_password`, reads fenced with 409)
-  and reconnect. **On the installed Mac 0.1.10:** Settings shows iCloud connected and the
-  cache holds a complete iCloud snapshot at the hosted generation.
-- **Not verified on production:** iCloud events on Timeline. The selected calendars had no
-  events from today through +30 days, and no test events were created in the owner's
-  calendars. Wrong-principal reconnect not run.
-- **241 step 6:** all three connectors passed their production smoke. Step 7 copy awaits the
-  owner's review in the messaging track.
-- **Tooling fix:** the preflight's QA Chrome probe missed a profile launched with
-  `--user-data-dir` last; the iCloud renewal now reads the vault field `password`, because a
-  relabeled built-in password field is read by its id.
-- **Owner:** revoke the "Cadence QA" app-specific password at account.apple.com when testing
-  ends; A's iCloud connection then needs a reconnect.
-
-Platform impact: test evidence and acceptance tooling only. Messaging impact: none.
-
-## Connector completion: owner decisions and the 0.1.10 ledger — November 12, 2026
-
-- **Mac 0.1.10 is published.** The publication record (commit `1c34c407`) stayed on an
-  unmerged branch, so `main` said 0.1.9. The release packet now carries the publication
-  section; both public feeds served 0.1.10 when read back on November 12.
-- **Owner decisions** for Tickets 319–324 are in `docs/DECISIONS.md`, 2026-11-12, "Finish
-  connector completion": iCloud vault item added, no messaging gate, Hevy test writes and
-  deletions allowed, one Hevy Pro account, agents revoke Outlook, the flag turns on after the
-  323 matrix with a US$5/month usage ceiling, and 324 may merge.
-
-Platform impact: records only. Messaging impact: none.
-
-## Owner's Mac first link after the hosted fix — November 12, 2026
-
-After PR #247 and hosted migration `20261112120000`, an agent quit and reopened Cadence 0.1.10 on
-the owner's Mac (still linked, empty local profile), which reran the `hydrate` first link. It
-synced at 05:52:12Z: 42 Behaviors, 2,486 Occurrences, 0 pending writes, one account-sync
-baseline, integrity `ok`, 0 foreign-key errors. The first-link timeout is closed; the Mac's
-error-text change waits for the next Mac release.
-
-Platform impact: desktop verification only; no code change. Messaging impact: none.
