@@ -501,9 +501,10 @@
     {
       "path": "components/behaviors/BehaviorCreateSection.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 3,
       "interaction_ids": [
-        "INT-BEHAVIOR-004"
+        "INT-BEHAVIOR-004",
+        "INT-BEHAVIOR-032"
       ]
     },
     {
@@ -1124,7 +1125,7 @@
     {
       "path": "components/behaviors/SourceLinkSettings.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 10,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-BEHAVIOR-032"
       ]
@@ -1146,6 +1147,13 @@
       "interaction_ids": [
         "INT-TIMELINE-013"
       ]
+    },
+    {
+      "path": "app/design-system/SourceLinkBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only synthetic Complete from Hevy bench (Tickets 317 and 329); no provider or account access."
     }
   ],
   "interactions": [
@@ -17702,11 +17710,15 @@
         {
           "kind": "activate",
           "control": "Complete from Hevy: Off, Chosen routines, Any workout, then Save Hevy link"
+        },
+        {
+          "kind": "activate",
+          "control": "Complete from Hevy in Create behavior: Off, Chosen routines or Any workout, saved by Save behavior"
         }
       ],
-      "availability": "Web, on an active Behavior's settings, only while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected. Off by default.",
-      "success_result": "The link is saved against the connected Hevy account. Matching workouts from today and the 30 prior days complete Unresolved Occurrences of this Behavior on their days, labeled From Hevy. Turning the link off stops new matches; past completions stay.",
-      "failure_result": "A routine already linked to another Behavior, or a second any-workout link, is refused and names the Behavior that holds it. Other failures leave the stored link unchanged.",
+      "availability": "Web, on an active Behavior's settings and in Create behavior (Ticket 329), only while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected. Off by default.",
+      "success_result": "The link is saved against the connected Hevy account. Matching workouts from today and the 30 prior days complete Unresolved Occurrences of this Behavior on their days, labeled From Hevy. Turning the link off stops new matches; past completions stay. At creation the choice is saved right after the Behavior is created, and the confirmation says whether it was linked.",
+      "failure_result": "A routine already linked to another Behavior, or a second any-workout link, is refused and names the Behavior that holds it. Other failures leave the stored link unchanged. At creation, a refused or failed link still creates the Behavior and says to set the link in its settings.",
       "effects": [
         "database_write",
         "network_request"
@@ -17714,8 +17726,9 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/behaviors/SourceLinkSettings.tsx",
         "app/api/connectors/links/route.ts",
+        "components/behaviors/BehaviorCreateSection.tsx",
+        "components/behaviors/SourceLinkSettings.tsx",
         "lib/services/source-links.service.ts"
       ],
       "test_coverage": {
@@ -17731,6 +17744,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/behaviors/BehaviorCreateSection.tsx",
             "components/behaviors/SourceLinkSettings.tsx"
           ],
           "evidence": [

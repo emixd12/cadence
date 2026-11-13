@@ -90,6 +90,17 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 329: Complete from Hevy at Behavior creation — November 13, 2026
+
+- **Built:** Create behavior on the web shows the Complete from Hevy choices when the flag is
+  on and Hevy is connected. Save behavior creates the Behavior, then saves the link through
+  the existing route; a refused or failed link keeps the Behavior and says so. The link
+  route's form state accepts an empty `behaviorId` for a Behavior being created.
+- **Owner request:** the link could only be set on an existing Behavior.
+
+Platform impact: web form; Mac follow-up (links are web-only); marketing not applicable;
+mobile web shares the form. Messaging impact: P-049.
+
 ## Ticket 328: launch audience research — November 13, 2026
 
 - **Report.** `docs/research/2026-11-13-launch-audience-research.md`: desk research on one

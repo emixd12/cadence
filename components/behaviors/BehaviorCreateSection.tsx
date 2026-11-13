@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
+import { createLinkMessage, SourceLinkCreateChoice, type SourceLinkChoice } from "@/components/behaviors/SourceLinkSettings";
+import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { dispatchBehaviorCreated } from "@/components/behaviors/behavior-events";
 import type {
   BehaviorActionState,
@@ -16,6 +18,8 @@ type BehaviorCreateSectionProps = Readonly<{
   defaultTimezone: string;
   defaultOpen: boolean;
   reminderRuntime?: "web" | "desktop";
+  /** Ticket 329: saves the Complete from Hevy choice after the Behavior is created. */
+  sourceLinkCoordinator?: SourceLinkCoordinator;
 }>;
 
 export function BehaviorCreateSection({
@@ -24,21 +28,34 @@ export function BehaviorCreateSection({
   defaultTimezone,
   defaultOpen,
   reminderRuntime = "web",
+  sourceLinkCoordinator = webSourceLinkCoordinator,
 }: BehaviorCreateSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [successMessage, setSuccessMessage] = useState("");
   const [formKey, setFormKey] = useState(0);
 
+  const linkChoice = useRef<SourceLinkChoice>({ mode: "off", selectorKeys: [] });
+  const handleLinkChoice = useCallback((choice: SourceLinkChoice) => { linkChoice.current = choice; }, []);
+
   const handleSuccess = useCallback((state: BehaviorActionState) => {
     setSuccessMessage(state.message);
+    const choice = linkChoice.current;
 
     if (state.behavior) {
       dispatchBehaviorCreated(state.behavior);
+      // Ticket 329: the link is its own hosted record, saved once the Behavior exists.
+      if (choice.mode !== "off") {
+        const behaviorId = state.behavior.id;
+        void sourceLinkCoordinator.save({ behaviorId, mode: choice.mode, selectorKeys: choice.selectorKeys })
+          .then((result) => setSuccessMessage(createLinkMessage(result)))
+          .catch(() => setSuccessMessage(createLinkMessage(null)));
+      }
     }
 
+    linkChoice.current = { mode: "off", selectorKeys: [] };
     setIsOpen(false);
     setFormKey((key) => key + 1);
-  }, []);
+  }, [sourceLinkCoordinator]);
 
   return (
     <section id="create-behavior" className="scroll-mt-20">
@@ -78,6 +95,9 @@ export function BehaviorCreateSection({
             categories={categories}
             defaultTimezone={defaultTimezone}
             onSuccess={handleSuccess}
+            extraFields={reminderRuntime !== "desktop"
+              ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={sourceLinkCoordinator} />
+              : null}
           />
         </div>
       </details>

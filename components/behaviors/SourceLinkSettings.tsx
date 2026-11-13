@@ -16,17 +16,11 @@ type LoadState =
   | Readonly<{ kind: "error" }>
   | Readonly<{ kind: "ready"; state: SourceLinkFormState }>;
 
-export function SourceLinkSettings({
-  behaviorId,
-  coordinator = webSourceLinkCoordinator,
-}: Readonly<{ behaviorId: string; coordinator?: SourceLinkCoordinator }>) {
-  const id = useId();
+/** Loads the form state for one Behavior, or for a Behavior being created (empty ID). */
+function useSourceLinkState(behaviorId: string, coordinator: SourceLinkCoordinator) {
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   const [mode, setMode] = useState<SourceLinkMode>("off");
   const [keys, setKeys] = useState<readonly string[]>([]);
-  const [message, setMessage] = useState<Readonly<{ tone: "status" | "alert"; text: string }> | null>(null);
-  const [pending, startTransition] = useTransition();
-
   useEffect(() => {
     let active = true;
     void coordinator.getState(behaviorId).then((state) => {
@@ -43,6 +37,18 @@ export function SourceLinkSettings({
     });
     return () => { active = false; };
   }, [behaviorId, coordinator]);
+  const toggle = (key: string) => setKeys((current) => current.includes(key) ? current.filter((value) => value !== key) : [...current, key]);
+  return { load, mode, setMode, keys, toggle };
+}
+
+export function SourceLinkSettings({
+  behaviorId,
+  coordinator = webSourceLinkCoordinator,
+}: Readonly<{ behaviorId: string; coordinator?: SourceLinkCoordinator }>) {
+  const id = useId();
+  const { load, mode, setMode, keys, toggle } = useSourceLinkState(behaviorId, coordinator);
+  const [message, setMessage] = useState<Readonly<{ tone: "status" | "alert"; text: string }> | null>(null);
+  const [pending, startTransition] = useTransition();
 
   if (load.kind === "hidden" || load.kind === "loading") return null;
   if (load.kind === "error") {
@@ -53,10 +59,7 @@ export function SourceLinkSettings({
   }
 
   const state = load.state;
-  const anyTaken = state.anyHolder !== null;
-  const chosen = new Set(keys);
   const canSave = !pending && (mode !== "routines" || keys.length > 0);
-  const toggle = (key: string) => setKeys((current) => current.includes(key) ? current.filter((value) => value !== key) : [...current, key]);
 
   function save() {
     startTransition(async () => {
@@ -80,49 +83,7 @@ export function SourceLinkSettings({
       {state.fenced ? <p className="mt-2 max-w-2xl text-sm leading-6" role="status">
         This link was saved for a different Hevy account. Save it again to use the connected account.
       </p> : null}
-      <fieldset className="mt-3 grid gap-2 border-0 p-0 text-sm">
-        <legend className="sr-only">Complete from Hevy</legend>
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="radio" name={`${id}-mode`} checked={mode === "off"} onChange={() => setMode("off")} disabled={pending}
-            className="h-4 w-4 accent-[var(--primary)]" />
-          Off
-        </label>
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="radio" name={`${id}-mode`} checked={mode === "routines"} onChange={() => setMode("routines")} disabled={pending}
-            className="h-4 w-4 accent-[var(--primary)]" />
-          Chosen routines
-        </label>
-        {mode === "routines" ? <div className="grid gap-1 pl-7" data-source-link-routines>
-          {state.routinesComplete === null ? <p className="text-muted-readable">Hevy routines could not be read. Try again later.</p> : null}
-          {state.routinesComplete !== null && state.routines.length === 0 ? <p className="text-muted-readable">No routines in Hevy yet. Use Any workout, or create a routine in Hevy.</p> : null}
-          {state.routines.map((routine) => {
-            const held = routine.holder !== null;
-            return <label key={routine.key} className="flex min-h-11 items-center gap-3">
-              <input type="checkbox" checked={chosen.has(routine.key)} disabled={pending || held} onChange={() => toggle(routine.key)}
-                className="h-4 w-4 accent-[var(--primary)]" />
-              <span className="min-w-0 break-words">
-                {routine.title}
-                {held ? <span className="text-muted-readable"> · linked to {routine.holder!.title}</span> : null}
-              </span>
-            </label>;
-          })}
-          {state.routinesComplete === false ? <p className="text-muted-readable">Showing the first 200 routines from Hevy.</p> : null}
-          {state.staleLinkedCount ? <p className="text-muted-readable" data-stale-routines>
-            {state.staleLinkedCount === 1 ? "1 linked routine is no longer in Hevy." : `${state.staleLinkedCount} linked routines are no longer in Hevy.`}
-          </p> : null}
-          {state.anyHolder ? <p className="text-muted-readable" data-any-holder-note>
-            A workout from these routines also counts for {state.anyHolder.title}, which is linked to any workout.
-          </p> : null}
-        </div> : null}
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="radio" name={`${id}-mode`} checked={mode === "any"} onChange={() => setMode("any")} disabled={pending || anyTaken}
-            className="h-4 w-4 accent-[var(--primary)]" />
-          <span>
-            Any workout
-            {anyTaken ? <span className="text-muted-readable"> · linked to {state.anyHolder!.title}. One Behavior can use any workout.</span> : null}
-          </span>
-        </label>
-      </fieldset>
+      <SourceLinkFields id={id} state={state} mode={mode} keys={keys} pending={pending} onMode={setMode} onToggle={toggle} />
       <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-5">
         <button type="button" onClick={save} disabled={!canSave}
           className="product-action product-action-secondary min-h-11 justify-self-start px-3 py-2 text-sm font-bold">
@@ -132,6 +93,99 @@ export function SourceLinkSettings({
       </div>
     </section>
   );
+}
+
+/** The mode radios and routine picker, shared by Behavior settings and Behavior creation. */
+function SourceLinkFields({ id, state, mode, keys, pending, onMode, onToggle }: Readonly<{
+  id: string;
+  state: SourceLinkFormState;
+  mode: SourceLinkMode;
+  keys: readonly string[];
+  pending: boolean;
+  onMode: (mode: SourceLinkMode) => void;
+  onToggle: (key: string) => void;
+}>) {
+  const anyTaken = state.anyHolder !== null;
+  const chosen = new Set(keys);
+  return (
+    <fieldset className="mt-3 grid gap-2 border-0 p-0 text-sm">
+      <legend className="sr-only">Complete from Hevy</legend>
+      <label className="flex min-h-11 items-center gap-3">
+        <input type="radio" name={`${id}-mode`} checked={mode === "off"} onChange={() => onMode("off")} disabled={pending}
+          className="h-4 w-4 accent-[var(--primary)]" />
+        Off
+      </label>
+      <label className="flex min-h-11 items-center gap-3">
+        <input type="radio" name={`${id}-mode`} checked={mode === "routines"} onChange={() => onMode("routines")} disabled={pending}
+          className="h-4 w-4 accent-[var(--primary)]" />
+        Chosen routines
+      </label>
+      {mode === "routines" ? <div className="grid gap-1 pl-7" data-source-link-routines>
+        {state.routinesComplete === null ? <p className="text-muted-readable">Hevy routines could not be read. Try again later.</p> : null}
+        {state.routinesComplete !== null && state.routines.length === 0 ? <p className="text-muted-readable">No routines in Hevy yet. Use Any workout, or create a routine in Hevy.</p> : null}
+        {state.routines.map((routine) => {
+          const held = routine.holder !== null;
+          return <label key={routine.key} className="flex min-h-11 items-center gap-3">
+            <input type="checkbox" checked={chosen.has(routine.key)} disabled={pending || held} onChange={() => onToggle(routine.key)}
+              className="h-4 w-4 accent-[var(--primary)]" />
+            <span className="min-w-0 break-words">
+              {routine.title}
+              {held ? <span className="text-muted-readable"> · linked to {routine.holder!.title}</span> : null}
+            </span>
+          </label>;
+        })}
+        {state.routinesComplete === false ? <p className="text-muted-readable">Showing the first 200 routines from Hevy.</p> : null}
+        {state.staleLinkedCount ? <p className="text-muted-readable" data-stale-routines>
+          {state.staleLinkedCount === 1 ? "1 linked routine is no longer in Hevy." : `${state.staleLinkedCount} linked routines are no longer in Hevy.`}
+        </p> : null}
+        {state.anyHolder ? <p className="text-muted-readable" data-any-holder-note>
+          A workout from these routines also counts for {state.anyHolder.title}, which is linked to any workout.
+        </p> : null}
+      </div> : null}
+      <label className="flex min-h-11 items-center gap-3">
+        <input type="radio" name={`${id}-mode`} checked={mode === "any"} onChange={() => onMode("any")} disabled={pending || anyTaken}
+          className="h-4 w-4 accent-[var(--primary)]" />
+        <span>
+          Any workout
+          {anyTaken ? <span className="text-muted-readable"> · linked to {state.anyHolder!.title}. One Behavior can use any workout.</span> : null}
+        </span>
+      </label>
+    </fieldset>
+  );
+}
+
+/**
+ * Ticket 329: "Complete from Hevy" while creating a Behavior. Shown only when connector
+ * completion is available and Hevy is connected. The choice is saved right after the
+ * Behavior is created; it has no save button of its own.
+ */
+export function SourceLinkCreateChoice({
+  onChange,
+  coordinator = webSourceLinkCoordinator,
+}: Readonly<{ onChange: (choice: SourceLinkChoice) => void; coordinator?: SourceLinkCoordinator }>) {
+  const id = useId();
+  const { load, mode, setMode, keys, toggle } = useSourceLinkState("", coordinator);
+  useEffect(() => { onChange({ mode, selectorKeys: mode === "routines" ? keys : [] }); }, [mode, keys, onChange]);
+  if (load.kind !== "ready") return null;
+  return (
+    <section className="border-t border-line pt-4" aria-labelledby={`${id}-heading`} data-source-link-create="hevy">
+      <h3 id={`${id}-heading`} className="text-lg leading-tight">Complete from Hevy</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-readable">
+        A matching workout marks this Behavior Completed on the workout&apos;s day. It never changes a status you set, and each
+        completion is labeled &ldquo;From Hevy&rdquo;. Saved when you create the Behavior.
+      </p>
+      <SourceLinkFields id={id} state={load.state} mode={mode} keys={keys} pending={false} onMode={setMode} onToggle={toggle} />
+    </section>
+  );
+}
+
+export type SourceLinkChoice = Readonly<{ mode: SourceLinkMode; selectorKeys: readonly string[] }>;
+
+/** Ticket 329: the line shown after creating a Behavior with a Hevy choice. */
+export function createLinkMessage(result: SourceLinkSaveResult | null): string {
+  if (result === null) return "Behavior created. The Hevy link was not saved. Set it in this Behavior's settings.";
+  if (result.saved) return result.mode === "off" ? "Behavior created." : "Behavior created and linked to Hevy.";
+  return `Behavior created. ${saveMessage(result).text} Set the Hevy link in this Behavior's settings.`;
 }
 
 export function saveMessage(result: SourceLinkSaveResult): Readonly<{ tone: "status" | "alert"; text: string }> {

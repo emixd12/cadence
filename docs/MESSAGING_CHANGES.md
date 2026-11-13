@@ -116,6 +116,7 @@ Status values:
 | [P-046](#p-046-daily-brief-chatgpt-plan-states-on-the-mac) | Daily Brief ChatGPT plan states on the Mac | logged | 299 | In-app copy (Mac), user guide |
 | [P-047](#p-047-count-an-unlinked-hevy-workout) | Count an unlinked Hevy workout | logged | 324 | In-app copy, user guide, Privacy |
 | [P-048](#p-048-launch-narrative-replaces-the-record-first-positioning) | Launch narrative replaces the record-first positioning | logged | 327, 246 | Marketing, README, developer docs, plugin listings |
+| [P-049](#p-049-complete-from-hevy-at-behavior-creation) | Complete from Hevy at Behavior creation | logged | 329 | In-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1533,4 +1534,19 @@ cite has not changed.
   ticket. Publish only claims whose row in its "Claims" table is live. Use "Cadence is free
   during the beta. It will not stay free." Update `tests/public-content-contract.test.ts`
   with the copy.
+- **Status:** logged.
+
+## P-049: Complete from Hevy at Behavior creation
+
+- **Change:** Ticket 329 shows "Complete from Hevy" in Create behavior on the web, with the
+  line "Saved when you create the Behavior." After creation the confirmation reads "Behavior
+  created and linked to Hevy.", or "Behavior created." followed by the refusal and "Set the
+  Hevy link in this Behavior's settings.", or "Behavior created. The Hevy link was not
+  saved. Set it in this Behavior's settings."
+- **Affected:** Ticket 329. Files: `components/behaviors/SourceLinkSettings.tsx`,
+  `components/behaviors/BehaviorCreateSection.tsx`.
+- **Surfaces:** in-app copy, user guide (connected sources section).
+- **Conflicting current text:** the user guide describes linking from an existing
+  Behavior's settings only.
+- **Update needed:** say the link can be chosen while creating a Behavior.
 - **Status:** logged.

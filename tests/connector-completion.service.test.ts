@@ -300,6 +300,19 @@ describe("source link service (Ticket 316)", () => {
     expect(await getSourceLinkFormState(caller, { behaviorId: BEHAVIOR, source: "hevy" }, { port: source }))
       .toMatchObject({ available: false, routines: [] });
   });
+
+  it("gives a Behavior being created no link of its own (Ticket 329)", async () => {
+    const source = port(async () => evidence([]));
+    const state = await getSourceLinkFormState(caller, { behaviorId: "", source: "hevy" }, {
+      env: ON, port: source, connectionDigest: async () => DIGEST, behaviorTitles: titles,
+      listLinks: async () => [link({ selector_kind: "provider_keys", selector_keys: [LEGS] }), link({ id: "other", behavior_id: OTHER })],
+    });
+    expect(state).toMatchObject({ available: true, connected: true, mode: "off", selectorKeys: [], fenced: false });
+    expect(state.anyHolder?.behaviorId).toBe(OTHER);
+    expect(state.routines.find((routine) => routine.key === LEGS)?.holder?.behaviorId).toBe(BEHAVIOR);
+    await expect(getSourceLinkFormState(caller, { behaviorId: "not-a-uuid", source: "hevy" }, { env: ON, port: source }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+  });
 });
 
 describe("re-arming background checks (Ticket 321 review)", () => {

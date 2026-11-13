@@ -803,6 +803,11 @@ Shown only while `CADENCE_CONNECTOR_COMPLETION` is on.
   Hevy." Past 200 routines it says "Showing the first 200 routines from Hevy." A link
   saved for another Hevy account says to save it again. Save Hevy link saves only the
   link. The Mac does not edit links yet.
+- **Behavior creation (web, Ticket 329):** Create behavior shows the same Complete from
+  Hevy choices after reminders, under the same conditions, with "Saved when you create the
+  Behavior." and no separate save button. Save behavior creates the Behavior, then saves the
+  link. The confirmation says "Behavior created and linked to Hevy."; a refused or failed
+  link keeps the Behavior and says to set the link in its settings.
 - **Timeline rows (web and Mac):** a Completed row whose latest status event is the
   connector's shows a muted line under the title: "From Hevy", or "From Hevy · 2
   workouts". Expanded, any row with attached workouts lists each workout's start and end

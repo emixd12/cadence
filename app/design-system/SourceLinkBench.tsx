@@ -1,6 +1,6 @@
 "use client";
 
-import { SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
+import { SourceLinkCreateChoice, SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
 import type { SourceLinkCoordinator } from "@/lib/ui/source-links";
 
 // Ticket 317 bench fixture: synthetic routines only; no network call.
@@ -16,6 +16,17 @@ const coordinator: SourceLinkCoordinator = {
   save: async () => ({ saved: true, mode: "routines" }),
 };
 
+// Ticket 329: a Behavior being created has no link of its own.
+const createCoordinator: SourceLinkCoordinator = {
+  getState: async (behaviorId) => ({ ...(await coordinator.getState(behaviorId)), mode: "off", selectorKeys: [], staleLinkedCount: null }),
+  save: coordinator.save,
+};
+
 export function SourceLinkBench() {
-  return <SourceLinkSettings behaviorId="bench-behavior" coordinator={coordinator} />;
+  return <div className="grid gap-6">
+    <SourceLinkSettings behaviorId="bench-behavior" coordinator={coordinator} />
+    <div data-bench-source-link-create>
+      <SourceLinkCreateChoice coordinator={createCoordinator} onChange={() => undefined} />
+    </div>
+  </div>;
 }
