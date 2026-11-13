@@ -210,6 +210,9 @@ every owner step.
 - 21:32:40Z: kept sessions A and B ok; a fresh Google sign-in as A in the agent's profile reached
   A's user ID; production login shows Google only.
 - The agent's Chrome (port 4438) was closed and its profile deleted.
+- 21:38Z: Calendar disconnect revocation confirmed. After Disconnect, Google's Linked apps page
+  for the test Google account showed 0 apps with access to account data (evidence row
+  `google-grant-check-gmslc` in `.intent/acceptance/t337/p3/`).
 
 ## Installed Mac (read-only)
 
