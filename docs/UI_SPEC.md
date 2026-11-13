@@ -1142,6 +1142,7 @@ Restore section history.
 
 Show:
 - Profile/email from Google sign-in when available
+- Planned under Ticket 334 (D31): Sign-in methods, to list, add and remove methods
 - Timezone
 - Notification permission status
 - Control to request browser notification permission

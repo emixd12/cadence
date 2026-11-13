@@ -2468,11 +2468,15 @@ The owner asked for more ways to create a Cadence account and sign in, and asked
 WorkOS would reduce the work. The owner answered four questions on November 13, 2026.
 Google is the only sign-in method until Tickets 331–337 ship.
 
+The four answers are D31.1, the no-password rule in D31.2, D31.4 and the first two
+sentences of D31.5. The rest of D31.2, D31.3, D31.5 and D31.6 comes from the plan the
+owner approved with the tickets.
+
 1. **D31.1: auth provider.** Supabase Auth stays. Cadence does not adopt WorkOS or any
    other auth vendor.
 2. **D31.2: methods.** A person can create an account and sign in with Google, with email,
    or with Apple, on web and on the Mac. An email account has no password: Cadence emails
-   a link and a 6-digit code, and either one signs the person in. Apple uses the web flow
+   a link or a 6-digit code, and either one signs the person in. Apple uses the web flow
    through the Supabase Apple provider.
 3. **D31.3: one account.** Every method a person uses reaches the same account. A sign-in
    never reaches an existing account through an unconfirmed email address. An account
@@ -2491,8 +2495,8 @@ The owner approved Tickets 331–337 and independent testing on the same day. Ag
 owner-only steps (credentials, consent, Apple two-factor prompts) in one list and continue
 with the rest.
 
-Why not WorkOS. The planning agent read the provider documents on November 13, 2026. This
-entry did not recheck them, and it records no source URL for them.
+Why not WorkOS. The planning agent read the provider documents on November 13, 2026
+("Sources" below). This entry did not recheck them.
 
 - Supabase Auth already offers each method asked for: email link and code, Apple, and
   custom OIDC providers. Not rechecked.
@@ -2501,7 +2505,7 @@ entry did not recheck them, and it records no source URL for them.
   Not rechecked.
 - Replacing Supabase Auth would rewrite the security core. WorkOS user IDs are not UUIDs
   (not rechecked), so `auth.uid()` would fail. The migrations call `auth.uid()` 232 times
-  (counted on `origin/main` `8bd2e165`), and every user-owned table points at `auth.users`.
+  (counted on `origin/main` `8bd2e165`, on 224 lines), and every user-owned table points at `auth.users`.
   The Mac Keychain session, MCP consent, the leave reminder and connector completion job
   tokens, the Calendar identity check, account deletion and the test login all depend on
   Supabase Auth. Existing accounts would need migrating.
@@ -2537,6 +2541,24 @@ Findings the tickets start from:
   by interest form (OpenAI's documents, read November 13, 2026; not rechecked). OpenAI
   publishes an OIDC discovery document, so a Supabase custom OIDC provider should fit.
   Not tested. Recorded for the revisit in D31.4.
+
+Sources, read by the planning agent on November 13, 2026 and not rechecked for this entry:
+
+- OpenAI, Sign in with ChatGPT: `https://developers.openai.com/siwc/llms-full.txt`
+- WorkOS pricing: `https://workos.com/pricing.md`
+- WorkOS, Supabase with AuthKit: `https://workos.com/docs/integrations/supabase-authkit.md`
+- WorkOS social login: `https://workos.com/docs/authkit/social-login.md`
+- WorkOS Magic Auth: `https://workos.com/docs/authkit/magic-auth.md`
+- Supabase custom OAuth and OIDC providers:
+  `https://supabase.com/docs/guides/auth/custom-oauth-providers.md`
+- Supabase WorkOS third-party auth:
+  `https://supabase.com/docs/guides/auth/third-party/workos.md`
+- Supabase identity linking: `https://supabase.com/docs/guides/auth/auth-identity-linking.md`
+- Supabase custom SMTP: `https://supabase.com/docs/guides/auth/auth-smtp.md`
+- Supabase Sign in with Apple:
+  `https://supabase.com/docs/guides/auth/social-login/auth-apple.md`
+- Sequenzy, Supabase custom SMTP: `https://docs.sequenzy.com/guides/supabase-custom-smtp`
+- From memory, with no document read: App Store Review Guidelines 4.8 and 5.1.1(v).
 
 Assumptions. The owner has not confirmed the first two:
 

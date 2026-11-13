@@ -345,6 +345,7 @@ request and creates its grant/code under the authenticated user. The user may
 approve any valid advertised scope set, whatever the client requested; the grant
 holds exactly what the user left on (Ticket 259). Render client text as text, identify unverified clients, and show
 the redirect host. Preserve the cookie through the existing Google login flow.
+Tickets 331–337 plan the same for email and Apple sign-in (D31); not shipped.
 
 Ticket 228 uses `verifyMcpAccessToken` to resolve a SHA-256 hash, check token
 expiry, exact audience, active grant/family/client and requested scopes. The
