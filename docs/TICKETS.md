@@ -18585,12 +18585,12 @@ Verification: the acceptance matrix and `dagger check --cadence --progress=repor
 
 ## Ticket 324: Count an unlinked workout by hand
 
-Status: implemented on the web November 13, 2026. Migration
+Status: complete November 13, 2026 (PR #254). Migration
 `20261113050000_count_unlinked_workout.sql` adds `attach_unlinked_source_activity`.
 Route `POST /api/connectors/completions/count`; control
 `components/timeline/CountWorkoutButtons.tsx`; registry entry INT-TIMELINE-013. Rule for a
 match with no link: it is the user's record, never changes a status, and reconcile never
-removes it. Hosted migration applied November 13, 2026; a deployed click on test account A is not yet recorded.
+removes it. Hosted migration applied November 13, 2026. Deployed check on test account A passed: the control showed on the three unlinked rows of today; one click on "Evening walk" stored a `manual_tap` Completed event and an `attached` match with no link; at 390 px the button is 44 px tall with no horizontal scroll.
 Dependencies: Ticket 323.
 
 Goal: let the user count a logged workout that no link accepted.
