@@ -1231,6 +1231,10 @@ Production sign-in email (since November 13, 2026):
 
 ### Sign in with Apple (Ticket 333)
 
+**Live on production web since November 13, 2026, 21:36Z** (`CADENCE_SIGN_IN_APPLE=on`, with
+`CADENCE_SIGN_IN_LINKING=on`). Rollback: unset the flag in Vercel Production and redeploy;
+Login hides Apple at once and existing Apple accounts keep their sessions.
+
 Continue with Apple starts Supabase Auth's Apple provider through
 `/auth/sign-in/apple`. Apple returns to Supabase
 (`https://qjodzutjxtmtzczbloxa.supabase.co/auth/v1/callback`), and Supabase returns to

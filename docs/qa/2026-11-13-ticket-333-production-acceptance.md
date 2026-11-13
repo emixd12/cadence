@@ -6,11 +6,11 @@ folder (git-ignored): `.intent/acceptance/t333-enable/` in the Intent workspace 
 No token, client secret, key, cookie or email address was printed or recorded; addresses
 appear only as their domain.
 
-**Result: every Apple row passed. The relay email row was skipped by the owner.**
-`CADENCE_SIGN_IN_APPLE` stays off in production by the coordinator's hold (20:43Z): Apple
-goes on together with `CADENCE_SIGN_IN_LINKING` (Ticket 334), so an existing Google user who
-picks Apple with Hide My Email can join the second account from Settings. The Supabase Apple
-provider and the Vercel Production `APPLE_SIGN_IN_*` values stay set.
+**Result: every Apple row passed (the relay email row was skipped by the owner). Apple is
+live on production web since 21:36Z,** turned on together with `CADENCE_SIGN_IN_LINKING`
+(Ticket 334) on the coordinator's go, after every linking row passed. Linking going on with
+Apple means an existing Google user who picks Apple with Hide My Email can join the second
+account from Settings. See "Go-live".
 
 ## Setup
 
@@ -72,8 +72,25 @@ after the run.
   secret set) and Vercel Production `APPLE_SIGN_IN_SERVICES_ID` and
   `APPLE_SIGN_IN_CLIENT_SECRET`. `CADENCE_SIGN_IN_APPLE` is unset in Production.
 
-## Remaining step
+## Go-live (November 13, 2026, 21:35–21:42Z)
 
-Set `CADENCE_SIGN_IN_APPLE=on` in Vercel Production with `CADENCE_SIGN_IN_LINKING`, in the
-order the coordinator gives, redeploy, then check `/login` at 390 px and desktop and
-recheck Google sign-in and the kept sessions.
+- **Vercel Production before (21:35Z):** 49 variables. Sign-in related: `APPLE_SIGN_IN_SERVICES_ID`,
+  `APPLE_SIGN_IN_CLIENT_SECRET`, plus `CADENCE_TURNSTILE_SITE_KEY` and `CADENCE_SIGN_IN_EMAIL`
+  set by the email go-live agent minutes earlier. `CADENCE_SIGN_IN_APPLE` and
+  `CADENCE_SIGN_IN_LINKING` unset.
+- **Change:** `CADENCE_SIGN_IN_LINKING=on` and `CADENCE_SIGN_IN_APPLE=on` (config, read back as
+  exactly `on`). **After:** 51 variables; the diff is exactly those two.
+- **Redeploy:** one production redeploy (`cadence-9ik8hgqdn…`). The email agent redeployed at
+  the same time; `app.cadence-me.com` served `dpl_6EbQniQvr9GGzbAu2NZPp1igu1dS`
+  (`cadence-fnithtg83…`, created 21:36:13Z, after both flags), which carries them.
+
+| Check (production) | Result |
+|---|---|
+| `/login` at 390 px and 1280 px in a fresh Chrome profile | **Passed.** Continue with Google, Continue with Apple, Continue with email (email is the other agent's flag); no horizontal overflow; each control 44 px high. The one-account hint reads "Have an account already? Sign in the way you did before, then add other ways in Settings. Another way can start a second account." Screenshots in the run folder |
+| Apple start | **Passed.** Reaches `appleid.apple.com/auth/authorize` with `client_id=app.cadence.web`, the Supabase callback as `redirect_uri`, `form_post`, scope `email name`. No real Apple sign-in (not needed again) |
+| Google sign-in as test account A | **Passed.** Fresh sign-in from a cleared cookie returns A's user ID |
+| Kept sessions A and B | **Passed** (refresh) |
+| A's Settings | **Passed.** The Sign-in methods row shows "Google and email" |
+| `GET /api/auth/sign-in-methods` | **Passed.** 200; Google, Apple and email; code length 6 |
+| A's Google Calendar status | **Passed.** 200, connected (no earlier read to compare the generation with) |
+| Signed-in Sign-in methods actions with hosted CAPTCHA on | **Passed.** A throwaway account made with the admin API on a reserved `example.com` address signed in through `/login/confirm`. Settings → Change address → "If that address can be used, Cadence sent it a confirmation link…"; Auth shows the change pending and the address unchanged. Add Apple reached Apple with `client_id=app.cadence.web`. The account was deleted with the admin API (200) |

@@ -1,6 +1,6 @@
 # Ticket 333: hosted and provider changes for Apple sign-in
 
-Written November 13, 2026, for Ticket 333 (D31.2, L-024, L-025). Steps 1–9 are applied;
+Written November 13, 2026, for Ticket 333 (D31.2, L-024, L-025). Steps 1–12 are applied; Apple is live on production web;
 see "Applied". Production acceptance: `docs/qa/2026-11-13-ticket-333-production-acceptance.md`.
 Originally: nothing here had been applied. No hosted setting, provider setting or Apple Developer item changed in this
 task. Agents apply the steps in order under the coordinator's ruling of November 13,
@@ -32,7 +32,7 @@ blockers note), **Waiting: step N** (an earlier step here).
 | 9 | Apple portal, Services → Sign in with Apple for Email Communication: register email sources. Domain `cadence-me.com` (SPF and DKIM from owner rows 2 and 3) and the addresses `login@cadence-me.com` (sign-in email) and the reminder sender | None | Each source shows a green SPF check | Remove the source | **Waiting: rows 2, 3 and 4.** The reminder sender address was not read in this task: read it with `npm run sequenzy -- transactional get <SEQUENZY_REMINDER_TEMPLATE_SLUG>` first. Today the only Sequenzy domain is the shared `identityscaffolding.sequenzymail.com`. Apple needs SPF or DKIM that passes for each source, so move the reminder sender to `cadence-me.com` (for example `reminders@cadence-me.com`) once that domain verifies, then register it. Sequenzy's `websites list` has an `appleEmailSources` field to check against |
 | 10 | Vercel Preview: `CADENCE_SIGN_IN_APPLE=on` | Unset | `on` on Preview only | Unset | **Waiting: step 6** |
 | 11 | Production check on a Preview with the test Apple Account (Ticket 337 rows): a new Apple user gets an account and lands on `next`; a returning one reaches the same account; one with "Hide My Email" gets the relay address in Settings; the kept-token row exists (read `apple_sign_in_read_tokens` count only); deleting the account returns 200 from Apple (no `account_deletion_apple_revocation_failed` event) and account.apple.com no longer lists Cadence; an email reminder to the relay address arrives | None | Recorded in Ticket 337's run | None | **Waiting: rows 4 and 5** (test Apple Account); the reminder part waits on step 9 |
-| 12 | Vercel Production: `CADENCE_SIGN_IN_APPLE=on` | Unset | `on` | Unset (Login hides Apple at once; existing Apple accounts keep their sessions but cannot sign in again until it is back) | **Waiting: Ticket 337** passes for Apple, and the owner's yes for the public flag |
+| 12 | Vercel Production: `CADENCE_SIGN_IN_APPLE=on` | Unset | `on` | Unset (Login hides Apple at once; existing Apple accounts keep their sessions but cannot sign in again until it is back) | **Done November 13, 2026, 21:36Z** with `CADENCE_SIGN_IN_LINKING=on`, on the coordinator's go after every Apple and linking row passed; see the production acceptance record, \"Go-live\" |
 
 ## Not in this list
 
