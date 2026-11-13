@@ -345,6 +345,11 @@ mode only:
   does. Implemented in source (`apps/desktop/src/local-timeline.service.ts`,
   `apps/desktop/src-tauri/migrations/0024_connector_completion_records.sql`); not in a
   published Mac build. Older Macs (contract 4 and below) receive neither kind.
+- Ticket 330: a linked Mac edits Complete from Hevy in Behavior settings and Create
+  behavior through the hosted link route (`apps/desktop/src/calendar/source-links.ts`).
+  Links stay hosted records; the Mac runs account sync before a save, so a Behavior made
+  on the Mac exists on the account, and after it, so SQLite receives the link. Local mode
+  shows no control.
 - A Mac schedules Behavior reminders locally and learns of a connector completion when
   it syncs. A reminder can still fire for a logged workout while Cadence for Mac is
   closed.

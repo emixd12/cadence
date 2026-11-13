@@ -1,6 +1,7 @@
 "use client";
 
 import { SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
+import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { RuntimeLink as Link } from "@cadence/ui/runtime";
 import type { CSSProperties, ReactNode } from "react";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
@@ -63,6 +64,8 @@ type BehaviorListProps = Readonly<{
   noteShortcutViews?: Record<string, NoteShortcutView>;
   noteShortcutAction?: NoteShortcutAction;
   reminderRuntime?: "web" | "desktop";
+  /** Ticket 330: Complete from Hevy on a linked Mac; the web uses its own route by default. */
+  sourceLinkCoordinator?: SourceLinkCoordinator | null;
 }>;
 
 const EMPTY_ACTION_STATE: BehaviorActionState = {
@@ -123,7 +126,10 @@ export function BehaviorList({
   noteShortcutViews = {},
   noteShortcutAction,
   reminderRuntime = "web",
+  sourceLinkCoordinator,
 }: BehaviorListProps) {
+  const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
+    : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
   const [updateAnnouncement, setUpdateAnnouncement] = useState<BehaviorActionAnnouncement | null>(null);
   const announcedUpdateAction = useCallback<BehaviorFormAction>(async (previous, form) => {
     const result = await updateAction(previous, form);
@@ -282,6 +288,7 @@ export function BehaviorList({
                 resetTimeTrackingAction={resetTimeTrackingAction}
                 noteShortcutView={noteShortcutViews[behavior.id]}
                 noteShortcutAction={noteShortcutAction}
+                sourceLinkCoordinator={linkCoordinator}
               />
               </div>
             ))}
@@ -293,6 +300,7 @@ export function BehaviorList({
 
       <ArchivedBehaviorDisclosure
         reminderRuntime={reminderRuntime}
+        linkCoordinator={linkCoordinator}
         archivedBehaviors={archivedList.rows}
         visibleIds={archivedList.visibleIds}
         categories={categories}
@@ -445,6 +453,7 @@ function BehaviorRecord({
   reminderRuntime,
   noteShortcutView,
   noteShortcutAction,
+  sourceLinkCoordinator = null,
 }: Readonly<{
   behavior: BehaviorView;
   categories: CategoryOption[];
@@ -460,6 +469,7 @@ function BehaviorRecord({
   reminderRuntime?: "web" | "desktop";
   noteShortcutView?: NoteShortcutView;
   noteShortcutAction?: NoteShortcutAction;
+  sourceLinkCoordinator?: SourceLinkCoordinator | null;
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -569,7 +579,7 @@ function BehaviorRecord({
                     whereDraft={whereDraft}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
-                  {reminderRuntime !== "desktop" ? <SourceLinkSettings behaviorId={behavior.id} /> : null}
+                  {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
                   <div className="grid justify-items-end">
                     <BehaviorStateForm
                       behaviorId={behavior.id}
@@ -972,6 +982,7 @@ function ArchivedBehaviorDisclosure({
   reminderRuntime,
   noteShortcutViews,
   noteShortcutAction,
+  linkCoordinator,
 }: Readonly<{
   archivedBehaviors: BehaviorView[];
   visibleIds: ReadonlySet<string>;
@@ -982,6 +993,7 @@ function ArchivedBehaviorDisclosure({
   reminderRuntime?: "web" | "desktop";
   noteShortcutViews: Record<string, NoteShortcutView>;
   noteShortcutAction?: NoteShortcutAction;
+  linkCoordinator: SourceLinkCoordinator | null;
 }>) {
   return (
     <section className="border-t border-line pt-4" aria-labelledby="archived-behaviors-title">
@@ -1014,6 +1026,7 @@ function ArchivedBehaviorDisclosure({
                 lifecycleResult={lifecycleResult}
                 noteShortcutView={noteShortcutViews[behavior.id]}
                 noteShortcutAction={noteShortcutAction}
+                sourceLinkCoordinator={linkCoordinator}
               />
               </div>
             ))}

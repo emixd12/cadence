@@ -281,7 +281,8 @@
         "INT-PLACE-007",
         "INT-PLACE-008",
         "INT-PLACE-009",
-        "INT-PLACE-010"
+        "INT-PLACE-010",
+        "INT-BEHAVIOR-032"
       ]
     },
     {
@@ -17716,7 +17717,7 @@
           "control": "Complete from Hevy in Create behavior: Off, Chosen routines or Any workout, saved by Save behavior"
         }
       ],
-      "availability": "Web, on an active Behavior's settings and in Create behavior (Ticket 329), only while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected. Off by default.",
+      "availability": "Web, and Cadence for Mac while linked to an account (Ticket 330), on an active Behavior's settings and in Create behavior (Ticket 329), only while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected. Off by default.",
       "success_result": "The link is saved against the connected Hevy account. Matching workouts from today and the 30 prior days complete Unresolved Occurrences of this Behavior on their days, labeled From Hevy. Turning the link off stops new matches; past completions stay. At creation the choice is saved right after the Behavior is created, and the confirmation says whether it was linked.",
       "failure_result": "A routine already linked to another Behavior, or a second any-workout link, is refused and names the Behavior that holds it. Other failures leave the stored link unchanged. At creation, a refused or failed link still creates the Behavior and says to set the link in its settings.",
       "effects": [
@@ -17727,6 +17728,8 @@
       "confirmation": "none",
       "implementation": [
         "app/api/connectors/links/route.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/calendar/source-links.ts",
         "components/behaviors/BehaviorCreateSection.tsx",
         "components/behaviors/SourceLinkSettings.tsx",
         "lib/services/source-links.service.ts"
@@ -17735,7 +17738,8 @@
         "level": "direct",
         "references": [
           "tests/connector-completion-ui.dom.test.tsx",
-          "tests/connector-completion.service.test.ts"
+          "tests/connector-completion.service.test.ts",
+          "tests/desktop-source-links.test.tsx"
         ],
         "notes": "Synthetic UI, service and SQL checks; live Hevy and deployed acceptance remain in Ticket 323. The SQL fixture tests/sql/ticket-314-connector-completion-smoke.sql covers the database limits."
       },
@@ -17752,9 +17756,15 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Ticket 319 gives the Mac the label and the reconcile trigger only; links are edited on the web until a follow-up."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/calendar/source-links.ts",
+            "apps/desktop/src/behaviors-screen.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-source-links.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",

@@ -35,6 +35,7 @@ import { activateDailyBriefClient, discardDailyBriefAttempt } from "@/lib/ui/dai
 import { TimelineScreen } from "./timeline-screen";
 import { DesktopErrorBoundary } from "./desktop-error-boundary";
 import { BehaviorsScreen } from "./behaviors-screen";
+import { desktopSourceLinkCoordinator } from "./calendar/source-links";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
@@ -514,6 +515,12 @@ export function Product() {
     });
     return completion;
   }, [accountUserId, conflictReview, profileId, refreshScreen, syncReady]);
+  // Ticket 330: Complete from Hevy edits hosted links; only a linked Mac shows it.
+  const connectorBroker = connectors.broker;
+  /* eslint-disable react-hooks/refs -- syncAccount reads refs only when a save runs from an event handler, never during render. */
+  const sourceLinkCoordinator = useMemo(() => connectorBroker && syncReady ? desktopSourceLinkCoordinator(connectorBroker, syncAccount) : null,
+    [connectorBroker, syncAccount, syncReady]);
+  /* eslint-enable react-hooks/refs */
   const refreshCalendar = calendar.refresh;
   const refreshConnectors = connectors.refresh;
   const reloadTimeline = useCallback(async () => {
@@ -634,6 +641,7 @@ export function Product() {
       {activeScreen === "behaviors" ? <BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
+        sourceLinkCoordinator={sourceLinkCoordinator}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
         shellCue={(conflictReview?.conflicts.length ?? 0) > 0}

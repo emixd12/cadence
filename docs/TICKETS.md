@@ -18815,7 +18815,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | `components/behaviors/BehaviorCreateSection.tsx`, `SourceLinkCreateChoice` in `components/behaviors/SourceLinkSettings.tsx`. |
-| Desktop | Follow-up: the Mac does not edit links yet (Ticket 319); creation on the Mac stays unchanged. |
+| Desktop | Ticket 330. |
 | Marketing | Not applicable: no public claim. |
 | Future mobile | Mobile web uses the same form. |
 
@@ -18824,6 +18824,41 @@ Messaging impact: P-049.
 Verification: `tests/connector-completion-ui.dom.test.tsx`,
 `tests/connector-completion.service.test.ts` and `dagger check --cadence --progress=report`.
 
+## Ticket 330: Complete from Hevy on a linked Mac
+
+Status: complete November 13, 2026. Installed acceptance passed on the test Mac (dev-signed
+0.1.11-dev.2, test account A): Behavior settings saved Any workout on "Evening walk", and
+Create behavior made "T330 Mac create" linked to a routine ("Behavior created and linked to
+Hevy."). Both links were on hosted and synced into the Mac's SQLite. The owner's Mac, in
+local mode on 0.1.11-dev.1, showed no control.
+Dependencies: Tickets 317, 320 and 329. Requested by the owner on November 13, 2026.
+
+Goal: a linked Mac sets a Behavior's Hevy link in Behavior settings and Create behavior,
+as the web does.
+
+Scope and acceptance:
+
+- A linked Mac shows Complete from Hevy wherever the web does, under the same conditions
+  (flag on, Hevy connected). A Mac in local mode shows nothing.
+- The Mac reads and saves links through the authenticated hosted broker
+  (`GET` and `PUT /api/connectors/links`). Links are never written to SQLite directly.
+- A save runs account sync first, so a Behavior created on the Mac exists on the account,
+  and again after a saved link, so the Mac receives it through contract 5.
+- No route, schema or sync contract change.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Unchanged behavior; shared components take an optional coordinator. |
+| Desktop | `apps/desktop/src/calendar/source-links.ts`, `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/product.tsx`. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: P-050.
+
+Verification: `tests/desktop-source-links.test.tsx`, `dagger check --cadence --progress=report`
+and installed acceptance on a dev-signed build.
 
 ## Tickets 331–337: sign-in by email and Apple (D31)
 

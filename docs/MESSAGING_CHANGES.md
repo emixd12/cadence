@@ -117,6 +117,7 @@ Status values:
 | [P-047](#p-047-count-an-unlinked-hevy-workout) | Count an unlinked Hevy workout | logged | 324 | In-app copy, user guide, Privacy |
 | [P-048](#p-048-launch-narrative-replaces-the-record-first-positioning) | Launch narrative replaces the record-first positioning | logged | 327, 246 | Marketing, README, developer docs, plugin listings |
 | [P-049](#p-049-complete-from-hevy-at-behavior-creation) | Complete from Hevy at Behavior creation | logged | 329 | In-app copy, user guide |
+| [P-050](#p-050-complete-from-hevy-on-the-mac) | Complete from Hevy on the Mac | logged | 330 | In-app copy (Mac), user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1549,6 +1550,17 @@ cite has not changed.
 - **Conflicting current text:** the user guide describes linking from an existing
   Behavior's settings only.
 - **Update needed:** say the link can be chosen while creating a Behavior.
+- **Status:** logged.
+
+## P-050: Complete from Hevy on the Mac
+
+- **Change:** Ticket 330 shows the web's Complete from Hevy control and its messages on a
+  linked Mac, in Behavior settings and Create behavior.
+- **Affected:** Ticket 330. Files: `apps/desktop/src/behaviors-screen.tsx`,
+  `apps/desktop/src/calendar/source-links.ts`.
+- **Surfaces:** in-app copy (Mac), user guide.
+- **Conflicting current text:** text that says Hevy links are set on the web only.
+- **Update needed:** say a linked Mac can set them too.
 - **Status:** logged.
 
 ## P-051: Sign-in is no longer Google only

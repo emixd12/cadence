@@ -18,8 +18,11 @@ type BehaviorCreateSectionProps = Readonly<{
   defaultTimezone: string;
   defaultOpen: boolean;
   reminderRuntime?: "web" | "desktop";
-  /** Ticket 329: saves the Complete from Hevy choice after the Behavior is created. */
-  sourceLinkCoordinator?: SourceLinkCoordinator;
+  /**
+   * Ticket 329: saves the Complete from Hevy choice after the Behavior is created. The web
+   * uses its own route by default; a Mac passes one only while linked (Ticket 330).
+   */
+  sourceLinkCoordinator?: SourceLinkCoordinator | null;
 }>;
 
 export function BehaviorCreateSection({
@@ -28,8 +31,10 @@ export function BehaviorCreateSection({
   defaultTimezone,
   defaultOpen,
   reminderRuntime = "web",
-  sourceLinkCoordinator = webSourceLinkCoordinator,
+  sourceLinkCoordinator,
 }: BehaviorCreateSectionProps) {
+  const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
+    : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [successMessage, setSuccessMessage] = useState("");
   const [formKey, setFormKey] = useState(0);
@@ -44,9 +49,9 @@ export function BehaviorCreateSection({
     if (state.behavior) {
       dispatchBehaviorCreated(state.behavior);
       // Ticket 329: the link is its own hosted record, saved once the Behavior exists.
-      if (choice.mode !== "off") {
+      if (choice.mode !== "off" && linkCoordinator) {
         const behaviorId = state.behavior.id;
-        void sourceLinkCoordinator.save({ behaviorId, mode: choice.mode, selectorKeys: choice.selectorKeys })
+        void linkCoordinator.save({ behaviorId, mode: choice.mode, selectorKeys: choice.selectorKeys })
           .then((result) => setSuccessMessage(createLinkMessage(result)))
           .catch(() => setSuccessMessage(createLinkMessage(null)));
       }
@@ -55,7 +60,7 @@ export function BehaviorCreateSection({
     linkChoice.current = { mode: "off", selectorKeys: [] };
     setIsOpen(false);
     setFormKey((key) => key + 1);
-  }, [sourceLinkCoordinator]);
+  }, [linkCoordinator]);
 
   return (
     <section id="create-behavior" className="scroll-mt-20">
@@ -95,8 +100,8 @@ export function BehaviorCreateSection({
             categories={categories}
             defaultTimezone={defaultTimezone}
             onSuccess={handleSuccess}
-            extraFields={reminderRuntime !== "desktop"
-              ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={sourceLinkCoordinator} />
+            extraFields={linkCoordinator
+              ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={linkCoordinator} />
               : null}
           />
         </div>
