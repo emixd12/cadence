@@ -1608,6 +1608,11 @@ cite has not changed.
   and removing a sign-in method. In-app text changes inside Tickets 331–336; Privacy,
   Terms, README and the user guide change in the messaging track. Update
   `tests/legal-content.test.tsx` with the copy.
+- **Now out of date (November 13, 2026, 21:36Z):** `CADENCE_SIGN_IN_APPLE` and
+  `CADENCE_SIGN_IN_LINKING` are on in production web, so the "conflicting current text"
+  above is wrong for Apple and for Settings sign-in methods. Privacy, Terms and the user
+  guide still name Google sign-in only. The Trust page was not checked for sign-in text.
+  Logged here; not edited in the development track.
 - **Related:** L-024 and L-025.
 - **Status:** logged.
 

@@ -25,7 +25,7 @@ standard supports the product story; promoting it is not the product's purpose.
 - Next.js App Router
 - TypeScript
 - Supabase Postgres
-- Supabase Auth: Google and email sign-in (email live since November 13, 2026); Apple under Ticket 333 (D31)
+- Supabase Auth: Google, email and Apple sign-in, live on web since November 13, 2026 (D31)
 - Supabase Row Level Security
 - Tailwind CSS
 - shadcn-style components where useful
@@ -664,7 +664,7 @@ Do not expand scope to solve speculative future requirements.
 ## Security rules
 
 - Use Supabase Auth for the web app and optional desktop account mode. Sign-in
-  methods are Google, email (live since November 13, 2026) and Apple under Ticket 333
+  methods are Google, email and Apple, all live on web since November 13, 2026
   (D31). Add no other auth vendor and no password sign-in.
 - A sign-in must never reach an existing account through an unconfirmed email
   address. An account keeps at least one sign-in method (D31).
