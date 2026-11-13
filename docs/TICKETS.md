@@ -19205,7 +19205,10 @@ the test Mac (`.claude/skills/desktop-acceptance`); `dagger check --cadence --pr
 
 ## Ticket 337: Sign-in acceptance on production web and the installed Mac
 
-Status: not started. Filed November 13, 2026.
+Status: in progress (November 13, 2026, first pass). Preflight suite `sign-in` added; hosted
+manual linking on; linking rows that need no owner step passed on a flag-on test deployment.
+Every production flag stays off. Results and what each flag still waits on:
+`docs/qa/2026-11-13-ticket-337-acceptance.md`. Filed November 13, 2026.
 Dependencies: Tickets 331–336. Decision: D31.6.
 
 Goal: agents run each method end to end as the test accounts.
