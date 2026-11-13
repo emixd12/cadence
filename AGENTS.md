@@ -3,7 +3,8 @@
 ## Project
 
 This repository contains Cadence, a public, open-source personal behavior
-tracker product. The implemented surfaces are an authenticated web app for one
+tracker product. Its public positioning is "behavioral remodeling assistant"
+(`docs/NARRATIVE.md`; `docs/DECISIONS.md`, 2026-11-13, D30). The implemented surfaces are an authenticated web app for one
 account at a time, a separate public Astro marketing site under
 `apps/marketing`, a macOS desktop app under `apps/desktop`, a remote MCP
 server, and Claude and ChatGPT plugins under `integrations/`.
@@ -15,9 +16,9 @@ single-player. This is not a general productivity app, not a social habit
 tracker, not a collaboration product, and not an
 admin-heavy SaaS product.
 
-Cadence also serves as a practical reference implementation and promotion
-surface for the BehaviorLog Bundle standard:
-`https://github.com/emixd12/BehaviorLog-Bundle`.
+Cadence also serves as a practical reference implementation of the BehaviorLog
+Bundle standard: `https://github.com/emixd12/BehaviorLog-Bundle`. Since D30 the
+standard supports the product story; promoting it is not the product's purpose.
 
 ## Primary stack
 
@@ -56,7 +57,9 @@ let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
 (`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
 Behavior can be marked Completed from activity recorded in a connected service, starting
 with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Ticket 310 recorded the decision; no
-code has shipped. Mobile and broader workspace restructuring remain deferred.
+code has shipped. Mobile and broader workspace restructuring remain deferred. The owner
+intends an iPhone app and a Mac App Store listing near launch (D30). Neither has tickets;
+the launch narrative is written for them, and no mobile code starts without a ticket.
 
 ## Agent operating model
 
@@ -176,6 +179,7 @@ Product and implementation docs:
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
 27. `/docs/MESSAGING_CHANGES.md`
 28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
+29. `/docs/NARRATIVE.md` — positioning, public claims and the marketing register
 
 ## Messaging changes
 
@@ -189,6 +193,8 @@ continue. These entries never block development, merges or deployments.
   development tickets.
 - Only outward actions wait on open entries: provider submissions, public launch
   and public listings.
+- Public copy derives from `docs/NARRATIVE.md`. A public claim needs a row in its
+  "Claims" table. In-app copy keeps the `PRODUCT.md` voice.
 
 Provider-terms and licence questions stay in `docs/LEGAL.md`. Log a suspected
 terms or licence issue there and continue. Such entries never block development,
@@ -258,7 +264,8 @@ Out of scope for v1:
 - Apple Health / Google Fit integration
 - Structured measurement templates
 - Supply/refill inventory
-- General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
+- General AI chat and autonomous execution, until ticketed. D30 positions Cadence as a
+  behavioral remodeling assistant and adds no assistant feature. Tickets 146–148 implement only
   the in-app read-only daily briefing in the horse bubble. Outside AI clients may
   call scoped MCP tools at the user's direction (Tickets 220–232); Cadence itself
   runs no server-side AI agent or autonomous execution through MCP

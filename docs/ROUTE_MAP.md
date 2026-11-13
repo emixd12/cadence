@@ -197,6 +197,7 @@ nothing while `CADENCE_CONNECTOR_COMPLETION` is not `on`: reconcile returns
 | Route | Methods | Ticket | Purpose |
 |---|---|---:|---|
 | `/api/connectors/completions/reconcile` | POST | 316 | Body exactly `{ source }`. One reconcile for the caller: server-side evidence read over today and the 30 prior local dates, at most 100 writes, five-minute throttle. Returns counts, stable codes and the last successful check time |
+| `/api/connectors/completions/count` | POST | 324 | Body exactly `{ occurrenceId, source, activityRef }`. Counts one of today's workouts that no link accepted: reads today's workouts on the server, refuses a linked Behavior or a workout a link accepts, records the user's Completed mark through the manual status path, then attaches the workout with no link. Returns `{ counted, reason }` with stable codes |
 | `/api/connectors/links?behaviorId=&source=` | GET, PUT | 316 | GET: the Behavior form's link state, with routine titles read live for the picker and never stored. PUT: body exactly `{ behaviorId, source, mode, selectorKeys }` with `mode` `off`, `any` or `routines`; refuses a routine already linked to another Behavior and a second any-workout link, naming the Behavior that holds it |
 
 Services: `lib/services/connector-completion.service.ts` and

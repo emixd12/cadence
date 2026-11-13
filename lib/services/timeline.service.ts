@@ -1,7 +1,9 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
 import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
-import { attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
+import { attachTimelineSourceCountable, attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
+import { readConnectorConnection } from "@/lib/db/connectors.repo";
+import { listSourceLinks } from "@/lib/db/sourceLinks.repo";
 import type { TimelineSourceEvidence } from "@cadence/core/types/timeline";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
@@ -211,7 +213,44 @@ async function getTimelineViewForUser(input: {
   });
   const dayNoteRange = timelineDayNoteRange(view);
   const withNotes = attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
-  return attachTimelineSourceEvidence(withNotes, await readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone));
+  const [evidence, countable] = await Promise.all([
+    readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone),
+    readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
+  ]);
+  return attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable);
+}
+
+/**
+ * Ticket 324: today's Unresolved rows that may count a Hevy workout by hand. Hevy must be
+ * connected, the Behavior must have no enabled link, and no any-workout link may exist
+ * (it would match every workout). Read only while the flag is on; a failed read offers
+ * nothing.
+ */
+async function readTimelineSourceCountable(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly Occurrence[],
+  now: Temporal.Instant,
+  timezone: string,
+): Promise<Record<string, readonly string[]>> {
+  if (!connectorCompletionEnabled()) return {};
+  const today = now.toZonedDateTimeISO(timezone).toPlainDate().toString();
+  const candidates = occurrences.filter((occurrence) => occurrence.status === "unresolved" && occurrence.local_date === today);
+  if (candidates.length === 0) return {};
+  try {
+    const [connection, links] = await Promise.all([
+      readConnectorConnection(supabase, userId, "hevy"),
+      listSourceLinks(supabase, userId, "hevy"),
+    ]);
+    if (connection?.status !== "connected") return {};
+    const enabled = links.filter((link) => link.enabled);
+    if (enabled.some((link) => link.selector_kind === "any")) return {};
+    const linked = new Set(enabled.map((link) => link.behavior_id));
+    return Object.fromEntries(candidates.filter((occurrence) => !linked.has(occurrence.behavior_id))
+      .map((occurrence) => [occurrence.id, ["hevy"]]));
+  } catch {
+    return {};
+  }
 }
 
 /**

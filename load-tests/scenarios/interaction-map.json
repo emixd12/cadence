@@ -1359,6 +1359,11 @@
       "reason": "A day note is at most a few saves per user per day through the same guarded Timeline Server Action pattern as INT-TIMELINE-008; Timeline loads add one indexed day_notes range read."
     },
     {
+      "id": "INT-TIMELINE-013",
+      "classification": "external_provider",
+      "reason": "Counting a workout reads today's workouts from Hevy on the server before writing; load tests need separate synthetic provider authorization."
+    },
+    {
       "id": "INT-BEHAVIOR-029",
       "classification": "destructive_serial_only",
       "reason": "Behavior shortcut commands need isolated owner, revision, suppression, and sync verification."

@@ -2406,8 +2406,20 @@ nothing. Malformed input raises SQLSTATE `22023`; no path uses `40001`.
   writes an Unresolved event with connector provenance, clears the status
   timestamps and sets `reverted_event_id`. Otherwise no status changes.
 
+- `attach_unlinked_source_activity(occurrence, source, activity_ref, start, end,
+  revision, recorded_at)` (Ticket 324, migration
+  `20261113050000_count_unlinked_workout.sql`): a user session only (the job channel is
+  refused). Requires an active Behavior with no enabled link to the source, a connected
+  source, an ended activity on the Occurrence's own local date inside the 31-day window,
+  Completed status whose latest event is the user's (`manual_tap` or `manual_text`), and no
+  match for the activity and Behavior. Inserts an `attached` match with `link_id` null.
+  A match with no link is the user's record: it never changes a status, and reconcile
+  never removes or refreshes it. The service marks Completed first and attaches second; a
+  failed attachment leaves the user's mark, and the same request retries the attachment.
+
 `apply_occurrence_status_transition` is unchanged and still rejects `derived`.
-Fixture: `tests/sql/ticket-314-connector-completion-smoke.sql`. Repositories:
+Fixtures: `tests/sql/ticket-314-connector-completion-smoke.sql` and
+`tests/sql/ticket-324-count-unlinked-workout-smoke.sql`. Repositories:
 `lib/db/sourceLinks.repo.ts` and `lib/db/sourceMatches.repo.ts`.
 
 ### Account sync contract 5 (Ticket 320)

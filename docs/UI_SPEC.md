@@ -788,7 +788,7 @@ The Reminder editor should use the same unframed form-section treatment as the
 Recurrence editor. Use a plain section heading and smaller subsection heading
 text for options such as Reminder offset.
 
-## Connector completion (Tickets 317–319, D28)
+## Connector completion (Tickets 317–319 and 324, D28)
 
 Shown only while `CADENCE_CONNECTOR_COMPLETION` is on.
 
@@ -812,6 +812,15 @@ Shown only while `CADENCE_CONNECTOR_COMPLETION` is on.
 - **Hevy panel:** beside the connection state, "Last checked for completed Behaviors
   <date, time>." or "Not checked for completed Behaviors yet." No notification announces
   a connector completion (D28.6).
+- **Count a workout by hand (web, Ticket 324):** an expanded Unresolved row of today
+  whose Behavior has no enabled Hevy link offers "Count the 6:05 PM Hevy workout" for
+  each of today's ended workouts of 5 minutes or more that no row in view shows, while no
+  any-workout link exists. One text button per workout, above the time tracker. It marks
+  the row Completed as the user's own mark and lists the workout. A refusal shows one short
+  line under the buttons. If the mark lands but the workout time does not, the row says
+  "Marked Completed. The workout time was not saved. Try again." and keeps the button; a
+  retry attaches the workout alone. No label "From Hevy": the mark is the user's. The Mac has no
+  count control yet.
 - **Behaviors review (web):** a linked Behavior with matched workouts shows "Timing: On
   schedule 6 of 9. Usually 40 min later." beside the existing counts. No streaks, scores
   or charts.

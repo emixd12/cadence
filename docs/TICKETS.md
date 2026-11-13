@@ -17766,8 +17766,9 @@ dev-signed build checked in local mode and linked mode (`docs/DESKTOP_RELEASE.md
 
 ## Ticket 303: Settings save as they change
 
-Status: implemented November 10, 2026 on PR 205. The owner confirmed the three exceptions below
-on November 10.
+Status: complete November 13, 2026. The owner confirmed the three exceptions below on
+November 10. Installed Mac 0.1.10 kept **Save timezone**, filled Home without saving and
+committed it on Enter (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none. Easier after Ticket 301.
 
 Goal: a person never wonders whether a setting was saved.
@@ -17811,7 +17812,9 @@ confirmation; `npm run interactions:check`; bench at both widths.
 
 ## Ticket 304: Categories drawer with drag reordering
 
-Status: implemented November 10, 2026 on PR 205. Not verified: drag in a real browser at 390 px and on touch hardware.
+Status: complete November 13, 2026. Touch drag passed at 390 px against production and in
+iOS Simulator Safari; a keyboard move on installed Mac 0.1.10 synced to hosted and back
+(STATUS, "Tickets 301–309 closing checks — November 13, 2026"). The Simulator stood in for touch hardware at the owner's choice.
 Dependencies: Ticket 301 for the drawer; can be built first against the current page.
 
 Goal: a person reorders and edits categories in one compact list.
@@ -17854,7 +17857,9 @@ for mouse, touch and keyboard moves and the announcement; `npm run resolvers:che
 
 ## Ticket 305: Note shortcuts on by default
 
-Status: implemented November 10, 2026 on PR 205. Hosted: `20261110153050` relaxes the commit check; `20261110170000` turns stored off switches on once and needs the owner's authorization.
+Status: complete November 13, 2026. Hosted migrations `20261110153050` and
+`20261110170000` pushed November 11; web and Mac show "Day note shortcuts · On"
+(STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none.
 
 Goal: repeated Notes are offered as shortcuts without anyone switching the feature on.
@@ -17898,7 +17903,9 @@ DOM tests that no switch renders and proposals still need Accept;
 
 ## Ticket 306: One Daily Brief choice for every connected source
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110150000` pushed November 11; hosted `GET /api/advisor/preferences` as test account A returned the version 4 shape. Waiting on the Mac 0.1.10 release for the installed check.
+Status: complete November 13, 2026. Hosted migration `20261110150000` pushed November 11;
+installed Mac 0.1.10 shows **Plan around my connected sources**, its four sources and
+**Advanced: choose sources** (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none. Coordinate with Tickets 294–300 on branch `chatgpt-https`, which also
 change Daily Brief.
 
@@ -17943,7 +17950,10 @@ later-connected sources; `tests/daily-brief-ui.dom.test.tsx`;
 
 ## Ticket 307: Daily Brief reads Google Calendar through the Timeline connection
 
-Status: implemented November 10, 2026 on PR 205. Hosted runbook in `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)"; the owner authorized the push after merge.
+Status: complete November 13, 2026. Grant retired on hosted November 11; no Daily Brief
+Calendar panel on web or installed Mac 0.1.10. Runbook step 6 is done: the Vercel values went
+November 11 and the owner deleted the vault item `google-calendar-agent-retire-secret`
+November 13 (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: Ticket 306.
 
 Goal: a person connects Google Calendar once.
@@ -17984,7 +17994,9 @@ hosted check as a test account after the migration is authorized.
 
 ## Ticket 308: Set Home from the current location
 
-Status: implemented November 10, 2026 on PR 205. Hosted migration `20261110155000` pushed November 11; the hosted route rejects a missing session and a bad body. Not verified: one paid hosted lookup, waiting on the owner's travel spend cap; iPhone Safari.
+Status: complete November 13, 2026. One paid hosted lookup as test account A returned an
+address at 390 px; iOS Simulator Safari asked for location inside the tap; installed Mac
+0.1.10 filled the field from its position. Home was restored each time (STATUS, "Tickets 301–309 closing checks — November 13, 2026").
 Dependencies: none.
 
 Goal: a person sets Home without typing an address.
@@ -18025,7 +18037,8 @@ account within the travel spend cap the owner sets.
 
 ## Ticket 309: Settings wording pass
 
-Status: implemented November 10, 2026 on PR 205. Before-and-after list: `docs/qa/2026-11-10-settings-wording.md`; every "After" string was found in source November 11. Waiting on the owner to read it.
+Status: complete November 13, 2026. The owner approved
+`docs/qa/2026-11-10-settings-wording.md` in chat.
 Dependencies: Ticket 301 for the final section names.
 
 Goal: Settings reads clearly and warmly, and each thing has one name.
@@ -18585,7 +18598,12 @@ Verification: the acceptance matrix and `dagger check --cadence --progress=repor
 
 ## Ticket 324: Count an unlinked workout by hand
 
-Status: not started. After the first release.
+Status: complete November 13, 2026 (PR #254). Migration
+`20261113050000_count_unlinked_workout.sql` adds `attach_unlinked_source_activity`.
+Route `POST /api/connectors/completions/count`; control
+`components/timeline/CountWorkoutButtons.tsx`; registry entry INT-TIMELINE-013. Rule for a
+match with no link: it is the user's record, never changes a status, and reconcile never
+removes it. Hosted migration applied November 13, 2026. Deployed check on test account A passed: the control showed on the three unlinked rows of today; one click on "Evening walk" stored a `manual_tap` Completed event and an `attached` match with no link; at 390 px the button is 44 px tall with no horizontal scroll.
 Dependencies: Ticket 323.
 
 Goal: let the user count a logged workout that no link accepted.
@@ -18610,9 +18628,10 @@ Platform impact:
 | Marketing | Not applicable: no public claim. |
 | Future mobile | 390 px checks on mobile web. |
 
-Messaging impact: new entries for the control's copy.
+Messaging impact: P-047.
 
-Verification: `npm run interactions:check` and `dagger check --cadence --progress=report`.
+Verification: `npm run interactions:check`, `tests/sql/ticket-324-count-unlinked-workout-smoke.sql`
+and `dagger check --cadence --progress=report`.
 
 ## Ticket 325: Release credential backup, restore and renewal
 
@@ -18704,3 +18723,67 @@ Messaging impact: none.
 Verification: `npx vitest run tests/export-camelcase-configuration.test.ts
 tests/export-download-route.test.ts` and `dagger check --cadence --progress=report`. Production: export
 for test account A downloads.
+
+## Ticket 327: Launch narrative source and claims table
+
+Status: complete November 13, 2026 (PR #257). The owner accepted `docs/NARRATIVE.md` as written.
+Messaging track. Not a development ticket.
+Dependencies: none. Decision: `docs/DECISIONS.md`, 2026-11-13, D30.
+
+Goal: give every public surface one source for what Cadence says about itself.
+
+Scope and acceptance:
+
+- `docs/NARRATIVE.md` states the positioning, the core sentence, three claims, the
+  marketing register, the price statement, the platform premise and what stays out of
+  launch copy.
+- Its "Claims" table lists each public claim with its proof and current state.
+- `AGENTS.md` and `PRODUCT.md` point to it and keep the in-app voice unchanged.
+- No public copy changes in this ticket. P-048 lists the text to rewrite.
+
+Out of scope: persona research, the marketing site rewrite, store and directory listings,
+visual identity and the social content system. Each needs its own ticket.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: no product or in-app copy change. |
+| Desktop | Not applicable: no product or in-app copy change. |
+| Marketing | Follow-up: the site rewrite from `docs/NARRATIVE.md` (P-048; Ticket 246 or a new ticket). |
+| Future mobile | The narrative is written for an iPhone app (D30.5); no mobile code. |
+
+Messaging impact: P-048.
+
+Verification: `npm run agents:check`.
+
+## Ticket 328: Launch audience research
+
+Status: desk research complete November 13, 2026; the recommendation awaits the owner's
+decision. Messaging track. Not a development ticket.
+Dependencies: Ticket 327.
+
+Goal: answer the "Audience" question in `docs/NARRATIVE.md` with evidence.
+
+Scope and acceptance:
+
+- `docs/research/2026-11-13-launch-audience-research.md` tests three candidate audiences,
+  states the evidence and its limits, proposes personas as hypotheses, and lists channels.
+- Every figure names its source. Unverified items are marked.
+- `docs/NARRATIVE.md`, "Audience", points to the report without recording a decision.
+
+Out of scope: interviews, named contact lists, newsletters and creators, the site rewrite
+and any listing submission.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: research only. |
+| Desktop | Not applicable: research only. |
+| Marketing | Follow-up: audience-specific copy after the owner decides. |
+| Future mobile | The second-wave audience depends on the iPhone app (D30.5). |
+
+Messaging impact: none.
+
+Verification: `npm run agents:check`.

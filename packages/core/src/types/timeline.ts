@@ -75,6 +75,12 @@ export type TimelineOccurrenceView = {
   canStartTimeTracking: boolean;
   /** Tickets 317 and 319: what a connected service contributed. Absent when nothing did. */
   sourceEvidence?: TimelineSourceEvidence;
+  /**
+   * Ticket 324: connected sources whose workouts this Occurrence may count by hand. Set
+   * only on today's Unresolved rows whose Behavior has no enabled link to the source,
+   * while no any-workout link exists for it. Absent otherwise.
+   */
+  sourceCountable?: readonly string[];
 };
 
 export type TimelineSourceEvidence = Readonly<{

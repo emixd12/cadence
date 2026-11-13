@@ -48,8 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 301–309: Settings regroup and simplification | Merged to `main` November 11 as PR #205 (`6dd414f8`); all six hosted migrations pushed; Daily Brief grant retired; signed-in hosted check passed November 11 as test account A at 1280 and 390 px; installed Settings check (302) passed in linked and local mode on notarized 0.1.10 | Owner sets the Google Maps spend cap, then an agent runs one hosted Home lookup (308); owner deletes the vault item `google-calendar-agent-retire-secret`; owner reads `docs/qa/2026-11-10-settings-wording.md` | TICKETS, Tickets 301–309; STATUS, "Tickets 301–309 hosted verification — November 11, 2026"; `docs/qa/2026-11-12-desktop-0.1.10-release-packet.md` |
-| Tickets 310–324: connector completion (D28) | 310–323 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Ticket 324 in progress | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
+| Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
 | Ticket 293: test-access preflight | Merged November 10, 2026; awaiting verification | First live preflight run per suite | TICKETS, Ticket 293; STATUS, "Ticket 293: test-access preflight for acceptance runs — November 7, 2026" |
@@ -67,6 +66,7 @@ Check the cited entry before acting on a row.
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
 | Ticket 165: travel release acceptance | In progress | Denied state; installed Open Location Services and Check again; installed status-only permission regression. Directions matrix: web rows in Ticket 284, installed Mac row in Ticket 285 | TICKETS, Ticket 165; STATUS, Ticket 284 and Ticket 285 entries (November 6–7) |
 | Ticket 187: agentic Calendar access | Live since October 24, 2026 | Google sensitive-scope verification (Ticket 245); published Mac against the 187 server; installed desktop consent; `P-012` | TICKETS, Ticket 187 |
+| Launch narrative follow-ups (D30, Ticket 327 complete) | `docs/NARRATIVE.md` accepted November 13; positioning is "behavioral remodeling assistant"; no public copy changed | Owner decides the beta audience from the Ticket 328 report and approves interviews; the marketing site rewrite (P-048), listings, visual identity and the social system each need a ticket; claims table not checked against production | TICKETS, Ticket 327; DECISIONS, 2026-11-13 (D30); P-048 |
 | Tickets 245–246: messaging track | Filed October 27; not development tickets | 245: Google verification submission, gated on `P-010` and `P-012`. 246: pre-launch messaging pass | TICKETS, Tickets 245–246; STATUS, "Messaging track — October 27, 2026" |
 | Ticket 212: home and travel in onboarding | Live on web since October 24 | Authenticated browser QA of the setup row against a real routing report; installed desktop QA | TICKETS, Ticket 212 |
 | Ticket 216: completion place labels | Live on web since October 24 | iPhone Safari re-prompt check; installed signed-desktop CoreLocation acceptance; `P-001` | TICKETS, Ticket 216 |
@@ -89,6 +89,99 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 328: launch audience research — November 13, 2026
+
+- **Report.** `docs/research/2026-11-13-launch-audience-research.md`: desk research on one
+  day. Sources are one survey of 5,067 U.S. adults read in full, ten competitor home pages
+  and one distribution guide.
+- **Recommendation.** Beta audience: professionals who already use AI agents, with parents
+  in professional jobs and Hevy trainers as variants. Self-improvement practitioners after
+  the iPhone app. No separate executive campaign.
+- **Finding to act on.** Habitify, Todoist and Divitica already offer MCP access, so AI
+  access alone does not set Cadence apart.
+- **Open.** The owner's decision; ten interviews; newsletters, creators and press were not
+  researched.
+
+Platform impact: documentation only. Messaging impact: none.
+
+## Ticket 327: launch narrative accepted — November 13, 2026
+
+- **Decision D30.** The owner set the public positioning: Cadence is a "behavioral
+  remodeling assistant". Free during the beta with no public price; MCP and plugins lead
+  the AI story; marketing may be promotional in an elegant, scientific register; the
+  narrative assumes an iPhone app and a Mac App Store listing near launch.
+- **Source.** `docs/NARRATIVE.md` holds the core sentence, three claims, the register, and
+  a claims table with proof and state. `AGENTS.md` and `PRODUCT.md` point to it.
+- **Not changed.** No marketing, README, listing or in-app copy. P-048 lists the public
+  text that now conflicts, including three statements that are already false.
+- **Accepted.** The owner accepted the draft as written (PR #257). Production was not checked
+  for the claims table.
+
+Platform impact: documentation only; marketing rewrite is a follow-up. Messaging impact:
+P-048.
+
+## Tickets 301–309 closing checks — November 13, 2026
+
+- **Track complete.** Tickets 303–309 are complete; 301 and 302 were already. The owner set a
+  US$5 Google Maps cap for this run (recorded in the run folder), approved the Ticket 309
+  wording list and deleted the vault item `google-calendar-agent-retire-secret`. Run
+  folder: `.intent/acceptance/settings-close-20261113/` (not committed).
+- **Web, production, test account A, 390 px with touch (headless Chrome):** a touch drag moved
+  Medical to position 3, announced "Medical moved to position 3 of 9.", and kept the order
+  after reload; arrow keys restored it (304). One paid Home lookup returned `200` and filled
+  "1523 Broadway, New York, NY 10036, USA" without saving; Home was put back and reloaded
+  unchanged (308). Cost about US$0.005.
+- **iOS Simulator Safari (iPhone 18 Pro, iOS 27.2), local stack with test login:** a touch drag
+  saved the order and announced "Alpha moved to position 4 of 11." (304). With Travel off the
+  panel showed the "turn on Travel estimates first" line; with it on, **Use my current
+  location** showed "Finding your address…", Safari asked for location inside the tap, and
+  the position reached `POST /api/travel/home-lookup` (local `503`, no provider configured;
+  the paid path passed on production) (308). The Simulator replaced iPhone hardware at the
+  owner's choice.
+- **Installed Mac 0.1.10, test Mac, linked as A:** Settings has no Daily Brief Calendar panel
+  (307). Daily Brief shows **Plan around my connected sources**, naming all four sources, and
+  **Advanced: choose sources** (306). Timezone keeps **Save timezone** (303). **Use my current
+  location** filled Home from the Mac's position; the field was set back to the fixture and
+  committed with Enter, and hosted Home stayed the fixture (303, 308). A keyboard move of
+  Medical announced "Medical moved to position 2 of 9.", reached hosted, and moved back (304).
+- **Findings outside this track:** the first Mac lookup failed with "Your device did not
+  share a position." while another app covered Cadence (the reader returns unavailable when the
+  page is hidden); it passed with Cadence in front. `GET /api/outlook-calendar/calendars`
+  returned `409` `timeout` for A while the connection read `connected`. The npm Supabase CLI
+  binary (2.105.0) failed its code-signature check on this Mac and was re-signed ad hoc in one
+  worktree; Docker held a stale binding on local port 55321.
+- **Preflight:** `desktop-test-mac` ready except the `test-mac-app-permissions` probe, which
+  timed out; Notifications and Location read "Allowed" in Cadence on the device.
+
+Platform impact: web and installed Mac checked; marketing not applicable; future mobile web
+checked at 390 px and in iOS Safari. Messaging impact: none (P-033 to P-036 stay with Ticket
+246).
+
+## Ticket 324: count an unlinked workout by hand — November 13, 2026
+
+- **Built:** "Count the 6:05 PM Hevy workout" on today's expanded Unresolved rows whose
+  Behavior has no enabled Hevy link, while no any-workout link exists. The server reads
+  today's workouts, refuses a linked Behavior or a workout a link accepts, marks Completed
+  through the manual status path, then attaches the workout with no link through
+  `attach_unlinked_source_activity` (migration `20261113050000`). Reconcile never removes
+  a match with no link.
+- **Verified locally** against the live Hevy account: the control showed only on the two
+  unlinked rows and only for the new 20-minute workout; one click marked the row Completed
+  (`manual_tap`), listed the workout and stored an `attached` match with no link; a repeat
+  returned `not_unresolved`. SQL fixture, service, resolver and DOM tests pass.
+- **Hosted push:** `20261113050000` applied under the standing approval after the PR's
+  Local Supabase rehearsal passed; read back: `authenticated` calls it, `anon` gets 404.
+- **Deployed check passed** on test account A after PR #254 merged: one click on "Evening
+  walk" stored a `manual_tap` Completed event and an `attached` match with no link; the
+  button is 44 px tall at 390 px with no horizontal scroll. Account A's "Read 20 pages"
+  link is now off.
+- **Review fixes before merge:** a link's timing refresh skips a hand-counted match, and a
+  failed attachment after the mark is retryable.
+- **Test data:** two more private Hevy workouts, `Cadence test 323 W-d` and `W-e`, for the owner to delete.
+
+Platform impact: web control and service; Mac follow-up (no count control); marketing not
+applicable; future mobile through mobile web. Messaging impact: P-047.
 
 ## Connector completion turned on in Production — November 13, 2026
 

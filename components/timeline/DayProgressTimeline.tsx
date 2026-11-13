@@ -4,6 +4,8 @@ import { combineExternalEventFreshness, projectExternalEventSchedulingEvent } fr
 import { CalendarDays } from "lucide-react";
 import type { TravelEvidenceResult, TravelLeaveAnswer, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { Temporal } from "@js-temporal/polyfill";
+import { countableSourceWorkouts } from "@cadence/core/services/timeline-source-evidence";
+import { RECORDED_ACTIVITY_MIN_MATCH_SECONDS } from "@cadence/core/types/recorded-activity";
 import { useDevelopmentBuild, useRefresh } from "@cadence/ui/runtime";
 import {
   useCallback,
@@ -744,6 +746,9 @@ function DayProgressDay({
     return () => { observer.disconnect(); unregister(); };
   }, [onMeasure, registerMeasurement, root, section]);
 
+  // Ticket 324: a workout already shown on a row here was matched by a link.
+  const shownWorkoutStarts = new Set(section.occurrences.flatMap((item) => (item.sourceEvidence?.workouts ?? [])
+    .map((workout) => Temporal.Instant.from(workout.startAt).toString())));
   return (
     <section ref={sectionRef} className={styles.day} aria-labelledby={`${section.key}-title`}>
       <header className={styles.dayHeader}>
@@ -786,6 +791,10 @@ function DayProgressDay({
         <div ref={bodyRef} className="relative min-h-24 py-4" data-day-progress-date={section.localDate}>
           {section.occurrences.length === 0 ? <p className="bg-surface p-3 text-base leading-7 text-muted-readable">{section.emptyMessage}</p> : <div className="grid gap-1">
             {section.occurrences.map((occurrence) => {
+              const countableWorkouts = activity?.day && activity.day.localDate === section.localDate ? countableSourceWorkouts({
+                occurrence, source: "hevy", todayLocalDate: section.localDate, now: Temporal.Instant.from(now), timezone,
+                minimumDurationSeconds: RECORDED_ACTIVITY_MIN_MATCH_SECONDS.hevy, items: activity.day.items, matchedStartAts: shownWorkoutStarts,
+              }) : [];
               const highlighted = contexts.get(occurrence.id)?.overlappingEventIds.some((id) => activeIds.includes(id));
               const context = contexts.get(occurrence.id);
               return <div
@@ -808,6 +817,7 @@ function DayProgressDay({
                   shortcuts={shortcutsByBehavior?.[occurrence.behaviorId]}
                   statusIconsOnly={iconsOnly[occurrence.id] ?? false}
                   crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
+                  countableWorkouts={countableWorkouts}
                 />
               </div>;
             })}
