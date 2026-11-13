@@ -29,7 +29,9 @@ export const DIRECT_CREDENTIALS = Object.freeze({
   }),
   'icloud-calendar': Object.freeze({
     item: 'icloud-test-account-a',
-    env: Object.freeze({ CONNECTOR_ICLOUD_APPLE_ID: 'username', CONNECTOR_ICLOUD_APP_PASSWORD: 'app-specific password' }),
+    env: Object.freeze({ CONNECTOR_ICLOUD_APPLE_ID: 'username', CONNECTOR_ICLOUD_APP_PASSWORD: 'password' }),
+    // The item's built-in password field holds the app-specific password; op reads it by
+    // its id `password` even when the field is relabeled (live, November 12, 2026).
     body: (env) => ({ appleId: env.CONNECTOR_ICLOUD_APPLE_ID ?? '', appPassword: env.CONNECTOR_ICLOUD_APP_PASSWORD ?? '' }),
   }),
 });

@@ -230,7 +230,7 @@
     {
       "id": "vault-icloud-a",
       "kind": "vault-item",
-      "summary": "iCloud test identity for A (username, app-specific password). Decision 2026-11-07, item 2.",
+      "summary": "iCloud identity for A (username, and the app-specific password in the built-in password field). The owner's own Apple Account since 2026-11-12. Decision 2026-11-07, item 2.",
       "identity": "account-a",
       "suites": [
         "connectors"
@@ -248,7 +248,7 @@
         ],
         "timeout_seconds": 90
       },
-      "owner_step": "Create the iCloud test Apple Account and add the icloud-test-account-a item (username, app-specific password) to the Cadence Agents vault.",
+      "owner_step": "Add the icloud-test-account-a item to the Cadence Agents vault: username = the Apple Account email, password = an app-specific password from account.apple.com.",
       "freshness_seconds": 86400
     },
     {

@@ -58,17 +58,40 @@ workouts were already gone before this run (Hevy count 49).
 
 ## Ticket 240: iCloud Calendar
 
-**Not run. Needs an owner decision.**
+**Passed on production web and on installed Mac 0.1.10 with the owner's own Apple Account
+(November 12, 2026, 20:00–20:15 ET), except event display: the selected calendars had no
+events in the read window.**
 
-- The owner reported that attempts to create an Apple Account for testing returned
-  "account cannot be created". No usable Apple test identity was available to this run.
-- A vault item named `icloud-test-account-a` now exists, but its fields could not be read
-  (`agent-secret` exit 5), so the preflight renewal failed.
-- Production status for A: `disconnected`, generation 0 (never connected on production).
-  The route is configured; unauthenticated requests return 401.
-- Options: run with the owner's own Apple Account and an app-specific password under the
-  2026-10-19 custody decision (owner-run live tests may use real Apple credentials), or keep
-  Ticket 240 live acceptance and the iCloud part of 241 step 6 recorded as waiting.
+Apple refused to create a test Apple Account, so the owner chose their own account under the
+2026-10-19 custody decision. The owner created the app-specific password "Cadence QA" and
+stored it in `icloud-test-account-a`. The owner relabeled the item's built-in password field;
+`op` reads that field by its id `password`, not by the new label, so the preflight adapter
+now reads `password` (`scripts/acceptance/access/connection.mjs`). By the owner's instruction,
+no test events were created in the owner's calendars. Output kept counts, kinds and field
+names only; no calendar content was recorded.
+
+| Check | Result |
+|---|---|
+| Connect (preflight adapter, posted once to `POST /api/icloud-calendar/connection` with A's session) | `connected`, generation 1 |
+| Calendar list | 200 in 0.9 s; 5 calendars; fields `id`, `name`, `isDefault` only |
+| Selection in Settings (QA Chrome) | Choosing a calendar auto-saved ("Saved", "Connected · 1 calendar"); then all 5, one at a time |
+| `GET /api/icloud-calendar/events`, today to +30 days, all 5 calendars | 200 in 1.8 s, schema `1.1.0`, `complete`, no failures, **0 events**. With `fields=location` the same. Reversed range: 400 `invalid_request` |
+| Settings panel text | Hosted-custody line: deleting Cadence's saved copy; Apple keeps the app-specific password active until it is removed at account.apple.com |
+| All-day toggle | Off saved (`showAllDay` false), on saved again |
+| Disconnect (`DELETE`) | 200, `disconnected`, generation 2, selection cleared, revocation key `apple_app_specific_password` |
+| Reads after disconnect | Events and calendars 409 `not_connected` |
+| Reconnect | `connected`, generation 3; a later adapter renewal (same Apple Account) gave generation 4 and kept the selection |
+| Installed Mac 0.1.10 (test Mac, read-only) | Settings "iCloud Calendar … Connected · 1 calendar"; `calendar-cache.sqlite3` holds a complete iCloud snapshot at hosted generation 3 with 0 events |
+
+Not verified on production: an iCloud event on Timeline (web or Mac), all-day and other-zone
+timing, server-expanded recurrence and floating-time quarantine. All passed in the October 19
+local live run. They need an event in a selected calendar; the owner may add one or allow the
+agent to. Also not run: wrong-principal reconnect (one Apple Account) and the
+`invalid_request`/rejected-password path on production.
+
+Account A stays connected to the owner's iCloud with one calendar (Work) selected. The owner
+can revoke the "Cadence QA" password at account.apple.com; A's connection then moves to
+`reconnect_required` on its next read.
 
 ## Ticket 242: Outlook Calendar
 
@@ -112,7 +135,7 @@ mean the provider grant was revoked after the run.
 | Connector | Smoke on production | Credential after the run |
 |---|---|---|
 | Hevy | Passed (above) | The owner's key stays connected to account A by design (decision 2026-11-11); the owner decides whether to regenerate it |
-| iCloud Calendar | Not run: the existing vault item's fields were unreadable, and no usable test identity was available. Awaiting the owner's account choice | — |
+| iCloud Calendar | Passed on web and Mac (above), without an event to display | A stays connected to the owner's Apple Account; the owner revokes "Cadence QA" at account.apple.com when testing ends |
 | Outlook Calendar | Passed (above) | The test identity stays connected to account A for later runs; it is an agent test identity, not the owner's |
 | Installed desktop | Passed on published 0.1.10 on the test Mac for Hevy and Outlook (below), except the Microsoft deep-link completion, account switch and sign-out cleanup, and Hevy key entry on the Mac | — |
 
@@ -154,7 +177,7 @@ Not run on the Mac:
   mac-release still needs for a leave-reminder check.
 - Hevy key entry from the Mac: it would pass the owner's key through a remote text field.
   The hosted intake is the same route the web uses (verified above).
-- iCloud: not connected (Ticket 240 waits on the owner's Apple Account item).
+- iCloud: not connected at the time; checked on November 12 at 20:10 ET (see Ticket 240).
 
 The test Mac is left as found: Cadence 0.1.10 running and linked as A; Outlook connected
 (generation 5, Calendar selected), Hevy connected (generation 3), iCloud not connected.
