@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-044` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-049` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -115,6 +115,7 @@ Status values:
 | [P-045](#p-045-use-your-chatgpt-plan-card-copy-on-the-mac) | "Use your ChatGPT plan" card copy on the Mac | logged | 299 | In-app copy (Mac), user guide |
 | [P-046](#p-046-daily-brief-chatgpt-plan-states-on-the-mac) | Daily Brief ChatGPT plan states on the Mac | logged | 299 | In-app copy (Mac), user guide |
 | [P-047](#p-047-count-an-unlinked-hevy-workout) | Count an unlinked Hevy workout | logged | 324 | In-app copy, user guide, Privacy |
+| [P-048](#p-048-launch-narrative-replaces-the-record-first-positioning) | Launch narrative replaces the record-first positioning | logged | 327, 246 | Marketing, README, developer docs, plugin listings |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1499,4 +1500,37 @@ cite has not changed.
 - **Conflicting current text:** the user guide describes only linked completions.
 - **Update needed:** describe counting by hand beside "Complete from Hevy"; confirm the
   Privacy text on stored workout times covers it.
+- **Status:** logged.
+
+## P-048: Launch narrative replaces the record-first positioning
+
+- **Change:** decided November 13, 2026 (D30). Cadence's public positioning is "behavioral
+  remodeling assistant". `docs/NARRATIVE.md` holds the core sentence, three claims, the
+  marketing register, the price statement and a claims table. Public copy derives from it.
+- **Affected:** Ticket 327 (the source), Ticket 246 (the pre-launch pass). Files:
+  `apps/marketing/src/pages/index.astro`, `apps/marketing/src/pages/about.astro`,
+  `apps/marketing/src/data/faq.ts`, `apps/marketing/src/data/routes.ts`,
+  `apps/marketing/src/data/site.ts`, `apps/marketing/src/data/developers.ts`, `README.md`,
+  `integrations/chatgpt-plugin/plugin.json`, `integrations/claude-plugin/.claude-plugin/plugin.json`.
+- **Surfaces:** marketing, README, developer docs, plugin listings.
+- **Conflicting current text:**
+  - Homepage hero: "A record for changing what you repeat." Homepage: "It does not infer
+    causes, diagnose patterns, or prescribe a response."
+  - About: "It is not a social tracker, collaboration product, medical dosing app, payment
+    system, or AI coach." About and FAQ: "Hosted MCP launch remains pending." MCP has been
+    live since October 29, 2026.
+  - FAQ, "What does Cadence cost?": "Cadence is currently available without charge."
+  - FAQ, "What does the Hevy connector use?": "Workouts never automatically complete a
+    Behavior". See P-042.
+  - README: "Cadence does not send behavior data to an AI provider." Daily Brief sends
+    disclosed context to OpenAI.
+  - `developers.ts`: "Hosted launch, live Claude and ChatGPT acceptance, and directory
+    approval are pending."
+  - Plugin listings: "Track and review routines"; the product term is Behavior.
+  - Site description: "Cadence records recurring behavior through explicit decisions,
+    preserved context, longitudinal review, and portable BehaviorLog data."
+- **Update needed:** rewrite these surfaces from `docs/NARRATIVE.md` under a marketing
+  ticket. Publish only claims whose row in its "Claims" table is live. Use "Cadence is free
+  during the beta. It will not stay free." Update `tests/public-content-contract.test.ts`
+  with the copy.
 - **Status:** logged.

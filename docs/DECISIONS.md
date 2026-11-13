@@ -2419,3 +2419,44 @@ The owner answered the remaining connector completion questions in chat on Novem
 
 Platform impact: web, the flag and Ticket 324; desktop, installed acceptance on published
 0.1.10; marketing, none; future mobile, not applicable. Messaging impact: none.
+
+## 2026-11-13: Launch narrative: behavioral remodeling assistant (D30)
+
+The owner set the public positioning for the beta launch on November 13, 2026. The
+product has changed since the August marketing redesign, and its public surfaces each
+tell a different, older story. `docs/NARRATIVE.md` is now the one source for public
+copy.
+
+1. **D30.1: positioning.** Cadence is a "behavioral remodeling assistant". The
+   record-first story with BehaviorLog portability as the headline is retired. Cadence
+   keeps its exports and BehaviorLog support. Never "coach": the posture is scientific.
+2. **D30.2: price.** Public copy says Cadence is free during the beta and will not stay
+   free. No price, tier or usage limit is public. The owner works out pricing separately.
+   This replaces "Cadence is currently available without charge."
+3. **D30.3: AI angle.** Lead with MCP and the Claude and ChatGPT plugins. No public claim
+   about using a ChatGPT plan inside Cadence; that path stays hidden (2026-11-12).
+4. **D30.4: marketing register.** Marketing surfaces may use promotional copy. It is
+   elegant, scientific and philosophically serious, and avoids sensational words.
+   In-app copy keeps the `PRODUCT.md` voice.
+5. **D30.5: platforms.** The owner intends an iPhone app and a Mac App Store listing near
+   launch, and possibly Android later. The narrative is written for web, Mac, iPhone and
+   AI clients. No public claim or store page precedes a shipped app.
+6. **D30.6: company roadmap.** Other company products stay out of Cadence launch copy.
+
+Assumptions made while recording this, for the owner to confirm or correct:
+
+- "Assistant" is positioning. It adds no feature. In-app chat and autonomous execution
+  still need their own tickets (`AGENTS.md`, out of scope for v1).
+- D30.5 records intent. Native mobile work still needs tickets before any code.
+- The marketing register applies to marketing surfaces only.
+
+Superseded text:
+
+- "Pricing and AI" above and `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, "Pricing and future
+  AI": the free-apps-plus-paid-web shape is no longer the stated direction. Billing is
+  still not built and still needs a billing ticket.
+- The 2026-08-27 marketing content plan's pricing line and behavioral-remodeling hero.
+- `PRODUCT.md`: "no promotional copy" now applies to the product only.
+
+Platform impact: web, desktop and future mobile, none (no product change); marketing, a
+rewrite under its own ticket. Messaging impact: P-048.

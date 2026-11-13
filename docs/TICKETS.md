@@ -18722,3 +18722,36 @@ Messaging impact: none.
 Verification: `npx vitest run tests/export-camelcase-configuration.test.ts
 tests/export-download-route.test.ts` and `dagger check --cadence --progress=report`. Production: export
 for test account A downloads.
+
+## Ticket 327: Launch narrative source and claims table
+
+Status: drafted November 13, 2026; awaiting the owner's review of `docs/NARRATIVE.md`.
+Messaging track. Not a development ticket.
+Dependencies: none. Decision: `docs/DECISIONS.md`, 2026-11-13, D30.
+
+Goal: give every public surface one source for what Cadence says about itself.
+
+Scope and acceptance:
+
+- `docs/NARRATIVE.md` states the positioning, the core sentence, three claims, the
+  marketing register, the price statement, the platform premise and what stays out of
+  launch copy.
+- Its "Claims" table lists each public claim with its proof and current state.
+- `AGENTS.md` and `PRODUCT.md` point to it and keep the in-app voice unchanged.
+- No public copy changes in this ticket. P-048 lists the text to rewrite.
+
+Out of scope: persona research, the marketing site rewrite, store and directory listings,
+visual identity and the social content system. Each needs its own ticket.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: no product or in-app copy change. |
+| Desktop | Not applicable: no product or in-app copy change. |
+| Marketing | Follow-up: the site rewrite from `docs/NARRATIVE.md` (P-048; Ticket 246 or a new ticket). |
+| Future mobile | The narrative is written for an iPhone app (D30.5); no mobile code. |
+
+Messaging impact: P-048.
+
+Verification: `npm run agents:check`.

@@ -66,6 +66,7 @@ Check the cited entry before acting on a row.
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
 | Ticket 165: travel release acceptance | In progress | Denied state; installed Open Location Services and Check again; installed status-only permission regression. Directions matrix: web rows in Ticket 284, installed Mac row in Ticket 285 | TICKETS, Ticket 165; STATUS, Ticket 284 and Ticket 285 entries (November 6–7) |
 | Ticket 187: agentic Calendar access | Live since October 24, 2026 | Google sensitive-scope verification (Ticket 245); published Mac against the 187 server; installed desktop consent; `P-012` | TICKETS, Ticket 187 |
+| Ticket 327: launch narrative (D30) | `docs/NARRATIVE.md` drafted November 13; positioning is "behavioral remodeling assistant"; no public copy changed | Owner reviews the draft and the three assumptions in D30; then persona research and the site rewrite get tickets | TICKETS, Ticket 327; DECISIONS, 2026-11-13 (D30); P-048 |
 | Tickets 245–246: messaging track | Filed October 27; not development tickets | 245: Google verification submission, gated on `P-010` and `P-012`. 246: pre-launch messaging pass | TICKETS, Tickets 245–246; STATUS, "Messaging track — October 27, 2026" |
 | Ticket 212: home and travel in onboarding | Live on web since October 24 | Authenticated browser QA of the setup row against a real routing report; installed desktop QA | TICKETS, Ticket 212 |
 | Ticket 216: completion place labels | Live on web since October 24 | iPhone Safari re-prompt check; installed signed-desktop CoreLocation acceptance; `P-001` | TICKETS, Ticket 216 |
@@ -88,6 +89,21 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 327: launch narrative drafted — November 13, 2026
+
+- **Decision D30.** The owner set the public positioning: Cadence is a "behavioral
+  remodeling assistant". Free during the beta with no public price; MCP and plugins lead
+  the AI story; marketing may be promotional in an elegant, scientific register; the
+  narrative assumes an iPhone app and a Mac App Store listing near launch.
+- **Source.** `docs/NARRATIVE.md` holds the core sentence, three claims, the register, and
+  a claims table with proof and state. `AGENTS.md` and `PRODUCT.md` point to it.
+- **Not changed.** No marketing, README, listing or in-app copy. P-048 lists the public
+  text that now conflicts, including three statements that are already false.
+- **Open.** The owner reviews the draft. Production was not checked for the claims table.
+
+Platform impact: documentation only; marketing rewrite is a follow-up. Messaging impact:
+P-048.
 
 ## Tickets 301–309 closing checks — November 13, 2026
 
