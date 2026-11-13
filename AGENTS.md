@@ -25,7 +25,7 @@ standard supports the product story; promoting it is not the product's purpose.
 - Next.js App Router
 - TypeScript
 - Supabase Postgres
-- Supabase Auth: Google login today; email and Apple planned (D31)
+- Supabase Auth: Google and email sign-in (email live since November 13, 2026); Apple under Ticket 333 (D31)
 - Supabase Row Level Security
 - Tailwind CSS
 - shadcn-style components where useful
@@ -57,8 +57,9 @@ let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
 (`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
 Behavior can be marked Completed from activity recorded in a connected service, starting
 with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Ticket 310 recorded the decision; no
-code has shipped. Tickets 331–337 plan sign-in by email and Apple beside Google, on Supabase
-Auth (`docs/DECISIONS.md`, 2026-11-13, D31); no code has shipped. Mobile and broader
+code has shipped. Tickets 331–337 add sign-in by email and Apple beside Google, on Supabase
+Auth (`docs/DECISIONS.md`, 2026-11-13, D31); their code is merged and email sign-in is
+live in production since November 13, 2026. Mobile and broader
 workspace restructuring remain deferred. The owner
 intends an iPhone app and a Mac App Store listing near launch (D30). Neither has tickets;
 the launch narrative is written for them, and no mobile code starts without a ticket.
@@ -662,9 +663,9 @@ Do not expand scope to solve speculative future requirements.
 
 ## Security rules
 
-- Use Supabase Auth for the web app and optional desktop account mode. Google is
-  the only sign-in method until Tickets 331–337 ship email and Apple (D31). Add no
-  other auth vendor and no password sign-in.
+- Use Supabase Auth for the web app and optional desktop account mode. Sign-in
+  methods are Google, email (live since November 13, 2026) and Apple under Ticket 333
+  (D31). Add no other auth vendor and no password sign-in.
 - A sign-in must never reach an existing account through an unconfirmed email
   address. An account keeps at least one sign-in method (D31).
 - Add desktop account controls only within Tickets 116–122 and Ticket 336. Never

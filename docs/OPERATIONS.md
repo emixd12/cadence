@@ -1187,7 +1187,9 @@ keep the standard authenticated redirect behavior.
 Sign-in method flags (Ticket 331, D31.6): `CADENCE_SIGN_IN_APPLE` and
 `CADENCE_SIGN_IN_EMAIL`. A method shows on Login and starts only when its flag
 is exactly `on` and its ticket has shipped (email: Ticket 332; Apple: Ticket
-333). Leave both unset in Production until Ticket 337 passes for that method.
+333). Leave a flag unset in Production until Ticket 337 passes for that method.
+`CADENCE_SIGN_IN_EMAIL` is `on` in Production since November 13, 2026, 21:35Z
+(`docs/qa/2026-11-13-ticket-332-production-acceptance.md`, "Go-live run").
 Google has no flag.
 
 Email sign-in (Ticket 332): `/login/email` posts the address to
@@ -1199,8 +1201,33 @@ holds the address and return path for one hour. `CADENCE_TURNSTILE_SITE_KEY`
 adds Cloudflare Turnstile to the request forms; set it only together with
 hosted Auth CAPTCHA. The code length is `EMAIL_SIGN_IN_CODE_LENGTH` in
 `lib/auth/email-sign-in.ts` and must equal `otp_length` locally and on hosted
-Auth (an open owner decision: 6 or 8). Local check:
+Auth (6 on both since November 13, 2026). Local check:
 `docs/qa/2026-11-13-ticket-332-email-sign-in.md`.
+
+Production sign-in email (since November 13, 2026):
+
+- **Sender.** Hosted Auth sends through Sequenzy SMTP (`smtp.sequenzy.com`, port
+  587, user `api`) as `Cadence <login@cadence-me.com>`, with the key in the Cadence
+  Agents vault item `sequenzy-supabase-smtp-key` (Sequenzy company "Identity
+  Scaffolding", which holds `cadence-me.com`). Email rate limit: 30 an hour.
+- **Sequenzy company settings** (shared with reminder email): default Reply-To
+  `Cadence <login@cadence-me.com>` (Sequenzy requires one; the domain has no
+  mailbox, so replies do not reach anyone); click tracking off, account-wide and for
+  transactional sends, so links are not rewritten; open tracking on; the free-plan
+  "Sent with Sequenzy" footer stays.
+- **Bot check.** Hosted Auth CAPTCHA is on with Cloudflare Turnstile. The widget is
+  `cadence-turnstile-secret-key` (site key `0x4AAAAAAGAC-PYcXe6PWyGo`, Managed),
+  hostnames `cadence-me.com` (covers `app.`), `cadence-blush-three.vercel.app`,
+  `localhost` and `127.0.0.1`. Its secret is in hosted Auth and in the vault item
+  `turnstile-secret-key`; the site key is `CADENCE_TURNSTILE_SITE_KEY` in Vercel
+  Production. A test deployment's host must be added to the widget for the check
+  to pass there; remove it afterwards.
+- **What needs a token** with CAPTCHA on: requesting an email (`/auth/v1/otp`),
+  sign-up and password grants. Typed codes, link tokens, refresh, Google and Apple
+  starts and the admin API do not. Scripts that request sign-in email against the
+  hosted project need a token; the test login and `admin.generateLink` paths do
+  not.
+- **Change record:** `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
 
 ### Sign in with Apple (Ticket 333)
 
@@ -1379,9 +1406,10 @@ Remaining owner decisions before broader launch:
   reserved for testing keep theirs for the test login. Pushing it is step 2 of
   `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`;
 - decide whether localhost callback URLs remain allow-listed for development;
-- CAPTCHA: Cloudflare Turnstile is planned for email sign-in (Ticket 332) and is
-  project-wide; its effects on the test login and the Mac are listed in the same
-  file. Leaked-password protection does not apply once no account has a password.
+- CAPTCHA: Cloudflare Turnstile is on for hosted Auth since November 13, 2026
+  (Ticket 332) and is project-wide; its effects on the test login and the Mac are
+  listed in the same file. Leaked-password protection does not apply once no account
+  has a password.
 
 Implemented follow-up:
 

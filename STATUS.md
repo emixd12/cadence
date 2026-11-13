@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); production acceptance of email passed November 13; code length 6 and `cadence-me.com` DNS applied; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 merged behind `CADENCE_SIGN_IN_LINKING` (PR #266; migration `20261113190000` pushed; hosted manual linking on since November 13, 20:26Z); 336 merged (PR #270), not in a Mac release yet; 335 merged behind `CADENCE_SIGN_IN_LINKING` (PR #271; migration `20261113210000` pushed); 337 first pass done, no flag on; three linking rows wait on owner row 16; Google stays the only live method | 332: owner rows 11–13 (an SMTP key from the Sequenzy company that holds `cadence-me.com`; reply-to, click tracking and footer; Turnstile permission on the Cloudflare token), then SMTP, CAPTCHA and the flag (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 complete: email sign-in live in Production since November 13, 21:35Z (`CADENCE_SIGN_IN_EMAIL` on; Sequenzy SMTP, Turnstile CAPTCHA, rate 30 an hour); 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 merged behind `CADENCE_SIGN_IN_LINKING` (PR #266; migration `20261113190000` pushed; hosted manual linking on since November 13, 20:26Z); 336 merged (PR #270), not in a Mac release yet; 335 merged behind `CADENCE_SIGN_IN_LINKING` (PR #271; migration `20261113210000` pushed); 337 first pass done, no flag on; three linking rows wait on owner row 16 | 332: none; measure sign-in email volume in the first week (`docs/COSTS.md`); messaging P-051 and P-052 (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`, "Applied, go-live"). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -91,6 +91,32 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 332: email sign-in live in production — November 13, 2026
+
+- **Live.** `CADENCE_SIGN_IN_EMAIL` is `on` in Production since 21:35Z; `/login` offers
+  Continue with email at 390 px and desktop. One real email sign-in on production passed;
+  the account was deleted.
+- **Hosted, 21:13–21:35Z.** Owner rows 11–13 answered at 21:11Z. Hosted Auth SMTP through
+  Sequenzy as `Cadence <login@cadence-me.com>` with the new Identity Scaffolding key; email
+  rate limit 2 → 3 → 30 an hour; CAPTCHA on with the owner's Turnstile widget (its secret in
+  hosted Auth, `cadence-blush-three.vercel.app` added to its hostnames); Vercel Production
+  `CADENCE_TURNSTILE_SITE_KEY`. Sequenzy company-wide: Reply-To changed from the owner's Gmail
+  to `Cadence <login@cadence-me.com>` (a Reply-To is required), click tracking off; a test
+  reminder still renders. Before and after values:
+  `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`, "Applied, go-live".
+- **Accepted with Turnstile on** (unaliased flag-on deployment, removed after): new account,
+  code, link in another browser, wrong and used code and link refused, no token and a fake
+  token refused by Supabase, `/login/email/mac` page and post. Rechecks after each Auth
+  change: kept sessions A and B, Google sign-in as A, Google and Apple starts, admin link-token
+  path, `qa:preflight --suite mcp-protocol` 9 of 9
+  (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`, "Go-live run").
+- **For the owner, not blocking.** The widget allows `localhost` and `127.0.0.1`; the SMTP key
+  has full access where the sender preset would do.
+
+Platform impact: web sign-in (email live); Mac email sign-in uses `/login/email/mac`, which
+works on production now, and ships with the next Mac release (owner row 14); marketing not
+applicable; mobile web checked at 390 px. Messaging impact: P-051 and P-052 updated.
 
 ## Ticket 337: sign-in acceptance, first pass — November 13, 2026
 

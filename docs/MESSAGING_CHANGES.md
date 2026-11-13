@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-054` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-055` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1568,8 +1568,10 @@ cite has not changed.
 - **Change:** decided November 13, 2026 (D31). A person will create an account and sign in
   with Google, with email (a link or a 6-digit code, no password) or with Apple, on web
   and the Mac. Connecting Google Calendar will add that Google account as a sign-in
-  method. Auth email will go through Sequenzy. Nothing has shipped: each method is behind
-  a flag that is off in production until Ticket 337 passes for it.
+  method. Auth email will go through Sequenzy. Each method is behind a flag that is off
+  in production until Ticket 337 passes for it. **Email sign-in is live in production
+  since November 13, 2026, 21:35Z** (`CADENCE_SIGN_IN_EMAIL` on), so the Google-only text
+  below is now wrong for email.
 - **Affected:** Tickets 331–337. Files: `components/settings/LegalContent.tsx`,
   `README.md`, `docs/user-guide/public-and-sign-in.md`,
   `docs/user-guide/privacy-and-account.md`, `docs/user-guide/desktop-local.md`,
@@ -1619,6 +1621,13 @@ cite has not changed.
   any password sent to Supabase Auth. When the owner turns on Cloudflare Turnstile, the
   email forms load Cloudflare's bot check, which reads browser signals and the IP address
   (Cloudflare's documents; not rechecked).
+- **Live, November 13, 2026, 21:35Z.** Turnstile is on for every email request. The
+  sign-in email comes from `Cadence <login@cadence-me.com>` through Sequenzy, with
+  Reply-To `Cadence <login@cadence-me.com>` (an address with no mailbox: Sequenzy requires
+  a Reply-To, so replies reach no one), Sequenzy's open-tracking pixel (open tracking is
+  on for the company; click tracking is off, so links go direct) and the free plan's
+  "Sent with Sequenzy" footer. Reminder email shares these settings. Record:
+  `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`, "Applied, go-live".
 - **Affected:** Ticket 332. Files: `supabase/templates/sign-in.html`,
   `app/(auth)/login/email/EmailSignInSteps.tsx`, `app/(auth)/login/TurnstileField.tsx`,
   `lib/auth/email-sign-in.ts`.
@@ -1626,9 +1635,10 @@ cite has not changed.
   user guide's sign-in section, Trust if it lists providers.
 - **Conflicting current text:** Privacy names Supabase and Google for sign-in and lists
   no bot-check provider and no sign-in cookie other than the session.
-- **Update needed:** name Cloudflare Turnstile as a provider once it is on; say that
-  sign-in emails come from Sequenzy for Cadence; describe the one-hour sign-in cookie;
-  state that email accounts have no password. The sign-in email's own text is in-app
+- **Update needed:** name Cloudflare Turnstile as a provider (now on); say that
+  sign-in emails come from Sequenzy for Cadence and that Sequenzy records whether they
+  are opened; say that replies to sign-in and reminder email are not read; describe the
+  one-hour sign-in cookie; state that email accounts have no password. The sign-in email's own text is in-app
   voice and changes with the template.
 - **Related:** P-051.
 - **Status:** logged.
