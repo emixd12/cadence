@@ -7,8 +7,8 @@ link, token hash, cookie or key was printed or recorded. One exception, noted un
 "Incidents".
 
 **Result: every email row passed on production Supabase. `CADENCE_SIGN_IN_EMAIL` stays
-off in production**, because bot protection is not on (owner row 11) and the production
-SMTP key is from the wrong Sequenzy company (owner rows 9 and 10).
+off in production**, because bot protection is not on (owner row 13) and the production
+SMTP key is from the wrong Sequenzy company (owner rows 11 and 12).
 
 ## Setup
 
@@ -90,7 +90,7 @@ for these rows.
 4. 17:55Z: SMTP set with that company key for the acceptance window only, then set back to
    off after the run (see the hosted change list).
 
-Observed on every email from `login@cadence-me.com` (owner row 10):
+Observed on every email from `login@cadence-me.com` (owner row 12):
 
 - `Reply-To: Emi Bache Rodriguez <emibache@gmail.com>` (the company's sender default).
 - The HTML link goes through `sequenzylink3.com/track/click/…?url=<the sign-in link>`; the

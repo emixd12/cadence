@@ -3,7 +3,7 @@
 Written November 13, 2026, for Ticket 332 (D31.2, D31.3). **Steps 1–4 were applied on
 November 13, 2026, about 17:15–17:20Z, by the verifier** (see "Applied" below). **Step 5 was
 applied, and steps 6–7 applied and then set back, by the Task 10 agent, 17:38–19:01Z**
-(see "Applied, Task 10"); steps 8–9 wait on owner row 11. Agents apply the steps in order under the
+(see "Applied, Task 10"); steps 8–9 wait on owner row 13. Agents apply the steps in order under the
 coordinator's ruling of November 13, 07:35Z (owner blockers rows 1 and 6): record each
 before and after value in this file, read the setting back, and recheck Google sign-in on
 production after each step. `CADENCE_SIGN_IN_EMAIL` stays unset in Production until
@@ -23,10 +23,10 @@ The "Before" column was read on November 13, 2026 at about 16:12Z, read-only.
 | 3 | Sign-in email for a new address: `mailer_subjects_confirmation`, `mailer_templates_confirmation_content` | `Confirm your email address`; Supabase's content (masked in the read; save the full value to the private run folder before the change) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved subject and content back | **Done 17:19Z; read back equal to the file** |
 | 4 | Sign-in email for a known address: `mailer_subjects_magic_link`, `mailer_templates_magic_link_content` | `Your sign-in link`; Supabase's content (save it as in step 3) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved values back | **Done 17:19Z; read back equal to the file** |
 | 5 | Code length `mailer_otp_length` | `8` | **`6`, 17:44Z, read back** (owner row 8, D31.2) | `8` | **Done.** Recheck passed (sessions A and B, Google sign-in as A) |
-| 6 | Custom SMTP: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email`, `smtp_sender_name`, `smtp_max_frequency` | All null except `smtp_max_frequency` 60 | **Now: all null again (19:00Z).** Applied 17:44Z with the vault key and set back 17:54Z; applied 17:55Z with the Identity Scaffolding company key for acceptance only and set back 19:00Z. Values when on: `smtp.sequenzy.com`, `587`, `api`, key, `login@cadence-me.com`, `Cadence`, `60` | Null the five connection fields (the sender name clears with them) | **Waiting: owner rows 9 and 10.** Hosted Auth keeps SMTP only as a full set: a PATCH of host, port, user and key without the sender returns 200 and stores nothing, so SMTP and sender are one change |
+| 6 | Custom SMTP: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email`, `smtp_sender_name`, `smtp_max_frequency` | All null except `smtp_max_frequency` 60 | **Now: all null again (19:00Z).** Applied 17:44Z with the vault key and set back 17:54Z; applied 17:55Z with the Identity Scaffolding company key for acceptance only and set back 19:00Z. Values when on: `smtp.sequenzy.com`, `587`, `api`, key, `login@cadence-me.com`, `Cadence`, `60` | Null the five connection fields (the sender name clears with them) | **Waiting: owner rows 11 and 12.** Hosted Auth keeps SMTP only as a full set: a PATCH of host, port, user and key without the sender returns 200 and stores nothing, so SMTP and sender are one change |
 | 7 | Email rate limit `rate_limit_email_sent` | `2` an hour | **Now `2`.** `10` from 17:45Z for the acceptance window, back to `2` at 19:00Z. Planned: `3` while CAPTCHA is off (at most about 2,160 a month, inside Sequenzy's free 2,500 shared with reminders), `30` once Turnstile is on | `2` | **Waiting: step 6.** Supabase refuses a value other than the built-in one without SMTP ("Custom SMTP required to configure … RATE_LIMIT_EMAIL_SENT"); lower it before nulling SMTP |
-| 8 | Bot check: `security_captcha_enabled`, `security_captcha_provider`, `security_captcha_secret` | `false`, `hcaptcha`, null | Unchanged | `security_captcha_enabled` `false` | **Waiting: owner row 11** (the Cloudflare token gets 403 on Turnstile widgets). Prerequisite done in PR #268: test login signs in with a link token |
-| 9 | Vercel Production and Preview: `CADENCE_TURNSTILE_SITE_KEY` | Unset | Unchanged | Unset | **Waiting: owner row 11** |
+| 8 | Bot check: `security_captcha_enabled`, `security_captcha_provider`, `security_captcha_secret` | `false`, `hcaptcha`, null | Unchanged | `security_captcha_enabled` `false` | **Waiting: owner row 13** (the Cloudflare token gets 403 on Turnstile widgets). Prerequisite done in PR #268: test login signs in with a link token |
+| 9 | Vercel Production and Preview: `CADENCE_TURNSTILE_SITE_KEY` | Unset | Unchanged | Unset | **Waiting: owner row 13** |
 | 10 | Redirect allow list `uri_allow_list` | 47 entries | Unchanged | None | No change: the link uses `{{ .SiteURL }}/login/confirm`, which needs no allow-list entry |
 | 11 | Unchanged and checked: `external_email_enabled` true, `disable_signup` false, `mailer_autoconfirm` false (confirmation on), `mailer_allow_unverified_email_sign_ins` false, `mailer_otp_exp` 3600, `mfa_totp_*` true, `security_manual_linking_enabled` false | As listed | As listed | None | Local `supabase/config.toml` now matches these |
 
@@ -60,7 +60,7 @@ Record kept in the git-ignored run folder `.intent/acceptance/v332-enable/` (wor
 | 17:40 | Cloudflare zone `cadence-me.com`: records Sequenzy asked for (DNS only) | 3 records: A `cadence-me.com`, A `app.cadence-me.com`, TXT google-site-verification | + CNAME `sq1._domainkey` → `sq1.wwfsmjra.d.sequenzydns.com`; CNAME `sq2._domainkey` → `sq2.wwfsmjra.d.sequenzydns.com`; CNAME `rp` → `r1.wwfsmjra.d.sequenzydns.com`; CNAME `rp2` → `r2.wwfsmjra.d.sequenzydns.com` |
 | 17:40 | Cloudflare: DMARC (none existed) | None | TXT `_dmarc` `v=DMARC1; p=none;` |
 | 18:10 | Cloudflare: root SPF, for Apple's email relay (coordinator, after the Apple portal session) | No root SPF | TXT `cadence-me.com` `v=spf1 include:spf.sequenzydns.com ~all`. Checked first: `spf.sequenzydns.com` covers `include:amazonses.com` and Sequenzy's IPs; the zone has no MX and no other sender (reminders send from Sequenzy's shared domain) |
-| 17:44 | Hosted Auth step 6 (vault key) | SMTP null | Set; then 17:54 back to null (wrong Sequenzy company, owner row 9) |
+| 17:44 | Hosted Auth step 6 (vault key) | SMTP null | Set; then 17:54 back to null (wrong Sequenzy company, owner row 11) |
 | 17:44 | Hosted Auth step 5 | `mailer_otp_length` 8 | 6 |
 | 17:45 | Hosted Auth step 7 | 2 | 10; 17:54 back to 2 |
 | 17:55 | Hosted Auth step 6 for acceptance (Identity Scaffolding key) and step 7 | SMTP null, 2 | Set, 10 |
@@ -75,7 +75,7 @@ After every change: kept sessions A and B refreshed, and a fresh Google sign-in 
 existing reminder email still sent from `hello@identityscaffolding.sequenzymail3.com` after
 the domain was added (17:42Z).
 
-To finish (after owner rows 9–11): set SMTP with the new key and step 7 to 3; send one
+To finish (after owner rows 11–13): set SMTP with the new key and step 7 to 3; send one
 test to AgentMail and check sender, reply-to and links; create the Turnstile widget; set
 step 9, redeploy; merge PR #268; then step 8 and step 7 to 30; recheck the test login,
 Google sign-in and kept sessions; then the flag.
