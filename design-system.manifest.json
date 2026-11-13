@@ -88,6 +88,21 @@
       "notes": ""
     },
     {
+      "id": "flow.email-sign-in",
+      "name": "EmailSignInSteps",
+      "kind": "flow",
+      "source": "app/(auth)/login/email/EmailSignInSteps.tsx",
+      "exportName": "EmailAddressStep",
+      "usageNames": [
+        "EmailAddressStep",
+        "EmailCodeStep"
+      ],
+      "benchAnchor": "design-system#ds-flow-email-sign-in",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 332: the address and code steps of email sign-in at /login/email, behind CADENCE_SIGN_IN_EMAIL. Plain forms that post to route handlers. The bench passes no Turnstile site key."
+    },
+    {
       "id": "flow.first-run-onboarding-panel",
       "name": "FirstRunOnboardingPanel",
       "kind": "flow",

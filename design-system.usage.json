@@ -540,6 +540,22 @@
       "confidence": "exact"
     },
     {
+      "componentId": "flow.email-sign-in",
+      "file": "app/(auth)/login/email/page.tsx",
+      "line": 56,
+      "route": "(auth)/login/email/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.email-sign-in",
+      "file": "app/(auth)/login/email/page.tsx",
+      "line": 67,
+      "route": "(auth)/login/email/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "layout.app-shell",
       "file": "app/(app)/layout.tsx",
       "line": 30,

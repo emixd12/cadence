@@ -44,7 +44,9 @@
       "label": "Sign in",
       "kind": "public",
       "routes": [
-        "/login"
+        "/login",
+        "/login/email",
+        "/login/confirm"
       ]
     },
     {
@@ -405,6 +407,22 @@
       "interaction_ids": [
         "INT-AUTH-002",
         "INT-AUTH-003"
+      ]
+    },
+    {
+      "path": "app/(auth)/login/email/EmailSignInSteps.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 13,
+      "interaction_ids": [
+        "INT-AUTH-015"
+      ]
+    },
+    {
+      "path": "app/(auth)/login/confirm/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 3,
+      "interaction_ids": [
+        "INT-AUTH-015"
       ]
     },
     {
@@ -1475,7 +1493,7 @@
           "control": "Continue with Google"
         }
       ],
-      "availability": "Available when public Supabase runtime configuration is present. Google has no flag. Apple (CADENCE_SIGN_IN_APPLE) and email (CADENCE_SIGN_IN_EMAIL) stay hidden until Tickets 333 and 332 ship and their flag is exactly on; both flags are off in production.",
+      "availability": "Available when public Supabase runtime configuration is present. Google has no flag. Email (CADENCE_SIGN_IN_EMAIL, INT-AUTH-015) shows when its flag is exactly on; Apple (CADENCE_SIGN_IN_APPLE) stays hidden until Ticket 333 ships. Both flags are off in production.",
       "success_result": "Starts Supabase Google OAuth and returns the signed-in user to the sanitized next route, normally /timeline.",
       "failure_result": "Returns to /login with a factual, recoverable authentication error that names no provider. A start request for a method that is not enabled returns to /login with sign_in_method_unavailable.",
       "effects": [
@@ -10644,6 +10662,110 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "No mobile client is authorized."
+        }
+      }
+    },
+    {
+      "id": "INT-AUTH-015",
+      "name": "Sign in or create an account with email",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#sign-in-with-google"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "login"
+      ],
+      "routes": [
+        "/login",
+        "/auth/sign-in/email",
+        "/login/email",
+        "/auth/email/verify",
+        "/login/confirm",
+        "/auth/confirm"
+      ],
+      "journeys": [
+        "J03",
+        "J20"
+      ],
+      "intent": "Sign in, or create an account for a new address, with one email that carries a link and a code. No password (Ticket 332, D31.2).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Continue with email"
+        },
+        {
+          "kind": "submit",
+          "control": "Send sign-in email"
+        },
+        {
+          "kind": "submit",
+          "control": "Sign in"
+        },
+        {
+          "kind": "submit",
+          "control": "Send a new email"
+        },
+        {
+          "kind": "activate",
+          "control": "Use a different email"
+        }
+      ],
+      "availability": "Only when CADENCE_SIGN_IN_EMAIL is exactly on and public Supabase runtime configuration is present. Off in production until Ticket 337 passes for email. With CADENCE_TURNSTILE_SITE_KEY set, the request forms show Cloudflare Turnstile.",
+      "success_result": "Supabase Auth emails a link and a code. The code on /login/email, or the button on /login/confirm opened from the link in any browser, signs the person in and returns to the sanitized next route (the link returns to Timeline in a browser that did not ask). A new address creates the account; an address with a Google account reaches that account.",
+      "failure_result": "Returns to /login/email with a plain message: invalid address, a resend inside 60 seconds, a failed bot check, email unavailable, a send failure, a wrong, used or expired code, or a used or expired link. Each message offers a new email or another way to sign in.",
+      "effects": [
+        "authentication_session",
+        "external_message",
+        "navigation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "app/(auth)/login/email/EmailSignInSteps.tsx",
+        "app/auth/sign-in/[method]/route.ts#POST",
+        "app/auth/email/verify/route.ts#POST",
+        "app/auth/confirm/route.ts#POST",
+        "lib/auth/email-sign-in-server.ts#requestEmailSignIn"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/email-sign-in.local-integration.test.ts",
+          "tests/sign-in-methods.test.ts"
+        ],
+        "notes": "The local-integration test drives a running web server and the local mail inbox over HTTP: code, link in another browser, wrong, used and expired code and link, resend inside 60 seconds, the Google-account address and password refusal. tests/sign-in-methods.test.ts covers the flag, the start redirect and the config and template parity."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "app/(auth)/login/email/EmailSignInSteps.tsx",
+            "app/auth/sign-in/[method]/route.ts#POST",
+            "app/auth/email/verify/route.ts#POST",
+            "app/auth/confirm/route.ts#POST"
+          ],
+          "evidence": [
+            "tests/email-sign-in.local-integration.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Ticket 336 adds email by code in the Mac account panel."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; P-051 covers sign-in copy."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Mobile web uses the same form; native mobile remains unscheduled."
         }
       }
     },

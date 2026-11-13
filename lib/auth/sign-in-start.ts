@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { emailSignInPagePath } from "@/lib/auth/email-sign-in";
 import {
   AUTH_CALLBACK_ROUTE,
   authRequestUrl,
@@ -19,7 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // Ticket 331: one start for every sign-in method. `/auth/google` and
 // `/auth/sign-in/[method]` both call it. Every OAuth method returns through
-// `/auth/callback`.
+// `/auth/callback`. Email (Ticket 332) opens its form at `/login/email`.
 export async function startSignIn(
   request: NextRequest,
   methodId: string,
@@ -34,6 +35,12 @@ export async function startSignIn(
     NextResponse.redirect(new URL(buildLoginPath(nextPath, error), requestUrl));
 
   const method = findEnabledSignInMethod(methodId, process.env, methods);
+
+  if (method?.start?.kind === "email") {
+    return NextResponse.redirect(
+      new URL(emailSignInPagePath(nextPath), requestUrl),
+    );
+  }
 
   if (method?.start?.kind !== "oauth") {
     return backToLogin(SIGN_IN_METHOD_UNAVAILABLE_ERROR);

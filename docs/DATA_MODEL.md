@@ -241,6 +241,19 @@ Authenticated Data API clients may select their own profile and update only
 `display_name`, `id`, `created_at`, or `updated_at` directly. Account deletion
 continues through the server-side Auth user deletion boundary and its cascade.
 
+**No passwords on Auth users (Ticket 332, D31.2).** Trigger `refuse_auth_password`
+(`before insert or update of encrypted_password on auth.users`, function
+`cadence_private.refuse_auth_password()`, migration
+`20261113160000_refuse_auth_passwords.sql`) sets `encrypted_password` to `''` whenever a
+new or changed password arrives for an address whose domain is not reserved for testing
+(`.test`, `.invalid`, `.example`, `.localhost`, `example.com`, `example.net`,
+`example.org`). It covers password sign-up, the random password Supabase Auth sets on a
+code or link sign-up, and `updateUser({ password })`. Existing passwords are untouched.
+Reserved test addresses keep their password for the test login and local smoke tests;
+with email confirmation on, only a service-role caller can confirm such an address. The
+function calls only built-in functions because it runs as the Auth service's role. Local
+check: `tests/email-sign-in.local-integration.test.ts`.
+
 ### `categories`
 
 ```sql

@@ -73,6 +73,10 @@ import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.r
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { SignInMethods } from "@/app/(auth)/login/SignInMethods";
 import {
+  EmailAddressStep,
+  EmailCodeStep,
+} from "@/app/(auth)/login/email/EmailSignInSteps";
+import {
   enabledSignInMethods,
   SIGN_IN_METHODS,
   type SignInMethod,
@@ -1283,7 +1287,7 @@ function SignInMethodsBench() {
       methods: enabledSignInMethods({}),
     },
     {
-      label: "All methods (after Tickets 332 and 333, flags on)",
+      label: "All methods (after Ticket 333, flags on)",
       methods: SIGN_IN_METHODS,
     },
   ];
@@ -1301,6 +1305,76 @@ function SignInMethodsBench() {
               methods={state.methods}
               nextPath="/timeline"
             />
+          </ProductPreview>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmailSignInBench() {
+  const common = {
+    codeLength: 6,
+    nextPath: "/timeline",
+    requestAction: "#",
+    turnstileSiteKey: null,
+  };
+  const states: ReadonlyArray<{ label: string; node: ReactNode }> = [
+    {
+      label: "Address",
+      node: (
+        <EmailAddressStep
+          {...common}
+          defaultEmail=""
+          errorMessage={null}
+          loginHref="#"
+        />
+      ),
+    },
+    {
+      label: "Address, link used or expired",
+      node: (
+        <EmailAddressStep
+          {...common}
+          defaultEmail=""
+          errorMessage="That sign-in link was already used or is more than an hour old. Send a new email."
+          loginHref="#"
+        />
+      ),
+    },
+    {
+      label: "Code",
+      node: (
+        <EmailCodeStep
+          {...common}
+          changeHref="#"
+          email="a.very.long.address.for.wrapping@example.com"
+          errorMessage={null}
+          verifyAction="#"
+        />
+      ),
+    },
+    {
+      label: "Code rejected",
+      node: (
+        <EmailCodeStep
+          {...common}
+          changeHref="#"
+          email="name@example.com"
+          errorMessage="That code did not work. It may be mistyped, used or more than an hour old. Check it, or send a new email."
+          verifyAction="#"
+        />
+      ),
+    },
+  ];
+
+  return (
+    <div className="grid gap-3">
+      {states.map((state) => (
+        <div key={state.label} className="grid gap-1">
+          <p className="text-xs font-semibold text-neutral-600">{state.label}</p>
+          <ProductPreview>
+            <div className="max-w-[22rem]">{state.node}</div>
           </ProductPreview>
         </div>
       ))}
@@ -1680,6 +1754,7 @@ const previewFactories: Record<
       </ProductPreview>
     ),
   "flow.sign-in-methods": () => <SignInMethodsBench />,
+  "flow.email-sign-in": () => <EmailSignInBench />,
   "flow.first-run-onboarding-panel": () => (
       <ProductPreview maxHeight="28rem">
         <div className="relative min-h-[24rem] bg-background">

@@ -18930,7 +18930,10 @@ desktop width.
 
 ## Ticket 332: Email sign-in and account creation (web)
 
-Status: not started. Filed November 13, 2026.
+Status: in progress (November 13, 2026, draft PR). Built and checked on the local stack
+behind `CADENCE_SIGN_IN_EMAIL`; the hosted Auth steps wait on owner rows and the code
+length decision (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). Filed November
+13, 2026.
 Dependencies: Ticket 331. Decision: D31.2 and D31.3.
 
 Goal: a person enters an email address and gets one email with a link and a 6-digit code.

@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-052` is next; draft PR #261 holds `P-050`). Never reuse an ID.
+1. Give a new entry the next ID (`P-053` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1607,4 +1607,28 @@ cite has not changed.
   Terms, README and the user guide change in the messaging track. Update
   `tests/legal-content.test.tsx` with the copy.
 - **Related:** L-024 and L-025.
+- **Status:** logged.
+
+## P-052: Email sign-in details: the sign-in email, a bot check and a short-lived cookie
+
+- **Change:** implemented November 13, 2026 behind `CADENCE_SIGN_IN_EMAIL` (Ticket 332,
+  D31.2), off in production. Cadence sends one email, "Sign in to Cadence", with a link
+  and a 6-digit code (`supabase/templates/sign-in.html`). A new address creates an
+  account. While a person waits for the code, an HTTP-only cookie holds the address and
+  the return page for up to one hour. An email account has no password: Cadence drops
+  any password sent to Supabase Auth. When the owner turns on Cloudflare Turnstile, the
+  email forms load Cloudflare's bot check, which reads browser signals and the IP address
+  (Cloudflare's documents; not rechecked).
+- **Affected:** Ticket 332. Files: `supabase/templates/sign-in.html`,
+  `app/(auth)/login/email/EmailSignInSteps.tsx`, `app/(auth)/login/TurnstileField.tsx`,
+  `lib/auth/email-sign-in.ts`.
+- **Surfaces:** Privacy (providers table, cookies, what an email sign-in collects), the
+  user guide's sign-in section, Trust if it lists providers.
+- **Conflicting current text:** Privacy names Supabase and Google for sign-in and lists
+  no bot-check provider and no sign-in cookie other than the session.
+- **Update needed:** name Cloudflare Turnstile as a provider once it is on; say that
+  sign-in emails come from Sequenzy for Cadence; describe the one-hour sign-in cookie;
+  state that email accounts have no password. The sign-in email's own text is in-app
+  voice and changes with the template.
+- **Related:** P-051.
 - **Status:** logged.
