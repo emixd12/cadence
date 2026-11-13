@@ -109,7 +109,7 @@ Check the cited entry before acting on a row.
   the user row and refuses deleting the last identity; account deletion, the test login and
   email sign-up still pass. Add, Remove and Change address now need a sign-in within 15
   minutes (coordinator decision, recorded as an assumption). A taken address gets the same
-  answer as a usable one. Not pushed to hosted.
+  answer as a usable one.
 - **After Ticket 333 merged.** Rebased on `2482fcb1`. Removing Apple revokes its kept token
   at Apple and forgets the row (migration `20261113200000`); a refused or unconfigured
   revocation never blocks the removal. An Apple account added from Settings keeps its token
@@ -119,9 +119,14 @@ Check the cited entry before acting on a row.
   running server, Mailpit and manual linking on; the same flow by clicks in Chrome at
   1280 and 390 px, which found and fixed a disabled field dropped from the form
   (`docs/qa/2026-11-13-ticket-334-sign-in-methods.md`).
-- **Not applied.** Hosted manual linking stays off; the ordered list is
+- **Hosted, 18:48Z.** The verifier pushed `20261113190000` (trigger
+  `keep_one_auth_identity`) and `20261113200000` (`apple_sign_in_forget_token`,
+  `service_role` only) and read both back (hosted change list, "Applied"). Verifier
+  re-check: 20 of 20 concurrent removal trials through Cadence and 20 of 20 against
+  Supabase's unlink endpoint kept one identity. Hosted manual linking stays off and
+  `CADENCE_SIGN_IN_LINKING` stays unset; the remaining steps are in
   `docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`. Local `enable_manual_linking`
-  is now on.
+  is on.
 
 Platform impact: web Settings, routes and login hint; Mac shows no row (Ticket 336);
 marketing not applicable; mobile web checked at 390 px. Messaging impact: P-054.
