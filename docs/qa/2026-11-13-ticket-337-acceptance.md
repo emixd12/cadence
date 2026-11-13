@@ -137,6 +137,80 @@ No call reached another account, removed the last identity, or removed a Google 
 Calendar uses. Cadence's 15-minute recent sign-in rule does not cover direct calls (already
 noted in the Ticket 334 change list, step 4).
 
+## Third pass: the remaining linking rows with the owner's spare Google accounts
+
+Run November 13, 2026, 21:04–21:33Z, by a top-level agent with the owner present. Run folder
+(git-ignored): `.intent/acceptance/t337/p3/` in the Intent workspace worktree (`evidence.jsonl`,
+`rechecks.jsonl`, `auth-p3-*.json`, `shots/`, scripts `hosted.mjs`, `drive.mjs`). Addresses
+are masked to their domain; Google subjects are recorded as 16-character SHA-256 prefixes.
+No token, link or bypass value was printed or kept; the session files were deleted at the end.
+**No production flag was turned on.**
+
+### Setup
+
+- **Test deployment:** an unaliased production-target build of `origin/main` `e5441797` with
+  `CADENCE_SIGN_IN_LINKING=on` and `CADENCE_SIGN_IN_EMAIL=on` (both for that deployment only;
+  email was on only so a one-time sign-in link would work in any browser; no email was sent),
+  aliased to `cadence-t337-linking.vercel.app`. For that deployment only,
+  `GOOGLE_CALENDAR_LEGACY_CALLBACK_URL` named the alias's Calendar callback, so Cadence would
+  start Calendar there (`readCalendarOAuthConfig` refuses an origin that is not a configured
+  callback). Google refuses that callback (`redirect_uri_mismatch`, seen once), so **the Calendar
+  consent itself ran on `app.cadence-me.com`**, where the production code connects an account
+  with exactly one Google sign-in whatever the flag.
+- Redirect allow-list entry `https://cadence-t337-linking.vercel.app/auth/callback**` added and
+  removed. Vercel's shareable link does not apply to an alias; the project's automation bypass
+  cookie was used in the agent's window instead, and the owner passed Vercel's own sign-in.
+- **Throwaway accounts:** `t337-p3a@example.com` (`ff8042b8-…`) and `t337-p3b@example.com`
+  (`a933136e-…`), created with the Auth admin API (`email_confirm: true`). They signed in on the
+  test deployment through `/login/confirm?token_hash=…` with an admin-generated magic-link
+  hash (no email sent): in the agent's own Chrome profile, and opened by the agent in the
+  owner's everyday Chrome profile, where the owner's spare Google accounts were signed in.
+- **Google clients:** linking uses the sign-in client (project `habit-tracker-498717`,
+  scope `email profile`, Supabase callback); Calendar uses `cadence-calendar-498717`, In
+  production and verified. The sign-in project's publishing status cannot be read through an
+  API; the spare accounts were not refused.
+- The owner used the everyday profile instead of a dedicated window. The agent could not
+  drive or read it, so the owner clicked there, and every result was read from the hosted
+  database and API. The removal and deletion rows ran in the agent's own profile (port 4438).
+
+### Rows
+
+| Row | Result | Evidence |
+|---|---|---|
+| Calendar for an account with no Google sign-in adds Google first (D31.5) | **Passed.** p3a (email only): the Calendar panel said "Connecting adds the Google account you choose as a way to sign in to Cadence."; Connect started Supabase linking with the sign-in client; the owner chose a spare Google account (outlook.com address); p3a gained a Google identity at 21:17:00Z. Repeated for p3b with a second spare (gm.slc.edu): Google identity at 21:27:07Z. No Cadence account used either address beforehand (checked by address) | `calendar-p3a-start`, `p3-calendar-start-probe-2`, `sql-p3times`, `spare-check` |
+| Adding Google reaches the same account on the next sign-in (row 1) | **Passed.** On `app.cadence-me.com`, Continue with Google signed p3a in at 21:21:00Z and p3b at 21:27:45Z, each the same user ID with both identities | `sql-recent` |
+| Calendar connects for that account | **Passed** for p3b: connected, generation 1, one sealed credential, bound to the added Google subject | `calendar-row` (21:28:10Z), `calendar-p3b-connected` |
+| Remove Google refused while Calendar is connected (row 3) | **Passed.** At 390 and 1280 px, Remove → Remove Google showed "Google Calendar uses this Google account. Disconnect Google Calendar first, then remove Google."; both identities kept; no horizontal overflow | `remove-ui-p3b-calendar-connected`, `…-desktop`, `shots/remove-*` |
+| A direct Supabase unlink is refused by the database | **Passed.** `DELETE /auth/v1/user/identities/{google}` with p3b's own token: 500, `P0001` `cadence_calendar_connected`; both identities kept | `unlink-direct-p3b-calendar-connected` |
+| Disconnect Calendar (row 4) | **Passed.** Disconnect → Disconnect: `DELETE /api/google-calendar/connection` 200; row `disconnected`, generation 2, credential deleted. The service revokes the grant at Google during that call; the page's message, which says whether Google confirmed the revocation, was not captured | `calendar-disconnect-p3b`, `calendar-row` (21:30:42Z) |
+| After disconnect, Google can be removed; the last method cannot | **Passed.** Remove Google: "Google removed. It no longer signs in to this account."; identities `email`. A removal post for the email identity: "Email stays while this account has an address. You can change the address."; a direct unlink of it: 422 `single_identity_not_deletable`. The account still works: Timeline 200; signed out (API 401) and back in by link | `remove-ui-p3b-after-disconnect`, `remove-p3b-last-method`, `unlink-direct-p3b-last-identity`, `timeline-p3b-after`, `signout-p3b`, `confirm-p3b` |
+| Deletion frees the Google accounts (row 5) | **Passed.** p3b and p3a (p3a still had its Google identity) deleted through Settings at 390 px: `/login`, session 401, old token 403. Afterwards, for both Google subjects: identities 0, Calendar rows 0, users and identities on the address 0, so a new Google sign-in would create a fresh account (not done) | `account-deletion-p3b`, `account-deletion-p3a`, `subject-gone` ×2 |
+
+### Incident: an extra account
+
+At 21:23:02Z, during the Calendar step, the owner's Google sign-in on `app.cadence-me.com` used
+the gm.slc.edu account, which then had no Cadence account, so it **created a new Cadence
+account** (`e7131d5e-…`, 0 Behaviors), and Calendar connected there. The owner disconnected
+Calendar and deleted that account through Settings (gone at 21:26:40Z), and the gm.slc.edu
+account was then used for p3b. Cause: the Google chooser in the everyday profile lists several
+accounts, and step 2 sent the owner to `/login` with a Google session that could pick any
+of them. Lesson: name the exact account at each chooser, and check the hosted users after
+every owner step.
+
+### Cleanup and rechecks
+
+- Both throwaway accounts deleted; no `t337-p3` user remains. Hosted users 8, none without an
+  identity, none with two Google identities. The eighth is an agentmail.to email account
+  that another agent created at 21:29:42Z.
+- Test deployment and alias removed (`/login` 404 on both at 21:33Z); the first build of this
+  pass (`cadence-72yp8om31`) was removed when the second replaced it. Redirect entry removed.
+  The allow-list then had 48 entries: another agent's test-deployment entry
+  (`cadence-75492nx23`) was added during the run and left in place. Hosted SMTP and CAPTCHA
+  changed to on during the run, by another agent.
+- 21:32:40Z: kept sessions A and B ok; a fresh Google sign-in as A in the agent's profile reached
+  A's user ID; production login shows Google only.
+- The agent's Chrome (port 4438) was closed and its profile deleted.
+
 ## Installed Mac (read-only)
 
 The test Mac runs Cadence 0.1.11-dev.4 (production values), signed in as A with the account
@@ -152,12 +226,12 @@ test Mac's state, so it waits on owner row 15.
 |---|---|---|
 | `CADENCE_SIGN_IN_EMAIL` | Ticket 332's email rows (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`); MCP consent and deletion for an email-only account (332 and this pass) | Hosted SMTP with the right Sequenzy key (owner row 11); reply-to, click tracking and footer (owner row 12); Turnstile and CAPTCHA (owner row 13); then a recheck of one email and of rows 1–2 at phone width with CAPTCHA on. Acceptance row 3 needs email added to a Google account, which waits on the same rows |
 | `CADENCE_SIGN_IN_APPLE` | Ticket 333's Apple rows (`docs/qa/2026-11-13-ticket-333-production-acceptance.md`, draft PR #272) | The Hide My Email sign-in (the Apple agent's owner step). Not run here, by instruction |
-| `CADENCE_SIGN_IN_LINKING` | Hosted manual linking on; Sign-in methods row for Google-only and email-only accounts; neutral refusal of a Google account owned by another account (real Google chooser); 15-minute rule with return to the row; last-method refusal; Calendar unchanged for a one-Google account; MCP consent and deletion with linking on; 390 px and desktop | A successful add of a method; Remove Google refused while Calendar is connected; Calendar connect from an account with no Google sign-in (acceptance row 5); acceptance row 3. Each needs a Google account that is not yet a Cadence account (owner row 16), or email live (rows 11–13) or the Apple flag plus changes to test account A |
+| `CADENCE_SIGN_IN_LINKING` | Hosted manual linking on; Sign-in methods row for Google-only and email-only accounts; neutral refusal of a Google account owned by another account (real Google chooser); 15-minute rule with return to the row; last-method refusal; Calendar unchanged for a one-Google account; MCP consent and deletion with linking on; 390 px and desktop. Third pass: Google added from the Calendar panel to email-only accounts, the same account on the next Google sign-in, Calendar connected, Remove Google refused while connected (UI and database), disconnect, removal afterwards, deletion freeing the Google account | Adding Google from Sign-in methods › Add Google ran only to Google's chooser (same `startAddSignInMethod` as the Calendar path). Acceptance row 3 for email and Apple waits on those flags |
 
 Rows of the track's acceptance list: 1 (email part) passed under Ticket 332, Apple part under
 Ticket 333 except Hide My Email; 2 passed under Ticket 332; 3 waits (above); 4 passed under
 Ticket 332 (an unconfirmed address cannot reach A's account; admin-confirmed addresses here
-are not that test); 5 waits on owner row 16; 6 (Mac) waits on owner rows 14 and 15 and on a
+are not that test); 5 passed in the third pass; 6 (Mac) waits on owner rows 14 and 15 and on a
 flag being on; 7 passed for an email-only account (332 and this pass); 8 passed for email-only
 (332, this pass) and Apple (333) accounts; Google-account deletion passed under Ticket 334's
 verifier; 9 passed: production lists Google only, and every recheck after a hosted change
@@ -165,9 +239,9 @@ passed.
 
 ## Remaining
 
-1. Owner row 16 (new): a third Google test account, `google-test-account-c`. Unblocks the
-   successful add of Google, Calendar from an account with no Google sign-in, and Remove
-   Google refused while Calendar is connected.
+1. Owner row 16 is no longer needed for the linking rows: the third pass used the owner's
+   spare Google accounts. A vault item `google-test-account-c` would still let agents repeat
+   these rows alone.
 2. Owner rows 11–13: email delivery and CAPTCHA, then the email flag rows above and A adding
    email (acceptance row 3).
 3. The Apple agent's Hide My Email row; then A adding Apple on a test deployment with both
