@@ -16,7 +16,9 @@ Cadence is a public, open-source personal behavior tracker for recurring life pa
 
 Success means the user can open the Timeline, understand what needs attention, make a decision, and leave with confidence that the record reflects only explicit user input.
 
-Cadence is also a demonstration and adoption surface for the BehaviorLog Bundle standard. It should make portable behavior-history export feel practical rather than theoretical.
+Cadence still exports the BehaviorLog Bundle standard, and export should stay practical. Since `docs/DECISIONS.md`, 2026-11-13 (D30), the standard supports the product story and is not the product's purpose.
+
+Public positioning: Cadence is a behavioral remodeling assistant. `docs/NARRATIVE.md` holds the positioning, the public claims and the marketing register. This file governs the product itself and its in-app voice.
 
 ## Brand Personality
 
@@ -31,7 +33,8 @@ Voice: clear, warm and brief (owner direction, `docs/DECISIONS.md`, 2026-11-10: 
 - One name for one thing. "Connected sources" is the section for Google Calendar, Outlook Calendar, iCloud Calendar and Hevy, never "Connectors". Each Connect, Refresh and Disconnect action names its source in full ("Refresh Outlook Calendar").
 - Places read as places: a timezone shows "New York", while the saved value stays `America/New_York`.
 - Keep the domain terms exactly: Behavior, Occurrence, Completed, Not Completed, Unresolved, Needs decision.
-- Still no motivational, celebratory or promotional copy, and no mannered metaphors.
+- Still no motivational, celebratory or promotional copy in the product, and no mannered metaphors. Marketing surfaces use a separate register that allows promotional copy (`docs/NARRATIVE.md`, "Register").
+- Never call Cadence a coach. The public term is "behavioral remodeling assistant".
 - Sentences that state what Cadence sends, stores or shares change only through the messaging track (`docs/MESSAGING_CHANGES.md`).
 
 ## Anti-references
