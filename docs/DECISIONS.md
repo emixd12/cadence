@@ -2394,3 +2394,28 @@ in Tickets 294–299 continues, but nothing reaches users until the owner turns 
 Platform impact: desktop, Ticket 299 gates its UI; web, the flag stays off; marketing,
 no claim until the owner turns it on (P-032); future mobile, not applicable. Messaging
 impact: none.
+
+## 2026-11-12: Finish connector completion (Tickets 319–324) without further owner steps
+
+The owner answered the remaining connector completion questions in chat on November 12, 2026.
+
+1. **iCloud.** The owner added `icloud-test-account-a` to the Cadence Agents vault, using the
+   owner's own Apple Account with an app-specific password. Agents connect it for account A.
+2. **Messaging and legal review never gate this track.** Ticket 241 step 7 and P-038 to
+   P-042 stay in the messaging and legal track; Ticket 323 and the flag do not wait for them.
+3. **Hevy writes on the owner's account.** Agents may create, edit and delete test routines
+   and test workouts on the owner's Hevy account (`hevy-owner`), including deletions on
+   hevy.com with the owner's Hevy login from the vault. If agents cannot sign in there, the
+   owner deletes the test workouts.
+4. **One Hevy Pro account.** No second Pro account. The "reconnect with another account"
+   row runs as far as one account allows; the rest is covered by tests.
+5. **Outlook revocation.** Agents may revoke Cadence's grant in test account A's Microsoft
+   account (Ticket 241 step 6 follow-up).
+6. **Flag.** Turn on `CADENCE_CONNECTOR_COMPLETION` in Vercel Production and redeploy once
+   Ticket 323's matrix passes. After one full day, measure the job's usage. If it projects
+   over US$5 a month above the baseline, turn the flag off and tell the owner. Record the
+   measurement in `docs/COSTS.md`.
+7. **Ticket 324.** Agents may build and merge it after Ticket 323, web only.
+
+Platform impact: web, the flag and Ticket 324; desktop, installed acceptance on published
+0.1.10; marketing, none; future mobile, not applicable. Messaging impact: none.
