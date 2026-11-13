@@ -2585,3 +2585,17 @@ each ticket ships.
 Platform impact: web, Tickets 331–335; desktop, Ticket 336; marketing, no change (public
 text is logged in P-051); future mobile, mobile web uses the same login page, and a native
 app needs its own ticket (L-024). Messaging impact: P-051.
+
+## 2026-11-13: Service-role functions for the sealed Apple token (Tickets 333 and 334)
+
+The owner said yes on November 13, 2026, 18:18Z (owner blockers row 10, sign-in track)
+to agents pushing the Apple sign-in migrations that grant `execute` to `service_role` on
+the functions that keep, read and delete the sealed Apple refresh token: Ticket 333's
+`20261113180000_apple_sign_in_tokens.sql` (`apple_sign_in_keep_token`,
+`apple_sign_in_read_tokens`) and Ticket 334's forget-token function. The 2026-11-10
+standing approval excludes grants to `service_role`; this yes covers only these
+functions. Each push still meets the standing approval's other conditions and reads the
+grants back.
+
+Platform impact: web hosted database only. Desktop, marketing and future mobile: not
+applicable. Messaging impact: none (P-053 already covers the kept token).

@@ -1236,9 +1236,14 @@ that. `STATUS.md` "Open work" holds the dated row with the current secret's expi
 
 1. Run `npm run qa:preflight -- --suite hosted-migrations` (it checks the Supabase token).
 2. Read the `.p8` and Key ID from the Cadence Release vault. The owner approves the read.
-3. Make the secret, keeping the key in the environment only:
-   `APPLE_SIGN_IN_PRIVATE_KEY="<p8 contents>" node scripts/apple-client-secret.mjs --key-id <Key ID> --team-id HK26VT477G --client-id <Services ID> --days 180 --json`.
-   The output gives the secret and its expiry.
+3. Make the secret, with the key passed only through the environment. Never paste the
+   `.p8` into a command, a file in the repository or a transcript:
+   `APPLE_SIGN_IN_PRIVATE_KEY="$(<reader>)" node scripts/apple-client-secret.mjs --key-id <Key ID> --team-id HK26VT477G --client-id <Services ID> --days 180 --json`,
+   where `<reader>` prints the key from the Cadence Release vault to the pipe only.
+   `agent:secret` never reads that vault (`docs/qa/agent-secrets.md`, "Cadence Release
+   vault"). `npm run release:credentials` does, with the owner's `release-secrets`
+   approval, but has no reader for the Sign in with Apple item yet: add one before the
+   first rotation. The output gives the secret and its expiry.
 4. `PATCH /v1/projects/qjodzutjxtmtzczbloxa/config/auth` with `external_apple_secret`
    (Management API, through `agent:secret` as in the Ticket 332 change list). Read it back
    twice: a change can take a few seconds to show.
@@ -2109,6 +2114,10 @@ verification and per-tenant consent policy remain release gates. Local
 implementation does not authorize app registration or live-account access.
 
 For key rotation, retain old decrypt keys while credentials use those key IDs.
+This includes the Apple refresh tokens in
+`cadence_calendar_private.apple_sign_in_tokens` (Ticket 333), sealed with the same
+connector key: a row is resealed only when that person signs in with Apple again, so
+check the key ID prefix of `sealed_refresh_token` before removing an old key.
 New consent seals with the current key. Remove an old key only after every
 connection using it reconnects or disconnects. Missing keys fail closed and
 require reconnect. Never print configuration values or provider payloads.
