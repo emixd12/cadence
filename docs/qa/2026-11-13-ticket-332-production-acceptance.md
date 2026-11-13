@@ -6,9 +6,11 @@ Run November 13, 2026, 17:36–19:01Z, by the Task 10 agent. Run folder (git-ign
 link, token hash, cookie or key was printed or recorded. One exception, noted under
 "Incidents".
 
-**Result: every email row passed on production Supabase. `CADENCE_SIGN_IN_EMAIL` stays
-off in production**, because bot protection is not on (owner row 13) and the production
-SMTP key is from the wrong Sequenzy company (owner rows 11 and 12).
+**Result: every email row passed on production Supabase.** The first run (below) left
+`CADENCE_SIGN_IN_EMAIL` off, because bot protection was not on (owner row 13) and the
+production SMTP key was from the wrong Sequenzy company (owner rows 11 and 12). **After the
+owner answered those rows, the go-live run (21:13–21:40Z) passed with Turnstile on, and
+`CADENCE_SIGN_IN_EMAIL` is `on` in Production since 21:35Z.** See "Go-live run" at the end.
 
 ## Setup
 
@@ -118,3 +120,46 @@ Created on production and deleted through Settings in the run, each confirmed by
 
 Supabase sent 8 emails in the run (one with the wrong key, seven in the window). The test
 deployment was removed at 19:00Z (`vercel remove`), which also ends its share bypass.
+
+## Go-live run (November 13, 2026, 21:13–21:40Z)
+
+Run by the go-live agent after owner rows 11–13 were answered (21:11Z). Run folder
+(git-ignored): `.intent/acceptance/t332-live/` in the Intent workspace worktree
+(`evidence.jsonl`, `rechecks.jsonl`, `accept.mjs`, screenshots in `shots/`). Hosted changes
+and their before and after values: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`,
+"Applied, go-live". No code, link, token hash, cookie, key or bypass value was printed or
+recorded.
+
+**Setup.** Hosted SMTP with the new Identity Scaffolding key, CAPTCHA (Turnstile) on, email
+rate limit 30. An unaliased production-target deployment of `origin/main` `5a9d4e16` with
+`CADENCE_SIGN_IN_EMAIL=on` for that deployment only (`dpl_7gt5c7a64n8NCo9wtxUjnDggv8eV`,
+`cadence-75492nx23-…vercel.app`), opened with a new Vercel share pass. For the run its
+callback (`/auth/callback**`) was on the redirect allow list and its host on the Turnstile
+widget; both were removed and the deployment was deleted at 21:34Z. Browser: real Google
+Chrome in the agent's own profile (not the shared QA profile), attached over CDP; each
+"browser" below is a separate browser context with no shared cookies. Inbox: AgentMail
+`cadence-332-main@agentmail.to` with plus-addresses.
+
+| Row | Result |
+|---|---|
+| The Turnstile widget renders and passes | **Passed.** Every request form got a `cf-turnstile-response` token (Managed mode, no interaction) |
+| A request without a token is refused by Supabase | **Passed.** Direct `/auth/v1/otp` with no token: 400 `captcha_failed` ("no captcha_token found"); with a made-up token: 400 `captcha_failed` (`invalid-input-response`, so Supabase checks with Cloudflare using a valid secret). Cadence's form posted with the token field removed: `error=email_check_failed`, "The check that you are a person did not finish. Try again.", no email |
+| A new address creates an account (`+new`) | **Passed.** Request with token → code step; email from `Cadence <login@cadence-me.com>`, "Sign in to Cadence", 6 digits, link direct, Reply-To `Cadence <login@cadence-me.com>`, SPF/DKIM/DMARC pass; the code → `/timeline`, session 200, providers `email` |
+| The 6-digit code signs in | **Passed** (`+new`) |
+| Used code refused | **Passed.** A second browser holding the same pending cookie: `code_rejected`, session 401 |
+| Wrong code refused | **Passed** (`+wrong`): `code_rejected`, "That code did not work…", session 401 |
+| A link opened in another browser signs in (`+link`) | **Passed.** Requested in browser 4; the link's path and query opened in browser 5: Sign in → `/timeline`, session 200 |
+| Used link refused | **Passed.** Browser 6: `error=link_rejected`, session 401 |
+| `/login/email/mac` for the Mac flow (page and POST only) | **Passed** (`+mac`): with the address in the fragment, the Turnstile check passed, the page posted to `/auth/email/mac` and showed "Cadence sent a 6-digit code… Type it in Cadence for Mac." with a link back to `cadence://`; the email arrived with a code. No Mac build used |
+| Test accounts deleted | **Passed.** `+new`, `+wrong`, `+link`, `+mac` (and `+smtp1` from the SMTP check) deleted with the admin API; none left; `+new`'s old session cookie then got 401 |
+
+**Production with the flag on** (`app.cadence-me.com`, after the 21:35Z redeploy):
+
+| Row | Result |
+|---|---|
+| `/login` at 390 px and 1280 px | **Passed.** Continue with Google and Continue with email present, no horizontal overflow; the email page shows the Turnstile check ("Success!") at both widths (`shots/prod-login-390.png`, `shots/prod-email-390.png`). From 21:36Z Continue with Apple also shows: the Apple go-live agent turned `CADENCE_SIGN_IN_APPLE` and `CADENCE_SIGN_IN_LINKING` on and redeployed; this run did not touch those flags |
+| One real email sign-in on production (`+prod1`) | **Passed.** Request with token, email as above, code → `/timeline`, session 200. Account deleted; its session then 401 |
+| Kept sessions A and B, Google sign-in as A | **Passed** (21:39Z) |
+
+Supabase sent 7 sign-in emails in this run (`+smtp1`, `+new` twice because the driver lost the first pending cookie, `+wrong`, `+link`, `+mac`, `+prod1`), and Sequenzy one test reminder.
+

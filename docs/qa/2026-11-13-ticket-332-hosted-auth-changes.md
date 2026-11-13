@@ -3,7 +3,8 @@
 Written November 13, 2026, for Ticket 332 (D31.2, D31.3). **Steps 1–4 were applied on
 November 13, 2026, about 17:15–17:20Z, by the verifier** (see "Applied" below). **Step 5 was
 applied, and steps 6–7 applied and then set back, by the Task 10 agent, 17:38–19:01Z**
-(see "Applied, Task 10"); steps 8–9 wait on owner row 13. Agents apply the steps in order under the
+(see "Applied, Task 10"). **Steps 6–9 were applied for good by the go-live agent,
+21:13–21:40Z, and `CADENCE_SIGN_IN_EMAIL` is `on` in Production** (see "Applied, go-live"). Agents apply the steps in order under the
 coordinator's ruling of November 13, 07:35Z (owner blockers rows 1 and 6): record each
 before and after value in this file, read the setting back, and recheck Google sign-in on
 production after each step. `CADENCE_SIGN_IN_EMAIL` stays unset in Production until
@@ -23,10 +24,10 @@ The "Before" column was read on November 13, 2026 at about 16:12Z, read-only.
 | 3 | Sign-in email for a new address: `mailer_subjects_confirmation`, `mailer_templates_confirmation_content` | `Confirm your email address`; Supabase's content (masked in the read; save the full value to the private run folder before the change) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved subject and content back | **Done 17:19Z; read back equal to the file** |
 | 4 | Sign-in email for a known address: `mailer_subjects_magic_link`, `mailer_templates_magic_link_content` | `Your sign-in link`; Supabase's content (save it as in step 3) | `Sign in to Cadence`; `supabase/templates/sign-in.html` | `PATCH` the saved values back | **Done 17:19Z; read back equal to the file** |
 | 5 | Code length `mailer_otp_length` | `8` | **`6`, 17:44Z, read back** (owner row 8, D31.2) | `8` | **Done.** Recheck passed (sessions A and B, Google sign-in as A) |
-| 6 | Custom SMTP: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email`, `smtp_sender_name`, `smtp_max_frequency` | All null except `smtp_max_frequency` 60 | **Now: all null again (19:00Z).** Applied 17:44Z with the vault key and set back 17:54Z; applied 17:55Z with the Identity Scaffolding company key for acceptance only and set back 19:00Z. Values when on: `smtp.sequenzy.com`, `587`, `api`, key, `login@cadence-me.com`, `Cadence`, `60` | Null the five connection fields (the sender name clears with them) | **Waiting: owner rows 11 and 12.** Hosted Auth keeps SMTP only as a full set: a PATCH of host, port, user and key without the sender returns 200 and stores nothing, so SMTP and sender are one change |
-| 7 | Email rate limit `rate_limit_email_sent` | `2` an hour | **Now `2`.** `10` from 17:45Z for the acceptance window, back to `2` at 19:00Z. Planned: `3` while CAPTCHA is off (at most about 2,160 a month, inside Sequenzy's free 2,500 shared with reminders), `30` once Turnstile is on | `2` | **Waiting: step 6.** Supabase refuses a value other than the built-in one without SMTP ("Custom SMTP required to configure … RATE_LIMIT_EMAIL_SENT"); lower it before nulling SMTP |
-| 8 | Bot check: `security_captcha_enabled`, `security_captcha_provider`, `security_captcha_secret` | `false`, `hcaptcha`, null | Unchanged | `security_captcha_enabled` `false` | **Waiting: owner row 13** (the Cloudflare token gets 403 on Turnstile widgets). Prerequisite done in PR #268: test login signs in with a link token |
-| 9 | Vercel Production and Preview: `CADENCE_TURNSTILE_SITE_KEY` | Unset | Unchanged | Unset | **Waiting: owner row 13** |
+| 6 | Custom SMTP: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email`, `smtp_sender_name`, `smtp_max_frequency` | All null except `smtp_max_frequency` 60 | **Now: all null again (19:00Z).** Applied 17:44Z with the vault key and set back 17:54Z; applied 17:55Z with the Identity Scaffolding company key for acceptance only and set back 19:00Z. Values when on: `smtp.sequenzy.com`, `587`, `api`, key, `login@cadence-me.com`, `Cadence`, `60` | Null the five connection fields (the sender name clears with them) | **Done 21:21Z** with the new Identity Scaffolding key (owner rows 11–12 answered 21:11Z); read back. Hosted Auth keeps SMTP only as a full set: a PATCH of host, port, user and key without the sender returns 200 and stores nothing, so SMTP and sender are one change |
+| 7 | Email rate limit `rate_limit_email_sent` | `2` an hour | **Now `2`.** `10` from 17:45Z for the acceptance window, back to `2` at 19:00Z. Planned: `3` while CAPTCHA is off (at most about 2,160 a month, inside Sequenzy's free 2,500 shared with reminders), `30` once Turnstile is on | `2` | **Done: `3` at 21:21Z, `30` at 21:24Z** (after step 8). Supabase refuses a value other than the built-in one without SMTP ("Custom SMTP required to configure … RATE_LIMIT_EMAIL_SENT"); lower it before nulling SMTP |
+| 8 | Bot check: `security_captcha_enabled`, `security_captcha_provider`, `security_captcha_secret` | `false`, `hcaptcha`, null | **`true`, `turnstile`, secret set** | `security_captcha_enabled` `false` | **Done:** secret and provider 21:19Z, enabled 21:24Z. Prerequisite done in PR #268: test login signs in with a link token |
+| 9 | Vercel Production and Preview: `CADENCE_TURNSTILE_SITE_KEY` | Unset | **Production: `0x4AAAAAAGAC-PYcXe6PWyGo`** (Preview unset) | Unset | **Done 21:19Z**; live after the 21:22Z redeploy |
 | 10 | Redirect allow list `uri_allow_list` | 47 entries | Unchanged | None | No change: the link uses `{{ .SiteURL }}/login/confirm`, which needs no allow-list entry |
 | 11 | Unchanged and checked: `external_email_enabled` true, `disable_signup` false, `mailer_autoconfirm` false (confirmation on), `mailer_allow_unverified_email_sign_ins` false, `mailer_otp_exp` 3600, `mfa_totp_*` true, `security_manual_linking_enabled` false | As listed | As listed | None | Local `supabase/config.toml` now matches these |
 
@@ -79,6 +80,54 @@ To finish (after owner rows 11–13): set SMTP with the new key and step 7 to 3;
 test to AgentMail and check sender, reply-to and links; create the Turnstile widget; set
 step 9, redeploy; merge PR #268; then step 8 and step 7 to 30; recheck the test login,
 Google sign-in and kept sessions; then the flag.
+
+## Applied, go-live (November 13, 2026)
+
+Run folder (git-ignored): `.intent/acceptance/t332-live/` in the Intent workspace worktree
+(`evidence.jsonl`, `rechecks.jsonl`, `auth-*.json`, `seq-*.json`). No key, secret, code,
+link token or cookie was printed or recorded. Owner rows 11–13 were answered at 21:11Z.
+
+| Time (Z) | Change | Before | After |
+|---|---|---|---|
+| 21:13 | Check of the new vault key `sequenzy-supabase-smtp-key` (no send) | — | Company "Identity Scaffolding" (holds `cadence-me.com`, ready to send); key "cadence-all-access", preset `full_access`, not the reminder key; SMTP login 235; `MAIL FROM login@cadence-me.com` and `RCPT` accepted, then reset without sending |
+| 21:14 | Sequenzy default Reply-To (company-wide) | `Emi Bache Rodriguez <owner's Gmail>` | `Cadence <login@cadence-me.com>`. Removal is not possible: the API requires a string (`replyTo: null` → 422) and has no delete for reply profiles. The old profile remains, not default |
+| 21:14 | Sequenzy click tracking (company-wide) | `clickTrackingEnabled` true, `transactionalClickTrackingEnabled` true | both false. Open tracking unchanged (on). Also applies to reminder email |
+| 21:17 | Check: one `habit-reminder` test send to `cadence-332-main+reminder@agentmail.to` | — | Rendered; subject and variables intact; Open timeline link direct to `app.cadence-me.com`; only the footer's "Sent with Sequenzy" link goes to `sequenzylink3.com`; Reply-To `Cadence <login@cadence-me.com>`; SPF, DKIM, DMARC pass. From `Identity Scaffolding <hello@cadence-me.com>` (the company default sender since 17:38Z, unchanged here) |
+| 21:19 | Turnstile widget | The owner's widget `cadence-turnstile-secret-key` (made 20:51Z, Managed; hostnames `127.0.0.1`, `cadence-me.com`, `localhost`); its secret already in the vault item `turnstile-secret-key` | Used instead of a second widget; `cadence-blush-three.vercel.app` added. No new widget |
+| 21:19 | Step 8 secret: `security_captcha_provider`, `security_captcha_secret` (from the vault item) | `hcaptcha`, null | `turnstile`, set (the API returns a 64-character hash, so equality cannot be read back; the 21:33Z fake-token row proves Supabase checks with it). CAPTCHA still off |
+| 21:19 | Step 9: Vercel Production `CADENCE_TURNSTILE_SITE_KEY` | Unset | `0x4AAAAAAGAC-PYcXe6PWyGo` |
+| 21:21 | Step 6: SMTP | All null except `smtp_max_frequency` 60 | `smtp.sequenzy.com`, `587`, `api`, key set, `login@cadence-me.com`, `Cadence`, 60 |
+| 21:21 | Step 7 | `2` | `3` |
+| 21:21 | Check: one sign-in email from hosted Auth to `cadence-332-main+smtp1@agentmail.to` | — | From `Cadence <login@cadence-me.com>`, subject "Sign in to Cadence", 6-digit code, sign-in link direct to `app.cadence-me.com/login/confirm` (not rewritten), Reply-To `Cadence <login@cadence-me.com>`, SPF (`rp2.cadence-me.com`), DKIM, DMARC pass, free-plan footer. The unconfirmed user was deleted |
+| 21:22 | Production redeploy (same source, PR #273 merge `5a9d4e16`) so the site key is live | `dpl_24XetaJHx8JHEaFxVz6Yp4Thj9zR` | `dpl_FczNuaUmrQEwAxqmuwSmSAduYvp8` |
+| 21:24 | Step 8: `security_captcha_enabled` | `false` | `true`. An email request with no token: 400 `captcha_failed` |
+| 21:24 | Step 7 | `3` | `30` (reasoning below) |
+| 21:28–21:35 | Acceptance deployment (see the acceptance record): redirect entry `https://cadence-75492nx23-…vercel.app/auth/callback**` and that host on the widget | 48 entries; 4 hostnames | Added, then removed at 21:34Z (47 entries after another agent removed its own entry; 4 hostnames); deployment removed |
+| 21:35 | Vercel Production `CADENCE_SIGN_IN_EMAIL` | Unset | `on`; production redeployed 21:35Z (`dpl_…h74e23zw4`) |
+
+Rechecks after each hosted Auth change (baseline 21:20Z, 21:21Z, 21:24Z, 21:39Z): kept
+sessions A and B, and a fresh Google sign-in to `app.cadence-me.com` as A in the agent's own
+Chrome profile, returned as A. All passed. After CAPTCHA on: the Google and Apple starts
+(`/auth/v1/authorize`) redirect to Google and Apple; the admin link-token path that the test
+login uses (`admin/generate_link` then `/verify`) signs a reserved-address user in (user
+deleted); `npm run qa:preflight -- --suite mcp-protocol` ready 9 of 9. The Mac's current
+sign-in (Google in the browser) uses the same Google start and token refresh, which passed;
+hosted Auth logs read through the Management API returned no rows, so there is no Mac-specific
+log evidence.
+
+**Rate limit 30 an hour, against Sequenzy's free 2,500 emails a month (shared with
+reminders).** The limit is a ceiling for the whole project, not expected use. At 30 an hour
+sustained, 2,500 emails would last about 3.5 days. What stands between a bot and that
+ceiling is Turnstile on every email request, Supabase's per-address minimum of 60 seconds
+and per-IP limits on `/otp` (30 per 5 minutes). Expected real use is a few sign-in emails a
+day. A legitimate burst above 3 an hour (the pre-CAPTCHA value) is plausible at launch, so
+3 would refuse real people. If the Sequenzy dashboard shows sign-in email near the monthly
+cap, lower the limit or upgrade the plan (`docs/COSTS.md`).
+
+**For the owner (not blocking).** The widget's hostnames include `localhost` and
+`127.0.0.1`, so a token solved on a local page also passes production. Cloudflare suggests a
+separate widget (or its test keys) for development. The vault key has full access to the
+Sequenzy company; a key with the `transactional_sender` preset would be enough for SMTP.
 
 ## Before turning on CAPTCHA (step 8)
 

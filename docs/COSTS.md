@@ -67,7 +67,7 @@ implement most of it in source; it is not deployed yet.
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
-| Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 2 an hour with the built-in sender; with custom SMTP the planned value is 3 an hour while CAPTCHA is off (at most about 2,160 a month, inside the free 2,500) and 30 an hour once Turnstile is on | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 8 Supabase emails. `CADENCE_SIGN_IN_EMAIL` stays off and hosted SMTP is off until owner rows 11–13. Cloudflare Turnstile is free (not rechecked). Measure the volume in the first week after launch |
+| Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 30 an hour since November 13, 2026, 21:24Z, with Turnstile on every request (3 an hour before CAPTCHA; 2 with the built-in sender). 30 an hour is a ceiling, not expected use: sustained, it would spend the free 2,500 in about 3.5 days | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 8 Supabase emails; go-live run 7 more and one test reminder. Live since November 13, 2026, 21:35Z (`CADENCE_SIGN_IN_EMAIL` on; SMTP through Sequenzy as `login@cadence-me.com`). Cloudflare Turnstile is free (not rechecked). Measure the volume in the first week after launch; if it nears the monthly cap, lower the limit or upgrade |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
 
 ### Per-user total at 100 users
@@ -635,6 +635,9 @@ arrives, fees reduce the US$5:
 - 2026-11-13: The owner chose Sequenzy's free plan. Recorded its limits (2,500 emails a
   month shared by reminders and sign-in, 300,000 per company per 24 hours, a footer) and
   sized the sign-in email rate limit to it. Totals unchanged.
+- 2026-11-13: Email sign-in went live: hosted SMTP through Sequenzy, Turnstile on, email
+  rate limit 30 an hour, `CADENCE_SIGN_IN_EMAIL` on. No new paid call; sign-in email draws
+  on the same free 2,500 as reminders. Totals unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
