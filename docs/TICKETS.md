@@ -18977,10 +18977,13 @@ code, expiry and reuse; `dagger check --cadence --progress=report`.
 
 ## Ticket 333: Apple sign-in (web)
 
-Status: in progress (November 13, 2026). Built behind `CADENCE_SIGN_IN_APPLE` and checked
-locally with a stubbed provider (`docs/qa/2026-11-13-ticket-333-apple-sign-in.md`). The
-Apple Developer setup, the Supabase Apple provider, relay registration and the production
-check wait on owner blockers rows 4 and 5 (`docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`).
+Status: complete, live on production web since November 13, 2026, 21:36Z (`CADENCE_SIGN_IN_APPLE=on`, set
+together with `CADENCE_SIGN_IN_LINKING`). Local check with a stubbed provider:
+`docs/qa/2026-11-13-ticket-333-apple-sign-in.md`. Apple Developer setup, the Supabase Apple
+provider, relay registration and the client secret (expires May 12, 2027; rotate by April
+12, 2027): `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`. Production acceptance
+with the owner's Apple Account: `docs/qa/2026-11-13-ticket-333-production-acceptance.md`.
+The Mac side is Ticket 336.
 Filed November 13, 2026.
 Dependencies: Ticket 331; Ticket 332 merges first because both edit the login page.
 Decision: D31.2. Legal: L-024 and L-025.
@@ -19018,9 +19021,9 @@ test Apple Account; `dagger check --cadence --progress=report`.
 
 ## Ticket 334: Sign-in methods in Settings and the one-account rule
 
-Status: in progress. Filed November 13, 2026. Built November 13 behind
-`CADENCE_SIGN_IN_LINKING` (draft PR); hosted manual linking and acceptance remain
-(`docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`).
+Status: complete, live on production web since November 13, 2026, 21:36Z (`CADENCE_SIGN_IN_LINKING=on`).
+Filed November 13, 2026. Hosted changes: `docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`;
+production acceptance: Ticket 337's record.
 Dependencies: Tickets 332 and 333. Decision: D31.3.
 
 Goal: show which methods an account has and let the person add another, so nobody ends
@@ -19086,9 +19089,9 @@ Verification: local-integration tests for link, unlink and last-method refusal;
 
 ## Ticket 335: Google Calendar for accounts that do not sign in with Google
 
-Status: in progress. Filed November 13, 2026. Built November 13 behind
-`CADENCE_SIGN_IN_LINKING` (draft PR #271, migration `20261113210000` not pushed); acceptance
-with hosted manual linking remains (Ticket 337).
+Status: complete, live on production web since November 13, 2026, 21:36Z (behind `CADENCE_SIGN_IN_LINKING`,
+now on). Filed November 13, 2026. PR #271; migration `20261113210000` pushed; acceptance in
+Ticket 337's record.
 Dependencies: Ticket 334 (shared add-a-method path). Decision: D31.5.
 
 Goal: an email or Apple account connects Google Calendar without an error. Connecting adds
