@@ -1294,6 +1294,11 @@
       "reason": "Desktop reconnection uses provider-owned OAuth and one local Keychain session rather than Cadence route load."
     },
     {
+      "id": "INT-AUTH-015",
+      "classification": "not_load_bearing",
+      "reason": "Email sign-in is flag-gated and bounded by Supabase Auth's email limits (one email per address per 60 seconds; a project-wide hourly cap); its routes add one Auth call each and no Cadence database load."
+    },
+    {
       "id": "INT-TIMELINE-009",
       "classification": "not_load_bearing",
       "reason": "Elapsed-time capture and review reset are user-paced and duration-dependent; ordinary Timeline and Behaviors document reads cover their shared route capacity."

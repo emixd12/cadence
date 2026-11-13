@@ -55,14 +55,24 @@ describe("login interaction controls", () => {
     expect(await renderLogin({ next: "/settings" })).toContain(GOOGLE_DISABLED);
   });
 
-  it("renders the same page when the flags of unbuilt methods are on", async () => {
+  it("renders the same page when the flag of an unbuilt method is on", async () => {
     stubConfiguredSupabase();
     const flagsOff = await renderLogin({ next: "/settings" });
 
     vi.stubEnv("CADENCE_SIGN_IN_APPLE", "on");
-    vi.stubEnv("CADENCE_SIGN_IN_EMAIL", "on");
 
     expect(await renderLogin({ next: "/settings" })).toBe(flagsOff);
+  });
+
+  it("adds Continue with email after Google when the email flag is on (Ticket 332)", async () => {
+    stubConfiguredSupabase();
+    vi.stubEnv("CADENCE_SIGN_IN_EMAIL", "on");
+    const html = await renderLogin({ next: "/settings" });
+
+    expect(html).toContain('href="/auth/sign-in/email?next=%2Fsettings"');
+    expect(html.indexOf("Continue with Google")).toBeLessThan(
+      html.indexOf("Continue with email"),
+    );
   });
 
   it("lists every method it is given, in order, each with its own start link", () => {
