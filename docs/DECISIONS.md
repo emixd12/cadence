@@ -2560,7 +2560,8 @@ Sources, read by the planning agent on November 13, 2026 and not rechecked for t
 - Sequenzy, Supabase custom SMTP: `https://docs.sequenzy.com/guides/supabase-custom-smtp`
 - From memory, with no document read: App Store Review Guidelines 4.8 and 5.1.1(v).
 
-Assumptions. The owner has not confirmed the first two:
+Assumptions. The owner confirmed the first two on November 13, 2026 (see "Owner answers
+on D31" below):
 
 - Web ships first. The Mac follows in the next Mac release.
 - One email carries both the link and the code.
@@ -2599,3 +2600,20 @@ grants back.
 
 Platform impact: web hosted database only. Desktop, marketing and future mobile: not
 applicable. Messaging impact: none (P-053 already covers the kept token).
+
+## 2026-11-13: Owner answers on D31: assumptions confirmed, 6-digit code
+
+Amends D31; no new decision number. The owner answered the Owner blockers rows on
+November 13, 2026, about 17:36Z:
+
+1. **Row 7, D31 assumptions: confirmed.** Web ships first and the Mac follows in the next
+   Mac release (Ticket 336). One email carries both the link and the code (Ticket 332's
+   template `supabase/templates/sign-in.html`).
+2. **Row 8, code length: 6 digits.** Hosted `mailer_otp_length` changed from 8 to 6 on
+   November 13, 17:44Z. `EMAIL_SIGN_IN_CODE_LENGTH` and local `otp_length` were already 6.
+
+The same answers granted: agents change the hosted Auth settings for Tickets 332–335
+(row 1); sign-in email may go to the AgentMail test inbox on production (row 6); the sender
+is `login@cadence-me.com`, name "Cadence", and agents add `cadence-me.com` as a Sequenzy
+sending domain (row 2); Sequenzy stays on the free plan for now (row 2). Evidence of what
+was applied: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.

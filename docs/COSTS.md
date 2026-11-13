@@ -42,7 +42,7 @@ These costs do not grow with each user.
 | Supabase Pro | From US$25; includes US$10 compute credit, 100,000 MAU, 8 GB disk, 250 GB egress | US$25 | [Supabase pricing](https://supabase.com/pricing) | 2026-10-16 | Micro compute covered by the credit. |
 | Apple Developer Program | US$99 per year | US$8.25 | Apple, not rechecked | — | Required for signed macOS builds. |
 | Domain `cadence-me.com` | About US$10–11 per year | About US$0.90 | Cloudflare Registrar, not verified | — | Replace with the renewal invoice amount. |
-| Sequenzy | Plan not recorded; public free allowance 2,500 emails per month | Unknown | [Sequenzy pricing](https://www.sequenzy.com/pricing) | 2026-08-01 | `docs/SEQUENZY_WORKFLOW.md` requires the owner to record the plan. |
+| Sequenzy | Free plan (owner, November 13, 2026): 2,500 emails per month pooled across the account's companies, unlimited contacts and sending domains; free-plan email carries a "Sent with Sequenzy" footer. A rolling safety cap of 300,000 accepted emails per 24 hours per company; the monthly allowance is an accounting and upgrade threshold, not a documented hard stop | US$0 | [Sequenzy pricing](https://www.sequenzy.com/pricing); [workspaces and billing](https://docs.sequenzy.com/concepts/workspaces-and-billing) | 2026-11-13 | Reminder and sign-in email share the 2,500. What happens above it is not documented; upgrade before volume nears it. Paid plans start at 15,000 emails per month (price not recorded). |
 | Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$0 while testing on the free API; US$29 before commercial use | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18. On 2026-10-22 the owner chose the free API for development and testing; API Standard is required before commercial use (`docs/LEGAL.md` L-008). Not subscribed. |
 | **Total known** | | **About US$54 today; about US$83 with the paid weather plan** | | | |
 
@@ -67,7 +67,7 @@ implement most of it in source; it is not deployed yet.
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
-| Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session; Supabase allows at most one per address per 60 s and the project limit is 2 an hour until custom SMTP (then 30 an hour, step 7 of `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`) | Sequenzy's public free allowance covers about 2,500 sign-in emails a month; volume not measured | US$0 within the free allowance; the account's plan and per-email price are not recorded | Built behind `CADENCE_SIGN_IN_EMAIL`, off in production; no hosted email sent. Sequenzy's SMTP relay waits on the owner (sender, key, DNS). Cloudflare Turnstile is free (not rechecked). Measure the volume in the first week after Ticket 337 |
+| Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 2 an hour with the built-in sender; with custom SMTP the planned value is 3 an hour while CAPTCHA is off (at most about 2,160 a month, inside the free 2,500) and 30 an hour once Turnstile is on | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 13 Supabase emails. `CADENCE_SIGN_IN_EMAIL` stays off and hosted SMTP is off until owner rows 9–11. Cloudflare Turnstile is free (not rechecked). Measure the volume in the first week after launch |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
 
 ### Per-user total at 100 users
@@ -632,6 +632,9 @@ arrives, fees reduce the US$5:
   The sign-in email row now has a volume estimate and the rate limits; price stays
   unknown until the owner records Sequenzy's plan. Cloudflare Turnstile is free (not
   rechecked). Totals unchanged.
+- 2026-11-13: The owner chose Sequenzy's free plan. Recorded its limits (2,500 emails a
+  month shared by reminders and sign-in, 300,000 per company per 24 hours, a footer) and
+  sized the sign-in email rate limit to it. Totals unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
