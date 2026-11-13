@@ -23,6 +23,7 @@ vi.mock("@supabase/supabase-js", () => ({
 import {
   authForwardingFor,
   clientAddressOf,
+  isSessionRefreshUrl,
   turnstilePasses,
   type AuthForwarding,
 } from "@/lib/auth/auth-forwarding";
@@ -157,5 +158,23 @@ describe("sendEmailSignIn", () => {
     expect((await sendEmailSignIn({ request, config, email: "a@example.test", captchaToken: "tok" })).error?.code).toBe("captcha_failed");
     expect(supabase.calls).toEqual([]);
     expect(supabase.otp).not.toHaveBeenCalled();
+  });
+});
+
+// Ticket 339: only the session refresh may carry the secret key and the address.
+// The sign-in callback's code exchange uses the same endpoint with another grant.
+describe("isSessionRefreshUrl", () => {
+  const base = "https://project.supabase.co";
+  it.each([
+    [`${base}/auth/v1/token?grant_type=refresh_token`, true],
+    [`${base}/auth/v1/token?grant_type=pkce`, false],
+    [`${base}/auth/v1/token?grant_type=password`, false],
+    [`${base}/auth/v1/token`, false],
+    [`${base}/auth/v1/user`, false],
+    [`${base}/auth/v1/otp?grant_type=refresh_token`, false],
+    ["https://other.example/auth/v1/token?grant_type=refresh_token", false],
+  ])("%s -> %s", (url, expected) => {
+    expect(isSessionRefreshUrl(new URL(url), base)).toBe(expected);
+    expect(isSessionRefreshUrl(new URL(url), `${base}/`)).toBe(expected);
   });
 });

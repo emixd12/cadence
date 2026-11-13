@@ -125,3 +125,34 @@ Part 2 goes live on merge. Production check after deploy: A's kept session loads
   `/token` from Cadence's server and is not forwarded. If Auth counts it in the same
   bucket, the same attack can delay new Google sign-ins. Not measured; a follow-up.
 - The 503 page reloads every 5 s while Auth refuses. Each reload is one refresh call.
+
+## H. Verifier check (November 13, 2026)
+
+Result: part 2 behaves as section B says; no protected data is served on the 503 path.
+Own Next dev server (port 56900) against the shared local stack, through a fault gateway
+(port 56901) that answered Auth calls with chosen statuses; own Auth copy
+(`scripts/auth-rate-limit-local.mjs`, ports 56997 and 56998) for the callback
+measurement. Throwaway users deleted, containers and servers stopped. Nothing hosted
+changed.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Refresh answer classes, `/timeline` and `/api/export/json` | 200: new cookie. 400 (`invalid_grant`, `refresh_token_not_found`, `refresh_token_already_used`), 401, 403, 404: 307 to `/login`, cookie cleared; export 401. 429 (JSON or HTML), 500, 502, 503, 520, 522, empty 500, connection reset: 503 page or JSON, `Cache-Control: private, no-store`, `Retry-After: 5`, no cookie written. 200 with an HTML or empty body: 307 to `/login`, cookie kept (as on main). |
+| 2 | Same classes on main | 429: signed out (cookie cleared). 500 and connection reset: 307 to `/login`, cookie kept. |
+| 3 | Real ended sessions | Revoked (admin global sign-out), deleted account, made-up token: 307, cookie cleared. Revoked session behind two 429s: 503, 503, then 307 with the cookie cleared on the first real answer. |
+| 4 | Retry time | auth-js retries 5xx, network errors and unparseable bodies for about 25 s (8 Auth calls) before the proxy answers, on main and on the branch. A 429 is not retried. Auth that never answers holds the request until the platform timeout (unchanged). |
+| 5 | Parallel requests, one expired session, 6 at once | No fault: 6 × 200 with a new cookie. Two or five 429s mixed in: the refused ones 503 with no cookie, the rest 200; applying the answers in arrival order left a working cookie in 8 of 8 trials. |
+| 6 | Refresh 200 then JWKS 503 (cold key cache) | 503 without the new cookie, so the browser keeps the rotated-out refresh token. 12 s later the old token still refreshed (200): Auth accepts the parent of the active token. One extra 503, no sign-out. |
+| 7 | Chrome (headless, own profile) | Page load during three 429s: 503, 503, 503 at 5 s intervals, then 200 `/timeline`. Client navigation to `/behaviors` during 429: the RSC fetch got 503, Next fell back to a full load, the retry page showed, then `/behaviors` loaded. Save behavior during 429: the action POST got 503, nothing was saved, nothing was replayed after Auth recovered; the app showed its error ("An unexpected response was received from the server") and the typed title was lost. On main the same POST also fails and signs the person out. Sign out: cookie removed, `/timeline` then goes to `/login`. |
+| 8 | Forwarding on (`VERCEL=1`, both variables) | Only `POST /token?grant_type=refresh_token` carried `sb_secret_…` and `Sb-Forwarded-For`; both JWKS calls and all 16 PostgREST calls used the publishable key. |
+| 9 | `VERCEL` on Vercel | Vercel documents `VERCEL=1` at build and runtime when system variables are exposed; the project's `autoExposeSystemEnvs` is `true` (Vercel API). Ticket 338's email paths keep forwarding there. |
+| 10 | Tests are real | 12 breaks of the rule, the 503 path, `/login`, Cache-Control, forwarding scope and the Vercel gate: 11 failed the unit tests. Forwarding every `/token` grant passed, so the verifier added `isSessionRefreshUrl` cases (PKCE, password, other paths and hosts); that break and dropping the host check now fail. |
+| 11 | Does the sign-in callback share the bucket? | **Yes.** Auth copy with hosted limits, one address: 30 made-up refreshes, then a PKCE exchange got 429 `over_request_rate_limit`; 30 made-up PKCE exchanges, then a refresh got 429. Until the callback forwards the address too, one address can block new Google and Apple sign-ins for everyone for up to a few minutes. Follow-up, not fixed here: forward `Sb-Forwarded-For` on the callback's `grant_type=pkce` exchange under the same conditions. |
+
+What a person sees during a 5-minute Auth outage. On main, a page load that needs a refresh
+waits about 25 s, then goes to `/login` (cookie kept for 5xx, cleared for 429). On the
+branch, the same wait ends on "Cadence could not check your sign-in just now", which
+reloads every 5 s (each reload waits about 25 s again for 5xx) and returns to the page
+after Auth recovers. A form submitted during the outage is lost on both. Load: one
+waiting tab sends about 8 Auth calls every 30 s during a 5xx outage, or 1 every 5 s during
+429s, until it gets through. The reload has no jitter or backoff.
