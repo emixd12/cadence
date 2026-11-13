@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase/server";
 import { invalidateStableUserData } from "@/lib/cache/stable-user-data.cache";
 import type { AccountDeletionActionState } from "@/lib/types/account";
+import { accountDeletionConfirmationText } from "@/lib/auth/account-sign-in-methods";
 
 export class AccountDeletionUserError extends Error {
   constructor(message: string) {
@@ -40,7 +41,7 @@ export async function deleteCurrentAccountFromFormData(
     );
   }
 
-  const expectedConfirmation = user.email?.trim() || "DELETE";
+  const expectedConfirmation = accountDeletionConfirmationText(user.email);
 
   assertExportAcknowledged(formData);
   assertConfirmationMatches(formData, expectedConfirmation);

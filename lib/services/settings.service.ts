@@ -17,6 +17,7 @@ import {
   readCachedProfileSettings,
 } from "@/lib/cache/stable-user-data.cache";
 import { createClient } from "@/lib/supabase/server";
+import { accountDeletionConfirmationText } from "@/lib/auth/account-sign-in-methods";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import type { TimezoneActionState } from "@/lib/types/settings";
 
@@ -50,7 +51,7 @@ export async function getSettingsPageData(): Promise<SettingsPageData> {
     vapidPublicKey: normalizePublicVapidKey(
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     ),
-    deleteConfirmationLabel: claimsEmail?.trim() || "DELETE",
+    deleteConfirmationLabel: accountDeletionConfirmationText(claimsEmail),
   };
 }
 

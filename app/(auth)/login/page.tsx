@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/redirects";
 import { MARKETING_SITE_URL } from "@/lib/marketing-site";
 import { enabledSignInMethods } from "@/lib/auth/sign-in-methods";
+import { signInLinkingEnabled } from "@/lib/auth/account-sign-in-methods";
 import { DEFAULT_APP_ROUTE } from "@/lib/navigation";
 import { readSupabaseRuntimeConfig } from "@/lib/supabase/env";
 import { shouldShowTestLogin } from "@/lib/auth/test-login";
@@ -34,6 +35,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const signedOut = !accountDeleted && params.signedout === "1";
   const isConfigured = readSupabaseRuntimeConfig() !== null;
   const testLoginEnabled = shouldShowTestLogin();
+  const methods = enabledSignInMethods();
+  // Ticket 334: a sign-in by a method the account does not have yet makes a
+  // second account, so say which way to choose before anyone picks.
+  const showOneAccountHint = signInLinkingEnabled() && methods.length > 1;
 
   return (
     <main className="min-h-dvh bg-background px-6 pb-16 pt-[22dvh] text-foreground">
@@ -77,9 +82,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="mt-6">
           <SignInMethods
             disabled={!isConfigured}
-            methods={enabledSignInMethods()}
+            methods={methods}
             nextPath={nextPath}
           />
+          {showOneAccountHint ? (
+            <p className="mt-4 text-sm leading-6 text-muted-readable">
+              Have an account already? Sign in the way you did before, then
+              add other ways in Settings. Another way can start a second
+              account.
+            </p>
+          ) : null}
         </div>
 
         <p className="mt-6 text-[0.8rem] leading-5 text-muted-readable">

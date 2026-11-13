@@ -19,6 +19,13 @@ import {
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
+import { SignInMethodsRow } from "@/components/settings/SignInMethodsPanel";
+import {
+  SIGN_IN_METHODS_METHOD_PARAM,
+  SIGN_IN_METHODS_RESULT_PARAM,
+  signInMethodResultMessage,
+} from "@/lib/auth/account-sign-in-methods";
+import { getSignInMethodsView } from "@/lib/services/sign-in-methods.service";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
@@ -44,27 +51,31 @@ export const metadata: Metadata = {
   title: "Settings",
 };
 
-export default function SettingsPage() {
+type SettingsSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default function SettingsPage({ searchParams }: Readonly<{ searchParams: SettingsSearchParams }>) {
   return (
     <ScreenFrame title="Settings">
       <Suspense fallback={<ScreenContentLoading label="Loading settings" />}>
-        <SettingsContent />
+        <SettingsContent searchParams={searchParams} />
       </Suspense>
     </ScreenFrame>
   );
 }
 
-async function SettingsContent() {
+async function SettingsContent({ searchParams }: Readonly<{ searchParams: SettingsSearchParams }>) {
   const settings = await withPerformanceRoute(
     "/settings",
     "page.data_load",
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, connectedApps, dayNoteShortcutView] = await Promise.all([
+  const [categorySettings, connectedApps, dayNoteShortcutView, signInMethods, params] = await Promise.all([
     getCategorySettings(),
     getConnectedApps(),
     getNoteShortcutViewForCurrentUser(DAY_NOTE_SHORTCUT_POOL_ID),
+    getSignInMethodsView(),
+    searchParams,
   ]);
 
   // Ticket 301: four groups, a sticky index, closed source rows and drawers.
@@ -122,6 +133,16 @@ async function SettingsContent() {
       </SettingsGroup>
 
       <SettingsGroup id="settings-account">
+        {/* Ticket 334: only while CADENCE_SIGN_IN_LINKING is on. */}
+        {signInMethods ? (
+          <SignInMethodsRow
+            view={signInMethods}
+            result={signInMethodResultMessage(
+              params[SIGN_IN_METHODS_RESULT_PARAM],
+              params[SIGN_IN_METHODS_METHOD_PARAM],
+            )}
+          />
+        ) : null}
         <SettingsExportEntry />
       </SettingsGroup>
 
