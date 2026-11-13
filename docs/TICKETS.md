@@ -18725,7 +18725,7 @@ for test account A downloads.
 
 ## Ticket 327: Launch narrative source and claims table
 
-Status: drafted November 13, 2026; awaiting the owner's review of `docs/NARRATIVE.md`.
+Status: complete November 13, 2026 (PR #257). The owner accepted `docs/NARRATIVE.md` as written.
 Messaging track. Not a development ticket.
 Dependencies: none. Decision: `docs/DECISIONS.md`, 2026-11-13, D30.
 

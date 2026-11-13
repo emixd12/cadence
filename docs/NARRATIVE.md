@@ -1,6 +1,6 @@
 # Launch narrative
 
-Status: draft for owner review. Decision: `docs/DECISIONS.md`, 2026-11-13, D30.
+Status: accepted by the owner on November 13, 2026. Decision: `docs/DECISIONS.md`, 2026-11-13, D30.
 Ticket 327.
 
 This file is the one source for what Cadence says about itself in public. Every

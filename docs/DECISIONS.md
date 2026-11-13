@@ -2443,7 +2443,8 @@ copy.
    AI clients. No public claim or store page precedes a shipped app.
 6. **D30.6: company roadmap.** Other company products stay out of Cadence launch copy.
 
-Assumptions made while recording this, for the owner to confirm or correct:
+Assumptions made while recording this. The owner accepted the draft as written on
+November 13, 2026, without changing them:
 
 - "Assistant" is positioning. It adds no feature. In-app chat and autonomous execution
   still need their own tickets (`AGENTS.md`, out of scope for v1).
