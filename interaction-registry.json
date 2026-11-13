@@ -903,9 +903,9 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 14,
       "interaction_ids": [],
-      "reason": "Development-only synthetic Calendar bench; no provider or account access."
+      "reason": "Development-only synthetic Calendar bench; no provider or account access. Ticket 335 adds a Google sign-in select for the four googleSignIn sentences."
     },
     {
       "path": "app/design-system/DailyBriefBench.tsx",
@@ -12850,7 +12850,7 @@
       ],
       "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Each button shows for an enabled method the account does not have yet; Apple needs CADENCE_SIGN_IN_APPLE and Ticket 333. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Supabase manual identity linking sends the person to the provider and back through /auth/callback; Settings shows the new method and says it was added.",
-      "failure_result": "A provider account that already signs in to another Cadence account is refused with a plain message that names no account; Cadence does not merge accounts. Other failures say the method was not added.",
+      "failure_result": "A provider account that already signs in to another Cadence account is refused with a plain message that names no account; Cadence does not merge accounts. A method the account already has is refused on the server (Ticket 335: one Google sign-in per account). Other failures say the method was not added.",
       "effects": [
         "external_navigation",
         "authentication_identity_change",
@@ -13043,7 +13043,7 @@
       ],
       "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
       "success_result": "Unlinks the identity with the person's own session and says it was removed. Removing Apple also asks Apple to revoke Cadence's authorization and forgets the token Cadence kept for that identity; a failed revocation does not block the removal.",
-      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays.",
+      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays. Ticket 335: Google is refused while Google Calendar is connected through it, by the server and by the database trigger under the account's row lock; the message says to disconnect Google Calendar first.",
       "effects": [
         "authentication_identity_change",
         "external_api_request",
@@ -13122,9 +13122,9 @@
           "control": "Connect Google Calendar"
         }
       ],
-      "availability": "Explicit action is available after Cadence sign-in and provider configuration. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Opens provider consent; same-account verification installs sealed server credentials.",
-      "failure_result": "Consent denial, wrong-account selection, and expired state leave Cadence data unchanged. Wrong-account recovery links to Google Account connections and discloses project-wide revocation; Cadence never revokes automatically.",
+      "availability": "Explicit action is available after Cadence sign-in and provider configuration. Each purpose requires its own configured client and same-account grant. Ticket 335 (D31.5): an account with no Google sign-in sees the button only on web while CADENCE_SIGN_IN_LINKING is on, with the sentence that the chosen Google account becomes a way to sign in; with the flag off, on the Mac, or with more than one Google sign-in, a plain sentence replaces the button.",
+      "success_result": "Opens provider consent; same-account verification installs sealed server credentials. Ticket 335: an account with no Google sign-in first adds Google through Supabase manual identity linking (with a sign-in in the last 15 minutes) and returns to Settings; the next Connect opens Calendar consent for that same Google account. The return address alone starts nothing.",
+      "failure_result": "Consent denial, wrong-account selection, and expired state leave Cadence data unchanged. Wrong-account recovery links to Google Account connections and discloses project-wide revocation; Cadence never revokes automatically. A Google account that already signs in to another Cadence account is refused with a plain message that names no account, and Calendar does not connect.",
       "effects": [
         "authentication_session",
         "external_navigation",
@@ -13133,13 +13133,16 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/settings/GoogleCalendarPanel.tsx"
+        "components/settings/GoogleCalendarPanel.tsx",
+        "components/settings/WebGoogleCalendarPanel.tsx",
+        "lib/services/google-calendar.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts"
+          "tests/google-calendar-agent-retirement.test.ts",
+          "tests/calendar-google-sign-in.local-integration.test.ts"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },

@@ -291,6 +291,24 @@ is not security definer, has no grant to `anon` or `authenticated`, and names on
 tables, which the Auth service's role owns. Local check:
 `tests/sign-in-methods.local-integration.test.ts`.
 
+**Calendar's Google sign-in stays while Calendar is connected (Ticket 335, D31.5).**
+Migration `20261113210000_calendar_google_identity_lock.sql` extends
+`keep_one_auth_identity`: after the last-identity check it refuses (`P0001`,
+`cadence_calendar_connected`) to delete a `google` identity whose `provider_id` is the
+`google_subject` of a `connected` `google_calendar_connections` row of that user. The
+function is now security definer (owner `postgres`, search path empty), because the
+trigger runs as the Auth service's role, which cannot read `public`; it still has no grant
+to `public`, `anon` or `authenticated`. The same migration makes
+`calendar_install_credential` lock the user's `auth.users` row before it checks the
+identity, so an unlink and a Calendar install for one account run one after the other:
+whichever commits second sees the other (measured before the fix: Calendar connected with no
+Google sign-in in 8 of 40 trials). Lock order on both paths is identity row (delete only),
+then user row, then the Calendar row. `calendar_begin_attempt` now moves a Calendar row that
+is not `connected` to the Google identity it was given (which it has already checked belongs
+to the account), so a person who removed one Google sign-in and added another can connect
+again. Grants on both `calendar_*` functions are unchanged (`service_role`). Local check:
+`tests/calendar-google-sign-in.local-integration.test.ts`.
+
 ### `categories`
 
 ```sql
@@ -2342,6 +2360,12 @@ attempt hash where applicable. A key ID selects the decryption keyring. Credenti
 never enter exports, sync snapshots, or desktop backups. Hosting infrastructure
 backups may retain sealed ciphertext under the existing provider retention policy.
 Local ownership/race verification: `tests/sql/google-calendar-contract.sql`.
+
+Ticket 335 (migration `20261113210000`) locks the account's `auth.users` row in
+`calendar_install_credential`, lets `calendar_begin_attempt` move a row that is not
+`connected` to the account's current Google identity, and refuses removing the Google
+identity a connected row uses (see "Calendar's Google sign-in stays while Calendar is
+connected" above). A connected row is never rebound.
 
 ## Hevy, Outlook, and iCloud connector lifecycle (Ticket 235)
 

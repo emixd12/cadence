@@ -2,29 +2,65 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { beginCalendarAttempt, consumeCalendarAttempt, installCalendarCredential, readCalendarCallbackUser, readCalendarConnection, readCalendarCredential, removeCalendarCredential, saveCalendarPreferences } from "@/lib/db/google-calendar.repo";
-import type { CalendarConnection, CalendarConnectionView, CalendarPreferences, CalendarPurpose } from "@/lib/types/google-calendar";
-import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
-import { CalendarConnectionError, calendarGoogleSubject, type CalendarIdentityUser, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
+import type { CalendarConnection, CalendarConnectionView, CalendarGoogleSignIn, CalendarPreferences, CalendarPurpose } from "@/lib/types/google-calendar";
+import { CALENDAR_AFTER_GOOGLE_SIGN_IN, DEFAULT_CALENDAR_PREFERENCES, GOOGLE_CALENDAR_SETTINGS_PATH } from "@/lib/types/google-calendar";
+import { REAUTH_REQUIRED_ERROR, signInLinkingEnabled } from "@/lib/auth/account-sign-in-methods";
+import { buildLoginPath } from "@/lib/auth/redirects";
+import { endSessionForRecentSignIn, startAddSignInMethod } from "@/lib/services/sign-in-methods.service";
+import { CalendarConnectionError, calendarGoogleSubject, googleSignInSubjects, type CalendarIdentityUser, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 
-export type CalendarCaller = { client: AppSupabaseClient; user: User };
+/** `via: "bearer"` marks the Mac's token requests; the web sends its session cookie. */
+export type CalendarCaller = { client: AppSupabaseClient; user: User; via?: "cookie" | "bearer" };
 /** Calendar reads need only the account id and its Google identity, so the leave reminder job's caller (Ticket 276) fits. */
 export type CalendarReadCaller = { client: AppSupabaseClient; user: CalendarIdentityUser };
 function config(requestOrigin?: string, grantPurpose: CalendarPurpose = "standard") { const value = readCalendarOAuthConfig(process.env, requestOrigin, grantPurpose); if (!value) throw new CalendarConnectionError("not_configured"); return value; }
-export async function getCalendarConnection(caller: CalendarReadCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnectionView> {
+/**
+ * Ticket 335 (D31.5): what Connect does for an account without exactly one Google sign-in.
+ * `undefined` for the one-Google-sign-in account, which connects as before.
+ */
+export function calendarGoogleSignIn(caller: CalendarReadCaller & { via?: CalendarCaller["via"] }): CalendarGoogleSignIn | undefined {
+  const count = googleSignInSubjects(caller.user).length;
+  if (count === 1) return undefined;
+  if (count > 1) return "multiple";
+  if (!signInLinkingEnabled()) return "unavailable";
+  return caller.via === "bearer" ? "add_on_web" : "add";
+}
+export async function getCalendarConnection(caller: CalendarReadCaller & { via?: CalendarCaller["via"] }, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnectionView> {
   const settings = readCalendarOAuthConfig(process.env, undefined, grantPurpose);
   if (!settings) return { accountId: caller.user.id, status: "not_configured", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
-  if (connection && connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
-  return connection ? { accountId: caller.user.id, status: connection.status === "connected" && grantPurpose === "agent" && connection.oauthClientId !== settings.clientId ? "reconnect_required" : connection.status, generation: connection.generation, selectionRevision: connection.selectionRevision, preferences: connection.preferences }
-    : { accountId: caller.user.id, status: "disconnected", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
+  // A row without a credential keeps its first Google subject until the next connect moves it
+  // (calendar_begin_attempt). A connected row must use one of the account's Google sign-ins.
+  if (connection?.status === "connected" && !googleSignInSubjects(caller.user).includes(connection.googleSubject)) throw new CalendarConnectionError("same_account_required");
+  const googleSignIn = calendarGoogleSignIn(caller);
+  const hint = googleSignIn ? { googleSignIn } : {};
+  return connection ? { accountId: caller.user.id, status: connection.status === "connected" && grantPurpose === "agent" && connection.oauthClientId !== settings.clientId ? "reconnect_required" : connection.status, generation: connection.generation, selectionRevision: connection.selectionRevision, preferences: connection.preferences, ...hint }
+    : { accountId: caller.user.id, status: "disconnected", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES, ...hint };
+}
+/**
+ * Ticket 335 (D31.5): an account with no Google sign-in adds one first, through Ticket 334's
+ * linking. The return lands on Settings with `calendar=link`, and the Calendar panel then
+ * starts the Calendar consent for that same Google account. Calendar keeps its own OAuth:
+ * the link callback does not keep Google's tokens.
+ */
+async function addGoogleSignInFirst(origin: URL): Promise<{ url: string }> {
+  const [path, hash] = GOOGLE_CALENDAR_SETTINGS_PATH.split("#");
+  const outcome = await startAddSignInMethod({ origin, methodId: "google", returnPath: `${path}?calendar=${CALENDAR_AFTER_GOOGLE_SIGN_IN}#${hash}` });
+  if (outcome.kind === "redirect") return { url: outcome.url };
+  if (outcome.result === "reauth_required") {
+    await endSessionForRecentSignIn();
+    return { url: buildLoginPath(GOOGLE_CALENDAR_SETTINGS_PATH, REAUTH_REQUIRED_ERROR) };
+  }
+  throw new CalendarConnectionError("provider_unavailable");
 }
 export async function startCalendarConnection(caller: CalendarCaller, target: "web" | "desktop", clientState = "", requestOrigin?: string, grantPurpose: CalendarPurpose = "standard") {
   // Ticket 307: the separate Daily Brief grant is retired; no new one starts.
   if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const settings = config(requestOrigin);
+  if (target === "web" && requestOrigin && calendarGoogleSignIn(caller) === "add") return addGoogleSignInFirst(new URL(requestOrigin));
   const googleSubject = calendarGoogleSubject(caller.user);
   if (target === "desktop" && !/^[a-zA-Z0-9_-]{32,128}$/.test(clientState)) throw new CalendarConnectionError("invalid_request");
   const existing = await readCalendarConnection(caller.client, caller.user.id);
@@ -229,8 +265,9 @@ export async function disconnectCalendar(caller: CalendarCaller, grantPurpose: C
   if (grantPurpose === "agent") throw new CalendarConnectionError("not_configured");
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
   let revocationFailed = false;
+  // Ticket 335: the account's own connection can always be disconnected and its grant
+  // revoked, whatever its Google sign-ins are now.
   if (connection) {
-    if (connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
     const sealed = await removeCalendarCredential(connection, "disconnected");
     if (sealed) {
       try { await revokeCalendarToken(openCalendarSecret(config(undefined, grantPurpose), sealed, { ...connection, purpose: "refresh" })); }
@@ -257,7 +294,6 @@ export async function prepareCalendarRevocation(caller: CalendarCaller): Promise
       ? await readCalendarConnection(caller.client, caller.user.id, grantPurpose).catch(() => null)
       : await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
     if (!connection || connection.status !== "connected") continue;
-    if (connection.googleSubject !== calendarGoogleSubject(caller.user)) throw new CalendarConnectionError("same_account_required");
     const sealed = await readCalendarCredential(connection);
     work.push(async () => revokeCalendarToken(openCalendarSecret(settings, sealed, { ...connection, purpose: "refresh" })));
   }

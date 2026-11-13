@@ -19086,7 +19086,9 @@ Verification: local-integration tests for link, unlink and last-method refusal;
 
 ## Ticket 335: Google Calendar for accounts that do not sign in with Google
 
-Status: not started. Filed November 13, 2026.
+Status: in progress. Filed November 13, 2026. Built November 13 behind
+`CADENCE_SIGN_IN_LINKING` (draft PR #271, migration `20261113210000` not pushed); acceptance
+with hosted manual linking remains (Ticket 337).
 Dependencies: Ticket 334 (shared add-a-method path). Decision: D31.5.
 
 Goal: an email or Apple account connects Google Calendar without an error. Connecting adds
@@ -19106,6 +19108,50 @@ Scope and acceptance:
 - The leave reminder job still reads Calendar for both kinds of account.
 
 Out of scope: a Calendar connection for a Google account that is not a sign-in method.
+
+As built (November 13, 2026):
+
+- An account with no Google sign-in reads `googleSignIn: "add"` in the Calendar connection
+  view on web while the flag is on. The panel says "Connecting adds the Google account you
+  choose as a way to sign in to Cadence." Connect calls `startAddSignInMethod` (Google,
+  return `/settings?calendar=link#connector-google_calendar`); an old session is signed out
+  and sent to sign in again. On return, `WebGoogleCalendarPanel` clears the address and
+  starts Calendar consent, whose login hint is the Google account just added. The Sign-in
+  methods row stays quiet on that return; the Calendar panel shows the result.
+  Verifier fix: the return never starts anything by itself, because a link from another site
+  can carry the same address. The panel says "Google added as a way to sign in. Select
+  Connect Google Calendar…" and consent starts on that click.
+- Calendar keeps its own OAuth, because the link callback does not keep Google's tokens.
+  Two Google screens appear: sign-in, then Calendar access.
+- Second Google sign-in: prevented in Ticket 334's add path. `startAddSignInMethod` refuses a
+  method the account already has (`already_added`). Reason: Calendar, its sealed
+  credentials and `leave_reminder_google_subject` all bind to the one Google sign-in, so one
+  Google account per Cadence account keeps the binding unambiguous with no migration. Two
+  Google sign-ins can still arise from two simultaneous adds; Calendar then shows
+  `multiple` ("Remove one under Sign-in methods") and does not connect, and the leave
+  reminder job reads no Calendar, as before. The database does not refuse a second Google
+  identity: that would break Ticket 334's tests and Supabase's automatic linking. A
+  person's own session could call Supabase's linking endpoint directly; it can only add
+  their own Google account, and the state is handled as above. Disconnect works whatever
+  the Google sign-ins are, so the grant can always be revoked.
+- Removing Google while Calendar is connected through it: refused (`calendar_connected`,
+  "Disconnect Google Calendar first, then remove Google."). Chosen over disconnecting
+  automatically because it needs no revocation inside the removal. The database enforces it
+  (migration `20261113210000`): `keep_one_auth_identity` refuses deleting that identity, and
+  `calendar_install_credential` takes the same user-row lock, so a removal and a Calendar
+  connect at the same moment cannot leave Calendar connected without Google (verifier: 8 of
+  40 before the fix). A Calendar row without a credential keeps its first Google subject;
+  `calendar_begin_attempt` moves it to the account's current Google sign-in on the next
+  connect, never a connected row.
+- Flag off: a plain sentence replaces Connect ("…this account does not sign in with
+  Google."), not the `same_account_required` error. Mac (bearer requests): `add_on_web`, a
+  sentence pointing to Sign-in methods on the web, and no Connect button; a desktop connect
+  request is still refused before any provider step.
+- Unchanged: a one-Google-sign-in account; sealed credentials (bound to user ID and Google
+  subject); the leave reminder job; the retired Daily Brief grant.
+- Hosted: push `20261113210000` before Ticket 334's manual linking
+  (`docs/qa/2026-11-13-ticket-335-hosted-changes.md`).
+- Evidence: `docs/qa/2026-11-13-ticket-335-calendar-google-sign-in.md`.
 
 Platform impact:
 

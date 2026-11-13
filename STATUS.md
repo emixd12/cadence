@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); production acceptance of email passed November 13; code length 6 and `cadence-me.com` DNS applied; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 336 merged (PR #270), not in a Mac release yet; 335 and 337 not started; Google stays the only live method | 332: owner rows 11–13 (an SMTP key from the Sequenzy company that holds `cadence-me.com`; reply-to, click tracking and footer; Turnstile permission on the Cloudflare token), then SMTP, CAPTCHA and the flag (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); production acceptance of email passed November 13; code length 6 and `cadence-me.com` DNS applied; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 336 merged (PR #270), not in a Mac release yet; 335 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #271; migration `20261113210000` not pushed); 337 not started; Google stays the only live method | 332: owner rows 11–13 (an SMTP key from the Sequenzy company that holds `cadence-me.com`; reply-to, click tracking and footer; Turnstile permission on the Cloudflare token), then SMTP, CAPTCHA and the flag (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -91,6 +91,38 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 335: Google Calendar for accounts that do not sign in with Google — November 13, 2026
+
+- **Built, behind `CADENCE_SIGN_IN_LINKING` (draft PR #271).** An account with no Google
+  sign-in is told "Connecting adds the Google account you choose as a way to sign in to
+  Cadence."; Connect adds Google through Ticket 334's `startAddSignInMethod`, returns to
+  Settings, and the next click on **Connect Google Calendar** opens consent for that Google
+  account. A Google account on another Cadence account is refused without naming it.
+- **Rules.** One Google sign-in per account: the add path refuses a second (`already_added`);
+  two (only by a race) read as `multiple`, Calendar does not connect, Disconnect still works.
+  Removing Google is refused while Calendar is connected through it (`calendar_connected`).
+- **Verifier fixes.** Migration `20261113210000_calendar_google_identity_lock.sql` (pushed
+  to hosted November 13, 20:13:20Z, by the verifier; `docs/qa/2026-11-13-ticket-335-hosted-changes.md`,
+  step 1, before and after read back; no grant changed): the identities
+  trigger refuses removing Calendar's Google identity and `calendar_install_credential` takes
+  the same user-row lock, closing a race that left Calendar connected without Google (8 of 40);
+  `calendar_begin_attempt` rebinds an idle row, replacing a service-role table write. The
+  return from adding Google no longer starts consent from the address alone.
+- **Verified locally.** `db reset` clean; `tests/calendar-google-sign-in.local-integration.test.ts`
+  9 of 9 (the race case fails with the old functions); Ticket 334's suite 10 of 10; flows in
+  Chrome; bench shows the four sentences
+  (`docs/qa/2026-11-13-ticket-335-calendar-google-sign-in.md`).
+- **Verifier, second round (local stack of its own, Google stubbed).** Race: 0 of 60 unforced
+  trials and the forced run end with Calendar connected without Google (was 8 of 40); both
+  lock orders serialize in the database; deletion still cascades; two removals at once keep
+  one identity (15 of 15). Suites for Tickets 332, 333, 334 and 335 pass (9, 9, 10, 9). Flag
+  off matches `origin/main` step for step; a token sealed on main opens. A crafted return
+  link starts nothing; Disconnect revokes in the `multiple` state.
+
+Platform impact: web Calendar connect and Sign-in methods; Mac shows the add-on-web sentence
+and keeps working; marketing not applicable; mobile web checked at 390 px. Messaging impact:
+none new (P-051).
 
 ## Ticket 336: sign-in methods in Cadence for Mac — November 13, 2026
 

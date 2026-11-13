@@ -20,6 +20,8 @@ import {
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { appleSubject } from "@/lib/auth/apple-sign-in";
 import { prepareAppleTokenForget } from "@/lib/services/apple-sign-in.service";
+import { readCalendarConnection } from "@/lib/db/google-calendar.repo";
+import { googleIdentitySubject } from "@/lib/services/google-calendar-oauth";
 import { createClient } from "@/lib/supabase/server";
 
 // Ticket 334 (D31.3): list, add and remove the sign-in methods of the signed-in
@@ -105,6 +107,13 @@ export async function startAddSignInMethod(input: Readonly<{
 
   const supabase = await createClient();
   if (!(await signedInRecentlyNow(supabase))) return { kind: "refused", result: "reauth_required" };
+  // Ticket 335: one identity per method. Calendar and the leave reminder job bind to the
+  // account's one Google sign-in, so a second Google account is never added.
+  const account = await readAccount(supabase);
+  if (!account) return { kind: "refused", result: "unavailable" };
+  if (account.identities.some((identity) => identity.provider === method.id)) {
+    return { kind: "refused", result: "already_added" };
+  }
 
   const redirectTo = new URL(AUTH_CALLBACK_ROUTE, input.origin);
   redirectTo.searchParams.set("next", normalizeRedirectPath(input.returnPath));
@@ -189,6 +198,18 @@ export async function removeSignInMethod(identityId: unknown): Promise<
   if (plan.kind === "refused") return { result: plan.result };
 
   const identity = account.identities.find((item) => item.identity_id === plan.identity.identityId)!;
+  // Ticket 335 (D31.5): Calendar reads through this Google sign-in, so it is disconnected
+  // first. The database trigger `keep_one_auth_identity` enforces the same rule under the
+  // account's row lock, so a Calendar connect finishing at the same moment cannot slip past.
+  const calendarUses = async () => {
+    if (plan.methodId !== "google") return false;
+    const calendar = await readCalendarConnection(supabase, account.userId).catch(() => undefined);
+    if (calendar === undefined) return null;
+    return calendar?.status === "connected" && calendar.googleSubject === googleIdentitySubject(identity);
+  };
+  const usedBeforehand = await calendarUses();
+  if (usedBeforehand === null) return { result: "remove_failed", methodId: plan.methodId };
+  if (usedBeforehand) return { result: "calendar_connected", methodId: plan.methodId };
   // Ticket 333's kept Apple token is read before the unlink, then revoked and forgotten after.
   const subject = plan.methodId === "apple" ? appleSubject(identity) : null;
   const forgetAppleToken = subject
@@ -202,6 +223,7 @@ export async function removeSignInMethod(identityId: unknown): Promise<
     // Supabase's own last-identity check, or the database trigger
     // `keep_one_auth_identity` when another removal won a race (Auth answers 500).
     if (error.code === "single_identity_not_deletable") return { result: "last_method", methodId: plan.methodId };
+    if (await calendarUses()) return { result: "calendar_connected", methodId: plan.methodId };
     const after = await readAccount(supabase);
     const replan = after
       ? planRemoveSignInMethod(after.state.identities, identityId, enabledSignInMethods())
