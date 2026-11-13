@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | Filed November 13, 2026; all not started; Google stays the only live method | Ticket 331 first. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332–337 not started; Google stays the only live method | Ticket 332 next. Owner-only steps (vault items, Apple two-factor prompts) are collected in one list | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31) |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
 | Ticket 326: configuration history in two key shapes (defect D2, web export 500) | Read-side fix on branch `claude/fix-export-camelcase-60ae30`: export, BehaviorLog restore and Daily Brief history normalize camelCase snapshots; the export route logs failures | Merge and check export as account A on production; Mac account sync still uploads camelCase snapshots (writer fix ships with a later Mac release); optional data migration needs the owner's approval | TICKETS, Ticket 326; STATUS, "Ticket 326: web export reads Mac-written configuration history — November 11, 2026" |
@@ -101,6 +101,24 @@ Check the cited entry before acting on a row.
   owner's Mac (0.1.11-dev.1) shows no control. Both Macs run dev builds until the next release.
 
 Platform impact: Mac; web unchanged. Messaging impact: P-050.
+
+## Ticket 331: login page and routes for more than one sign-in method — November 13, 2026
+
+- **Built.** `lib/auth/sign-in-methods.ts` lists Google, Apple and email. Login renders the
+  enabled ones; `lib/auth/sign-in-start.ts` starts them from `/auth/google` and the new
+  `/auth/sign-in/[method]`. Sign-in errors name no provider.
+- **Flags.** `CADENCE_SIGN_IN_APPLE` and `CADENCE_SIGN_IN_EMAIL`, on only when exactly `on`.
+  Both are unset everywhere. A flag shows nothing until Ticket 333 or 332 gives the method
+  its start.
+- **Unchanged.** With the flags off, the Login HTML equals `origin/main` `07ce9a03` in five
+  states, apart from the two reworded errors. Test login and MCP consent sign-in untouched.
+- **Verified.** On a local stack next to `origin/main`: same Login HTML, Google start
+  URL, test login and MCP consent return. `dagger check --cadence`: 10 passed.
+- **Fixed in review.** `normalizeRedirectPath` refuses `/.//host` and `/\host`. Before,
+  `/login?next=/.//host` sent a signed-in person to another site.
+
+Platform impact: web login and auth routes; Mac not applicable (Ticket 336); marketing not
+applicable; mobile web shares the page, bench checked at 390 px. Messaging impact: P-051.
 
 ## Tickets 331–337 filed: sign-in by email and Apple (D31) — November 13, 2026
 
@@ -285,161 +303,3 @@ baseline, integrity `ok`, 0 foreign-key errors. The first-link timeout is closed
 error-text change waits for the next Mac release.
 
 Platform impact: desktop verification only; no code change. Messaging impact: none.
-
-## First account link times out for a large account — November 12, 2026
-
-The owner's Mac (published 0.1.10, empty local profile, first link choice `hydrate`) got
-HTTP 500 from `apply_account_sync_plan` twice; Postgres logged a statement timeout.
-
-- Cause: hosted `authenticated` has `statement_timeout=8s`. PostgREST applies the called
-  function's own timeout; `read_account_sync_snapshot` sets 25 s, but
-  `public.apply_account_sync_plan` set none. One snapshot build for the owner's account
-  (about 7,000 entities, 5 MB) took 1.8–2.4 s on hosted, and the apply built it two or
-  three times.
-- Fix: migration `20261112120000_account_sync_apply_large_account.sql` sets 25 s on the
-  public apply wrapper, builds the snapshot once before the compare, reuses it for the
-  older-contract restore, and reuses it as the result when the plan has no hosted writes.
-  Same signature and results. New fixture `tests/sql/account-sync-large-account-apply.sql`
-  (2,500 Occurrences, 2,500 reminder deliveries).
-- Mac: `localErrorMessage` now shows the `message` of plain-object Supabase errors
-  instead of "Unable to save the local change. Try again." Ships with the next Mac release.
-- Verification: local stack replay of every migration; all 47 `tests/sql` fixtures passed.
-- Open: hosted push, the owner's Mac retry, and its integrity check.
-
-## Installed connector checks on Mac 0.1.10 — November 12, 2026
-
-An agent ran installed connector acceptance on the test Mac (published 0.1.10, account A)
-from 05:40 to 05:55Z. Evidence: `docs/qa/2026-11-11-connector-acceptance.md`, "Installed
-desktop".
-
-- **Passed:** per-source cache fences; complete Hevy and Outlook snapshots at the hosted
-  generation; Settings states match hosted; an Outlook test event refreshed into the cache and
-  onto the Mac Timeline; Hevy recorded-activity line; disconnect from the Mac (confirmation,
-  hosted generation bump, Outlook cache deleted, Hevy cache kept, revocation text); Connect
-  from the Mac opens Microsoft's `common` authorize page with `Calendars.Read`; a reconnect
-  from the web reaches the Mac (generation 5).
-- **Not run:** Microsoft sign-in completion through `cadence://` (no remote browser driving),
-  the Keychain attempt item (not visible to `security` over SSH), sign-out and account-switch
-  cleanup (would unlink the Mac), Hevy key entry on the Mac, and iCloud.
-- **Test Mac handed back** to mac-release for its leave-reminder recheck: Cadence 0.1.10
-  running and linked as A, Outlook and Hevy connected, nothing else changed.
-- **Defects:** none found.
-
-Platform impact: desktop evidence only. Messaging impact: none.
-
-## PRs 238–245 integration and release review — November 12, 2026
-
-Reviewed, repaired and merged #242, #238, #240, #241, #244, #243 and #245 in that
-dependency order. PR #239 records the final review and signing configuration.
-The implementation plan, findings and evidence are in
-`docs/qa/2026-11-12-pr-integration-review.md`; PR #239 holds final closeout identifiers.
-
-- Bounded provider and native response reads; fixed completion replay and pending-lease
-  cleanup; enforced sign-in deadlines and grant cleanup; hardened account switching,
-  refresh scope checks and dormant signed builds. Preserved concurrent implementation
-  fixes and archived history. Corrected release and connector acceptance claims.
-- #243 CI passed 5,805 tests, skipped 230 and failed none. Native CI compiled the app
-  and Swift helpers and passed 161 Rust tests. Final #239 source passed 5,777 local
-  tests; its 29 failures are the known Unix-socket `EPERM` restriction, with 230 skipped.
-  Lint, typecheck, web build, governance and focused release-credential checks passed.
-- Hosted Supabase matches all 116 source migrations. The new pending-only release RPC
-  has authenticated-only grants and rejected a sessionless call. Both Vercel production
-  projects reached READY at `a48e1bbd`; public login, export rejection and marketing
-  checks passed. Live environment flags were not independently readable.
-- The feature stays hidden, and Ticket 300 remains deferred. L-019 and messaging review
-  remain activation gates. Chromium and the external design verifier are unavailable
-  here; no visual pass is claimed.
-- Mac publication remains blocked on execution access to the configured release and
-  test Macs. Both feeds remain 0.1.9. The retained `c67ec4d1` candidate predates the new
-  native code. Build a new dormant candidate and finish ordinary installed acceptance;
-  include default-off Cadence disconnect and cancel-link, which now invoke native
-  Keychain cleanup. Release is already authorized.
-
-Platform impact: web and desktop source, additive hosted RPC and release records;
-marketing deployment verification; future mobile, none. Messaging impact: P-029 and P-032.
-
-## PR #245 connector acceptance record review — November 12, 2026
-
-Follow-up to the November 11 connector entry, which PR #243 archived unchanged.
-The reported Outlook production run passed with a personal Microsoft account: consent,
-calendar selection, timed/all-day fixtures, Timeline at 1280 and 390 px, disconnect and
-reconnect. Cross-tenant consent, `admin_approval_required` and unverified-app-blocking
-tenants remain unexercised under the recorded owner decision. Evidence:
-`docs/qa/2026-11-11-connector-acceptance.md`. No live acceptance or account access ran
-in this documentation review.
-
-- The existing iCloud vault item was unreadable, and no usable Apple test identity was
-  available to that run. Initial missing-item preflight results are marked as historical.
-- PR #239's release packet records 0.1.10 installed and Hevy timing shown on the test Mac.
-  The remaining dependency is installed connector acceptance, not another installation.
-- Outlook remains connected for later runs. Post-run provider-grant revocation remains
-  an open Ticket 241 step 6 follow-up; disconnect/reconnect smoke did not complete it.
-- Ticket 300's deferral and the hidden ChatGPT plan track from PR #244 are unchanged.
-- Integrated reviewed PR #243 commit `e0774ac1`; all product files and archived history
-  remain identical to that candidate.
-- Checks: `npm run agents:check` and `git diff --check` passed. Only the three connector
-  documentation files differ from PR #243; no runtime checks were needed for this record
-  correction.
-
-Platform impact: documentation only across web and desktop; marketing and future mobile
-unchanged. Messaging impact: none; Ticket 241 step 7 remains in the messaging track.
-
-## PR #243 integration review — November 12, 2026
-
-Reviewed Ticket 299 on merged PRs #240 and #241. Preserved the concurrent device-only
-availability fix and PR #244's owner pause. The feature remains hidden; Ticket 300 is
-deferred until activation. Implementation plan and evidence:
-`docs/qa/2026-11-12-chatgpt-plan-review.md`.
-
-- Fixed env-file activation of signed releases by pinning the build flag off. Dev builds
-  can still enable it explicitly. Real Vite env-file regressions cover both file names.
-- Moved native plan-scope checks under the session lock and rechecked after refresh,
-  preserving rotated refresh tokens even when the provider narrows the grant.
-- Bound native status and model work, cancelled changed-grant attempts, and released
-  pending leases after every post-prepare failure. Preserved the reviewed pending-only
-  RPC, completed-attempt replay protection and strict no hosted fallback.
-- Blocked account changes after Keychain cleanup failure. Added cleanup when cancelling
-  the first account link, guarded stale controls and late responses, and invalidated
-  ready and remembered briefs when the connection changes.
-- Fresh dependencies, governance, lint (six existing warnings), root and desktop
-  typechecks, web/desktop/marketing builds, marketing checks and Public Trust/source
-  checks passed. Full suite: 5,776 passed, 230 skipped, 29 Unix-socket `EPERM` failures
-  in unchanged infrastructure tests. Focused suites passed 94 and 60 tests; the final
-  fixture-only type corrections passed a further 38-test rerun.
-- Native Rust needs GitHub CI; no compiler is installed here. The design-system verifier
-  is absent, and Chromium fails on `socket()` with `EPERM`, so no visual pass is claimed.
-  No live sign-in, feature activation or release ran. Live flag values were not verified.
-
-Platform impact: desktop, hidden plan UI and account isolation; web, shared launcher
-invalidation support with no new hosted behavior; marketing and future mobile, none.
-Messaging impact: P-045 adds fixed account/connection guard errors; other activation
-gates remain in P-029 to P-031, P-046 and L-019.
-
-## Ticket 299: ChatGPT plan UI and Daily Brief wiring — November 12, 2026
-
-Implemented in source on PR #243, based on merged PRs #240 and #241.
-Hidden, per the owner's November 12 decision.
-
-- Switch: `VITE_CADENCE_CHATGPT_PLAN=1` at build time (`apps/desktop/src/chatgpt/plan-switch.ts`).
-  A default build creates no ChatGPT connection, renders no card and keeps today's hosted
-  Daily Brief. Tests prove both.
-- Release: `POST /api/advisor/brief/device/release` verifies the envelope and binding as
-  complete does and uses Ticket 298's pending-only release RPC. Completed attempts and
-  replacement leases remain unchanged. An expired envelope returns `context_expired`.
-- Mac: `chatgpt_access_token` returns only a fresh access token, held in memory for one model
-  call. The CSP adds exactly `https://api.openai.com`. With plan usage and
-  `deviceModelAvailable`, the brief runs prepare, the plan call and complete, and releases on
-  any failure after prepare. No fallback to Cadence's key (D27). Disconnecting the Cadence
-  account or cancelling its first link first disconnects ChatGPT; storage failures stop
-  the account change.
-- UI: the "Use your ChatGPT plan" card (`components/briefing/ChatGptPlanCard.tsx`) and the
-  bubble's plan states, with bench states at 352px, `DESIGN.md`, INT-SETTINGS-019 to 021
-  (internal QA guidance) and the updated INT-AUTH-012 and 013.
-- Platform impact: web, the release route only, no UI; desktop, this ticket; marketing, none
-  until release (P-032); future mobile, not applicable. Messaging impact: P-045 and P-046;
-  P-030 and P-031 text unchanged. L-019 records the clauses followed and the logo gap.
-- Original author checks: agents, interactions, resolvers and design-system checks, typecheck, desktop
-  typecheck, lint (six existing warnings), build and desktop build passed. `npm run test`:
-  5,882 passed, 1 failed (`tests/acceptance-local-stack.test.mjs`, spaces-in-path entry
-  point; this branch does not touch it). Rust lib tests: 157 passed. No live sign-in, Tauri
-  bundle, Dagger or Vercel change.

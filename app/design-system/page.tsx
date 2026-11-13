@@ -71,7 +71,12 @@ import { Timeline } from "@/components/timeline/Timeline";
 import { TravelWeatherCredit } from "@/components/timeline/TravelWeather";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
-import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
+import { SignInMethods } from "@/app/(auth)/login/SignInMethods";
+import {
+  enabledSignInMethods,
+  SIGN_IN_METHODS,
+  type SignInMethod,
+} from "@/lib/auth/sign-in-methods";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
 import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
@@ -1262,6 +1267,47 @@ function TraceCard({
   );
 }
 
+function SignInMethodsBench() {
+  const states: ReadonlyArray<{
+    label: string;
+    disabled?: boolean;
+    methods: readonly SignInMethod[];
+  }> = [
+    {
+      label: "Every new flag off (production today)",
+      methods: enabledSignInMethods({}),
+    },
+    {
+      label: "Supabase not configured",
+      disabled: true,
+      methods: enabledSignInMethods({}),
+    },
+    {
+      label: "All methods (after Tickets 332 and 333, flags on)",
+      methods: SIGN_IN_METHODS,
+    },
+  ];
+
+  return (
+    <div className="grid gap-3">
+      {states.map((state) => (
+        <div key={state.label} className="grid gap-1">
+          <p className="text-xs font-semibold text-neutral-600">
+            {state.label}
+          </p>
+          <ProductPreview>
+            <SignInMethods
+              disabled={state.disabled}
+              methods={state.methods}
+              nextPath="/timeline"
+            />
+          </ProductPreview>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ProductPreview({
   children,
   maxHeight = "44rem",
@@ -1633,11 +1679,7 @@ const previewFactories: Record<
         </ScreenFrame>
       </ProductPreview>
     ),
-  "flow.google-login-button": () => (
-      <ProductPreview>
-        <GoogleLoginButton disabled nextPath="/timeline" />
-      </ProductPreview>
-    ),
+  "flow.sign-in-methods": () => <SignInMethodsBench />,
   "flow.first-run-onboarding-panel": () => (
       <ProductPreview maxHeight="28rem">
         <div className="relative min-h-[24rem] bg-background">

@@ -1184,6 +1184,11 @@ app shell links to it only outside production, so it does not become a normal
 production navigation destination. Requests to `/login` without `preview=1`
 keep the standard authenticated redirect behavior.
 
+Sign-in method flags (Ticket 331, D31.6): `CADENCE_SIGN_IN_APPLE` and
+`CADENCE_SIGN_IN_EMAIL`. A method shows on Login and starts only when its flag
+is exactly `on` and its ticket (333, 332) has shipped. Leave both unset in
+Production until Ticket 337 passes for that method. Google has no flag.
+
 ## Source-of-truth order
 
 1. `AGENTS.md`: operating rules and architecture constraints.

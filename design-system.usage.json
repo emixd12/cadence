@@ -532,9 +532,9 @@
       "confidence": "exact"
     },
     {
-      "componentId": "flow.google-login-button",
+      "componentId": "flow.sign-in-methods",
       "file": "app/(auth)/login/page.tsx",
-      "line": 77,
+      "line": 78,
       "route": "(auth)/login/page",
       "usageKind": "render",
       "confidence": "exact"
