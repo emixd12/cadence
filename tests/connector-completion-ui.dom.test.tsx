@@ -150,6 +150,16 @@ describe("Count an unlinked workout (Ticket 324)", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("A link already uses this workout."));
   });
 
+  it("keeps the button when the mark landed but the workout time did not", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ counted: true, attached: false, reason: "attach_failed" }), { status: 200 }));
+    const onRefresh = vi.fn();
+    await renderCountRow(unresolved, onRefresh);
+    await act(async () => { (container.querySelector("[data-count-workouts] button") as HTMLButtonElement).click(); });
+    await vi.waitFor(() => expect(container.textContent).toContain("The workout time was not saved. Try again."));
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(container.querySelector("[data-count-workouts] button")).not.toBeNull();
+  });
+
   it("shows nothing when no workout is countable (a marked row gets none)", async () => {
     await renderCountRow(unresolved, vi.fn(), []);
     expect(container.querySelector("[data-count-workouts]")).toBeNull();

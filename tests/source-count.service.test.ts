@@ -53,6 +53,18 @@ describe("countUnlinkedWorkout", () => {
     expect(calls).toEqual(["mark", "attach"]);
   });
 
+  it("keeps the mark when the attachment fails, and a retry attaches alone", async () => {
+    const failing = deps({ attach: async () => { throw new Error("connector_attach_failed"); } });
+    await expect(countUnlinkedWorkout(caller, body, failing.value)).resolves.toEqual({ counted: true, attached: false, reason: "attach_failed" });
+    const completed = { readOccurrence: async () => ({ id: OCCURRENCE, behaviorId: "walk", status: "completed", localDate: "2026-11-12", timezone: "America/New_York" }) };
+    const retry = deps(completed);
+    await expect(countUnlinkedWorkout(caller, body, retry.value)).resolves.toEqual({ counted: true, attached: true, reason: "attached" });
+    expect(retry.calls).toEqual(["attach"]);
+    // A Completed row whose mark is not the user's (the database refuses) stays refused.
+    const refused = deps({ ...completed, attach: async () => ({ attached: false, reason: "not_completed" }) });
+    await expect(countUnlinkedWorkout(caller, body, refused.value)).resolves.toEqual({ counted: false, reason: "not_unresolved" });
+  });
+
   it("refuses while the flag is off", async () => {
     const { value } = deps({ env: {} });
     await expect(countUnlinkedWorkout(caller, body, value)).rejects.toMatchObject({ code: "not_configured" });

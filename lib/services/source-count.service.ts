@@ -15,7 +15,8 @@ import { applyOccurrenceStatusTransition } from "./occurrence.service";
 
 // Ticket 324: the user counts a logged workout that no link accepted. The service
 // checks the workout on the server, records the user's own Completed mark through the
-// manual status path, then attaches the workout for timing with no link. It never
+// manual status path, then attaches the workout for timing with no link. The two writes
+// are separate; when the attachment fails, the same request attaches it on retry. It never
 // trusts workout times from the client. Results carry stable codes only.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -73,7 +74,10 @@ export async function countUnlinkedWorkout(caller: ConnectorCaller, body: unknow
 
   const occurrence = await store.readOccurrence(request.occurrenceId);
   if (!occurrence) return refuse("occurrence_unavailable");
-  if (occurrence.status !== "unresolved") return refuse("not_unresolved");
+  // A Completed Occurrence is a retry after the mark landed but the attachment did not.
+  // The database attaches only when the latest mark is the user's own.
+  const retry = occurrence.status === "completed";
+  if (occurrence.status !== "unresolved" && !retry) return refuse("not_unresolved");
   const today = now.toZonedDateTimeISO(occurrence.timezone).toPlainDate().toString();
   if (occurrence.localDate !== today) return refuse("not_today");
 
@@ -91,8 +95,15 @@ export async function countUnlinkedWorkout(caller: ConnectorCaller, body: unknow
     return refuse("matched_by_link");
   }
 
-  await store.markCompleted(occurrence.id, now);
-  const attached = await store.attach({ occurrenceId: occurrence.id, source: request.source, activity, recordedAt: now.toString() });
+  if (!retry) await store.markCompleted(occurrence.id, now);
+  let attached: Readonly<{ attached: boolean; reason: string }>;
+  try {
+    attached = await store.attach({ occurrenceId: occurrence.id, source: request.source, activity, recordedAt: now.toString() });
+  } catch {
+    // The mark stands; the same request retries the attachment alone.
+    attached = { attached: false, reason: "attach_failed" };
+  }
+  if (retry && !attached.attached) return refuse("not_unresolved");
   return { counted: true, attached: attached.attached, reason: attached.reason };
 }
 

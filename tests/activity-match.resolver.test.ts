@@ -331,6 +331,11 @@ describe("activity match resolver: removal", () => {
     expect(run({ occurrences: [userMarked], evidence: evidence([], { complete: false, deletedActivityRefs: [work.id] }), matches: [counted] }).remove).toEqual([]);
     const moved = activity("w1", "2026-11-09T22:00:00Z", 45, [LEGS]);
     expect(run({ occurrences: [userMarked], evidence: evidence([moved]), matches: [counted] }).remove).toEqual([]);
+    // A later link and an edited workout never refresh the counted times.
+    const edited = activity("w1", "2026-11-10T22:05:00Z", 45, [LEGS], "2026-11-10T22:55:00Z");
+    const plan = run({ occurrences: [userMarked], evidence: evidence([edited]), matches: [counted] });
+    expect(plan.attach).toEqual([]);
+    expect(plan.skip).toContainEqual({ activityRef: edited.id, behaviorId: "legday", reason: "already_matched" });
   });
 
   it("keeps the user's later status when the last match is removed", () => {

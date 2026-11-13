@@ -11737,7 +11737,7 @@
       ],
       "availability": "Web, while CADENCE_CONNECTOR_COMPLETION is on and Hevy is connected, on today's Unresolved rows whose Behavior has no enabled Hevy link, while no any-workout link exists. Offers each of today's ended workouts of 5 minutes or more that no row in view already shows.",
       "success_result": "The server reads today's Hevy workouts, records the user's own Completed mark through the manual status path, and attaches the workout for timing with no link. The row refreshes as Completed and lists the workout. Reconcile never removes a hand-counted workout.",
-      "failure_result": "A workout a link accepts, a linked Behavior, an already marked Occurrence, a workout Hevy no longer lists, one under 5 minutes or still running, and a disconnected Hevy are refused with a short message and write nothing.",
+      "failure_result": "A workout a link accepts, a linked Behavior, an already marked Occurrence, a workout Hevy no longer lists, one under 5 minutes or still running, and a disconnected Hevy are refused with a short message and write nothing. If the mark lands but the attachment fails, the row says the workout time was not saved and keeps the button; a retry attaches the workout alone.",
       "effects": [
         "database_write",
         "network_request"

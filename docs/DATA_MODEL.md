@@ -2414,7 +2414,8 @@ nothing. Malformed input raises SQLSTATE `22023`; no path uses `40001`.
   Completed status whose latest event is the user's (`manual_tap` or `manual_text`), and no
   match for the activity and Behavior. Inserts an `attached` match with `link_id` null.
   A match with no link is the user's record: it never changes a status, and reconcile
-  never removes or refreshes it.
+  never removes or refreshes it. The service marks Completed first and attaches second; a
+  failed attachment leaves the user's mark, and the same request retries the attachment.
 
 `apply_occurrence_status_transition` is unchanged and still rejects `derived`.
 Fixtures: `tests/sql/ticket-314-connector-completion-smoke.sql` and

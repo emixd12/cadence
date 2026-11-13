@@ -320,8 +320,9 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
       // compare instants: an unchanged workout must not spend the run's write budget.
       const timingChanged = !sameInstant(existing.activityStartAt, activity.startAt)
         || !sameInstant(existing.activityEndAt, activity.endAt);
+      // Ticket 324: a hand-counted match keeps the times the user counted.
       if (existing.state === "active" && !removed.has(existing.id) && existing.occurrenceId === occurrence.id
-        && timingChanged && activity.duration.seconds >= input.minimumDurationSeconds) {
+        && !isHandCounted(existing) && timingChanged && activity.duration.seconds >= input.minimumDurationSeconds) {
         plan.attach.push({ ...target, reason: "timing_refresh", matchId: existing.id });
         return;
       }

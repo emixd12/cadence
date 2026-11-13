@@ -28,9 +28,14 @@ export function CountWorkoutButtons({ occurrenceId, source, workouts }: Readonly
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ occurrenceId, source, activityRef: workout.activityRef }),
       });
-      const result = (await response.json().catch(() => null)) as { counted?: boolean; reason?: string; error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { counted?: boolean; attached?: boolean; reason?: string; error?: string } | null;
       if (!response.ok || !result?.counted) {
         setMessage(countRefusalMessage(result?.reason ?? result?.error ?? null));
+        return;
+      }
+      // Marked, but the workout time was not saved: keep the button so a retry attaches it.
+      if (!result.attached) {
+        setMessage("Marked Completed. The workout time was not saved. Try again.");
         return;
       }
       refresh();

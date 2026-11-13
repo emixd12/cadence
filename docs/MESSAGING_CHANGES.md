@@ -1491,7 +1491,8 @@ cite has not changed.
   the user's own mark and keeps the workout's start and end time on the Occurrence. Refusal
   messages: "A link already uses this workout.", "This was already marked.", "Hevy no longer
   lists this workout.", "This workout is shorter than 5 minutes.", "Hevy is not connected."
-  and "The workout could not be counted. Try again."
+  "The workout could not be counted. Try again." and "Marked Completed. The workout time was
+  not saved. Try again."
 - **Affected:** Ticket 324. Files: `components/timeline/CountWorkoutButtons.tsx`.
 - **Surfaces:** in-app copy, user guide (connected sources section), Privacy (workout times
   are stored for a counted workout, as for linked ones).
