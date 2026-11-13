@@ -18826,7 +18826,11 @@ Verification: `tests/connector-completion-ui.dom.test.tsx`,
 
 ## Ticket 330: Complete from Hevy on a linked Mac
 
-Status: implemented November 13, 2026.
+Status: complete November 13, 2026. Installed acceptance passed on the test Mac (dev-signed
+0.1.11-dev.2, test account A): Behavior settings saved Any workout on "Evening walk", and
+Create behavior made "T330 Mac create" linked to a routine ("Behavior created and linked to
+Hevy."). Both links were on hosted and synced into the Mac's SQLite. The owner's Mac, in
+local mode on 0.1.11-dev.1, showed no control.
 Dependencies: Tickets 317, 320 and 329. Requested by the owner on November 13, 2026.
 
 Goal: a linked Mac sets a Behavior's Hevy link in Behavior settings and Create behavior,

@@ -96,7 +96,9 @@ Check the cited entry before acting on a row.
 - **Built:** a linked Mac shows Complete from Hevy in Behavior settings and Create behavior,
   reading and saving through the hosted link route over the authenticated broker. A save
   syncs first (so a Behavior made on the Mac exists on the account) and again after.
-- **Not verified yet:** installed acceptance on a dev-signed build.
+- **Installed acceptance passed** on the test Mac (0.1.11-dev.2, account A): a settings save
+  and a create-time link both reached hosted and synced back to SQLite. Local mode on the
+  owner's Mac (0.1.11-dev.1) shows no control. Both Macs run dev builds until the next release.
 
 Platform impact: Mac; web unchanged. Messaging impact: P-050.
 
