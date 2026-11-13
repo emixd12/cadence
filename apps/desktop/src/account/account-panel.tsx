@@ -1,36 +1,82 @@
 import type { DesktopAccountState } from "./auth";
+import { GOOGLE_ONLY_SIGN_IN, type DesktopSignInMethods } from "./sign-in-methods";
 import type { SyncStatus } from "../sync-engine";
 import { useState } from "react";
 import { SettingsPartHeading, SettingsSectionHeading } from "@/components/settings/settings-heading";
 import { canKeepBothAccountSyncConflict, type AccountSyncConflict, type AccountSyncConflictDecision } from "@cadence/core/resolvers/account-sync.resolver";
 
-export function AccountPanel({ state, configured, connected, busy, onSignIn, onCancel }: Readonly<{
-  state: DesktopAccountState; configured: boolean; connected: boolean; busy: boolean;
-  onSignIn: () => void; onCancel: () => void;
+export function AccountPanel({ state, configured, connected, busy, methods = GOOGLE_ONLY_SIGN_IN, onSignIn, onEmail = () => undefined,
+  onCode = () => undefined, onResend = () => undefined, onCancel }: Readonly<{
+  state: DesktopAccountState; configured: boolean; connected: boolean; busy: boolean; methods?: DesktopSignInMethods;
+  onSignIn: (method: "google" | "apple") => void; onEmail?: (email: string) => void; onCode?: (code: string) => void;
+  onResend?: () => void; onCancel: () => void;
 }>) {
+  const signedIn = state.status === "linked" && state.email ? `Signed in as ${state.email}.` : "Signed in.";
+  const flow = state.status === "code" ? <EmailCodeEntry state={state} codeLength={methods.emailCodeLength} busy={busy}
+    onCode={onCode} onResend={onResend} onCancel={onCancel} />
+    : state.status === "waiting" ? <>
+      <p role="status" className="mt-3 text-sm leading-6">Finish signing in in your browser.</p>
+      <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel sign in</button>
+    </> : <MethodChoice methods={methods} busy={busy || !configured} onSignIn={onSignIn} onEmail={onEmail} />;
   return <section id="account" aria-busy={busy} className="bg-background py-4">
     <SettingsSectionHeading>Account</SettingsSectionHeading>
     {connected ? <>
-      <p className="mt-4 max-w-2xl text-sm leading-6">{state.status === "linked" ? `Signed in${state.email ? ` as ${state.email}` : " with Google"}.` : "This Mac is linked to your Cadence account."}</p>
+      <p className="mt-4 max-w-2xl text-sm leading-6">{state.status === "linked" ? signedIn : "This Mac is linked to your Cadence account."}</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">SQLite is this Mac’s offline working copy. Account changes synchronize while Cadence runs with connectivity.</p>
       {state.status === "linked" && state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
       {state.status === "error" ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.message}</p> : null}
-      {state.status === "waiting" ? <><p role="status" className="mt-3 text-sm leading-6">Finish reconnecting in your browser.</p>
-        <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel reconnect</button></> : null}
+      {state.status === "linked" ? null : flow}
     </> : state.status === "linked" ? <>
-      <p className="mt-4 max-w-2xl text-sm leading-6">Signed in{state.email ? ` as ${state.email}` : " with Google"}.</p>
+      <p className="mt-4 max-w-2xl text-sm leading-6">{signedIn}</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Your local data has not been uploaded or replaced. Choose how to link it in the next step.</p>
       {state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
     </> : <>
-      <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Sign in with the Google account you use for Cadence. Tracking works without an account.</p>
+      <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Sign in to your Cadence account to sync this Mac. Tracking works without an account.</p>
       {!configured ? <p role="status" className="mt-3 text-sm leading-6 text-muted-readable">This version of Cadence cannot sign in to an account.</p> : null}
       {state.status === "error" ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.message}</p> : null}
-      {state.status === "waiting" ? <>
-        <p role="status" className="mt-3 text-sm leading-6">Finish signing in with Google in your browser.</p>
-        <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel sign in</button>
-      </> : <button type="button" disabled={busy || !configured} onClick={onSignIn} className="product-action product-action-primary mt-4 min-h-11 py-2 text-sm">Sign in with Google</button>}
+      {flow}
     </>}
   </section>;
+}
+
+// Ticket 336 (D31.2): the same methods, labels and order as the web login page.
+function MethodChoice({ methods, busy, onSignIn, onEmail }: Readonly<{
+  methods: DesktopSignInMethods; busy: boolean; onSignIn: (method: "google" | "apple") => void; onEmail: (email: string) => void;
+}>) {
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  return <div className="mt-4 grid max-w-sm gap-3">
+    {methods.methods.map((method) => method.id === "email"
+      ? emailOpen ? <form key="email" className="grid gap-2" onSubmit={(event) => { event.preventDefault(); onEmail(email); }}>
+          <label htmlFor="account-sign-in-email" className="text-sm leading-6">Email</label>
+          <input id="account-sign-in-email" type="email" required autoFocus autoComplete="email" maxLength={254} value={email}
+            onChange={(event) => setEmail(event.target.value)} className="block min-h-11 w-full border border-line bg-background px-3 py-2 text-sm" />
+          <p className="text-sm leading-6 text-muted-readable">Your browser opens to send a {methods.emailCodeLength}-digit code. A new address starts a new account.</p>
+          <button type="submit" disabled={busy} className="product-action product-action-primary min-h-11 justify-self-start py-2 text-sm">Send code</button>
+        </form>
+        : <button key="email" type="button" disabled={busy} onClick={() => setEmailOpen(true)} className="product-action product-action-primary min-h-11 justify-self-start py-2 text-sm">{method.label}</button>
+      : <button key={method.id} type="button" disabled={busy} onClick={() => onSignIn(method.id as "google" | "apple")} className="product-action product-action-primary min-h-11 justify-self-start py-2 text-sm">{method.label}</button>)}
+  </div>;
+}
+
+function EmailCodeEntry({ state, codeLength, busy, onCode, onResend, onCancel }: Readonly<{
+  state: Extract<DesktopAccountState, { status: "code" }>; codeLength: number; busy: boolean;
+  onCode: (code: string) => void; onResend: () => void; onCancel: () => void;
+}>) {
+  const [code, setCode] = useState("");
+  return <form className="mt-4 grid max-w-sm gap-2" onSubmit={(event) => { event.preventDefault(); onCode(code); }}>
+    <p role="status" className="text-sm leading-6">Cadence is sending a {codeLength}-digit code to <span className="break-all font-bold">{state.email}</span>. Finish in your browser, then type the code here.</p>
+    {state.notice ? <p role="status" className="text-sm leading-6">{state.notice}</p> : null}
+    {state.error ? <p role="alert" className="text-sm leading-6 text-accent">{state.error}</p> : null}
+    <label htmlFor="account-sign-in-code" className="mt-2 text-sm leading-6">Code</label>
+    <input id="account-sign-in-code" required autoFocus autoComplete="one-time-code" inputMode="numeric" maxLength={codeLength + 3} value={code}
+      onChange={(event) => setCode(event.target.value)} className="block min-h-11 w-full border border-line bg-background px-3 py-2 font-mono text-lg tracking-[0.3em]" />
+    <div className="mt-2 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap">
+      <button type="submit" disabled={busy} className="product-action product-action-primary min-h-11 py-2 text-sm">Sign in</button>
+      <button type="button" disabled={busy} onClick={onResend} className="product-action product-action-secondary min-h-11 py-2 text-sm">Send a new code</button>
+      <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary min-h-11 py-2 text-sm">Cancel sign in</button>
+    </div>
+  </form>;
 }
 
 export function AccountSyncPanel({ status, busy, onSync, onReconnect, onUpdate }: Readonly<{ status: SyncStatus; busy: boolean; onSync: () => void; onReconnect: () => void; onUpdate?: () => void }>) {

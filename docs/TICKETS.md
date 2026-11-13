@@ -19125,7 +19125,8 @@ Verification: existing Calendar and leave-reminder tests plus new cases;
 
 ## Ticket 336: Sign-in methods in Cadence for Mac
 
-Status: not started. Filed November 13, 2026.
+Status: merged (PR #270, November 13, 2026); waits on a Mac release (owner row 14) and Ticket 337's installed Apple and email runs. Filed November 13, 2026. Design:
+`docs/DESKTOP_BUILD.md`, "Sign-in methods (Ticket 336)".
 Dependencies: Tickets 331–335. Decision: D31.2. Ships with a Mac release.
 
 Goal: the Mac account panel offers the same methods as the web.

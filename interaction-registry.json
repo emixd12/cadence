@@ -132,7 +132,7 @@
     {
       "path": "apps/desktop/src/account/account-panel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 27,
+      "interaction_marker_count": 41,
       "interaction_ids": [
         "INT-AUTH-004",
         "INT-AUTH-005",
@@ -417,6 +417,14 @@
       "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-AUTH-015"
+      ]
+    },
+    {
+      "path": "app/(auth)/login/email/mac/MacEmailCodeRequest.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 3,
+      "interaction_ids": [
+        "INT-AUTH-004"
       ]
     },
     {
@@ -9816,7 +9824,7 @@
     },
     {
       "id": "INT-AUTH-004",
-      "name": "Sign in to a desktop account with Google",
+      "name": "Sign in to a desktop account",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9837,12 +9845,32 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Sign in with Google"
+          "control": "Continue with Google"
+        },
+        {
+          "kind": "activate",
+          "control": "Continue with Apple"
+        },
+        {
+          "kind": "submit",
+          "control": "Send code"
+        },
+        {
+          "kind": "submit",
+          "control": "Sign in"
+        },
+        {
+          "kind": "activate",
+          "control": "Send a new code"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel sign in"
         }
       ],
-      "availability": "Available in a configured installed macOS build while no account session exists.",
-      "success_result": "The system browser returns through the registered callback, Cadence consumes the PKCE code once, and Keychain retains the session for Ticket 119.",
-      "failure_result": "Cancellation, denial, stale, duplicate, malformed, and state-mismatched callbacks show a recoverable error and leave local data unchanged.",
+      "availability": "Available in a configured installed macOS build while no account session exists. The Mac offers the methods GET /api/auth/sign-in-methods reports as on (Ticket 336): Google always, Apple behind CADENCE_SIGN_IN_APPLE and email behind CADENCE_SIGN_IN_EMAIL on the hosted app. Without the list it offers Google alone. Email also needs the hosted origin (VITE_CALENDAR_BROKER_ORIGIN).",
+      "success_result": "Google and Apple return through the registered callback and Cadence consumes the PKCE code once; after Apple the Mac hands Apple refresh token to the hosted app once. Email: the system browser opens /login/email/mac, which passes Turnstile and sends a 6-digit code; the person types the code in the panel and Cadence verifies it. Keychain retains the session without provider tokens.",
+      "failure_result": "Cancellation, denial, stale, duplicate, malformed, and state-mismatched callbacks show a recoverable error and leave local data unchanged. A wrong code keeps the request; a code request older than an hour or already used needs a new code. A session for a different account than the linked profile is removed and refused.",
       "effects": [
         "authentication_session",
         "native_navigation"
@@ -9851,22 +9879,31 @@
       "confirmation": "none",
       "implementation": [
         "apps/desktop/src/account/auth.ts",
+        "apps/desktop/src/account/sign-in-methods.ts",
         "apps/desktop/src/account/account-panel.tsx",
         "apps/desktop/src-tauri/src/auth.rs",
-        "apps/desktop/src-tauri/native/auth.m"
+        "apps/desktop/src-tauri/native/auth.m",
+        "lib/auth/desktop-sign-in.ts",
+        "lib/services/desktop-sign-in.service.ts",
+        "app/(auth)/login/email/mac/MacEmailCodeRequest.tsx",
+        "app/auth/email/mac/route.ts",
+        "app/api/auth/sign-in-methods/route.ts",
+        "app/api/auth/apple-sign-in-token/route.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/desktop-auth.test.tsx"
+          "tests/desktop-auth.test.tsx",
+          "tests/desktop-auth-upgrade.test.ts",
+          "tests/desktop-sign-in-route.test.ts"
         ],
-        "notes": "Unit tests cover callback origin, state, denial, expiry, and public configuration. The hosted allowlist and installed-app round trip remain Ticket 118 acceptance gates."
+        "notes": "Unit tests cover callback origin, state, denial, expiry, each method, the email code (wrong, expired, used), stray callbacks during an email request, the different-account guard and the method list. The installed round trip per method is Ticket 336 and 337 acceptance."
       },
       "platforms": {
         "web": {
           "applicability": "not_applicable",
           "status": "not_applicable",
-          "reason": "The separate existing web Google flow remains INT-AUTH-001."
+          "reason": "Web sign-in is INT-AUTH-001, INT-AUTH-015 and INT-AUTH-016. /login/email/mac and its routes exist only for the Mac flow."
         },
         "desktop": {
           "applicability": "applicable",
@@ -9874,10 +9911,12 @@
           "implementation": [
             "apps/desktop/src/account/account-panel.tsx",
             "apps/desktop/src/account/auth.ts",
+            "apps/desktop/src/account/sign-in-methods.ts",
             "apps/desktop/src-tauri/src/auth.rs"
           ],
           "evidence": [
-            "tests/desktop-auth.test.tsx"
+            "tests/desktop-auth.test.tsx",
+            "tests/desktop-auth-upgrade.test.ts"
           ]
         },
         "marketing": {

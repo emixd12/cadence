@@ -43,6 +43,8 @@ export function desktopAccountSectionState(input: DesktopAccountSectionInput): S
   if (!input.known) return SETTINGS_SECTION_CHECKING;
   switch (input.account.status) {
     case "waiting": return state("Waiting for sign-in", false);
+    // Ticket 336: the code is typed in this drawer, so it opens.
+    case "code": return state("Waiting for the email code", false, true);
     case "error": return state("Sign-in did not finish", false, true);
     // Linked but not yet synchronizing: the link is still being set up.
     case "linked": return SETTINGS_SECTION_CHECKING;
