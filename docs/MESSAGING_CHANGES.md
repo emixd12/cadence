@@ -1656,4 +1656,30 @@ cite has not changed.
   people who use Hide My Email that a relay address is a separate account until they add
   Apple to their existing account (Ticket 334).
 - **Related:** P-051, P-052, L-024, L-025.
+
+## P-054: Sign-in methods in Settings, address change and the one-account rule
+
+- **Change:** implemented November 13, 2026 behind `CADENCE_SIGN_IN_LINKING` (Ticket 334,
+  D31.3), off in production. Settings lists an account's sign-in methods and lets the
+  person add Google or Apple, change the email address, and remove Google or Apple while
+  another way in remains. Changing the address sends confirmation links to the new and
+  the current address; after confirmation, sign-in codes and email reminders go to the
+  new address. Cadence refuses an account or address that already signs in to another
+  Cadence account and never merges accounts. An account with no address or an Apple
+  relay address types `DELETE` to delete the account. Login says that another way can
+  start a second account. Changing sign-in methods asks for a sign-in within the last 15
+  minutes. An address that already has an account gets the same answer as a usable one.
+  Removing Apple asks Apple to revoke Cadence's Sign in with Apple authorization and
+  deletes the token Cadence kept for it (P-053); adding Apple from Settings keeps one.
+- **Affected:** Ticket 334. Files: `components/settings/SignInMethodsPanel.tsx`,
+  `lib/auth/account-sign-in-methods.ts`, `app/(auth)/login/page.tsx`.
+- **Surfaces:** user guide (privacy and account: a sign-in methods section; deletion
+  confirmation text), Privacy (linked sign-in identities are kept with the account and
+  removed on deletion; the address change), in-app copy as written.
+- **Conflicting current text:** the user guide's "Complete or clear the deletion gates"
+  says the confirmation is the account email or `DELETE`, without the relay case; no
+  guide section describes sign-in methods.
+- **Update needed:** describe adding, changing and removing methods, the confirmation
+  links, that reminders follow the address, and the relay `DELETE` case.
+- **Related:** P-051, P-052.
 - **Status:** logged.

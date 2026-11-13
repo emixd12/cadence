@@ -745,6 +745,16 @@
       ]
     },
     {
+      "path": "components/settings/SignInMethodsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 19,
+      "interaction_ids": [
+        "INT-SETTINGS-022",
+        "INT-SETTINGS-023",
+        "INT-SETTINGS-024"
+      ]
+    },
+    {
       "path": "components/settings/TimezonePanel.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 8,
@@ -9301,7 +9311,7 @@
       "journeys": [
         "J19"
       ],
-      "intent": "Enter the account email or DELETE fallback required for account deletion.",
+      "intent": "Enter the account email, or DELETE when the account has no address or an Apple Hide My Email relay address, to confirm account deletion (Ticket 334).",
       "triggers": [
         {
           "kind": "input",
@@ -9323,7 +9333,9 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/settings-interactions-ui.test.tsx"
+          "tests/account-sign-in-methods.test.ts",
+          "tests/settings-interactions-ui.test.tsx",
+          "tests/sign-in-methods.local-integration.test.ts"
         ],
         "notes": "The Settings UI test renders the typed confirmation field and required label."
       },
@@ -9335,7 +9347,8 @@
             "components/settings/AccountDeletionPanel.tsx"
           ],
           "evidence": [
-            "tests/settings-interactions-ui.test.tsx"
+            "tests/settings-interactions-ui.test.tsx",
+            "tests/sign-in-methods.local-integration.test.ts"
           ]
         },
         "desktop": {
@@ -12761,6 +12774,285 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Desktop only; native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-022",
+      "name": "Add a Google or Apple sign-in method",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#delete-the-signed-in-account"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#sign-in-methods",
+        "/auth/sign-in-methods/[action]",
+        "/auth/callback"
+      ],
+      "journeys": [
+        "J19"
+      ],
+      "intent": "Add another Google or Apple account as a way to sign in to the same Cadence account (Ticket 334, D31.3).",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Add Google"
+        },
+        {
+          "kind": "submit",
+          "control": "Add Apple"
+        }
+      ],
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Each button shows for an enabled method the account does not have yet; Apple needs CADENCE_SIGN_IN_APPLE and Ticket 333. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
+      "success_result": "Supabase manual identity linking sends the person to the provider and back through /auth/callback; Settings shows the new method and says it was added.",
+      "failure_result": "A provider account that already signs in to another Cadence account is refused with a plain message that names no account; Cadence does not merge accounts. Other failures say the method was not added.",
+      "effects": [
+        "external_navigation",
+        "authentication_identity_change",
+        "navigation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SignInMethodsPanel.tsx",
+        "app/auth/sign-in-methods/[action]/route.ts#POST",
+        "lib/services/sign-in-methods.service.ts",
+        "app/auth/callback/route.ts#GET"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sign-in-methods.local-integration.test.ts",
+          "tests/account-sign-in-methods.test.ts"
+        ],
+        "notes": "The local-integration test renders Add Google, posts it and checks the redirect to Google through Supabase linking, and replays the identity_already_exists return to check the plain refusal. The unit test covers Apple once enabled. Completing a provider sign-in is checked in Ticket 337."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SignInMethodsPanel.tsx",
+            "app/auth/sign-in-methods/[action]/route.ts#POST",
+            "lib/services/sign-in-methods.service.ts",
+            "app/auth/callback/route.ts#GET"
+          ],
+          "evidence": [
+            "tests/sign-in-methods.local-integration.test.ts",
+            "tests/account-sign-in-methods.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "The Mac's Settings does not render this row: its forms need a web session. Ticket 336 adds Mac sign-in methods; until then a linked Mac shows no Sign-in methods row."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; P-051 and P-054 cover sign-in copy."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Mobile web uses the same Settings row (checked at 390 px); native mobile remains unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-023",
+      "name": "Add email or change the sign-in address",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#delete-the-signed-in-account"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#sign-in-methods",
+        "/auth/sign-in-methods/[action]",
+        "/auth/callback"
+      ],
+      "journeys": [
+        "J19"
+      ],
+      "intent": "Make email codes reach this account at an address the person chooses, with no password (Ticket 334, D31.2, D31.3).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Change address"
+        },
+        {
+          "kind": "activate",
+          "control": "Add email"
+        },
+        {
+          "kind": "submit",
+          "control": "Send confirmation link"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
+        }
+      ],
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Also needs CADENCE_SIGN_IN_EMAIL. Change address shows on the Email row; Add email shows when the account has no confirmed address. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
+      "success_result": "Supabase Auth emails a confirmation link to the new address (and to the current one while secure address change is on). After the links are opened, the account address, email sign-in and email reminders use the new address.",
+      "failure_result": "Refuses an invalid address, the current address, a second request inside a minute, and a used or expired link, each with a plain message. An address that already has an account gets the same answer as a usable one and no email. The address does not change before confirmation.",
+      "effects": [
+        "external_message",
+        "authentication_identity_change",
+        "database_write",
+        "navigation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/SignInMethodsPanel.tsx",
+        "app/auth/sign-in-methods/[action]/route.ts#POST",
+        "lib/services/sign-in-methods.service.ts",
+        "app/auth/callback/route.ts#GET"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sign-in-methods.local-integration.test.ts",
+          "tests/account-sign-in-methods.test.ts"
+        ],
+        "notes": "The local-integration test changes a Google account's address through both links, checks the email identity, profile address and no stored password, and signs in by email to the same data; it also checks taken, same-address and cross-site refusals."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SignInMethodsPanel.tsx",
+            "app/auth/sign-in-methods/[action]/route.ts#POST",
+            "lib/services/sign-in-methods.service.ts",
+            "app/auth/callback/route.ts#GET"
+          ],
+          "evidence": [
+            "tests/sign-in-methods.local-integration.test.ts",
+            "tests/account-sign-in-methods.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "The Mac's Settings does not render this row: its forms need a web session. Ticket 336 adds Mac sign-in methods; until then a linked Mac shows no Sign-in methods row."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; P-051 and P-054 cover sign-in copy."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Mobile web uses the same Settings row (checked at 390 px); native mobile remains unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-SETTINGS-024",
+      "name": "Remove a sign-in method",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#delete-the-signed-in-account"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#sign-in-methods",
+        "/auth/sign-in-methods/[action]",
+        "/auth/callback"
+      ],
+      "journeys": [
+        "J19"
+      ],
+      "intent": "Stop a Google or Apple account from signing in to this Cadence account while another way in remains (Ticket 334, D31.3).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Remove"
+        },
+        {
+          "kind": "submit",
+          "control": "Remove Google"
+        },
+        {
+          "kind": "submit",
+          "control": "Remove Apple"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
+        }
+      ],
+      "availability": "Only when CADENCE_SIGN_IN_LINKING is exactly on (off in production until Ticket 337) and hosted Supabase manual identity linking is on. Remove shows only while another enabled identity remains. Email has no Remove: a confirmed address always receives sign-in codes. Needs a sign-in within the last 15 minutes, read on the server from the session; an older session is signed out and sent to /login, which returns to the row.",
+      "success_result": "Unlinks the identity with the person's own session and says it was removed. Removing Apple also asks Apple to revoke Cadence's authorization and forgets the token Cadence kept for that identity; a failed revocation does not block the removal.",
+      "failure_result": "The server refuses the last enabled way in, an email identity and an identity no longer on the account, even when posted directly; the database trigger keep_one_auth_identity refuses the last identity when two removals race. Every identity stays.",
+      "effects": [
+        "authentication_identity_change",
+        "external_api_request",
+        "navigation"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/settings/SignInMethodsPanel.tsx",
+        "app/auth/sign-in-methods/[action]/route.ts#POST",
+        "lib/services/sign-in-methods.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sign-in-methods.local-integration.test.ts",
+          "tests/account-sign-in-methods.test.ts"
+        ],
+        "notes": "The local-integration test checks that a Google-only account shows no Remove and a direct post is refused, then removes Google after an email identity exists and refuses removing email. It also sends two removals at once (one removed, one refused, one identity left) and checks Cadence's enabled-method rule beside a disabled Apple identity."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/SignInMethodsPanel.tsx",
+            "app/auth/sign-in-methods/[action]/route.ts#POST",
+            "lib/services/sign-in-methods.service.ts"
+          ],
+          "evidence": [
+            "tests/sign-in-methods.local-integration.test.ts",
+            "tests/account-sign-in-methods.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "The Mac's Settings does not render this row: its forms need a web session. Ticket 336 adds Mac sign-in methods; until then a linked Mac shows no Sign-in methods row."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; P-051 and P-054 cover sign-in copy."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Mobile web uses the same Settings row (checked at 390 px); native mobile remains unscheduled."
         }
       }
     },

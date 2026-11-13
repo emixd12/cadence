@@ -1179,6 +1179,20 @@ scrolls; on small screens it sits below the app header.
   panel's own heading.
 - Account and data has one Export entry: "Download your history as JSONL, CSV,
   full JSON, or a BehaviorLog bundle." with **Open Export**.
+- Ticket 334, behind `CADENCE_SIGN_IN_LINKING`: Account and data starts with a
+  Sign-in methods row ("Ways to sign in to this account"; state names the methods,
+  such as "Google and email"). It lists each Google or Apple account and the email
+  address. **Remove** asks in place ("Remove Google? It will no longer sign in to
+  this account.") and shows only while another enabled way in remains. Email has
+  **Change address** (or **Add email** when the account has no confirmed address):
+  a field, **Send confirmation link** and **Cancel**. **Add Google** and **Add
+  Apple** show for enabled methods the account lacks. One result line below the
+  list; a taken account is refused without naming the other account, and a taken
+  address gets the same answer as a usable one. Add, Remove and Change address need a
+  sign-in within 15 minutes; otherwise Login asks the person to sign in again and
+  returns them to the row.
+- Delete account asks for the account address, or `DELETE` when the account has no
+  address or an Apple Hide My Email relay address (Ticket 334).
 - The page ends with one line of Privacy, Terms and Trust links, then Delete
   account as a plain link. It opens the existing deletion form unchanged.
 - Links to `#timezone`, `#notifications`, `#travel`, `#categories`,

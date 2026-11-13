@@ -8,6 +8,12 @@ import {
   appleSubject,
 } from "@/lib/auth/apple-sign-in";
 import {
+  isSignInMethodId,
+  LINK_CALLBACK_PARAM,
+  linkCallbackResult,
+  signInMethodReturnPath,
+} from "@/lib/auth/account-sign-in-methods";
+import {
   authRequestUrl,
   buildLoginPath,
   MISSING_CONFIG_ERROR,
@@ -27,6 +33,11 @@ export async function GET(request: NextRequest) {
   const nextPath = normalizeRedirectPath(requestUrl.searchParams.get("next"));
   const viaApple =
     requestUrl.searchParams.get(APPLE_CALLBACK_PARAM) === APPLE_CALLBACK_VALUE;
+  const link = requestUrl.searchParams.get(LINK_CALLBACK_PARAM);
+
+  if (isSignInMethodId(link)) {
+    return finishLink(requestUrl, link, nextPath);
+  }
 
   if (callbackError) {
     reportMonitoringEvent({
@@ -112,6 +123,45 @@ async function keepAppleToken(session: Session | null, user: User | null) {
   } catch (error) {
     reportMonitoringError("apple_sign_in_token_store_failed", error, routeContext());
   }
+}
+
+// Ticket 334: a return from adding a sign-in method or confirming a new address
+// goes back to `next` with the result, never to the login page. A refusal from
+// Supabase Auth (`identity_already_exists`) names no account.
+async function finishLink(
+  requestUrl: URL,
+  link: Parameters<typeof linkCallbackResult>[0]["link"],
+  nextPath: string,
+) {
+  const params = requestUrl.searchParams;
+  const error = params.get("error");
+  const errorCode = params.get("error_code");
+  const code = params.get("code");
+  let exchanged: boolean | null = null;
+
+  if (!error && !errorCode && code) {
+    try {
+      const supabase = await createClient();
+      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      exchanged = !exchangeError;
+      // Ticket 333 (L-025): an Apple account added here keeps its token for revocation too.
+      if (exchanged && link === "apple") await keepAppleToken(data.session, data.user);
+    } catch {
+      exchanged = false;
+    }
+  }
+
+  const result = linkCallbackResult({ link, error, errorCode, code, exchanged });
+  if (result !== "added" && result !== "email_confirmed" && result !== "email_confirm_other") {
+    reportMonitoringEvent({
+      name: "auth_link_callback_refused",
+      severity: "warning",
+      context: { ...routeContext(), reason: result },
+    });
+  }
+  return NextResponse.redirect(
+    new URL(signInMethodReturnPath(nextPath, result, link), requestUrl),
+  );
 }
 
 function routeContext() {

@@ -103,6 +103,21 @@
       "notes": "Ticket 332: the address and code steps of email sign-in at /login/email, behind CADENCE_SIGN_IN_EMAIL. Plain forms that post to route handlers. The bench passes no Turnstile site key."
     },
     {
+      "id": "flow.sign-in-methods-settings",
+      "name": "SignInMethodsPanel",
+      "kind": "flow",
+      "source": "components/settings/SignInMethodsPanel.tsx",
+      "exportName": "SignInMethodsRow",
+      "usageNames": [
+        "SignInMethodsRow",
+        "SignInMethodsPanel"
+      ],
+      "benchAnchor": "design-system#ds-flow-sign-in-methods-settings",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 334: Settings, Account and data, Sign-in methods row behind CADENCE_SIGN_IN_LINKING. Plain forms post to /auth/sign-in-methods/*. The bench fakes Apple's start."
+    },
+    {
       "id": "flow.first-run-onboarding-panel",
       "name": "FirstRunOnboardingPanel",
       "kind": "flow",

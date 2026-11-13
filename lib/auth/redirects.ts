@@ -98,6 +98,10 @@ export function getAuthErrorMessage(value: RedirectParam) {
     return "Apple did not share an email address, and Cadence needs one. In your Apple Account settings, stop using Sign in with Apple for Cadence, then try again and share an email.";
   }
 
+  if (error === "reauth_required") {
+    return "Sign in again to change how you sign in. Cadence asks when the last sign-in was more than 15 minutes ago.";
+  }
+
   if (error === "sign_in_method_unavailable") {
     return "That sign-in method is not available. Choose another.";
   }

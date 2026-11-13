@@ -267,7 +267,29 @@ by `service_role` only: `apple_sign_in_keep_token(owner_id, apple_subject_digest
 token_ciphertext)` upserts and raises `apple_identity_required` unless the user has an
 Apple identity in `auth.identities`; `apple_sign_in_read_tokens(owner_id)` returns the
 user's rows. Account deletion reads the rows before deleting the Auth user (they cascade)
-and revokes after. Local check: `tests/apple-sign-in.local-integration.test.ts`.
+and revokes after. A third, `apple_sign_in_forget_token(owner_id, apple_subject_digest)`
+(Ticket 334, migration `20261113200000_apple_sign_in_forget_token.sql`, `service_role`
+only, owner's yes November 13, 18:18Z), deletes one row: removing Apple as a sign-in
+method reads that identity's token before the unlink, revokes it at Apple after, and
+forgets the row even when Apple refuses or is unreachable. Local check:
+`tests/apple-sign-in.local-integration.test.ts`.
+
+**At least one Auth identity per user (Ticket 334, D31.3).** Trigger `keep_one_auth_identity`
+(`before delete on auth.identities`, function `cadence_private.keep_one_auth_identity()`,
+migration `20261113190000_keep_one_auth_identity.sql`) locks the user's `auth.users` row
+with `FOR UPDATE`, then refuses (`P0001`, `cadence_last_identity`) to delete an identity when
+no other identity of that user remains. Supabase Auth's own last-identity check does not
+lock, so two unlinks at once each passed it and left none; with the lock they run one after
+the other and the second fails (Auth answers 500, which Cadence shows as "Add another way to
+sign in before removing this one."). Any other identity counts, whatever its provider. A
+confirmed address does not count, although it receives sign-in codes while email sign-in is
+on, because that depends on a flag; the rule can only refuse a deletion, so it never locks
+anyone out. Deleting the user is unaffected: its identities cascade after the user row is
+gone, so the lookup finds no user and lets them through. Automatic linking removes
+unconfirmed identities only after adding the new one. The function is owned by `postgres`,
+is not security definer, has no grant to `anon` or `authenticated`, and names only `auth`
+tables, which the Auth service's role owns. Local check:
+`tests/sign-in-methods.local-integration.test.ts`.
 
 ### `categories`
 
