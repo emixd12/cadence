@@ -45,7 +45,8 @@ Vercel's addresses, which production shares. Real people would be refused for up
   before.
 - Forwarding is on only when `SUPABASE_SECRET_KEY` (`sb_secret_`) and
   `CADENCE_TURNSTILE_SECRET_KEY` are both set and the address is a valid IP. Otherwise
-  every call is the same as before the change.
+  every call is the same as before the change. Since Ticket 339, forwarding also requires
+  `VERCEL=1` (section F, row 1).
 
 Brute force: with forwarding, someone with many addresses gets 30 code checks per
 5 minutes per address. That is what anyone already gets by calling Supabase's `/verify`
@@ -122,8 +123,8 @@ Undo: remove the two Vercel variables and redeploy; set
 - Token refresh in `proxy.ts` is shared too, and it can sign other people out today.
   The verifier measured it (section F, row 6): 31 page loads with a made-up expired
   session cookie used up the server address's refresh burst, and the next person's
-  valid refresh got 429 and was signed out. This is not caused by this change and needs
-  its own ticket (section F).
+  valid refresh got 429 and was signed out. This is not caused by this change. Fixed by
+  Ticket 339 (`docs/qa/2026-11-13-ticket-339-session-refresh-rate-limit.md`).
 - The Supabase docs do not say whether a secret key with a user's bearer token keeps
   Sb-Forwarded-For. Cadence does not rely on it.
 

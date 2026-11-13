@@ -411,3 +411,151 @@ function requestWithAuthCookie(url: string): NextRequest {
     },
   });
 }
+
+// Ticket 339: what a refused session refresh does. The real attack runs in
+// tests/session-refresh-rate-limit.local-integration.test.ts.
+//
+// What can go wrong:
+// 1. A 429, a 5xx or a network failure clears the cookie or redirects to /login.
+// 2. A 400, 401, 403 or 404 (the session has ended) keeps the cookie.
+// 3. A retried refresh that ends in 400 is kept because an earlier try was a 503.
+// 4. The secret key or the address goes on any call but the refresh, or goes out
+//    without Vercel, or without both Ticket 338 secrets.
+// 5. Without forwarding, the refresh call changes.
+describe("Supabase proxy refused refresh (Ticket 339)", () => {
+  const TOKEN_URL = "https://supabase.example/auth/v1/token?grant_type=refresh_token";
+  const JWKS_URL = "https://supabase.example/auth/v1/.well-known/jwks.json";
+  const SESSION = "sb-test-auth-token";
+  type Answer = number | "network";
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  function stubAuth(answers: Answer[], calls: string[] = [TOKEN_URL]) {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "publishable-key");
+    const queue = [...answers];
+    const network = vi.fn(async () => {
+      const answer = queue.shift() ?? 200;
+      if (answer === "network") throw new TypeError("fetch failed");
+      return new Response("{}", { status: answer });
+    });
+    vi.stubGlobal("fetch", network);
+
+    vi.mocked(createServerClient).mockImplementation(((...args: unknown[]) => {
+      const options = args[2] as {
+        global: { fetch: typeof fetch };
+        cookies: { setAll: (c: Array<{ name: string; value: string; options: object }>, h: Record<string, string>) => void };
+      };
+      return {
+        auth: {
+          async getClaims() {
+            // Like auth-js: try each call; a refused refresh removes the session.
+            for (const url of calls) {
+              try {
+                await options.global.fetch(url, {
+                  method: url === TOKEN_URL ? "POST" : "GET",
+                  headers: { apikey: "publishable-key", Authorization: "Bearer publishable-key" },
+                });
+              } catch {}
+            }
+            options.cookies.setAll([{ name: SESSION, value: "", options: { path: "/", maxAge: 0 } }], {});
+            return { data: null, error: new Error("refresh failed") };
+          },
+        },
+      };
+    }) as never);
+    return network;
+  }
+
+  it.each([429, 500, 503, 522, "network" as const])("keeps the session when Auth answers %s", async (answer) => {
+    stubAuth([answer]);
+    const response = await updateSession(requestWithAuthCookie("http://localhost:3000/timeline"));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("retry-after")).toBe("5");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.getSetCookie()).toEqual([]);
+    expect(await response.text()).toContain("You are still signed in.");
+  });
+
+  it.each([400, 401, 403, 404])("ends the session when Auth answers %s", async (answer) => {
+    stubAuth([answer]);
+    const response = await updateSession(requestWithAuthCookie("http://localhost:3000/timeline"));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/login?next=%2Ftimeline");
+    expect(response.cookies.get(SESSION)).toMatchObject({ value: "", maxAge: 0 });
+  });
+
+  it("lets the last Auth answer decide", async () => {
+    stubAuth([503, 400], [TOKEN_URL, TOKEN_URL]);
+    const ended = await updateSession(requestWithAuthCookie("http://localhost:3000/timeline"));
+    expect(ended.status).toBe(307);
+
+    stubAuth([200, 503], [TOKEN_URL, JWKS_URL]);
+    const kept = await updateSession(requestWithAuthCookie("http://localhost:3000/timeline"));
+    expect(kept.status).toBe(503);
+  });
+
+  it("answers the export API in JSON, the root with the page and shows /login unchanged", async () => {
+    stubAuth([429]);
+    const api = await updateSession(requestWithAuthCookie("http://localhost:3000/api/export/json"));
+    expect(api.status).toBe(503);
+    expect(await api.json()).toEqual({ error: "auth_unavailable" });
+    expect(api.headers.getSetCookie()).toEqual([]);
+
+    stubAuth([429]);
+    expect((await updateSession(requestWithAuthCookie("http://localhost:3000/"))).status).toBe(503);
+
+    stubAuth([429]);
+    const login = await updateSession(requestWithAuthCookie("http://localhost:3000/login"));
+    expect(login.status).toBe(200);
+    expect(login.headers.get("location")).toBeNull();
+    expect(login.headers.getSetCookie()).toEqual([]);
+    expect(login.headers.get("x-middleware-request-cookie")).toBeNull();
+  });
+
+  function forwardingRequest(path = "/timeline") {
+    return new NextRequest(`https://app.cadence.example${path}`, {
+      headers: { cookie: `${SESSION}=header.payload.signature`, "x-real-ip": "198.51.100.7" },
+    });
+  }
+
+  const headersOf = (network: ReturnType<typeof vi.fn>, index: number) =>
+    new Headers((network.mock.calls[index] as unknown as [string, RequestInit])[1].headers);
+
+  it("sends the secret key and the address with the refresh only, on Vercel with both secrets", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    vi.stubEnv("CADENCE_TURNSTILE_SECRET_KEY", "turnstile");
+    const network = stubAuth([400, 200], [TOKEN_URL, JWKS_URL]);
+    await updateSession(forwardingRequest());
+
+    const refresh = headersOf(network, 0);
+    expect(refresh.get("apikey")).toBe("sb_secret_test");
+    expect(refresh.get("authorization")).toBe("Bearer sb_secret_test");
+    expect(refresh.get("sb-forwarded-for")).toBe("198.51.100.7");
+    const jwks = headersOf(network, 1);
+    expect(jwks.get("apikey")).toBe("publishable-key");
+    expect(jwks.get("sb-forwarded-for")).toBeNull();
+  });
+
+  it.each([
+    { label: "off Vercel", env: { SUPABASE_SECRET_KEY: "sb_secret_test", CADENCE_TURNSTILE_SECRET_KEY: "turnstile" } },
+    { label: "without the Turnstile secret", env: { VERCEL: "1", SUPABASE_SECRET_KEY: "sb_secret_test" } },
+    { label: "without the secret key", env: { VERCEL: "1", CADENCE_TURNSTILE_SECRET_KEY: "turnstile" } },
+  ])("sends the refresh unchanged $label", async ({ env }) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+    const network = stubAuth([400]);
+    await updateSession(forwardingRequest());
+
+    const [url, init] = network.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(TOKEN_URL);
+    expect(init.headers).toEqual({ apikey: "publishable-key", Authorization: "Bearer publishable-key" });
+  });
+});

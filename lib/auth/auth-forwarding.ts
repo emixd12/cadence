@@ -41,11 +41,17 @@ export function clientAddressOf(headers: HeaderSource): string | null {
   return null;
 }
 
-/** Null keeps the earlier behaviour: publishable key, Supabase runs the CAPTCHA. */
+/**
+ * Null keeps the earlier behaviour: publishable key, Supabase runs the CAPTCHA.
+ * Only on Vercel (`VERCEL=1`), the one host where a client cannot set its own address
+ * (Ticket 338 verifier, section F row 1). Under `next start` or `next dev` the address
+ * headers are whatever the client sends.
+ */
 export function authForwardingFor(
   headers: HeaderSource,
   env: Env = process.env,
 ): AuthForwarding | null {
+  if (env.VERCEL !== "1") return null;
   const secretKey = env.SUPABASE_SECRET_KEY?.trim();
   const turnstileSecret = env.CADENCE_TURNSTILE_SECRET_KEY?.trim();
   if (!secretKey?.startsWith("sb_secret_") || !turnstileSecret) return null;
@@ -56,6 +62,32 @@ export function authForwardingFor(
 
 export function forwardedForHeaders(forwarding: AuthForwarding): Record<string, string> {
   return { [SB_FORWARDED_FOR_HEADER]: forwarding.clientAddress };
+}
+
+/**
+ * Ticket 339: the session refresh (`POST /auth/v1/token?grant_type=refresh_token`)
+ * counts against Auth's per-address limit like `/otp` and `/verify`. Only that call
+ * gets the secret key and the person's address; every other Auth call keeps the
+ * publishable key.
+ */
+export function isSessionRefreshUrl(url: URL, supabaseUrl: string): boolean {
+  const token = new URL("auth/v1/token", supabaseUrl.endsWith("/") ? supabaseUrl : `${supabaseUrl}/`);
+  return (
+    url.origin === token.origin &&
+    url.pathname === token.pathname &&
+    url.searchParams.get("grant_type") === "refresh_token"
+  );
+}
+
+export function withRefreshForwarding(
+  init: RequestInit | undefined,
+  forwarding: AuthForwarding,
+): RequestInit {
+  const headers = new Headers(init?.headers);
+  headers.set("apikey", forwarding.secretKey);
+  headers.set("authorization", `Bearer ${forwarding.secretKey}`);
+  headers.set(SB_FORWARDED_FOR_HEADER, forwarding.clientAddress);
+  return { ...init, headers };
 }
 
 /**

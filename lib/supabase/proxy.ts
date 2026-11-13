@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  authForwardingFor,
+  isSessionRefreshUrl,
+  withRefreshForwarding,
+  type AuthForwarding,
+} from "@/lib/auth/auth-forwarding";
+import {
   authRequestUrl,
   buildLoginPath,
   LOGIN_ROUTE,
@@ -12,6 +18,10 @@ import { readSupabaseRuntimeConfig } from "@/lib/supabase/env";
 
 type ClaimsAuthResult = {
   authenticated: boolean;
+};
+
+type AuthCallRecord = {
+  unavailable: boolean;
 };
 
 const LOGIN_PREVIEW_PARAM = "preview";
@@ -55,6 +65,64 @@ function allowsAuthenticatedLoginPreview(request: NextRequest) {
   return (
     request.nextUrl.searchParams.get(LOGIN_PREVIEW_PARAM) ===
     LOGIN_PREVIEW_VALUE
+  );
+}
+
+/**
+ * Ticket 339. Auth answers a refresh of an ended session (signed out, revoked,
+ * account deleted, token reused or made up) with 400, 401, 403 or 404. A 429 or a
+ * server error (5xx, Cloudflare's 52x), or no answer at all, says nothing about the
+ * session: Cadence keeps it and asks the browser to try again.
+ */
+function isUnavailableStatus(status: number) {
+  return status === 429 || status >= 500;
+}
+
+function proxyAuthFetch(
+  supabaseUrl: string,
+  forwarding: AuthForwarding | null,
+  record: AuthCallRecord,
+): typeof fetch {
+  return async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    const refresh = isSessionRefreshUrl(url, supabaseUrl);
+    try {
+      const response = await fetch(
+        input,
+        forwarding && refresh ? withRefreshForwarding(init, forwarding) : init,
+      );
+      // The last Auth answer decides: a retried call that ends in 400 has ended.
+      record.unavailable = isUnavailableStatus(response.status);
+      return response;
+    } catch (error) {
+      record.unavailable = true;
+      throw error;
+    }
+  };
+}
+
+const RETRY_AFTER_SECONDS = 5;
+
+/** No cookie is written, so the browser keeps the session it sent. */
+function authUnavailableResponse(request: NextRequest) {
+  const headers = {
+    "Cache-Control": "private, no-store",
+    "Retry-After": String(RETRY_AFTER_SECONDS),
+  };
+
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "auth_unavailable" },
+      { status: 503, headers },
+    );
+  }
+
+  return new NextResponse(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta http-equiv="refresh" content="${RETRY_AFTER_SECONDS}"><title>Cadence</title></head><body style="font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box"><p style="margin:0;max-width:28rem;line-height:1.5">Cadence could not check your sign-in just now. You are still signed in. This page tries again in a few seconds.</p></body></html>`,
+    {
+      status: 503,
+      headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+    },
   );
 }
 
@@ -140,7 +208,15 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  const authCalls: AuthCallRecord = { unavailable: false };
   const supabase = createServerClient(config.url, config.publishableKey, {
+    global: {
+      fetch: proxyAuthFetch(
+        config.url,
+        authForwardingFor(request.headers),
+        authCalls,
+      ),
+    },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -180,6 +256,13 @@ export async function updateSession(request: NextRequest) {
       };
     },
   );
+
+  if (!authResult.authenticated && authCalls.unavailable) {
+    // The refresh may have written cookie removals; neither response carries them.
+    return pathname === LOGIN_ROUTE
+      ? NextResponse.next()
+      : authUnavailableResponse(request);
+  }
 
   if (protectedRoute && !authResult.authenticated) {
     return redirectWithSessionCookies(
