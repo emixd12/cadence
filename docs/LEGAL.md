@@ -717,11 +717,12 @@ part of L-002.
   on Login. Not a legal opinion.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** owner decision D31, November 13, 2026, adds Apple
-  sign-in on the web and the Mac. It accepts no risk. The licence question is open for
-  the owner.
-- **Status:** open.
-- **Next action:** the owner decides whether the embedded glyph stays or Login uses
-  Apple's own button. A mobile or Mac App Store ticket rereads guideline 4.8.
+  sign-in on the web and the Mac. On November 13, 2026 the owner chose to keep the
+  embedded glyph (Owner blockers row 9, recorded by the Apple enablement agent before
+  `CADENCE_SIGN_IN_APPLE` went on at 21:36Z).
+- **Status:** owner decided: keep the glyph.
+- **Next action:** none for the web. A mobile or Mac App Store ticket rereads guideline
+  4.8 and this entry.
 
 ## L-025: Apple token revocation when an account is deleted
 

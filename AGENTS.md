@@ -56,10 +56,10 @@ implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Tickets 
 let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
 (`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
 Behavior can be marked Completed from activity recorded in a connected service, starting
-with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Ticket 310 recorded the decision; no
-code has shipped. Tickets 331–337 add sign-in by email and Apple beside Google, on Supabase
-Auth (`docs/DECISIONS.md`, 2026-11-13, D31); their code is merged and email sign-in is
-live in production since November 13, 2026. Mobile and broader
+with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Tickets 310–324 are complete; connector completion is on in
+Production since November 13, 2026. Tickets 331–337 add sign-in by email and Apple beside Google, on Supabase
+Auth (`docs/DECISIONS.md`, 2026-11-13, D31); email, Apple and Settings sign-in methods are
+live on web since November 13, 2026; the Mac gets them in its next release. Mobile and broader
 workspace restructuring remain deferred. The owner
 intends an iPhone app and a Mac App Store listing near launch (D30). Neither has tickets;
 the launch narrative is written for them, and no mobile code starts without a ticket.

@@ -18930,9 +18930,9 @@ desktop width.
 
 ## Ticket 332: Email sign-in and account creation (web)
 
-Status: in progress (November 13, 2026, draft PR). Built and checked on the local stack
-behind `CADENCE_SIGN_IN_EMAIL`; the hosted Auth steps wait on owner rows and the code
-length decision (`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`). Filed November
+Status: complete, live on production web since November 13, 2026, 21:35Z
+(`CADENCE_SIGN_IN_EMAIL=on`; PRs #265 and #268; hosted Auth steps applied in
+`docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`, "Applied, go-live"). Filed November
 13, 2026.
 Dependencies: Ticket 331. Decision: D31.2 and D31.3.
 
@@ -19174,7 +19174,7 @@ Verification: existing Calendar and leave-reminder tests plus new cases;
 
 ## Ticket 336: Sign-in methods in Cadence for Mac
 
-Status: merged (PR #270, November 13, 2026); waits on a Mac release (owner row 14) and Ticket 337's installed Apple and email runs. Filed November 13, 2026. Design:
+Status: merged (PR #270, November 13, 2026); the owner instructed the release at 21:45Z and PR #276 prepares Cadence for Mac 0.1.11 (not published when checked, 22:20Z); Ticket 337's installed Apple and email runs follow it. Filed November 13, 2026. Design:
 `docs/DESKTOP_BUILD.md`, "Sign-in methods (Ticket 336)".
 Dependencies: Tickets 331–335. Decision: D31.2. Ships with a Mac release.
 
@@ -19208,10 +19208,13 @@ the test Mac (`.claude/skills/desktop-acceptance`); `dagger check --cadence --pr
 
 ## Ticket 337: Sign-in acceptance on production web and the installed Mac
 
-Status: in progress (November 13, 2026, first pass). Preflight suite `sign-in` added; hosted
-manual linking on; linking rows that need no owner step passed on a flag-on test deployment.
-Every production flag stays off. Results and what each flag still waits on:
-`docs/qa/2026-11-13-ticket-337-acceptance.md`. Filed November 13, 2026.
+Status: in progress. Web rows complete: email, Apple and Settings sign-in methods passed on
+production and their flags are on since November 13, 2026, 21:35–21:36Z
+(`docs/qa/2026-11-13-ticket-337-acceptance.md`; final check
+`docs/qa/2026-11-13-sign-in-final-verification.md`). Open: acceptance row 6 (Mac links by
+each method, syncs, refuses a second account) on the installed release that carries
+Ticket 336, and acceptance row 3's Apple half (a Google account adds Apple, then signs in
+with Apple). Filed November 13, 2026.
 Dependencies: Tickets 331–336. Decision: D31.6.
 
 Goal: agents run each method end to end as the test accounts.
