@@ -99,12 +99,11 @@ Effects:
 
 - **Web email sign-in.** Needs step 9 first. Without the site key the form sends no token
   and every request fails with "The check that you are a person did not finish."
-- **Test login (`app/auth/test-login`).** Its `signInWithPassword` fails against a hosted
-  project with CAPTCHA on, so hosted test login (`CADENCE_ALLOW_HOSTED_TEST_LOGIN=1`) stops
-  working. Local test login is unaffected while local CAPTCHA stays off. Fix, if hosted
-  test login is still needed: sign the temporary user in with
-  `admin.generateLink({ type: "magiclink" })` and `verifyOtp({ token_hash, type: "email" })`;
-  both passed without a token in the local check. Not built in Ticket 332.
+- **Test login (`app/auth/test-login`).** Before PR #268 it used `signInWithPassword`,
+  which fails against a hosted project with CAPTCHA on. PR #268 signs the temporary user
+  in with `admin.generateLink({ type: "magiclink" })` and
+  `verifyOtp({ token_hash, type: "email" })`; neither needs a CAPTCHA token in the local
+  check. Recheck hosted test login after step 8.
 - **Scripts that sign in with a password against a hosted project** (load-test fixtures,
   RLS and push-cap smoke scripts) stop working the same way. They target loopback
   Supabase by default.
