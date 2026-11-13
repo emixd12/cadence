@@ -25,14 +25,16 @@ const get = (path, cookie) => new Promise((resolve, reject) => {
   req.on('error', reject); req.end();
 });
 const sessionCount = (userId) => Number(execFileSync('docker', ['exec', DB, 'psql', '-U', 'postgres', '-tAc', `select count(*) from auth.sessions where user_id = '${userId}'`], { encoding: 'utf8' }).trim());
-const latestLink = async (email, after) => {
+// Ticket 332's sign-in email links to Cadence's own confirm page, so the starter
+// rebuilds the Auth verify URL that the old template carried, from the token hash.
+const latestLink = async (email, after, redirectTo) => {
   for (let i = 0; i < 40; i += 1) {
     const list = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`)).json();
     const message = (list.messages ?? []).find((m) => Date.parse(m.Created) >= after);
     if (message) {
       const full = await (await fetch(`${MAILPIT}/api/v1/message/${message.ID}`)).json();
-      const link = String(full.Text).match(/https?:\/\/127\.0\.0\.1:56120\/auth\/v1\/verify\?[^\s)\]]+/);
-      if (link) return link[0].replaceAll('&amp;', '&');
+      const tokenHash = String(full.HTML ?? full.Text).match(/token_hash=([0-9a-zA-Z_-]+)/)?.[1];
+      if (tokenHash) return `${ORIGIN}/auth/v1/verify?token=${tokenHash}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`;
     }
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -57,7 +59,7 @@ it.skipIf(!enabled)('exchanges real PKCE codes, discards a wrong account, refres
       const after = Date.now() - 1000;
       const { error } = await client.auth.signInWithOtp({ email: EMAILS[nextUser], options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
       if (error) { beginErrors.push(error.code ?? error.message); return null; }
-      try { return await latestLink(EMAILS[nextUser], after); } catch (e) { beginErrors.push(e.message); return null; }
+      try { return await latestLink(EMAILS[nextUser], after, redirectTo); } catch (e) { beginErrors.push(e.message); return null; }
     },
   });
   await broker.start();

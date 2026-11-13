@@ -255,10 +255,13 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+# Ticket 332: hosted CAPTCHA is off today, so this stays off. Turnstile is the planned
+# provider (docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md). Cloudflare's test
+# secret 1x0000000000000000000000000000000AA always passes for a local check.
 # [auth.captcha]
 # enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# provider = "turnstile"
+# secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -267,12 +270,16 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Ticket 332: on, as on hosted Auth.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# Ticket 332: 60 s, as on hosted Auth.
+max_frequency = "60s"
 # Number of characters used in the email OTP.
+# Ticket 332: must equal EMAIL_SIGN_IN_CODE_LENGTH in lib/auth/email-sign-in.ts. Hosted
+# Auth sends 8 digits today; D31 says 6. The owner decides; until then this stays 6.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
@@ -286,6 +293,17 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Ticket 332: one sign-in email with a link and a code, for a new address
+# (confirmation) and a known one (magic_link). Hosted Auth needs the same subject and
+# body (docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md).
+[auth.email.template.confirmation]
+subject = "Sign in to Cadence"
+content_path = "./supabase/templates/sign-in.html"
+
+[auth.email.template.magic_link]
+subject = "Sign in to Cadence"
+content_path = "./supabase/templates/sign-in.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -344,8 +362,9 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+# Ticket 332: on, as on hosted Auth. Cadence has no MFA screen.
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
