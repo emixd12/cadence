@@ -37,6 +37,8 @@ if (!["127.0.0.1", "localhost"].includes(new URL(upstream).hostname)) {
   console.error("The Apple stub runs only in front of loopback Supabase.");
   process.exit(2);
 }
+// Requests forward to this fixed origin; only the path and query come from the request.
+const upstreamOrigin = new URL(upstream).origin;
 
 /** @type {null | Record<string, any>} */
 let nextScenario = null;
@@ -135,8 +137,7 @@ function send(response, status, body, headers = {}) {
 async function forward(request, response, body) {
   // Only the path and query come from the request; the origin is always loopback Supabase.
   const incoming = new URL(request.url, "http://stub.invalid");
-  const url = new URL(`${incoming.pathname}${incoming.search}`, upstream);
-  if (url.origin !== new URL(upstream).origin) throw new Error("refused");
+  const url = `${upstreamOrigin}/${incoming.pathname.replace(/^\/+/, "")}${incoming.search}`;
   const headers = { ...request.headers };
   delete headers.host;
   delete headers.connection;
