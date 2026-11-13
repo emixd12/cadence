@@ -115,7 +115,8 @@ function runGateway(keys) {
     const requested = new URL(req.url, "http://gateway.invalid");
     const path = `${requested.pathname}${requested.search}`;
     const isAuth = requested.pathname.startsWith("/auth/v1/");
-    let target = new URL(path, STACK);
+    // String prefixes keep the host fixed even for a path that starts with "//".
+    let target = new URL(`${new URL(STACK).origin}${path}`);
     if (isAuth) {
       const apikey = headers.apikey ?? "";
       const bearer = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
@@ -124,7 +125,7 @@ function runGateway(keys) {
       }
       if (apikey !== keys.secret) delete headers["sb-forwarded-for"];
       headers["x-forwarded-for"] = req.socket.remoteAddress.replace(/^::ffff:/, "");
-      target = new URL(path.slice("/auth/v1".length), `http://127.0.0.1:${AUTH_PORT}`);
+      target = new URL(`http://127.0.0.1:${AUTH_PORT}${path.slice("/auth/v1".length)}`);
     }
 
     try {
