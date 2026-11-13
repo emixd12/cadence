@@ -92,6 +92,51 @@ B today: 3 Behaviors, 13 Occurrences, 9 Categories, 4 status events, one Google 
 created September 17, 2026. The three rows stay on owner row 16 (a third Google test account).
 Using A instead has the same problems, plus A's Calendar connection and the test Mac's link.
 
+## Verification of PR #273 (direct Supabase calls with every flag off)
+
+Run November 13, 2026, 20:55–21:03Z, by the PR #273 verifier. Run folder (git-ignored):
+`.intent/acceptance/v337-verify/` in the Intent workspace worktree (`evidence.jsonl`,
+`probe.mjs`). No hosted setting changed. Hosted Auth read before and after: manual linking
+on, secure email change on, email and Google and Apple providers on, SMTP host not set,
+CAPTCHA off, 47 redirect entries with no test-deployment entry, trigger
+`keep_one_auth_identity` enabled with the Calendar rule. The four test deployments of Tickets
+333 and 337 answer 404. Production `/api/auth/sign-in-methods` lists Google only.
+
+A throwaway email-only user (`v337-v1@example.com`, admin-created, no email sent) called
+Supabase Auth directly with the public key and its own session:
+
+| Call | Result |
+|---|---|
+| Unlink its only identity | 422 `single_identity_not_deletable` |
+| Start linking Google or Apple (`/user/identities/authorize`) | 200, a provider URL: flags do not gate the Auth endpoint |
+| Finish linking test account A's Google (owned by another account), in the verifier's own Chrome profile | Supabase redirected to `/auth/callback` with `identity_already_exists`; nothing linked |
+| Unlink a Google identity while a Calendar connection names it (identity and connection rows written for the throwaway user) | 500 `cadence_calendar_connected` from the trigger; both identities kept |
+| Two unlinks at once, 4 trials | One 200 and one 422 each time; one identity always kept |
+| Start Apple sign-in with no session (`/authorize?provider=apple`) | 302 to Apple: anyone can start Apple sign-up while `CADENCE_SIGN_IN_APPLE` is off |
+
+The user was deleted after. Hosted users 7, none without an identity, none with more than one.
+Afterwards a fresh Google sign-in as A in the verifier's profile reached `/timeline` as A, and kept
+sessions A and B answered "session ok".
+
+Reachable with every flag off, through direct calls only, each limited to the caller's own
+account. Items 1–3 are read from the code and the results above, not run end to end: no
+Google or Apple identity outside a Cadence account was available.
+
+1. Link a second method the caller owns (Apple, or a second Google account). The app has no
+   Settings row to show or remove it with the linking flag off. A linked Apple identity skips
+   Cadence's callback, so no Apple refresh token is kept for revocation on deletion (L-025).
+2. Then unlink Google, leaving Apple only. The login page offers Google only, so the account is
+   reachable only through a direct Apple sign-in, and Continue with Google with that Google
+   account creates a new account.
+3. A second Google identity makes Calendar report `multiple` and refuse event reads
+   (`calendarGoogleSubject`) until the caller unlinks one directly.
+4. Apple sign-up through `/authorize` creates an Apple-only account while the Apple flag is off
+   (the hosted Apple provider is on).
+
+No call reached another account, removed the last identity, or removed a Google identity a
+Calendar uses. Cadence's 15-minute recent sign-in rule does not cover direct calls (already
+noted in the Ticket 334 change list, step 4).
+
 ## Installed Mac (read-only)
 
 The test Mac runs Cadence 0.1.11-dev.4 (production values), signed in as A with the account
@@ -137,7 +182,9 @@ passed.
 - E1 (`d8cad61d-…`, `t337-e1@example.com`) deleted through Settings; no `t337-` user remains.
   Hosted users 7, none without an identity, none with two Google identities.
 - Test deployment removed at 20:51:42Z (`/login` then answered 404), with its share link;
-  its redirect entry removed (47 entries, matching the list before the run). The two earlier
+  its redirect entry removed (47 entries: the four permanent non-local entries plus the local
+  ones; the run started at 48 because Ticket 333's test-deployment entry, `cadence-311hbjk9f`,
+  was still listed, and the Apple agent removed it during the run). The two earlier
   deployments and their entries were removed the same way.
 - After cleanup (20:51:56Z): kept sessions A and B ok; fresh Google sign-in to
   `app.cadence-me.com` as A returned A's user ID; login shows Google only.
