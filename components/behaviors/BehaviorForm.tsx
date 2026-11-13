@@ -42,6 +42,8 @@ type BehaviorFormProps = Readonly<{
   reminderRuntime?: "web" | "desktop";
   /** Ticket 216: Where filled in from a reviewed suggestion; saving still needs the user. */
   whereDraft?: WhereDraft | null;
+  /** Ticket 329: extra settings shown after reminders, such as Complete from Hevy on create. */
+  extraFields?: ReactNode;
 }>;
 
 export type TimeEntryRow = {
@@ -106,6 +108,7 @@ export function BehaviorForm({
   initialState = EMPTY_ACTION_STATE,
   onSuccess,
   reminderRuntime = "web",
+  extraFields,
   whereDraft = null,
 }: BehaviorFormProps) {
   const planningId = useId();
@@ -429,6 +432,8 @@ export function BehaviorForm({
           error={fieldErrors.reminders}
         />
       </div>
+
+      {extraFields}
 
       {mode === "edit" && showActiveToggle ? (
         <label className="flex min-h-12 items-center gap-3 border-b border-line py-2 text-sm">

@@ -18787,3 +18787,40 @@ Platform impact:
 Messaging impact: none.
 
 Verification: `npm run agents:check`.
+
+## Ticket 329: Choose Complete from Hevy while creating a Behavior
+
+Status: implemented November 13, 2026.
+Dependencies: Tickets 316 and 317. Requested by the owner on November 13, 2026: the Hevy
+link could only be set on a Behavior that already existed.
+
+Goal: a user creating a Behavior can link it to Hevy in the same step.
+
+Scope and acceptance:
+
+- Create behavior shows "Complete from Hevy" after reminders on the web, under the same
+  conditions as Behavior settings: the flag is on and Hevy is connected. Off by default.
+  Same choices and limits: Off, Chosen routines, Any workout; a routine held by another
+  Behavior and a taken any-workout link are disabled and named.
+- No separate save button. Save behavior creates the Behavior, then saves the link through
+  the existing `PUT /api/connectors/links`. The confirmation says whether the link was
+  saved. A refused or failed link never undoes the Behavior; the message says to set the
+  link in the Behavior's settings.
+- `GET /api/connectors/links` with an empty `behaviorId` returns the state for a Behavior
+  being created. No schema or route change.
+- Interaction registry: INT-BEHAVIOR-032 gains the create trigger.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `components/behaviors/BehaviorCreateSection.tsx`, `SourceLinkCreateChoice` in `components/behaviors/SourceLinkSettings.tsx`. |
+| Desktop | Follow-up: the Mac does not edit links yet (Ticket 319); creation on the Mac stays unchanged. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Mobile web uses the same form. |
+
+Messaging impact: P-049.
+
+Verification: `tests/connector-completion-ui.dom.test.tsx`,
+`tests/connector-completion.service.test.ts` and `dagger check --cadence --progress=report`.
+

@@ -70,7 +70,9 @@ export async function getSourceLinkFormState(
     routines: [], routinesComplete: null, staleLinkedCount: null, anyHolder: null,
   };
   if (!connectorCompletionEnabled(deps.env)) return empty;
-  if (!isUuid(input.behaviorId)) throw new ConnectorError("invalid_request");
+  // An empty ID is a Behavior being created: it has no link yet, and every enabled link
+  // belongs to another Behavior (Ticket 329).
+  if (input.behaviorId !== "" && !isUuid(input.behaviorId)) throw new ConnectorError("invalid_request");
   const digest = await (deps.connectionDigest ?? ((value) => connectedDigest(caller, value)))(source);
   const links = await (deps.listLinks ?? ((value) => listSourceLinks(caller.client, caller.user.id, value)))(source);
   const own = links.find((link) => link.behavior_id === input.behaviorId) ?? null;

@@ -11,7 +11,7 @@ import {
   sourceEvidenceSummary,
 } from "@cadence/core/services/timeline-source-evidence";
 import type { TimelineOccurrenceView, TimelineSourceEvidence } from "@cadence/core/types/timeline";
-import { SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
+import { createLinkMessage, SourceLinkCreateChoice, SourceLinkSettings, type SourceLinkChoice } from "@/components/behaviors/SourceLinkSettings";
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import type { SourceLinkFormState } from "@/lib/services/source-links.service";
@@ -102,6 +102,40 @@ describe("Complete from Hevy link control (Ticket 317)", () => {
       coordinator={coordinator(linkState({ mode: "routines", selectorKeys: [LEGS], staleLinkedCount: null, routinesComplete: false }))} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Showing the first 200 routines"));
     expect(container.querySelector("[data-stale-routines]")).toBeNull();
+  });
+});
+
+describe("Complete from Hevy at creation (Ticket 329)", () => {
+  it("loads the state for a new Behavior and reports the choice without saving", async () => {
+    const coord = coordinator(linkState());
+    const choices: SourceLinkChoice[] = [];
+    await act(() => root.render(<SourceLinkCreateChoice coordinator={coord} onChange={(choice) => choices.push(choice)} />));
+    await vi.waitFor(() => expect(container.querySelector("[data-source-link-create]")).not.toBeNull());
+    expect(coord.getState).toHaveBeenCalledWith("");
+    expect(container.textContent).toContain("Saved when you create the Behavior.");
+    expect(container.querySelector("button")).toBeNull();
+    await act(async () => { radio("Chosen routines").click(); });
+    const legs = [...container.querySelectorAll("label")].find((node) => node.textContent?.includes("Legs"))!.querySelector("input")!;
+    await act(async () => { legs.click(); });
+    expect(choices.at(-1)).toEqual({ mode: "routines", selectorKeys: [LEGS] });
+    await act(async () => { radio("Any workout").click(); });
+    expect(choices.at(-1)).toEqual({ mode: "any", selectorKeys: [] });
+    expect(coord.save).not.toHaveBeenCalled();
+  });
+
+  it("stays hidden while unavailable or not connected", async () => {
+    for (const state of [linkState({ available: false }), linkState({ connected: false })]) {
+      await act(() => root.render(<SourceLinkCreateChoice coordinator={coordinator(state)} onChange={() => undefined} />));
+      await act(async () => undefined);
+      expect(container.textContent).toBe("");
+    }
+  });
+
+  it("says whether the link was saved after creation", () => {
+    expect(createLinkMessage({ saved: true, mode: "any" })).toBe("Behavior created and linked to Hevy.");
+    expect(createLinkMessage({ saved: false, reason: "any_link_exists", holder: { behaviorId: "x", title: "Gym" } }))
+      .toContain("Behavior created. Gym already uses any workout.");
+    expect(createLinkMessage(null)).toBe("Behavior created. The Hevy link was not saved. Set it in this Behavior's settings.");
   });
 });
 
