@@ -240,7 +240,9 @@ lives in `lib/auth/desktop-sign-in.ts`, imported by both sides.
 3. **Email.** The person types the address in the panel. The Mac saves the flow
    (state, time, method, address) in the `pending-state` Keychain item and opens
    `/login/email/mac` in the system browser, with the state and address in the URL
-   fragment, which no server or log receives. That page passes Turnstile, when the
+   fragment, which no server or log receives. The page removes the fragment from the address
+bar at once; the browser's own history may still keep the first URL, on the person's own
+browser. That page passes Turnstile, when the
    hosted project has it on, and posts to `POST /auth/email/mac`, which calls Supabase
    Auth's code request with the Turnstile token. Without Turnstile the page sends at
    once. The person types the 6-digit code in the panel, and the Mac verifies it with

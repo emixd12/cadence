@@ -84,13 +84,20 @@ Tailnet serve was turned off and the local web server stopped after the run.
 `0.1.11-dev.4`, signed in as A, link paused on the error above. Production data is
 untouched. Restoring the protected copy `backups/pre-0.1.11-dev.3-ticket336-…` (A's
 linked database) lets A reconnect without a first link; that restore needs the owner's
-instruction (Owner blockers row 13).
+instruction (Owner blockers row 15).
 
 ### Finding for a follow-up
 
-Test account A's hosted history has more than one status row for some occurrence, so
-no new Mac can make a first link to A. Branches may come from connector completion
-(Ticket 330) next to manual marks. This needs its own ticket.
+Test account A's hosted history has two root status events for one occurrence: a Hevy
+connector completion (`reason_code` `connector:hevy`, Completed, 04:36:30Z on November 13)
+and a manual Not Completed 48 seconds later, also with `previous_status` Unresolved and no
+`revises_event_id`. The second mark was made without seeing the first, the race that
+connector completion (D28) allows. `connectorAndManualMark` in
+`packages/core/src/resolvers/account-sync.resolver.ts` accepts that pair only while one
+mark is local and the other hosted. Once both are hosted, every first link to the account
+fails at line 821. This is a product defect from connector completion, not bad test data
+(verifier, November 13: read-only query of A's events; one branched occurrence). It needs
+its own ticket.
 
 ### Not run on the installed app
 

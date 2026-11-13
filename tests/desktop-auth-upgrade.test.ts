@@ -255,6 +255,24 @@ describe("sign-in methods on the Mac", () => {
     await finish();
   });
 
+  it("refuses an email code when a session appeared after the request, without asking the server", async () => {
+    const { auth, states, finish } = await startAuth();
+    await auth.beginEmail("other@example.test");
+    native.secrets.set("supabase-session", JSON.stringify({ access_token: "synthetic-access", user: { id: "hosted-one", email: "owner@example.test", user_metadata: {} } }));
+    native.validCodes.add("123456");
+    await auth.verifyEmailCode("123456");
+    expect(native.verified).toEqual([]);
+    expect(states.at(-1)).toMatchObject({ status: "linked", userId: "hosted-one", notice: expect.stringContaining("different account") });
+    expect(native.secrets.has("pending-state")).toBe(false);
+    await finish();
+  });
+
+  it("refuses a page fragment whose state is not a plain identifier", () => {
+    expect(parseDesktopEmailFragment("#state=a%22%3E%3Cx&email=owner%40example.test")).toBeNull();
+    expect(parseDesktopEmailFragment(`#state=${"a".repeat(129)}&email=owner%40example.test`)).toBeNull();
+    expect(parseDesktopEmailFragment("#state=s-1&email=owner%40example.test")).toEqual({ state: "s-1", email: "owner@example.test" });
+  });
+
   it("ignores a stray or replayed callback during an email request and keeps the request", async () => {
     const { auth, states, finish } = await startAuth();
     await auth.beginEmail("owner@example.test");
