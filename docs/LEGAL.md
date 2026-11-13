@@ -666,45 +666,100 @@ part of L-002.
 - **Question:** What do Apple's rules require of Cadence when it offers Sign in with Apple
   on the web, and later in an iPhone app or a Mac App Store build that offers Google
   sign-in?
-- **Affected:** Tickets 333, 336 and 337 (decision D31). Files: the planned Apple button on
-  `app/(auth)/login/page.tsx` and in `apps/desktop/src/account/account-panel.tsx`. Related
-  messaging entry: P-051.
+- **Affected:** Tickets 333, 336 and 337 (decision D31). Files:
+  `app/(auth)/login/SignInMethods.tsx`, `app/globals.css` (`.apple-sign-in-action`), and
+  later `apps/desktop/src/account/account-panel.tsx`. Related messaging entries: P-051
+  and P-053.
 - **Provider, clause, source and check date:** Apple.
-  - App Store Review Guidelines, 4.8 (Login Services): an app that uses a third-party
-    login service to set up the user's primary account must also offer an equivalent
-    option with stated privacy properties. From memory. Not checked for this entry.
-  - Human Interface Guidelines, Sign in with Apple: the button's wording, shape and logo
-    use. Not checked for this entry.
-  - Apple's private email relay requires registered sending domains before mail reaches a
-    Hide My Email address. From memory. Not checked for this entry.
-- **Current reading:** none until Ticket 333 reads the sources. The web app and the
-  directly distributed Mac app are not App Store apps, so 4.8 does not bind them today.
-  It will bind the iPhone app and the Mac App Store listing the owner intends (D30.5).
-  Apple sign-in on the web (D31.2) is a step toward that, but a native app needs native
-  Sign in with Apple under its own ticket.
+  - Human Interface Guidelines, "Sign in with Apple",
+    `https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple`,
+    read 2026-11-13 by Ticket 333. Clauses relied on:
+    - "Make a Sign in with Apple button no smaller than other sign-in buttons, and avoid
+      making people scroll to see the button."
+    - Custom buttons: "Use only Sign in with Apple, Sign up with Apple, or Continue with
+      Apple"; buttons with logo and text "are always rectangular"; "Within a button, both
+      items must be either black or white"; the background "needs to remain black or
+      white"; the title font, weight and size, the corner radius and the bezel may change.
+    - Black style: "Use this style on white or light-color backgrounds"; minimum
+      140 pt wide, 30 pt tall, margin 1/10 of the height.
+    - The title is 43% of the button's height ("the button's height would be 233% of the
+      title's font size").
+    - Logo: "Use only the logo artwork downloaded from Apple Design Resources; never
+      create a custom Apple logo"; "Match the height of the logo file to the height of
+      the button. Don't crop the logo file. Don't add vertical padding."
+    - "Avoid asking for a personal email address when people supply a private relay
+      address" and "Make sure that people can view their private relay address".
+    - "Don't ask people to supply a password."
+  - "Configuring your environment for Sign in with Apple",
+    `https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple`,
+    read 2026-11-13: register outbound email domains or addresses as email sources for
+    the Private Email Relay Service; "You must authenticate all registered domains with
+    the Sender Policy Framework (SPF), the DomainKeys Identified Mail (DKIM) protocol, or
+    both"; organizations may register up to 100 sources.
+  - Apple Design Resources licence (`Logo-Sign-in-with-Apple.dmg`, "LICENSE AGREEMENT
+    FOR APPLE DESIGN RESOURCES", LM1006), read 2026-11-13: the resources are licensed
+    "solely for creating mock-ups of user interfaces" and "You may not embed the Apple
+    Design Resources in any software programs or other products."
+  - App Store Review Guidelines, 4.8 (Login Services): not reread for this entry.
+- **Current reading:** the web button follows the custom-button rules: Apple's black
+  style on Cadence's light page, white logo and title, rectangular, 44 px tall (the
+  height of the other sign-in actions), at least 140 px wide, a 19 px title, the "Left
+  aligned, Medium" logo file at the button's full height. Users can see the relay address
+  in Settings → Profile, and Cadence asks for no other address. The web app and the
+  directly distributed Mac app are not App Store apps, so 4.8 does not bind them today; it
+  will bind the iPhone app and the Mac App Store listing (D30.5), which need native Sign
+  in with Apple under their own ticket.
+  **Suspected licence conflict:** the HIG tells developers to use the downloadable logo
+  in custom buttons, while the licence that ships with that download limits it to
+  mock-ups and forbids embedding it in products. Cadence embeds the glyph from that file
+  (`AppleLogo` in `SignInMethods.tsx`). Apple's own web button (Sign in with Apple JS, or
+  the button image service) would avoid the question but loads Apple's script or images
+  on Login. Not a legal opinion.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** owner decision D31, November 13, 2026, adds Apple
-  sign-in on the web and the Mac. It accepts no risk.
+  sign-in on the web and the Mac. It accepts no risk. The licence question is open for
+  the owner.
 - **Status:** open.
-- **Next action:** Ticket 333 reads Apple's button guidelines and relay rules, and records
-  the clauses and check date here. A mobile or Mac App Store ticket rereads guideline 4.8.
+- **Next action:** the owner decides whether the embedded glyph stays or Login uses
+  Apple's own button. A mobile or Mac App Store ticket rereads guideline 4.8.
 
 ## L-025: Apple token revocation when an account is deleted
 
 - **Question:** Must Cadence revoke a person's Sign in with Apple tokens when that person
   deletes their Cadence account?
-- **Affected:** Ticket 333 (decision D31). File: `lib/services/account.service.ts`.
-- **Provider, clause, source and check date:** Apple. App Store Review Guidelines,
-  5.1.1(v): an app that supports account creation must let the user delete the account
-  in the app; Apple's guidance for apps that use Sign in with Apple says to revoke the
-  user's tokens through the Sign in with Apple REST API on deletion. From memory. Not
-  checked for this entry.
-- **Current reading:** none until Ticket 333 reads the source. The rule is written for App
-  Store apps. Cadence's web app and directly distributed Mac app are not App Store apps
-  today; the intended iPhone app and Mac App Store listing (D30.5) will be. Ticket 333
-  plans the revocation anyway, so a later App Store build has it.
+- **Affected:** Ticket 333 (decision D31). Files: `lib/services/account.service.ts`,
+  `lib/services/apple-sign-in.service.ts`, `app/auth/callback/route.ts`, migration
+  `20261113180000_apple_sign_in_tokens.sql`. Related messaging entry: P-053.
+- **Provider, clause, source and check date:** Apple.
+  - Sign in with Apple REST API, "Token revocation",
+    `https://developer.apple.com/documentation/signinwithapplerestapi/revoke-tokens`,
+    read 2026-11-13 by Ticket 333: "Invalidate the tokens and associated user
+    authorizations for a user when they are no longer associated with your app." "In
+    order to revoke authorization for a user, you must obtain a valid refresh token or
+    access token." `POST https://appleid.apple.com/auth/revoke` with `client_id`,
+    `client_secret`, `token` and `token_type_hint`; 200 when revoked "or if the token
+    value was previously invalidated".
+  - App Store Review Guidelines, 5.1.1(v), and Apple's account-deletion guidance for apps
+    that use Sign in with Apple: not reread for this entry.
+- **Current reading:** Supabase Auth hands Apple's refresh token to the sign-in callback
+  once (`provider_refresh_token`) and does not keep it, so revocation is not possible
+  without storing it. Ticket 333 chose sealed storage over logging the gap: the callback
+  seals the refresh token with the connector key into
+  `cadence_calendar_private.apple_sign_in_tokens` (service role only, no raw Apple ID), and
+  account deletion reads it before deleting the Auth user and revokes after. The rule is
+  written for App Store apps; Cadence's web app is not one, but the intended iPhone app
+  and Mac App Store listing (D30.5) will be. Remaining gaps:
+  - Not verified against Apple that Supabase passes `provider_refresh_token` for Apple
+    (the local check used a stub). If it does not, revocation cannot happen and this
+    entry must say so (step 11 of `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md`).
+  - A revocation that fails (an expired client secret, an Apple outage) is reported but
+    not retried, because the token is deleted with the account. The person can remove
+    Cadence at account.apple.com.
+  - Removing the Apple method from an account without deleting it (Ticket 334) should
+    also revoke and delete the kept token.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** none.
 - **Status:** open.
-- **Next action:** Ticket 333 reads the source, implements revocation in account
-  deletion, or records the gap and the reason here.
+- **Next action:** Ticket 337's production run confirms the refresh token and a 200 from
+  Apple on deletion, then this entry can close. Ticket 334 adds revocation when the Apple
+  method is removed.

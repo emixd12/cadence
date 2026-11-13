@@ -1,4 +1,9 @@
+import { prepareAppleRevocation } from "./apple-sign-in.service";
 import { prepareCalendarRevocation } from "./google-calendar.service";
+import {
+  reportMonitoringError,
+  reportMonitoringEvent,
+} from "@/lib/monitoring/privacy-safe-events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   clearSupabaseAuthCookies,
@@ -16,6 +21,7 @@ export class AccountDeletionUserError extends Error {
 
 const ACCOUNT_DELETION_FAILURE_MESSAGE =
   "Unable to delete this account. Your account and session are unchanged. Try again.";
+const DELETION_CONTEXT = { route: "account_deletion" } as const;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -44,6 +50,16 @@ export async function deleteCurrentAccountFromFormData(
   assertDeletionFailureCanaryInactive(user.id);
 
   const revokeCalendar = await prepareCalendarRevocation({ client: supabase, user }).catch(() => null);
+  const hasApple = user.identities?.some((identity) => identity.provider === "apple") ?? false;
+  const revokeApple = hasApple
+    ? await prepareAppleRevocation(user.id).catch((error: unknown) => {
+        reportMonitoringError("account_deletion_apple_token_read_failed", error, DELETION_CONTEXT);
+        return null;
+      })
+    : null;
+  if (hasApple && !revokeApple) {
+    reportMonitoringEvent({ name: "account_deletion_apple_token_absent", severity: "warning", context: DELETION_CONTEXT });
+  }
   const { error: deleteError } = await deleteAuthUser(serviceRole, user.id);
 
   if (deleteError) {
@@ -56,6 +72,17 @@ export async function deleteCurrentAccountFromFormData(
   // so no provider call follows; a failed deletion above leaves them intact.
   try { await revokeCalendar?.(); }
   catch { /* A provider outage must not turn completed deletion into a retry. */ }
+
+  // Ticket 333 (L-025): revoke Cadence's Sign in with Apple authorization with the
+  // refresh token kept at sign-in. A failure is reported, never retried by the person.
+  try { await revokeApple?.(); }
+  catch (error) {
+    reportMonitoringEvent({
+      name: "account_deletion_apple_revocation_failed",
+      severity: "warning",
+      context: { ...DELETION_CONTEXT, reason: error instanceof Error ? error.message : "unknown" },
+    });
+  }
 
   try {
     invalidateStableUserData(user.id);

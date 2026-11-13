@@ -1,7 +1,7 @@
 // Ticket 331 (D31): the one list of ways to sign in on the web. The login page
 // renders the enabled methods and the start routes accept only those.
 // A method is enabled when its flag is exactly "on" (Google has no flag) and its
-// `start` is set. Ticket 332 set `start` for email; Ticket 333 sets it for Apple.
+// `start` is set. Ticket 332 set `start` for email and Ticket 333 for Apple.
 
 export type SignInMethodId = "google" | "apple" | "email";
 
@@ -35,7 +35,7 @@ export const SIGN_IN_METHODS: readonly SignInMethod[] = [
     id: "apple",
     label: "Continue with Apple",
     flag: "CADENCE_SIGN_IN_APPLE",
-    start: null,
+    start: { kind: "oauth", provider: "apple" },
     startPath: "/auth/sign-in/apple",
   },
   {

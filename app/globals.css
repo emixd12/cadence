@@ -130,6 +130,28 @@ button:disabled {
   color: var(--accent);
 }
 
+/* Ticket 333 (L-024): Apple's black button style. Unlayered, like .product-action,
+   so the base link color cannot override the white title and logo. */
+.apple-sign-in-action {
+  display: inline-flex;
+  align-items: center;
+  height: 2.75rem;
+  min-width: 140px;
+  border: 0;
+  padding: 0 1rem 0 0;
+  background: #000;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color 200ms ease;
+}
+
+.apple-sign-in-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .product-action:disabled,
 .product-action[aria-disabled="true"] {
   color: var(--muted-readable);
@@ -262,6 +284,10 @@ details[open] > .product-disclosure-trigger .product-disclosure-indicator {
 @media (hover: hover) {
   .product-action:not(:disabled):not([aria-disabled="true"]):hover {
     text-shadow: 0.02em 0 currentColor;
+  }
+
+  .apple-sign-in-action:not(:disabled):hover {
+    background: #262626;
   }
 
   .product-action-secondary:not(:disabled):not([aria-disabled="true"]):hover {
