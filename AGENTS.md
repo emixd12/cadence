@@ -25,7 +25,7 @@ standard supports the product story; promoting it is not the product's purpose.
 - Next.js App Router
 - TypeScript
 - Supabase Postgres
-- Supabase Auth with Google login
+- Supabase Auth: Google login today; email and Apple planned (D31)
 - Supabase Row Level Security
 - Tailwind CSS
 - shadcn-style components where useful
@@ -57,7 +57,9 @@ let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
 (`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
 Behavior can be marked Completed from activity recorded in a connected service, starting
 with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Ticket 310 recorded the decision; no
-code has shipped. Mobile and broader workspace restructuring remain deferred. The owner
+code has shipped. Tickets 331–337 plan sign-in by email and Apple beside Google, on Supabase
+Auth (`docs/DECISIONS.md`, 2026-11-13, D31); no code has shipped. Mobile and broader
+workspace restructuring remain deferred. The owner
 intends an iPhone app and a Mac App Store listing near launch (D30). Neither has tickets;
 the launch narrative is written for them, and no mobile code starts without a ticket.
 
@@ -208,6 +210,10 @@ Keep the app small.
 
 In scope:
 - Google login
+- Sign-in by email (a link or a 6-digit code, no password) and by Apple under Tickets
+  331–337 (`docs/DECISIONS.md`, 2026-11-13, D31), on web and Mac. Each method sits behind
+  a flag that is off in production until its acceptance passes. Every method reaches the
+  same account. Connecting Google Calendar adds that Google account as a sign-in method
 - Many independent single-account users for the web app
 - Behavior CRUD
 - Category CRUD or simple category selection
@@ -283,6 +289,9 @@ Out of scope for v1:
   tracked time from a workout; notifications about connector completions
 - EventKit and local-only Mac calendar access
 - Payment/subscription infrastructure
+- WorkOS or any other auth vendor; passwords for email accounts; passkeys, two-factor
+  sign-in, SMS and company SSO; native Sign in with Apple; merging two existing accounts
+  (D31)
 - ChatGPT as a Cadence login and ChatGPT plan usage in the hosted web app, until OpenAI
   approves them; plan-based pricing or discounts, until a billing ticket exists (D27)
 - Admin dashboards
@@ -653,10 +662,13 @@ Do not expand scope to solve speculative future requirements.
 
 ## Security rules
 
-- Use Supabase Auth and Google login for the web app and optional desktop
-  account mode under Tickets 116–122.
-- Add desktop account controls only within Tickets 116–122. Never package a
-  service-role key or Google provider credential.
+- Use Supabase Auth for the web app and optional desktop account mode. Google is
+  the only sign-in method until Tickets 331–337 ship email and Apple (D31). Add no
+  other auth vendor and no password sign-in.
+- A sign-in must never reach an existing account through an unconfirmed email
+  address. An account keeps at least one sign-in method (D31).
+- Add desktop account controls only within Tickets 116–122 and Ticket 336. Never
+  package a service-role key or a Google or Apple provider credential.
 - Keep desktop session secrets in Keychain, not SQLite, browser storage, logs,
   exports, or backups.
 - Keep connector credentials (Google and Outlook refresh tokens, iCloud
