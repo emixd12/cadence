@@ -18590,7 +18590,7 @@ Status: implemented on the web November 13, 2026. Migration
 Route `POST /api/connectors/completions/count`; control
 `components/timeline/CountWorkoutButtons.tsx`; registry entry INT-TIMELINE-013. Rule for a
 match with no link: it is the user's record, never changes a status, and reconcile never
-removes it. Deployed check on test account A pending the hosted push and deploy.
+removes it. Hosted migration applied November 13, 2026; a deployed click on test account A is not yet recorded.
 Dependencies: Ticket 323.
 
 Goal: let the user count a logged workout that no link accepted.
