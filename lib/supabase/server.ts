@@ -1,16 +1,28 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import {
+  forwardedForHeaders,
+  type AuthForwarding,
+} from "@/lib/auth/auth-forwarding";
 import { getSupabaseRuntimeConfig } from "@/lib/supabase/env";
 
 const JWT_CLOCK_SKEW_RETRY_DELAY_MS = 1_000;
 
-export async function createClient() {
+/**
+ * With `forwarding`, Auth calls carry the person's address and the secret key
+ * (Ticket 338). Use it only for the email code and link checks.
+ */
+export async function createClient(
+  options: { forwarding?: AuthForwarding | null } = {},
+) {
   const { url, publishableKey } = getSupabaseRuntimeConfig();
   const cookieStore = await cookies();
+  const forwarding = options.forwarding ?? null;
 
-  return createServerClient(url, publishableKey, {
+  return createServerClient(url, forwarding?.secretKey ?? publishableKey, {
     global: {
       fetch: fetchWithJwtIssuedAtFutureRetry,
+      ...(forwarding ? { headers: forwardedForHeaders(forwarding) } : {}),
     },
     cookies: {
       getAll() {
