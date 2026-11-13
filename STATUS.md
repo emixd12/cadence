@@ -102,8 +102,9 @@ Check the cited entry before acting on a row.
 - **Rules.** One Google sign-in per account: the add path refuses a second (`already_added`);
   two (only by a race) read as `multiple`, Calendar does not connect, Disconnect still works.
   Removing Google is refused while Calendar is connected through it (`calendar_connected`).
-- **Verifier fixes.** Migration `20261113210000_calendar_google_identity_lock.sql` (not
-  pushed; `docs/qa/2026-11-13-ticket-335-hosted-changes.md`, step 1 Ready): the identities
+- **Verifier fixes.** Migration `20261113210000_calendar_google_identity_lock.sql` (pushed
+  to hosted November 13, 20:13:20Z, by the verifier; `docs/qa/2026-11-13-ticket-335-hosted-changes.md`,
+  step 1, before and after read back; no grant changed): the identities
   trigger refuses removing Calendar's Google identity and `calendar_install_credential` takes
   the same user-row lock, closing a race that left Calendar connected without Google (8 of 40);
   `calendar_begin_attempt` rebinds an idle row, replacing a service-role table write. The
@@ -112,6 +113,12 @@ Check the cited entry before acting on a row.
   9 of 9 (the race case fails with the old functions); Ticket 334's suite 10 of 10; flows in
   Chrome; bench shows the four sentences
   (`docs/qa/2026-11-13-ticket-335-calendar-google-sign-in.md`).
+- **Verifier, second round (local stack of its own, Google stubbed).** Race: 0 of 60 unforced
+  trials and the forced run end with Calendar connected without Google (was 8 of 40); both
+  lock orders serialize in the database; deletion still cascades; two removals at once keep
+  one identity (15 of 15). Suites for Tickets 332, 333, 334 and 335 pass (9, 9, 10, 9). Flag
+  off matches `origin/main` step for step; a token sealed on main opens. A crafted return
+  link starts nothing; Disconnect revokes in the `multiple` state.
 
 Platform impact: web Calendar connect and Sign-in methods; Mac shows the add-on-web sentence
 and keeps working; marketing not applicable; mobile web checked at 390 px. Messaging impact:
