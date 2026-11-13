@@ -1190,7 +1190,10 @@ is exactly `on` and its ticket has shipped (email: Ticket 332; Apple: Ticket
 333). Leave a flag unset in Production until Ticket 337 passes for that method.
 `CADENCE_SIGN_IN_EMAIL` is `on` in Production since November 13, 2026, 21:35Z
 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`, "Go-live run").
-Google has no flag.
+`CADENCE_SIGN_IN_APPLE` and `CADENCE_SIGN_IN_LINKING` (Settings Sign-in methods,
+Ticket 334) are `on` since 21:36Z
+(`docs/qa/2026-11-13-ticket-333-production-acceptance.md`). Google has no flag.
+Read back November 13, 2026, 22:05Z (`docs/qa/2026-11-13-sign-in-final-verification.md`).
 
 Email sign-in (Ticket 332): `/login/email` posts the address to
 `/auth/sign-in/email`, which asks Supabase Auth for one email with a link and a
