@@ -72,6 +72,8 @@ import { TravelWeatherCredit } from "@/components/timeline/TravelWeather";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { SignInMethods } from "@/app/(auth)/login/SignInMethods";
+import { SignInMethodsPanel } from "@/components/settings/SignInMethodsPanel";
+import { buildSignInMethodsView, signInMethodResultMessage } from "@/lib/auth/account-sign-in-methods";
 import {
   EmailAddressStep,
   EmailCodeStep,
@@ -1325,6 +1327,51 @@ function SignInMethodsBench() {
   );
 }
 
+// Ticket 334: the Settings Sign-in methods panel. Apple shows as addable once
+// Ticket 333 gives it a start; the bench fakes that start.
+function SignInMethodsSettingsBench() {
+  const withApple: SignInMethod[] = SIGN_IN_METHODS.map((method) =>
+    method.id === "apple" ? { ...method, start: { kind: "oauth", provider: "apple" } } : method,
+  );
+  const google = { identityId: "g", provider: "google", email: "maya@gmail.com" };
+  const apple = { identityId: "a", provider: "apple", email: "k7x2@privaterelay.appleid.com" };
+  const email = { identityId: "e", provider: "email", email: "maya@ortiz.dev" };
+  const states = [
+    {
+      label: "Google only, email on: Google cannot be removed",
+      view: buildSignInMethodsView({ identities: [google], email: "maya@gmail.com", emailConfirmed: true }, withApple),
+      result: null,
+    },
+    {
+      label: "Google, Apple and email",
+      view: buildSignInMethodsView({ identities: [google, apple, email], email: "maya@ortiz.dev", emailConfirmed: true }, withApple),
+      result: signInMethodResultMessage("added", "apple"),
+    },
+    {
+      label: "Apple refused: it signs in to another account",
+      view: buildSignInMethodsView({ identities: [email], email: "maya@ortiz.dev", emailConfirmed: true }, withApple),
+      result: signInMethodResultMessage("taken", "apple"),
+    },
+    {
+      label: "Apple relay only, email off",
+      view: buildSignInMethodsView({ identities: [apple], email: apple.email, emailConfirmed: true }, enabledSignInMethods({})),
+      result: null,
+    },
+  ];
+  return (
+    <div className="grid gap-3">
+      {states.map((state) => (
+        <div key={state.label} className="grid gap-1">
+          <p className="text-xs font-semibold text-neutral-600">{state.label}</p>
+          <ProductPreview>
+            <SignInMethodsPanel view={state.view} result={state.result} />
+          </ProductPreview>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EmailSignInBench() {
   const common = {
     codeLength: 6,
@@ -1768,6 +1815,7 @@ const previewFactories: Record<
     ),
   "flow.sign-in-methods": () => <SignInMethodsBench />,
   "flow.email-sign-in": () => <EmailSignInBench />,
+  "flow.sign-in-methods-settings": () => <SignInMethodsSettingsBench />,
   "flow.first-run-onboarding-panel": () => (
       <ProductPreview maxHeight="28rem">
         <div className="relative min-h-[24rem] bg-background">

@@ -65,7 +65,7 @@ export function SignInMethodsPanel({ view, result }: Readonly<{ view: SignInMeth
           {view.addable.map((methodId) => (
             <form key={methodId} method="post" action="/auth/sign-in-methods/add">
               <input type="hidden" name="method" value={methodId} />
-              <button type="submit" className={PRIMARY}>Add {signInMethodName(methodId)}</button>
+              <button type="submit" className={PRIMARY}>{`Add ${signInMethodName(methodId)}`}</button>
             </form>
           ))}
           {!emailRow && view.emailEnabled ? <EmailAddressForm toggleLabel="Add email" /> : null}
@@ -106,7 +106,7 @@ function RemoveMethod({ identityId, name }: Readonly<{ identityId: string; name:
     <form method="post" action="/auth/sign-in-methods/remove" onSubmit={() => setPending(true)}
       role="group" aria-label={`Remove ${name}`} className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6">
       <input type="hidden" name="identity_id" value={identityId} />
-      <span>Remove {name}? It will no longer sign in to this account.</span>
+      <span>{`Remove ${name}? It will no longer sign in to this account.`}</span>
       <button type="submit" className={DANGER} disabled={pending}>{pending ? "Removing…" : `Remove ${name}`}</button>
       <button ref={cancel} type="button" className={SECONDARY} disabled={pending}
         onClick={() => { returnFocus.current = true; setAsking(false); }}>Cancel</button>
@@ -125,6 +125,7 @@ function EmailAddressForm({ toggleLabel }: Readonly<{ toggleLabel: string }>) {
     if (returnFocus.current) { returnFocus.current = false; trigger.current?.focus(); }
   }, [open]);
 
+  // readOnly, not disabled, while sending: a disabled field leaves the form data.
   if (!open) {
     return <button ref={trigger} type="button" className={SECONDARY} onClick={() => setOpen(true)}>{toggleLabel}</button>;
   }
@@ -132,7 +133,7 @@ function EmailAddressForm({ toggleLabel }: Readonly<{ toggleLabel: string }>) {
     <form method="post" action="/auth/sign-in-methods/email" onSubmit={() => setPending(true)} className="grid basis-full gap-2">
       <label htmlFor="sign-in-method-email" className="text-sm leading-6">New email address</label>
       <input ref={input} id="sign-in-method-email" name="email" type="email" required autoComplete="email" spellCheck={false}
-        autoCapitalize="none" disabled={pending}
+        autoCapitalize="none" readOnly={pending}
         className="min-h-11 min-w-0 w-full max-w-md border border-line bg-background px-3 py-2" />
       <p className="text-sm leading-6 text-muted-readable">
         Cadence sends a link to confirm it. Sign-in codes and email reminders then go to this address.

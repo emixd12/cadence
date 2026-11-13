@@ -556,6 +556,14 @@
       "confidence": "exact"
     },
     {
+      "componentId": "flow.sign-in-methods-settings",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 138,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "layout.app-shell",
       "file": "app/(app)/layout.tsx",
       "line": 30,
@@ -2557,7 +2565,7 @@
     }
   ],
   "summary": {
-    "productUsages": 302,
+    "productUsages": 303,
     "benchPreviews": 0
   }
 }

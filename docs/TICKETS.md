@@ -19018,7 +19018,9 @@ test Apple Account; `dagger check --cadence --progress=report`.
 
 ## Ticket 334: Sign-in methods in Settings and the one-account rule
 
-Status: not started. Filed November 13, 2026.
+Status: in progress. Filed November 13, 2026. Built November 13 behind
+`CADENCE_SIGN_IN_LINKING` (draft PR); hosted manual linking and acceptance remain
+(`docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`).
 Dependencies: Tickets 332 and 333. Decision: D31.3.
 
 Goal: show which methods an account has and let the person add another, so nobody ends
@@ -19040,16 +19042,31 @@ Scope and acceptance:
 Out of scope: merging two existing accounts. A Hide My Email address differs from the
 person's other addresses, so automatic linking by email does not cover Apple.
 
+As built (November 13, 2026):
+
+- Email is a method of every account with a confirmed address while email sign-in is on:
+  Supabase Auth signs a confirmed address in with or without an email identity, and
+  unlinking that identity moves the address back. So Email has **Change address** (or
+  **Add email**), confirmed by a link, and no Remove. Google and Apple can be removed
+  while another enabled identity remains; the server refuses otherwise.
+- The login hint, shown while the flag is on and more than one method is offered, says to
+  sign in the way you did before and add other ways in Settings.
+- Delete account asks for `DELETE` when the account has no address or an Apple relay
+  address.
+- Shared entry point for Ticket 335: `startAddSignInMethod` in
+  `lib/services/sign-in-methods.service.ts` (method, return path, optional scopes);
+  `/auth/callback` returns with `sign_in_method` `added`, `taken` or `add_failed`.
+
 Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | This ticket: Settings row, linking and the login message. |
-| Desktop | Desktop Settings uses the same hosted components; Ticket 336 checks the row on the Mac. |
+| Desktop | The Mac's Settings does not render the row: its forms need a web session. Ticket 336 adds it to the Mac. |
 | Marketing | Not applicable: no public claim. |
-| Future mobile | Mobile web uses the same Settings row. |
+| Future mobile | Mobile web uses the same Settings row (checked at 390 px). |
 
-Messaging impact: P-051.
+Messaging impact: P-051, P-054.
 
 Verification: local-integration tests for link, unlink and last-method refusal;
 `npm run interactions:check`; `dagger check --cadence --progress=report`.

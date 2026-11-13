@@ -1414,6 +1414,21 @@
       "reason": "Disconnect ChatGPT revokes at OpenAI from Rust and clears Keychain without Cadence HTTP traffic."
     },
     {
+      "id": "INT-SETTINGS-022",
+      "classification": "not_load_bearing",
+      "reason": "Adding a sign-in method is flag-gated and rare; it makes one Supabase Auth call and a provider redirect, with no Cadence database load."
+    },
+    {
+      "id": "INT-SETTINGS-023",
+      "classification": "not_load_bearing",
+      "reason": "An address change is flag-gated and bounded by Supabase Auth's email limits; it makes one Auth call and no Cadence database load beyond the profile address trigger."
+    },
+    {
+      "id": "INT-SETTINGS-024",
+      "classification": "destructive_serial_only",
+      "reason": "Removing a sign-in method is never admitted to a concurrent load profile."
+    },
+    {
       "id": "INT-CALENDAR-001",
       "classification": "external_provider",
       "reason": "Calendar provider consent and external reads require separate synthetic provider authorization."

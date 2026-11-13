@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys. 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
+| Tickets 331–337: sign-in by email and Apple (D31) | 331 complete (PR #264); 332 merged behind `CADENCE_SIGN_IN_EMAIL` (unset in Production); hosted steps 1–4 applied November 13; 333 merged behind `CADENCE_SIGN_IN_APPLE` (unset in Production; PR #267); 334 built behind `CADENCE_SIGN_IN_LINKING` (draft PR #266; hosted manual linking off; migration `20261113190000` not pushed); 335–337 not started; Google stays the only live method | 332: hosted Auth steps in `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`; waits on the owner's code-length choice (6 or 8), the Sequenzy sender and key, and Cloudflare DNS and Turnstile keys. 333: migration `20261113180000` pushed November 13, 18:20Z (step 1, owner's yes for its `service_role` grants; grants read back); the Apple portal, provider, relay and production steps in `docs/qa/2026-11-13-ticket-333-apple-hosted-changes.md` wait on owner rows 4 and 5; L-024 licence question for the owner | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); STATUS, "Ticket 332", "Ticket 333" |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | No secret exists yet: the first one waits on owner row 4 (step 5 of the Ticket 333 change list) | The agent that makes a secret writes its expiry here and a rotate-by date 30 days earlier (at most about 182 days after it was made). Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)"; the same section covers a missed rotation | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -92,6 +92,28 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 334: sign-in methods in Settings, behind its flag — November 13, 2026
+
+- **Built.** Settings, Account and data, has a Sign-in methods row behind
+  `CADENCE_SIGN_IN_LINKING`: it lists Google, Apple and the email address; **Add Google**
+  and **Add Apple** use Supabase manual identity linking; **Change address** (or **Add
+  email**) moves email sign-in to a new address after a confirmation link, with no
+  password; **Remove** unlinks Google or Apple while another enabled way in remains. The
+  server refuses the last way in and email removal, not only the UI. A Google or Apple
+  account or address that belongs to another account is refused without naming it. Login
+  shows a one-account hint while the flag is on. Delete account asks for `DELETE` with no
+  address or an Apple relay address.
+- **Seam for Ticket 335.** `startAddSignInMethod` in `lib/services/sign-in-methods.service.ts`.
+- **Verified locally.** `tests/sign-in-methods.local-integration.test.ts`: 6 of 6 against a
+  running server, Mailpit and manual linking on; the same flow by clicks in Chrome at
+  1280 and 390 px, which found and fixed a disabled field dropped from the form
+  (`docs/qa/2026-11-13-ticket-334-sign-in-methods.md`).
+- **Not applied.** Hosted manual linking stays off; the ordered list is
+  `docs/qa/2026-11-13-ticket-334-hosted-auth-changes.md`. Local `enable_manual_linking`
+  is now on.
+
+Platform impact: web Settings, routes and login hint; Mac shows no row (Ticket 336);
+marketing not applicable; mobile web checked at 390 px. Messaging impact: P-054.
 ## Ticket 333: Apple sign-in built behind its flag — November 13, 2026
 
 - **Built.** Continue with Apple starts Supabase Auth's Apple provider and returns
