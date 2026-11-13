@@ -2603,6 +2603,7 @@ Hosted runbook, in this order:
    `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` from Vercel, and delete the vault item
    `google-calendar-agent-retire-secret`. A later cleanup ticket
    may drop the empty tables, the retirement route and the agent repository branches.
+   Done: Vercel values removed November 11, 2026; vault item deleted November 13, 2026.
 
 Rollback: revoked tokens cannot be restored, so a restored grant needs new consent.
 Before step 4, redeploying the previous app restores the old panel with no data loss.
