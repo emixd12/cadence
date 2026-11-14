@@ -120,6 +120,74 @@ describe("connector and manual first marks (Ticket 319)", () => {
     expect(() => plan(baseline, snapshot([projection(one), one]), snapshot([projection(two), two]))).toThrow("branched status history");
   });
 
+  describe("both marks already hosted (Ticket 341)", () => {
+    // The hosted state Ticket 319 leaves behind: both roots, and the user's mark shown.
+    const connector = mark("conn", "completed", earlier, "connector"), manual = mark("user", "not_completed", later, "manual");
+    const hosted = snapshot([projection(manual), connector, manual]);
+    const firstLinkModes = [
+      ["hydrate", (local: AccountSyncSnapshot) => resolveAccountSync({ accountLinkId: "link", baseline: local, local, hosted, firstLink: true, firstHostedHydration: true })],
+      ["import", (local: AccountSyncSnapshot) => resolveAccountSync({ accountLinkId: "link", baseline: local, local, hosted, firstLink: true, noteShortcutExclusionPolicy: "preserve" })],
+    ] as const;
+
+    it("links, re-links and imports with the manual status shown", () => {
+      for (const local of [empty, baseline]) for (const [, resolve] of firstLinkModes) {
+        const result = resolve(local);
+        expect(result.conflicts).toEqual([]);
+        expect(result.hostedWrites).toEqual([]);
+        expect(result.mergedEntities.filter(({ kind }) => kind === "status_event").map(({ id }) => id)).toEqual(["conn", "user"]);
+        expect(result.mergedEntities.find(({ kind }) => kind === "occurrence")!.value).toMatchObject({ status: "not_completed", completed_at: null });
+        expect(result.localWrites).toContainEqual(expect.objectContaining({ kind: "occurrence", id: "o", value: expect.objectContaining({ status: "not_completed" }) }));
+        const settled = { entities: result.mergedEntities };
+        expect(plan(settled, settled, settled)).toMatchObject({ conflicts: [], localWrites: [], hostedWrites: [] });
+      }
+    });
+
+    it("lets a linked Mac whose baseline predates the pair keep syncing", () => {
+      const result = plan(baseline, baseline, hosted);
+      expect(result.conflicts).toEqual([]);
+      expect(result.hostedWrites).toEqual([]);
+      expect(result.mergedEntities.find(({ kind }) => kind === "occurrence")!.value).toMatchObject({ status: "not_completed" });
+    });
+
+    it("accepts a local copy that already holds one or both of the hosted marks", () => {
+      for (const local of [snapshot([projection(manual), connector, manual]), snapshot([projection(connector), connector])]) {
+        const result = resolveAccountSync({ accountLinkId: "link", baseline: local, local, hosted, firstLink: true, firstHostedHydration: true });
+        expect(result.conflicts).toEqual([]);
+        expect(result.mergedEntities.find(({ kind }) => kind === "occurrence")!.value).toMatchObject({ status: "not_completed" });
+        expect(result.mergedEntities.filter(({ kind }) => kind === "status_event").map(({ id }) => id)).toEqual(["conn", "user"]);
+      }
+    });
+
+    it("still refuses a local root mark of its own beside the hosted pair", () => {
+      const localMark = mark("local", "completed", later, "manual");
+      expect(() => resolveAccountSync({ accountLinkId: "link", baseline, local: snapshot([projection(localMark), localMark]), hosted, firstLink: true, firstHostedHydration: true }))
+        .toThrow("branched status history");
+    });
+
+    it("still refuses two hosted manual roots with different statuses, two connector roots, and a third root", () => {
+      const done = mark("user-a", "completed", earlier, "manual"), notDone = mark("user-b", "not_completed", later, "manual");
+      const manualPair = snapshot([projection(notDone), done, notDone]);
+      for (const resolve of [
+        () => resolveAccountSync({ accountLinkId: "link", baseline, local: baseline, hosted: manualPair, firstLink: true, firstHostedHydration: true }),
+        () => resolveAccountSync({ accountLinkId: "link", baseline, local: baseline, hosted: manualPair, firstLink: true }),
+        () => plan(baseline, baseline, manualPair),
+      ]) expect(resolve).toThrow("hosted account snapshot contains branched status history");
+      const second = mark("conn-2", "completed", later, "connector");
+      expect(() => plan(baseline, baseline, snapshot([projection(second), connector, second]))).toThrow("hosted account snapshot contains branched status history");
+      const third = mark("user-c", "completed", later, "manual");
+      expect(() => plan(baseline, baseline, snapshot([projection(manual), connector, manual, third]))).toThrow("hosted account snapshot contains branched status history");
+    });
+
+    it("still refuses the pair when the marks disagree on the Occurrence's day or one revises an event", () => {
+      const otherDay = { ...connector, value: { ...(connector.value as object), local_date: "2026-09-17" } };
+      expect(() => plan(baseline, baseline, snapshot([projection(manual), otherDay, manual]))).toThrow("hosted account snapshot contains branched status history");
+      const prior = mark("prior", "completed", earlier, "manual");
+      const revising = { ...manual, value: { ...(manual.value as object), revises_event_id: "prior" } };
+      const revisingConnector = { ...connector, value: { ...(connector.value as object), revises_event_id: "prior" } };
+      expect(() => plan(baseline, baseline, snapshot([projection(manual), prior, revisingConnector, revising]))).toThrow("hosted account snapshot contains branched status history");
+    });
+  });
+
   it("fails when the connector mark is not a root mark or the projections disagree", () => {
     const manual = mark("user", "completed", later, "manual");
     const connector = mark("conn", "completed", earlier, "connector");

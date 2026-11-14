@@ -385,6 +385,11 @@ own event. With the same status, existing latest-event ordering selects display
 timestamps. With different statuses, the user's mark wins. This is a provenance rule,
 not timestamp arbitration: a connector only fills an Unresolved Occurrence, and the
 user's decision is final (D28.1). Two connector marks for one Occurrence still fail.
+After that convergence the hosted account holds both root events (Ticket 341). A copy
+that later reads the account, at first link, re-link, Import or a later sync, accepts
+exactly that hosted pair when it adds no root event of its own for the Occurrence; the
+hosted occurrence row already shows the user's mark. Two manual roots with different
+statuses, two connector roots and a third root still fail.
 Published 0.1.9 lacks this rule, so a Mac build with it ships before
 `CADENCE_CONNECTOR_COMPLETION` turns on (Ticket 323). During the
 first automatic hydration of an untouched local profile only, the planner may

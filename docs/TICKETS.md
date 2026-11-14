@@ -19386,3 +19386,53 @@ Verification: the callback integration test in `shared` and `separate` modes and
 the code before the fix, Ticket 339's refresh test in both modes, unit tests, `dagger check
 --cadence --progress=report`, a verifier before merge.
 
+
+## Ticket 341: Account link accepts a hosted connector and manual mark pair
+
+Status: in progress. Filed November 13, 2026, from the Ticket 336 verifier's finding
+(Sign-in follow-ups, item 7, `docs/qa/2026-11-13-sign-in-final-verification.md`).
+Dependencies: Tickets 319 and 320. Decision: D28.
+
+Goal: a Mac's first account link, re-link and Import succeed when the hosted account holds
+both a connector completion and a manual mark as root events of one Occurrence. A linked
+Mac whose sync baseline predates that pair keeps syncing.
+
+Problem: the Ticket 319 convergence accepts a connector root mark on one copy and the
+user's root mark on the other, and the sync then writes both events to the hosted
+account. Every later copy that reads the account sees two hosted root events for one
+Occurrence. `historyBranches` in `packages/core/src/resolvers/account-sync.resolver.ts`
+refused that as "The hosted account snapshot contains branched status history", so test
+account A could not be linked. The data is valid. The hosted manual write paths
+(`apply_occurrence_status_transition` for web and MCP) already check the latest event,
+so they revise a connector event; only the Ticket 319 sync convergence writes two roots.
+That convergence is offline-first by design, so the read side changes, not the writer.
+
+Scope and acceptance:
+
+- The planner accepts exactly two hosted root events for one Occurrence when one is a
+  connector root mark and the other a manual root mark, as Ticket 319 defines them: both
+  `previous_status` Unresolved, no `revises_event_id`, the same Occurrence, Behavior,
+  local date and time zone, and valid timestamps. The local copy may hold neither, one or
+  both of those events, and no other root event for that Occurrence.
+- It applies in every plan (first link with Hydrate or Import, re-link, later sync). The
+  hosted occurrence row already shows the user's mark, so the merged copy shows the
+  manual status.
+- Still refused: two manual roots with different statuses (outside the first-hydration
+  same-status rule), two connector roots, three or more roots, a local root of its own
+  beside the pair, and a pair that disagrees on the Occurrence's day.
+- No schema, contract or hosted change.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: web reads the hosted rows directly and never plans a sync. |
+| Desktop | `packages/core/src/resolvers/account-sync.resolver.ts` (`hostedConnectorAndManualRoots`); ships in the next Mac release, which needs the owner's instruction. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | A phone app that syncs a local copy would use the same shared resolver. |
+
+Messaging impact: none.
+
+Verification: `tests/account-sync.resolver.test.ts`, "both marks already hosted (Ticket
+341)" (fails on the code before the fix); `dagger check --cadence --progress=report`; a
+dev-signed build on the test Mac re-links account A without restoring its database.
