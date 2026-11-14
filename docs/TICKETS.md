@@ -19174,7 +19174,7 @@ Verification: existing Calendar and leave-reminder tests plus new cases;
 
 ## Ticket 336: Sign-in methods in Cadence for Mac
 
-Status: merged (PR #270, November 13, 2026); the owner instructed the release at 21:45Z and PR #276 prepares Cadence for Mac 0.1.11 (not published when checked, 22:20Z); Ticket 337's installed Apple and email runs follow it. Filed November 13, 2026. Design:
+Status: complete, published in Cadence for Mac 0.1.11 on November 14, 2026, 06:14Z (PR #270; owner's instruction November 13, 21:45Z). Installed on production: the method list, email link on a clean profile, the different-account guard and Google reconnects of test account A passed; Apple on the installed app not run (owner skipped); a first link of A stays blocked by the branched-history defect (`docs/qa/2026-11-13-desktop-0.1.11-release-packet.md`). Filed November 13, 2026. Design:
 `docs/DESKTOP_BUILD.md`, "Sign-in methods (Ticket 336)".
 Dependencies: Tickets 331–335. Decision: D31.2. Ships with a Mac release.
 
