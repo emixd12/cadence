@@ -19341,8 +19341,8 @@ two-person test, unit tests, a latency comparison, `dagger check --cadence
 
 ## Ticket 340: Every server-side sign-in call limits per person
 
-Status: implemented on branch `claude/sign-in-auth-call-limits` (draft PR). Inactive in
-production until the hosted steps of Ticket 338 run. Filed November 14, 2026, from the
+Status: implemented and verified (QA record, section F); merged through PR #281. Inactive
+in production until the hosted steps of Ticket 338 run. Filed November 14, 2026, from the
 Ticket 339 verifier's finding (Ticket 339 QA record, section H, row 11). Dependencies:
 Tickets 338 and 339. Decision: D31.2.
 

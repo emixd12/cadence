@@ -108,8 +108,13 @@ refused refresh still writes nothing.
   `Authorization`. Supabase does not document whether its gateway passes
   `Sb-Forwarded-For` in that combination (QA record 338, E), and that cannot be measured
   until hosted step D1 is on. Abuse needs a signed-in account with a sign-in in the last
-  15 minutes, and each call also uses the project-wide email count, which is the tighter
-  limit. Proposed measurement in the hosted list (338, D, after step 1).
+  15 minutes (`signedInRecentlyNow` runs before `updateUser`). A change to a new address
+  also uses the project-wide email count. A change to an address that already has an
+  account does not: Auth answers `email_exists` before sending (`internal/api/user.go`,
+  line 138, v2.189.0), and Cadence's route has no limit of its own. So one recently
+  signed-in account can use up the shared 30-per-5-minutes `/user` count with about 30
+  requests, and delay Change address (not sign-in) for everyone for up to 5 minutes.
+  Proposed measurement in the hosted list (338, D, after step 1).
 - Ticket 338's E risk about the project-wide email count stands.
 - Until the hosted steps run, rows 3 to 5 stay shared: about 30 made-up exchanges from one
   address can delay Google and Apple sign-in for everyone for a few minutes.
@@ -144,3 +149,30 @@ is unchanged apart from the JWKS case, and the Ticket 338 email code is untouche
 None new. These calls turn on with Ticket 338's change list
 (`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D); Ticket 340 adds its
 acceptance items there.
+
+## F. Verifier (November 14, 2026)
+
+Result: passed. No defect in the forwarding-off path, the forwarding-on scope or the proxy
+JWKS change. One doc correction (section C, Change address).
+
+Setup: own worktree without `.env.local`, own Auth copy and gateway
+(`scripts/auth-rate-limit-local.mjs`, container `cadence_t340v_auth`, ports 57398 and
+57397) on the shared local database, a request recorder in front of the gateway (port
+57396) that logged every outgoing Supabase request in full, the Apple stub (57390), and
+`next dev` on port 4329. Headless Chrome with its own profile. Nothing hosted changed.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Audit, independent search (`\.auth\.`, `createClient`/`createServerClient`, `auth/v1`, the job routes' clients) | No row missing. Buckets match Auth v2.189.0: `/token` has one limiter for `password`, `refresh_token`, `id_token` and `pkce` (`token.go`, web3 separate); `/user` limits only `PUT` (`api.go`); `/logout`, `GET /user`, identities and JWKS have none; `isIgnoreCaptchaRoute` skips CAPTCHA for `pkce` and `refresh_token`. Every cron route uses the service role (`createServiceRoleClient`) or a minted token, never the cookie client |
+| 2 | Forwarding off: the same scenario (callback sign-in, link return, refresh outside the proxy, `getUser`, PostgREST write and read, proxy refresh on `/timeline`, sign-out, malformed address, no address) on the branch and on origin/main's three files, outgoing requests compared after replacing per-run values (tokens, codes, IDs, timestamps, the run label) | Identical: same URLs, header names, order and values, bodies and Set-Cookie headers. The only other difference was one JWKS read that main served from auth-js's cache (a rerun on the branch matched) |
+| 3 | Forwarding on (`VERCEL=1`, both variables) | Secret key and `Sb-Forwarded-For` only on `POST /auth/v1/token` with `pkce` or `refresh_token`. `/user`, `/logout`, identities, JWKS and every `/rest/v1` call kept the publishable key and had no header. `x-real-ip: not-an-ip` with `x-forwarded-for: evil, 198.51.100.99`: not forwarded. The match needs the configured origin, the exact `/auth/v1/token` path and a supabase-js-built query, so no user-supplied URL can match; the only user-supplied values are the code and verifier in the body, which are the same with either key |
+| 4 | Browser (Chrome, own profile), both modes | Email code (code from the code line), sign-out, email link, Apple stub sign-in and an Add Google link return (`link=google`) all passed with forwarding on and off. Apple suite (`tests/apple-sign-in.local-integration.test.ts`, token keep included): 9 of 9 with forwarding on. Callback Set-Cookie (verifier removal, session write) identical in every mode. Calendar connect was not run locally (needs HTTPS and a synthetic Calendar client); covered by item 2 (`getUser`, refresh) and the production check |
+| 5 | Callback test | `separate` on the branch: 3 of 3. `separate` on origin/main's files: 3 failed (Mallory limited after 29 codes). `shared`, forwarding off: 3 of 3. Ticket 338 email suite: 3 passed, 1 skipped (`shared`), 4 of 4 (`separate`). Ticket 339 refresh suite: 4 of 4 in both |
+| 6 | Proxy JWKS change | The cookies are copied only when a refresh answered 2xx and a session value was written. A refused refresh (400–404) ends the session as before; a 429 or 5xx refresh writes nothing. The 503 answer is `private, no-store` |
+| 7 | Mutations (each restored) | 10 breaks, each failed at least one test: no forwarding; any grant; forwarding every call; JWKS cookie copy removed; `VERCEL` ignored; headers read with the variables unset; path check removed; cookies copied on any unavailable answer; publishable key kept on the grant; `isIP` check removed |
+| 8 | Change address deferral | Reasoning holds; section C corrected (an existing address sends no email) |
+| 9 | Docs, checks | `STATUS.md` under 40,000 bytes; all GitHub checks green, including `rehearse` |
+
+Note for any non-Vercel host: under `next dev` a request with no address headers gets
+`x-forwarded-for: 127.0.0.1` from Next, which would be forwarded. This cannot happen in
+production, where forwarding needs `VERCEL=1` and Vercel sets the headers itself.
