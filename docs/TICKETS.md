@@ -19293,8 +19293,9 @@ test deployment, `dagger check --cadence --progress=report`.
 
 ## Ticket 339: Session refresh limits per person, and a refused refresh keeps the session
 
-Status: implemented on branch `claude/sign-in-refresh-rate-limit` (draft PR). Part 2 goes
-live on merge; part 1 is inactive in production until the hosted steps of Ticket 338 run.
+Status: part 2 live in Production since November 13, 2026 (PR #279, merge 94220cb1);
+part 1 is inactive in production until the hosted steps of Ticket 338 run. The sign-in
+callback's code exchange shares the same `/token` limit (QA record, section H, row 11).
 Filed November 13, 2026, from finding 11 of the sign-in follow-ups (Ticket 338 QA record,
 section F, row 6). Dependencies: Ticket 338. Decision: D31.2.
 
