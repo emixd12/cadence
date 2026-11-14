@@ -395,7 +395,7 @@
     {
       "path": "app/(auth)/login/SignInMethods.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 2,
       "interaction_ids": [
         "INT-AUTH-001",
         "INT-AUTH-015",
