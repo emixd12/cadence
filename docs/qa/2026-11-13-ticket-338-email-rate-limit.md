@@ -72,7 +72,7 @@ That route is not in the branch.
 Hosted Auth counted 2 `/otp` and 1 `/verify` calls against Vercel's addresses, out of 30
 each. A real sign-in with forwarding on needs the hosted steps in section D first.
 
-## D. Hosted change list (for a verifier; nothing applied)
+## D. Hosted change list (applied November 14, 2026; section G)
 
 Order matters. Each step can be undone on its own. Before step 3, nothing changes for
 anyone.
@@ -143,7 +143,8 @@ Undo: remove the two Vercel variables and redeploy; set
   valid refresh got 429 and was signed out. This is not caused by this change. Fixed by
   Ticket 339 (`docs/qa/2026-11-13-ticket-339-session-refresh-rate-limit.md`).
 - The Supabase docs do not say whether a secret key with a user's bearer token keeps
-  Sb-Forwarded-For. Cadence does not rely on it.
+  Sb-Forwarded-For. Cadence does not rely on it. Measured on hosted on November 14
+  (section G, 1b): it does, and the `/user` limit then follows the header.
 
 ## F. Verifier check (November 13, 2026)
 
@@ -173,3 +174,101 @@ Follow-up (not in this ticket): token refresh in `proxy.ts` needs the same treat
 the Ticket 338 variables set, the proxy's client could send `Sb-Forwarded-For` with the
 secret key for the refresh call only. Until then, anyone can sign other people out for up
 to 5 minutes at a time, from one address, with about 30 requests.
+
+## G. Live enablement (November 14, 2026)
+
+Result: **live.** Tickets 338, 339 and 340 forward each person's address in production
+since November 14, 2026, 01:44:33Z. Owner approval: November 14, 01:34Z, "Yes, use both"
+(Owner blockers note): the two existing secrets in Vercel Production and the hosted
+setting, nothing else. No new Supabase key was made.
+
+Run folder: `.intent/acceptance/t338-live/` (Intent workspace worktree). Evidence lines:
+`evidence.jsonl`; vault reads: `events.jsonl`. Attacker-side checks ran from the test Mac
+over Tailscale SSH (`scripts/test-device.mjs exec`), a different public address from the
+agent's Mac (Cloudflare trace: ORD and EWR). Browser checks ran in the run's own Chrome
+profile (port 4439), never in the shared QA Chrome window.
+
+### Sources of the two secrets
+
+| Variable | Source | Route |
+|---|---|---|
+| `CADENCE_TURNSTILE_SECRET_KEY` | Vault item `turnstile-secret-key` (the owner's widget, already in hosted Auth CAPTCHA) | `npm run agent:secret`, value piped into `vercel env add` by stdin |
+| `SUPABASE_SECRET_KEY` | The project's existing secret key `default` (`sb_secret_`, the only one) | Management API `GET /api-keys?reveal=true` with the agents' vault token `supabase-access-token`, inside the `agent:secret` child, held in a shell variable and piped by stdin. The same in-memory read Ticket 338's probe used |
+
+Vercel Production already held `SUPABASE_SERVICE_ROLE_KEY` (Secret; not readable, so its
+form was not checked). It was not used.
+
+### Before and after
+
+| Setting | Before | After |
+|---|---|---|
+| Auth `security_sb_forwarded_for_enabled` | `false` | `true` (01:42:21Z, read back twice) |
+| Vercel Production `CADENCE_TURNSTILE_SECRET_KEY` | unset | Secret (01:42:40Z) |
+| Vercel Production `SUPABASE_SECRET_KEY` | unset | Secret (01:43:10Z) |
+| Production deployment | `dpl_5HMArNfWa2JgRxsyaJKoyR9Jpvdv` (7560ebde) | redeploy `cadence-cv66kz90j…`, aliased 01:44:33Z; then PR #282 (docs) deployed 2ba23c50 at 01:50:47Z (`dpl_9R6SupiEykdDMHdsLZmEV6DCmUB4`) with the same variables |
+| Other Auth limits | `rate_limit_otp` 30, `rate_limit_verify` 30, `rate_limit_token_refresh` 150, `rate_limit_email_sent` 30, CAPTCHA Turnstile on | unchanged |
+
+Vercel Production had 51 variables before; the two new names are the only change.
+
+### Step 1 checks
+
+| # | Check | Result |
+|---|---|---|
+| 1a | 31 `/verify` calls from the agent's Mac, publishable key, a different made-up `Sb-Forwarded-For` (203.0.113.x) each | Calls 1–30: 403 `otp_expired`; call 31: **429** `over_request_rate_limit`. Without the secret key the header is ignored. |
+| 1b | `PUT /auth/v1/user` `{"data":{}}` as test account A: publishable key, then the secret key as `apikey` with A's bearer, each with a made-up header | Both 200 and **answered as A**. With the secret key and one header value, call 31 got 429; the next call with another header value got 200, and a publishable-key call (keyed by the Mac's own address) got 200. **The `/user` limit follows the header.** So Change address can be forwarded the same way (Ticket 340, section C). A's metadata was not changed (`data` empty). |
+
+### Forwarding-live check (before any attack-style check)
+
+Only the agent's Mac's own count was used. Throwaway `+t338l-pc` asked for a code on
+production. The Mac then used up its own `/verify` count with direct calls (18 to the 429),
+and posted the right code to Cadence once: `code_rejected`, no session, so Cadence counted
+it against the Mac's address, not Vercel's. 50 seconds later the same code in the
+browser reached `/timeline`.
+
+### Acceptance
+
+| # | Check | Result |
+|---|---|---|
+| 338-1 | Email sign-in in a real browser with Turnstile: request, code, `/timeline` | Passed (`+t338l-pc`, amr `otp`) |
+| 338-2 | The emailed link opened in a second browser | Passed: `/login/confirm`, button, `/timeline` (`+t338l-lk`) |
+| 338-3 | The Mac's email page (`/login/email/mac`) | Code email sent from `Cadence <login@cadence-me.com>`; the hash was removed from the address bar; the return link to the app is present. The code entry runs in the app and was not repeated here |
+| 338-4 | Bot check: a form post with the Turnstile field removed | `email_check_failed`, no code step, **0 emails** to that address after 45 s |
+| 338-5 | Two networks, wrong codes | Test Mac (attacker): 31 wrong codes, then the right code: all `code_rejected`; a direct `/verify` from the test Mac right after: **429**. Agent's Mac, 8 s later: another throwaway's code reached `/timeline`. Then the attacked address's right code, from the agent's Mac: `/timeline`. Only the test Mac's address was limited |
+| 338-6 | Settings, Change address, throwaway | Sent; both confirmation emails arrived; both links opened; the Sign-in methods row shows the new address |
+| 339-1 | A's kept session with `expires_at` in the past, `/timeline` | 200, new refresh token, stored back to the Keychain |
+| 339-2 | Two networks, made-up expired cookies | Test Mac: 40 loads then 45 s at 1 a second; the first 503 ("could not check your sign-in") at load 37, then 503 on about a third of the held loads. During the hold, A's expired session on the agent's Mac refreshed (200), and a made-up cookie from the agent's Mac still went to `/login` (not 503) |
+| 340-1 | Two networks, sign-in callback | Test Mac: 40 made-up codes (`auth_callback_failed`), then 50 s held; its refresh probes started getting 503, so its `/token` count was used up. During the hold, a fresh Google sign-in as A on the agent's Mac reached `/timeline` with methods Google, Apple, email |
+| 340-2 | Add a sign-in method, throwaway | Add Google with A's Google account: the link return came back through the forwarded exchange and refused cleanly ("That Google account already signs in to a different Cadence account…"); the row is unchanged. Add Apple reaches `appleid.apple.com` with client `app.cadence.web`. **Remove was not run**: a throwaway has one method and no spare Google or Apple account was available, so nothing could be removed |
+| 340-3 | A's Calendar and Settings | Identical before and after: Sign-in methods "Google and email", Google, Outlook and iCloud Calendar connected, API `connected` |
+| Rechecks | After the redeploy | Kept sessions A and B: `/timeline` and `/api/export/json` 200 (01:44Z and 02:02Z). Fresh Google sign-in and sign-out as A. Apple start: 307 to Supabase `authorize?provider=apple`. Preflights `sign-in` and `mcp-protocol`: ready |
+
+A first try of 338-5 looked like a failure: both right codes were refused as
+`otp_expired`. The cause was the run's own email parser: some code emails carry other
+6-digit numbers in their text part, and the parser took the first one. The fixed parser
+takes the code shown in the HTML. Three wrong codes from one address do not cancel the
+right code (checked). The rerun above used the right codes.
+
+### Production logs, 01:44–02:02Z
+
+1,617 requests. Every 5xx (21) was a `curl` `/timeline` 503 from the test Mac's checks.
+No 429 or 5xx for any other client. Runtime warnings and errors were all from this run's
+checks: made-up refresh tokens (`Refresh token is not valid`), the test Mac's
+`Request rate limit reached` on `/timeline`, the run's wrong codes and made-up callbacks,
+one `email_check_failed` (338-4). No `auth_unavailable`. Another agent's Linux browser
+loaded `/login` twice with 200s. Vercel logs carry no client address, so "from other
+addresses" was judged by user agent and timing.
+
+### Undo (not needed)
+
+`.intent/acceptance/t338-live/undo.sh`: remove both variables, redeploy production, set
+`security_sb_forwarded_for_enabled` to false.
+
+### Follow-ups
+
+- Change address (`PUT /user`) can now be forwarded: 1b shows hosted Auth answers as the
+  user and limits by the header. Needs a ticket.
+- Remove a sign-in method with forwarding on: not run (no spare provider account). It
+  makes no limited Auth call (Ticket 340, section A, row 13), so forwarding does not
+  change it.
+- The Mac app's own code entry against production was not repeated; it calls Supabase
+  directly from the Mac and is not forwarded.

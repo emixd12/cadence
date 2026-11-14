@@ -19246,8 +19246,9 @@ run itself.
 
 ## Ticket 338: Email sign-in limits per person, not per server
 
-Status: merged (PR #278) and verified; inactive in production
-until the hosted steps in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. Filed
+Status: complete; live in Production since November 14, 2026, 01:44Z (merged as PR #278;
+hosted steps and acceptance in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`,
+section G). Filed
 November 13, 2026, from finding 1 of `docs/qa/2026-11-13-sign-in-final-verification.md`.
 Dependencies: Ticket 332. Decision: D31.2.
 
@@ -19293,9 +19294,9 @@ test deployment, `dagger check --cadence --progress=report`.
 
 ## Ticket 339: Session refresh limits per person, and a refused refresh keeps the session
 
-Status: part 2 live in Production since November 13, 2026 (PR #279, merge 94220cb1);
-part 1 is inactive in production until the hosted steps of Ticket 338 run. The sign-in
-callback's code exchange shares the same `/token` limit (QA record, section H, row 11).
+Status: complete. Part 2 live in Production since November 13, 2026 (PR #279, merge
+94220cb1); part 1 live since November 14, 2026, 01:44Z with Ticket 338's hosted steps
+(Ticket 338 QA record, section G). The callback's code exchange is forwarded by Ticket 340.
 Filed November 13, 2026, from finding 11 of the sign-in follow-ups (Ticket 338 QA record,
 section F, row 6). Dependencies: Ticket 338. Decision: D31.2.
 
@@ -19341,8 +19342,10 @@ two-person test, unit tests, a latency comparison, `dagger check --cadence
 
 ## Ticket 340: Every server-side sign-in call limits per person
 
-Status: implemented and verified (QA record, section F); merged through PR #281. Inactive
-in production until the hosted steps of Ticket 338 run. Filed November 14, 2026, from the
+Status: complete; live in Production since November 14, 2026, 01:44Z with Ticket 338's
+hosted steps (Ticket 338 QA record, section G); merged through PR #281. Change address
+(`PUT /user`) stays unforwarded; the hosted measurement shows it can be forwarded (needs a
+ticket). Filed November 14, 2026, from the
 Ticket 339 verifier's finding (Ticket 339 QA record, section H, row 11). Dependencies:
 Tickets 338 and 339. Decision: D31.2.
 

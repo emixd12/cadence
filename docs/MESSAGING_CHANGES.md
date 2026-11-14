@@ -1701,8 +1701,8 @@ cite has not changed.
 
 ## P-055: Email sign-in sends the person's IP address to Supabase and Cloudflare from Cadence's server
 
-- **Change:** implemented November 13, 2026 (Ticket 338), inactive until the hosted steps in
-  `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When a person asks for a
+- **Change:** implemented November 13, 2026 (Ticket 338); live in production since November 14, 2026, 01:44Z
+  (`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section G). When a person asks for a
   sign-in email or enters a code, Cadence's server sends that person's IP address to
   Supabase Auth (header `Sb-Forwarded-For`) so Supabase's abuse limits count per person,
   and to Cloudflare Turnstile's server check. Before, Supabase saw only Cadence's server
@@ -1719,8 +1719,8 @@ cite has not changed.
 
 ## P-056: Session refresh sends the person's IP address to Supabase from Cadence's server
 
-- **Change:** implemented November 13, 2026 (Ticket 339), inactive until the hosted steps
-  in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When Cadence's server renews
+- **Change:** implemented November 13, 2026 (Ticket 339); live in production since November 14,
+  2026, 01:44Z (`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section G). When Cadence's server renews
   a signed-in person's web session, it sends that person's IP address to Supabase Auth
   (header `Sb-Forwarded-For`) so Supabase's abuse limits count per person. Before, Supabase
   saw only Cadence's server address for this step on the web.
@@ -1735,8 +1735,8 @@ cite has not changed.
 
 ## P-057: Google and Apple sign-in send the person's IP address to Supabase from Cadence's server
 
-- **Change:** implemented November 14, 2026 (Ticket 340), inactive until the hosted steps
-  in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When a person returns from
+- **Change:** implemented November 14, 2026 (Ticket 340); live in production since November 14,
+  2026, 01:44Z (`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section G). When a person returns from
   Google or Apple (or from adding a sign-in method), Cadence's server sends that person's
   IP address to Supabase Auth (header `Sb-Forwarded-For`) with the sign-in code, so
   Supabase's abuse limits count per person. Session renewals outside the page proxy (API
