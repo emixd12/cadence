@@ -1337,6 +1337,70 @@ If docs conflict, report and fix the conflict before implementing product code.
 - Sequenzy: `docs/SEQUENZY_WORKFLOW.md`
 - Vercel: `docs/VERCEL_WORKFLOW.md`
 
+## Cadence mailbox (Microsoft 365)
+
+Set up November 14, 2026 under the owner's approval (07:19Z). Mail to
+`hello@`, `login@` and `support@cadence-me.com` reaches one shared mailbox in
+Identity Scaffolding's existing Microsoft 365 tenant (Business Basic, Exchange
+Online included). Sequenzy keeps sending app email as `hello@` and
+`login@cadence-me.com`. Before this, the domain had no MX record, so replies to
+sign-in and reminder email bounced.
+
+Tenant objects:
+
+- Accepted domain `cadence-me.com`, Authoritative, not the default domain. Added
+  in admin.microsoft.com, Settings > Domains, with the manual TXT verification
+  and "Add your own DNS records". Microsoft's offer to sign in to Cloudflare was
+  declined; DNS stays in Cloudflare.
+- Shared mailbox "Cadence", primary `hello@cadence-me.com`, aliases
+  `login@cadence-me.com` and `support@cadence-me.com`. Exchange added
+  `cadence-hello@identityscaffolding.com` automatically; it was removed so the
+  mailbox has no address on the Identity Scaffolding domain. Shared mailboxes
+  need no licence.
+- The admin user has Full Access and Send As on the mailbox. Sending from an
+  alias was left off: it is a tenant-wide setting
+  (`SendFromAliasEnabled`), which would also change the Identity Scaffolding
+  domain.
+- Microsoft DKIM keys for `cadence-me.com` (selectors `selector1` and
+  `selector2`), with signing on in the Defender portal, Email authentication
+  settings > DKIM.
+
+Cloudflare DNS for `cadence-me.com`, all DNS-only. Changed with the agents'
+`cloudflare-api-token` (an account token, `cfat_` prefix, which has DNS edit on
+this zone; `npm run cloudflare:verify` reports 401 because it calls the user-token
+verify endpoint):
+
+| Record | Before | After |
+| --- | --- | --- |
+| TXT `@` (SPF) | `v=spf1 include:spf.sequenzydns.com ~all` | `v=spf1 include:spf.protection.outlook.com include:spf.sequenzydns.com ~all` |
+| TXT `@` (Microsoft verification) | none | `MS=ms55298285` |
+| MX `@` | none | `0 cadenceme-com01i.mail.protection.outlook.com` |
+| CNAME `autodiscover` | none | `autodiscover.outlook.com` |
+| CNAME `selector1._domainkey` | none | `selector1-cadenceme-com01i._domainkey.identityscaffolding.k-v1.dkim.mail.microsoft` |
+| CNAME `selector2._domainkey` | none | `selector2-cadenceme-com01i._domainkey.identityscaffolding.k-v1.dkim.mail.microsoft` |
+
+Unchanged: Sequenzy's `sq1` and `sq2._domainkey` CNAMEs, its `rp` and `rp2`
+return-path CNAMEs, `_dmarc` (`v=DMARC1; p=none;`), the Google site
+verification TXT and the A records. Microsoft suggests `-all` in SPF; the record
+keeps `~all` because DMARC is still `p=none`. Sequenzy's SPF alignment comes from
+the `rp`/`rp2` return-path subdomains, so the root include is belt and braces.
+
+Checks:
+
+```bash
+dig +short MX cadence-me.com
+dig +short TXT cadence-me.com
+dig +short CNAME selector1._domainkey.cadence-me.com
+dig +short TXT _dmarc.cadence-me.com
+```
+
+Undo, in this order: turn DKIM signing off for `cadence-me.com` in Defender;
+delete the shared mailbox "Cadence" in the Exchange admin center; remove
+`cadence-me.com` in Settings > Domains; then delete the MX, autodiscover,
+`selector1`/`selector2` and `MS=` records and set the SPF TXT back to
+`v=spf1 include:spf.sequenzydns.com ~all`. Do not touch the Sequenzy or DMARC
+records. Replies bounce again after the MX is removed.
+
 ## AgentMail Test Inboxes
 
 AgentMail is the repo-standard test inbox layer for agent-led email QA. Use it
