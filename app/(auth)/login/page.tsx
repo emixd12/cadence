@@ -87,9 +87,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           />
           {showOneAccountHint ? (
             <p className="mt-4 text-sm leading-6 text-muted-readable">
-              Have an account already? Sign in the way you did before, then
-              add other ways in Settings. Another way can start a second
-              account.
+              Already have an account? Use the way you signed in before.
             </p>
           ) : null}
         </div>
@@ -105,19 +103,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </a>
           .
         </p>
-
-        <div className="mt-10 border-t border-line pt-6">
-          <ul className="grid list-none gap-2 text-sm leading-6 text-muted-readable">
-            <li>
-              <span className="text-foreground">Single-player and private.</span>{" "}
-              No feed, no sharing, no coaching layer.
-            </li>
-            <li>
-              <span className="text-foreground">Yours to take.</span> Export
-              everything as plain files, anytime.
-            </li>
-          </ul>
-        </div>
 
         <nav
           aria-label="Public product information"

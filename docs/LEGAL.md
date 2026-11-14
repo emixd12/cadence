@@ -724,6 +724,8 @@ part of L-002.
 - **Next action:** none for the web. A mobile or Mac App Store ticket rereads guideline
   4.8 and this entry.
 
+- **Update 2026-11-14:** the owner chose to style Continue with Apple like the other sign-in actions (text action, Apple glyph, no black fill; `.apple-sign-in-action` removed). This departs from Apple's custom-button rules quoted above. Recheck before Apple review or an App Store listing; the work continues meanwhile.
+
 ## L-025: Apple token revocation when an account is deleted
 
 - **Question:** Must Cadence revoke a person's Sign in with Apple tokens when that person
