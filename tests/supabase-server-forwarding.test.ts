@@ -89,7 +89,7 @@ function stubNetwork() {
 }
 
 const forwardingEnv = { VERCEL: "1", SUPABASE_SECRET_KEY: SECRET, CADENCE_TURNSTILE_SECRET_KEY: "turnstile" };
-const offCases = [
+const offCases: Array<{ label: string; env: Record<string, string>; address: boolean }> = [
   { label: "with no variables", env: {}, address: true },
   { label: "off Vercel", env: { SUPABASE_SECRET_KEY: SECRET, CADENCE_TURNSTILE_SECRET_KEY: "turnstile" }, address: true },
   { label: "without the Turnstile secret", env: { VERCEL: "1", SUPABASE_SECRET_KEY: SECRET }, address: true },
