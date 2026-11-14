@@ -1750,3 +1750,23 @@ cite has not changed.
   every sign-in and session renewal, to limit abuse.
 - **Related:** P-055, P-056.
 - **Status:** logged.
+
+## P-058: Replies to Cadence email now reach a Microsoft 365 shared mailbox
+
+- **Change:** implemented November 14, 2026 (owner-approved mailbox setup;
+  `docs/OPERATIONS.md`, "Cadence mailbox (Microsoft 365)"). `hello@`, `login@` and
+  `support@cadence-me.com` now receive mail in a shared mailbox in Identity Scaffolding's
+  Microsoft 365 tenant. Replies to sign-in and reminder email used to bounce.
+- **Affected:** DNS and tenant configuration only; no code.
+- **Surfaces:** Privacy (Processors row "Microsoft 365" and the "Support messages"
+  retention row), marketing and the user guide if they ever name a Cadence contact
+  address.
+- **Conflicting current text:** `components/settings/LegalContent.tsx` says support
+  messages are kept 12 months after resolution and that "Microsoft 365 mailbox retention
+  is configured for this period". No retention policy is configured on the new shared
+  mailbox. The public contact address is still `privacy@identityscaffolding.com`.
+- **Update needed:** either apply a 12-month retention policy to the Cadence mailbox (an
+  owner decision; it is a tenant change) or say which mailbox the retention claim covers.
+  Decide whether public text should name `support@cadence-me.com`.
+- **Related:** none.
+- **Status:** logged.
