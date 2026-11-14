@@ -19,7 +19,7 @@ no secret, code, link token or cookie was printed or recorded.
 | Users | 7: 3 Google-only, 4 `cadence-captu…@example.invalid` from July 1 (load-test captures with passwords). No AgentMail, `example.com` or relay user; no user without an identity; no user with two Google identities; no connected Calendar without its Google identity | Yes (July users predate the track) |
 | Vercel deployments | Older and preview deployments sit behind Vercel SSO (302). No alias other than the Git branch aliases | Yes |
 | Cloudflare | DKIM `sq1`/`sq2`, return path `rp`/`rp2`, DMARC `p=none`, root SPF for Sequenzy; **no MX**. Turnstile widget `cadence-turnstile-secret-key` (Managed): `cadence-me.com`, `cadence-blush-three.vercel.app`, `localhost`, `127.0.0.1` | Yes; localhost noted |
-| Sequenzy | Default sender `Identity Scaffolding <hello@cadence-me.com>`; Reply-To `Cadence <login@cadence-me.com>`; click tracking off; open tracking on; footer kept; tracking domain `links.cadence-me.com` registered in Sequenzy, pending (no CNAME) | Partly: the 332 change record says the tracking CNAME was "not added", which is true for DNS only |
+| Sequenzy | Default sender `Identity Scaffolding <hello@cadence-me.com>`; Reply-To `Cadence <login@cadence-me.com>`; click tracking off; open tracking on; footer kept; tracking domain `links.cadence-me.com` registered in Sequenzy, pending (no CNAME) | Partly: the 332 change record says the tracking CNAME was "not added", which is true for DNS only. **Update, November 14, 01:48Z:** default sender renamed to `Cadence <hello@cadence-me.com>` (owner approval; row in `2026-11-13-ticket-332-hosted-auth-changes.md`) |
 
 ## B. Acceptance criteria
 
