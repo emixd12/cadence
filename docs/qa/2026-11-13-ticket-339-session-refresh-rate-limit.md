@@ -156,3 +156,19 @@ reloads every 5 s (each reload waits about 25 s again for 5xx) and returns to th
 after Auth recovers. A form submitted during the outage is lost on both. Load: one
 waiting tab sends about 8 Auth calls every 30 s during a 5xx outage, or 1 every 5 s during
 429s, until it gets through. The reload has no jitter or backoff.
+
+## I. Production (November 13–14, 2026)
+
+PR #279 merged at 23:56:28Z as 94220cb1; production deployment `dpl_Cnij3SrQsaXSSB7jtFsUBCtCEZ6N`
+ready at about 23:57Z. Run folder `.intent/acceptance/t339-verify/` (Intent workspace
+worktree), own Chrome profiles on ports 4437 and 4439.
+
+| Check | Result |
+|---|---|
+| Kept sessions A and B | `/timeline` 200, `/api/export/json` 200 with the profile, each |
+| A's kept session with `expires_at` in the past | 200 `/timeline`, new refresh token and expiry in the cookie, written back to the Keychain; A's kept session still loads after |
+| Made-up expired cookie | 307 to `/login?next=%2Ftimeline`, cookie cleared |
+| Fresh Google sign-in as A | Landed on `/timeline` as A; sign-in methods google, apple, email |
+| Sign-out as A | Session cookies removed; `/timeline` then goes to `/login` |
+| Email sign-in by code (AgentMail) | Landed on `/timeline` (`amr` otp); account deleted through Settings, 0 rows left in `auth.users` |
+| 503s after the deploy | 0 of 41 production requests between 23:57Z and 00:17Z |
