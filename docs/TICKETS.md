@@ -19338,3 +19338,51 @@ Messaging impact: P-056.
 Verification: the integration test in `shared` and `separate` modes, Ticket 338's
 two-person test, unit tests, a latency comparison, `dagger check --cadence
 --progress=report`, a verifier before merge.
+
+## Ticket 340: Every server-side sign-in call limits per person
+
+Status: implemented and verified (QA record, section F); merged through PR #281. Inactive
+in production until the hosted steps of Ticket 338 run. Filed November 14, 2026, from the
+Ticket 339 verifier's finding (Ticket 339 QA record, section H, row 11). Dependencies:
+Tickets 338 and 339. Decision: D31.2.
+
+Goal: no call Cadence's server makes to Supabase Auth for a person shares one rate limit
+across all people.
+
+Problem: the sign-in callback exchanges the Google or Apple code (`/auth/v1/token`,
+`grant_type=pkce`) from Cadence's server, in the same per-address `/token` bucket as the
+session refresh. About 30 made-up codes from one address delayed every new Google and
+Apple sign-in for a few minutes. Refreshes made by the cookie client outside the proxy
+were in the same bucket and not forwarded either.
+
+Scope and acceptance:
+
+- An audit table of every server-side Auth call: route, endpoint, limit bucket, person or
+  job, forwarding (`docs/qa/2026-11-13-ticket-340-auth-call-limits.md`, section A).
+- The cookie client (`lib/supabase/server.ts`) sends the secret key and `Sb-Forwarded-For`
+  on the code exchange and the refresh only, under Ticket 338's rule (`VERCEL=1`, both
+  variables, a valid address). Every other call is unchanged; jobs never forward.
+- The code-verifier and session cookie handling of the exchange is unchanged.
+- The proxy keeps a refreshed cookie when a later JWKS read fails (Ticket 339 verifier,
+  H row 6).
+- With the variables unset, every request is identical to before (unit tests).
+- Change address (`PUT /user`, per address) is not changed: it needs a hosted
+  measurement first (QA record 338, section D, item 5).
+- Evidence: `tests/auth-callback-rate-limit.local-integration.test.ts` (fails on the code
+  before the fix), `tests/supabase-server-forwarding.test.ts`, the QA record.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/supabase/server.ts`, `lib/auth/auth-forwarding.ts`, `lib/supabase/proxy.ts`. |
+| Desktop | Not applicable: the Mac exchanges its sign-in code and refreshes against Supabase directly from the person's own address; Cadence's hosted Mac routes check a bearer token (`GET /user`, not limited). |
+| Marketing | Not applicable: the marketing site has no session. |
+| Future mobile | A phone app would call Supabase directly, like the Mac. |
+
+Messaging impact: P-057.
+
+Verification: the callback integration test in `shared` and `separate` modes and against
+the code before the fix, Ticket 339's refresh test in both modes, unit tests, `dagger check
+--cadence --progress=report`, a verifier before merge.
+

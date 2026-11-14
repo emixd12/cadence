@@ -520,6 +520,43 @@ describe("Supabase proxy refused refresh (Ticket 339)", () => {
     expect(login.headers.get("x-middleware-request-cookie")).toBeNull();
   });
 
+  // Ticket 339 verifier, H row 6: the refresh already rotated the token.
+  it("keeps the refreshed cookie when a later call fails after a successful refresh", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "publishable-key");
+    const queue = [200, 503];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: queue.shift() ?? 200 })));
+    vi.mocked(createServerClient).mockImplementation(((...args: unknown[]) => {
+      const options = args[2] as {
+        global: { fetch: typeof fetch };
+        cookies: { setAll: (c: Array<{ name: string; value: string; options: object }>, h: Record<string, string>) => void };
+      };
+      return {
+        auth: {
+          async getClaims() {
+            await options.global.fetch(TOKEN_URL, { method: "POST" });
+            options.cookies.setAll([
+              { name: SESSION, value: "new-session", options: { path: "/" } },
+              { name: `${SESSION}.1`, value: "", options: { path: "/", maxAge: 0 } },
+            ], {});
+            await options.global.fetch(JWKS_URL, { method: "GET" });
+            return { data: null, error: new Error("jwks unavailable") };
+          },
+        },
+      };
+    }) as never);
+
+    const response = await updateSession(requestWithAuthCookie("http://localhost:3000/timeline"));
+    expect(response.status).toBe(503);
+    expect(response.cookies.get(SESSION)?.value).toBe("new-session");
+    expect(response.cookies.get(`${SESSION}.1`)).toMatchObject({ value: "", maxAge: 0 });
+
+    queue.push(200, 503);
+    const login = await updateSession(requestWithAuthCookie("http://localhost:3000/login"));
+    expect(login.status).toBe(200);
+    expect(login.cookies.get(SESSION)?.value).toBe("new-session");
+  });
+
   function forwardingRequest(path = "/timeline") {
     return new NextRequest(`https://app.cadence.example${path}`, {
       headers: { cookie: `${SESSION}=header.payload.signature`, "x-real-ip": "198.51.100.7" },

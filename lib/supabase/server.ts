@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
+  authForwardingConfigured,
+  authForwardingFor,
   forwardedForHeaders,
+  isPersonTokenGrantUrl,
+  withTokenGrantForwarding,
   type AuthForwarding,
 } from "@/lib/auth/auth-forwarding";
 import { getSupabaseRuntimeConfig } from "@/lib/supabase/env";
@@ -11,6 +15,9 @@ const JWT_CLOCK_SKEW_RETRY_DELAY_MS = 1_000;
 /**
  * With `forwarding`, Auth calls carry the person's address and the secret key
  * (Ticket 338). Use it only for the email code and link checks.
+ *
+ * Ticket 340: with the same conditions met, the refresh and the code exchange of this
+ * client carry the person's address and the secret key too, and nothing else does.
  */
 export async function createClient(
   options: { forwarding?: AuthForwarding | null } = {},
@@ -18,10 +25,13 @@ export async function createClient(
   const { url, publishableKey } = getSupabaseRuntimeConfig();
   const cookieStore = await cookies();
   const forwarding = options.forwarding ?? null;
+  const tokenGrantForwarding = authForwardingConfigured()
+    ? authForwardingFor(await headers())
+    : null;
 
   return createServerClient(url, forwarding?.secretKey ?? publishableKey, {
     global: {
-      fetch: fetchWithJwtIssuedAtFutureRetry,
+      fetch: tokenGrantForwardingFetch(url, tokenGrantForwarding),
       ...(forwarding ? { headers: forwardedForHeaders(forwarding) } : {}),
     },
     cookies: {
@@ -39,6 +49,23 @@ export async function createClient(
       },
     },
   });
+}
+
+/** Without forwarding, the same fetch as before Ticket 340. */
+export function tokenGrantForwardingFetch(
+  supabaseUrl: string,
+  forwarding: AuthForwarding | null,
+): typeof fetch {
+  if (!forwarding) return fetchWithJwtIssuedAtFutureRetry;
+  return (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    return fetchWithJwtIssuedAtFutureRetry(
+      input,
+      isPersonTokenGrantUrl(url, supabaseUrl)
+        ? withTokenGrantForwarding(init, forwarding)
+        : init,
+    );
+  };
 }
 
 export async function fetchWithJwtIssuedAtFutureRetry(
