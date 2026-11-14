@@ -113,3 +113,34 @@ refused refresh still writes nothing.
 - Ticket 338's E risk about the project-wide email count stands.
 - Until the hosted steps run, rows 3 to 5 stay shared: about 30 made-up exchanges from one
   address can delay Google and Apple sign-in for everyone for a few minutes.
+
+## D. Results
+
+Local stack (API port 55341), the Auth copy and gateway from
+`scripts/auth-rate-limit-local.mjs` (ports 55398 and 55397), Cadence under `next dev` on
+port 4325 against the gateway. Run folder `.intent/acceptance/t340-auth-calls/` (Intent
+workspace worktree). Auth restarted before each run. Nothing hosted changed.
+
+`tests/auth-callback-rate-limit.local-integration.test.ts` signs people in through
+`/auth/callback` with real PKCE codes: the test asks the copy for a PKCE email
+(`code_challenge`), reads the `pkce_` token hash from Mailpit and follows `/verify` to get
+the code Auth would hand to Google's or Apple's return. Those two calls use the `/otp` and
+`/verify` buckets of the test's own address, not `/token`.
+
+| # | Run | Result |
+|---|---|---|
+| 1 | Branch, forwarding on (`VERCEL=1`, both variables), `separate` | 3 of 3. Real code: 307 to `/timeline`, session cookie set, verifier cookie removed; the one `/token` call was an admin call with `Sb-Forwarded-For` 198.51.100.30. Expired session on `/api/google-calendar/connection` (outside the proxy): 200, one refresh, admin, 198.51.100.31; no other Auth call carried the secret key or the header. Attack: Mallory (198.51.100.10) needed 31 made-up codes to reach her own 429; Bea (198.51.100.20) then signed in (307 to `/timeline`, `/token` 200 with her address). |
+| 2 | origin/main's `lib/supabase/server.ts`, forwarding on, `separate` | **0 of 3**: no call forwarded, and Mallory hit the shared 429 after 29 codes. The test fails without the fix. |
+| 3 | Branch, forwarding off, `shared` | 3 of 3: no call forwarded; after Mallory's codes Bea's real code got 429 `over_request_rate_limit` and Cadence sent her to `/login` with `auth_callback_failed`, as on main. |
+| 4 | Ticket 339 refresh test, `shared` and `separate`, on the branch | 4 of 4 each. |
+| 5 | Unit tests | `tests/supabase-server-forwarding.test.ts` (new, real `@supabase/ssr` and auth-js): forwarding off in five ways (no variables, off Vercel, either secret missing, no address) leaves the exchange request unchanged, passes the earlier fetch function itself and never reads the request headers; forwarding on changes only `apikey`, `Authorization` and `Sb-Forwarded-For` on the exchange and the refresh, the request body and the cookie writes are identical, `/user`, `/logout` and PostgREST keep the publishable key, and a request without cookies makes no Auth call. `tests/auth-forwarding.test.ts`: `isPersonTokenGrantUrl` (refresh and PKCE only; password, ID token, other paths and hosts refused). `tests/supabase-proxy.test.ts`: refresh 200 then JWKS 503 keeps the new cookie on the 503 and on `/login`. Deliberate breaks (exchange no longer forwarded; JWKS fix removed) each failed these tests. |
+
+Sign-in by Google and Apple, linking returns, email and sign-out with the variables unset:
+the cookie client is the same object as before (row 5, first case), the proxy refresh path
+is unchanged apart from the JWKS case, and the Ticket 338 email code is untouched.
+
+## E. Hosted steps
+
+None new. These calls turn on with Ticket 338's change list
+(`docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D); Ticket 340 adds its
+acceptance items there.

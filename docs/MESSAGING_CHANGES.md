@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-057` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-058` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1731,4 +1731,22 @@ cite has not changed.
 - **Update needed:** with P-055, say that Supabase receives the IP address during sign-in
   and session renewal, to limit abuse.
 - **Related:** P-055.
+- **Status:** logged.
+
+## P-057: Google and Apple sign-in send the person's IP address to Supabase from Cadence's server
+
+- **Change:** implemented November 14, 2026 (Ticket 340), inactive until the hosted steps
+  in `docs/qa/2026-11-13-ticket-338-email-rate-limit.md` run. When a person returns from
+  Google or Apple (or from adding a sign-in method), Cadence's server sends that person's
+  IP address to Supabase Auth (header `Sb-Forwarded-For`) with the sign-in code, so
+  Supabase's abuse limits count per person. Session renewals outside the page proxy (API
+  routes, Settings sign-in methods, Calendar returns) send it too, as P-056 describes for
+  the proxy. Before, Supabase saw only Cadence's server address for these steps.
+- **Affected:** Ticket 340. Files: `lib/supabase/server.ts`, `lib/auth/auth-forwarding.ts`.
+- **Surfaces:** Privacy (what Supabase receives during sign-in), Trust if it lists what
+  each provider receives.
+- **Conflicting current text:** none known.
+- **Update needed:** with P-055 and P-056, say that Supabase receives the IP address during
+  every sign-in and session renewal, to limit abuse.
+- **Related:** P-055, P-056.
 - **Status:** logged.

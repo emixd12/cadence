@@ -108,6 +108,23 @@ Acceptance after step 4 (agent steps, test accounts and AgentMail; real email):
 4. Read back: `security_sb_forwarded_for_enabled` true; both variables present
    (names only).
 
+Ticket 340 additions (`docs/qa/2026-11-13-ticket-340-auth-call-limits.md`):
+
+5. After step 1, before step 3 (agent's Mac, test account A, no email): with A's access
+   token, call `PUT /auth/v1/user` with `{"data":{}}` and, in turn, (a) the publishable
+   key, (b) the secret key as `apikey` with A's token as bearer, each with a made-up
+   `Sb-Forwarded-For`. Record whether hosted Auth answers (b) as A (200 with A's user)
+   and whether its limit follows the header: about 31 calls of (b) with one header value,
+   then one with another value. This decides whether Change address can be forwarded
+   later (Ticket 340, section C). It limits only the agent's own address, for up to
+   5 minutes.
+6. After step 4, two-network check of the sign-in callback: from network 1, about 31 loads
+   of `https://app.cadence-me.com/auth/callback?code=<random UUID>` until the gateway
+   answers 429 (Cadence shows `/login` with `auth_callback_failed` each time); from
+   network 2, a fresh Google sign-in as A must reach `/timeline`.
+7. After step 4: Settings, add and remove a sign-in method for test account A, and
+   Calendar connect (refreshes outside the proxy), each unchanged.
+
 Undo: remove the two Vercel variables and redeploy; set
 `security_sb_forwarded_for_enabled` back to false.
 

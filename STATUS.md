@@ -52,6 +52,7 @@ Check the cited entry before acting on a row.
 | Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Reminder email sender reads "Identity Scaffolding" (since June; the address is `hello@cadence-me.com` since November 13): rename Sequenzy sender profile `oqf1lrv9mmvxjkj8admg39cv` to "Cadence" (owner or approved agent). (2) Reply-To `login@cadence-me.com` has no MX, so replies to sign-in and reminder email bounce: owner chooses a mailbox or forwarding. (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history (`account-sync.resolver.ts:821`; proposed workspace). (8) After a refused CAPTCHA the email form clears the typed address. (9) Shared per-IP OTP and verify limits: confirmed, fixed inactive under Ticket 338 (next row). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production. (11) Token refresh in `proxy.ts` shares one per-address limit and a refused refresh signed people out: Ticket 339 (next row but one) | `docs/qa/2026-11-13-sign-in-final-verification.md` |
 | Ticket 338: email sign-in limits per person | Shared limit confirmed (local copy of hosted limits; Vercel called out from 2 addresses on a test deployment). Fix merged (PR #278) and verified: Vercel address headers cannot be forged; fails closed; unchanged with the variables unset. Inactive until hosted steps | Verifier runs `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section D: Auth `security_sb_forwarded_for_enabled` on, then Vercel `CADENCE_TURNSTILE_SECRET_KEY` and `SUPABASE_SECRET_KEY` (owner approval for both credentials), redeploy, acceptance | TICKETS, Ticket 338 |
 | Ticket 339: session refresh limits per person | Part 2 live: PR #279 merged November 13, 23:56Z as 94220cb1. A refused refresh (429, 5xx, no answer) keeps the session and answers 503; 400–404 end it. Production checked. The per-person refresh limit (part 1) stays inactive. Open: the sign-in callback's code exchange shares the same `/token` limit (measured), so one address can still delay Google and Apple sign-in for everyone | Forwarding turns on with Ticket 338's hosted steps (QA record, section F). Needs a ticket: forward the address on the callback's code exchange too | TICKETS, Ticket 339 |
+| Ticket 340: every server-side sign-in call limits per person | Audit done (20 server-side Auth calls; 3 per-address ones were not forwarded: the callback's code exchange, link returns, refreshes outside the proxy). Fix in draft PR, inactive until Ticket 338's hosted steps; Change address (`PUT /user`) deferred to a hosted measurement | Verifier, then merge. Hosted acceptance items 5–7 added to the Ticket 338 list (section D) | TICKETS, Ticket 340; `docs/qa/2026-11-13-ticket-340-auth-call-limits.md` |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | Current secret made November 13, 2026, 18:58Z; **expires May 12, 2027**; **rotate by April 12, 2027**. Held by the Supabase Apple provider and Vercel Production `APPLE_SIGN_IN_CLIENT_SECRET` | Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)" (owner approves the key read); the same section covers a missed rotation. Update this row with the new dates | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix ships with the next Mac release | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -94,6 +95,22 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 340: sign-in callback limits per person, fixed inactive — November 14, 2026
+
+- **Audit.** Every server-side Supabase Auth call, with its limit bucket and caller:
+  `docs/qa/2026-11-13-ticket-340-auth-call-limits.md`, section A. Per address and not
+  forwarded: the callback's code exchange (`/token`, `pkce`), the same on link returns,
+  and refreshes by the cookie client outside the proxy. Change address (`PUT /user`) is
+  per address too; deferred to a hosted measurement.
+- **Fix (branch `claude/sign-in-auth-call-limits`).** Under Ticket 338's rule the cookie
+  client sends the secret key and the person's address on those `/token` calls only. On a
+  local Auth copy, 31 made-up codes from one address no longer block another person's
+  sign-in; the same test fails on the code before the fix. Unset: unchanged. The proxy
+  now keeps a refreshed cookie when a later JWKS read fails.
+- **Hosted: nothing changed.**
+
+Platform impact: web only (Ticket 340). Messaging impact: P-057.
 
 ## Ticket 339: session refresh no longer signs people out — November 13, 2026
 
