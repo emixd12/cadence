@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   authForwardingFor,
   isSessionRefreshUrl,
-  withRefreshForwarding,
+  withTokenGrantForwarding,
   type AuthForwarding,
 } from "@/lib/auth/auth-forwarding";
 import {
@@ -22,6 +22,7 @@ type ClaimsAuthResult = {
 
 type AuthCallRecord = {
   unavailable: boolean;
+  refreshed: boolean;
 };
 
 const LOGIN_PREVIEW_PARAM = "preview";
@@ -89,10 +90,11 @@ function proxyAuthFetch(
     try {
       const response = await fetch(
         input,
-        forwarding && refresh ? withRefreshForwarding(init, forwarding) : init,
+        forwarding && refresh ? withTokenGrantForwarding(init, forwarding) : init,
       );
       // The last Auth answer decides: a retried call that ends in 400 has ended.
       record.unavailable = isUnavailableStatus(response.status);
+      if (refresh && response.ok) record.refreshed = true;
       return response;
     } catch (error) {
       record.unavailable = true;
@@ -208,7 +210,8 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  const authCalls: AuthCallRecord = { unavailable: false };
+  const authCalls: AuthCallRecord = { unavailable: false, refreshed: false };
+  let wroteSession = false;
   const supabase = createServerClient(config.url, config.publishableKey, {
     global: {
       fetch: proxyAuthFetch(
@@ -234,6 +237,7 @@ export async function updateSession(request: NextRequest) {
 
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
+          if (value) wroteSession = true;
         });
 
         Object.entries(headers).forEach(([name, value]) => {
@@ -258,10 +262,19 @@ export async function updateSession(request: NextRequest) {
   );
 
   if (!authResult.authenticated && authCalls.unavailable) {
-    // The refresh may have written cookie removals; neither response carries them.
-    return pathname === LOGIN_ROUTE
-      ? NextResponse.next()
-      : authUnavailableResponse(request);
+    // A refused refresh may have written cookie removals; neither response carries
+    // them. A refresh that succeeded before a later call failed (the JWKS read) has
+    // already rotated the refresh token, so its new cookies go out with the answer.
+    const unavailable =
+      pathname === LOGIN_ROUTE
+        ? NextResponse.next()
+        : authUnavailableResponse(request);
+    if (authCalls.refreshed && wroteSession) {
+      response.cookies.getAll().forEach((cookie) => {
+        unavailable.cookies.set(cookie);
+      });
+    }
+    return unavailable;
   }
 
   if (protectedRoute && !authResult.authenticated) {

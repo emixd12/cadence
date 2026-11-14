@@ -21,8 +21,10 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 import {
+  authForwardingConfigured,
   authForwardingFor,
   clientAddressOf,
+  isPersonTokenGrantUrl,
   isSessionRefreshUrl,
   turnstilePasses,
   type AuthForwarding,
@@ -176,5 +178,34 @@ describe("isSessionRefreshUrl", () => {
   ])("%s -> %s", (url, expected) => {
     expect(isSessionRefreshUrl(new URL(url), base)).toBe(expected);
     expect(isSessionRefreshUrl(new URL(url), `${base}/`)).toBe(expected);
+  });
+});
+
+// Ticket 340: the refresh and the callback's code exchange, nothing else.
+describe("isPersonTokenGrantUrl", () => {
+  const base = "https://project.supabase.co";
+  it.each([
+    [`${base}/auth/v1/token?grant_type=refresh_token`, true],
+    [`${base}/auth/v1/token?grant_type=pkce`, true],
+    [`${base}/auth/v1/token?grant_type=password`, false],
+    [`${base}/auth/v1/token?grant_type=id_token`, false],
+    [`${base}/auth/v1/token`, false],
+    [`${base}/auth/v1/user`, false],
+    [`${base}/auth/v1/verify?grant_type=pkce`, false],
+    [`${base}/rest/v1/token?grant_type=pkce`, false],
+    ["https://other.example/auth/v1/token?grant_type=pkce", false],
+  ])("%s -> %s", (url, expected) => {
+    expect(isPersonTokenGrantUrl(new URL(url), base)).toBe(expected);
+    expect(isPersonTokenGrantUrl(new URL(url), `${base}/`)).toBe(expected);
+  });
+});
+
+describe("authForwardingConfigured", () => {
+  it("needs Vercel, a secret key and the Turnstile secret", () => {
+    expect(authForwardingConfigured(both)).toBe(true);
+    expect(authForwardingConfigured({})).toBe(false);
+    expect(authForwardingConfigured({ ...both, VERCEL: undefined })).toBe(false);
+    expect(authForwardingConfigured({ ...both, SUPABASE_SECRET_KEY: "eyJhbGciOi.service-role" })).toBe(false);
+    expect(authForwardingConfigured({ ...both, CADENCE_TURNSTILE_SECRET_KEY: " " })).toBe(false);
   });
 });

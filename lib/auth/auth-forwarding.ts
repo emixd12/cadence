@@ -51,17 +51,31 @@ export function authForwardingFor(
   headers: HeaderSource,
   env: Env = process.env,
 ): AuthForwarding | null {
-  if (env.VERCEL !== "1") return null;
-  const secretKey = env.SUPABASE_SECRET_KEY?.trim();
-  const turnstileSecret = env.CADENCE_TURNSTILE_SECRET_KEY?.trim();
-  if (!secretKey?.startsWith("sb_secret_") || !turnstileSecret) return null;
+  if (!authForwardingConfigured(env)) return null;
+  const secretKey = env.SUPABASE_SECRET_KEY!.trim();
+  const turnstileSecret = env.CADENCE_TURNSTILE_SECRET_KEY!.trim();
   const clientAddress = clientAddressOf(headers);
   if (!clientAddress) return null;
   return { secretKey, turnstileSecret, clientAddress };
 }
 
+/** The host and variable conditions of `authForwardingFor`, without an address. */
+export function authForwardingConfigured(env: Env = process.env): boolean {
+  return (
+    env.VERCEL === "1" &&
+    Boolean(env.SUPABASE_SECRET_KEY?.trim().startsWith("sb_secret_")) &&
+    Boolean(env.CADENCE_TURNSTILE_SECRET_KEY?.trim())
+  );
+}
+
 export function forwardedForHeaders(forwarding: AuthForwarding): Record<string, string> {
   return { [SB_FORWARDED_FOR_HEADER]: forwarding.clientAddress };
+}
+
+function tokenGrantOf(url: URL, supabaseUrl: string): string | null {
+  const token = new URL("auth/v1/token", supabaseUrl.endsWith("/") ? supabaseUrl : `${supabaseUrl}/`);
+  if (url.origin !== token.origin || url.pathname !== token.pathname) return null;
+  return url.searchParams.get("grant_type");
 }
 
 /**
@@ -71,15 +85,21 @@ export function forwardedForHeaders(forwarding: AuthForwarding): Record<string, 
  * publishable key.
  */
 export function isSessionRefreshUrl(url: URL, supabaseUrl: string): boolean {
-  const token = new URL("auth/v1/token", supabaseUrl.endsWith("/") ? supabaseUrl : `${supabaseUrl}/`);
-  return (
-    url.origin === token.origin &&
-    url.pathname === token.pathname &&
-    url.searchParams.get("grant_type") === "refresh_token"
-  );
+  return tokenGrantOf(url, supabaseUrl) === "refresh_token";
 }
 
-export function withRefreshForwarding(
+/**
+ * Ticket 340: the two `/token` grants Cadence's server makes for a person, both in the
+ * same per-address bucket: the refresh, and the sign-in callback's code exchange
+ * (`grant_type=pkce`). Each carries state from that person's cookies, so a request
+ * without them (a job) never makes one.
+ */
+export function isPersonTokenGrantUrl(url: URL, supabaseUrl: string): boolean {
+  const grant = tokenGrantOf(url, supabaseUrl);
+  return grant === "refresh_token" || grant === "pkce";
+}
+
+export function withTokenGrantForwarding(
   init: RequestInit | undefined,
   forwarding: AuthForwarding,
 ): RequestInit {
