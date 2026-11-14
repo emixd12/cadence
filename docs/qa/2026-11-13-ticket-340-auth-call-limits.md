@@ -114,10 +114,15 @@ refused refresh still writes nothing.
   line 138, v2.189.0), and Cadence's route has no limit of its own. So one recently
   signed-in account can use up the shared 30-per-5-minutes `/user` count with about 30
   requests, and delay Change address (not sign-in) for everyone for up to 5 minutes.
-  Proposed measurement in the hosted list (338, D, after step 1).
+  Proposed measurement in the hosted list (338, D, after step 1). Measured November 14
+  (QA record 338, section G, 1b): with the secret key and a user's bearer, hosted Auth answers
+  as the user and the `/user` limit follows `Sb-Forwarded-For`, so Change address can be
+  forwarded. Needs a ticket.
 - Ticket 338's E risk about the project-wide email count stands.
 - Until the hosted steps run, rows 3 to 5 stay shared: about 30 made-up exchanges from one
-  address can delay Google and Apple sign-in for everyone for a few minutes.
+  address can delay Google and Apple sign-in for everyone for a few minutes. The hosted
+  steps ran on November 14, 01:44Z (QA record 338, section G); rows 3 to 5 now count per
+  person.
 
 ## D. Results
 
