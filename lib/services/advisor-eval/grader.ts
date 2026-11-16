@@ -28,7 +28,7 @@ You will see the facts as JSON, then several briefs for the same day, labelled w
 Score each brief from 1 (poor) to 5 (excellent) on:
 - accurate: every claim, time and number matches the facts; nothing invented; uncertainty (such as stale calendar data) is acknowledged when the facts flag it.
 - useful: it leads with what matters most for this person today and helps them act; it does not bury the point or list everything.
-- clear: a person glancing at their phone understands it at once; plain words, no internal jargon (such as "supported", "planner", "interval", "Behavior" used as a technical term).
+- clear: a person glancing at their phone understands it at once; plain words, no internal jargon (such as "supported", "planner", "interval", "coverage", "buffer"). "Behavior" is Cadence's own name for a planned habit, which people see in the app, so it is fine; naming the item by its title is better.
 - warm: friendly and human, like a thoughtful assistant; not robotic, not gushing, not preachy.
 - concise: no padding or repetition; length fits how much there is to say.
 

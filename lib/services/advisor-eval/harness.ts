@@ -105,8 +105,11 @@ function sumUsage(items: readonly DailyBriefModelUsage[]): DailyBriefModelUsage 
     cacheWriteTokens: total((item) => item.cacheWriteTokens ?? null), outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens) };
 }
 
+/** Cadence's internal vocabulary, which the instructions forbid in text a person reads. */
+const INTERNAL_WORDS = /\b(planner|supported|feasible|intervals?|coverage|constraints?|reserved range|least-change|day window|configured)\b/i;
+
 /** Phrases that claim a track record. A new account has none. */
-const HISTORY_CLAIMS = /\b(usually|typically|as always|streak|in a row|lately|recently|last (week|time)|you've been|you have been|most days|every day this|consistent(ly)?)\b|\d+\s?%/i;
+const HISTORY_CLAIMS = /\b(usual(ly)?|normal(ly)?|typical(ly)?|as always|streak|in a row|lately|recently|last (week|time)|you've been|you have been|most days|every day this|consistent(ly)?)\b|\d+\s?%/i;
 
 /**
  * Deterministic rubric. General criteria apply to every fixture; the rest come
@@ -133,6 +136,8 @@ export function scoreRubric(input: Readonly<{
   const wrong = times.filter((time) => !allowed.has(time));
   criteria.push({ id: "local_times_correct", passed: brief !== null && wrong.length === 0, ...(wrong.length ? { detail: wrong.join(", ") } : {}) });
   const picked = brief?.suggestions?.filter((item) => item.optionId !== null).length ?? 0;
+  const jargon = shown.match(INTERNAL_WORDS);
+  criteria.push({ id: "plain_words", passed: brief !== null && !jargon, ...(jargon ? { detail: jargon[0] } : {}) });
   if (fixture.expect.noHistoryClaims) {
     const match = shown.match(HISTORY_CLAIMS);
     criteria.push({ id: "no_history_claims", passed: brief !== null && !match, ...(match ? { detail: match[0] } : {}) });
