@@ -360,6 +360,16 @@ One look for "something is wrong", everywhere in the product: the model failed, 
 - **Announcing:** a refused write answers the person's own action and uses `role="alert"`. Standing states use `role="status"`.
 - **Never advice:** advice and advisor quips never use the warning icon, Rust Signal text or an alert label. An alert never carries a suggestion that could be read as the advisor's opinion; its one action only recovers.
 
+### Move for today
+
+The person's own per-day move on the web Timeline (advisor plan, Phase 2C). Components: `components/timeline/OccurrenceMoveMenu.tsx`, `OccurrenceMoves.tsx`, `MoveConflictNotices.tsx` (bench: `/design-system#ds-module-occurrence-move`).
+
+- **Menu:** "Move for today" is the first line of an expanded row, as a bold text button. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
+- **No confirmation:** a tap moves at once. Undo is the safety net: a short dark message at the bottom ("Gym moved to 10:00 AM. · Undo") and the lasting "Moved from 9:00 AM · Undo" line on the row.
+- **Reasons:** right after a move, one muted line offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
+- **Refusals** use the Alert notice with the "Not changed" label, and offer free times or "Move it again". Never advice.
+- **Overlap after a schedule edit:** one plain line above the Timeline with "Yes · No · Other time" as text links. Nothing failed, so it is not an alert.
+
 ### Chips
 
 - **Style:** Square, compact labels with 1px border.

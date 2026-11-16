@@ -254,6 +254,47 @@ deleted timing sessions.
 Start, Stop, Reset, and failures announce one result; the one-second counter
 does not repeatedly announce itself.
 
+## Move an item for today
+
+**Prerequisites:** You are on the web Timeline, and the item is today's,
+Unresolved, and scheduled at a set time. Items scheduled as a time range are
+not moved.
+
+1. Open the row and choose **Move for today**.
+2. Pick one of the free times Cadence lists, or enter a time under
+   **Other time** and choose **Move**.
+3. The item moves at once. Its row shows the new time and reads
+   **Moved from** the planned time, with **Undo**.
+4. Optionally, tap one reason under the moved row: **Running late**,
+   **Conflict**, **Low energy**, or **Other**. You can ignore it.
+
+**Result and persistence:** The move changes today only. Your schedule stays
+as it is, and tomorrow the item is back at its planned time. Reminders follow
+the new time. The Mac app shows the move after it syncs. The first time you
+move something, the row says so: "This changes today only. Your schedule
+stays."
+
+**Recovery or undo:** Choose **Undo** in the short message at the bottom of the
+screen, or on the moved row for the rest of the day. Undo returns the item to
+where it was before the latest move. If Cadence cannot move the item (it is
+already marked, the time has passed, or something else is at that time), the
+row says why under **Not changed** and offers other free times. If the item was
+just moved on another device, the row says where it is now and offers **Move it
+again**.
+
+**Schedule changes after a move:** If you edit the Behavior's schedule and the
+moved time now overlaps another item, Timeline asks whether to keep it there.
+Choose **Yes** to keep it, **No** to move it back, or **Other time** to pick a
+new time.
+
+**Privacy and safety:** A move and its optional reason are stored with your
+account and included in your export. A move never changes the Behavior's
+schedule.
+
+**Keyboard and mobile:** **Move for today**, each time, **Undo**, and each
+reason are real buttons. Tab to them and press Enter or Space. The Undo message
+is announced to assistive technology.
+
 ## Review Needs decision
 
 **Prerequisites:** At least one prior-day Unresolved Occurrence exists, or a

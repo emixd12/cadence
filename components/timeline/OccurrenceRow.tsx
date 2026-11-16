@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { TimelineOccurrenceContext } from "@cadence/core/types/day-progress";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
 
 import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
+import { OccurrenceMovedLine, OccurrenceMoveFollowUp, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
+import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
@@ -126,6 +128,15 @@ export function OccurrenceRow({
     ? "pr-4 sm:pr-5"
     : "";
 
+  // Advisor plan, Phase 2C: a notice's "Other time" or "Move it again" opens this row's menu.
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const moveMenuRequest = useOccurrenceMoves()?.menuRequest;
+  useEffect(() => {
+    if (moveMenuRequest?.occurrenceId !== occurrence.id || !detailsRef.current) return;
+    detailsRef.current.open = true;
+    if (typeof detailsRef.current.scrollIntoView === "function") detailsRef.current.scrollIntoView({ block: "nearest" });
+  }, [moveMenuRequest, occurrence.id]);
+
   const handleOptimisticStatus = useCallback(
     (nextStatus: TimelineStatusActionStatus) => {
       setKeyedOptimisticStatus({
@@ -169,6 +180,7 @@ export function OccurrenceRow({
       ) : null}
       <div className="timeline-occurrence-row-grid grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0">
         <details
+          ref={detailsRef}
           className="group col-start-1 col-end-3 row-start-1 min-w-0"
         >
           <summary
@@ -199,9 +211,7 @@ export function OccurrenceRow({
               >
                 {visibleOccurrence.title}
               </h3>
-              {visibleOccurrence.movedFromLabel ? <p className="timeline-occurrence-moved col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable" data-moved-from>
-                Moved from {visibleOccurrence.movedFromLabel}
-              </p> : null}
+              <OccurrenceMovedLine occurrence={visibleOccurrence} toneClass={visibleOccurrence.visualTone === "default" ? "text-muted-readable" : TIME_TONE_CLASSES[visibleOccurrence.visualTone]} />
               {sourceLine ? <p className={["timeline-occurrence-source col-start-2 min-w-0 text-xs font-normal leading-5", TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")} data-source-completion={occurrence.sourceEvidence?.source}>
                 {sourceLine}
               </p> : null}
@@ -215,6 +225,8 @@ export function OccurrenceRow({
             id={detailsId}
             className="timeline-occurrence-details mt-0 gap-2 px-3 pb-3 pt-0 text-sm leading-6 text-muted-readable sm:px-4 sm:pb-4"
           >
+            <OccurrenceMoveMenu occurrence={visibleOccurrence} />
+
             <DetailItem
               label="Description"
               value={visibleOccurrence.description || "No description."}
@@ -324,6 +336,8 @@ export function OccurrenceRow({
         ) : null}
 
       </div>
+      <OccurrenceMoveFollowUp occurrence={visibleOccurrence} />
+      <OccurrenceMoveNotice occurrence={visibleOccurrence} />
     </article>
   );
 }
