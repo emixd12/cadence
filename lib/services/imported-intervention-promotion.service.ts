@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 
 import { getBehaviorById } from "@/lib/db/behaviors.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -192,7 +193,7 @@ function toPromotionOccurrence(
     id: occurrence.id,
     userId: occurrence.user_id,
     behaviorId: occurrence.behavior_id,
-    scheduledFor: occurrence.scheduled_for,
+    scheduledFor: effectiveStartAt(occurrence),
     status: normalizeOccurrenceStatus(occurrence.status),
   };
 }

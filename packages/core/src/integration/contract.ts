@@ -16,7 +16,10 @@ import {
   type IntegrationOperationName,
   type IntegrationOperationOutput,
 } from "./operations";
-import type { IntegrationScope } from "./scopes";
+import { INTEGRATION_AGENT_SCOPES, type IntegrationScope } from "./scopes";
+
+/** Operations that also accept the agent-only move scope. */
+const MOVE_OPERATIONS: ReadonlySet<string> = new Set(["move_occurrence_for_day", "revert_occurrence_move"]);
 import { validateAgainstSchema, type ValidationIssue } from "./validate";
 
 export type IntegrationContractResult<T> =
@@ -90,7 +93,10 @@ export function checkOperationScope(
   grantedScopes: readonly string[],
 ): IntegrationError | null {
   const required = requiredScopeFor(name);
-  return grantedScopes.includes(required) ? null : insufficientScopeError(required, name);
+  if (grantedScopes.includes(required)) return null;
+  // Per-day moves also run for agents that hold only the move scope.
+  if (MOVE_OPERATIONS.has(name) && grantedScopes.includes(INTEGRATION_AGENT_SCOPES.occurrencesMove)) return null;
+  return insufficientScopeError(required, name);
 }
 
 /** Validates an operation name from an untrusted request. */

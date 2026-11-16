@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   resolveActivityMatches,
@@ -301,7 +302,7 @@ export function toMatchOccurrence(occurrence: Occurrence, timezone: string, late
     id: occurrence.id,
     behaviorId: occurrence.behavior_id,
     localDate: occurrence.local_date,
-    scheduledStartAt: Temporal.Instant.from(occurrence.scheduled_for).toString(),
+    scheduledStartAt: Temporal.Instant.from(effectiveStartAt(occurrence)).toString(),
     scheduledEndAt: scheduledEnd(occurrence, timezone),
     status: occurrence.status as ActivityMatchOccurrence["status"],
     latestStatusEventId,

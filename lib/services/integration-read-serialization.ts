@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { effectiveEndAt, effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import { OCCURRENCE_STATUS_LABELS, type BehaviorOutput, type OccurrenceOutput } from "@cadence/core/integration";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
 import { resolvePersistedTimelineOccurrence } from "@cadence/core/services/timeline.service";
@@ -69,7 +70,13 @@ export function serializeIntegrationOccurrence(
     id: occurrence.id, behavior_id: behavior.id, behavior_title: behavior.title,
     category_name: behavior.category?.name ?? null,
     local_date: occurrence.local_date, timezone: behavior.timezone,
-    scheduled_for: integrationInstant(occurrence.scheduled_for),
+    scheduled_for: integrationInstant(plannedStartAt(occurrence)),
+    effective_start_at: integrationInstant(effectiveStartAt(occurrence)),
+    move: isMoved(occurrence) ? {
+      planned_start_at: integrationInstant(plannedStartAt(occurrence)),
+      start_at: integrationInstant(effectiveStartAt(occurrence)),
+      end_at: integrationInstant(effectiveEndAt(occurrence) ?? effectiveStartAt(occurrence)),
+    } : null,
     schedule: {
       kind: normalizeScheduleKind(occurrence.schedule_kind),
       preset: normalizeSchedulePreset(occurrence.schedule_preset),

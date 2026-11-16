@@ -71,6 +71,42 @@ function existingOccurrence(
   };
 }
 
+describe("planOccurrenceGeneration with per-day moves (advisor Phase 2A)", () => {
+  const atTen = { ...BASE_BEHAVIOR, scheduleSlots: [{ ...BASE_BEHAVIOR.scheduleSlots[0]!, startTime: "10:00" }] };
+  const atFifteen = { ...BASE_BEHAVIOR, scheduleSlots: [{ ...BASE_BEHAVIOR.scheduleSlots[0]!, startTime: "15:00" }] };
+  const today = (plan: ReturnType<typeof planOccurrenceGeneration>) =>
+    summarizeCreate(plan).filter((occurrence) => occurrence.localDate === "2026-01-02");
+
+  it("keeps a moved Occurrence through a schedule edit and adds no second copy for its day", () => {
+    // Planned 09:00 (already past at 11:00), moved for today; the schedule moves to 10:00.
+    const moved = { ...existingOccurrence("moved", "2026-01-02T14:00:00Z", "2026-01-02"), moved: true };
+    const plan = planOccurrenceGeneration({ behavior: atTen, existingOccurrences: [moved], now: NOW, horizonDays: 1 });
+    expect(today(plan)).toEqual([]);
+    expect(deleteIds(plan)).toEqual([]);
+    expect(summarizeCreate(plan)).toEqual([{ scheduledFor: "2026-01-03T15:00:00Z", localDate: "2026-01-03" }]);
+  });
+
+  it("never deletes a moved Occurrence whose planned time is still ahead", () => {
+    const unmoved = existingOccurrence("plain", "2026-01-02T19:00:00Z", "2026-01-02");
+    unmoved.scheduleStartTime = "14:00";
+    const moved = { ...unmoved, id: "moved", moved: true };
+    const before = planOccurrenceGeneration({ behavior: atFifteen, existingOccurrences: [unmoved], now: NOW, horizonDays: 1 });
+    expect(deleteIds(before)).toEqual(["plain"]);
+    expect(today(before)).toEqual([{ scheduledFor: "2026-01-02T20:00:00Z", localDate: "2026-01-02" }]);
+    const after = planOccurrenceGeneration({ behavior: atFifteen, existingOccurrences: [moved], now: NOW, horizonDays: 1 });
+    expect(deleteIds(after)).toEqual([]);
+    expect(today(after)).toEqual([]);
+  });
+
+  it("leaves other days and other slots alone", () => {
+    const twoSlots = { ...atTen, scheduleSlots: [atTen.scheduleSlots[0]!, { ...atTen.scheduleSlots[0]!, startTime: "18:00", sortOrder: 1 }] };
+    const moved = { ...existingOccurrence("moved", "2026-01-02T14:00:00Z", "2026-01-02"), moved: true };
+    const plan = planOccurrenceGeneration({ behavior: twoSlots, existingOccurrences: [moved], now: NOW, horizonDays: 1 });
+    // Today keeps the moved item in place of 10:00 and still gets 18:00.
+    expect(today(plan)).toEqual([{ scheduledFor: "2026-01-02T23:00:00Z", localDate: "2026-01-02" }]);
+  });
+});
+
 describe("planOccurrenceGeneration", () => {
   it("plans today plus the next 30 local days by default", () => {
     const plan = planOccurrenceGeneration({

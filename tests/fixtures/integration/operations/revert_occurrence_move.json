@@ -1,0 +1,165 @@
+{
+  "operation": "revert_occurrence_move",
+  "valid_inputs": [
+    {
+      "name": "undo",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "expected_revision": "2026-10-18T12:00:00.000001Z",
+        "idempotency_key": "undo-walk-1"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "missing revision",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005"
+      },
+      "code": "invalid_input",
+      "path": "$.expected_revision"
+    },
+    {
+      "name": "start time",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "expected_revision": "o1.3",
+        "start_time": "09:00"
+      },
+      "code": "invalid_input",
+      "path": "$.start_time"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "undone",
+      "value": {
+        "outcome": "undone",
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T12:05:00Z",
+          "revision": "2026-10-18T12:05:00Z"
+        },
+        "move": {
+          "id": "0000000a-1111-4111-8111-00000000000a",
+          "kind": "revert",
+          "from_start_at": "2026-10-18T13:00:00Z",
+          "to_start_at": "2026-10-18T11:30:00Z",
+          "to_end_at": "2026-10-18T12:00:00Z",
+          "to_planned": true,
+          "chain_position": 2,
+          "source": "mcp",
+          "created_at": "2026-10-18T12:05:00Z"
+        },
+        "refusal": null
+      }
+    },
+    {
+      "name": "nothing to undo",
+      "value": {
+        "outcome": "refused",
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3"
+        },
+        "move": null,
+        "refusal": {
+          "reason": "nothing_to_undo",
+          "message": "There is no move to undo.",
+          "alternatives": []
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "moved outcome",
+      "value": {
+        "outcome": "moved",
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T12:05:00Z",
+          "revision": "2026-10-18T12:05:00Z"
+        },
+        "move": {
+          "id": "0000000a-1111-4111-8111-00000000000a",
+          "kind": "revert",
+          "from_start_at": "2026-10-18T13:00:00Z",
+          "to_start_at": "2026-10-18T11:30:00Z",
+          "to_end_at": "2026-10-18T12:00:00Z",
+          "to_planned": true,
+          "chain_position": 2,
+          "source": "mcp",
+          "created_at": "2026-10-18T12:05:00Z"
+        },
+        "refusal": null
+      },
+      "code": "internal_error",
+      "path": "$.outcome"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 /** Version of the Cadence integration operation contract (semantic versioning). */
-export const INTEGRATION_CONTRACT_VERSION = "1.2.0" as const;
+export const INTEGRATION_CONTRACT_VERSION = "1.3.0" as const;
 
 export type IntegrationContractVersion = typeof INTEGRATION_CONTRACT_VERSION;
 

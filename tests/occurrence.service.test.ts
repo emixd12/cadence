@@ -93,6 +93,7 @@ vi.mock("@/lib/db/occurrenceStatusEvents.repo", () => ({
   getLatestOccurrenceStatusEventForOccurrence: vi.fn(),
 }));
 
+vi.mock("@/lib/services/occurrence-move.service", () => ({ syncMoveConflicts: async () => 0 }));
 vi.mock("@/lib/services/reminder.service", () => ({
   syncReminderDeliveriesForBehavior: vi.fn(),
   syncReminderDeliveriesForBehaviors: vi.fn(),

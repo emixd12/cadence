@@ -37,7 +37,9 @@ export type CreateAgentContextOptions = {
 };
 
 const REFRESH_MARGIN_MS = 30_000;
-const KNOWN_SCOPES: readonly IntegrationScope[] = ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"];
+const KNOWN_SCOPES: readonly IntegrationScope[] = [
+  "cadence.read", "cadence.occurrences.write", "cadence.behaviors.write", "cadence.occurrences.move",
+];
 
 /**
  * True when this deployment can mint agent tokens, false when no key is set.

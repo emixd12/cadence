@@ -903,6 +903,29 @@ By category:
 - Medical: 30 completed, 1 not completed, 0 unresolved
 ```
 
+## Per-day moves
+
+BehaviorLog exports add `raw/cadence/occurrence_moves.jsonl` when the selected
+Occurrences have per-day moves (advisor Phase 2A). The manifest declares its path,
+count, ordering (`created_at_utc`, `id`) and export-only support under
+`extensions.app.cadence.occurrence_moves`. Each record is one move or one Undo
+(`kind: revert`) of one Occurrence on one local date: `occurrence_id`,
+`behavior_id`, `local_date`, the Behavior `timezone`, the start and end before
+and after (`from_*_utc`, `to_*_utc`, with `from_planned` / `to_planned` true when
+that side is the planned time), `duration_source`, `chain_position` (1 for the
+day's first record), `revises_move_id`, the planner `reason` code, the
+`person_reason` chip a person tapped (`running_late`, `conflict`, `low_energy`,
+`other`, or null), the `source` (`person`, `daily_brief`, `chat`, `coach`, `mcp`)
+and `created_at_utc`. Records follow the selected Occurrence range and
+archived-Behavior option. No moves add no file.
+
+Moves never change a Behavior's schedule or an Occurrence's planned time, so the
+core records keep `scheduled_for` as planned. The latest record for an Occurrence
+gives where it sat that day. The extension omits owner IDs, idempotency keys,
+client references and proposal IDs. A restore does not replay moves: moves only
+place today's items, and history is kept for reading. Web and Mac exports use the
+same file and fields.
+
 ## Desktop export adapter
 
 Desktop BehaviorLog exports map native reminder observations to standard

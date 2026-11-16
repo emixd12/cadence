@@ -56,7 +56,7 @@ localDescribe("first-party agent caller against local Supabase", () => {
   it("runs a read and a write as the person, under the agent's own label and scopes", async () => {
     const chat = await createAgentContext(userA, "chat", options());
     expect(chat.actor).toMatchObject({ channel: "chat", clientId: "cadence:agent:chat", clientLabel: "Cadence chat",
-      grantedScopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"] });
+      grantedScopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write", "cadence.occurrences.move"] });
 
     const read = await executeMcpOperation("get_account_context", chat, {});
     expect(read.ok).toBe(true);
@@ -73,9 +73,9 @@ localDescribe("first-party agent caller against local Supabase", () => {
     const { data: other } = await otherChat.supabase.from("day_notes").select("user_id").eq("local_date", "2026-11-16");
     expect(other).toEqual([]);
 
-    // The Daily Brief agent is a different caller with read-only scopes.
+    // The Daily Brief agent is a different caller that reads and moves today's items only.
     const brief = await createAgentContext(userA, "daily_brief", options());
-    expect(brief.actor).toMatchObject({ clientLabel: "Cadence Daily Brief", grantedScopes: ["cadence.read"] });
+    expect(brief.actor).toMatchObject({ clientLabel: "Cadence Daily Brief", grantedScopes: ["cadence.read", "cadence.occurrences.move"] });
     expect(brief.actor.grantId).not.toBe(chat.actor.grantId);
     const refused = await executeMcpOperation("update_day_note", brief, { local_date: "2026-11-16", note: "Brief wrote this" });
     expect(refused).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });

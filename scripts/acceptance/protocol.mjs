@@ -37,10 +37,12 @@ import { qaPublishableKey } from './qa-config.mjs';
 export const REGISTRY_TOOLS = Object.freeze([
   'get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences',
   'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
-  'set_occurrence_status', 'update_occurrence_note', 'update_day_note', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
+  'set_occurrence_status', 'update_occurrence_note', 'move_occurrence_for_day', 'revert_occurrence_move',
+  'update_day_note', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
 ]);
 export const WRITE_SCOPE = Object.freeze({
   set_occurrence_status: 'cadence.occurrences.write', update_occurrence_note: 'cadence.occurrences.write',
+  move_occurrence_for_day: 'cadence.occurrences.write', revert_occurrence_move: 'cadence.occurrences.write',
   update_day_note: 'cadence.occurrences.write',
   create_behavior: 'cadence.behaviors.write', update_behavior: 'cadence.behaviors.write',
   archive_behavior: 'cadence.behaviors.write', restore_behavior: 'cadence.behaviors.write',
@@ -314,6 +316,8 @@ export async function runProtocolSuite({
     const writes = {
       set_occurrence_status: { occurrence_id: occurrenceId, status: 'completed' },
       update_occurrence_note: { occurrence_id: occurrenceId, note: SAMPLE_NOTE },
+      move_occurrence_for_day: { occurrence_id: occurrenceId, start_time: '23:55', expected_revision: 'r1' },
+      revert_occurrence_move: { occurrence_id: occurrenceId, expected_revision: 'r1' },
       update_day_note: { local_date: today, note: SAMPLE_NOTE },
       create_behavior: { title: `${behaviorTitle} denied`, schedules },
       update_behavior: { behavior_id: behaviorId, expected_revision: behaviors.behaviorRevision ?? 1, title: `${behaviorTitle} denied` },
@@ -333,6 +337,23 @@ export async function runProtocolSuite({
     const { check } = ctx;
     const before = await expectOk(session, check, 'get_occurrence', { occurrence_id: occurrenceId }, 'get_occurrence-before');
     const start = before?.occurrence?.status ?? 'unresolved';
+    // Per-day move and Undo (contract 1.3.0): today's Unresolved item moves, shows its
+    // effective time, and Undo returns it to the plan. A refusal offers free times.
+    if (start === 'unresolved') {
+      let moved = await expectOk(session, check, 'move_occurrence_for_day', { occurrence_id: occurrenceId, start_time: '23:55',
+        expected_revision: before?.occurrence?.revision, idempotency_key: key('move') }, 'move-for-day');
+      const alternative = moved?.refusal?.alternatives?.[0]?.start_time;
+      if (moved?.outcome === 'refused' && alternative) {
+        moved = await expectOk(session, check, 'move_occurrence_for_day', { occurrence_id: occurrenceId, start_time: alternative,
+          expected_revision: before?.occurrence?.revision, idempotency_key: key('move-alternative') }, 'move-for-day-alternative');
+      }
+      check('move-applied', moved?.outcome === 'moved' && moved?.occurrence?.move !== null
+        && moved?.occurrence?.effective_start_at !== moved?.occurrence?.scheduled_for, `outcome=${moved?.outcome} reason=${moved?.refusal?.reason ?? ''}`);
+      const undone = await expectOk(session, check, 'revert_occurrence_move', { occurrence_id: occurrenceId,
+        expected_revision: moved?.occurrence?.revision, idempotency_key: key('undo') }, 'undo-move');
+      check('undo-applied', undone?.outcome === 'undone' && undone?.occurrence?.move === null
+        && undone?.occurrence?.effective_start_at === undone?.occurrence?.scheduled_for, `outcome=${undone?.outcome}`);
+    }
     const completed = await expectOk(session, check, 'set_occurrence_status', { occurrence_id: occurrenceId, status: 'completed', expected_status: start, idempotency_key: key('completed') }, 'mark-completed');
     check('status-completed', completed?.occurrence?.status === 'completed');
     const notCompleted = await expectOk(session, check, 'set_occurrence_status', { occurrence_id: occurrenceId, status: 'not_completed', expected_status: 'completed', idempotency_key: key('not-completed') }, 'mark-not-completed');

@@ -31,6 +31,8 @@
           "local_date": "2026-10-18",
           "timezone": "America/New_York",
           "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
           "schedule": {
             "kind": "exact",
             "preset": null,
@@ -92,6 +94,8 @@
           "local_date": "2026-10-18",
           "timezone": "America/New_York",
           "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
           "schedule": {
             "kind": "exact",
             "preset": null,
@@ -155,6 +159,8 @@
           "local_date": "2026-10-18",
           "timezone": "America/New_York",
           "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
           "schedule": {
             "kind": "exact",
             "preset": null,
@@ -194,6 +200,8 @@
           "local_date": "2026-10-18",
           "timezone": "America/New_York",
           "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
           "schedule": {
             "kind": "exact",
             "preset": null,

@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { createHash } from "node:crypto";
 import { behaviorEndAt as coreBehaviorEndAt } from "@cadence/core/services/departure-stops";
 import { Temporal } from "@js-temporal/polyfill";
@@ -252,7 +253,7 @@ export async function refreshTravelRoutesReportingCalendars(
   }) : null;
   const budget = await readTravelBudget(caller, timezone, now);
   return { calendarsLeftOut: calendarEvents.unavailable, response: response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
-    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now) ||
+    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(effectiveStartAt(occurrence), now) ||
       (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
         notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
       const duration = durationEstimates.get(occurrence.behavior_id);
@@ -440,8 +441,8 @@ function behaviorCommitmentDrafts(
   const behaviorById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   const prospective = occurrences
     .filter((occurrence) => occurrence.status === "unresolved" && !!behaviorDestination(behaviorById.get(occurrence.behavior_id), homeText) &&
-      (afterNow(occurrence.scheduled_for, now) || notEnded(behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone), now)))
-    .sort((left, right) => compareInstants(left.scheduled_for, right.scheduled_for));
+      (afterNow(effectiveStartAt(occurrence), now) || notEnded(behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone), now)))
+    .sort((left, right) => compareInstants(effectiveStartAt(left), effectiveStartAt(right)));
   const candidates = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
   return candidates.flatMap((occurrence, index) => {
     const behavior = behaviorById.get(occurrence.behavior_id);
@@ -453,7 +454,7 @@ function behaviorCommitmentDrafts(
         ref: occurrence.id,
         revision: `${behavior.updatedAt}:${occurrence.updated_at}`,
         kind: "behavior",
-        startAt: occurrence.scheduled_for,
+        startAt: effectiveStartAt(occurrence),
         endAt: behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone),
         attendance: overflow ? "unknown" : "physical",
         mode: null,
@@ -475,14 +476,14 @@ function behaviorOccupancyCandidates(
 ): TravelCollisionCandidate[] {
   const sourceById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   return occurrences
-    .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now))
+    .filter((occurrence) => occurrence.status === "unresolved" && afterNow(effectiveStartAt(occurrence), now))
     .flatMap((occurrence) => {
       const source = sourceById.get(occurrence.behavior_id);
       // Routed Behaviors already enter the travel plan. Not set, Anywhere and
       // Home without a saved Home still occupy time but never break the route chain.
       if (!source || behaviorDestination(source, homeText)) return [];
       const endAt = behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone);
-      return endAt ? [{ ref: occurrence.id, kind: "behavior" as const, startAt: occurrence.scheduled_for, endAt }] : [];
+      return endAt ? [{ ref: occurrence.id, kind: "behavior" as const, startAt: effectiveStartAt(occurrence), endAt }] : [];
     });
 }
 
@@ -492,7 +493,7 @@ function behaviorEndAt(
   estimate: BehaviorDurationEstimate | undefined,
   timezone: string,
 ): string | null {
-  return coreBehaviorEndAt({ localDate: occurrence.local_date, scheduledFor: occurrence.scheduled_for,
+  return coreBehaviorEndAt({ localDate: occurrence.local_date, scheduledFor: effectiveStartAt(occurrence),
     scheduleKind: occurrence.schedule_kind, scheduleEndTime: occurrence.schedule_end_time }, estimate, timezone);
 }
 
@@ -517,7 +518,7 @@ function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly Tra
 }
 
 function occurrenceRouteRevision(occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>): string {
-  return JSON.stringify(occurrences.map(occurrence => [occurrence.id, occurrence.behavior_id, occurrence.scheduled_for,
+  return JSON.stringify(occurrences.map(occurrence => [occurrence.id, occurrence.behavior_id, effectiveStartAt(occurrence),
     occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time, occurrence.status]));
 }
 

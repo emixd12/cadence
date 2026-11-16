@@ -81,7 +81,10 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
   const notFound = () => ({ isError: true, errorCode: 'not_found', structured: { error: { code: 'not_found' } } });
   const okResult = (structured) => ({ isError: false, errorCode: null, structured });
   const view = (b) => ({ id: b.id, title: b.title, state: b.state, revision: b.revision, created_at: b.created_at });
-  const occView = (o) => ({ id: o.id, behavior_id: o.behavior_id, status: o.status, note: o.note, local_date: o.local_date, status_history: [...o.history] });
+  const PLANNED = '2026-10-18T13:00:00Z';
+  const occView = (o) => ({ id: o.id, behavior_id: o.behavior_id, status: o.status, note: o.note, local_date: o.local_date, status_history: [...o.history],
+    scheduled_for: PLANNED, effective_start_at: o.moved ?? PLANNED, move: o.moved ? { planned_start_at: PLANNED, start_at: o.moved, end_at: o.moved } : null,
+    revision: `r${o.rev ?? 0}` });
   const execute = (grant, name, args) => {
     const slot = grant.slot;
     switch (name) {
@@ -113,6 +116,15 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
         const o = own(data.occurrences, slot, args.occurrence_id); if (!o) return notFound();
         const previous = o.status; o.status = args.status; o.history.push({ status: args.status });
         return okResult({ occurrence: occView(o), previous_status: previous, changed: previous !== args.status });
+      }
+      case 'move_occurrence_for_day': case 'revert_occurrence_move': {
+        const o = own(data.occurrences, slot, args.occurrence_id); if (!o) return notFound();
+        const refuse = (reason, alternatives = []) => okResult({ outcome: 'refused', occurrence: occView(o), move: null, refusal: { reason, message: reason, alternatives } });
+        if (args.expected_revision !== `r${o.rev ?? 0}`) return refuse('revision_changed');
+        if (name === 'move_occurrence_for_day' && args.start_time === '23:55') return refuse('slot_taken', [{ start_at: '2026-10-19T03:00:00Z', start_time: '23:00' }]);
+        if (name === 'revert_occurrence_move' && !o.moved) return refuse('nothing_to_undo');
+        o.moved = name === 'move_occurrence_for_day' ? '2026-10-19T03:00:00Z' : null; o.rev = (o.rev ?? 0) + 1;
+        return okResult({ outcome: o.moved ? 'moved' : 'undone', occurrence: occView(o), move: { id: randomUUID() }, refusal: null });
       }
       case 'update_occurrence_note': { const o = own(data.occurrences, slot, args.occurrence_id); if (!o) return notFound(); o.note = args.note; return okResult({ occurrence: occView(o), changed: true }); }
       default: return { isError: true, errorCode: 'unknown_tool', structured: null };

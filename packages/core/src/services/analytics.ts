@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "../resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorGraphRecord } from "../behavior-store";
 import type { OccurrenceRecord } from "../data-store";
@@ -75,7 +76,7 @@ function toAnalyticsOccurrenceInput(
     behaviorActive: behavior.active,
     behaviorCreatedAt: behavior.created_at,
     categoryName: behavior.category?.name ?? "No category",
-    scheduledFor: occurrence.scheduled_for,
+    scheduledFor: effectiveStartAt(occurrence),
     scheduledTimeLabel: formatOccurrenceScheduleLabel({
       scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
       schedulePreset: normalizeSchedulePreset(occurrence.schedule_preset),

@@ -1329,6 +1329,7 @@ export type Database = {
           occurrence_id: string
           proposal_id: string | null
           reason: string | null
+          request_hash: string | null
           revises_move_id: string | null
           source: string
           timezone: string
@@ -1355,6 +1356,7 @@ export type Database = {
           occurrence_id: string
           proposal_id?: string | null
           reason?: string | null
+          request_hash?: string | null
           revises_move_id?: string | null
           source: string
           timezone: string
@@ -1381,6 +1383,7 @@ export type Database = {
           occurrence_id?: string
           proposal_id?: string | null
           reason?: string | null
+          request_hash?: string | null
           revises_move_id?: string | null
           source?: string
           timezone?: string
@@ -2726,6 +2729,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      keep_moved_occurrence: {
+        Args: { p_conflict_id: string }
+        Returns: {
+          behavior_id: string
+          conflicting_occurrence_id: string | null
+          created_at: string
+          detected_at: string
+          id: string
+          local_date: string
+          move_id: string
+          occurrence_id: string
+          resolved_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "move_conflicts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       leave_reminder_google_subject: { Args: never; Returns: string }
       list_my_occurrence_time_session_history: {
         Args: {
@@ -2779,6 +2805,21 @@ export type Database = {
           target_timezone: string
           target_updated_count: number
           target_user_id: string
+        }
+        Returns: Json
+      }
+      move_occurrence_for_day: {
+        Args: {
+          p_duration_source: string
+          p_expected_revision: string
+          p_idempotency_key?: string
+          p_occurrence_id: string
+          p_planned_seconds: number
+          p_proposal_id?: string
+          p_reason?: string
+          p_request_hash?: string
+          p_to_end_at: string
+          p_to_start_at: string
         }
         Returns: Json
       }
@@ -2951,6 +2992,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_occurrence_move_reason: {
+        Args: { p_move_id: string; p_person_reason: string }
+        Returns: string
+      }
       release_advisor_day_context_read: {
         Args: { p_client_id: string; p_lease_token: string }
         Returns: boolean
@@ -2991,6 +3036,16 @@ export type Database = {
           resets_at: string
           retry_after_seconds: number
         }[]
+      }
+      revert_occurrence_move: {
+        Args: {
+          p_expected_revision: string
+          p_idempotency_key?: string
+          p_move_id?: string
+          p_occurrence_id: string
+          p_request_hash?: string
+        }
+        Returns: Json
       }
       save_daily_brief_preferences: {
         Args: {
@@ -3109,6 +3164,29 @@ export type Database = {
       settle_agent_spend: {
         Args: { p_actual_microdollars: number; p_reservation_id: string }
         Returns: boolean
+      }
+      sync_move_conflicts: {
+        Args: { p_conflicts: Json; p_local_date: string }
+        Returns: {
+          behavior_id: string
+          conflicting_occurrence_id: string | null
+          created_at: string
+          detected_at: string
+          id: string
+          local_date: string
+          move_id: string
+          occurrence_id: string
+          resolved_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "move_conflicts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       update_behavior_with_definition_event: {
         Args: {

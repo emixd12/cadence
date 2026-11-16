@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 
 import {
@@ -523,7 +524,7 @@ export function createHostedLeaveReminderAccountPort(
     const titleById = new Map((behaviors ?? []).map((behavior) => [behavior.id, behavior.title]));
     for (const occurrence of occurrences) {
       if (occurrence.status !== "unresolved" || !routes(whereById.get(occurrence.behavior_id), source.settings.baseLocationText)) continue;
-      destinations.set(occurrence.id, { kind: "behavior", startAt: occurrence.scheduled_for, title: withTitles ? titleById.get(occurrence.behavior_id) ?? null : null });
+      destinations.set(occurrence.id, { kind: "behavior", startAt: effectiveStartAt(occurrence), title: withTitles ? titleById.get(occurrence.behavior_id) ?? null : null });
     }
     return { destinations, calendarsLeftOut: calendarEvents.unavailable.length > 0 };
   }

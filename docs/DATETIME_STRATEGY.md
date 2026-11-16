@@ -164,6 +164,33 @@ from the Occurrence menu.
   output and Mac sync follow the move. Export keeps the planned time and carries
   moves in its `app.cadence` extension.
 
+### Where the rules live
+
+- **Database.** `move_occurrence_for_day` and `revert_occurrence_move` are the only
+  writers of `occurrence_moves` and of `effective_start_at` / `effective_end_at`.
+  They check, in this order: the Occurrence exists, is Unresolved, is today, still
+  has the revision the caller read, is not a range, the new start is on its day and
+  not more than a minute in the past, and it is not already there. Undo also needs
+  a latest move to undo. A failed check returns `outcome: refused` and a reason,
+  never an error, and changes nothing. Each move gives the Occurrence a new
+  revision. A Behavior timezone change clears effective time; the records stay.
+- **Service.** `lib/services/occurrence-move.service.ts` is the one path every
+  caller takes (web actions, MCP tools, the advisor). It picks the length a moved
+  item keeps (`resolveMoveDuration`: the Behavior's duration, then the person's
+  logged average of at least two sessions, then 30 minutes; a second move keeps
+  the length it already has), checks the slot against the day's other Unresolved
+  items at their effective times and, when the caller holds them, today's calendar
+  events (`slot_taken`, `calendar_busy`), offers up to three free starts on a
+  five-minute grid for a refusal (`moveAlternatives`), and resyncs the item's
+  reminders. The server keeps no calendar copy, so MCP moves check only other
+  Occurrences.
+- **Scopes.** Outside MCP clients move with `cadence.occurrences.write`. Cadence's
+  own agents hold `cadence.occurrences.move` (Daily Brief and chat); the coach
+  stays read-only. The move scope is never on the consent screen.
+- **Mac.** Account sync contract 6 carries `occurrence_move` records read-only. A
+  Mac derives effective time with `effectiveTimeFromMoves`, and passes it to
+  occurrence generation so schedule edits keep the move there too.
+
 ### Two devices at once
 
 Different kinds of action never collide: a move, a status mark and a note are
@@ -179,7 +206,7 @@ iPhone and Android apps, inherits them.
 |---|---|
 | An Occurrence is Completed or Not Completed while a move is pending | The status wins. A resolved Occurrence is not moved, and any open proposal for it is withdrawn. |
 | Undo of a move that a later move already replaced | Refused. Undo reverses only the latest move of that Occurrence's day. |
-| The Behavior's schedule is edited after today's move | The move stays. The moved Occurrence takes the new schedule identity, so no second copy appears. If the new schedule collides with the moved time, Cadence raises a move conflict notice. |
+| The Behavior's schedule is edited after today's move | The move stays. The moved Occurrence is never deleted by the edit, and it stands in for the new schedule's item on its day, so no second copy appears (it keeps its row and its planned time for that day). If another item now sits where the moved one is, Cadence opens a move conflict notice; "keep it here" answers it for good, and moving again or Undo answers it too. |
 | The same write arrives twice with the same idempotency key | The second returns the first result and applies nothing. |
 | Two moves of the same Occurrence with the same expected revision | The first to arrive wins. The second is refused with the current state. |
 

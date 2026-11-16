@@ -17,6 +17,7 @@ export type ReminderResolverBehavior = {
 export type ReminderResolverOccurrence = {
   id: string;
   userId: string;
+  /** Effective start (`effectiveStartAt`): where the Occurrence sits today, after any per-day move. */
   scheduledFor: string;
   status: OccurrenceStatus;
 };
