@@ -11,6 +11,12 @@ export type TimelineOccurrenceInput = {
   scheduleSummary: string;
   scheduledFor: string;
   scheduledTimeLabel: string;
+  /**
+   * Advisor plan, Phase 2: the planned time label when a per-day move places this
+   * Occurrence elsewhere today. The row's time and time label are then the moved
+   * (effective) time. Absent when the Occurrence sits at its planned time.
+   */
+  movedFromLabel?: string;
   /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
   scheduleKind?: "exact" | "range";
   scheduleEndTime?: string | null;
@@ -49,6 +55,12 @@ export type TimelineOccurrenceView = {
   title: string;
   scheduledFor: string;
   scheduledTimeLabel: string;
+  /**
+   * Advisor plan, Phase 2: the planned time label when a per-day move places this
+   * Occurrence elsewhere today. The row's time and time label are then the moved
+   * (effective) time. Absent when the Occurrence sits at its planned time.
+   */
+  movedFromLabel?: string;
   /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
   scheduleKind?: "exact" | "range";
   scheduleEndTime?: string | null;

@@ -21,6 +21,8 @@ import type {
 import type { PlaceLabelClient } from "../../../lib/ui/place-labels";
 import { readMacForegroundLocation } from "./foreground-location";
 import { localCommand, localMutation } from "./local-store";
+import { withLocalMoves } from "./local-moves.service";
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 
 type Owned<T> = T & { user_id: string };
 export type LocalPlaceLabelRows = {
@@ -82,6 +84,8 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     ]);
     if (!occurrence) return null;
     const timezone = graphs.find(({ behavior }) => behavior.id === occurrence.behavior_id)?.behavior.timezone ?? owner.timezone;
+    // Advisor Phase 2B: a moved Occurrence is judged at its moved time.
+    const [moved] = await withLocalMoves(owner.id, [occurrence], [{ id: occurrence.behavior_id, timezone }]);
     const latest = [...history.statusEvents].sort((left, right) => right.recorded_at.localeCompare(left.recorded_at)
       || right.created_at.localeCompare(left.created_at) || right.id.localeCompare(left.id))[0] ?? null;
     return {
@@ -90,7 +94,7 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
       homeText: travel.baseLocationText,
       markers: stored.markers,
       occurrence: { id: occurrence.id, behaviorId: occurrence.behavior_id, status: occurrence.status, localDate: occurrence.local_date,
-        timezone, scheduledFor: occurrence.scheduled_for, scheduleKind: occurrence.schedule_kind,
+        timezone, scheduledFor: effectiveStartAt(moved ?? occurrence), scheduleKind: occurrence.schedule_kind,
         scheduleStartTime: occurrence.schedule_start_time, scheduleEndTime: occurrence.schedule_end_time },
       latestMark: latest ? { status: latest.status, previousStatus: latest.previous_status,
         sourceCaptureMethod: latest.source_capture_method, recordedAt: latest.recorded_at } : null,

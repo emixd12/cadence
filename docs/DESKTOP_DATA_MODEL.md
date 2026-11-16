@@ -24,6 +24,24 @@ write that row, so older Mac builds keep syncing and cannot change it. A linked 
 and the web then share one day-pool state. Exclusion IDs are unioned like a Behavior
 pool's.
 
+Schema version 25 adds read-only copies of the hosted per-day move records (advisor
+plan, Phase 2B). Migration `0025_occurrence_moves.sql` creates `occurrence_moves` with
+exactly the fields of account sync contract 6 (`OCCURRENCE_MOVE_SYNC_FIELDS`): no client,
+idempotency key, request hash or proposal link. Account sync is the only writer. As on the
+server, `occurrence_id` has no foreign key, so a move outlives its Occurrence as history;
+rows leave with their Behavior. A move never changes the stored Occurrence row, so a status
+mark on the Mac after a web move compares equal and needs no conflict review. The native
+command `readOccurrenceMoves` returns an Occurrence's records in chain order;
+`apps/desktop/src/local-moves.service.ts` derives effective time from them with the shared
+`effectiveTimeFromMoves` (latest record decides; an Undo to the plan or a timezone change
+means the planned time) and attaches it to in-memory copies only. The Timeline, native
+reminders, leave reminders (through the Timeline's stops), an opened reminder and place
+labels read those copies; native writes always re-read the stored row. A moved Occurrence
+keeps its reminder request ID, so its new fire time replaces the planned one. Rust test
+`account_sync_round_trips_read_only_occurrence_moves` covers apply, field rejection, chain
+order and the cascade. Export and restore carry moves once the web defines them in the
+`app.cadence` extension.
+
 Schema version 24 adds read-only copies of the hosted connector completion records
 (Ticket 320, D28). Migration `0024_connector_completion_records.sql` creates
 `behavior_source_links` and `occurrence_source_matches` with only the synced fields

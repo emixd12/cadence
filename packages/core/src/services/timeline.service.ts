@@ -1,4 +1,4 @@
-import type { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "@js-temporal/polyfill";
 import { resolveBehaviorDurationEstimate } from "../resolvers/timeline-context.resolver";
 import type { BehaviorDurationHistoryOccurrence } from "../types/day-progress";
 import type { BehaviorGraphRecord } from "../behavior-store";
@@ -8,7 +8,8 @@ import type { TimeSession } from "../types/time-tracking";
 import { resolveTimeline, resolveTimelineOccurrence } from "../resolvers/timeline.resolver";
 import { resolveOccurrenceTimeTracking } from "../resolvers/time-tracking.resolver";
 import { normalizeRecurrenceRule, normalizeScheduledTime, summarizeRecurrenceRule } from "./behavior-values";
-import { formatCompactOccurrenceScheduleLabel } from "./schedule";
+import { formatClockTimeLabel, formatCompactOccurrenceScheduleLabel } from "./schedule";
+import { effectiveStartAt, isMoved } from "../resolvers/time.resolver";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "./occurrence-generation";
 import { normalizeOccurrenceStatus } from "./occurrence.service";
 import { storedBehaviorWhere } from "./behavior-where";
@@ -90,15 +91,7 @@ function toTimelineOccurrenceInput(
     description: behavior.description ?? "",
     categoryName: behavior.category?.name ?? "No category",
     scheduleSummary: summarizeRecurrenceRule(recurrenceRule),
-    scheduledFor: occurrence.scheduled_for,
-    scheduledTimeLabel: formatCompactOccurrenceScheduleLabel({
-      scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
-      schedulePreset: normalizeSchedulePreset(occurrence.schedule_preset),
-      scheduleStartTime: normalizeScheduledTime(occurrence.schedule_start_time),
-      scheduleEndTime: occurrence.schedule_end_time
-        ? normalizeScheduledTime(occurrence.schedule_end_time)
-        : null,
-    }),
+    ...occurrenceTimeLabels(occurrence, behavior.timezone),
     scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
     scheduleEndTime: occurrence.schedule_end_time ? normalizeScheduledTime(occurrence.schedule_end_time) : null,
     ...behaviorPlaceText(behavior),
@@ -112,6 +105,26 @@ function toTimelineOccurrenceInput(
     },
     canStartTimeTracking: behavior.active,
   };
+}
+
+/**
+ * Advisor plan, Phase 2: the row sits at its effective time. A moved row shows its new
+ * time and keeps the planned label as "Moved from". Range Behaviors are not moved in v1.
+ */
+function occurrenceTimeLabels(occurrence: OccurrenceRecord, timezone: string) {
+  const planned = formatCompactOccurrenceScheduleLabel({
+    scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
+    schedulePreset: normalizeSchedulePreset(occurrence.schedule_preset),
+    scheduleStartTime: normalizeScheduledTime(occurrence.schedule_start_time),
+    scheduleEndTime: occurrence.schedule_end_time
+      ? normalizeScheduledTime(occurrence.schedule_end_time)
+      : null,
+  });
+  const start = effectiveStartAt(occurrence);
+  const time: { scheduledFor: string; scheduledTimeLabel: string; movedFromLabel?: string } = { scheduledFor: start, scheduledTimeLabel: planned };
+  if (!isMoved(occurrence)) return time;
+  const wall = Temporal.Instant.from(start).toZonedDateTimeISO(timezone).toPlainTime().toString({ smallestUnit: "minute" });
+  return { ...time, scheduledTimeLabel: formatClockTimeLabel(wall), movedFromLabel: planned };
 }
 
 /**
