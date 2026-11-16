@@ -17,6 +17,7 @@ import { DailyBriefError, type DailyBriefCallUsage, type DailyBriefGenerator } f
 import { dailyBriefPromptRevision, effectiveDailyBriefPromptVariant, type DailyBriefPromptVariant } from "./daily-brief-instructions";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import type { CalendarCaller } from "./google-calendar.service";
+import { agentModelConfigured } from "./agent-model";
 import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseGeneration, parseReview, productionGeneration, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
 
 export type BriefingSequenceHistory = Readonly<{ fingerprint: string; lastShownLocalDate: string }>;
@@ -147,7 +148,7 @@ export async function startBriefingSequence(request: Request, generate?: DailyBr
       const { plan, tasks } = planSequence(input, details);
       if (input.action === "simulate") return plan;
       let rejection: string | undefined;
-      if (!generate && !process.env.OPENAI_API_KEY) rejection = "not_configured";
+      if (!generate && !agentModelConfigured()) rejection = "not_configured";
       if (plan.plannedCalls > input.callBudget || plan.plannedCalls > briefingBenchBudget().snapshot().available) rejection = "comparison_limit";
       const reservation = briefingBenchBudget().reserve(rejection ? 0 : plan.plannedCalls);
       const job: Job = { id: randomUUID(), accountRef: input.accountRef, createdAt: Date.now(), controller: new AbortController(), state: "queued", plan,

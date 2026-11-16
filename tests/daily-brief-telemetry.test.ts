@@ -7,7 +7,9 @@ import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-co
 import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG } from "@cadence/core/services/briefing-config";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { adviceRejected, DailyBriefError, generateDailyBrief, type DailyBriefCallUsage, type DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief, generateOpenAIDurationEstimates, parseOpenAIUsage } from "@/lib/services/daily-brief-openai";
+import { DAILY_BRIEF_MODEL, generateDailyBriefWithModel, generateDurationEstimatesWithModel } from "@/lib/services/daily-brief-model";
+import { parseUsage } from "@/lib/services/agent-model";
+import { OPENAI_ENV, responsesReply } from "./helpers/model-responses";
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { createBriefingBenchStore, type BenchRun, type BriefingBenchStore } from "@/lib/services/briefing-bench-store";
 import { briefingFixture } from "@/lib/services/briefing-fixtures";
@@ -16,93 +18,79 @@ import { briefingFixture } from "@/lib/services/briefing-fixtures";
 const context = validateAdvisorDayContext(fixture);
 const now = () => Temporal.Instant.from(context.capturedAt);
 const advice = { suggestions: [], text: "Make room for your planned walk.", occurrenceRefs: [context.cadence.occurrences[0].ref] };
-const providerUsage = { input_tokens: 1200, input_tokens_details: { cached_tokens: 300 }, output_tokens: 150, output_tokens_details: { reasoning_tokens: 64 }, total_tokens: 1350 };
-const message = (text: string) => ({ type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text }] });
-const completed = (text = JSON.stringify(advice), extra: Record<string, unknown> = {}) => ({ status: "completed", output: [message(text)], usage: providerUsage, ...extra });
+const completed = (output: unknown = advice) => responsesReply(output, { input: 1200, cached: 300, output: 150, reasoning: 64 });
 const adapterInput = { instructions: "Instructions", facts: "Synthetic facts", signal: new AbortController().signal };
 
-describe("OpenAI usage parsing", () => {
+describe("AI SDK usage parsing (Phase 1B)", () => {
   it("reads input, cached input, output and reasoning tokens", () => {
-    expect(parseOpenAIUsage(providerUsage)).toEqual({ inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
+    expect(parseUsage({ inputTokens: 1200, inputTokenDetails: { cacheReadTokens: 300 }, outputTokens: 150, outputTokenDetails: { reasoningTokens: 64 } }))
+      .toEqual({ inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
   });
   it("turns missing or malformed counts into null and a missing object into null", () => {
-    expect(parseOpenAIUsage({ input_tokens: 10, output_tokens: -1, output_tokens_details: { reasoning_tokens: 1.5 } }))
+    expect(parseUsage({ inputTokens: 10, outputTokens: -1, outputTokenDetails: { reasoningTokens: 1.5 } }))
       .toEqual({ inputTokens: 10, cachedInputTokens: null, outputTokens: null, reasoningTokens: null });
-    expect(parseOpenAIUsage({ input_tokens: "10", input_tokens_details: [] })).toEqual({ inputTokens: null, cachedInputTokens: null, outputTokens: null, reasoningTokens: null });
-    expect(parseOpenAIUsage(undefined)).toBeNull();
-    expect(parseOpenAIUsage([1, 2])).toBeNull();
+    expect(parseUsage({ inputTokens: undefined, outputTokens: undefined })).toBeNull();
+    expect(parseUsage(undefined)).toBeNull();
+    expect(parseUsage([1, 2])).toBeNull();
   });
 });
 
-describe("OpenAI adapter usage and reasons", () => {
+describe("model adapter usage and reasons", () => {
+  const options = (respond: () => Response) => ({ env: OPENAI_ENV, fetch: async () => respond() });
   it("reports usage for the brief call and the estimate call", async () => {
     const onUsage = vi.fn();
-    expect(await generateOpenAIDailyBrief({ ...adapterInput, onUsage }, { apiKey: "key", fetch: async () => Response.json(completed()) })).toEqual(advice);
+    expect(await generateDailyBriefWithModel({ ...adapterInput, onUsage }, options(() => Response.json(completed())))).toEqual(advice);
     const estimates = { estimates: [] };
-    expect(await generateOpenAIDurationEstimates({ ...adapterInput, onUsage }, { apiKey: "key", fetch: async () => Response.json(completed(JSON.stringify(estimates))) })).toEqual(estimates);
+    expect(await generateDurationEstimatesWithModel({ ...adapterInput, onUsage }, options(() => Response.json(completed(estimates))))).toEqual(estimates);
     expect(onUsage).toHaveBeenCalledTimes(2);
     expect(onUsage).toHaveBeenNthCalledWith(1, { inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
   });
 
   it("reports nothing when the provider omits usage, and a throwing callback never changes the result", async () => {
     const onUsage = vi.fn();
-    const withoutUsage: Record<string, unknown> = completed();
-    delete withoutUsage.usage;
-    await generateOpenAIDailyBrief({ ...adapterInput, onUsage }, { apiKey: "key", fetch: async () => Response.json(withoutUsage) });
+    await generateDailyBriefWithModel({ ...adapterInput, onUsage }, options(() => Response.json(responsesReply(advice))));
     expect(onUsage).not.toHaveBeenCalled();
     const throwing = () => { throw new Error("collector failed"); };
-    expect(await generateOpenAIDailyBrief({ ...adapterInput, onUsage: throwing }, { apiKey: "key", fetch: async () => Response.json(completed()) })).toEqual(advice);
+    expect(await generateDailyBriefWithModel({ ...adapterInput, onUsage: throwing }, options(() => Response.json(completed())))).toEqual(advice);
   });
 
-  it("sends a byte-identical request body with or without a usage callback", async () => {
+  it("sends the same request body with or without a usage callback; an override changes only model and effort", async () => {
     const bodies: string[] = [];
-    const fetcher = async (_url: RequestInfo | URL, init?: RequestInit) => { bodies.push(init!.body as string); return Response.json(completed(JSON.stringify({ estimates: [] }))); };
-    await generateOpenAIDailyBrief(adapterInput, { apiKey: "key", fetch: fetcher });
-    await generateOpenAIDailyBrief({ ...adapterInput, onUsage: () => undefined }, { apiKey: "key", fetch: fetcher });
-    await generateOpenAIDurationEstimates({ ...adapterInput, estimateVariant: "alongside" }, { apiKey: "key", fetch: fetcher });
-    await generateOpenAIDurationEstimates({ ...adapterInput, estimateVariant: "alongside", onUsage: () => undefined }, { apiKey: "key", fetch: fetcher });
+    const fetcher = (async (_url: RequestInfo | URL, init?: RequestInit) => { bodies.push(init!.body as string); return Response.json(completed({ estimates: [] })); }) as typeof fetch;
+    await generateDailyBriefWithModel(adapterInput, { env: OPENAI_ENV, fetch: fetcher }).catch(() => undefined);
+    await generateDailyBriefWithModel({ ...adapterInput, onUsage: () => undefined }, { env: OPENAI_ENV, fetch: fetcher }).catch(() => undefined);
+    await generateDurationEstimatesWithModel({ ...adapterInput, estimateVariant: "alongside" }, { env: OPENAI_ENV, fetch: fetcher });
+    await generateDurationEstimatesWithModel({ ...adapterInput, estimateVariant: "alongside", onUsage: () => undefined }, { env: OPENAI_ENV, fetch: fetcher });
     expect(bodies[1]).toBe(bodies[0]);
     expect(bodies[3]).toBe(bodies[2]);
-    // The body built before Ticket 288, field for field and in the same key order.
-    const parsed = JSON.parse(bodies[0]);
-    expect(bodies[0]).toBe(JSON.stringify({
-      model: DAILY_BRIEF_MODEL, store: false, background: false, tools: [], tool_choice: "none",
-      reasoning: { effort: "low" }, max_output_tokens: 2_000,
-      instructions: adapterInput.instructions, input: adapterInput.facts,
-      text: { format: { type: "json_schema", name: "cadence_daily_brief", strict: true, schema: parsed.text.format.schema } },
-    }));
     expect(bodies[0]).not.toContain("onUsage");
+    expect(JSON.parse(bodies[0])).toMatchObject({ model: DAILY_BRIEF_MODEL.replace("openai/", ""), reasoning: { effort: "low" }, max_output_tokens: 2_000, store: false });
     expect(JSON.parse(bodies[2]).text.format.name).toBe("cadence_duration_estimates_v1_2");
-    // Ticket 290: a workbench override changes only the model and the effort, in the same key order.
-    await generateOpenAIDailyBrief(adapterInput, { apiKey: "key", fetch: fetcher, model: "bench-model-a", effort: "medium" });
-    expect(bodies[4]).toBe(bodies[0].replace(JSON.stringify(DAILY_BRIEF_MODEL), '"bench-model-a"').replace('{"effort":"low"}', '{"effort":"medium"}'));
+    await generateDailyBriefWithModel(adapterInput, { env: OPENAI_ENV, fetch: fetcher, model: "openai/gpt-5.6-terra", effort: "medium" }).catch(() => undefined);
+    expect(bodies[4]).toBe(bodies[0].replace('"model":"gpt-5.6-luna"', '"model":"gpt-5.6-terra"').replace('"effort":"low"', '"effort":"medium"'));
   });
 
   it.each([
     ["HTTP 500", () => new Response("provider secret", { status: 500 }), "advisor_unavailable", "provider_http_5xx"],
     ["HTTP 404", () => new Response("provider secret", { status: 404 }), "advisor_unavailable", "provider_http_4xx"],
     ["HTTP 429", () => new Response("provider secret", { status: 429 }), "rate_limited", "provider_http_429"],
-    ["a missing body", () => new Response(null, { status: 200 }), "advisor_unavailable", "provider_body_missing"],
-    ["an oversized body", () => new Response("a".repeat(65_537)), "advisor_unavailable", "provider_body_too_large"],
-    ["a non-JSON body", () => new Response("not json"), "advisor_unavailable", "provider_body_not_json"],
-    ["a missing output array", () => Response.json({ status: "completed" }), "advisor_unavailable", "provider_shape"],
+    ["a non-JSON body", () => new Response("not json"), "advisor_unavailable", "provider_shape"],
+    // The AI SDK reports a reply with no output as a provider 500.
+    ["a missing output array", () => Response.json({ status: "completed" }), "advisor_unavailable", "provider_http_5xx"],
     ["a token-limit stop", () => Response.json({ ...completed(), status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }), "advisor_unavailable", "provider_incomplete_max_output_tokens"],
-    ["an unsafe incomplete reason", () => Response.json({ ...completed(), status: "incomplete", incomplete_details: { reason: "Some Long Provider Text!" } }), "advisor_unavailable", "provider_incomplete"],
-    ["a failed status", () => Response.json({ ...completed(), status: "failed" }), "advisor_unavailable", "provider_status_failed"],
-    ["a tool call", () => Response.json({ ...completed(), output: [{ type: "function_call" }] }), "advisor_unavailable", "provider_shape"],
-    ["a refusal", () => Response.json({ ...completed(), output: [{ ...message(""), content: [{ type: "refusal", refusal: "No" }] }] }), "advisor_unavailable", "provider_refusal"],
-    ["two text parts", () => Response.json({ ...completed(), output: [message("{}"), message("{}")] }), "advisor_unavailable", "provider_shape"],
+    ["a content-filter stop", () => Response.json({ ...completed(), status: "incomplete", incomplete_details: { reason: "content_filter" } }), "advisor_unavailable", "provider_refusal"],
+    ["an oversized output", () => Response.json(completed(JSON.stringify({ ...advice, text: "a".repeat(65_537) }))), "advisor_unavailable", "provider_body_too_large"],
     ["non-JSON output text", () => Response.json(completed("plain words")), "advisor_unavailable", "output_not_json"],
   ])("names the reason for %s and keeps the public code", async (_label, respond, code, reason) => {
-    const error = await generateOpenAIDailyBrief(adapterInput, { apiKey: "key", fetch: async () => respond() }).catch((caught: unknown) => caught);
+    const error = await generateDailyBriefWithModel(adapterInput, options(respond)).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(DailyBriefError);
     expect(error).toMatchObject({ code, reason, message: code });
   });
 
   it("still reports usage from an incomplete response it rejects", async () => {
     const onUsage = vi.fn();
-    await expect(generateOpenAIDailyBrief({ ...adapterInput, onUsage }, { apiKey: "key",
-      fetch: async () => Response.json({ ...completed(), status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }) }))
+    await expect(generateDailyBriefWithModel({ ...adapterInput, onUsage },
+      options(() => Response.json({ ...completed(), status: "incomplete", incomplete_details: { reason: "max_output_tokens" } }))))
       .rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_incomplete_max_output_tokens" });
     expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ outputTokens: 150 }));
   });

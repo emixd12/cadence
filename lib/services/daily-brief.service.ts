@@ -5,7 +5,10 @@ import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
-import { generateOpenAIDailyBrief } from "./daily-brief-openai";
+import { dailyBriefModelSetting, generateDailyBriefWithModel } from "./daily-brief-model";
+import { agentModelConfigured } from "./agent-model";
+import { AgentBudgetRefused, defaultAgentMetering, inputHash, meteredCall, type AgentMetering, type AgentRunRecord } from "./agent-metering";
+import { DAILY_BRIEF_PROMPT_REVISION } from "./daily-brief-instructions";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
 import { getIcloudCalendarConnection } from "./icloud-calendar.service";
@@ -47,7 +50,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     readDailyBriefSourceStatus(caller, preferences),
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
-  return { accountRef: briefingAccountRef(caller.user.id), available: !!process.env.OPENAI_API_KEY,
+  return { accountRef: briefingAccountRef(caller.user.id), available: agentModelConfigured(),
     deviceModelAvailable: dailyBriefDeviceModelAvailable(process.env),
     configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled,
     useConnectedSources: preferences.useConnectedSources, excludedSources: preferences.excludedSources, sourceStatus,
@@ -71,7 +74,7 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
   const input = parseDailyBriefSettingsInput(value);
   if (!input) throw new DailyBriefError("invalid_request");
   // Ticket 298: a server that offers only the device model still lets a linked Mac turn the brief on.
-  if (input.enabled && !process.env.OPENAI_API_KEY && !dailyBriefDeviceModelAvailable(process.env)) throw new DailyBriefError("not_configured");
+  if (input.enabled && !agentModelConfigured() && !dailyBriefDeviceModelAvailable(process.env)) throw new DailyBriefError("not_configured");
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
@@ -149,10 +152,13 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   generate?: DailyBriefGenerator;
   now?: () => Temporal.Instant;
   deadlineMs?: number;
+  /** Phase 1B: spend budget and run log. Defaults to the stub until Phase 1A lands. */
+  metering?: AgentMetering;
 }> = {}): Promise<DailyBriefResponse> {
   const attempt = readDailyBriefAttemptInput(value);
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new DailyBriefError("not_configured");
+  if (!options.generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
+  const metering = options.metering ?? defaultAgentMetering();
+  const setting = dailyBriefModelSetting();
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
   const clock = options.now ?? (() => Temporal.Now.instant());
@@ -185,20 +191,57 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         await prepared.assertCurrent();
       };
       await assertCurrent();
-      const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
-      // Usage reaches only the performance log, never the response.
+      const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(setting.timeoutMs)]);
+      // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
-      const briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
-        () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
-          analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
-          onTip: (fingerprints) => { tipFingerprints = fingerprints; },
-          onUsage: (item) => { usage.push(item); },
-          generate: options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey })) }), modelSignal));
+      const generator = options.generate ?? ((input: Parameters<DailyBriefGenerator>[0]) => generateDailyBriefWithModel(input));
+      const runStart = Date.now();
+      let costMicrodollars = 0, calls = 0, hash = "";
+      const writeRun = (outcome: AgentRunRecord["outcome"], errorReason: string | null, body?: unknown) => {
+        const total = sumDailyBriefUsage(usage);
+        const run: AgentRunRecord = { runId: leaseToken, agent: "daily_brief", trigger: "user", model: setting.model,
+          promptVersion: `${DAILY_BRIEF_PROMPT_REVISION}:${configurationRevision}`, inputHash: hash, calls,
+          inputTokens: total.inputTokens, cachedInputTokens: total.cachedInputTokens, outputTokens: total.outputTokens, reasoningTokens: total.reasoningTokens,
+          costMicrodollars, toolCalls: 0, outcome, errorReason, latencyMs: Date.now() - runStart, startedAt: new Date(runStart).toISOString() };
+        // A lost run-log write never changes what the person sees.
+        return metering.runLog.record({ accountId: caller.user.id, run,
+          ...(body !== undefined ? { content: { kind: "daily_brief" as const, localDate: admission.localDate, body } } : {}) }).catch(() => undefined);
+      };
+      let briefing;
+      try {
+        briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
+          () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
+            analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
+            onTip: (fingerprints) => { tipFingerprints = fingerprints; },
+            onUsage: (item) => { usage.push(item); },
+            generate: (input) => meteredCall({ metering, accountId: caller.user.id, agent: "daily_brief", setting,
+              inputChars: input.instructions.length + input.facts.length,
+              onCost: (cost) => { costMicrodollars += cost; },
+              call: (onCost) => {
+                calls += 1;
+                hash = inputHash(input.instructions, input.facts);
+                return generator({ ...input, onUsage: (item) => { input.onUsage?.(item); onCost(item); } });
+              } }) }), modelSignal));
+      } catch (error) {
+        if (error instanceof AgentBudgetRefused) {
+          await writeRun("budget_refused", "budget_exhausted");
+          throw new DailyBriefError("budget_reached");
+        }
+        await writeRun("error", error instanceof DailyBriefError ? error.reason ?? error.code : "generation_failed");
+        throw error;
+      }
       // The lease must still belong to this attempt. A superseded attempt never returns text.
-      const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
-      if (!finished) throw new DailyBriefError("context_changed");
-      await assertCurrent();
+      try {
+        const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
+        if (!finished) throw new DailyBriefError("context_changed");
+        await assertCurrent();
+      } catch (error) {
+        // The model ran and cost money, but nothing was shown: keep the metadata, not the text.
+        await writeRun("error", "superseded");
+        throw error;
+      }
       successful = true;
+      await writeRun("ok", null, briefing);
       // Only a completed, still-current attempt consumes the tip. A lost record may repeat the tip; it never hides text.
       if (tipFingerprints.length) {
         await phase("tip_record", async () => {

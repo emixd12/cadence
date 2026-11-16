@@ -2612,10 +2612,10 @@
       "id": "workbench.model",
       "label": "Model",
       "category": "Provenance",
-      "definition": "Names the model each attempt used. Production uses DAILY_BRIEF_MODEL; a workbench candidate may choose another model listed in CADENCE_BRIEFING_BENCH_MODELS (Ticket 290).",
+      "definition": "Names the model each attempt used. Production uses DAILY_BRIEF_MODEL, an AI Gateway model string; a workbench candidate may choose another model listed in CADENCE_BRIEFING_BENCH_MODELS (Ticket 290, Phase 1B).",
       "contracts": [
         {
-          "path": "lib/services/daily-brief-openai.ts",
+          "path": "lib/services/daily-brief-model.ts",
           "symbol": "DAILY_BRIEF_MODEL"
         }
       ],

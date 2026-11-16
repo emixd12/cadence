@@ -11,15 +11,16 @@ import { createBriefingBenchStore, type BenchCandidate, type BenchRun, type Brie
 import { generateDailyBrief, type DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
 import { composeDailyBriefInstructions, dailyBriefPromptRevision, DAILY_BRIEF_PROMPT_REVISION } from "@/lib/services/daily-brief-instructions";
 import {
-  DAILY_BRIEF_MODEL, DAILY_BRIEF_REASONING_EFFORT, dailyBriefRequestBody, generateOpenAIDailyBrief, generateOpenAIDurationEstimates, OPENAI_REASONING_EFFORTS,
-} from "@/lib/services/daily-brief-openai";
+  DAILY_BRIEF_MODEL, DAILY_BRIEF_REASONING_EFFORT, DAILY_BRIEF_REASONING_EFFORTS, generateDailyBriefWithModel, generateDurationEstimatesWithModel,
+} from "@/lib/services/daily-brief-model";
+import { OPENAI_ENV, responsesReply } from "./helpers/model-responses";
 
 // Ticket 290: workbench-only model, reasoning effort and prompt variant. Model IDs here are fake.
 // No provider is called: generators are injected or `fetch` is stubbed.
 const origin = "http://127.0.0.1:4321";
 const CASE = "case-0000-generation";
 const advice = { text: "Your walk is at noon.", occurrenceRefs: [], suggestions: [] };
-const completed = (text = JSON.stringify(advice)) => ({ status: "completed", output: [{ type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text }] }] });
+const completed = (text = JSON.stringify(advice)) => responsesReply(text);
 const candidate = (id: string, role: "baseline" | "candidate") => ({ id, label: role, role, parentCandidateId: null, proposalId: null, rationale: "" });
 const review = (caseId = CASE, ids = ["cand-baseline-0290", "cand-candidate-0290"]) => ({ caseId, candidates: ids.map((id, index) => candidate(id, index ? "candidate" : "baseline")) });
 const post = (url: string, body: unknown) => new Request(`${origin}${url}`, { method: "POST", body: JSON.stringify(body),
@@ -33,7 +34,7 @@ let store: BriefingBenchStore;
 beforeEach(async () => {
   vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget"));
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("CADENCE_BRIEFING_BENCH_MODELS", " bench-model-a,not a model!,bench-model-b ,bench-model-a");
+  vi.stubEnv("CADENCE_BRIEFING_BENCH_MODELS", " openai/gpt-5.6-terra,not a model!,bench-model-b ,gpt-5.6-terra");
   root = await mkdtemp(path.join(tmpdir(), "briefing-generation-"));
   store = createBriefingBenchStore(root);
 });
@@ -54,27 +55,27 @@ describe("OpenAI adapter overrides", () => {
   };
 
   it("lists the documented reasoning efforts and keeps the production effort", () => {
-    expect(OPENAI_REASONING_EFFORTS).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+    expect(DAILY_BRIEF_REASONING_EFFORTS).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
     expect(DAILY_BRIEF_REASONING_EFFORT).toBe("low");
   });
 
   it("sends the production body without overrides and changes only model and effort with them", async () => {
     const { bodies, fetcher } = capture();
-    await generateOpenAIDailyBrief(input, { apiKey: "key", fetch: fetcher });
-    await generateOpenAIDailyBrief(input, { apiKey: "key", fetch: fetcher, model: "bench-model-a", effort: "high" });
-    await generateOpenAIDailyBrief(input, { apiKey: "key", fetch: fetcher, effort: "medium" });
-    expect(bodies[0]).toBe(dailyBriefRequestBody(input, "cadence_daily_brief", JSON.parse(bodies[0]!).text.format.schema));
+    const run = (extra = {}) => generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: fetcher as typeof fetch, ...extra }).catch(() => undefined);
+    await run();
+    await run({ model: "openai/gpt-5.6-terra", effort: "high" });
+    await run({ effort: "medium" });
     const [base, both, effortOnly] = bodies.map((body) => JSON.parse(body));
-    expect([base.model, base.reasoning]).toEqual([DAILY_BRIEF_MODEL, { effort: "low" }]);
-    expect(both).toEqual({ ...base, model: "bench-model-a", reasoning: { effort: "high" } });
+    expect([`openai/${base.model}`, base.reasoning]).toEqual([DAILY_BRIEF_MODEL, { effort: "low" }]);
+    expect(both).toEqual({ ...base, model: "gpt-5.6-terra", reasoning: { effort: "high" } });
     expect(Object.keys(both)).toEqual(Object.keys(base));
     expect(effortOnly).toEqual({ ...base, reasoning: { effort: "medium" } });
   });
 
   it("keeps the production model and effort for the duration-estimate call", async () => {
     const { bodies, fetcher } = capture();
-    await generateOpenAIDurationEstimates(input, { apiKey: "key", fetch: fetcher });
-    expect(JSON.parse(bodies[0]!)).toMatchObject({ model: DAILY_BRIEF_MODEL, reasoning: { effort: "low" } });
+    await generateDurationEstimatesWithModel(input, { env: OPENAI_ENV, fetch: fetcher as typeof fetch });
+    expect(JSON.parse(bodies[0]!)).toMatchObject({ model: DAILY_BRIEF_MODEL.replace("openai/", ""), reasoning: { effort: "low" } });
   });
 });
 
@@ -114,12 +115,13 @@ describe("workbench generation options", () => {
   it("allows DAILY_BRIEF_MODEL plus valid environment IDs, and serves them only in development", async () => {
     const { briefingGenerationOptions, readBriefingGenerationOptions } = await service();
     const options = briefingGenerationOptions();
-    expect(options.models).toEqual([DAILY_BRIEF_MODEL, "bench-model-a", "bench-model-b"]);
-    expect(options.efforts).toEqual(OPENAI_REASONING_EFFORTS);
+    // Phase 1B: gateway model strings; a bare ID is an OpenAI model and duplicates collapse.
+    expect(options.models).toEqual([DAILY_BRIEF_MODEL, "openai/gpt-5.6-terra", "openai/bench-model-b"]);
+    expect(options.efforts).toEqual(DAILY_BRIEF_REASONING_EFFORTS);
     expect(options.promptVariants).toEqual(["layered", "consolidated"]);
     expect(options.defaults).toEqual({ model: DAILY_BRIEF_MODEL, effort: "low", promptVariant: "layered" });
     expect(briefingGenerationOptions({}).models).toEqual([DAILY_BRIEF_MODEL]);
-    expect(briefingGenerationOptions({ CADENCE_BRIEFING_BENCH_MODELS: `${"a".repeat(65)},ok:model-1.2_x` }).models).toEqual([DAILY_BRIEF_MODEL, "ok:model-1.2_x"]);
+    expect(briefingGenerationOptions({ CADENCE_BRIEFING_BENCH_MODELS: `${"a".repeat(65)},ok:model-1.2_x` }).models).toEqual([DAILY_BRIEF_MODEL, "openai/ok:model-1.2_x"]);
     const get = () => new Request(`${origin}/api/dev/briefing-comparison?view=generation`, { headers: { "sec-fetch-site": "same-origin" } });
     const response = readBriefingGenerationOptions(get());
     expect(response.status).toBe(200);
@@ -170,21 +172,22 @@ describe("workbench generation options", () => {
     }));
     const config = lanesOff(preset("1.1"));
     const response = await compare({ fixtureId: "sparse", configs: [config, config], review: review(),
-      generation: [{}, { model: "bench-model-a", effort: "high", promptVariant: "consolidated" }] });
+      generation: [{}, { model: "openai/gpt-5.6-terra", effort: "high", promptVariant: "consolidated" }] });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(bodies).toHaveLength(2);
-    expect(bodies[0]).toMatchObject({ model: DAILY_BRIEF_MODEL, reasoning: { effort: "low" } });
-    expect(bodies[1]).toMatchObject({ model: "bench-model-a", reasoning: { effort: "high" } });
-    expect(bodies[1]!.instructions).not.toBe(bodies[0]!.instructions);
-    expect(bodies[1]!.instructions).toContain("Route:");
-    expect(bodies[1]!.instructions).not.toContain("Recipe 1.1 rules");
-    const consolidated = { model: "bench-model-a", effort: "high", promptVariant: "consolidated", promptRevision: dailyBriefPromptRevision("consolidated") };
+    expect(bodies[0]).toMatchObject({ model: DAILY_BRIEF_MODEL.replace("openai/", ""), reasoning: { effort: "low" } });
+    expect(bodies[1]).toMatchObject({ model: "gpt-5.6-terra", reasoning: { effort: "high" } });
+    const instructions = (body: Record<string, unknown>) => (body.input as { role: string; content: string }[]).find((item) => item.role === "developer")!.content;
+    expect(instructions(bodies[1]!)).not.toBe(instructions(bodies[0]!));
+    expect(instructions(bodies[1]!)).toContain("Route:");
+    expect(instructions(bodies[1]!)).not.toContain("Recipe 1.1 rules");
+    const consolidated = { model: "openai/gpt-5.6-terra", effort: "high", promptVariant: "consolidated", promptRevision: dailyBriefPromptRevision("consolidated") };
     expect(body.results[0]).toMatchObject({ model: DAILY_BRIEF_MODEL, effort: "low", promptVariant: "layered", promptRevision: DAILY_BRIEF_PROMPT_REVISION });
     expect(body.results[1]).toMatchObject(consolidated);
     const detail = await store.readCase("synthetic", CASE);
     expect(detail.runs[1]).toMatchObject(consolidated);
-    expect(detail.candidates[1]!.generation).toEqual({ model: "bench-model-a", effort: "high", promptVariant: "consolidated" });
+    expect(detail.candidates[1]!.generation).toEqual({ model: "openai/gpt-5.6-terra", effort: "high", promptVariant: "consolidated" });
   });
 
   it("records the layered text for a recipe the consolidated variant does not rewrite", async () => {
@@ -249,19 +252,19 @@ describe("workbench generation options", () => {
     expect((await writeBriefingReview(post("/api/dev/briefing-reviews", { source: "synthetic", action: "packet", caseId: CASE }), store)).status).toBe(200);
     const packet = await readFile(path.join(dir, "review-packet.md"), "utf8");
     expect(packet).toContain("- Generation: not recorded (saved before Ticket 290; it used the production model, effort and layered prompt)");
-    expect(packet).toContain("- Generation: model bench-model-b; reasoning effort low; prompt consolidated");
-    expect(packet).toContain('- `generation.model`: "' + DAILY_BRIEF_MODEL + '" → "bench-model-b"');
+    expect(packet).toContain("- Generation: model openai/bench-model-b; reasoning effort low; prompt consolidated");
+    expect(packet).toContain('- `generation.model`: "' + DAILY_BRIEF_MODEL + '" → "openai/bench-model-b"');
     expect(packet).toContain('- `generation.promptVariant`: "layered" → "consolidated"');
     expect(packet).toContain("- No configuration or generation differences.");
     expect(packet).toContain(`- Generation: model ${DAILY_BRIEF_MODEL}; reasoning effort not recorded; prompt variant not recorded; prompt revision \`${DAILY_BRIEF_PROMPT_REVISION}\``);
-    expect(packet).toContain(`- Generation: model bench-model-b; reasoning effort low; prompt variant layered; prompt revision \`${DAILY_BRIEF_PROMPT_REVISION}\``);
+    expect(packet).toContain(`- Generation: model openai/bench-model-b; reasoning effort low; prompt variant layered; prompt revision \`${DAILY_BRIEF_PROMPT_REVISION}\``);
 
     expect((await writeBriefingReview(post("/api/dev/briefing-reviews", { source: "synthetic", action: "sequence_report", caseId: CASE, caseIds: [CASE] }), store)).status).toBe(200);
     const report = await readFile(path.join(dir, "sequence-report.md"), "utf8");
     expect(report).toContain("Generation · baseline · baseline: not recorded (saved before Ticket 290; it used the production model, effort and layered prompt).");
-    expect(report).toContain(`Generation · candidate · candidate: model bench-model-b; reasoning effort low; prompt consolidated. Differences from baseline: generation.model ${DAILY_BRIEF_MODEL} → bench-model-b; generation.promptVariant layered → consolidated.`);
+    expect(report).toContain(`Generation · candidate · candidate: model openai/bench-model-b; reasoning effort low; prompt consolidated. Differences from baseline: generation.model ${DAILY_BRIEF_MODEL} → openai/bench-model-b; generation.promptVariant layered → consolidated.`);
     expect(report).toContain("Differences from baseline: none.");
     expect(report).toContain(`model: ${DAILY_BRIEF_MODEL}; effort: not recorded; prompt variant: not recorded; prompt: ${DAILY_BRIEF_PROMPT_REVISION};`);
-    expect(report).toContain(`model: bench-model-b; effort: low; prompt variant: layered; prompt: ${DAILY_BRIEF_PROMPT_REVISION};`);
+    expect(report).toContain(`model: openai/bench-model-b; effort: low; prompt variant: layered; prompt: ${DAILY_BRIEF_PROMPT_REVISION};`);
   });
 });

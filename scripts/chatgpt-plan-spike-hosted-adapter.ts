@@ -1,6 +1,12 @@
-import type { DailyBriefGenerator, DailyBriefModelUsage } from "./daily-brief-consumer";
-import { adviceRejected, DailyBriefError } from "./daily-brief-consumer";
-import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "./daily-brief-schema";
+/**
+ * Frozen copy of the hosted Daily Brief adapter as it was before Phase 1B moved the
+ * hosted call onto the AI SDK (`lib/services/daily-brief-model.ts`). Only the Ticket 294
+ * ChatGPT plan spike and its tests use it, so the spike stays reproducible. Production
+ * never imports this file.
+ */
+import type { DailyBriefGenerator, DailyBriefModelUsage } from "@/lib/services/daily-brief-consumer";
+import { adviceRejected, DailyBriefError } from "@/lib/services/daily-brief-consumer";
+import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "@/lib/services/daily-brief-schema";
 
 export const DAILY_BRIEF_MODEL = "gpt-5.6-luna";
 /** The production reasoning effort. */

@@ -20,7 +20,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { BRIEFING_FIXTURE_IDS, briefingFixture, type BriefingFixtureId } from "@/lib/services/briefing-fixtures";
 import { activeBriefingConfig } from "@/lib/services/briefing-pipeline";
 import { DailyBriefError, generateDailyBrief, type DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief } from "@/lib/services/daily-brief-openai";
+import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief } from "./chatgpt-plan-spike-hosted-adapter";
 
 export const SPIKE_VERSION = "2026-11-07.1";
 export const AGENT_NAME_HINT = "Cadence";

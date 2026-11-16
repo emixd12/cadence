@@ -25,7 +25,8 @@ vi.mock("@/lib/services/briefing-account-context.service", () => ({
   prepareAccountBriefingContexts: mocks.prepare,
   readBriefingContextFence: mocks.fence,
 }));
-vi.mock("@/lib/services/daily-brief-openai", () => ({ generateOpenAIDailyBrief: mocks.openaiBrief, generateOpenAIDurationEstimates: mocks.openaiEstimates }));
+vi.mock("@/lib/services/daily-brief-model", async (original) => ({ ...await original<typeof import("@/lib/services/daily-brief-model")>(),
+  generateDailyBriefWithModel: mocks.openaiBrief, generateDurationEstimatesWithModel: mocks.openaiEstimates }));
 vi.mock("@/lib/db/advisor-context.repo", () => ({ readAdvisorProfileTimezone: mocks.timezone }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));

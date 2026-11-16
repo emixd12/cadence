@@ -205,10 +205,10 @@ it("keeps the brief block out of model input (Ticket 272, L-001)", async () => {
   const { readFile, readdir } = await import("node:fs/promises");
   const files = [
     ...(await readdir("packages/core/src/services")).filter((name) => name.startsWith("briefing-")).map((name) => `packages/core/src/services/${name}`),
-    ...(await readdir("lib/services")).filter((name) => /^(briefing|daily-brief|advisor)/.test(name)).map((name) => `lib/services/${name}`),
+    ...(await readdir("lib/services")).filter((name) => /^(briefing|daily-brief|advisor|agent-)/.test(name)).map((name) => `lib/services/${name}`),
   ];
   expect(files).toContain("packages/core/src/services/briefing-config.ts");
-  expect(files).toContain("lib/services/daily-brief-openai.ts");
+  expect(files).toContain("lib/services/daily-brief-model.ts");
   for (const file of files) {
     // The block's leave times and places come from these modules; model input never imports them.
     expect(await readFile(file, "utf8"), file).not.toMatch(/brief-travel-guidance|departure-phrases|departure\.resolver/);

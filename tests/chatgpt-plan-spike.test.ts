@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { generateOpenAIDailyBrief } from "@/lib/services/daily-brief-openai";
+import { generateOpenAIDailyBrief } from "../scripts/chatgpt-plan-spike-hosted-adapter";
 import {
   acceptCallback, buildAuthorizeUrl, contractFromProbes, corsAllowsWebview, createSseParser, latencyStats, main, mockBrowser, newAttempt, parseArgs,
   pkceChallenge, refreshTokens, renderMarkdown, revokeRefreshToken, runSpike, SecretBag, selectModels, SpikeStop, streamResponses, toPlanRequest, verifyIdToken,

@@ -28,7 +28,10 @@ vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: vi.fn() }));
 
 import { requestInAppDailyBrief } from "@/lib/services/daily-brief.service";
 import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief } from "@/lib/services/daily-brief-consumer";
-import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-openai";
+import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-model";
+import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "@/lib/services/daily-brief-schema";
+import { dailyBriefRequestBody } from "../scripts/chatgpt-plan-spike-hosted-adapter";
+import { responsesReply } from "./helpers/model-responses";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
@@ -49,19 +52,31 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-/** Runs `/api/advisor/brief`'s service with the real OpenAI adapter and returns the exact request bodies it sent. */
+/** Runs `/api/advisor/brief`'s service with the real model adapter and returns the exact request bodies it sent. */
 async function productionBodies(config?: BriefingConfig): Promise<string[]> {
   mocks.config.mockReturnValue(config);
   const bodies: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     expect(String(url)).toBe("https://api.openai.com/v1/responses");
     bodies.push(init!.body as string);
-    return Response.json({ status: "completed", output: [{ type: "message", role: "assistant", status: "completed",
-      content: [{ type: "output_text", text: JSON.stringify({ text: "Make room for your planned walk.", occurrenceRefs: [], suggestions: [], tip: null }) }] }] });
+    return Response.json(responsesReply({ text: "Make room for your planned walk.", occurrenceRefs: [], suggestions: [], tip: null }));
   }));
   await requestInAppDailyBrief(caller, { installationId: "11111111-1111-4111-8111-111111111111", retry: false },
     { now: () => Temporal.Instant.from(fixture.capturedAt) }).catch(() => undefined);
   return bodies;
+}
+
+/**
+ * Phase 1B: the AI SDK builds a different wire body, so the pin is now on what the model
+ * reads. The instructions and facts are put back into the pre-1B body builder; its hash
+ * must equal the hash pinned before Ticket 290. Same text, same model, same effort.
+ */
+function asPreAiSdkBody(body: string): string {
+  const parsed = JSON.parse(body);
+  const instructions = parsed.input.find((item: { role: string }) => item.role === "developer").content as string;
+  const facts = parsed.input.find((item: { role: string }) => item.role === "user").content[0].text as string;
+  return dailyBriefRequestBody({ instructions, facts, signal: new AbortController().signal }, DAILY_BRIEF_SCHEMA_NAME, DAILY_BRIEF_SCHEMA,
+    { model: parsed.model, effort: parsed.reasoning.effort });
 }
 
 describe("pinned production generation (Ticket 290)", () => {
@@ -75,9 +90,11 @@ describe("pinned production generation (Ticket 290)", () => {
       const bodies = await productionBodies(config);
       expect(bodies).toHaveLength(1);
       const body = JSON.parse(bodies[0]!);
-      expect(body.model).toBe(DAILY_BRIEF_MODEL);
+      expect(`openai/${body.model}`).toBe(DAILY_BRIEF_MODEL);
       expect(body.reasoning).toEqual({ effort: "low" });
-      hashes.push(sha(bodies[0]!));
+      expect(body).toMatchObject({ store: false, max_output_tokens: 2_000, text: { format: { type: "json_schema", strict: true, name: DAILY_BRIEF_SCHEMA_NAME, schema: DAILY_BRIEF_SCHEMA } } });
+      expect(body.tools).toBeUndefined();
+      hashes.push(sha(asPreAiSdkBody(bodies[0]!)));
     }
     expect(hashes).toEqual([
       "203330927b3fc0e3034e81a003667f7cbf746fe2721ea539647f20067ff1cded",

@@ -7,7 +7,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { activeBriefingConfig } from "@/lib/services/briefing-pipeline";
 import { briefingFixture } from "@/lib/services/briefing-fixtures";
 import { prepareDailyBrief, validateDailyBrief } from "@/lib/services/daily-brief-consumer";
-import { dailyBriefRequestBody } from "@/lib/services/daily-brief-openai";
+import { dailyBriefRequestBody } from "../scripts/chatgpt-plan-spike-hosted-adapter";
 import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "@/lib/services/daily-brief-schema";
 import {
   CHATGPT_PLAN_OUTPUT_LIMIT_BYTES, CHATGPT_PLAN_STREAM_LIMIT_BYTES, ChatGPTPlanError, chatGPTPlanBriefBody, chatGPTPlanErrorCode, chooseChatGPTPlanModel, createSseParser,
