@@ -13202,6 +13202,10 @@ That review produced candidate 3: recipe `daily_brief@1.2` in preset
 names, empty quiet days and relaxed next-day tip spacing (owner decision October 23).
 Held-out cases, quality acceptance, promotion and rollback execution remain open.
 Phase 5 of the briefing-bench plan.
+Decision November 16, 2026 (advisor build plan, Phase 1B): candidate 3 is not promoted
+as is. Production stays on `cadence-default`. The advisor plan's same-day move lines
+start from candidate 3's move block instead; their evaluation runs on the Phase 1B eval
+harness (`lib/services/advisor-eval/`). The candidate and its evidence stay recorded here.
 Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
 174; do not duplicate or silently close their outstanding gates.
 

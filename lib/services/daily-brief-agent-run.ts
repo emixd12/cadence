@@ -26,7 +26,7 @@ import { DailyBriefError, type DailyBriefGenerator, type DailyBriefModelUsage } 
 // brief that came back go to the 30-day content store, and only until the end
 // of the local day when they include calendar or travel facts.
 
-/** The output cap in daily-brief-openai.ts; every brief call may use all of it. */
+/** Default output cap for the estimate; the brief passes its model setting's cap. Every call may use all of it. */
 export const DAILY_BRIEF_MAX_OUTPUT_TOKENS = 2_000;
 
 export type DailyBriefAgentRun = Readonly<{
@@ -47,7 +47,10 @@ export type DailyBriefAgentRun = Readonly<{
 export type BeginDailyBriefAgentRunOptions = Readonly<{
   userId: string;
   trigger: AgentRunTrigger;
+  /** AI Gateway model string, such as `openai/gpt-5.6-luna`. Its price must be in agent-model-pricing.ts. */
   model: string;
+  /** The call's output cap, used for the pre-call estimate. Defaults to DAILY_BRIEF_MAX_OUTPUT_TOKENS. */
+  maxOutputTokens?: number;
   promptVersion: string;
   signal?: AbortSignal;
   /** Tests inject a client; production mints a `daily_brief` agent client. */
@@ -86,7 +89,7 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
     if (!price) throw new DailyBriefError("advisor_unavailable", undefined, "model_price_unknown");
     const estimate = estimateCallMicrodollars(price, {
       requestCharacters: input.instructions.length + input.facts.length,
-      maxOutputTokens: DAILY_BRIEF_MAX_OUTPUT_TOKENS,
+      maxOutputTokens: options.maxOutputTokens ?? DAILY_BRIEF_MAX_OUTPUT_TOKENS,
     });
     let decision;
     try {

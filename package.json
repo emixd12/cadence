@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "advisor:eval": "CADENCE_ADVISOR_EVAL=1 vitest run tests/advisor-eval.live.test.ts --silent=false",
     "test:web-client": "CADENCE_WEB_CLIENT_TEST=1 vitest run tests/acceptance-web-client.test.mjs",
     "mcp:oauth": "node scripts/acceptance/oauth-driver.mjs",
     "mcp:accept:protocol": "node scripts/acceptance/protocol.mjs",
@@ -103,12 +104,15 @@
     "git:fresh": "node scripts/git-freshness.mjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.105",
+    "@ai-sdk/openai": "4.0.118",
     "@cadence/core": "*",
     "@cadence/ui": "*",
     "@js-temporal/polyfill": "^0.5.1",
     "@modelcontextprotocol/server": "2.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.107.0",
+    "ai": "7.0.173",
     "lucide-react": "^1.59.0",
     "next": "16.4.3",
     "react": "^19.3.1",

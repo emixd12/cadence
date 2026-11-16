@@ -8,7 +8,8 @@ import { listBriefingWorkbenchBehaviors, listDailyBriefBehaviorIds, readDailyBri
 import { briefingFixture, BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "./briefing-fixtures";
 import { BRIEFING_PIPELINE_VERSION, briefingConfigurationRevision, prepareBriefing } from "./briefing-pipeline";
 import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefCallUsage, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, DAILY_BRIEF_REASONING_EFFORT, generateOpenAIDailyBrief, generateOpenAIDurationEstimates, OPENAI_REASONING_EFFORTS, type OpenAIReasoningEffort } from "./daily-brief-openai";
+import { DAILY_BRIEF_MODEL, DAILY_BRIEF_REASONING_EFFORT, DAILY_BRIEF_REASONING_EFFORTS, generateDailyBriefWithModel, generateDurationEstimatesWithModel } from "./daily-brief-model";
+import { agentModelConfigured, isModelId, normalizeModelId, type AgentReasoningEffort } from "./agent-model";
 import { DAILY_BRIEF_PROMPT_VARIANTS, dailyBriefPromptRevision, effectiveDailyBriefPromptVariant, type DailyBriefPromptVariant } from "./daily-brief-instructions";
 import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
@@ -63,12 +64,11 @@ export async function readBriefingWorkbenchAccount(request: Request): Promise<Re
 
 /** Ticket 290: extra workbench models come only from this environment variable. */
 export const BRIEFING_BENCH_MODELS_ENV = "CADENCE_BRIEFING_BENCH_MODELS";
-const BENCH_MODEL_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const GENERATION_KEYS = ["model", "effort", "promptVariant"];
 
 export type BriefingGenerationOptions = Readonly<{
   models: readonly string[];
-  efforts: readonly OpenAIReasoningEffort[];
+  efforts: readonly AgentReasoningEffort[];
   promptVariants: readonly DailyBriefPromptVariant[];
   defaults: BenchGeneration;
 }>;
@@ -84,8 +84,9 @@ export function productionGeneration(): BenchGeneration {
  * pattern are ignored.
  */
 export function briefingGenerationOptions(env: Readonly<Record<string, string | undefined>> = process.env): BriefingGenerationOptions {
-  const extra = (env[BRIEFING_BENCH_MODELS_ENV] ?? "").split(",").map((item) => item.trim()).filter((item) => BENCH_MODEL_ID.test(item));
-  return { models: [...new Set([DAILY_BRIEF_MODEL, ...extra])], efforts: OPENAI_REASONING_EFFORTS, promptVariants: DAILY_BRIEF_PROMPT_VARIANTS, defaults: productionGeneration() };
+  // Phase 1B: AI Gateway model strings (`creator/model`); a bare ID means an OpenAI model.
+  const extra = (env[BRIEFING_BENCH_MODELS_ENV] ?? "").split(",").map((item) => item.trim()).filter(isModelId).map(normalizeModelId);
+  return { models: [...new Set([DAILY_BRIEF_MODEL, ...extra])], efforts: DAILY_BRIEF_REASONING_EFFORTS, promptVariants: DAILY_BRIEF_PROMPT_VARIANTS, defaults: productionGeneration() };
 }
 
 /** Development-only: the allowed generation values, so the interface never offers one the server rejects. */
@@ -109,8 +110,10 @@ export function parseGeneration(value: unknown, count: number): BenchGeneration[
     const entry = item as Record<string, unknown>;
     // Only an omitted field takes the production value; null or any other non-listed value is rejected.
     const pick = (key: keyof BenchGeneration) => key in entry ? entry[key] : options.defaults[key];
-    const model = pick("model"), effort = pick("effort"), promptVariant = pick("promptVariant");
-    if (!options.models.includes(model as string) || !options.efforts.includes(effort as OpenAIReasoningEffort) ||
+    const picked = pick("model");
+    // A candidate saved before Phase 1B names a bare OpenAI model; it means the same gateway model.
+    const model = isModelId(picked) ? normalizeModelId(picked) : picked, effort = pick("effort"), promptVariant = pick("promptVariant");
+    if (!options.models.includes(model as string) || !options.efforts.includes(effort as AgentReasoningEffort) ||
         !options.promptVariants.includes(promptVariant as DailyBriefPromptVariant)) throw new DailyBriefError("invalid_request");
     return { model: model as string, effort: effort as string, promptVariant: promptVariant as DailyBriefPromptVariant };
   });
@@ -119,7 +122,7 @@ export function parseGeneration(value: unknown, count: number): BenchGeneration[
 /** Candidate identity: a candidate saved before Ticket 290 used the production values. */
 export function sameGeneration(saved: BenchGeneration | undefined, requested: BenchGeneration): boolean {
   const left = saved ?? productionGeneration();
-  return left.model === requested.model && left.effort === requested.effort && left.promptVariant === requested.promptVariant;
+  return (isModelId(left.model) ? normalizeModelId(left.model) : left.model) === requested.model && left.effort === requested.effort && left.promptVariant === requested.promptVariant;
 }
 
 export type BriefingComparisonOptions = Readonly<{
@@ -172,7 +175,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
     const estimating = configs.map(estimatesDurations);
     const descriptionsConfirmed = accountMode && value.descriptionsConfirmed === true && estimating.some(Boolean);
     const review = value.review === undefined ? null : parseReview(value.review, configs.length);
-    if (!generate && !process.env.OPENAI_API_KEY) return json({ error: "not_configured" }, 503);
+    if (!generate && !agentModelConfigured()) return json({ error: "not_configured" }, 503);
     const compare = async (caller?: CalendarCaller) => {
       signal.throwIfAborted();
       const ownerRef = caller ? briefingAccountRef(caller.user.id) : null;
@@ -271,18 +274,18 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(25_000)]);
             // Authorization may change while another tab holds both provider permits.
             const recheck = (input: Parameters<DailyBriefGenerator>[0]) => async () => {
-              if (!generate && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
+              if (!generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
               if (account) await raceBriefAbort(account.assertCurrent(), input.signal);
               if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, input.signal), input.signal);
             };
             // The estimate step keeps the production model and effort (Ticket 290).
-            const estimate = options.estimate ?? generate ?? ((payload: Parameters<DailyBriefGenerator>[0]) => generateOpenAIDurationEstimates(payload, { apiKey: process.env.OPENAI_API_KEY! }));
-            const override = chosen ? { model: chosen[index]!.model, effort: chosen[index]!.effort as OpenAIReasoningEffort } : {};
+            const estimate = options.estimate ?? generate ?? ((payload: Parameters<DailyBriefGenerator>[0]) => generateDurationEstimatesWithModel(payload));
+            const override = chosen ? { model: chosen[index]!.model, effort: chosen[index]!.effort as AgentReasoningEffort } : {};
             const briefing = await generateDailyBrief(context, { config, signal: modelSignal, analysis,
               ...(chosen ? { promptVariant: chosen[index]!.promptVariant } : {}),
               // Saved and synthetic cases replay on their captured clock; production keeps live freshness checks.
               planningNow: context.capturedAt, now: frozenClock ? () => captured : () => Temporal.Now.instant(),
-              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY!, ...override })))(input), recheck(input)),
+              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateDailyBriefWithModel(payload, override)))(input), recheck(input)),
               ...(descriptions ? { descriptions, estimate: (input: Parameters<DailyBriefGenerator>[0]) => reservation.dispatch(input.signal, () => estimate(input), recheck(input)) } : {}),
               onUsage: (item) => { usage.push(item); },
               onPrepared: (value) => { planned = value; } });

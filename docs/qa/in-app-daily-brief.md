@@ -10,7 +10,7 @@ are separate gates; this record does not claim production activation.
   existing account. Settings explicitly enables OpenAI disclosure and optional
   selected Calendar timing. No approval of model-written text is required.
 - `daily-brief.service.ts` reads the internal context directly. The former external
-  consumer is now provider-neutral generation/validation. `daily-brief-openai.ts`
+  consumer is now provider-neutral generation/validation. `daily-brief-model.ts`
   is the sole model adapter. The old GET stays disabled as a compatibility boundary.
 - The model receives minimized current-day facts, 90-day all-status counts,
   aggregate durations and authorized Calendar intervals. It receives no Notes,

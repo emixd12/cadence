@@ -533,7 +533,7 @@ and sends the prepared request in the plan contract. It reads the event stream t
 `validateDailyBrief`. Failures become `ChatGPTPlanError` codes: `usage_limit`,
 `not_eligible`, `reconnect`, `retry_later`, `advisor_unavailable` and `timeout`. It
 imports only types and `daily-brief-schema.ts`, the output schema it shares with
-`daily-brief-openai.ts`, so it runs in the Mac webview. It never logs bodies or keeps
+`daily-brief-model.ts`, so it runs in the Mac webview. It never logs bodies or keeps
 provider text. `tests/daily-brief-chatgpt-plan.test.ts` covers the contract, stream
 parsing, error mapping and the round trip with prepare and validate.
 
@@ -585,7 +585,8 @@ These owners are implemented in source; live release evidence remains separate.
 The in-app implementation calls `daily-brief.service.ts` from thin briefing routes.
 `daily-brief.repo.ts` owns session-bound preferences/admission and active Behavior
 IDs. `daily-brief-consumer.ts` validates facts/output through a provider-neutral
-callback; `daily-brief-openai.ts` owns the only model HTTP call. These modules cannot
+callback; `daily-brief-model.ts` owns the only model call, through the AI SDK layer in
+`agent-model.ts`. These modules cannot
 call tracking mutations. Shared `types/daily-brief.ts` contains no provider SDK types.
 Completion counts belong to the existing core context projection, with contract,
 service, repository/migration and model-adapter tests. UI clients render validated

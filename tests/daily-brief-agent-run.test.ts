@@ -88,9 +88,9 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
     expect(fake.names()).toEqual(["agent_run_start", "reserve_agent_spend", "settle_agent_spend",
       "agent_run_finish", "agent_run_store_content", "agent_run_store_content"]);
     const [start, reserve, settle, finish, storedInput, storedOutput] = fake.calls;
-    expect(start.args).toMatchObject({ p_trigger: "on_demand", p_model: "gpt-5.6-luna" });
-    expect(start.args.p_prompt_version).toMatch(/^[a-f0-9]{64}$/);
-    expect(reserve.args).toMatchObject({ p_run_id: "run-1", p_model: "gpt-5.6-luna" });
+    expect(start.args).toMatchObject({ p_trigger: "on_demand", p_model: "openai/gpt-5.6-luna" });
+    expect(start.args.p_prompt_version).toMatch(/^[a-f0-9]{16}:[a-f0-9]{64}$/);
+    expect(reserve.args).toMatchObject({ p_run_id: "run-1", p_model: "openai/gpt-5.6-luna" });
     expect(reserve.args.p_estimated_microdollars as number).toBeGreaterThan(2_400);
     // 8,700 input tokens at US$0.20/M plus 480 output tokens at US$1.20/M.
     expect(settle.args).toEqual({ p_reservation_id: "reservation-1", p_actual_microdollars: 2316 });
@@ -183,5 +183,21 @@ describe("agent model pricing", () => {
     expect(usageMicrodollars(price, { inputTokens: 1_000_000, cachedInputTokens: 500_000, outputTokens: 0 })).toBe(110_000);
     expect(usageMicrodollars(price, { inputTokens: null, cachedInputTokens: null, outputTokens: null })).toBeNull();
     expect(estimateCallMicrodollars(price, { requestCharacters: 40_000, maxOutputTokens: 2_000 })).toBe(10_400);
+  });
+
+  it("prices the Phase 1B eval candidates, including Anthropic models", () => {
+    expect(modelPrice("anthropic/claude-sonnet-5.5")).toEqual({ input: 2, cachedInput: 0.1, output: 10 });
+    expect(modelPrice("anthropic/claude-haiku-5.5")).not.toBeNull();
+    expect(modelPrice("openai/gpt-5.6-terra")).not.toBeNull();
+  });
+
+  it("estimates with the caller's output cap and model", async () => {
+    const fake = fakeAgentClient();
+    const run = await beginDailyBriefAgentRun({ userId: "owner", trigger: "on_demand", model: "anthropic/claude-sonnet-5.5", maxOutputTokens: 1_000,
+      promptVersion: "v1", client: fake.client as never });
+    await run!.wrap(async () => ({}))({ instructions: "i".repeat(100), facts: "", signal: new AbortController().signal });
+    const reserve = fake.calls.find((call) => call.name === "reserve_agent_spend")!;
+    // 100 characters at US$2 per million plus 1,000 output tokens at US$10 per million.
+    expect(reserve.args).toMatchObject({ p_model: "anthropic/claude-sonnet-5.5", p_estimated_microdollars: 10_200 });
   });
 });

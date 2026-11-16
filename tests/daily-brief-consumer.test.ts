@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
 import fixture from "./fixtures/advisor-day-context.valid.json";
-import { DAILY_BRIEF_INSTRUCTIONS, generateDailyBrief } from "@/lib/services/daily-brief-consumer";
-import { generateOpenAIDailyBrief } from "@/lib/services/daily-brief-openai";
+import { DAILY_BRIEF_INSTRUCTIONS, generateDailyBrief, type DailyBriefModelUsage } from "@/lib/services/daily-brief-consumer";
+import { generateDailyBriefWithModel } from "@/lib/services/daily-brief-model";
+import { ANTHROPIC_ENV, anthropicReply, GATEWAY_ENV, gatewayReply, OPENAI_ENV, responsesReply } from "./helpers/model-responses";
 const context = validateAdvisorDayContext(fixture);
 const now = () => Temporal.Instant.from(context.capturedAt);
 const advice = { suggestions: [], text: "Make room for your planned walk.", occurrenceRefs: [context.cadence.occurrences[0].ref] };
@@ -35,31 +36,56 @@ describe("provider-neutral daily briefing", () => {
   });
 });
 
-describe("OpenAI adapter", () => {
+describe("Daily Brief model adapter (Phase 1B, AI SDK)", () => {
   const input = { instructions: "Instructions", facts: "Synthetic facts", signal: new AbortController().signal };
-  const response = { status: "completed", output: [{ type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: JSON.stringify(advice) }] }] };
-  it("pins Luna, disables storage/tools, rejects redirects, and separates credentials from facts", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(response));
-    expect(await generateOpenAIDailyBrief(input, { apiKey: "synthetic-key", fetch: fetcher })).toEqual(advice);
+  it("pins Luna and low effort, disables storage and tools, and separates credentials from facts", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(responsesReply(advice)));
+    expect(await generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: fetcher })).toEqual(advice);
     const [url, options] = fetcher.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/responses");
-    expect(options).toMatchObject({ redirect: "error", signal: input.signal });
     const body = JSON.parse(options!.body as string);
-    expect(body).toMatchObject({ model: "gpt-5.6-luna", store: false, background: false, tools: [], tool_choice: "none", input: input.facts });
-    expect(body.text.format).toMatchObject({ type: "json_schema", strict: true });
+    expect(body).toMatchObject({ model: "gpt-5.6-luna", store: false, max_output_tokens: 2000, reasoning: { effort: "low" } });
+    expect(body.tools).toBeUndefined();
+    expect(body.input).toEqual([{ role: "developer", content: input.instructions }, { role: "user", content: [{ type: "input_text", text: input.facts }] }]);
+    expect(body.text.format).toMatchObject({ type: "json_schema", strict: true, name: "cadence_daily_brief" });
     expect(options!.body).not.toContain("synthetic-key");
   });
-  it.each([
-    { ...response, status: "incomplete" },
-    { ...response, output: [{ type: "function_call" }] },
-    { ...response, output: [{ ...response.output[0], content: [{ type: "refusal", refusal: "No" }] }] },
-    { ...response, output: [] },
-  ])("rejects incomplete, tool or refusal responses", async (body) => {
-    await expect(generateOpenAIDailyBrief(input, { apiKey: "key", fetch: async () => Response.json(body) })).rejects.toMatchObject({ code: "advisor_unavailable" });
+  it("sends the gateway model string through AI Gateway when that transport is on", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(gatewayReply(advice)));
+    expect(await generateDailyBriefWithModel(input, { env: GATEWAY_ENV, fetch: fetcher })).toEqual(advice);
+    const [url, options] = fetcher.mock.calls[0];
+    expect(String(url)).toBe("https://ai-gateway.vercel.sh/v4/ai/language-model");
+    expect((options!.headers as Record<string, string>)["ai-language-model-id"]).toBe("openai/gpt-5.6-luna");
+    expect(JSON.parse(options!.body as string)).toMatchObject({ reasoning: "low", maxOutputTokens: 2000, responseFormat: { type: "json", name: "cadence_daily_brief" } });
   });
-  it("bounds response bytes and sanitizes provider failures", async () => {
-    await expect(generateOpenAIDailyBrief(input, { apiKey: "key", fetch: async () => new Response("a".repeat(65537)) })).rejects.toMatchObject({ code: "advisor_unavailable" });
-    await expect(generateOpenAIDailyBrief(input, { apiKey: "key", fetch: async () => new Response("provider secret", { status: 429 }) })).rejects.toMatchObject({ code: "rate_limited" });
+  it.each([
+    ["incomplete", responsesReply(advice, undefined, { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } })],
+    ["not JSON", responsesReply("not json")],
+    ["refusal", { ...responsesReply(advice), output: [{ type: "message", id: "m", role: "assistant", status: "completed", content: [{ type: "refusal", refusal: "No" }] }] }],
+    ["empty", { ...responsesReply(advice), output: [] }],
+  ])("rejects %s responses", async (_label, body) => {
+    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: async () => Response.json(body) })).rejects.toMatchObject({ code: "advisor_unavailable" });
+  });
+  it("sanitizes provider failures and refuses a missing key or a non-OpenAI model without the gateway", async () => {
+    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: async () => new Response("provider secret", { status: 500 }) })).rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_http_5xx" });
+    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: async () => new Response("provider secret", { status: 429 }) })).rejects.toMatchObject({ code: "rate_limited" });
+    await expect(generateDailyBriefWithModel(input, { env: {}, fetch: async () => Response.json(responsesReply(advice)) })).rejects.toMatchObject({ code: "not_configured" });
+    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, model: "anthropic/claude-sonnet-5.5" })).rejects.toMatchObject({ code: "not_configured", reason: "anthropic_key_missing" });
+    await expect(generateDailyBriefWithModel(input, { env: { ...OPENAI_ENV, ...ANTHROPIC_ENV }, model: "google/gemini-3-pro" })).rejects.toMatchObject({ code: "not_configured", reason: "model_needs_gateway" });
+  });
+  it("calls Anthropic directly with the owner's key for anthropic/ models, without the gateway", async () => {
+    const usage: DailyBriefModelUsage[] = [];
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json(anthropicReply(advice, { input: 1_000, cached: 400, output: 120, reasoning: 0 })));
+    expect(await generateDailyBriefWithModel({ ...input, onUsage: (item) => usage.push(item) }, { env: ANTHROPIC_ENV, fetch: fetcher, model: "anthropic/claude-sonnet-5.5" })).toEqual(advice);
+    const [url, options] = fetcher.mock.calls[0];
+    expect(String(url)).toBe("https://api.anthropic.com/v1/messages");
+    expect((options!.headers as Record<string, string>)["x-api-key"]).toBe("synthetic-anthropic-key");
+    const body = JSON.parse(options!.body as string);
+    expect(body).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 2000 });
+    expect(JSON.stringify(body.system)).toContain(input.instructions.slice(0, 40));
+    expect(usage[0]).toMatchObject({ inputTokens: 1_000, cachedInputTokens: 400, outputTokens: 120 });
+    await expect(generateDailyBriefWithModel(input, { env: ANTHROPIC_ENV, fetch: async () => Response.json(anthropicReply(advice, undefined, "max_tokens")), model: "anthropic/claude-sonnet-5.5" }))
+      .rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_incomplete_max_output_tokens" });
   });
 });
 

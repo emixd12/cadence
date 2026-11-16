@@ -5,7 +5,9 @@ import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief } from "./daily-brief-openai";
+import { dailyBriefModelSetting, generateDailyBriefWithModel } from "./daily-brief-model";
+import { agentModelConfigured } from "./agent-model";
+import { DAILY_BRIEF_PROMPT_REVISION } from "./daily-brief-instructions";
 import { beginDailyBriefAgentRun, dailyBriefContextIsCalendarDerived, type DailyBriefAgentRun } from "./daily-brief-agent-run";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
@@ -50,7 +52,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     readDailyBriefSourceStatus(caller, preferences),
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
-  return { accountRef: briefingAccountRef(caller.user.id), available: !!process.env.OPENAI_API_KEY,
+  return { accountRef: briefingAccountRef(caller.user.id), available: agentModelConfigured(),
     deviceModelAvailable: dailyBriefDeviceModelAvailable(process.env),
     configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled,
     useConnectedSources: preferences.useConnectedSources, excludedSources: preferences.excludedSources, sourceStatus,
@@ -74,7 +76,7 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
   const input = parseDailyBriefSettingsInput(value);
   if (!input) throw new DailyBriefError("invalid_request");
   // Ticket 298: a server that offers only the device model still lets a linked Mac turn the brief on.
-  if (input.enabled && !process.env.OPENAI_API_KEY && !dailyBriefDeviceModelAvailable(process.env)) throw new DailyBriefError("not_configured");
+  if (input.enabled && !agentModelConfigured() && !dailyBriefDeviceModelAvailable(process.env)) throw new DailyBriefError("not_configured");
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
@@ -154,8 +156,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   deadlineMs?: number;
 }> = {}): Promise<DailyBriefResponse> {
   const attempt = readDailyBriefAttemptInput(value);
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new DailyBriefError("not_configured");
+  if (!options.generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
+  const setting = dailyBriefModelSetting();
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
   const clock = options.now ?? (() => Temporal.Now.instant());
@@ -183,8 +185,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       signal.throwIfAborted();
       // Advisor plan Phase 1A: one agent_runs row per attempt; each model call goes through the spend budget.
       agentRun = await phase("run_log", () => beginDailyBriefAgentRun({
-        userId: caller.user.id, trigger: attempt.retry ? "retry" : "on_demand", model: DAILY_BRIEF_MODEL,
-        promptVersion: configurationRevision, signal,
+        userId: caller.user.id, trigger: attempt.retry ? "retry" : "on_demand", model: setting.model,
+        maxOutputTokens: setting.maxOutputTokens, promptVersion: `${DAILY_BRIEF_PROMPT_REVISION}:${configurationRevision}`, signal,
       }));
       signal.throwIfAborted();
       const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
@@ -198,15 +200,16 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         await prepared.assertCurrent();
       };
       await assertCurrent();
-      const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
-      // Usage reaches only the performance log, never the response.
+      const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(setting.timeoutMs)]);
+      // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
+      const generator: DailyBriefGenerator = options.generate ?? ((input) => generateDailyBriefWithModel(input));
       const briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
         () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
           analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
           onTip: (fingerprints) => { tipFingerprints = fingerprints; },
           onUsage: (item) => { usage.push(item); },
-          generate: withAgentRun(agentRun, options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey }))) }), modelSignal));
+          generate: withAgentRun(agentRun, generator) }), modelSignal));
       // The lease must still belong to this attempt. A superseded attempt never returns text.
       const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
       if (!finished) throw new DailyBriefError("context_changed");

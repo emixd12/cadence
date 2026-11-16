@@ -111,7 +111,7 @@ Check the cited entry before acting on a row.
   passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
   interactions checks pass.
 - **Owner decisions:** hosted migrations approved; US$25 global daily breaker confirmed.
-- **Open:** Phase 1B adapts its metering hook to these functions.
+- **Phase 1B follow-up (done in #291):** the brief runs through the AI SDK model setting, and its calls still go through `daily-brief-agent-run.ts` over these functions. 1B's stub metering module was removed; `agent-model-pricing.ts` gained the eval candidate prices.
 
 ## Advisor plan Phase 1C: ground rules — November 16, 2026
 

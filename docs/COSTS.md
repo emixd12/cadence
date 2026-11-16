@@ -387,8 +387,12 @@ admissions on September 22–25.
 
 ## Daily Brief model
 
-Provider: OpenAI `gpt-5.6-luna` (`lib/services/daily-brief-openai.ts`), with
-`max_output_tokens: 2000` and low reasoning effort. Price: US$0.20 per million
+Provider: OpenAI `gpt-5.6-luna` through the AI SDK (`lib/services/daily-brief-model.ts`,
+`lib/services/agent-model.ts`; Phase 1B, November 16, 2026), with
+`maxOutputTokens: 2000` and low reasoning effort. The default (direct) transport still bills the
+OpenAI account directly, and bills `anthropic/...` models used in development or evals to
+the Anthropic account (`ANTHROPIC_API_KEY`). `CADENCE_MODEL_TRANSPORT=gateway` sends calls
+through AI Gateway at the same catalog price. `lib/services/agent-model-pricing.ts` holds the per-call cost table, and Phase 1A's spend budget refuses any model not listed there. Price: US$0.20 per million
 input tokens, US$0.02 per million cached input tokens and US$1.20 per million output
 tokens ([OpenAI model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
 checked November 11, 2026; input and output unchanged since 2026-09-07).
@@ -447,6 +451,24 @@ How to measure now:
 Multiply measured input and output tokens by the provider rates above. Cached input
 tokens are part of `input_tokens`; bill them at the cached-input rate and the rest at
 the input rate. Reasoning tokens are part of `output_tokens`.
+
+### Agent model candidates
+
+Phase 1B lists these in `lib/services/agent-model-pricing.ts` so evals and a
+per-agent model setting can use them. None is the production default. Prices are US$
+per million tokens from the AI Gateway catalog, checked November 16, 2026; the direct
+OpenAI and Anthropic prices are the same.
+
+| Model | Input | Cached input | Output |
+| --- | --- | --- | --- |
+| `openai/gpt-5.6-terra` | 2.00 | 0.20 | 12.00 |
+| `openai/gpt-5.6-sol` | 4.00 | 0.40 | 20.00 |
+| `anthropic/claude-haiku-5.5` | 0.10 | 0.01 | 0.50 |
+| `anthropic/claude-sonnet-5.5` | 2.00 | 0.10 | 10.00 |
+| `anthropic/claude-opus-5.5` | 4.00 | 0.20 | 20.00 |
+| `anthropic/claude-fable-5.2` | 8.00 | 0.20 | 40.00 |
+
+Haiku 5.5 doubles its price past 100,000 input tokens; a brief sends about 9,000.
 
 ### Ticket 290 workbench candidate models
 

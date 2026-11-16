@@ -38,7 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
-  vi.doUnmock("@/lib/services/daily-brief-openai");
+  vi.doUnmock("@/lib/services/daily-brief-model");
   vi.doUnmock("@/lib/services/daily-brief-request");
   vi.doUnmock("@/lib/services/briefing-account-context.service");
   vi.restoreAllMocks();
@@ -205,7 +205,7 @@ describe("briefing workbench boundary", () => {
     vi.doMock('@/lib/services/daily-brief-request', () => ({ runDailyBriefRequest: accountRead }));
     vi.doMock('@/lib/services/briefing-account-context.service', () => ({ prepareAccountBriefingContexts: accountRead, briefingAccountRef: vi.fn(), workbenchBehaviorRef: vi.fn() }));
     const provider = vi.fn();
-    vi.doMock("@/lib/services/daily-brief-openai", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", DAILY_BRIEF_REASONING_EFFORT: "low", OPENAI_REASONING_EFFORTS: ["low"], generateOpenAIDailyBrief: provider }));
+    vi.doMock("@/lib/services/daily-brief-model", () => ({ DAILY_BRIEF_MODEL: "synthetic-model", DAILY_BRIEF_REASONING_EFFORT: "low", DAILY_BRIEF_REASONING_EFFORTS: ["low"], generateDailyBriefWithModel: provider, generateDurationEstimatesWithModel: provider }));
     const network = vi.fn();
     vi.stubGlobal("fetch", network);
     const run = await loadService();

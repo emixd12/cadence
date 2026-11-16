@@ -19,6 +19,15 @@ export type ModelUsage = Readonly<{
 const PRICES: Readonly<Record<string, ModelPrice>> = {
   // OpenAI model page, checked November 11, 2026 (docs/COSTS.md, "Daily Brief model").
   "gpt-5.6-luna": { input: 0.2, cachedInput: 0.02, output: 1.2 },
+  // Eval candidates (Phase 1B). AI Gateway catalog, checked November 16, 2026
+  // (docs/COSTS.md, "Agent model candidates"). Gateway and direct prices match.
+  "gpt-5.6-terra": { input: 2, cachedInput: 0.2, output: 12 },
+  "gpt-5.6-sol": { input: 4, cachedInput: 0.4, output: 20 },
+  // Haiku 5.5 doubles past 100k input tokens; a brief stays far below.
+  "claude-haiku-5.5": { input: 0.1, cachedInput: 0.01, output: 0.5 },
+  "claude-sonnet-5.5": { input: 2, cachedInput: 0.1, output: 10 },
+  "claude-opus-5.5": { input: 4, cachedInput: 0.2, output: 20 },
+  "claude-fable-5.2": { input: 8, cachedInput: 0.2, output: 40 },
 };
 
 /** Accepts a bare model id or an AI Gateway "provider/model" string. */
