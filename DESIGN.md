@@ -8,6 +8,7 @@ colors:
   text: "#0A0B0C"
   muted-readable: "#626C75"
   accent: "#C84A31"
+  alert-signal: "#C84A31"
   timeline-row-hover: "#eef6ff"
   timeline-needs-decision-hover: "#e8f2ff"
   timeline-completed-hover: "#2f669f"
@@ -349,6 +350,16 @@ A boundary's space always exceeds every boundary one level below it; header rule
 - **Reserved fills:** Use filled button surfaces only for selected controls, destructive confirmations, fixed high-priority actions such as Needs decision, and cases where the target needs a larger touch surface.
 - **Hover / Focus:** Hover may add non-reflowing text emphasis or shift secondary actions to Ink Black. Focus must use a visible 2px outline with offset.
 
+### Alert notice
+
+One look for "something is wrong", everywhere in the product: the model failed, data is out of date, the advisor's budget is reached, or a write was refused. `components/feedback/AlertNotice.tsx` (bench: `/design-system#ds-module-alert-notice`).
+
+- **Structure:** a 16px warning-triangle icon, then a short label in Label typography, uppercase, in Rust Signal (`--alert-signal`), then the message in Body text in Ink Black (`--alert-foreground`), then at most one underlined text-link action. No box, fill, border, stripe or shadow, so it sits in a text-like surface such as the brief.
+- **Labels:** model failed, "Advice unavailable"; data out of date, "Out of date" (or a specific one such as "Calendar not current"); budget reached, "Advisor paused"; write refused, "Not changed".
+- **Message:** what happened, what still works, and when it returns or what to do ("Gym was just moved to 10:00 on another device."). No apology, no blame, no implementation terms.
+- **Announcing:** a refused write answers the person's own action and uses `role="alert"`. Standing states use `role="status"`.
+- **Never advice:** advice and advisor quips never use the warning icon, Rust Signal text or an alert label. An alert never carries a suggestion that could be read as the advisor's opinion; its one action only recovers.
+
 ### Chips
 
 - **Style:** Square, compact labels with 1px border.
@@ -409,7 +420,7 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 ### Timeline Rows
 
 - **Timeline structure:** The current day is the first forward feed section and uses the strongest date treatment. Do not show a visible Timeline page title above the feed. The transparent Cadence horse-line-and-dot image may sit directly above the feed as a full app-content-width banner with no extra top or bottom margin; the first Timeline day section remains the current day. Day transitions use the date header plus a thin divider, not boxed day sections. Needs decision is reached from a fixed lower-right button on desktop and a full-width lower safe-area button on mobile; it opens a modal rather than appearing as an inline Timeline section.
-- **Daily Brief:** The existing Timeline horse may carry one read-only text bubble on first opening. The square bubble overlaps the horse tail in normal document flow, uses a small square pointer, wraps and scrolls long text, and never covers occurrence status controls. It has a 44px Close action and no suggested-action control, modal, focus transfer, or decorative motion.
+- **Daily Brief:** The existing Timeline horse carries the brief's text bubble on first opening. The square bubble overlaps the horse tail in normal document flow, uses a small square pointer, wraps and scrolls long text, and never covers occurrence status controls. It has a 44px Close action and no modal, focus transfer, or decorative motion. Since the advisor plan (`docs/DECISIONS.md`, 2026-11-16, D32) the brief may hold action lines: each proposed move is one line of text (Behavior title, "9:00 → 11:30", a plain reason) followed by plain underlined text links (Yes · No · Other time), with Accept all above two or more lines and Already did it on late items. Separation comes from spacing, weight and Readable Ash, never from boxes, outlines or filled buttons. Nothing is typed into the brief. The character is called the "advisor" in the UI; "coach" is an internal term only. Errors inside the brief use the Alert notice, never the advice line style.
 - **Mobile refresh:** At mobile widths, a downward pull from the top of Timeline uses a 72px threshold and the factual states Pull to refresh, Release to refresh, and Refreshing timeline. Render the temporary feedback as a small square, bordered surface below the sticky header with no shadow. Short, horizontal, cancelled, below-the-top, and control-started gestures retain their normal behavior. One qualifying release requests one route refresh and never mutates an Occurrence or adds offline behavior.
 - **Collapsed unresolved:** Scheduled time as plain text, behavior title, Completed text-link action, and Not Completed text-link action. Rows are compact and unboxed, with collapsed time, title, and action text vertically centered within the row; do not draw a perimeter border around each behavior row. Row content keeps a compact horizontal inset on both desktop and mobile, and time, title, Completed, and Not Completed share one horizontal row when unresolved status actions are visible. Completed and Not Completed keep their minimum tap target and same-line labels; the time and title may compact and truncate before the status targets shrink. Primary status actions are visible for Needs decision rows and current-day unresolved rows. Preset time ranges show only their short label, such as Morning or Evening, in collapsed rows.
 - **Timeline status actions:** Render Completed and Not Completed as inline underlined text-link controls with the check and x icons retained. Do not use boxed, filled, or outlined button chrome for these row-level status actions. Keep status action underlines consistently thin; do not use underline thickness to indicate that a row is already Not Completed. Mobile status and Save note actions should have at least a 44px tap target. Hover-capable devices and keyboard focus may add non-reflowing text emphasis as a targeted exception to the base no-bold type experiment, but should not change the action color or move adjacent actions.
@@ -538,13 +549,14 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 - **Do** make mobile layouts stack vertically with comfortable 24px spacing.
 - **Do** use Timeline Row Hover for active navigation, Monolith Blue for selected states and completed cells, Ink Black for primary actions, and Readable Ash for secondary actions.
 - **Do** use Rust Signal for explicit Not Completed decisions and true caution states.
+- **Do** show every error, stale state, budget stop or refused write with the Alert notice, so a person never mistakes it for advice.
 
 ### Don't:
 
 - **Don't** use dense dashboards.
 - **Don't** use gamified streaks, rewards, badges, or scorekeeping.
 - **Don't** use social habit-tracking language.
-- **Don't** use motivational coaching copy.
+- **Don't** use motivational or cheerleading copy, including from the advisor.
 - **Don't** use medical dose, supply, or refill tracking patterns.
 - **Don't** use quantified-self analytics sprawl.
 - **Don't** use multi-user SaaS administration patterns.

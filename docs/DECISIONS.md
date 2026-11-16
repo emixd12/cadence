@@ -2617,3 +2617,40 @@ The same answers granted: agents change the hosted Auth settings for Tickets 332
 is `login@cadence-me.com`, name "Cadence", and agents add `cadence-me.com` as a Sequenzy
 sending domain (row 2); Sequenzy stays on the free plan for now (row 2). Evidence of what
 was applied: `docs/qa/2026-11-13-ticket-332-hosted-auth-changes.md`.
+
+## 2026-11-16: Advisor plan: three agents and per-day moves (D32)
+
+The owner approved the advisor plan on November 15 and 16, 2026. Cadence's advisor
+becomes three agents on one shared core, all inside the Next.js app on Vercel (AI SDK, AI
+Gateway, Vercel Workflows):
+
+1. **Daily Brief** plans today. It proposes moving Unresolved Occurrences to another time
+   today and applies a move when the person says Yes. A move changes today only; the
+   Behavior's schedule stays. The brief keeps text-like lines (Yes · No · Other time,
+   Accept all, Already did it, Undo) and no typing.
+2. **Coach** (the horse) gives short, counted advice backed by reviewed research cards and
+   can propose a base schedule change for the person to confirm. "Coach" is an internal
+   term. In the UI the character is called the "advisor"; custom names come later.
+3. **Chat** is its own page and runs the same operations MCP clients can.
+
+The plan wins over `PRODUCT.md` and `DESIGN.md` where they disagree; both were updated on
+November 16 (Phase 1C). Per-day moves are their own append-only records and never touch
+`scheduled_for`; their time and race rules are in `docs/DATETIME_STRATEGY.md`, "Moves".
+Every reader of when an Occurrence happens goes through the time helper
+(`packages/core/src/resolvers/time.resolver.ts`), guarded by a drift test.
+
+The owner also decided: a starting budget of US$5 per account per month (Daily Brief
+US$0.50 protected, advisor quips US$1.00, Chat US$3.50, all adjustable); run content kept
+30 days with no opt-in, metadata long-term (settles Ticket 185); models chosen by cost and
+quality evaluation; one shared alert style for errors; `docs/MCP_CONTRACT.md` describes a
+deprecation path instead of "published tool names never change".
+
+Public text this makes stale is logged in `docs/MESSAGING_CHANGES.md` (P-059 to P-061) and
+fixed in one pass after the heavy development, as the messaging track already does. The
+scope lines in `AGENTS.md` that call the Daily Brief read-only and keep general AI chat and
+server-side agents out of scope change when the advisor tickets are written.
+
+Platform impact: web first; each phase is finished only when it reaches the Mac app, MCP
+output and export. Marketing: no change until the messaging pass. Future mobile: the race
+rules live on the server, so a phone app inherits them. Messaging impact: P-059, P-060,
+P-061.

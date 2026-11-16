@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-058` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-062` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -118,6 +118,9 @@ Status values:
 | [P-048](#p-048-launch-narrative-replaces-the-record-first-positioning) | Launch narrative replaces the record-first positioning | logged | 327, 246 | Marketing, README, developer docs, plugin listings |
 | [P-049](#p-049-complete-from-hevy-at-behavior-creation) | Complete from Hevy at Behavior creation | logged | 329 | In-app copy, user guide |
 | [P-050](#p-050-complete-from-hevy-on-the-mac) | Complete from Hevy on the Mac | logged | 330 | In-app copy (Mac), user guide |
+| [P-059](#p-059-the-advisor-may-use-model-providers-other-than-openai) | The advisor may use model providers other than OpenAI | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ, user guide |
+| [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
+| [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1769,4 +1772,80 @@ cite has not changed.
   owner decision; it is a tenant change) or say which mailbox the retention claim covers.
   Decide whether public text should name `support@cadence-me.com`.
 - **Related:** none.
+- **Status:** logged.
+
+## P-059: The advisor may use model providers other than OpenAI
+
+- **Change:** decided November 16, 2026 (`docs/DECISIONS.md`, D32; advisor plan Phase 1B).
+  The Daily Brief, the coach and Chat call models through Vercel AI Gateway with the AI
+  SDK. The model for each agent is chosen by cost and quality evaluation, so the provider
+  can be OpenAI, Anthropic or another provider the Gateway offers, and can change when a
+  later evaluation picks another model. Today's brief calls OpenAI directly until Phase 1B
+  ships.
+- **Affected:** advisor plan Phases 1B, 3, 4 and 5. Files when implemented: the model
+  gateway module that replaces `lib/services/daily-brief-openai.ts`.
+- **Surfaces:** Privacy ("Optional Daily Brief", the processors and subprocessors rows that
+  name OpenAI, the link to OpenAI's API data controls), Trust if it names the model
+  provider, in-app copy (`components/briefing/DailyBriefSettingsPanel.tsx`, "to OpenAI"),
+  marketing FAQ (`apps/marketing/src/data/faq.ts`: `use-external-ai` and
+  `new-connector-model-choice` both name OpenAI), user guide.
+- **Conflicting current text:** "When enabled, Daily Brief separately sends selected
+  tracking information to OpenAI" (FAQ `use-external-ai`); "Cadence sends today's Behavior
+  schedule and completion history ... to OpenAI" (Privacy, "Optional Daily Brief"; Daily
+  Brief settings panel); "Cadence requests store:false from OpenAI" (Privacy).
+- **Update needed:** name the Gateway and the providers it may route to, or describe the
+  provider by role; say how a provider change is announced. Recheck each provider's
+  retention terms (`docs/LEGAL.md`).
+- **Related:** P-060, P-061.
+- **Status:** logged.
+
+## P-060: Advisor content is stored for 30 days, with no opt-in
+
+- **Change:** decided November 16, 2026 (`docs/DECISIONS.md`, D32; advisor plan Phase 1A,
+  "Agent run log"; settles Ticket 185). Cadence keeps metadata for every advisor run (agent,
+  trigger, model, prompt version, tokens, cost, tool calls, outcome) long-term for
+  analytics. It keeps run content (brief text, coach quips, chat turns and the inputs
+  needed to replay a run) for 30 days, then a scheduled job deletes it. Calendar-derived
+  text is not kept past its day. There is no opt-in for now. Stored runs within the window
+  feed evaluations with personal text stripped.
+- **Affected:** advisor plan Phase 1A (`agent_runs` and its content table), later phases
+  that write to them.
+- **Surfaces:** Privacy (Daily Brief section and the retention table row "Daily Brief"),
+  Trust if it lists retention, in-app copy (Daily Brief settings), marketing FAQ
+  (`new-connector-model-choice`).
+- **Conflicting current text:** "Cadence retains no production prompt or briefing history"
+  and "It does not save prompts or generated briefing text in its hosted database"
+  (Privacy, "Optional Daily Brief"); retention row "No production prompt or briefing
+  history in Cadence"; "Cadence keeps no production prompt or briefing history" (FAQ
+  `new-connector-model-choice`).
+- **Update needed:** state what is kept, for how long, why (showing the brief again,
+  analytics, evaluation), and that account deletion removes it. Decide later whether an
+  opt-in or opt-out is offered; the owner chose none for now.
+- **Related:** P-059, P-061.
+- **Status:** logged.
+
+## P-061: The advisor can change records when the person says yes
+
+- **Change:** decided November 16, 2026 (`docs/DECISIONS.md`, D32; advisor plan Phases 2–5).
+  The Daily Brief proposes moving an Unresolved Occurrence to another time today and
+  applies the move when the person taps Yes or Accept all; "Already did it" marks it
+  Completed. The person can move an Occurrence for today from its menu. A coach (the
+  horse, called the "advisor" in the UI) shows short advice from reviewed research cards
+  and can propose a base schedule change for the person to confirm. A Chat page lets the
+  person talk to Cadence and run the same operations MCP clients can, small reversible
+  writes at once with Undo, larger ones after a confirm. A move never changes the
+  Behavior's schedule.
+- **Affected:** advisor plan Phases 2–5; `PRODUCT.md` and `DESIGN.md` updated in Phase 1C.
+- **Surfaces:** Privacy and Terms (what the briefing can do), in-app copy, marketing
+  (`docs/NARRATIVE.md` claims, FAQ, about page), user guide, provider submissions and
+  plugin listings that call the brief read-only.
+- **Conflicting current text:** "Cadence can prepare a read-only briefing" and "The
+  briefing cannot change tracking or Calendar records" (Privacy, "Optional Daily Brief";
+  Daily Brief settings panel); the "In-app read-only Cadence Daily Brief" scope line and
+  "Cadence itself runs no server-side AI agent" (`AGENTS.md`, until the advisor tickets
+  are written).
+- **Update needed:** describe the moves, the coach and Chat; say that nothing changes
+  until the person says yes, that a move changes today only, and that Undo exists. Calendar
+  records stay read-only.
+- **Related:** P-059, P-060.
 - **Status:** logged.

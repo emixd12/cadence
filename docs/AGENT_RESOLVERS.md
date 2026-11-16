@@ -88,6 +88,7 @@ unchanged. The canonical BehaviorLog schema lives only at
 
 | Domain | Owner resolver | Allowed callers | Forbidden bypasses | Source docs | Required test | Drift check |
 |---|---|---|---|---|---|---|
+| Time helper and effective time | `packages/core/src/resolvers/time.resolver.ts` | Every service, resolver and UI adapter that needs "now", today's local date, local day bounds or an Occurrence's effective time; `lib/services/clock.ts` supplies the web runtime clock; resolver tests | Reading `scheduled_for` directly for when an Occurrence happens, `new Date()` or `Temporal.Now` outside the runtime clock adapters, adding 24 hours to find the next local midnight, server timezone as a person's timezone | `docs/DATETIME_STRATEGY.md` | `tests/time.resolver.test.ts`, `tests/scheduled-for-drift.test.ts` | Core receives a `CadenceClock`; only runtime adapters read the system clock. `effectiveStartAt` returns the planned time until per-day moves land. The drift test fails when a file mentions `scheduled_for` more often than `tests/fixtures/governance/scheduled-for-allowlist.json` allows. |
 | Recurrence expansion | `packages/core/src/resolvers/recurrence.resolver.ts` | `lib/services/occurrence.service.ts`, resolver tests | React components, API routes, Supabase repositories, provider adapters, direct `Date` arithmetic | `docs/RECURRENCE_RULES.md`, `docs/DATETIME_STRATEGY.md` | `tests/recurrence.resolver.test.ts` | Resolver must not import React, Next, Supabase, browser globals, provider clients, or env vars. |
 | Occurrence generation and repair planning | `packages/core/src/resolvers/occurrence.resolver.ts` | `lib/services/occurrence.service.ts`, resolver tests | Database inserts inside resolver, UI deciding future occurrence or repair windows, API routes deduplicating occurrences, UI expanding or repairing behavior schedules or time entries | `docs/DATA_MODEL.md`, `docs/RECURRENCE_RULES.md` | `tests/occurrence.resolver.test.ts` | Generated occurrence and explicit repair plans must be pure; repository owns persistence and unique constraints. Schedule normalization returns `valid`, single-parent `repairable`, or typed `invalid` results. Active empty or ambiguous persisted graphs cannot be filtered into a successful no-op or fresh horizon. Multiple valid schedules expand through their own recurrence and time entries; duplicate candidates with the same behavior, local date, start time, and end-time/range identity merge before persistence. The Ticket 060 migration may mirror recurrence rules only for its one-time idempotent repair and must retain parity fixtures. |
 | Behavior definition history planning | `packages/core/src/resolvers/behavior-definition.resolver.ts` | `packages/core/src/services/behavior.service.ts`, web/desktop Behavior adapters, resolver tests | UI or repositories comparing title/description revisions, schedule/reminder/category/archive/timezone edits creating definition events, database writes inside the resolver | `docs/DATA_MODEL.md`, `docs/PRODUCT_SPEC.md`, `docs/EXPORT_FORMATS.md` | `tests/behavior-definition.resolver.test.ts` | Initial events always mark title changed and mark description changed only when it is non-null; edits compare trimmed title/description values, append only for changed definition fields, and retain full previous/next text in the plan. Source is `manual`, `import`, or `system`; user-entered reasons remain schema-only in this ticket. |
@@ -778,6 +779,25 @@ Google route data reaches the model only as Cadence's own conclusions.
 Paired tests: `tests/travel-model-projection.test.ts`, `tests/briefing-travel.test.ts`
 (including no route duration, departure, arrival or derived time pair in the full
 model payload) and `tests/briefing-account-context.test.ts`.
+
+## Time helper (advisor plan, Phase 1C)
+
+`packages/core/src/resolvers/time.resolver.ts` is the one place Cadence asks for the
+time: `todayIn` (today's local date for a person or a Behavior), `localDateAt`,
+`localDayBounds` (a half-open local day that can last 23 or 25 hours),
+`zonedInstant` (wall-clock time with the "compatible" daylight-saving rule) and
+`effectiveStartAt` (the time an Occurrence actually sits at). Core cannot read the
+clock, so callers pass a `CadenceClock`: `systemClock` from `lib/services/clock.ts`
+on the web, `fixedClock` in tests. Until per-day moves land, effective time is the
+planned time; callers that use it pick up moves without another change.
+
+`tests/scheduled-for-drift.test.ts` counts the lines that mention `scheduled_for`
+or `scheduledFor` in each shipped source file and compares them with
+`tests/fixtures/governance/scheduled-for-allowlist.json`, seeded with the 2026-11-16
+readers. A new reader fails the build. Counts only go down as readers move to the
+helper. Raise one only when the code needs the planned time on purpose (identity,
+recurrence, export), with the reason in the pull request. Rules:
+`docs/DATETIME_STRATEGY.md`, "Time helper" and "Moves".
 
 ## Historical completion timing resolver
 

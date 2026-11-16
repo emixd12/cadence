@@ -97,6 +97,92 @@ For nonexistent local times during spring-forward, prefer the next valid local t
 - Do not store locale-formatted dates.
 - UI may format display dates with `Intl.DateTimeFormat`, using the explicit user timezone.
 
+## Time helper
+
+`packages/core/src/resolvers/time.resolver.ts` is the one place Cadence asks for
+the time. New code uses it for "now", today's local date, local day bounds, local
+wall-clock times and an Occurrence's effective time, instead of writing its own
+conversion.
+
+- **Now.** Core never reads the clock. Callers inject a `CadenceClock`:
+  `systemClock` (`lib/services/clock.ts`) on the web, `fixedClock` in tests and
+  replays. `currentInstant(clock)` returns the instant.
+- **Today.** `todayIn(clock, timezone)` returns today's `local_date`. Pass the
+  Behavior's timezone for rules about an Occurrence, and the profile timezone for
+  rules about the person's day.
+- **Local days.** `localDayBounds(localDate, timezone)` returns `[start, end)`
+  from local midnight to the next local midnight. Never add 24 hours.
+- **Wall-clock times.** `zonedInstant(localDate, wallTime, timezone)` applies the
+  "compatible" rule in "DST and edge cases".
+- **Effective time.** `effectiveStartAt(occurrence)` is the time an Occurrence
+  actually sits at: its latest applied move for that day, otherwise its planned
+  time. Until moves exist it returns `scheduled_for`.
+
+`scheduled_for` keeps meaning the planned time. It is part of the Occurrence's
+identity, and the sync resolver rewrites it from the schedule.
+`tests/scheduled-for-drift.test.ts` fails when a shipped source file mentions
+`scheduled_for` more often than
+`tests/fixtures/governance/scheduled-for-allowlist.json` allows. The allowlist
+holds the readers that existed on 2026-11-16. Readers move to the helper over
+time and their counts go down. Raise a count only when the code needs the planned
+time on purpose, such as recurrence, sync identity or export, and give the reason
+in the pull request.
+
+## Moves
+
+A move changes when one Occurrence happens on one day. It never changes the
+Behavior's schedule, the Occurrence's `scheduled_for` or its identity. Each move is
+its own append-only record. The advisor plan's "Data model for per-day moves"
+holds the tables; this section holds the time and race rules. They apply to every
+writer: the Daily Brief, the coach, chat, MCP clients and the person's own moves
+from the Occurrence menu.
+
+### Time rules
+
+- **Same day, in the Behavior's timezone.** A move must keep the Occurrence on its
+  own `local_date`, computed in the Behavior's timezone, which is the zone that
+  defined `local_date`. Only the new start is checked. A late move may end after
+  midnight.
+- **Only today.** A move applies to an Occurrence whose `local_date` is today in
+  the Behavior's timezone (`todayIn`). Past and future days are not moved.
+- **Each move stores its timezone.** The record keeps the IANA timezone it was
+  made in, next to its UTC instants, so history reads correctly after a later
+  timezone change.
+- **A profile timezone change supersedes today's moves.** The change regenerates
+  future Unresolved Occurrences in the new zone (see "Product decisions"). Today's
+  applied moves stop counting toward effective time; their records stay as
+  history. The person or the Daily Brief can move again in the new zone.
+- **No moves for range Behaviors in v1.** An Occurrence scheduled as a time range
+  (for example Morning) is not moved. Behavior settings explain that a range means
+  no move suggestions.
+- **Daylight saving.** A new time is resolved with the "compatible" rule in "DST
+  and edge cases": a time skipped by spring-forward moves to the next valid time,
+  and a time repeated by fall-back takes the earlier instant. Durations are kept as
+  elapsed time, so a move across a transition keeps its length.
+- **Effective time.** Every reader asks `effectiveStartAt`. Reminders, the
+  Timeline, leave reminders, travel, Hevy matching, day progress, analytics, MCP
+  output and Mac sync follow the move. Export keeps the planned time and carries
+  moves in its `app.cadence` extension.
+
+### Two devices at once
+
+Different kinds of action never collide: a move, a status mark and a note are
+separate records. The same action on the same Occurrence is decided on the server
+by arrival. Each write carries the revision its device last saw and an
+idempotency key. The first write to arrive wins. A later write with an out-of-date
+revision is refused with the current state, and the device says what changed
+("Gym was just moved to 10:00 on another device"). Offline writes replay with the
+same check. These rules live on the server, so every client, including future
+iPhone and Android apps, inherits them.
+
+| Case | Rule |
+|---|---|
+| An Occurrence is Completed or Not Completed while a move is pending | The status wins. A resolved Occurrence is not moved, and any open proposal for it is withdrawn. |
+| Undo of a move that a later move already replaced | Refused. Undo reverses only the latest move of that Occurrence's day. |
+| The Behavior's schedule is edited after today's move | The move stays. The moved Occurrence takes the new schedule identity, so no second copy appears. If the new schedule collides with the moved time, Cadence raises a move conflict notice. |
+| The same write arrives twice with the same idempotency key | The second returns the first result and applies nothing. |
+| Two moves of the same Occurrence with the same expected revision | The first to arrive wins. The second is refused with the current state. |
+
 ## Tests are source-of-truth evidence
 
 The following tests are required before recurrence/timeline/status work is complete:
