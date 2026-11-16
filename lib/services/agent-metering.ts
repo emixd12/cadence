@@ -89,6 +89,11 @@ export const MODEL_PRICES: Readonly<Record<string, ModelPrice>> = {
   "openai/gpt-5.6-luna": { input: 0.20, cachedInput: 0.02, output: 1.20 },
   "openai/gpt-5.6-terra": { input: 2.00, cachedInput: 0.20, output: 12.00 },
   "openai/gpt-5.6-sol": { input: 4.00, cachedInput: 0.40, output: 20.00 },
+  // Anthropic, checked 2026-11-16. Haiku 5.5 doubles past 100k input tokens; a brief stays far below.
+  "anthropic/claude-haiku-5.5": { input: 0.10, cachedInput: 0.01, output: 0.50 },
+  "anthropic/claude-sonnet-5.5": { input: 2.00, cachedInput: 0.10, output: 10.00 },
+  "anthropic/claude-opus-5.5": { input: 4.00, cachedInput: 0.20, output: 20.00 },
+  "anthropic/claude-fable-5.2": { input: 8.00, cachedInput: 0.20, output: 40.00 },
 };
 
 /** Used for a model with no listed price, so a reservation is never zero. Deliberately high. */

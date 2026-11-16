@@ -1,4 +1,5 @@
 import { createGateway, generateText, jsonSchema, NoObjectGeneratedError, Output, type LanguageModel } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 
 /**
@@ -7,9 +8,12 @@ import { createOpenAI } from "@ai-sdk/openai";
  * harness passes an override to try another one.
  *
  * Transport: `CADENCE_MODEL_TRANSPORT=gateway` sends calls through Vercel AI Gateway
- * (`AI_GATEWAY_API_KEY`, or OIDC on Vercel). Any other value, or none, keeps the AI SDK
- * OpenAI provider with `OPENAI_API_KEY`, which bills the same OpenAI account as before.
- * Switching production to the gateway is an owner decision (Gateway credits or BYOK).
+ * (`AI_GATEWAY_API_KEY`, or OIDC on Vercel). Any other value, or none, is the direct
+ * transport: each model goes straight to its creator with the owner's own key, so it
+ * spends credits already bought there. `openai/...` uses `OPENAI_API_KEY` (the same
+ * OpenAI account as before Phase 1B) and `anthropic/...` uses `ANTHROPIC_API_KEY`
+ * (for development and evals; production's default model is OpenAI). Other creators
+ * need the gateway. Switching production to the gateway is an owner decision.
  *
  * Never log prompts, facts, output or response IDs here.
  */
@@ -59,14 +63,17 @@ export function isModelId(value: unknown): value is string {
   return typeof value === "string" && (GATEWAY_MODEL_ID.test(value) || BARE_MODEL_ID.test(value));
 }
 
-export type ModelTransport = "gateway" | "openai";
+export type ModelTransport = "gateway" | "direct";
 type Env = Readonly<Record<string, string | undefined>>;
 
 export function modelTransport(env: Env = process.env): ModelTransport {
-  return env.CADENCE_MODEL_TRANSPORT === "gateway" ? "gateway" : "openai";
+  return env.CADENCE_MODEL_TRANSPORT === "gateway" ? "gateway" : "direct";
 }
 
-/** Whether a model call can be attempted at all. Credentials are checked again by the provider. */
+/**
+ * Whether the production default model can be called. Credentials are checked again by
+ * the provider; a direct call to another creator fails then with `not_configured`.
+ */
 export function agentModelConfigured(env: Env = process.env): boolean {
   return modelTransport(env) === "gateway" ? !!(env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN || env.VERCEL) : !!env.OPENAI_API_KEY;
 }
@@ -154,11 +161,26 @@ function resolveModel(id: string, env: Env, customFetch?: typeof fetch): Languag
     const apiKey = env.AI_GATEWAY_API_KEY;
     return createGateway({ ...(apiKey ? { apiKey } : {}), ...(customFetch ? { fetch: customFetch } : {}) })(id);
   }
-  if (!env.OPENAI_API_KEY) throw new AgentModelError("not_configured", "openai_key_missing");
   const [creator, name] = id.split("/", 2);
-  // Without the gateway only OpenAI models are reachable; another creator needs the gateway transport.
-  if (creator !== "openai" || !name) throw new AgentModelError("not_configured", "model_needs_gateway");
-  return createOpenAI({ apiKey: env.OPENAI_API_KEY, ...(customFetch ? { fetch: customFetch } : {}) }).responses(name);
+  if (!name) throw new AgentModelError("invalid_model", "model_id_invalid");
+  if (creator === "openai") {
+    if (!env.OPENAI_API_KEY) throw new AgentModelError("not_configured", "openai_key_missing");
+    return createOpenAI({ apiKey: env.OPENAI_API_KEY, ...(customFetch ? { fetch: customFetch } : {}) }).responses(name);
+  }
+  if (creator === "anthropic") {
+    if (!env.ANTHROPIC_API_KEY) throw new AgentModelError("not_configured", "anthropic_key_missing");
+    return createAnthropic({ apiKey: env.ANTHROPIC_API_KEY, ...(customFetch ? { fetch: customFetch } : {}) })(anthropicApiModelId(name));
+  }
+  // Without the gateway only OpenAI and Anthropic models are reachable.
+  throw new AgentModelError("not_configured", "model_needs_gateway");
+}
+
+/**
+ * AI Gateway writes Claude versions with dots (`claude-sonnet-5.5`); the Anthropic API
+ * uses dashes (`claude-sonnet-5-5`). Dated IDs (`claude-haiku-4-5-20251001`) pass through.
+ */
+export function anthropicApiModelId(name: string): string {
+  return name.replace(/\./g, "-");
 }
 
 function outputFailureReason(finishReason: string | undefined): string {

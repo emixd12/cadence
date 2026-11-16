@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
 import fixture from "./fixtures/advisor-day-context.valid.json";
-import { DAILY_BRIEF_INSTRUCTIONS, generateDailyBrief } from "@/lib/services/daily-brief-consumer";
+import { DAILY_BRIEF_INSTRUCTIONS, generateDailyBrief, type DailyBriefModelUsage } from "@/lib/services/daily-brief-consumer";
 import { generateDailyBriefWithModel } from "@/lib/services/daily-brief-model";
-import { GATEWAY_ENV, gatewayReply, OPENAI_ENV, responsesReply } from "./helpers/model-responses";
+import { ANTHROPIC_ENV, anthropicReply, GATEWAY_ENV, gatewayReply, OPENAI_ENV, responsesReply } from "./helpers/model-responses";
 const context = validateAdvisorDayContext(fixture);
 const now = () => Temporal.Instant.from(context.capturedAt);
 const advice = { suggestions: [], text: "Make room for your planned walk.", occurrenceRefs: [context.cadence.occurrences[0].ref] };
@@ -70,7 +70,22 @@ describe("Daily Brief model adapter (Phase 1B, AI SDK)", () => {
     await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: async () => new Response("provider secret", { status: 500 }) })).rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_http_5xx" });
     await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, fetch: async () => new Response("provider secret", { status: 429 }) })).rejects.toMatchObject({ code: "rate_limited" });
     await expect(generateDailyBriefWithModel(input, { env: {}, fetch: async () => Response.json(responsesReply(advice)) })).rejects.toMatchObject({ code: "not_configured" });
-    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, model: "anthropic/claude-sonnet-5.5" })).rejects.toMatchObject({ code: "not_configured", reason: "model_needs_gateway" });
+    await expect(generateDailyBriefWithModel(input, { env: OPENAI_ENV, model: "anthropic/claude-sonnet-5.5" })).rejects.toMatchObject({ code: "not_configured", reason: "anthropic_key_missing" });
+    await expect(generateDailyBriefWithModel(input, { env: { ...OPENAI_ENV, ...ANTHROPIC_ENV }, model: "google/gemini-3-pro" })).rejects.toMatchObject({ code: "not_configured", reason: "model_needs_gateway" });
+  });
+  it("calls Anthropic directly with the owner's key for anthropic/ models, without the gateway", async () => {
+    const usage: DailyBriefModelUsage[] = [];
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json(anthropicReply(advice, { input: 1_000, cached: 400, output: 120, reasoning: 0 })));
+    expect(await generateDailyBriefWithModel({ ...input, onUsage: (item) => usage.push(item) }, { env: ANTHROPIC_ENV, fetch: fetcher, model: "anthropic/claude-sonnet-5.5" })).toEqual(advice);
+    const [url, options] = fetcher.mock.calls[0];
+    expect(String(url)).toBe("https://api.anthropic.com/v1/messages");
+    expect((options!.headers as Record<string, string>)["x-api-key"]).toBe("synthetic-anthropic-key");
+    const body = JSON.parse(options!.body as string);
+    expect(body).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 2000 });
+    expect(JSON.stringify(body.system)).toContain(input.instructions.slice(0, 40));
+    expect(usage[0]).toMatchObject({ inputTokens: 1_000, cachedInputTokens: 400, outputTokens: 120 });
+    await expect(generateDailyBriefWithModel(input, { env: ANTHROPIC_ENV, fetch: async () => Response.json(anthropicReply(advice, undefined, "max_tokens")), model: "anthropic/claude-sonnet-5.5" }))
+      .rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_incomplete_max_output_tokens" });
   });
 });
 

@@ -104,6 +104,7 @@
     "git:fresh": "node scripts/git-freshness.mjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.105",
     "@ai-sdk/openai": "4.0.118",
     "@cadence/core": "*",
     "@cadence/ui": "*",

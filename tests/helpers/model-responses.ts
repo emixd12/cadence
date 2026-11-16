@@ -23,5 +23,14 @@ export function gatewayReply(output: unknown, usage?: SyntheticUsage, finish = "
     warnings: [] };
 }
 
+/** An Anthropic Messages API body (direct transport, `anthropic/...` models). */
+export function anthropicReply(output: unknown, usage?: SyntheticUsage, stopReason = "end_turn") {
+  return { id: "msg_synthetic", type: "message", role: "assistant", model: "claude-sonnet-5-5", stop_reason: stopReason, stop_sequence: null,
+    content: [{ type: "text", text: typeof output === "string" ? output : JSON.stringify(output) }],
+    usage: usage ? { input_tokens: usage.input - usage.cached, cache_read_input_tokens: usage.cached, cache_creation_input_tokens: 0, output_tokens: usage.output }
+      : { input_tokens: 0, output_tokens: 0 } };
+}
+
 export const OPENAI_ENV = { OPENAI_API_KEY: "synthetic-key" } as const;
+export const ANTHROPIC_ENV = { ANTHROPIC_API_KEY: "synthetic-anthropic-key" } as const;
 export const GATEWAY_ENV = { CADENCE_MODEL_TRANSPORT: "gateway", AI_GATEWAY_API_KEY: "synthetic-gateway-key" } as const;

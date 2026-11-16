@@ -10,8 +10,10 @@ import { generateOpenAIDailyBrief } from "@/scripts/chatgpt-plan-spike-hosted-ad
  *
  * - Baseline: the pre-AI-SDK adapter (frozen copy) with the production model.
  * - Candidates: the AI SDK path, once per model in `CADENCE_ADVISOR_EVAL_MODELS`
- *   (comma-separated, default the production model). Set `CADENCE_MODEL_TRANSPORT=gateway`
- *   to send candidates through AI Gateway.
+ *   (comma-separated, default the production model). Without the gateway, `openai/...`
+ *   models bill `OPENAI_API_KEY` and `anthropic/...` models bill `ANTHROPIC_API_KEY`, so
+ *   tests spend credits already bought there. Set `CADENCE_MODEL_TRANSPORT=gateway` to send
+ *   candidates through AI Gateway instead.
  * - `CADENCE_ADVISOR_EVAL_BASELINE=0` skips the baseline.
  *
  * One pass of the 10 fixtures on the production model costs about US$0.05.
