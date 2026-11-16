@@ -96,8 +96,8 @@ Check the cited entry before acting on a row.
 
 ## Advisor plan Phase 1A: data foundations in source — November 16, 2026
 
-- **In progress, draft PR** on `claude/project-thread-vdfrmg`. Not applied to any hosted
-  database. First-party caller (one token channel and first-party grant per agent),
+- **Merged (PR #290) and applied to the hosted database** on November 16, 2026, with the
+  owner's go-ahead. First-party caller (one token channel and first-party grant per agent),
   agent run log with 30-day content store and daily deletion, Postgres spend budget
   (US$5 per account per month; Daily Brief US$0.50 protected, quips US$1.00, Chat
   US$3.50). The hosted Daily Brief now writes a run, reserves before its model call and
@@ -110,8 +110,25 @@ Check the cited entry before acting on a row.
   `mcp-server.local-integration`, which needs its own assigned stack; `npm run test`
   passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
   interactions checks pass.
-- **Open:** owner approval before the hosted migrations; owner to confirm the US$25
-  global daily breaker; Phase 1B adapts its metering hook to these functions.
+- **Owner decisions:** hosted migrations approved; US$25 global daily breaker confirmed.
+- **Open:** Phase 1B adapts its metering hook to these functions.
+
+## Advisor plan Phase 1C: ground rules — November 16, 2026
+
+- **Done in a draft PR** (D32). Time helper `packages/core/src/resolvers/time.resolver.ts`
+  (now, today, local day bounds, wall-clock times, effective time as planned time) with
+  `lib/services/clock.ts`; drift test `tests/scheduled-for-drift.test.ts` with an allowlist
+  of the 82 files that mention `scheduled_for` today. `docs/DATETIME_STRATEGY.md` gains
+  "Time helper" and "Moves". Shared `AlertNotice` (`components/feedback/`) and its tokens.
+  `PRODUCT.md` and `DESIGN.md` follow the advisor plan. `docs/MCP_CONTRACT.md` describes the
+  deprecation path. Public text logged as P-059 to P-061.
+- **Verification:** lint, typecheck, build, `agents:check`, `interactions:check`,
+  `resolvers:check` and `core:check` pass. `npm run test`: 16 failures in 4 files
+  (`mcp-fixture-cleanup`, `mcp-hosted-fixtures`, `mcp-hosted-isolation`,
+  `public-trust-input`), identical on `main` in this environment (Node 22).
+- **Deferred:** dropping "Suggestions never change the record" from
+  `briefing-references.json` changes the pinned production prompt
+  (`tests/daily-brief-production-pin.test.ts`); it moves to Phase 3 with the new prompt.
 
 ## Cadence mailbox on Microsoft 365 — November 14, 2026
 

@@ -491,6 +491,20 @@
       "notes": "Ticket 303 save-as-you-change pieces: each section's one result line (Saving…, Saved, or a specific error ending 'Your change was undone.'; visually hidden while empty) and SettingsDisconnect (components/settings/SettingsDisconnect.tsx), a source's destructive Disconnect that asks in place with Disconnect and Cancel."
     },
     {
+      "id": "module.alert-notice",
+      "name": "AlertNotice",
+      "kind": "module",
+      "source": "components/feedback/AlertNotice.tsx",
+      "exportName": "AlertNotice",
+      "usageNames": [
+        "AlertNotice"
+      ],
+      "benchAnchor": "design-system#ds-module-alert-notice",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Advisor plan Phase 1C. The one style for something going wrong: model failed, data out of date, budget reached, write refused. Warning icon plus a Rust Signal label; never used for advice."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",
