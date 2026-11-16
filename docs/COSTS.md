@@ -387,8 +387,11 @@ admissions on September 22–25.
 
 ## Daily Brief model
 
-Provider: OpenAI `gpt-5.6-luna` (`lib/services/daily-brief-openai.ts`), with
-`max_output_tokens: 2000` and low reasoning effort. Price: US$0.20 per million
+Provider: OpenAI `gpt-5.6-luna` through the AI SDK (`lib/services/daily-brief-model.ts`,
+`lib/services/agent-model.ts`; Phase 1B, November 16, 2026), with
+`maxOutputTokens: 2000` and low reasoning effort. The default transport still bills the
+OpenAI account directly; `CADENCE_MODEL_TRANSPORT=gateway` sends calls through AI Gateway
+at the same catalog price. `lib/services/agent-metering.ts` holds the per-call cost table. Price: US$0.20 per million
 input tokens, US$0.02 per million cached input tokens and US$1.20 per million output
 tokens ([OpenAI model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
 checked November 11, 2026; input and output unchanged since 2026-09-07).

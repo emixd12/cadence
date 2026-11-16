@@ -83,7 +83,7 @@ part of L-002.
   Ticket 216 (label counts; since L-003's October 22 resolution they no longer depend
   on Google coordinates). Files: `TravelTimingModelProjection` in
   `packages/core/src/types/travel.ts`, `projectBriefingContext` in
-  `packages/core/src/services/briefing-config.ts`, `lib/services/daily-brief-openai.ts`.
+  `packages/core/src/services/briefing-config.ts`, `lib/services/daily-brief-model.ts`.
 - **Sources** (checked 2026-10-17):
   - Google Maps Platform Terms 3.2.3(c): "Customer will not create content based on
     Google Maps Content." Example (vi): "convert text-based driving times into
