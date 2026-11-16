@@ -90,7 +90,8 @@ pub fn snapshot(db: &Connection, profile_id: &str) -> Result<Value> {
         "whereSuggestionDismissals":db::owned::<WhereSuggestionDismissal>(db,profile_id)?,
         "dayNotes":super::day_note::owned_if_present(db,profile_id)?,
         "sourceLinks":owned_if_table::<BehaviorSourceLink>(db,profile_id)?,
-        "sourceMatches":owned_if_table::<OccurrenceSourceMatch>(db,profile_id)?
+        "sourceMatches":owned_if_table::<OccurrenceSourceMatch>(db,profile_id)?,
+        "occurrenceMoves":owned_if_table::<OccurrenceMove>(db,profile_id)?
     }))
 }
 

@@ -60,6 +60,25 @@ pub fn read_history(db: &Connection, profile_id: &str, occurrence_ids: &[String]
     Ok(json!({"statusEvents":events,"timeSessions":sessions,"sourceMatches":matches}))
 }
 
+/// Advisor Phase 2B: the synced move records of these Occurrences, oldest first in each
+/// chain. Callers derive effective time with the shared core helper.
+pub fn read_moves(db: &Connection, profile_id: &str, occurrence_ids: &[String]) -> Result<Value> {
+    if occurrence_ids.len() > db::READ_LIMIT {
+        return Err("The occurrence move request exceeds 100,000 IDs.".into());
+    }
+    for id in occurrence_ids {
+        db::valid_id(id)?;
+    }
+    let mut ids = occurrence_ids.to_vec();
+    ids.sort();
+    ids.dedup();
+    let mut moves = history_rows::<OccurrenceMove>(db, profile_id, &ids)?;
+    moves.sort_by(|left, right| {
+        (&left.occurrence_id, left.chain_position, &left.id).cmp(&(&right.occurrence_id, right.chain_position, &right.id))
+    });
+    Ok(json!(moves))
+}
+
 fn history_rows<T: StoredRow>(db: &Connection, profile_id: &str, ids: &[String]) -> Result<Vec<T>> {
     let mut output = Vec::new();
     for batch in ids.chunks(500) {

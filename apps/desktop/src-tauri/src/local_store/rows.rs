@@ -637,3 +637,37 @@ impl StoredRow for OccurrenceSourceMatch {
     const JSON_COLUMNS: &'static [&'static str] = &[];
     const BOOL_COLUMNS: &'static [&'static str] = &[];
 }
+
+/// Advisor Phase 2B: a read-only copy of a hosted per-day move or undo record. Account
+/// sync is its only writer. Effective time is derived from these in TypeScript with the
+/// shared core helper and never stored on the Occurrence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct OccurrenceMove {
+    pub id: String,
+    pub user_id: String,
+    pub occurrence_id: String,
+    pub behavior_id: String,
+    pub local_date: String,
+    pub weekday: i64,
+    pub timezone: String,
+    pub kind: String,
+    pub from_start_at: String,
+    pub from_end_at: String,
+    pub from_planned: bool,
+    pub to_start_at: String,
+    pub to_end_at: String,
+    pub to_planned: bool,
+    pub duration_source: String,
+    pub revises_move_id: Option<String>,
+    pub chain_root_id: String,
+    pub chain_position: i64,
+    pub reason: Option<String>,
+    pub source: String,
+    pub created_at: String,
+}
+impl StoredRow for OccurrenceMove {
+    const TABLE: &'static str = "occurrence_moves";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &["from_planned", "to_planned"];
+}

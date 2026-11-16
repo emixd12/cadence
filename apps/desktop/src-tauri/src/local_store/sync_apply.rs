@@ -31,6 +31,7 @@ pub enum AccountSyncEntityKind {
     DayNote,
     BehaviorSourceLink,
     OccurrenceSourceMatch,
+    OccurrenceMove,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -79,6 +80,7 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::DayNote => { decode_row::<DayNote>(value)?; }
             AccountSyncEntityKind::BehaviorSourceLink => { decode_row::<BehaviorSourceLink>(value)?; }
             AccountSyncEntityKind::OccurrenceSourceMatch => { decode_row::<OccurrenceSourceMatch>(value)?; }
+            AccountSyncEntityKind::OccurrenceMove => { decode_row::<OccurrenceMove>(value)?; }
         }
     }
     Ok(())
@@ -245,6 +247,10 @@ fn apply_mode(
             }
             AccountSyncEntityKind::OccurrenceSourceMatch => {
                 row_write::<OccurrenceSourceMatch>(db, profile, write, false, false)?
+            }
+            // Advisor Phase 2B: append-only on the server; a delete only follows its Behavior's.
+            AccountSyncEntityKind::OccurrenceMove => {
+                row_write::<OccurrenceMove>(db, profile, write, false, false)?
             }
         }
     }
@@ -470,6 +476,9 @@ fn validate_write(
         AccountSyncEntityKind::OccurrenceSourceMatch => {
             validate_row_write::<OccurrenceSourceMatch>(db, profile, write, false, false)
         }
+        AccountSyncEntityKind::OccurrenceMove => {
+            validate_row_write::<OccurrenceMove>(db, profile, write, false, false)
+        }
     }
 }
 
@@ -668,6 +677,8 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         AccountSyncEntityKind::DayNote => 12,
         // Ticket 320: read-only connector rows follow their Behavior and Occurrence.
         AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch => 13,
+        // Advisor Phase 2B: read-only move records follow their Behavior.
+        AccountSyncEntityKind::OccurrenceMove => 14,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first
@@ -679,7 +690,8 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
             (write.operation == AccountSyncOperation::Upsert) as u8
         } else if write.operation == AccountSyncOperation::Delete
             && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery | AccountSyncEntityKind::DayNote
-                | AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch)
+                | AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch
+                | AccountSyncEntityKind::OccurrenceMove)
         {
             // A merged same-date day note also leaves its unique date before the replacement row arrives.
             // Connector rows leave before the Occurrence or Behavior whose cascade would remove them.
@@ -1476,6 +1488,100 @@ mod tests {
             .unwrap();
         assert!(db::by_id::<BehaviorSourceLink>(&connection, &profile, &link.id).is_err());
         assert!(db::by_id::<OccurrenceSourceMatch>(&connection, &profile, &matched.id).is_err());
+    }
+
+    #[test]
+    fn account_sync_round_trips_read_only_occurrence_moves() {
+        let (_directory, mut connection, profile, category) = database();
+        let graph = complete_graph(&profile, category, '4');
+        insert_complete_graph(&connection, &profile, &graph);
+        let occurrence_before = db::by_id::<Occurrence>(&connection, &profile, &graph.occurrence.id).unwrap();
+        let first = OccurrenceMove {
+            id: "40000000-0000-4000-8000-000000000201".into(),
+            user_id: profile.clone(),
+            occurrence_id: graph.occurrence.id.clone(),
+            behavior_id: graph.behavior.id.clone(),
+            local_date: "2026-09-01".into(),
+            weekday: 2,
+            timezone: "America/New_York".into(),
+            kind: "move".into(),
+            from_start_at: "2026-09-01T13:00:00.000000Z".into(),
+            from_end_at: "2026-09-01T13:30:00.000000Z".into(),
+            from_planned: true,
+            to_start_at: "2026-09-01T15:00:00.000000Z".into(),
+            to_end_at: "2026-09-01T15:30:00.000000Z".into(),
+            to_planned: false,
+            duration_source: "planned_length".into(),
+            revises_move_id: None,
+            chain_root_id: "40000000-0000-4000-8000-000000000201".into(),
+            chain_position: 1,
+            reason: None,
+            source: "person".into(),
+            created_at: "2026-09-01T12:00:00.000000Z".into(),
+        };
+        let undo = OccurrenceMove {
+            id: "40000000-0000-4000-8000-000000000202".into(),
+            kind: "revert".into(),
+            from_start_at: first.to_start_at.clone(),
+            from_end_at: first.to_end_at.clone(),
+            from_planned: false,
+            to_start_at: first.from_start_at.clone(),
+            to_end_at: first.from_end_at.clone(),
+            to_planned: true,
+            duration_source: "restored".into(),
+            revises_move_id: Some(first.id.clone()),
+            chain_position: 2,
+            created_at: "2026-09-01T12:05:00.000000Z".into(),
+            ..first.clone()
+        };
+        let synced = |row: &OccurrenceMove| {
+            let mut value = normalized(row).unwrap();
+            value.as_object_mut().unwrap().remove("user_id");
+            value
+        };
+        let upsert = |row: &OccurrenceMove| AccountSyncWrite {
+            kind: AccountSyncEntityKind::OccurrenceMove,
+            id: row.id.clone(),
+            operation: AccountSyncOperation::Upsert,
+            expected: None,
+            value: Some(synced(row)),
+        };
+        execute(
+            &mut connection,
+            Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![upsert(&undo), upsert(&first)] },
+        )
+        .unwrap();
+        assert_eq!(db::by_id::<OccurrenceMove>(&connection, &profile, &first.id).unwrap(), first);
+        assert_eq!(db::by_id::<OccurrenceMove>(&connection, &profile, &undo.id).unwrap(), undo);
+        // A move never touches the Occurrence row, so a later status mark has nothing to conflict with.
+        assert_eq!(db::by_id::<Occurrence>(&connection, &profile, &graph.occurrence.id).unwrap(), occurrence_before);
+        // Reads come back in chain order for the shared effective-time rule.
+        let read = execute(
+            &mut connection,
+            Request::ReadOccurrenceMoves { profile_id: profile.clone(), occurrence_ids: vec![graph.occurrence.id.clone()] },
+        )
+        .unwrap();
+        let positions: Vec<i64> = read.as_array().unwrap().iter().map(|row| row["chain_position"].as_i64().unwrap()).collect();
+        assert_eq!(positions, vec![1, 2]);
+        assert_eq!(read[1]["to_planned"], json!(true));
+        // Server-only fields never reach a Mac.
+        let mut leaky = synced(&first);
+        leaky.as_object_mut().unwrap().insert("idempotency_key".into(), json!("key"));
+        assert!(validate_snapshot(&profile, &[AccountSyncEntity {
+            kind: AccountSyncEntityKind::OccurrenceMove,
+            id: first.id.clone(),
+            value: leaky,
+        }])
+        .is_err());
+        // A move outlives its Occurrence as history and leaves with its Behavior.
+        connection
+            .execute("DELETE FROM occurrences WHERE user_id=?1 AND id=?2", params![profile, graph.occurrence.id])
+            .unwrap();
+        assert!(db::by_id::<OccurrenceMove>(&connection, &profile, &first.id).is_ok());
+        connection
+            .execute("DELETE FROM behaviors WHERE user_id=?1 AND id=?2", params![profile, graph.behavior.id])
+            .unwrap();
+        assert!(db::by_id::<OccurrenceMove>(&connection, &profile, &first.id).is_err());
     }
 
     #[test]

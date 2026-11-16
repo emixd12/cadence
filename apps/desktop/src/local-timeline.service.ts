@@ -4,6 +4,7 @@ import { resolvePersistedTimeline } from "@cadence/core/services/timeline.servic
 import { localCommand } from "./local-store";
 import { ensureLocalOccurrencesFresh, toLocalBehaviorGraphRecord } from "./local-generation.service";
 import { toTimeSession } from "./local-occurrence.service";
+import { withLocalMoves } from "./local-moves.service";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
 import { attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
 
@@ -19,7 +20,8 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
     localCommand("readOccurrences", { profileId, startLocalDate: window.startLocalDate, endLocalDate: window.endLocalDate }),
     localCommand("readOccurrences", { profileId, startLocalDate: "0001-01-01", endLocalDate: priorDate, status: "unresolved" }),
   ]);
-  const occurrences = [...priorUnresolved, ...visibleOccurrences];
+  // Advisor Phase 2B: a moved Occurrence sits at its moved time; the planned time stays on the row.
+  const occurrences = await withLocalMoves(profileId, [...priorUnresolved, ...visibleOccurrences], graphs.map(({ behavior }) => behavior));
   const history = await localCommand("readOccurrenceHistory", { profileId, occurrenceIds: occurrences.map(({ id }) => id) });
   const historyOccurrences = await localCommand("readOccurrences", { profileId,
     startLocalDate: Temporal.PlainDate.from(window.startLocalDate).subtract({ days: 90 }).toString(), endLocalDate: priorDate });

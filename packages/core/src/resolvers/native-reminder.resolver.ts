@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorRecord } from "../behavior-store";
 import type { OccurrenceRecord } from "../data-store";
 import { resolveReminderDeliveries } from "./reminder.resolver";
+import { effectiveStartAt, isMoved } from "./time.resolver";
 import { formatOccurrenceScheduleLabel } from "../services/schedule";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "../services/occurrence-generation";
 import { normalizeOccurrenceStatus } from "../services/occurrence.service";
@@ -60,7 +61,8 @@ export function planNativeReminderRequests(input: {
         browserReminderEnabled: behavior.browser_reminder_enabled,
         emailReminderEnabled: false, reminderOffsetMinutes: behavior.reminder_offset_minutes },
       occurrence: { id: occurrence.id, userId: occurrence.user_id,
-        status: normalizeOccurrenceStatus(occurrence.status), scheduledFor: occurrence.scheduled_for },
+        // Advisor plan, Phase 2: a moved Occurrence reminds at its moved time.
+        status: normalizeOccurrenceStatus(occurrence.status), scheduledFor: effectiveStartAt(occurrence) },
     });
     const delivery = deliveries[0];
     if (!delivery) continue;
@@ -70,7 +72,7 @@ export function planNativeReminderRequests(input: {
       scheduleStartTime: occurrence.schedule_start_time, scheduleEndTime: occurrence.schedule_end_time,
     });
     requests.push({ id: `cadence.local.${occurrence.id}`, title: behavior.title.trim() || "Behavior reminder",
-      body: `Scheduled for ${schedule}.`, fireAt: delivery.scheduledSendAt });
+      body: isMoved(occurrence) ? `Moved for today. Planned for ${schedule}.` : `Scheduled for ${schedule}.`, fireAt: delivery.scheduledSendAt });
   }
   return selectNativeReminderRequests({ ...input, requests, capacity: requests.length });
 }

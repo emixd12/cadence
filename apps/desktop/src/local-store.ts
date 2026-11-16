@@ -21,6 +21,14 @@ export type OccurrenceSourceMatchRecord = {
   activity_start_at: string; activity_end_at: string; role: string; state: string; created_at: string; updated_at: string;
 };
 
+/** Advisor Phase 2B: a read-only copy of a hosted per-day move record, received through account sync. */
+export type OccurrenceMoveRecord = {
+  id: string; user_id: string; occurrence_id: string; behavior_id: string; local_date: string; weekday: number;
+  timezone: string; kind: "move" | "revert"; from_start_at: string; from_end_at: string; from_planned: boolean;
+  to_start_at: string; to_end_at: string; to_planned: boolean; duration_source: string; revises_move_id: string | null;
+  chain_root_id: string; chain_position: number; reason: string | null; source: string; created_at: string;
+};
+
 export type LocalBehaviorGraph = {
   behavior: Behavior;
   schedules: BehaviorSchedule[];
@@ -118,6 +126,7 @@ export type LocalCommandMap = {
     input: Owned & { occurrenceIds: string[] };
     result: { statusEvents: OccurrenceStatusEventRecord[]; timeSessions: OccurrenceTimeSession[]; sourceMatches?: OccurrenceSourceMatchRecord[] };
   };
+  readOccurrenceMoves: { input: Owned & { occurrenceIds: string[] }; result: OccurrenceMoveRecord[] };
   readSyncState: { input: Owned; result: OccurrenceSyncState };
   createBehaviorGraph: {
     input: Mutation & { graph: LocalBehaviorGraph; definitionEvent: BehaviorDefinitionEvent; configurationEvent: BehaviorConfigurationEvent };

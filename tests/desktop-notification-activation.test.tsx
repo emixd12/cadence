@@ -68,14 +68,15 @@ describe("native reminder activation", () => {
       id: "session", user_id: USER_ID, behavior_id: behavior.id, occurrence_id: ID,
       started_at: "2026-06-01T13:00:00Z", stopped_at: "2026-06-01T13:01:00Z",
       created_at: NOW.toString(), updated_at: NOW.toString(),
-    }] });
+    }] }).mockResolvedValueOnce([]);
     const result = await loadNotificationOccurrence({ occurrenceId: ID, profile,
       behaviors: [{ ...behavior, active: false, archived_at: NOW.toString() }], now: NOW });
     expect(result).toMatchObject({ id: ID, localDate: "2026-06-01", status: "completed", note: "Saved context",
       canStartTimeTracking: false, timeTracking: { recordedSeconds: 60, runningStartedAt: null } });
     expect(localCommand).toHaveBeenNthCalledWith(1, "readOccurrence", { profileId: USER_ID, occurrenceId: ID });
     expect(localCommand).toHaveBeenNthCalledWith(2, "readOccurrenceHistory", { profileId: USER_ID, occurrenceIds: [ID] });
-    expect(localCommand).toHaveBeenCalledTimes(2);
+    expect(localCommand).toHaveBeenNthCalledWith(3, "readOccurrenceMoves", { profileId: USER_ID, occurrenceIds: [ID] });
+    expect(localCommand).toHaveBeenCalledTimes(3);
   });
 
   it("preserves eligibility for a target beyond the 30-day feed limit", () => {
