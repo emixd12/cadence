@@ -33,8 +33,15 @@ export type DailyBriefAgentRun = Readonly<{
   runId: string;
   /** Wraps the generator so each call reserves, then settles, spend. */
   wrap: (generate: DailyBriefGenerator) => DailyBriefGenerator;
-  /** Records the outcome. Never throws: the brief's result does not depend on the log. */
-  finish: (result: Readonly<{ ok: true; briefing: unknown; calendarDerived: boolean }> | Readonly<{ ok: false; error: unknown }>) => Promise<void>;
+  /**
+   * Records the outcome. Never throws: the brief's result does not depend on the log.
+   * The run row is written first; content is skipped once `signal` aborts, so the
+   * caller can bound these writes to its own deadline.
+   */
+  finish: (
+    result: Readonly<{ ok: true; briefing: unknown; calendarDerived: boolean }> | Readonly<{ ok: false; error: unknown }>,
+    signal?: AbortSignal,
+  ) => Promise<void>;
 }>;
 
 export type BeginDailyBriefAgentRunOptions = Readonly<{
@@ -53,8 +60,14 @@ export type BeginDailyBriefAgentRunOptions = Readonly<{
  * because spend could not be checked.
  */
 export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOptions): Promise<DailyBriefAgentRun | null> {
-  if (!options.client && !agentCallerConfigured()) return null;
-  const client = options.client ?? createAgentClient(options.userId, "daily_brief").client;
+  let client: AppSupabaseClient;
+  try {
+    if (!options.client && !agentCallerConfigured()) return null;
+    client = options.client ?? createAgentClient(options.userId, "daily_brief").client;
+  } catch {
+    // A key that is set but unusable stops the brief instead of skipping the budget.
+    throw new DailyBriefError("advisor_unavailable", undefined, "agent_key_invalid");
+  }
   const price = modelPrice(options.model);
   let runId: string;
   try {
@@ -106,22 +119,12 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
     }
   };
 
-  const finish: DailyBriefAgentRun["finish"] = async (result) => {
+  const finish: DailyBriefAgentRun["finish"] = async (result, signal) => {
     const failure = result.ok ? null : describeFailure(result.error, refused);
     const total = (pick: (item: DailyBriefModelUsage) => number | null) =>
       usage.reduce<number | null>((sum, item) => { const value = pick(item); return value === null ? sum : (sum ?? 0) + value; }, null);
-    try {
-      if (result.ok) {
-        for (const [seq, item] of inputs.entries()) {
-          await storeAgentRunContent(client, { runId, kind: "input", seq, calendarDerived: result.calendarDerived,
-            body: { instructions_sha256: item.instructionsSha256, facts: item.facts } });
-        }
-        await storeAgentRunContent(client, { runId, kind: "output", calendarDerived: result.calendarDerived,
-          body: JSON.parse(JSON.stringify(result.briefing ?? null)) as Json });
-      }
-    } catch {
-      // A lost content row only shortens replay coverage.
-    }
+    if (signal?.aborted) return;
+    // Metadata first: it is kept long-term; content only shortens replay coverage when lost.
     await finishAgentRun(client, {
       runId,
       outcome: failure?.outcome ?? "success",
@@ -133,7 +136,20 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
       cachedInputTokens: total((item) => item.cachedInputTokens),
       outputTokens: total((item) => item.outputTokens),
       reasoningTokens: total((item) => item.reasoningTokens),
-    }).catch(() => undefined);
+    }, signal).catch(() => undefined);
+    if (!result.ok) return;
+    try {
+      for (const [seq, item] of inputs.entries()) {
+        if (signal?.aborted) return;
+        await storeAgentRunContent(client, { runId, kind: "input", seq, calendarDerived: result.calendarDerived,
+          body: { instructions_sha256: item.instructionsSha256, facts: item.facts } }, signal);
+      }
+      if (signal?.aborted) return;
+      await storeAgentRunContent(client, { runId, kind: "output", calendarDerived: result.calendarDerived,
+        body: JSON.parse(JSON.stringify(result.briefing ?? null)) as Json }, signal);
+    } catch {
+      // A lost content row only shortens replay coverage.
+    }
   };
 
   return { runId, wrap, finish };

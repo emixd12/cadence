@@ -86,8 +86,8 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
     expect(result.state).toBe("ready");
     expect(mocks.agentClient).toHaveBeenCalledWith("owner", "daily_brief");
     expect(fake.names()).toEqual(["agent_run_start", "reserve_agent_spend", "settle_agent_spend",
-      "agent_run_store_content", "agent_run_store_content", "agent_run_finish"]);
-    const [start, reserve, settle, storedInput, storedOutput, finish] = fake.calls;
+      "agent_run_finish", "agent_run_store_content", "agent_run_store_content"]);
+    const [start, reserve, settle, finish, storedInput, storedOutput] = fake.calls;
     expect(start.args).toMatchObject({ p_trigger: "on_demand", p_model: "gpt-5.6-luna" });
     expect(start.args.p_prompt_version).toMatch(/^[a-f0-9]{64}$/);
     expect(reserve.args).toMatchObject({ p_run_id: "run-1", p_model: "gpt-5.6-luna" });
@@ -137,6 +137,26 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
     expect(fake.calls[0].args).toMatchObject({ p_trigger: "retry" });
     expect(fake.calls.at(-1)).toMatchObject({ name: "agent_run_finish", args: { p_outcome: "model_error", p_error_reason: "provider_body_missing" } });
     expect(fake.names()).not.toContain("agent_run_store_content");
+  });
+
+  it("stops the brief when a configured agent signing key is invalid", async () => {
+    mocks.configured.mockImplementation(() => { throw new Error("invalid key"); });
+    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "advisor_unavailable" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("returns a finished brief even when a run-log write is slower than the deadline allows", async () => {
+    const fake = fakeAgentClient();
+    const slow = { ...fake.client, rpc(name: string, args: Record<string, unknown> = {}) {
+      if (name !== "agent_run_store_content") return fake.client.rpc(name, args);
+      fake.calls.push({ name, args });
+      const pending = new Promise<Reply>(() => undefined);
+      return Object.assign(pending, { abortSignal: (signal: AbortSignal) =>
+        new Promise<Reply>((resolve) => signal.addEventListener("abort", () => resolve({ data: null, error: { message: "aborted" } }), { once: true })) });
+    } };
+    mocks.agentClient.mockReturnValue({ client: slow, tokenExpiresAt: () => new Date() });
+    await expect(requestInAppDailyBrief(caller, input, { generate, now, deadlineMs: 2_300 })).resolves.toMatchObject({ state: "ready" });
+    expect(fake.names()).toContain("agent_run_finish");
   });
 
   it("runs without a run log only when the deployment has no agent signing key", async () => {

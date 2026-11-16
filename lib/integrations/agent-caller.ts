@@ -39,13 +39,13 @@ export type CreateAgentContextOptions = {
 const REFRESH_MARGIN_MS = 30_000;
 const KNOWN_SCOPES: readonly IntegrationScope[] = ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"];
 
-/** True when this deployment can mint agent tokens. */
+/**
+ * True when this deployment can mint agent tokens, false when no key is set.
+ * Throws when a key is set but invalid: callers must fail closed, because an
+ * agent without a token cannot check its spend budget.
+ */
 export function agentCallerConfigured(env: Record<string, string | undefined> = process.env): boolean {
-  try {
-    return readIntegrationSigningKey(env) !== null;
-  } catch {
-    return false;
-  }
+  return readIntegrationSigningKey(env) !== null;
 }
 
 /** A Supabase client that acts as `userId` through `agent`'s channel. */

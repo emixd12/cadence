@@ -20,6 +20,8 @@ import { dailyBriefDeviceModelAvailable } from "./daily-brief-device-envelope";
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
 export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
+/** Run-log writes stop this long before the request deadline (advisor plan Phase 1A). */
+export const DAILY_BRIEF_LOG_MARGIN_MS = 2_000;
 
 /** Per-source key sets sent by clients built before Ticket 306. */
 const LEGACY_SETTINGS_KEY_SETS = [
@@ -161,6 +163,9 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   // Connector reads end early enough to leave the generation reserve inside the one attempt budget.
   const sourceDeadlineAt = Date.now() + deadlineMs - DAILY_BRIEF_GENERATION_RESERVE_MS;
   const signal = AbortSignal.timeout(deadlineMs);
+  // Run-log writes after the model call stop this long before the request deadline,
+  // so a slow log write never turns a finished brief into a timeout.
+  const logSignal = AbortSignal.timeout(Math.max(0, deadlineMs - DAILY_BRIEF_LOG_MARGIN_MS));
   const installationId = attempt.installationId;
   const work = async (): Promise<DailyBriefResponse> => {
     const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
@@ -215,10 +220,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           }
         }).catch(() => undefined);
       }
-      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context) });
+      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context) }, logSignal);
       return { state: "ready", briefing };
     } catch (error) {
-      await agentRun?.finish({ ok: false, error });
+      await agentRun?.finish({ ok: false, error }, logSignal);
       throw error;
     } finally {
       if (!successful) void finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision: preferences.revision }).catch(() => undefined);
