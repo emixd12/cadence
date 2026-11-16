@@ -94,6 +94,23 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 1C: ground rules — November 16, 2026
+
+- **Done in a draft PR** (D32). Time helper `packages/core/src/resolvers/time.resolver.ts`
+  (now, today, local day bounds, wall-clock times, effective time as planned time) with
+  `lib/services/clock.ts`; drift test `tests/scheduled-for-drift.test.ts` with an allowlist
+  of the 82 files that mention `scheduled_for` today. `docs/DATETIME_STRATEGY.md` gains
+  "Time helper" and "Moves". Shared `AlertNotice` (`components/feedback/`) and its tokens.
+  `PRODUCT.md` and `DESIGN.md` follow the advisor plan. `docs/MCP_CONTRACT.md` describes the
+  deprecation path. Public text logged as P-059 to P-061.
+- **Verification:** lint, typecheck, build, `agents:check`, `interactions:check`,
+  `resolvers:check` and `core:check` pass. `npm run test`: 16 failures in 4 files
+  (`mcp-fixture-cleanup`, `mcp-hosted-fixtures`, `mcp-hosted-isolation`,
+  `public-trust-input`), identical on `main` in this environment (Node 22).
+- **Deferred:** dropping "Suggestions never change the record" from
+  `briefing-references.json` changes the pinned production prompt
+  (`tests/daily-brief-production-pin.test.ts`); it moves to Phase 3 with the new prompt.
+
 ## Cadence mailbox on Microsoft 365 — November 14, 2026
 
 - **Done** on the owner's approval (07:19Z). `cadence-me.com` is an accepted domain (not the

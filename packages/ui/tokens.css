@@ -17,6 +17,9 @@
   --accent: oklch(57.69% 0.1656 33.1);
   --line: oklch(83% 0.006 248);
   --focus: oklch(57.69% 0.1656 33.1);
+  /* Advisor plan Phase 1C: the shared alert notice (DESIGN.md, "Alert notice"). Errors use these, never the advice styles. */
+  --alert-signal: var(--accent);
+  --alert-foreground: var(--foreground);
   --ring: var(--focus);
   /* Shift Tailwind's default type scale down one step for product UI. */
   --text-xs: 0.6875rem;

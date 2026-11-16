@@ -80,7 +80,10 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 ## Updating the contract
 
 1. Edit the registry in `packages/core/src/integration/`.
-2. Follow the versioning table below. Published tool names never change.
+2. Follow the versioning table below. Tools can be added, renamed or removed
+   through the deprecation path: a new tool is a minor version; a renamed or
+   removed tool is marked deprecated for at least one minor release (a rename
+   adds the new name beside the old one), then removed in the next major version.
 3. Add or update fixtures in `tests/fixtures/integration/`.
 4. Regenerate this document:
    `UPDATE_MCP_CONTRACT_DOC=1 npx vitest run tests/integration-contract.test.ts`.
@@ -209,11 +212,12 @@ Excluded:
 | Raised limit, or a relaxed input constraint | minor |
 | New required input field, removed or renamed field, changed field type or meaning | major |
 | Removed tool, lowered limit, new required scope, or stricter input constraint | major |
-| Renaming a published tool | never |
+| Renaming a published tool: the new name is added and the old one deprecated | minor |
+| Removing a deprecated tool or a renamed tool's old name | major |
 
 - Clients must ignore output fields they do not recognize; minor versions can add them.
 - Clients must treat unknown error codes by their `retryable` flag.
-- A tool is deprecated for at least one minor release before a major release removes it.
+- A tool is deprecated for at least one minor release before a major release removes it. A rename keeps the old name working, marked deprecated, until that major release.
 
 ## Tool reference
 
