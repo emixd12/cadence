@@ -11,9 +11,11 @@ import { Temporal } from "@js-temporal/polyfill";
  * injected `CadenceClock`. The web runtime's real clock is `systemClock` in
  * `lib/services/clock.ts`; tests pass `fixedClock`.
  *
- * Effective time is a placeholder until per-day moves land (advisor plan,
- * Phase 2): it returns the planned time. Callers that use it now pick up moves
- * without another change. `tests/scheduled-for-drift.test.ts` fails when new code
+ * Effective time is where an Occurrence actually sits today: the latest applied
+ * per-day move, otherwise its planned time (advisor plan, Phase 2). The server keeps
+ * it on the row as `effective_start_at` / `effective_end_at`, written only by the
+ * move functions; a device that syncs the move records derives the same value with
+ * `effectiveTimeFromMoves`. `tests/scheduled-for-drift.test.ts` fails when new code
  * reads `scheduled_for` directly instead of asking here.
  */
 
@@ -77,21 +79,86 @@ export function zonedInstant(localDate: string, wallTime: string, timezone: stri
     .toInstant();
 }
 
-/** The fields effective time reads. Phase 2 adds the Occurrence's applied moves. */
-export type EffectiveTimeSource = Readonly<{ scheduled_for: string }>;
+/**
+ * The fields effective time reads. `effective_start_at` is the server's derived
+ * value: null (or absent) means the Occurrence sits at its planned time.
+ */
+export type EffectiveTimeSource = Readonly<{
+  scheduled_for: string;
+  effective_start_at?: string | null;
+}>;
+
+/** The fields effective end time reads. */
+export type EffectiveEndSource = EffectiveTimeSource & Readonly<{ effective_end_at?: string | null }>;
 
 /**
  * The time an Occurrence actually sits at: the latest applied move for its day,
- * otherwise its planned time. Until moves exist this is the planned time.
- * Returns the same ISO instant string the caller passed in.
+ * otherwise its planned time. Returns an ISO instant string (the planned one exactly
+ * as the caller passed it when the Occurrence is not moved).
  */
 export function effectiveStartAt(occurrence: EffectiveTimeSource): string {
-  return occurrence.scheduled_for;
+  return occurrence.effective_start_at ?? occurrence.scheduled_for;
 }
 
 /** `effectiveStartAt` as a Temporal instant. */
 export function effectiveStartInstant(occurrence: EffectiveTimeSource): Temporal.Instant {
   return Temporal.Instant.from(effectiveStartAt(occurrence));
+}
+
+/**
+ * The end of a moved Occurrence, or null when it sits at its planned time (the
+ * caller then derives the planned end the way it always has).
+ */
+export function effectiveEndAt(occurrence: EffectiveEndSource): string | null {
+  return occurrence.effective_start_at ? occurrence.effective_end_at ?? null : null;
+}
+
+/** True when a move currently places the Occurrence away from its planned time. */
+export function isMoved(occurrence: EffectiveTimeSource): boolean {
+  return Boolean(occurrence.effective_start_at);
+}
+
+/**
+ * The planned time. Only identity, history and export code should need it: anything
+ * that shows, reminds or matches uses `effectiveStartAt`.
+ */
+export function plannedStartAt(occurrence: EffectiveTimeSource): string {
+  return occurrence.scheduled_for;
+}
+
+/** The fields of a synced `occurrence_moves` record that effective time reads. */
+export type OccurrenceMoveTimeRecord = Readonly<{
+  occurrence_id: string;
+  chain_position: number;
+  timezone: string;
+  to_start_at: string;
+  to_end_at: string;
+  to_planned: boolean;
+}>;
+
+/**
+ * Effective time from an Occurrence's move records, the same rule the server's move
+ * functions write onto the row: the latest record of the chain decides. A move places
+ * the Occurrence at its new time; an Undo back to the plan returns null. A record made
+ * in another timezone than the Behavior's current one is superseded, so the Occurrence
+ * follows its plan again. Returns null when the Occurrence sits at its planned time.
+ * Rules: docs/DATETIME_STRATEGY.md, "Moves".
+ */
+export function effectiveTimeFromMoves(
+  moves: readonly OccurrenceMoveTimeRecord[],
+  occurrenceId: string,
+  behaviorTimezone: string,
+): Readonly<{ effective_start_at: string; effective_end_at: string }> | null {
+  let latest: OccurrenceMoveTimeRecord | null = null;
+  for (const move of moves) {
+    if (move.occurrence_id !== occurrenceId) continue;
+    if (!latest || move.chain_position > latest.chain_position) latest = move;
+  }
+  if (!latest || latest.to_planned || latest.timezone !== behaviorTimezone) return null;
+  return {
+    effective_start_at: Temporal.Instant.from(latest.to_start_at).toString(),
+    effective_end_at: Temporal.Instant.from(latest.to_end_at).toString(),
+  };
 }
 
 function toInstant(value: InstantInput): Temporal.Instant {

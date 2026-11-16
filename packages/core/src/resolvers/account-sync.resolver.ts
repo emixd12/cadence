@@ -5,7 +5,7 @@ import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/trav
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
-export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note", "behavior_source_link", "occurrence_source_match"] as const;
+export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note", "behavior_source_link", "occurrence_source_match", "occurrence_move"] as const;
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
@@ -13,7 +13,7 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
  * Contract 5 adds the read-only connector completion kinds (Ticket 320).
  */
-export const ACCOUNT_SYNC_CONTRACT = 5;
+export const ACCOUNT_SYNC_CONTRACT = 6;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -37,7 +37,8 @@ const HISTORY = new Set<AccountSyncEntityKind>(["definition_event", "configurati
  * writes them to the hosted account, and a row whose Behavior or Occurrence leaves the
  * merge is dropped, as the hosted cascade drops it.
  */
-const READ_ONLY_KINDS = new Set<AccountSyncEntityKind>(["behavior_source_link", "occurrence_source_match"]);
+// Advisor Phase 2A: per-day moves reach a Mac read-only at contract 6; only the server writes them.
+const READ_ONLY_KINDS = new Set<AccountSyncEntityKind>(["behavior_source_link", "occurrence_source_match", "occurrence_move"]);
 const PROTECTED_DELETE = new Set<AccountSyncEntityKind>(["behavior", "import_run", "imported_note", "imported_intervention", "reminder_delivery", "time_session"]);
 // Sync strips source ownership; this placeholder only enables shared state validation.
 const SYNC_NOTE_SHORTCUT_OWNER_ID = "00000000-0000-4000-8000-000000000000";
@@ -399,6 +400,8 @@ function dependencies(entity: AccountSyncEntity): readonly (readonly [string, Ac
     case "where_suggestion_dismissal": return [["id", "behavior"]];
     case "behavior_source_link": return [["behavior_id", "behavior"]];
     case "occurrence_source_match": return [["behavior_id", "behavior"], ["occurrence_id", "occurrence"]];
+    // A move outlives its Occurrence as history, so only the Behavior is a parent.
+    case "occurrence_move": return [["behavior_id", "behavior"]];
     default: return [];
   }
 }
@@ -458,7 +461,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
   }
   if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
   if (entity.kind === "day_note") validateDayNoteRow(entity.id, value);
-  if (READ_ONLY_KINDS.has(entity.kind)) validateConnectorRow(entity.kind, entity.id, value);
+  if (entity.kind === "occurrence_move") validateOccurrenceMoveRow(entity.id, value);
+  else if (READ_ONLY_KINDS.has(entity.kind)) validateConnectorRow(entity.kind, entity.id, value);
   return { kind: entity.kind, id: entity.id, value };
 }
 
@@ -556,6 +560,39 @@ function validateConnectorRow(kind: AccountSyncEntityKind, id: string, value: Js
         && Temporal.Instant.compare(Temporal.Instant.from(value.activity_end_at as string), Temporal.Instant.from(value.activity_start_at as string)) > 0
         && (value.role === "completion" || value.role === "attached") && (value.state === "active" || value.state === "removed"));
   if (!valid) throw new Error("The synced connector completion is invalid.");
+}
+
+export const OCCURRENCE_MOVE_SYNC_FIELDS = [
+  "id", "occurrence_id", "behavior_id", "local_date", "weekday", "timezone", "kind",
+  "from_start_at", "from_end_at", "from_planned", "to_start_at", "to_end_at", "to_planned", "duration_source",
+  "revises_move_id", "chain_root_id", "chain_position", "reason", "source", "created_at",
+] as const;
+
+/** Advisor Phase 2A: mirrors the hosted occurrence_moves checks. The synced shape is exact. */
+function validateOccurrenceMoveRow(id: string, value: Json): void {
+  const instant = (item: Json | undefined) => { try { return typeof item === "string" && Boolean(Temporal.Instant.from(item)); } catch { return false; } };
+  const uuid = (item: Json | undefined) => typeof item === "string" && SYNC_UUID.test(item);
+  if (!value || Array.isArray(value) || typeof value !== "object" || value.id !== id || !SYNC_UUID.test(id)
+    || Object.keys(value).length !== OCCURRENCE_MOVE_SYNC_FIELDS.length || !OCCURRENCE_MOVE_SYNC_FIELDS.every((name) => name in value)) {
+    throw new Error("Update Cadence before synchronizing moved Occurrences.");
+  }
+  let date = false;
+  try { date = typeof value.local_date === "string" && Temporal.PlainDate.from(value.local_date, { overflow: "reject" }).toString() === value.local_date; } catch { date = false; }
+  const position = value.chain_position;
+  const valid = date && uuid(value.occurrence_id) && uuid(value.behavior_id) && uuid(value.chain_root_id)
+    && (value.revises_move_id === null || uuid(value.revises_move_id))
+    && Number.isInteger(value.weekday) && (value.weekday as number) >= 1 && (value.weekday as number) <= 7
+    && typeof value.timezone === "string" && value.timezone.length > 0
+    && (value.kind === "move" || value.kind === "revert")
+    && instant(value.from_start_at) && instant(value.from_end_at) && instant(value.to_start_at) && instant(value.to_end_at)
+    && typeof value.from_planned === "boolean" && typeof value.to_planned === "boolean"
+    && typeof value.duration_source === "string"
+    && Number.isInteger(position) && (position as number) >= 1
+    && ((position === 1) === (value.revises_move_id === null))
+    && (value.reason === null || typeof value.reason === "string")
+    && ["daily_brief", "coach", "chat", "mcp", "person"].includes(value.source as string)
+    && instant(value.created_at);
+  if (!valid) throw new Error("The synced move is invalid.");
 }
 
 /** Mirrors the hosted and SQLite day_notes checks (Ticket 292). */

@@ -58,8 +58,8 @@ declare
   contract_value integer;
   kind_value text;
 begin
-  if cadence_private.account_sync_current_contract() <> 5 then
-    raise exception 'Expected account sync contract 5, got %', cadence_private.account_sync_current_contract();
+  if cadence_private.account_sync_current_contract() < 5 then
+    raise exception 'Expected account sync contract 5 or later, got %', cadence_private.account_sync_current_contract();
   end if;
 
   -- Contracts 1-4 never receive either kind.

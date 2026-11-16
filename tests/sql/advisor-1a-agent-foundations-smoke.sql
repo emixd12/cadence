@@ -64,7 +64,7 @@ begin
 
   select * into brief from public.agent_ensure_grant();
   if brief.client_id <> 'cadence:agent:daily_brief' or brief.client_label <> 'Cadence Daily Brief'
-      or brief.scopes <> array['cadence.read'] then
+      or brief.scopes <> array['cadence.read', 'cadence.occurrences.move'] then
     raise exception 'Daily Brief grant is wrong: %', row_to_json(brief);
   end if;
   select * into again from public.agent_ensure_grant();
@@ -84,7 +84,7 @@ begin
   perform set_config('request.jwt.claims', '{"sub":"1a000000-0000-4000-8000-0000000000a1","role":"authenticated","cadence_channel":"chat"}', true);
   select * into chat from public.agent_ensure_grant();
   if chat.grant_id = brief.grant_id or chat.client_label <> 'Cadence chat'
-      or chat.scopes <> array['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'] then
+      or chat.scopes <> array['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write', 'cadence.occurrences.move'] then
     raise exception 'Chat grant is wrong: %', row_to_json(chat);
   end if;
   insert into advisor_1a_ids values ('chat_grant', chat.grant_id);
