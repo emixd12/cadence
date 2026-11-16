@@ -102,7 +102,7 @@ function sumUsage(items: readonly DailyBriefModelUsage[]): DailyBriefModelUsage 
   const total = (pick: (item: DailyBriefModelUsage) => number | null) =>
     items.reduce<number | null>((sum, item) => pick(item) === null ? sum : (sum ?? 0) + (pick(item) as number), null);
   return { inputTokens: total((item) => item.inputTokens), cachedInputTokens: total((item) => item.cachedInputTokens),
-    outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens) };
+    cacheWriteTokens: total((item) => item.cacheWriteTokens ?? null), outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens) };
 }
 
 /** Phrases that claim a track record. A new account has none. */
