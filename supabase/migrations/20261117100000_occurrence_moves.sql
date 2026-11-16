@@ -99,9 +99,11 @@ create table public.occurrence_moves (
   source text not null check (source in ('daily_brief', 'coach', 'chat', 'mcp', 'person')),
   proposal_id uuid,
   -- The OAuth client that wrote it (null for the person's own web session) and the
-  -- caller's idempotency key. Neither is synced.
+  -- caller's idempotency key. None of the three is synced.
   client_ref uuid,
   idempotency_key text check (idempotency_key is null or length(idempotency_key) between 1 and 255),
+  -- Hash of the request that used the key, so reusing a key for different input is refused.
+  request_hash text check (request_hash is null or request_hash ~ '^[a-f0-9]{64}$'),
   created_at timestamptz not null default now(),
 
   unique (user_id, id),
@@ -278,7 +280,7 @@ create trigger supersede_moves_on_timezone_change
 -- the synced moves, so a move never makes the occurrence row differ between devices
 -- and a status mark on the Mac never meets the move in conflict review.
 -- occurrence_move joins at contract 6, read-only (not in apply_account_sync_plan's
--- writable kinds), without the writer's client_ref, idempotency key or proposal link.
+-- writable kinds), without the writer's client_ref, idempotency key, request hash or proposal link.
 insert into cadence_private.account_sync_contract_additions (contract, kind, field, default_value)
 values (6, 'occurrence_move', null, null);
 
@@ -293,7 +295,7 @@ begin
   anchor := $a$union all select 'occurrence', r.id::text, cadence_private.normalize_account_sync_row(to_jsonb(r) - 'user_id') from public.occurrences r where r.user_id = current_user_id$a$;
   replacement := $r$union all select 'occurrence', r.id::text, cadence_private.normalize_account_sync_row(to_jsonb(r) - array['user_id', 'effective_start_at', 'effective_end_at']) from public.occurrences r where r.user_id = current_user_id
     union all select 'occurrence_move', r.id::text, cadence_private.normalize_account_sync_row(
-      to_jsonb(r) - array['user_id', 'client_ref', 'idempotency_key', 'proposal_id']) from public.occurrence_moves r where r.user_id = current_user_id$r$;
+      to_jsonb(r) - array['user_id', 'client_ref', 'idempotency_key', 'request_hash', 'proposal_id']) from public.occurrence_moves r where r.user_id = current_user_id$r$;
   if (length(definition) - length(replace(definition, anchor, ''))) / length(anchor) <> 1 then
     raise exception 'Account snapshot changed unexpectedly.';
   end if;
