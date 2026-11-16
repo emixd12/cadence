@@ -1990,6 +1990,50 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      agent_ensure_grant: {
+        Args: never
+        Returns: {
+          client_id: string
+          client_label: string
+          grant_id: string
+          scopes: string[]
+        }[]
+      }
+      agent_run_finish: {
+        Args: {
+          p_cached_input_tokens: number
+          p_error_code: string
+          p_error_reason: string
+          p_input_hash: string
+          p_input_tokens: number
+          p_linked_proposal_ids?: string[]
+          p_model_calls: number
+          p_outcome: string
+          p_output_tokens: number
+          p_reasoning_tokens: number
+          p_run_id: string
+          p_tool_calls?: string[]
+        }
+        Returns: boolean
+      }
+      agent_run_start: {
+        Args: { p_model: string; p_prompt_version: string; p_trigger: string }
+        Returns: {
+          local_date: string
+          run_id: string
+          timezone: string
+        }[]
+      }
+      agent_run_store_content: {
+        Args: {
+          p_body: Json
+          p_calendar_derived: boolean
+          p_kind: string
+          p_run_id: string
+          p_seq: number
+        }
+        Returns: boolean
+      }
       apple_sign_in_forget_token: {
         Args: { apple_subject_digest: string; owner_id: string }
         Returns: undefined
@@ -2572,6 +2616,7 @@ export type Database = {
         Args: { p_access_token_hash: string; p_resource: string }
         Returns: Json
       }
+      purge_expired_agent_run_contents: { Args: never; Returns: number }
       purge_expired_completion_place_labels: { Args: never; Returns: number }
       read_account_sync_snapshot:
         | { Args: never; Returns: Json }
@@ -2641,6 +2686,20 @@ export type Database = {
           p_recorded_at: string
         }
         Returns: Json
+      }
+      reserve_agent_spend: {
+        Args: {
+          p_estimated_microdollars: number
+          p_model: string
+          p_run_id: string
+        }
+        Returns: {
+          allowed: boolean
+          reason: string
+          reservation_id: string
+          resets_at: string
+          retry_after_seconds: number
+        }[]
       }
       reserve_travel_provider_spend: {
         Args: { requested_microdollars: number }
@@ -2763,6 +2822,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      settle_agent_spend: {
+        Args: { p_actual_microdollars: number; p_reservation_id: string }
+        Returns: boolean
       }
       update_behavior_with_definition_event: {
         Args: {

@@ -493,6 +493,46 @@ remain unmeasured. Workbench runs record the estimate call's usage separately as
 `duration_estimate` (Ticket 288). Recheck provider rates and measure both calls
 before promoting the candidate or treating these assumptions as a budget limit.
 
+## Advisor agent budget
+
+Advisor plan Phase 1A (November 16, 2026). Every model call made by the Daily Brief,
+the coach (advisor quips) or Chat goes through one Postgres budget
+(`supabase/migrations/20261116201000_agent_runs_and_spend_budget.sql`):
+
+- Before a call, `reserve_agent_spend` reserves an estimate. The estimate counts every
+  request character as a token, plus the full output cap (2,000 tokens for the brief), at
+  the list prices in `lib/services/agent-model-pricing.ts`. A brief reserves about
+  US$0.01 and settles at about US$0.0023.
+- After the call, `settle_agent_spend` replaces the estimate with the cost from the
+  provider's reported tokens, or keeps the estimate when no usage was reported.
+- A call is refused, before the model sees it, when it would pass the agent's share,
+  the account total less the unused part of every other protected share, or the global
+  daily breaker. A refused call reserves nothing. The brief shows
+  "Daily Brief reached this month's limit" (`budget_reached`, HTTP 429).
+- Months follow the account's timezone. The breaker follows UTC days.
+- A model without a price in `agent-model-pricing.ts` is refused. Add its price here and
+  there before an agent uses it.
+
+| Setting | Value | Where |
+| --- | --- | --- |
+| Monthly total per account | US$5.00 (owner, November 16, 2026) | `cadence_advisor_private.agent_budget_settings.monthly_total_microdollars` |
+| Daily Brief share, protected | US$0.50 (owner) | `agent_budget_shares`, agent `daily_brief` |
+| Advisor quips (coach) share | US$1.00 (owner) | `agent_budget_shares`, agent `coach` |
+| Chat share | US$3.50 (owner) | `agent_budget_shares`, agent `chat` |
+| Global breaker, all accounts, per UTC day | US$25.00 (owner confirmed 2026-11-16; raise it as users grow) | `agent_budget_settings.global_daily_microdollars` |
+| One account's total or share | none set | `agent_budget_account_overrides` (agent `total`, `daily_brief`, `coach` or `chat`) |
+
+All amounts are microdollars (US$1 = 1,000,000). Changing a value is an owner-approved
+SQL update on the hosted database, with no deploy. For example, to raise the Chat share:
+
+```sql
+update cadence_advisor_private.agent_budget_shares
+set monthly_microdollars = 4000000, updated_at = now()
+where agent = 'chat';
+```
+
+Record every change in the change log below.
+
 ## QA-only acceptance model calls
 
 The MCP acceptance runners (`npm run mcp:accept:clients`, Tickets 251 and 256)
@@ -572,6 +612,11 @@ arrives, fees reduce the US$5:
 - 2026-10-22: development and testing use the free Open-Meteo plan. The paid API
   Standard plan is required before commercial use (`docs/LEGAL.md` L-008, open until
   subscribed).
+- 2026-11-16: advisor budget of US$5 per account per month, split Daily Brief US$0.50
+  (protected), advisor quips US$1.00 and Chat US$3.50, all adjustable without a deploy
+  (advisor plan). Implemented in source by Phase 1A ("Advisor agent budget").
+- 2026-11-16: the owner confirmed the advisor global daily breaker at US$25 per UTC day
+  across all accounts.
 
 ## Proposals awaiting owner decision
 
@@ -647,6 +692,8 @@ status, Note, focus and stationary position checks make no provider call. These
 are automated fixture counts, not production measurements. The private workbench
 shows the authenticated owner's month-to-date reserved list-price spend; no new
 paid call supports that readback.
+- 2026-11-16: Added "Advisor agent budget" (advisor plan Phase 1A): Postgres reservations
+  for every agent model call, the owner's starting shares and a US$25 daily breaker.
 
 ### Tickets 213–214 production measurements — October 18, 2026
 

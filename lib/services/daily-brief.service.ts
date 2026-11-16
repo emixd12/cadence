@@ -5,7 +5,8 @@ import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferenceInput, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
-import { generateOpenAIDailyBrief } from "./daily-brief-openai";
+import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief } from "./daily-brief-openai";
+import { beginDailyBriefAgentRun, dailyBriefContextIsCalendarDerived, type DailyBriefAgentRun } from "./daily-brief-agent-run";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
 import { getIcloudCalendarConnection } from "./icloud-calendar.service";
@@ -19,6 +20,8 @@ import { dailyBriefDeviceModelAvailable } from "./daily-brief-device-envelope";
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
 export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
+/** Run-log writes stop this long before the request deadline (advisor plan Phase 1A). */
+export const DAILY_BRIEF_LOG_MARGIN_MS = 2_000;
 
 /** Per-source key sets sent by clients built before Ticket 306. */
 const LEGACY_SETTINGS_KEY_SETS = [
@@ -160,6 +163,9 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   // Connector reads end early enough to leave the generation reserve inside the one attempt budget.
   const sourceDeadlineAt = Date.now() + deadlineMs - DAILY_BRIEF_GENERATION_RESERVE_MS;
   const signal = AbortSignal.timeout(deadlineMs);
+  // Run-log writes after the model call stop this long before the request deadline,
+  // so a slow log write never turns a finished brief into a timeout.
+  const logSignal = AbortSignal.timeout(Math.max(0, deadlineMs - DAILY_BRIEF_LOG_MARGIN_MS));
   const installationId = attempt.installationId;
   const work = async (): Promise<DailyBriefResponse> => {
     const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
@@ -172,7 +178,14 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
     if (admission.state !== "acquired") return { state: admission.state };
     const leaseToken = admission.leaseToken;
     let successful = false;
+    let agentRun: DailyBriefAgentRun | null = null;
     try {
+      signal.throwIfAborted();
+      // Advisor plan Phase 1A: one agent_runs row per attempt; each model call goes through the spend budget.
+      agentRun = await phase("run_log", () => beginDailyBriefAgentRun({
+        userId: caller.user.id, trigger: attempt.retry ? "retry" : "on_demand", model: DAILY_BRIEF_MODEL,
+        promptVersion: configurationRevision, signal,
+      }));
       signal.throwIfAborted();
       const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
         configuration, preferences, localDate: admission.localDate, travelConclusions: attempt.travelConclusions, sourceDeadlineAt, signal, clock,
@@ -193,7 +206,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
           onTip: (fingerprints) => { tipFingerprints = fingerprints; },
           onUsage: (item) => { usage.push(item); },
-          generate: options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey })) }), modelSignal));
+          generate: withAgentRun(agentRun, options.generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey }))) }), modelSignal));
       // The lease must still belong to this attempt. A superseded attempt never returns text.
       const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
       if (!finished) throw new DailyBriefError("context_changed");
@@ -207,12 +220,20 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           }
         }).catch(() => undefined);
       }
+      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context) }, logSignal);
       return { state: "ready", briefing };
+    } catch (error) {
+      await agentRun?.finish({ ok: false, error }, logSignal);
+      throw error;
     } finally {
       if (!successful) void finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision: preferences.revision }).catch(() => undefined);
     }
   };
   return phase("request", () => raceAbort(work(), signal));
+}
+
+function withAgentRun(run: DailyBriefAgentRun | null, generate: DailyBriefGenerator): DailyBriefGenerator {
+  return run ? run.wrap(generate) : generate;
 }
 
 /**

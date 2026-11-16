@@ -16,6 +16,7 @@ import {
   LaunchCircuitBreakerOpenError,
 } from "@/lib/security/launch-circuit-breakers";
 import { processOccurrenceSyncHorizons } from "@/lib/services/occurrence.service";
+import { runAgentRunContentMaintenance } from "@/lib/services/agent-run-maintenance.service";
 import { runOAuthMaintenance } from "@/lib/services/oauth-maintenance.service";
 import { runPlaceLabelMaintenance } from "@/lib/services/place-labels.service";
 
@@ -92,10 +93,11 @@ async function processOccurrenceSyncRequest(request: NextRequest) {
     }
   });
   const placeLabels = runPlaceLabelMaintenance();
+  const agentRunContent = runAgentRunContentMaintenance();
   try {
     return await processAuthenticatedOccurrenceSyncRequest(request);
   } finally {
-    await Promise.all([maintenance, placeLabels]);
+    await Promise.all([maintenance, placeLabels, agentRunContent]);
   }
 }
 

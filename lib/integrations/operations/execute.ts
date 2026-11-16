@@ -4,7 +4,7 @@ import {
 } from "@cadence/core/integration";
 import { recordIntegrationActivity } from "@/lib/db/integration.repo";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
-import { consumeMcpRateLimit } from "@/lib/services/oauth/server";
+import { consumeAgentRateLimit, consumeMcpRateLimit } from "@/lib/services/oauth/server";
 import { readOperationHandlers } from "./read";
 import { writeOperationHandlers } from "./write";
 
@@ -15,7 +15,10 @@ export async function executeMcpOperation(name: IntegrationOperationName, contex
   let error: IntegrationError | null = checkOperationScope(name, context.actor.grantedScopes);
   try {
     if (!error) {
-      const admission = await consumeMcpRateLimit(context.actor.grantId, operation.access);
+      // Cadence's own agents keep their per-grant limits when MCP is turned off.
+      const admission = context.actor.channel === "mcp"
+        ? await consumeMcpRateLimit(context.actor.grantId, operation.access)
+        : await consumeAgentRateLimit(context.actor.grantId, operation.access);
       if (!admission.allowed) error = createIntegrationError("rate_limited", "Too many requests. Retry after the indicated delay.", {
         retryAfterSeconds: admission.retryAfterSeconds,
       });

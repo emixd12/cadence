@@ -333,6 +333,9 @@ function failureNotice(outcome: Extract<DailyBriefOutcome, { kind: "failed" }>):
       return { kind: "notice", message: "Your Timeline or settings changed while the brief was prepared.", retryLabel: "Get a current brief" };
     case "retry_exhausted":
       return { kind: "notice", message: "Today’s Daily Brief retry limit has been reached. Tracking is unaffected." };
+    // Advisor plan Phase 1A: the account's monthly advisor budget refused the model call.
+    case "budget_reached":
+      return { kind: "notice", message: "Daily Brief reached this month’s limit. Tracking is unaffected." };
     case "access_denied":
     case "not_configured":
       return { kind: "notice", message: "Daily Brief is turned off or unavailable. Check Settings." };

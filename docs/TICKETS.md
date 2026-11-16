@@ -13257,7 +13257,17 @@ and rollback records. Leave unexecuted acceptance gates open.
 
 ## Ticket 185: Decide the stored Daily Brief product contract
 
-Status: proposal prepared; awaiting recorded owner decisions September 28, 2026.
+Status: settled November 16, 2026 by the owner's advisor plan decisions; storage
+implemented in source by advisor plan Phase 1A. Every advisor run (Daily Brief, coach,
+chat) writes metadata to `agent_runs`, kept long-term. Run text (brief text, quips, chat
+turns and the inputs needed to replay a run) goes to `agent_run_contents` for 30 days,
+then the daily cron deletes it; calendar-derived text is deleted at the end of its local
+day. There is no opt-in for now; the privacy copy follow-up is
+`docs/MESSAGING_CHANGES.md` P-060. Reopening a stored brief (first brief or latest
+refresh, refresh later in the day, a Timeline button) is advisor plan Phase 3 work, not
+this ticket. Data model: `docs/DATA_MODEL.md`, "Advisor agents".
+
+Earlier status: proposal prepared; awaiting recorded owner decisions September 28, 2026.
 See `docs/plans/2026-09-28-briefing-owner-review.md`. Separate product track from the
 briefing-bench plan. It authorizes proposal preparation only. Implementation and
 deployment remain gated on the owner's recorded product decisions.
