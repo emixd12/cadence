@@ -203,3 +203,8 @@ export async function consumeMcpRateLimit(grantId: string, access: "read" | "wri
   requireOAuthEnabled();
   return repo.consumeOAuthRateLimit(tokenEndpointClient(), { action: access === "read" ? "mcp_read" : "mcp_write", grantId });
 }
+
+/** First-party agent grants share the MCP per-grant counters, and do not depend on MCP being enabled. */
+export async function consumeAgentRateLimit(grantId: string, access: "read" | "write") {
+  return repo.consumeOAuthRateLimit(tokenEndpointClient(), { action: access === "read" ? "mcp_read" : "mcp_write", grantId });
+}

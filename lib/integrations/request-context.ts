@@ -10,6 +10,7 @@ import {
   getIntegrationSigningKey,
   mintIntegrationAccessToken,
   type IntegrationSigningKey,
+  type AgentTokenChannel,
   type IntegrationTokenChannel,
 } from "@/lib/supabase/integration-token";
 import { fetchWithJwtIssuedAtFutureRetry } from "@/lib/supabase/server";
@@ -19,7 +20,9 @@ import { fetchWithJwtIssuedAtFutureRetry } from "@/lib/supabase/server";
 // the publishable key plus a minted user token, so normal RLS applies. The
 // service role is never used here.
 
-export type IntegrationChannel = IntegrationTokenChannel;
+// "mcp" for outside AI clients; an agent channel for Cadence's own agents
+// (lib/integrations/agent-caller.ts).
+export type IntegrationChannel = IntegrationTokenChannel | AgentTokenChannel;
 
 // Scope names from the MCP plan. Ticket 221's contract is the source of truth
 // for the full operation catalog; this list must stay equal to it.
@@ -36,7 +39,7 @@ export type VerifiedIntegrationGrant = {
   grantId: string;
   clientId: string;
   clientLabel: string;
-  channel: IntegrationChannel;
+  channel: IntegrationTokenChannel;
   scopes: readonly IntegrationScope[];
 };
 

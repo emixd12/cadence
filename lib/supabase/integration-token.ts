@@ -16,6 +16,10 @@ import {
 // - "connector_completion": the connector completion job (Ticket 321, D28.5). It
 //   carries no grant claims either. Only the connector completion functions accept
 //   it besides ordinary user sessions; MCP and leave reminder tokens never carry it.
+// - "daily_brief", "coach", "chat": Cadence's own agents (advisor plan Phase 1A).
+//   One channel per agent and no grant claims. The database resolves each
+//   agent's first-party grant from the channel, so the agent gets its own
+//   scopes, idempotency namespace, activity label and rate limit.
 // Tokens never leave the server and must never be logged.
 
 export const INTEGRATION_SIGNING_KEY_ENV = "CADENCE_INTEGRATION_JWT_SIGNING_KEY";
@@ -26,6 +30,13 @@ export const LEAVE_REMINDER_TOKEN_CHANNEL = "leave_reminder";
 export type LeaveReminderTokenChannel = typeof LEAVE_REMINDER_TOKEN_CHANNEL;
 export const CONNECTOR_COMPLETION_TOKEN_CHANNEL = "connector_completion";
 export type ConnectorCompletionTokenChannel = typeof CONNECTOR_COMPLETION_TOKEN_CHANNEL;
+
+export const AGENT_TOKEN_CHANNELS = ["daily_brief", "coach", "chat"] as const;
+export type AgentTokenChannel = (typeof AGENT_TOKEN_CHANNELS)[number];
+
+export function isAgentTokenChannel(value: unknown): value is AgentTokenChannel {
+  return typeof value === "string" && (AGENT_TOKEN_CHANNELS as readonly string[]).includes(value);
+}
 
 export type IntegrationSigningKey = {
   kid: string;
@@ -222,6 +233,26 @@ export function mintConnectorCompletionAccessToken(
     ...base,
     cadence_channel: CONNECTOR_COMPLETION_TOKEN_CHANNEL,
   }) satisfies ConnectorCompletionTokenClaims);
+}
+
+export type AgentTokenInput = LeaveReminderTokenInput & { agent: AgentTokenChannel };
+
+export type AgentTokenClaims = Omit<LeaveReminderTokenClaims, "cadence_channel"> & {
+  cadence_channel: AgentTokenChannel;
+};
+
+// One channel per first-party agent. It never carries MCP grant claims.
+export function mintAgentAccessToken(
+  key: IntegrationSigningKey,
+  input: AgentTokenInput,
+): MintedIntegrationToken {
+  if (!isAgentTokenChannel(input.agent)) {
+    throw new TypeError("Agent token channel must be daily_brief, coach or chat.");
+  }
+  return signUserToken(key, input, (base) => ({
+    ...base,
+    cadence_channel: input.agent,
+  }) satisfies AgentTokenClaims);
 }
 
 type BaseUserClaims = Omit<IntegrationTokenClaims, "cadence_channel" | "cadence_grant_id" | "cadence_client_id">;

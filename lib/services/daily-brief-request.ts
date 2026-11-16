@@ -17,7 +17,7 @@ export async function runDailyBriefRequest(request: Request, run: (caller: Calen
     const retryAfterSeconds = error instanceof DailyBriefError || error instanceof AdvisorDayContextServiceError ? error.retryAfterSeconds : undefined;
     // Ticket 298: a forged, altered or misbound envelope is a bad request; a recipe the device mode cannot run is a server limit.
     const status = code === "unauthenticated" ? 401 : code === "access_denied" ? 403 : code === "invalid_request" || code === "brief_envelope_invalid" ? 400
-      : code === "rate_limited" || code === "retry_exhausted" ? 429
+      : code === "rate_limited" || code === "retry_exhausted" || code === "budget_reached" ? 429
       : code === "not_configured" || code === "advisor_unavailable" || code === "device_recipe_unsupported" ? 503 : 409;
     const recovery = error instanceof AdvisorDayContextServiceError ? error.recovery : null;
     return calendarResponse(request, { error: code, ...(recovery ? { recovery } : {}), ...(retryAfterSeconds ? { retryAfterSeconds } : {}) }, status);

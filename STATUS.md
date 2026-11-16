@@ -94,6 +94,25 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 1A: data foundations in source — November 16, 2026
+
+- **In progress, draft PR** on `claude/project-thread-vdfrmg`. Not applied to any hosted
+  database. First-party caller (one token channel and first-party grant per agent),
+  agent run log with 30-day content store and daily deletion, Postgres spend budget
+  (US$5 per account per month; Daily Brief US$0.50 protected, quips US$1.00, Chat
+  US$3.50). The hosted Daily Brief now writes a run, reserves before its model call and
+  stores its facts and output. Settles Ticket 185. Docs: `docs/DATA_MODEL.md`, "Advisor
+  agents"; `docs/COSTS.md`, "Advisor agent budget"; `docs/SUPABASE_WORKFLOW.md`, "Agent
+  token channels".
+- **Verification (local stack, Node 22):** clean `db reset` replay of all 125 migrations;
+  all 49 `tests/sql` fixtures pass (Ticket 232 maintenance smoke now counts the three
+  seeded agent clients separately); local integration tests pass except
+  `mcp-server.local-integration`, which needs its own assigned stack; `npm run test`
+  passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
+  interactions checks pass.
+- **Open:** owner approval before the hosted migrations; owner to confirm the US$25
+  global daily breaker; Phase 1B adapts its metering hook to these functions.
+
 ## Cadence mailbox on Microsoft 365 — November 14, 2026
 
 - **Done** on the owner's approval (07:19Z). `cadence-me.com` is an accepted domain (not the

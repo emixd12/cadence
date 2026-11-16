@@ -3031,6 +3031,85 @@ checks, concurrency, exact replay, rollback, ownership, and web/desktop row
 compatibility. Use only an isolated loopback database and the local integration
 test environment documented in `docs/SUPABASE_WORKFLOW.md`.
 
+## Advisor agents: first-party caller, run log and spend budget (advisor plan Phase 1A)
+
+Migrations `20261116200000_agent_first_party_caller.sql` and
+`20261116201000_agent_runs_and_spend_budget.sql`. Plan: the advisor three-agent
+design plan, "Shared infrastructure". No user-visible change except the
+`budget_reached` notice.
+
+### First-party caller
+
+Cadence's own agents (`daily_brief`, `coach`, `chat`) call the integration
+operations as the signed-in person. Each agent mints its own token channel
+(`cadence_channel` = the agent name, no `cadence_grant_id` claim;
+`lib/integrations/agent-caller.ts`).
+
+- `cadence_oauth_private.clients` gains `registration_type = 'first_party'`: one
+  row per agent (`client_id` `cadence:agent:<agent>`, labels "Cadence Daily
+  Brief", "Cadence advisor", "Cadence chat"), no redirect URIs, never purged.
+  `active_client()` skips them, so no OAuth flow can reach them.
+- `cadence_oauth_private.agent_channels` (channel, client_ref, default_scopes)
+  holds each agent's scopes: `daily_brief` and `coach` read only, `chat` the MCP
+  set. Phase 2 adds move and propose scopes. A change here takes effect on the
+  agent's next run, without a deploy.
+- `agent_ensure_grant()` creates or refreshes the person's grant for the token's
+  agent (`resource = 'urn:cadence:first-party'`) and returns grant id, client id,
+  label and scopes. `current_integration_grant()` resolves an agent token to
+  that grant, so idempotency records (keyed by `client_ref`), activity (labelled
+  by `client_name`) and rate-limit counters (keyed by grant) work unchanged.
+  MCP tokens cannot resolve a first-party grant.
+- `oauth_list_grants`, `oauth_list_activity` and `oauth_revoke_grant` ignore
+  first-party grants (Settings shows connected AI apps only);
+  `oauth_revoke_all_grants` leaves them in place.
+
+### Run log (settles Ticket 185)
+
+Schema `cadence_advisor_private`, RLS on with no policies; reached only through
+the functions below, which accept only an agent token and take the agent and
+person from it.
+
+- `agent_runs`: one row per run. Agent, trigger (`on_demand`, `retry`,
+  `scheduled`, `chat_turn`), model, prompt version, local date and timezone,
+  input hash, model calls, input/cached/output/reasoning tokens, cost (sum of
+  the run's settled reservations), tool calls, outcome (`success`,
+  `refused_budget`, `invalid_output`, `model_error`, `timeout`, `superseded`,
+  `error`), error code and reason, linked proposal ids, start and finish times.
+  No text. Kept long-term.
+- `agent_run_contents`: text for a run (`input` and `output`, with a sequence
+  number). `expires_at` is 30 days after it is written, or the end of the run's
+  local day when the text is calendar-derived. The Daily Brief marks its facts
+  and output calendar-derived when they include calendar events or travel facts.
+- Functions: `agent_run_start`, `agent_run_finish`, `agent_run_store_content`
+  (also deletes the person's expired content). `purge_expired_agent_run_contents()`
+  is service-role only; the daily `/api/occurrences/sync` cron runs it
+  (`lib/services/agent-run-maintenance.service.ts`).
+- `daily_brief_runs` keeps the brief's per-installation lease and rate limits.
+  Coach and chat get their own leases when they are built.
+
+### Spend budget
+
+- `agent_budget_settings` (one row: monthly total, global daily breaker),
+  `agent_budget_shares` (per-agent monthly share, `protected`),
+  `agent_budget_account_overrides` (optional per-account total or share).
+  Values and how to change them: `docs/COSTS.md`, "Advisor agent budget".
+- `agent_spend_reservations`: one row per model call, with the estimate, the
+  settled actual and the account's local month. `agent_spend_global_day` counts
+  all accounts per UTC day.
+- `reserve_agent_spend(run_id, model, estimate)` refuses (`agent_share`,
+  `account_total` or `global_day`, with retry-after and reset time) or reserves.
+  `settle_agent_spend(reservation_id, actual)` settles once.
+
+### Account deletion
+
+Deleting the Auth user cascades through agent grants, runs, contents,
+reservations and overrides. Seeded first-party clients and budget settings are
+not user data.
+
+Repositories: `lib/db/agent-runs.repo.ts`. Local verification:
+`tests/sql/advisor-1a-agent-foundations-smoke.sql` and
+`tests/agent-caller.local-integration.test.ts`.
+
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 
 Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
