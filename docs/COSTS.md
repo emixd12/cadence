@@ -519,7 +519,7 @@ the coach (advisor quips) or Chat goes through one Postgres budget
 | Daily Brief share, protected | US$0.50 (owner) | `agent_budget_shares`, agent `daily_brief` |
 | Advisor quips (coach) share | US$1.00 (owner) | `agent_budget_shares`, agent `coach` |
 | Chat share | US$3.50 (owner) | `agent_budget_shares`, agent `chat` |
-| Global breaker, all accounts, per UTC day | US$25.00 (engineering default, assumed for a small user count; raise it as users grow) | `agent_budget_settings.global_daily_microdollars` |
+| Global breaker, all accounts, per UTC day | US$25.00 (owner confirmed 2026-11-16; raise it as users grow) | `agent_budget_settings.global_daily_microdollars` |
 | One account's total or share | none set | `agent_budget_account_overrides` (agent `total`, `daily_brief`, `coach` or `chat`) |
 
 All amounts are microdollars (US$1 = 1,000,000). Changing a value is an owner-approved
@@ -615,10 +615,11 @@ arrives, fees reduce the US$5:
 - 2026-11-16: advisor budget of US$5 per account per month, split Daily Brief US$0.50
   (protected), advisor quips US$1.00 and Chat US$3.50, all adjustable without a deploy
   (advisor plan). Implemented in source by Phase 1A ("Advisor agent budget").
+- 2026-11-16: the owner confirmed the advisor global daily breaker at US$25 per UTC day
+  across all accounts.
 
 ## Proposals awaiting owner decision
 
-- Confirm the advisor global daily breaker (US$25 per UTC day, engineering default).
 - Keep an account-wide Google Cloud budget alert.
 - Record Sequenzy's plan and per-email price.
 
