@@ -7,8 +7,8 @@ import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-a
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { dailyBriefModelSetting, generateDailyBriefWithModel } from "./daily-brief-model";
 import { agentModelConfigured } from "./agent-model";
-import { AgentBudgetRefused, defaultAgentMetering, inputHash, meteredCall, runOutcomeForReason, type AgentMetering, type AgentRunRecord } from "./agent-metering";
 import { DAILY_BRIEF_PROMPT_REVISION } from "./daily-brief-instructions";
+import { beginDailyBriefAgentRun, dailyBriefContextIsCalendarDerived, type DailyBriefAgentRun } from "./daily-brief-agent-run";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
 import { getIcloudCalendarConnection } from "./icloud-calendar.service";
@@ -22,6 +22,8 @@ import { dailyBriefDeviceModelAvailable } from "./daily-brief-device-envelope";
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
 export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
+/** Run-log writes stop this long before the request deadline (advisor plan Phase 1A). */
+export const DAILY_BRIEF_LOG_MARGIN_MS = 2_000;
 
 /** Per-source key sets sent by clients built before Ticket 306. */
 const LEGACY_SETTINGS_KEY_SETS = [
@@ -152,12 +154,9 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   generate?: DailyBriefGenerator;
   now?: () => Temporal.Instant;
   deadlineMs?: number;
-  /** Phase 1B: spend budget and run log. Defaults to the stub until Phase 1A lands. */
-  metering?: AgentMetering;
 }> = {}): Promise<DailyBriefResponse> {
   const attempt = readDailyBriefAttemptInput(value);
   if (!options.generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
-  const metering = options.metering ?? defaultAgentMetering();
   const setting = dailyBriefModelSetting();
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
@@ -166,6 +165,9 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   // Connector reads end early enough to leave the generation reserve inside the one attempt budget.
   const sourceDeadlineAt = Date.now() + deadlineMs - DAILY_BRIEF_GENERATION_RESERVE_MS;
   const signal = AbortSignal.timeout(deadlineMs);
+  // Run-log writes after the model call stop this long before the request deadline,
+  // so a slow log write never turns a finished brief into a timeout.
+  const logSignal = AbortSignal.timeout(Math.max(0, deadlineMs - DAILY_BRIEF_LOG_MARGIN_MS));
   const installationId = attempt.installationId;
   const work = async (): Promise<DailyBriefResponse> => {
     const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
@@ -178,7 +180,14 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
     if (admission.state !== "acquired") return { state: admission.state };
     const leaseToken = admission.leaseToken;
     let successful = false;
+    let agentRun: DailyBriefAgentRun | null = null;
     try {
+      signal.throwIfAborted();
+      // Advisor plan Phase 1A: one agent_runs row per attempt; each model call goes through the spend budget.
+      agentRun = await phase("run_log", () => beginDailyBriefAgentRun({
+        userId: caller.user.id, trigger: attempt.retry ? "retry" : "on_demand", model: setting.model,
+        maxOutputTokens: setting.maxOutputTokens, promptVersion: `${DAILY_BRIEF_PROMPT_REVISION}:${configurationRevision}`, signal,
+      }));
       signal.throwIfAborted();
       const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
         configuration, preferences, localDate: admission.localDate, travelConclusions: attempt.travelConclusions, sourceDeadlineAt, signal, clock,
@@ -194,55 +203,18 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(setting.timeoutMs)]);
       // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
-      const generator = options.generate ?? ((input: Parameters<DailyBriefGenerator>[0]) => generateDailyBriefWithModel(input));
-      const runStart = Date.now();
-      let costMicrodollars = 0, calls = 0, hash = "";
-      const writeRun = (errorReason: string | null, body?: unknown) => {
-        const outcome = errorReason === null ? "success" as const : runOutcomeForReason(errorReason);
-        const total = sumDailyBriefUsage(usage);
-        const run: AgentRunRecord = { runId: leaseToken, agent: "daily_brief", trigger: "user", model: setting.model,
-          promptVersion: `${DAILY_BRIEF_PROMPT_REVISION}:${configurationRevision}`, inputHash: hash, calls,
-          inputTokens: total.inputTokens, cachedInputTokens: total.cachedInputTokens, outputTokens: total.outputTokens, reasoningTokens: total.reasoningTokens,
-          costMicrodollars, toolCalls: 0, outcome, errorReason, latencyMs: Date.now() - runStart, startedAt: new Date(runStart).toISOString() };
-        // A lost run-log write never changes what the person sees.
-        return metering.runLog.record({ accountId: caller.user.id, run,
-          ...(body !== undefined ? { content: { kind: "daily_brief" as const, localDate: admission.localDate, body } } : {}) }).catch(() => undefined);
-      };
-      let briefing;
-      try {
-        briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
-          () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
-            analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
-            onTip: (fingerprints) => { tipFingerprints = fingerprints; },
-            onUsage: (item) => { usage.push(item); },
-            generate: (input) => meteredCall({ metering, accountId: caller.user.id, agent: "daily_brief", setting,
-              inputChars: input.instructions.length + input.facts.length,
-              onCost: (cost) => { costMicrodollars += cost; },
-              call: (onCost) => {
-                calls += 1;
-                hash = inputHash(input.instructions, input.facts);
-                return generator({ ...input, onUsage: (item) => { input.onUsage?.(item); onCost(item); } });
-              } }) }), modelSignal));
-      } catch (error) {
-        if (error instanceof AgentBudgetRefused) {
-          await writeRun("budget_exhausted");
-          throw new DailyBriefError("budget_reached");
-        }
-        await writeRun(error instanceof DailyBriefError ? error.reason ?? error.code : "generation_failed");
-        throw error;
-      }
+      const generator: DailyBriefGenerator = options.generate ?? ((input) => generateDailyBriefWithModel(input));
+      const briefing = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
+        () => raceAbort(generateDailyBrief(context, { config: configuration, now: clock, signal: modelSignal,
+          analysis: { source: prepared.analysisSource, shown, fingerprintOf: prepared.tipFingerprint },
+          onTip: (fingerprints) => { tipFingerprints = fingerprints; },
+          onUsage: (item) => { usage.push(item); },
+          generate: withAgentRun(agentRun, generator) }), modelSignal));
       // The lease must still belong to this attempt. A superseded attempt never returns text.
-      try {
-        const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
-        if (!finished) throw new DailyBriefError("context_changed");
-        await assertCurrent();
-      } catch (error) {
-        // The model ran and cost money, but nothing was shown: keep the metadata, not the text.
-        await writeRun("superseded");
-        throw error;
-      }
+      const finished = await phase("finish", () => finishDailyBrief(caller.client, { installationId, leaseToken, success: true, expectedRevision: preferences.revision }, signal));
+      if (!finished) throw new DailyBriefError("context_changed");
+      await assertCurrent();
       successful = true;
-      await writeRun(null, briefing);
       // Only a completed, still-current attempt consumes the tip. A lost record may repeat the tip; it never hides text.
       if (tipFingerprints.length) {
         await phase("tip_record", async () => {
@@ -251,12 +223,20 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           }
         }).catch(() => undefined);
       }
+      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context) }, logSignal);
       return { state: "ready", briefing };
+    } catch (error) {
+      await agentRun?.finish({ ok: false, error }, logSignal);
+      throw error;
     } finally {
       if (!successful) void finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision: preferences.revision }).catch(() => undefined);
     }
   };
   return phase("request", () => raceAbort(work(), signal));
+}
+
+function withAgentRun(run: DailyBriefAgentRun | null, generate: DailyBriefGenerator): DailyBriefGenerator {
+  return run ? run.wrap(generate) : generate;
 }
 
 /**

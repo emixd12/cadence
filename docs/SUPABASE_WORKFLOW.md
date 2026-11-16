@@ -943,6 +943,33 @@ its own channel. `createLeaveReminderCaller` in
 Local proof: `tests/leave-reminder-caller.local-integration.test.ts` (same four
 variables as below) and `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`.
 
+### Agent token channels (advisor plan Phase 1A)
+
+Cadence's own agents act as one person through one channel each:
+`cadence_channel` is `daily_brief`, `coach` or `chat`. `createAgentClient` and
+`createAgentContext` in `lib/integrations/agent-caller.ts` mint the token with
+`mintAgentAccessToken`: same signing key, same 5-minute cap, no
+`cadence_grant_id`. The client re-mints a token when the current one has less
+than 30 seconds left.
+
+- The database maps the channel to the agent's first-party grant
+  (`agent_ensure_grant()`, migration `20261116200000`), so the integration
+  operations run unchanged with the agent's own scopes, idempotency namespace,
+  activity label and per-grant rate limit. MCP tokens cannot resolve these
+  grants, and `mintIntegrationAccessToken` still refuses every channel but `mcp`.
+- Only agent tokens can call the run log and spend budget functions
+  (`agent_run_*`, `reserve_agent_spend`, `settle_agent_spend`). They refuse web
+  sessions, MCP tokens and the job channels.
+- Agent rate limits use the service-role `oauth_consume_rate_limit`, like MCP,
+  but do not depend on `CADENCE_MCP_ENABLED`.
+- A deployment without `CADENCE_INTEGRATION_JWT_SIGNING_KEY` runs the Daily
+  Brief without a run log or budget check (local development only; production
+  has the key for MCP).
+
+Local proof: `tests/agent-caller.local-integration.test.ts` (the four variables
+below plus `CADENCE_LOCAL_SUPABASE_DB_URL`) and
+`tests/sql/advisor-1a-agent-foundations-smoke.sql`.
+
 ### Key custody
 
 - `CADENCE_INTEGRATION_JWT_SIGNING_KEY` holds the private ES256 JWK, including

@@ -58,7 +58,9 @@ begin
     execute format('select count(*) from cadence_oauth_private.%I', table_name) into remaining;
     if remaining <> 1 then raise exception 'Purge did not preserve valid rows in %', table_name; end if;
   end loop;
-  if (select count(*) from cadence_oauth_private.clients) <> 3
+  -- First-party agent clients (advisor plan Phase 1A) are seeded rows, never purged.
+  if (select count(*) from cadence_oauth_private.clients where registration_type <> 'first_party') <> 3
+    or (select count(*) from cadence_oauth_private.clients where registration_type = 'first_party') <> 3
     or not exists (select 1 from cadence_oauth_private.clients where client_id = 'used-232')
     or not exists (select 1 from cadence_oauth_private.clients where registration_type = 'cimd') then
     raise exception 'Used/shared metadata must remain';

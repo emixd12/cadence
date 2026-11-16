@@ -2,7 +2,10 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
 import { DailyBriefError, prepareDailyBrief, validateDailyBrief, type DailyBriefGenerator, type DailyBriefModelUsage } from "../daily-brief-consumer";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
-import { usageMicrodollars, type Microdollars } from "../agent-metering";
+import { modelPrice, usageMicrodollars } from "../agent-model-pricing";
+
+/** US$1 = 1,000,000. */
+type Microdollars = number;
 import { advisorEvalFixtures, type AdvisorEvalFixture, type AdvisorEvalFixtureId } from "./fixtures";
 import { checkLayerOne, type LayerOneRule, type LayerOneViolation } from "./rules";
 
@@ -80,7 +83,13 @@ async function runFixture(fixture: AdvisorEvalFixture, run: AdvisorEvalRun, sign
   const usage = usages.length ? sumUsage(usages) : null;
   return { fixture: fixture.id, label: run.label, model: run.model, output, brief, rejection, layerOne, layerOneUnexpected, rubric,
     score: rubric.filter((item) => item.passed).length / rubric.length, usage,
-    costMicrodollars: usage ? usageMicrodollars(run.model, usage) : null, latencyMs };
+    costMicrodollars: usage ? evalCost(run.model, usage) : null, latencyMs };
+}
+
+/** Null when the model has no listed price; the live budget would refuse such a model anyway. */
+function evalCost(model: string, usage: DailyBriefModelUsage): Microdollars | null {
+  const price = modelPrice(model);
+  return price ? usageMicrodollars(price, usage) : null;
 }
 
 function busyIntervals(context: AdvisorDayContext) {
