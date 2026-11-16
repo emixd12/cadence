@@ -6,6 +6,7 @@ import { resolveNativeReminderGenerationHorizon } from "@cadence/core/resolvers/
 import { planPersistedOccurrences } from "@cadence/core/services/occurrence-generation";
 import { decideOccurrenceSyncCoverage, summarizeOccurrenceSyncPlans } from "@cadence/core/services/occurrence-sync";
 import type { Category, Profile } from "../../../lib/types/database";
+import { withLocalMoves } from "./local-moves.service";
 import { localCommand, localMutation, type LocalBehaviorGraph } from "./local-store";
 
 let generationQueue: Promise<void> = Promise.resolve();
@@ -33,8 +34,11 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
       startLocalDate: behaviorWindow.startLocalDate, endLocalDate: "9999-12-31",
     });
     const history = await localCommand("readOccurrenceHistory", { profileId, occurrenceIds: rows.map(({ id }) => id) });
+    // Generation keeps a moved Occurrence and adds no second copy for its day. It reads
+    // effective time from these in-memory copies; writes below still use the stored rows.
+    const moved = await withLocalMoves(profileId, rows, [graph.behavior]);
     const plan = planPersistedOccurrences({
-      behavior: toLocalBehaviorGraphRecord(graph, []), occurrences: rows,
+      behavior: toLocalBehaviorGraphRecord(graph, []), occurrences: moved,
       timeSessionOccurrenceIds: new Set(history.timeSessions.map((session) => session.occurrence_id)),
       now, horizonDays,
     });
