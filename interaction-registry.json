@@ -450,6 +450,13 @@
       "reason": "Development-only trial of an animated advisor horse avatar with sample advice. Not a product surface; no account or provider access."
     },
     {
+      "path": "app/design-system/AlertNoticeBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only bench for the shared alert notice (advisor plan Phase 1C). Its one sample action button does nothing. No account or provider access."
+    },
+    {
       "path": "app/design-system/page.tsx",
       "classification": "excluded",
       "interaction_marker_count": 30,

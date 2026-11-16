@@ -87,6 +87,7 @@ import { DayProgressBench } from "@/app/design-system/DayProgressBench";
 import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
 import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
+import { AlertNoticeBench } from "@/app/design-system/AlertNoticeBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -2169,6 +2170,7 @@ const previewFactories: Record<
   "module.settings-row": () => <ProductPreview maxHeight="48rem"><SettingsRowBench /></ProductPreview>,
   "module.settings-drawer": () => <ProductPreview><SettingsDrawerBench /></ProductPreview>,
   "module.settings-saving": () => <ProductPreview><SettingsSavingBench /></ProductPreview>,
+  "module.alert-notice": () => <ProductPreview><AlertNoticeBench /></ProductPreview>,
   "module.trust-and-legal-panel": () => (
       <ProductPreview>
         <TrustAndLegalPanel />

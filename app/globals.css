@@ -16,6 +16,8 @@
   --color-muted-readable: var(--muted-readable);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
+  --color-alert-signal: var(--alert-signal);
+  --color-alert-foreground: var(--alert-foreground);
   --color-line: var(--line);
   --color-ring: var(--ring);
   --font-mono: var(--font-ibm-plex-sans), "IBM Plex Sans", Arial, Helvetica, sans-serif;
