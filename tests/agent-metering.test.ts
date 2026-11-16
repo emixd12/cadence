@@ -95,7 +95,7 @@ describe("Daily Brief service hooks", () => {
     expect(settle).toHaveBeenCalledWith({ reservationId: "res-1", actualMicrodollars: 2_316 });
     expect(runs).toHaveLength(1);
     expect(runs[0]!.run).toMatchObject({ agent: "daily_brief", trigger: "user", model: "openai/gpt-5.6-luna", calls: 1, inputTokens: 8_700, outputTokens: 480,
-      costMicrodollars: 2_316, toolCalls: 0, outcome: "ok", errorReason: null });
+      costMicrodollars: 2_316, toolCalls: 0, outcome: "success", errorReason: null });
     expect(runs[0]!.run.inputHash).toMatch(/^[0-9a-f]{64}$/);
     expect(runs[0]!.content).toMatchObject({ kind: "daily_brief", localDate: fixture.localDate });
     // Metadata never carries the prompt, facts or output.
@@ -107,7 +107,7 @@ describe("Daily Brief service hooks", () => {
     const generate = vi.fn();
     await expect(requestInAppDailyBrief(caller, attempt, { generate, now, metering })).rejects.toMatchObject({ code: "budget_reached" });
     expect(generate).not.toHaveBeenCalled();
-    expect(runs).toEqual([expect.objectContaining({ run: expect.objectContaining({ outcome: "budget_refused", costMicrodollars: 0 }) })]);
+    expect(runs).toEqual([expect.objectContaining({ run: expect.objectContaining({ outcome: "refused_budget", costMicrodollars: 0 }) })]);
     expect(runs[0]!.content).toBeUndefined();
   });
 
@@ -115,7 +115,7 @@ describe("Daily Brief service hooks", () => {
     const { metering, runs } = recordingMetering();
     mocks.finish.mockResolvedValue(false);
     await expect(requestInAppDailyBrief(caller, attempt, { generate: vi.fn().mockResolvedValue(output), now, metering })).rejects.toMatchObject({ code: "context_changed" });
-    expect(runs).toEqual([expect.objectContaining({ run: expect.objectContaining({ outcome: "error", errorReason: "superseded" }) })]);
+    expect(runs).toEqual([expect.objectContaining({ run: expect.objectContaining({ outcome: "superseded", errorReason: "superseded" }) })]);
     expect(runs[0]!.content).toBeUndefined();
   });
 });

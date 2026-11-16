@@ -25,7 +25,18 @@ export interface AgentSpendBudget {
   settle(input: Readonly<{ reservationId: string; actualMicrodollars: Microdollars }>): Promise<void>;
 }
 
-export type AgentRunOutcome = "ok" | "error" | "budget_refused";
+/** Same names as Phase 1A's `agent_run_finish` outcomes. */
+export type AgentRunOutcome = "success" | "refused_budget" | "invalid_output" | "model_error" | "timeout" | "superseded" | "error";
+
+/** Maps an internal failure reason to a run outcome. */
+export function runOutcomeForReason(reason: string): AgentRunOutcome {
+  if (reason === "budget_exhausted") return "refused_budget";
+  if (reason === "superseded") return "superseded";
+  if (reason === "provider_timeout" || reason === "timeout" || reason === "cancelled") return "timeout";
+  if (/^(validation_|output_|provider_refusal|provider_incomplete|provider_body_too_large)/.test(reason)) return "invalid_output";
+  if (/^provider_/.test(reason)) return "model_error";
+  return "error";
+}
 
 /** Metadata only. Phase 1A keeps it long-term in `agent_runs`. */
 export type AgentRunRecord = Readonly<{

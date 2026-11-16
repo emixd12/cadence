@@ -7,7 +7,7 @@ import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-a
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { dailyBriefModelSetting, generateDailyBriefWithModel } from "./daily-brief-model";
 import { agentModelConfigured } from "./agent-model";
-import { AgentBudgetRefused, defaultAgentMetering, inputHash, meteredCall, type AgentMetering, type AgentRunRecord } from "./agent-metering";
+import { AgentBudgetRefused, defaultAgentMetering, inputHash, meteredCall, runOutcomeForReason, type AgentMetering, type AgentRunRecord } from "./agent-metering";
 import { DAILY_BRIEF_PROMPT_REVISION } from "./daily-brief-instructions";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
@@ -197,7 +197,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const generator = options.generate ?? ((input: Parameters<DailyBriefGenerator>[0]) => generateDailyBriefWithModel(input));
       const runStart = Date.now();
       let costMicrodollars = 0, calls = 0, hash = "";
-      const writeRun = (outcome: AgentRunRecord["outcome"], errorReason: string | null, body?: unknown) => {
+      const writeRun = (errorReason: string | null, body?: unknown) => {
+        const outcome = errorReason === null ? "success" as const : runOutcomeForReason(errorReason);
         const total = sumDailyBriefUsage(usage);
         const run: AgentRunRecord = { runId: leaseToken, agent: "daily_brief", trigger: "user", model: setting.model,
           promptVersion: `${DAILY_BRIEF_PROMPT_REVISION}:${configurationRevision}`, inputHash: hash, calls,
@@ -224,10 +225,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
               } }) }), modelSignal));
       } catch (error) {
         if (error instanceof AgentBudgetRefused) {
-          await writeRun("budget_refused", "budget_exhausted");
+          await writeRun("budget_exhausted");
           throw new DailyBriefError("budget_reached");
         }
-        await writeRun("error", error instanceof DailyBriefError ? error.reason ?? error.code : "generation_failed");
+        await writeRun(error instanceof DailyBriefError ? error.reason ?? error.code : "generation_failed");
         throw error;
       }
       // The lease must still belong to this attempt. A superseded attempt never returns text.
@@ -237,11 +238,11 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         await assertCurrent();
       } catch (error) {
         // The model ran and cost money, but nothing was shown: keep the metadata, not the text.
-        await writeRun("error", "superseded");
+        await writeRun("superseded");
         throw error;
       }
       successful = true;
-      await writeRun("ok", null, briefing);
+      await writeRun(null, briefing);
       // Only a completed, still-current attempt consumes the tip. A lost record may repeat the tip; it never hides text.
       if (tipFingerprints.length) {
         await phase("tip_record", async () => {
