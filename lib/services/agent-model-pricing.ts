@@ -7,12 +7,16 @@ export type ModelPrice = Readonly<{
   /** US$ per million tokens. */
   input: number;
   cachedInput: number;
+  /** Writing input to a prompt cache, when it bills above `input` (Anthropic: 1.25x for the 5-minute cache). */
+  cacheWriteInput?: number;
   output: number;
 }>;
 
 export type ModelUsage = Readonly<{
   inputTokens: number | null;
   cachedInputTokens: number | null;
+  /** Part of `inputTokens` written to a prompt cache. */
+  cacheWriteTokens?: number | null;
   outputTokens: number | null;
 }>;
 
@@ -24,10 +28,11 @@ const PRICES: Readonly<Record<string, ModelPrice>> = {
   "gpt-5.6-terra": { input: 2, cachedInput: 0.2, output: 12 },
   "gpt-5.6-sol": { input: 4, cachedInput: 0.4, output: 20 },
   // Haiku 5.5 doubles past 100k input tokens; a brief stays far below.
-  "claude-haiku-5.5": { input: 0.1, cachedInput: 0.01, output: 0.5 },
-  "claude-sonnet-5.5": { input: 2, cachedInput: 0.1, output: 10 },
-  "claude-opus-5.5": { input: 4, cachedInput: 0.2, output: 20 },
-  "claude-fable-5.2": { input: 8, cachedInput: 0.2, output: 40 },
+  // Anthropic bills a 5-minute cache write at 1.25x input.
+  "claude-haiku-5.5": { input: 0.1, cachedInput: 0.01, cacheWriteInput: 0.125, output: 0.5 },
+  "claude-sonnet-5.5": { input: 2, cachedInput: 0.1, cacheWriteInput: 2.5, output: 10 },
+  "claude-opus-5.5": { input: 4, cachedInput: 0.2, cacheWriteInput: 5, output: 20 },
+  "claude-fable-5.2": { input: 8, cachedInput: 0.2, cacheWriteInput: 10, output: 40 },
 };
 
 /** Accepts a bare model id or an AI Gateway "provider/model" string. */
@@ -41,7 +46,7 @@ export function modelPrice(model: string): ModelPrice | null {
  * text averages about four characters per token) plus the full output cap.
  */
 export function estimateCallMicrodollars(price: ModelPrice, input: Readonly<{ requestCharacters: number; maxOutputTokens: number }>): number {
-  const micro = input.requestCharacters * price.input + input.maxOutputTokens * price.output;
+  const micro = input.requestCharacters * Math.max(price.input, price.cacheWriteInput ?? 0) + input.maxOutputTokens * price.output;
   return Math.max(1, Math.ceil(micro));
 }
 
@@ -50,6 +55,8 @@ export function usageMicrodollars(price: ModelPrice, usage: ModelUsage): number 
   if (usage.inputTokens === null && usage.outputTokens === null) return null;
   const input = usage.inputTokens ?? 0;
   const cached = Math.min(usage.cachedInputTokens ?? 0, input);
-  const micro = (input - cached) * price.input + cached * price.cachedInput + (usage.outputTokens ?? 0) * price.output;
+  const written = Math.min(usage.cacheWriteTokens ?? 0, input - cached);
+  const micro = (input - cached - written) * price.input + cached * price.cachedInput + written * (price.cacheWriteInput ?? price.input)
+    + (usage.outputTokens ?? 0) * price.output;
   return Math.max(0, Math.ceil(micro));
 }
