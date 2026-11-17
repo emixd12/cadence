@@ -185,8 +185,16 @@ describe("agent model pricing", () => {
     expect(estimateCallMicrodollars(price, { requestCharacters: 40_000, maxOutputTokens: 2_000 })).toBe(10_400);
   });
 
+  it("bills Anthropic cache writes at 1.25x input and cache reads at the cached rate", () => {
+    const price = modelPrice("anthropic/claude-sonnet-5.5")!;
+    // 1M input: 600k written to the cache (US$1.50), 300k read from it (US$0.03), 100k fresh (US$0.20).
+    expect(usageMicrodollars(price, { inputTokens: 1_000_000, cachedInputTokens: 300_000, cacheWriteTokens: 600_000, outputTokens: 0 })).toBe(1_730_000);
+    // OpenAI has no separate write price; its cache writes bill as normal input.
+    expect(usageMicrodollars(modelPrice("openai/gpt-5.6-luna")!, { inputTokens: 1_000, cachedInputTokens: 0, cacheWriteTokens: 1_000, outputTokens: 0 })).toBe(200);
+  });
+
   it("prices the Phase 1B eval candidates, including Anthropic models", () => {
-    expect(modelPrice("anthropic/claude-sonnet-5.5")).toEqual({ input: 2, cachedInput: 0.1, output: 10 });
+    expect(modelPrice("anthropic/claude-sonnet-5.5")).toEqual({ input: 2, cachedInput: 0.1, cacheWriteInput: 2.5, output: 10 });
     expect(modelPrice("anthropic/claude-haiku-5.5")).not.toBeNull();
     expect(modelPrice("openai/gpt-5.6-terra")).not.toBeNull();
   });
@@ -197,7 +205,7 @@ describe("agent model pricing", () => {
       promptVersion: "v1", client: fake.client as never });
     await run!.wrap(async () => ({}))({ instructions: "i".repeat(100), facts: "", signal: new AbortController().signal });
     const reserve = fake.calls.find((call) => call.name === "reserve_agent_spend")!;
-    // 100 characters at US$2 per million plus 1,000 output tokens at US$10 per million.
-    expect(reserve.args).toMatchObject({ p_model: "anthropic/claude-sonnet-5.5", p_estimated_microdollars: 10_200 });
+    // 100 characters at the US$2.50 per million cache-write rate plus 1,000 output tokens at US$10 per million.
+    expect(reserve.args).toMatchObject({ p_model: "anthropic/claude-sonnet-5.5", p_estimated_microdollars: 10_250 });
   });
 });
