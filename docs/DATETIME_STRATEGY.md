@@ -150,8 +150,11 @@ from the Occurrence menu.
   timezone change.
 - **A profile timezone change supersedes today's moves.** The change regenerates
   future Unresolved Occurrences in the new zone (see "Product decisions"). Today's
-  applied moves stop counting toward effective time; their records stay as
-  history. The person or the Daily Brief can move again in the new zone.
+  applied moves on Unresolved Occurrences stop counting toward effective time:
+  the server appends a `supersede` record to each chain, so devices see the same
+  result and changing back does not revive the move. Records stay as history, and
+  a resolved Occurrence keeps the time it was moved to. The person or the Daily
+  Brief can move again in the new zone.
 - **No moves for range Behaviors in v1.** An Occurrence scheduled as a time range
   (for example Morning) is not moved. Behavior settings explain that a range means
   no move suggestions.

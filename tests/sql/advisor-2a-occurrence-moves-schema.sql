@@ -1,12 +1,13 @@
 \set ON_ERROR_STOP on
 
--- Advisor Phase 2A: per-day move schema (migration 20261117100000).
+-- Advisor Phase 2A: per-day move schema (migrations 20261117100000 and 20261117105000).
 --   1. Only the move functions write effective time; people, account sync and other
 --      writers keep it.
 --   2. Account sync contract 6 carries occurrence_move read-only with only the Mac
 --      fields; the occurrence row never shows effective time, so a status mark from a
 --      Mac merges with a web move.
---   3. A Behavior timezone change supersedes its moves.
+--   3. A Behavior timezone change supersedes moves on unresolved Occurrences with a
+--      'supersede' record and keeps a resolved Occurrence's moved time as history.
 -- Synthetic local fixtures only; all changes roll back.
 begin;
 
@@ -146,18 +147,53 @@ end $$;
 
 -- A timezone change supersedes the Behavior's moves; the records stay.
 reset role;
-update public.behaviors set timezone = 'Europe/London' where id = '2a010000-0000-4000-8000-000000000001';
+-- A resolved moved Occurrence of the same Behavior keeps its effective time.
+insert into public.occurrences (id, user_id, behavior_id, scheduled_for, local_date, schedule_kind, schedule_start_time, status) values
+  ('2a020000-0000-4000-8000-000000000002', '2a000000-0000-4000-8000-000000000001', '2a010000-0000-4000-8000-000000000001',
+   '2026-11-15T14:00:00Z', '2026-11-15', 'exact', '09:00', 'completed');
+insert into public.occurrence_moves (id, user_id, occurrence_id, behavior_id, local_date, weekday, timezone, kind,
+  from_start_at, from_end_at, from_planned, to_start_at, to_end_at, duration_source, chain_root_id, chain_position, source) values
+  ('2a030000-0000-4000-8000-000000000002', '2a000000-0000-4000-8000-000000000001', '2a020000-0000-4000-8000-000000000002',
+   '2a010000-0000-4000-8000-000000000001', '2026-11-15', 7, 'America/New_York', 'move',
+   '2026-11-15T14:00:00Z', '2026-11-15T15:00:00Z', true, '2026-11-15T18:00:00Z', '2026-11-15T19:00:00Z', 'planned_length',
+   '2a030000-0000-4000-8000-000000000002', 1, 'person');
 do $$ begin
+  perform set_config('cadence.occurrence_move_write', 'on', true);
+  update public.occurrences set effective_start_at = '2026-11-15T18:00:00Z', effective_end_at = '2026-11-15T19:00:00Z'
+    where id = '2a020000-0000-4000-8000-000000000002';
+  perform set_config('cadence.occurrence_move_write', '', true);
+end $$;
+update public.behaviors set timezone = 'Europe/London' where id = '2a010000-0000-4000-8000-000000000001';
+do $$
+declare superseding public.occurrence_moves;
+begin
   if (select effective_start_at from public.occurrences where id = '2a020000-0000-4000-8000-000000000001') is not null then
     raise exception 'A timezone change kept the move';
   end if;
-  if (select count(*) from public.occurrence_moves) <> 1 then raise exception 'A timezone change removed move history'; end if;
+  if (select effective_start_at from public.occurrences where id = '2a020000-0000-4000-8000-000000000002') <> '2026-11-15T18:00:00Z' then
+    raise exception 'A timezone change cleared a resolved Occurrence''s moved time';
+  end if;
+  select * into superseding from public.occurrence_moves where occurrence_id = '2a020000-0000-4000-8000-000000000001' and chain_position = 2;
+  if superseding.kind is distinct from 'supersede' or not superseding.to_planned or superseding.source <> 'system'
+    or superseding.revises_move_id <> '2a030000-0000-4000-8000-000000000001' or superseding.timezone <> 'Europe/London' then
+    raise exception 'A timezone change did not record the supersede';
+  end if;
+  if (select count(*) from public.occurrence_moves) <> 3 then raise exception 'A timezone change wrote the wrong records'; end if;
+end $$;
+
+-- Changing back does not revive the move: the latest record is the supersede.
+update public.behaviors set timezone = 'America/New_York' where id = '2a010000-0000-4000-8000-000000000001';
+do $$ begin
+  if (select effective_start_at from public.occurrences where id = '2a020000-0000-4000-8000-000000000001') is not null
+    or (select count(*) from public.occurrence_moves) <> 3 then
+    raise exception 'A timezone round trip revived or re-recorded the move';
+  end if;
 end $$;
 
 -- Deleting the Occurrence keeps its move history.
 delete from public.occurrences where id = '2a020000-0000-4000-8000-000000000001';
 do $$ begin
-  if (select count(*) from public.occurrence_moves) <> 1 then raise exception 'Deleting the Occurrence removed its moves'; end if;
+  if (select count(*) from public.occurrence_moves) <> 3 then raise exception 'Deleting the Occurrence removed its moves'; end if;
 end $$;
 
 -- Agent scopes: the Daily Brief and chat may move; the coach stays read-only.
