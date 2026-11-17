@@ -1064,3 +1064,66 @@ describe("connector completion records (Ticket 320, contract 5)", () => {
     expect(() => plan(snapshot(parents), snapshot(parents), snapshot([...parents, reversed]))).toThrow("The synced connector completion is invalid.");
   });
 });
+
+describe("per-day moves (advisor Phase 2A, contract 6)", () => {
+  const behaviorId = "66666666-6666-4666-8666-666666666666";
+  const occurrenceId = "77777777-7777-4777-8777-777777777777";
+  const moveId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const occurrence = (status = "unresolved"): AccountSyncEntity => ({ kind: "occurrence", id: occurrenceId, value: {
+    id: occurrenceId, behavior_id: behaviorId, status, scheduled_for: "2026-11-16T14:00:00Z",
+    completed_at: status === "completed" ? "2026-11-16T16:10:00Z" : null,
+    status_marked_at: status === "completed" ? "2026-11-16T16:10:00Z" : null,
+  } });
+  const behavior: AccountSyncEntity = { kind: "behavior", id: behaviorId, value: { id: behaviorId, title: "Gym" } };
+  const move: AccountSyncEntity = { kind: "occurrence_move", id: moveId, value: {
+    id: moveId, occurrence_id: occurrenceId, behavior_id: behaviorId, local_date: "2026-11-16", weekday: 1,
+    timezone: "America/New_York", kind: "move", from_start_at: "2026-11-16T14:00:00Z", from_end_at: "2026-11-16T15:00:00Z",
+    from_planned: true, to_start_at: "2026-11-16T16:00:00Z", to_end_at: "2026-11-16T17:00:00Z", to_planned: false,
+    duration_source: "behavior_duration", revises_move_id: null, chain_root_id: moveId, chain_position: 1,
+    reason: null, source: "person", created_at: "2026-11-16T13:00:00Z",
+  } };
+  const keys = (writes: readonly { kind: string; id: string; operation: string }[]) => writes.map(({ kind, id, operation }) => `${operation}:${kind}:${id}`);
+
+  it("copies a web move to the Mac and never writes moves to the hosted account", () => {
+    const base = snapshot([behavior, occurrence()]);
+    const result = plan(base, base, snapshot([behavior, occurrence(), move]));
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.localWrites)).toEqual([`upsert:occurrence_move:${moveId}`]);
+    expect(result.hostedWrites).toEqual([]);
+  });
+
+  it("merges a web move with a Mac status mark without conflict review", () => {
+    const base = snapshot([behavior, occurrence()]);
+    const result = plan(base, snapshot([behavior, occurrence("completed")]), snapshot([behavior, occurrence(), move]));
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.hostedWrites)).toEqual([`upsert:occurrence:${occurrenceId}`]);
+    expect(keys(result.localWrites)).toEqual([`upsert:occurrence_move:${moveId}`]);
+  });
+
+  it("keeps a move whose Occurrence is gone, as history", () => {
+    const base = snapshot([behavior, move]);
+    const result = plan(base, base, base);
+    expect(result.mergedEntities.some(({ kind }) => kind === "occurrence_move")).toBe(true);
+  });
+
+  it("copies the server's timezone supersede record to the Mac", () => {
+    const supersedeId = "2a030000-0000-4000-8000-0000000000aa";
+    const supersede: AccountSyncEntity = { kind: "occurrence_move", id: supersedeId, value: {
+      ...(move.value as Record<string, Json>), id: supersedeId, kind: "supersede", timezone: "Europe/London",
+      from_start_at: "2026-11-16T16:00:00Z", from_end_at: "2026-11-16T17:00:00Z", from_planned: false,
+      to_start_at: "2026-11-16T14:00:00Z", to_end_at: "2026-11-16T14:00:00Z", to_planned: true,
+      duration_source: "restored", revises_move_id: moveId, chain_position: 2, reason: "timezone_change", source: "system",
+    } };
+    const base = snapshot([behavior, occurrence(), move]);
+    const result = plan(base, base, snapshot([behavior, occurrence(), move, supersede]));
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.localWrites)).toEqual([`upsert:occurrence_move:${supersedeId}`]);
+  });
+
+  it("rejects a move carrying fields a Mac must not hold, or an invalid shape", () => {
+    const leaky: AccountSyncEntity = { ...move, value: { ...(move.value as Record<string, Json>), idempotency_key: "k" } };
+    expect(() => plan(snapshot([behavior]), snapshot([behavior]), snapshot([behavior, leaky]))).toThrow("Update Cadence before synchronizing moved Occurrences.");
+    const broken: AccountSyncEntity = { ...move, value: { ...(move.value as Record<string, Json>), chain_position: 2 } };
+    expect(() => plan(snapshot([behavior]), snapshot([behavior]), snapshot([behavior, broken]))).toThrow("The synced move is invalid.");
+  });
+});

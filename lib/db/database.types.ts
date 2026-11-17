@@ -1096,6 +1096,151 @@ export type Database = {
         }
         Relationships: []
       }
+      move_conflicts: {
+        Row: {
+          behavior_id: string
+          conflicting_occurrence_id: string | null
+          created_at: string
+          detected_at: string
+          id: string
+          local_date: string
+          move_id: string
+          occurrence_id: string
+          resolved_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          conflicting_occurrence_id?: string | null
+          created_at?: string
+          detected_at?: string
+          id?: string
+          local_date: string
+          move_id: string
+          occurrence_id: string
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          conflicting_occurrence_id?: string | null
+          created_at?: string
+          detected_at?: string
+          id?: string
+          local_date?: string
+          move_id?: string
+          occurrence_id?: string
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "move_conflicts_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "move_conflicts_move_owner_fkey"
+            columns: ["user_id", "move_id"]
+            isOneToOne: false
+            referencedRelation: "occurrence_moves"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      move_proposals: {
+        Row: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          expected_revision: string
+          id: string
+          local_date: string
+          move_id: string | null
+          occurrence_id: string
+          option_refs: Json
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_run_id?: string | null
+          behavior_id: string
+          created_at?: string
+          expected_revision: string
+          id?: string
+          local_date: string
+          move_id?: string | null
+          occurrence_id: string
+          option_refs?: Json
+          proposed_end_at: string
+          proposed_start_at: string
+          reason?: string | null
+          replaces_proposal_id?: string | null
+          source: string
+          status?: string
+          status_changed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_run_id?: string | null
+          behavior_id?: string
+          created_at?: string
+          expected_revision?: string
+          id?: string
+          local_date?: string
+          move_id?: string | null
+          occurrence_id?: string
+          option_refs?: Json
+          proposed_end_at?: string
+          proposed_start_at?: string
+          reason?: string | null
+          replaces_proposal_id?: string | null
+          source?: string
+          status?: string
+          status_changed_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "move_proposals_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "move_proposals_move_owner_fkey"
+            columns: ["user_id", "move_id"]
+            isOneToOne: false
+            referencedRelation: "occurrence_moves"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "move_proposals_replaces_owner_fkey"
+            columns: ["user_id", "replaces_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "move_proposals"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       note_shortcut_states: {
         Row: {
           behavior_id: string | null
@@ -1133,6 +1278,138 @@ export type Database = {
             columns: ["user_id", "behavior_id"]
             isOneToOne: false
             referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      occurrence_move_reasons: {
+        Row: {
+          created_at: string
+          move_id: string
+          person_reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          move_id: string
+          person_reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          move_id?: string
+          person_reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "occurrence_move_reasons_move_owner_fkey"
+            columns: ["user_id", "move_id"]
+            isOneToOne: false
+            referencedRelation: "occurrence_moves"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      occurrence_moves: {
+        Row: {
+          behavior_id: string
+          chain_position: number
+          chain_root_id: string
+          client_ref: string | null
+          created_at: string
+          duration_source: string
+          from_end_at: string
+          from_planned: boolean
+          from_start_at: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          local_date: string
+          occurrence_id: string
+          proposal_id: string | null
+          reason: string | null
+          revises_move_id: string | null
+          source: string
+          timezone: string
+          to_end_at: string
+          to_planned: boolean
+          to_start_at: string
+          user_id: string
+          weekday: number
+        }
+        Insert: {
+          behavior_id: string
+          chain_position: number
+          chain_root_id: string
+          client_ref?: string | null
+          created_at?: string
+          duration_source: string
+          from_end_at: string
+          from_planned: boolean
+          from_start_at: string
+          id?: string
+          idempotency_key?: string | null
+          kind: string
+          local_date: string
+          occurrence_id: string
+          proposal_id?: string | null
+          reason?: string | null
+          revises_move_id?: string | null
+          source: string
+          timezone: string
+          to_end_at: string
+          to_planned?: boolean
+          to_start_at: string
+          user_id: string
+          weekday: number
+        }
+        Update: {
+          behavior_id?: string
+          chain_position?: number
+          chain_root_id?: string
+          client_ref?: string | null
+          created_at?: string
+          duration_source?: string
+          from_end_at?: string
+          from_planned?: boolean
+          from_start_at?: string
+          id?: string
+          idempotency_key?: string | null
+          kind?: string
+          local_date?: string
+          occurrence_id?: string
+          proposal_id?: string | null
+          reason?: string | null
+          revises_move_id?: string | null
+          source?: string
+          timezone?: string
+          to_end_at?: string
+          to_planned?: boolean
+          to_start_at?: string
+          user_id?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "occurrence_moves_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "occurrence_moves_chain_root_owner_fkey"
+            columns: ["user_id", "chain_root_id"]
+            isOneToOne: false
+            referencedRelation: "occurrence_moves"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "occurrence_moves_revises_owner_fkey"
+            columns: ["user_id", "revises_move_id"]
+            isOneToOne: false
+            referencedRelation: "occurrence_moves"
             referencedColumns: ["user_id", "id"]
           },
         ]
@@ -1389,6 +1666,8 @@ export type Database = {
           behavior_schedule_slot_id: string | null
           completed_at: string | null
           created_at: string
+          effective_end_at: string | null
+          effective_start_at: string | null
           id: string
           local_date: string
           note: string | null
@@ -1409,6 +1688,8 @@ export type Database = {
           behavior_schedule_slot_id?: string | null
           completed_at?: string | null
           created_at?: string
+          effective_end_at?: string | null
+          effective_start_at?: string | null
           id?: string
           local_date: string
           note?: string | null
@@ -1429,6 +1710,8 @@ export type Database = {
           behavior_schedule_slot_id?: string | null
           completed_at?: string | null
           created_at?: string
+          effective_end_at?: string | null
+          effective_start_at?: string | null
           id?: string
           local_date?: string
           note?: string | null
@@ -2862,6 +3145,8 @@ export type Database = {
           behavior_schedule_slot_id: string | null
           completed_at: string | null
           created_at: string
+          effective_end_at: string | null
+          effective_start_at: string | null
           id: string
           local_date: string
           note: string | null

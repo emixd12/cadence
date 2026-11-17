@@ -2,8 +2,11 @@ import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 import {
   currentInstant,
+  effectiveEndAt,
   effectiveStartAt,
   effectiveStartInstant,
+  effectiveTimeFromMoves,
+  isMoved,
   fixedClock,
   isOnLocalDate,
   localDateAt,
@@ -85,9 +88,70 @@ describe("time helper: wall-clock times use the compatible DST rule", () => {
 });
 
 describe("time helper: effective time", () => {
-  it("is the planned time until moves exist", () => {
+  it("is the planned time when the Occurrence is not moved", () => {
     const occurrence = { scheduled_for: "2026-11-16T14:00:00.000Z" };
     expect(effectiveStartAt(occurrence)).toBe("2026-11-16T14:00:00.000Z");
     expect(effectiveStartInstant(occurrence).toString()).toBe("2026-11-16T14:00:00Z");
+    expect(effectiveStartAt({ ...occurrence, effective_start_at: null })).toBe("2026-11-16T14:00:00.000Z");
+    expect(effectiveEndAt({ ...occurrence, effective_start_at: null, effective_end_at: null })).toBeNull();
+    expect(isMoved(occurrence)).toBe(false);
+  });
+
+  it("is the moved time when the server derived one", () => {
+    const occurrence = {
+      scheduled_for: "2026-11-16T14:00:00.000Z",
+      effective_start_at: "2026-11-16T16:00:00.000Z",
+      effective_end_at: "2026-11-16T17:00:00.000Z",
+    };
+    expect(effectiveStartAt(occurrence)).toBe("2026-11-16T16:00:00.000Z");
+    expect(effectiveEndAt(occurrence)).toBe("2026-11-16T17:00:00.000Z");
+    expect(isMoved(occurrence)).toBe(true);
+  });
+});
+
+describe("time helper: effective time from synced moves", () => {
+  const move = (position: number, overrides: Partial<Parameters<typeof effectiveTimeFromMoves>[0][number]> = {}) => ({
+    occurrence_id: "occ-1",
+    chain_position: position,
+    timezone: NEW_YORK,
+    to_start_at: `2026-11-16T1${position}:00:00Z`,
+    to_end_at: `2026-11-16T1${position}:30:00Z`,
+    to_planned: false,
+    ...overrides,
+  });
+
+  it("is null with no moves", () => {
+    expect(effectiveTimeFromMoves([], "occ-1")).toBeNull();
+  });
+
+  it("follows the latest record, whatever order the records arrive in", () => {
+    expect(effectiveTimeFromMoves([move(2), move(1)], "occ-1")).toEqual({
+      effective_start_at: "2026-11-16T12:00:00Z",
+      effective_end_at: "2026-11-16T12:30:00Z",
+    });
+  });
+
+  it("returns to the plan after an Undo of the first move", () => {
+    expect(effectiveTimeFromMoves([move(1), move(2, { to_planned: true })], "occ-1")).toBeNull();
+  });
+
+  it("restores the earlier move after an Undo of a re-move", () => {
+    const undo = move(3, { to_start_at: "2026-11-16T11:00:00Z", to_end_at: "2026-11-16T11:30:00Z" });
+    expect(effectiveTimeFromMoves([move(1), move(2), undo], "occ-1")?.effective_start_at).toBe("2026-11-16T11:00:00Z");
+  });
+
+  it("ignores other Occurrences' moves", () => {
+    expect(effectiveTimeFromMoves([move(1, { occurrence_id: "occ-2" })], "occ-1")).toBeNull();
+  });
+
+  it("follows the plan after a supersede record and keeps it there across a timezone round trip", () => {
+    const supersede = move(2, { timezone: TOKYO, to_planned: true });
+    expect(effectiveTimeFromMoves([move(1), supersede], "occ-1")).toBeNull();
+    // Back in the move's own timezone, the chain still ends in the supersede.
+    expect(effectiveTimeFromMoves([supersede, move(1)], "occ-1")).toBeNull();
+  });
+
+  it("keeps a move made in another timezone when nothing superseded it (resolved history)", () => {
+    expect(effectiveTimeFromMoves([move(1, { timezone: TOKYO })], "occ-1")).not.toBeNull();
   });
 });

@@ -15,7 +15,15 @@ export type BehaviorConfigurationEvent =
   Tables<"behavior_configuration_events">;
 export type BehaviorSchedule = Tables<"behavior_schedules">;
 export type BehaviorScheduleSlot = Tables<"behavior_schedule_slots">;
-export type Occurrence = Tables<"occurrences">;
+/**
+ * An Occurrence row. effective_start_at / effective_end_at (advisor Phase 2A) are
+ * optional here so rows built in code and older fixtures stay valid; read them through
+ * `effectiveStartAt` in `@cadence/core/resolvers/time.resolver`.
+ */
+export type Occurrence = Omit<Tables<"occurrences">, "effective_start_at" | "effective_end_at"> & {
+  effective_start_at?: string | null;
+  effective_end_at?: string | null;
+};
 export type DayNote = Tables<"day_notes">;
 export type OccurrenceSyncState = Tables<"occurrence_sync_state">;
 export type OccurrenceTimeSession = Tables<"occurrence_time_sessions">;

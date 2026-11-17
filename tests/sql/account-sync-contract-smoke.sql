@@ -322,6 +322,9 @@ begin
   from information_schema.columns c
   where c.table_schema = 'public' and c.column_name <> 'user_id' and frozen ? c.table_name
     and not (frozen -> c.table_name) ? c.column_name
+    -- Server-only derived columns that the snapshot leaves out (advisor Phase 2A):
+    -- effective time is derived on each device from the synced occurrence_move rows.
+    and not (c.table_name = 'occurrences' and c.column_name in ('effective_start_at', 'effective_end_at'))
     and not exists (
       select 1 from cadence_private.account_sync_contract_additions addition
       where addition.kind = kinds ->> c.table_name and addition.field = c.column_name and addition.contract > 3
@@ -339,7 +342,8 @@ begin
 
   -- Contract 4 adds no column or kind; it adds the day-note Note shortcut row (Ticket 292).
   -- Contract 5 adds the read-only connector completion kinds (Ticket 320).
-  if cadence_private.account_sync_current_contract() <> 5 then
+  -- Contract 6 adds the read-only occurrence_move kind (advisor Phase 2A).
+  if cadence_private.account_sync_current_contract() <> 6 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
