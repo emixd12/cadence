@@ -470,6 +470,13 @@ OpenAI and Anthropic prices are the same.
 
 Haiku 5.5 doubles its price past 100,000 input tokens; a brief sends about 9,000.
 
+Anthropic caches a prompt only where the request marks it, and bills writing it to the
+5-minute cache at 1.25x the input price (Haiku 0.125, Sonnet 2.50, Opus 5.00, Fable
+10.00), listed as `cacheWriteInput`. The model layer marks the end of the shared
+instructions, so a brief that follows another within five minutes reads them at the
+cached price. A brief with no recent neighbour pays the write price on them instead.
+OpenAI caches a repeated prefix on its own and charges nothing extra to write it.
+
 ### Ticket 290 workbench candidate models
 
 The development workbench can run a candidate on another model, another reasoning

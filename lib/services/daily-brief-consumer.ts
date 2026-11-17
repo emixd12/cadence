@@ -31,6 +31,8 @@ import {
 export type DailyBriefModelUsage = Readonly<{
   inputTokens: number | null;
   cachedInputTokens: number | null;
+  /** Tokens written to a prompt cache. Anthropic bills these above the input price. */
+  cacheWriteTokens?: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
 }>;

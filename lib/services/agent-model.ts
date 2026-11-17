@@ -82,6 +82,8 @@ export function agentModelConfigured(env: Env = process.env): boolean {
 export type AgentModelUsage = Readonly<{
   inputTokens: number | null;
   cachedInputTokens: number | null;
+  /** Input tokens written to a prompt cache on this call. Anthropic bills these above the input price. */
+  cacheWriteTokens?: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
 }>;
@@ -130,7 +132,10 @@ export async function generateStructured(input: StructuredCallInput): Promise<un
   try {
     result = await generateText({
       model,
-      instructions: input.instructions,
+      // The instructions are the same for every account, so they end in a cache breakpoint.
+      // OpenAI caches a repeated prefix on its own; Anthropic caches only where it is asked to.
+      // Other providers ignore the Anthropic option.
+      instructions: { role: "system", content: input.instructions, providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } } },
       prompt: input.prompt,
       output: Output.object({ name: input.schemaName, schema: jsonSchema(input.schema as Parameters<typeof jsonSchema>[0]) }),
       reasoning: input.setting.reasoning,
@@ -212,7 +217,10 @@ export function parseUsage(value: unknown): AgentModelUsage | null {
   const output = record(value.outputTokenDetails) ? value.outputTokenDetails : {};
   const usage = { inputTokens: count(value.inputTokens), cachedInputTokens: count(input.cacheReadTokens),
     outputTokens: count(value.outputTokens), reasoningTokens: count(output.reasoningTokens) };
-  return Object.values(usage).every((item) => item === null) ? null : usage;
+  if (Object.values(usage).every((item) => item === null)) return null;
+  // Anthropic bills cache writes above the input price; OpenAI reports them too, at the input price.
+  const written = count(input.cacheWriteTokens);
+  return written ? { ...usage, cacheWriteTokens: written } : usage;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
