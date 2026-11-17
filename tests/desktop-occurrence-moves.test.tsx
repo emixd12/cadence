@@ -14,7 +14,6 @@ const NOW = Temporal.Instant.from("2026-08-30T12:00:00Z"); // 8:00 AM in New Yor
 const MOVED_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_ID = "44444444-4444-4444-8444-444444444444";
 const behavior = storedBehavior();
-const timezones = new Map([[behavior.id, behavior.timezone]]);
 
 function row(overrides: Partial<OccurrenceRecord> = {}): OccurrenceRecord {
   return {
@@ -43,18 +42,21 @@ const undo = move({ id: "50000000-0000-4000-8000-000000000002", kind: "revert", 
 
 describe("synced moves on the Mac", () => {
   it("places a moved Occurrence at its moved time and follows the latest record", () => {
-    const [moved] = applyOccurrenceMoves([row()], [move()], timezones);
+    const [moved] = applyOccurrenceMoves([row()], [move()]);
     expect(moved).toMatchObject({ scheduled_for: "2026-08-30T13:00:00Z", effective_start_at: "2026-08-30T15:00:00Z", effective_end_at: "2026-08-30T15:30:00Z" });
     // Undo returns it to the plan, whatever order the records arrive in.
-    expect(applyOccurrenceMoves([row()], [undo, move()], timezones)[0]).toMatchObject({ effective_start_at: null });
-    // A record made in another timezone than the Behavior's current one no longer counts.
-    expect(applyOccurrenceMoves([row()], [move({ timezone: "Europe/London" })], timezones)[0]).toMatchObject({ effective_start_at: null });
+    expect(applyOccurrenceMoves([row()], [undo, move()])[0]).toMatchObject({ effective_start_at: null });
+    // A Behavior timezone change appends a supersede record that returns the item to its plan.
+    const supersede = move({ id: "50000000-0000-4000-8000-000000000003", kind: "supersede", source: "system", reason: "timezone_change",
+      revises_move_id: "50000000-0000-4000-8000-000000000001", chain_position: 2, timezone: "Europe/London", to_planned: true,
+      to_start_at: "2026-08-30T13:00:00Z", to_end_at: "2026-08-30T13:00:00Z", duration_source: "restored" });
+    expect(applyOccurrenceMoves([row()], [supersede, move()])[0]).toMatchObject({ effective_start_at: null });
     // No moves leaves the row as stored.
-    expect(applyOccurrenceMoves([row()], [], timezones)[0]).toEqual(row());
+    expect(applyOccurrenceMoves([row()], [])[0]).toEqual(row());
   });
 
   it("shows the moved time on the Timeline with the planned time beside it", () => {
-    const [moved] = applyOccurrenceMoves([row()], [move()], timezones);
+    const [moved] = applyOccurrenceMoves([row()], [move()]);
     const other = row({ id: OTHER_ID, scheduled_for: "2026-08-30T14:00:00Z", schedule_start_time: "10:00" });
     const timeline = resolvePersistedTimeline({ behaviors: [{ ...behavior, category: null, schedule_slots: [] }],
       occurrences: [moved!, other], timeSessions: [], now: NOW, timezone: "America/New_York" });
@@ -72,7 +74,7 @@ describe("synced moves on the Mac", () => {
   it("reminds at the moved time, including after the planned time has passed", () => {
     const plan = (occurrences: OccurrenceRecord[]) => planNativeReminderRequests({ behaviors: [behavior], occurrences,
       now: NOW, targetThrough: NOW.add({ hours: 24 }) });
-    const [moved] = applyOccurrenceMoves([row()], [move()], timezones);
+    const [moved] = applyOccurrenceMoves([row()], [move()]);
     expect(plan([moved!])).toEqual([{ id: `cadence.local.${MOVED_ID}`, title: "Brush teeth",
       body: "Moved for today. Planned for 9:00 AM.", fireAt: "2026-08-30T15:00:00Z" }]);
     // The same request ID replaces the planned reminder, so the old one cannot also fire.
@@ -80,7 +82,7 @@ describe("synced moves on the Mac", () => {
     // Planned time already passed: a move later today still reminds; an unmoved item gets nothing new.
     const passed = row({ scheduled_for: "2026-08-30T11:00:00Z", schedule_start_time: "07:00" });
     expect(plan([passed])).toEqual([]);
-    const [late] = applyOccurrenceMoves([passed], [move({ from_start_at: "2026-08-30T11:00:00Z", from_end_at: "2026-08-30T11:30:00Z" })], timezones);
+    const [late] = applyOccurrenceMoves([passed], [move({ from_start_at: "2026-08-30T11:00:00Z", from_end_at: "2026-08-30T11:30:00Z" })]);
     expect(plan([late!]).map(({ fireAt }) => fireAt)).toEqual(["2026-08-30T15:00:00Z"]);
   });
 });

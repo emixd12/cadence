@@ -12,7 +12,6 @@ import { localCommand } from "./local-store";
 export function applyOccurrenceMoves<T extends OccurrenceRecord>(
   occurrences: readonly T[],
   moves: readonly OccurrenceMoveTimeRecord[],
-  timezoneByBehavior: ReadonlyMap<string, string>,
 ): T[] {
   if (!moves.length) return [...occurrences];
   const byOccurrence = new Map<string, OccurrenceMoveTimeRecord[]>();
@@ -23,9 +22,8 @@ export function applyOccurrenceMoves<T extends OccurrenceRecord>(
   }
   return occurrences.map((occurrence) => {
     const group = byOccurrence.get(occurrence.id);
-    const timezone = timezoneByBehavior.get(occurrence.behavior_id);
-    if (!group || !timezone) return occurrence;
-    const effective = effectiveTimeFromMoves(group, occurrence.id, timezone);
+    if (!group) return occurrence;
+    const effective = effectiveTimeFromMoves(group, occurrence.id);
     return { ...occurrence, effective_start_at: effective?.effective_start_at ?? null, effective_end_at: effective?.effective_end_at ?? null };
   });
 }
@@ -34,9 +32,8 @@ export function applyOccurrenceMoves<T extends OccurrenceRecord>(
 export async function withLocalMoves<T extends OccurrenceRecord>(
   profileId: string,
   occurrences: readonly T[],
-  behaviors: readonly Readonly<{ id: string; timezone: string }>[],
 ): Promise<T[]> {
   if (!occurrences.length) return [];
   const moves = await localCommand("readOccurrenceMoves", { profileId, occurrenceIds: occurrences.map(({ id }) => id) });
-  return applyOccurrenceMoves(occurrences, moves, new Map(behaviors.map((behavior) => [behavior.id, behavior.timezone])));
+  return applyOccurrenceMoves(occurrences, moves);
 }

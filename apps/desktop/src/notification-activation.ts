@@ -83,7 +83,7 @@ export async function loadNotificationOccurrence(input: {
     profileId: input.profile.id, occurrenceIds: [occurrence.id],
   });
   // Advisor Phase 2B: a reminder opens the Occurrence at its moved time.
-  const [moved] = await withLocalMoves(input.profile.id, [occurrence], [behavior]);
+  const [moved] = await withLocalMoves(input.profile.id, [occurrence]);
   return resolvePersistedTimelineOccurrence({
     occurrence: moved ?? occurrence, behavior, timeSessions: history.timeSessions.map(toTimeSession),
     now: input.now, timezone: input.profile.timezone,

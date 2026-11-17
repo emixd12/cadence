@@ -1534,6 +1534,18 @@ mod tests {
             created_at: "2026-09-01T12:05:00.000000Z".into(),
             ..first.clone()
         };
+        // A Behavior timezone change appends a system record that returns the item to its plan.
+        let supersede = OccurrenceMove {
+            id: "40000000-0000-4000-8000-000000000203".into(),
+            kind: "supersede".into(),
+            timezone: "Europe/London".into(),
+            source: "system".into(),
+            reason: Some("timezone_change".into()),
+            revises_move_id: Some(undo.id.clone()),
+            chain_position: 3,
+            created_at: "2026-09-01T12:10:00.000000Z".into(),
+            ..undo.clone()
+        };
         let synced = |row: &OccurrenceMove| {
             let mut value = normalized(row).unwrap();
             value.as_object_mut().unwrap().remove("user_id");
@@ -1548,11 +1560,12 @@ mod tests {
         };
         execute(
             &mut connection,
-            Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![upsert(&undo), upsert(&first)] },
+            Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![upsert(&supersede), upsert(&undo), upsert(&first)] },
         )
         .unwrap();
         assert_eq!(db::by_id::<OccurrenceMove>(&connection, &profile, &first.id).unwrap(), first);
         assert_eq!(db::by_id::<OccurrenceMove>(&connection, &profile, &undo.id).unwrap(), undo);
+        assert_eq!(db::by_id::<OccurrenceMove>(&connection, &profile, &supersede.id).unwrap(), supersede);
         // A move never touches the Occurrence row, so a later status mark has nothing to conflict with.
         assert_eq!(db::by_id::<Occurrence>(&connection, &profile, &graph.occurrence.id).unwrap(), occurrence_before);
         // Reads come back in chain order for the shared effective-time rule.
@@ -1562,7 +1575,7 @@ mod tests {
         )
         .unwrap();
         let positions: Vec<i64> = read.as_array().unwrap().iter().map(|row| row["chain_position"].as_i64().unwrap()).collect();
-        assert_eq!(positions, vec![1, 2]);
+        assert_eq!(positions, vec![1, 2, 3]);
         assert_eq!(read[1]["to_planned"], json!(true));
         // Server-only fields never reach a Mac.
         let mut leaky = synced(&first);

@@ -33,8 +33,8 @@ rows leave with their Behavior. A move never changes the stored Occurrence row, 
 mark on the Mac after a web move compares equal and needs no conflict review. The native
 command `readOccurrenceMoves` returns an Occurrence's records in chain order;
 `apps/desktop/src/local-moves.service.ts` derives effective time from them with the shared
-`effectiveTimeFromMoves` (latest record decides; an Undo to the plan or a timezone change
-means the planned time) and attaches it to in-memory copies only. The Timeline, native
+`effectiveTimeFromMoves` (latest record decides; an Undo, or the server's `supersede`
+record with source `system` after a Behavior timezone change, means the planned time) and attaches it to in-memory copies only. The Timeline, native
 reminders, leave reminders (through the Timeline's stops), an opened reminder and place
 labels read those copies; native writes always re-read the stored row. A moved Occurrence
 keeps its reminder request ID, so its new fire time replaces the planned one. Rust test

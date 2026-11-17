@@ -36,7 +36,7 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
     const history = await localCommand("readOccurrenceHistory", { profileId, occurrenceIds: rows.map(({ id }) => id) });
     // Generation keeps a moved Occurrence and adds no second copy for its day. It reads
     // effective time from these in-memory copies; writes below still use the stored rows.
-    const moved = await withLocalMoves(profileId, rows, [graph.behavior]);
+    const moved = await withLocalMoves(profileId, rows);
     const plan = planPersistedOccurrences({
       behavior: toLocalBehaviorGraphRecord(graph, []), occurrences: moved,
       timeSessionOccurrenceIds: new Set(history.timeSessions.map((session) => session.occurrence_id)),

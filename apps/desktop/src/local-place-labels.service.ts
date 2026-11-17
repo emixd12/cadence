@@ -85,7 +85,7 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     if (!occurrence) return null;
     const timezone = graphs.find(({ behavior }) => behavior.id === occurrence.behavior_id)?.behavior.timezone ?? owner.timezone;
     // Advisor Phase 2B: a moved Occurrence is judged at its moved time.
-    const [moved] = await withLocalMoves(owner.id, [occurrence], [{ id: occurrence.behavior_id, timezone }]);
+    const [moved] = await withLocalMoves(owner.id, [occurrence]);
     const latest = [...history.statusEvents].sort((left, right) => right.recorded_at.localeCompare(left.recorded_at)
       || right.created_at.localeCompare(left.created_at) || right.id.localeCompare(left.id))[0] ?? null;
     return {
