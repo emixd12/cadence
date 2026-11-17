@@ -121,30 +121,37 @@ describe("time helper: effective time from synced moves", () => {
   });
 
   it("is null with no moves", () => {
-    expect(effectiveTimeFromMoves([], "occ-1", NEW_YORK)).toBeNull();
+    expect(effectiveTimeFromMoves([], "occ-1")).toBeNull();
   });
 
   it("follows the latest record, whatever order the records arrive in", () => {
-    expect(effectiveTimeFromMoves([move(2), move(1)], "occ-1", NEW_YORK)).toEqual({
+    expect(effectiveTimeFromMoves([move(2), move(1)], "occ-1")).toEqual({
       effective_start_at: "2026-11-16T12:00:00Z",
       effective_end_at: "2026-11-16T12:30:00Z",
     });
   });
 
   it("returns to the plan after an Undo of the first move", () => {
-    expect(effectiveTimeFromMoves([move(1), move(2, { to_planned: true })], "occ-1", NEW_YORK)).toBeNull();
+    expect(effectiveTimeFromMoves([move(1), move(2, { to_planned: true })], "occ-1")).toBeNull();
   });
 
   it("restores the earlier move after an Undo of a re-move", () => {
     const undo = move(3, { to_start_at: "2026-11-16T11:00:00Z", to_end_at: "2026-11-16T11:30:00Z" });
-    expect(effectiveTimeFromMoves([move(1), move(2), undo], "occ-1", NEW_YORK)?.effective_start_at).toBe("2026-11-16T11:00:00Z");
+    expect(effectiveTimeFromMoves([move(1), move(2), undo], "occ-1")?.effective_start_at).toBe("2026-11-16T11:00:00Z");
   });
 
   it("ignores other Occurrences' moves", () => {
-    expect(effectiveTimeFromMoves([move(1, { occurrence_id: "occ-2" })], "occ-1", NEW_YORK)).toBeNull();
+    expect(effectiveTimeFromMoves([move(1, { occurrence_id: "occ-2" })], "occ-1")).toBeNull();
   });
 
-  it("treats a move made in another timezone as superseded", () => {
-    expect(effectiveTimeFromMoves([move(1)], "occ-1", TOKYO)).toBeNull();
+  it("follows the plan after a supersede record and keeps it there across a timezone round trip", () => {
+    const supersede = move(2, { timezone: TOKYO, to_planned: true });
+    expect(effectiveTimeFromMoves([move(1), supersede], "occ-1")).toBeNull();
+    // Back in the move's own timezone, the chain still ends in the supersede.
+    expect(effectiveTimeFromMoves([supersede, move(1)], "occ-1")).toBeNull();
+  });
+
+  it("keeps a move made in another timezone when nothing superseded it (resolved history)", () => {
+    expect(effectiveTimeFromMoves([move(1, { timezone: TOKYO })], "occ-1")).not.toBeNull();
   });
 });

@@ -583,14 +583,14 @@ function validateOccurrenceMoveRow(id: string, value: Json): void {
     && (value.revises_move_id === null || uuid(value.revises_move_id))
     && Number.isInteger(value.weekday) && (value.weekday as number) >= 1 && (value.weekday as number) <= 7
     && typeof value.timezone === "string" && value.timezone.length > 0
-    && (value.kind === "move" || value.kind === "revert")
+    && (value.kind === "move" || value.kind === "revert" || value.kind === "supersede")
     && instant(value.from_start_at) && instant(value.from_end_at) && instant(value.to_start_at) && instant(value.to_end_at)
     && typeof value.from_planned === "boolean" && typeof value.to_planned === "boolean"
     && typeof value.duration_source === "string"
     && Number.isInteger(position) && (position as number) >= 1
     && ((position === 1) === (value.revises_move_id === null))
     && (value.reason === null || typeof value.reason === "string")
-    && ["daily_brief", "coach", "chat", "mcp", "person"].includes(value.source as string)
+    && ["daily_brief", "coach", "chat", "mcp", "person", "system"].includes(value.source as string)
     && instant(value.created_at);
   if (!valid) throw new Error("The synced move is invalid.");
 }
