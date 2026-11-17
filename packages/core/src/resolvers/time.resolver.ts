@@ -147,14 +147,13 @@ export type OccurrenceMoveTimeRecord = Readonly<{
 export function effectiveTimeFromMoves(
   moves: readonly OccurrenceMoveTimeRecord[],
   occurrenceId: string,
-  behaviorTimezone: string,
 ): Readonly<{ effective_start_at: string; effective_end_at: string }> | null {
   let latest: OccurrenceMoveTimeRecord | null = null;
   for (const move of moves) {
     if (move.occurrence_id !== occurrenceId) continue;
     if (!latest || move.chain_position > latest.chain_position) latest = move;
   }
-  if (!latest || latest.to_planned || latest.timezone !== behaviorTimezone) return null;
+  if (!latest || latest.to_planned) return null;
   return {
     effective_start_at: Temporal.Instant.from(latest.to_start_at).toString(),
     effective_end_at: Temporal.Instant.from(latest.to_end_at).toString(),

@@ -1106,6 +1106,20 @@ describe("per-day moves (advisor Phase 2A, contract 6)", () => {
     expect(result.mergedEntities.some(({ kind }) => kind === "occurrence_move")).toBe(true);
   });
 
+  it("copies the server's timezone supersede record to the Mac", () => {
+    const supersedeId = "2a030000-0000-4000-8000-0000000000aa";
+    const supersede: AccountSyncEntity = { kind: "occurrence_move", id: supersedeId, value: {
+      ...(move.value as Record<string, Json>), id: supersedeId, kind: "supersede", timezone: "Europe/London",
+      from_start_at: "2026-11-16T16:00:00Z", from_end_at: "2026-11-16T17:00:00Z", from_planned: false,
+      to_start_at: "2026-11-16T14:00:00Z", to_end_at: "2026-11-16T14:00:00Z", to_planned: true,
+      duration_source: "restored", revises_move_id: moveId, chain_position: 2, reason: "timezone_change", source: "system",
+    } };
+    const base = snapshot([behavior, occurrence(), move]);
+    const result = plan(base, base, snapshot([behavior, occurrence(), move, supersede]));
+    expect(result.conflicts).toEqual([]);
+    expect(keys(result.localWrites)).toEqual([`upsert:occurrence_move:${supersedeId}`]);
+  });
+
   it("rejects a move carrying fields a Mac must not hold, or an invalid shape", () => {
     const leaky: AccountSyncEntity = { ...move, value: { ...(move.value as Record<string, Json>), idempotency_key: "k" } };
     expect(() => plan(snapshot([behavior]), snapshot([behavior]), snapshot([behavior, leaky]))).toThrow("Update Cadence before synchronizing moved Occurrences.");
