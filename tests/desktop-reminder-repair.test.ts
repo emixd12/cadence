@@ -30,6 +30,7 @@ beforeEach(() => {
     if (operation === "readBehaviorGraphs") return [{ behavior: { ...storedBehavior(), active } }];
     if (operation === "readOccurrences") return Array.from({ length: count }, (_, index) => ({ ...storedExportOccurrence(), id: uuid(index + 1), user_id: USER_ID,
       scheduled_for: NOW.add({ hours: 24, minutes: index }).toString(), local_date: "2026-08-31" }));
+    if (operation === "readOccurrenceMoves") return [];
     if (operation === "commitNativeReminderPlan") {
       const next = new Map(state.reminders.map((row) => [row.id, row]));
       for (const row of input.reminders) next.set(row.id, row);

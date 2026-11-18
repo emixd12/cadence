@@ -296,6 +296,10 @@ pub enum Request {
         profile_id: String,
         occurrence_ids: Vec<String>,
     },
+    ReadOccurrenceMoves {
+        profile_id: String,
+        occurrence_ids: Vec<String>,
+    },
     ReadDayNotes {
         profile_id: String,
         start_local_date: String,
@@ -757,6 +761,13 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
         } => {
             db::owner(&tx, profile_id)?;
             occurrence::read_history(&tx, profile_id, occurrence_ids)?
+        }
+        Request::ReadOccurrenceMoves {
+            profile_id,
+            occurrence_ids,
+        } => {
+            db::owner(&tx, profile_id)?;
+            occurrence::read_moves(&tx, profile_id, occurrence_ids)?
         }
         Request::ReadSyncState { profile_id } => {
             db::owner(&tx, profile_id)?;
