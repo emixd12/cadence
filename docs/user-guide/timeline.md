@@ -265,18 +265,18 @@ not moved.
    **Other time** and choose **Move**.
 3. The item moves at once. Its row shows the new time and reads
    **Moved from** the planned time, with **Undo**.
-4. Optionally, tap one reason in the message at the bottom of the screen:
+4. Optionally, tap one reason in the note at the bottom of the screen:
    **Running late**, **Conflict**, **Low energy**, or **Other**. You can
    ignore it.
 
 **Result and persistence:** The move changes today only. Your schedule stays
 as it is, and tomorrow the item is back at its planned time. Reminders follow
 the new time. The Mac app shows the move after it syncs. The first time you
-move something, the message says so: "This changes today only. Your schedule
+move something, the note says so: "This changes today only. Your schedule
 stays."
 
-**Recovery or undo:** Choose **Undo** in the short message at the bottom of the
-screen, or on the moved row for the rest of the day. Undo returns the item to
+**Recovery or undo:** Choose **Undo** in the note at the bottom of the screen
+(it stays until you close it), or on the moved row for the rest of the day. Undo returns the item to
 where it was before the latest move. If Cadence cannot move the item (it is
 already marked, the time has passed, or something else is at that time), the
 row says why under **Not changed** and offers other free times. If the item was

@@ -6,7 +6,7 @@ import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
 
 import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
-import { OccurrenceMovedLine, OccurrenceMoveFollowUp, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
+import { OccurrenceMovedLine, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
 import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
@@ -130,14 +130,7 @@ export function OccurrenceRow({
 
   // Advisor plan, Phase 2C: a notice's "Other time" or "Move it again" opens this row's menu.
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const moves = useOccurrenceMoves();
-  const moveMenuRequest = moves?.menuRequest;
-  // The "row" confirmation option: the moved row holds its open-row blue for a few seconds.
-  const justMoved = moves?.confirmation === "row" && moves.recentMoveId === occurrence.id;
-  useEffect(() => {
-    if (!justMoved || !detailsRef.current || typeof detailsRef.current.scrollIntoView !== "function") return;
-    detailsRef.current.scrollIntoView({ block: "nearest" });
-  }, [justMoved]);
+  const moveMenuRequest = useOccurrenceMoves()?.menuRequest;
   useEffect(() => {
     if (moveMenuRequest?.occurrenceId !== occurrence.id || !detailsRef.current) return;
     detailsRef.current.open = true;
@@ -175,10 +168,9 @@ export function OccurrenceRow({
       aria-busy={optimisticView.isPending ? "true" : undefined}
       data-optimistic-status={optimisticStatus.pendingStatus ?? undefined}
       data-visual-tone={visibleOccurrence.visualTone}
-      data-just-moved={justMoved ? "true" : undefined}
       className={[
         "timeline-occurrence-row transition-colors",
-        justMoved && visibleOccurrence.visualTone === "default" ? "bg-timeline-row-hover text-foreground" : ROW_TONE_CLASSES[visibleOccurrence.visualTone],
+        ROW_TONE_CLASSES[visibleOccurrence.visualTone],
       ].join(" ")}
     >
       {pendingStatusLabel ? (
@@ -344,7 +336,6 @@ export function OccurrenceRow({
         ) : null}
 
       </div>
-      <OccurrenceMoveFollowUp occurrence={visibleOccurrence} />
       <OccurrenceMoveNotice occurrence={visibleOccurrence} />
     </article>
   );

@@ -365,10 +365,20 @@ One look for "something is wrong", everywhere in the product: the model failed, 
 The person's own per-day move on the web Timeline (advisor plan, Phase 2C). Components: `components/timeline/OccurrenceMoveMenu.tsx`, `OccurrenceMoves.tsx`, `MoveConflictNotices.tsx` (bench: `/design-system#ds-module-occurrence-move`).
 
 - **Menu:** "Move for today" is the last line of an expanded row, after Save note, as a secondary (Readable Ash) text button. Moves should come mostly from the advisor, so the person's own move is not promoted. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
-- **No confirmation:** a tap moves at once. Undo is the safety net: a confirmation with Undo and the lasting "Moved from 9:00 AM · Undo" line on the row. The confirmation's form is under owner review (2026-11-18), with four options on the bench: the row itself (held in the open-row blue for 8 seconds), a corner note (flat bordered panel above Needs decision, fades after 8 seconds), a bottom drawer (the Calendar preview drawer: full width, one top Ash Line, stays until closed) and a dialog. The drawer is the default until the owner chooses. Never a dark filled bar.
-- **Reasons:** right after a move, one muted line (in the drawer or dialog, else under the row) offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
+- **No confirmation:** a tap moves at once. Undo is the safety net: the move's notice in the bottom drawer (below) and the lasting "Moved from 9:00 AM · Undo" line on the row. Never a dark filled bar.
+- **Confirmation (owner decision, 2026-11-18):** the shared Bottom drawer notice holds "Gym moved to 10:00 AM for today. Undo", the one-time first-move line and the reasons. It stays until closed or replaced by the next notice, so the reasons are not missed (owner decision, 2026-11-18).
+- **Reasons:** right after a move, one muted line in the drawer offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
 - **Refusals** use the Alert notice with the "Not changed" label, without the icon and at the row's 12px size for label, message and action, and offer free times or "Move it again". Never advice.
 - **Overlap after a schedule edit:** one plain line above the Timeline with "Yes · No · Other time" as text links. Nothing failed, so it is not an alert.
+
+### Bottom drawer notice
+
+The one place for short notifications (owner decision, 2026-11-18). `components/feedback/BottomDrawerNotice.tsx`; first use: the move confirmation.
+
+- **Look:** the Calendar preview drawer: fixed to the bottom, full width, one Ash Line on top, Bleached Newsprint, no shadow or box, 16px padding, content capped at 72rem, a 44px Close icon action. Text and text-link actions only.
+- **Ending:** each notification chooses. By default it stays until Close or until the next notification replaces it, as the move confirmation does. A timer is an option only when everything in it can also be done elsewhere. A timer pauses while the pointer or keyboard focus is inside and starts over when they leave.
+- **Behavior:** non-modal; it never takes focus. Announced with `role="status"`, or `role="alert"` for something that needs action now. A new notification replaces the open one.
+- **Not for errors** about a specific row or field: those stay next to what failed, in the Alert notice.
 
 ### Chips
 

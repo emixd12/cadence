@@ -7,6 +7,7 @@ import { RefreshProvider } from "@cadence/ui/runtime";
 import { canSelfMoveOccurrence } from "@cadence/core/resolvers/move.resolver";
 import type { NormalizedExternalEvent, NormalizedTimedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TimelineOccurrenceView, TimelineView } from "@cadence/core/types/timeline";
+import { BottomDrawerNotice } from "@/components/feedback/BottomDrawerNotice";
 import { MoveConflictNotices } from "@/components/timeline/MoveConflictNotices";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import {
@@ -14,7 +15,6 @@ import {
   FIRST_MOVE_LINE,
   MoveCalendarEventsContext,
   OccurrenceMovesProvider,
-  type MoveConfirmationStyle,
   type OccurrenceMoveActions,
 } from "@/components/timeline/OccurrenceMoves";
 
@@ -76,11 +76,10 @@ function row(occurrence: TimelineOccurrenceView) {
 
 function render(occurrence: TimelineOccurrenceView, moveActions: OccurrenceMoveActions | null, options: Readonly<{
   hasMovedBefore?: boolean; events?: readonly NormalizedExternalEvent[]; onRefresh?: () => void; extra?: React.ReactNode;
-  confirmation?: MoveConfirmationStyle;
 }> = {}) {
   const content = <MoveCalendarEventsContext.Provider value={options.events ?? []}>{options.extra}{row(occurrence)}</MoveCalendarEventsContext.Provider>;
   return act(() => root.render(<RefreshProvider onRefresh={options.onRefresh ?? (() => undefined)}>
-    {moveActions ? <OccurrenceMovesProvider actions={moveActions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={options.hasMovedBefore ?? true} confirmation={options.confirmation}>
+    {moveActions ? <OccurrenceMovesProvider actions={moveActions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={options.hasMovedBefore ?? true}>
       {content}
     </OccurrenceMovesProvider> : content}
   </RefreshProvider>));
@@ -290,52 +289,63 @@ describe("calendar busy times", () => {
   });
 });
 
-describe("Confirmation options", () => {
-  async function moveGym(confirmation: MoveConfirmationStyle) {
+describe("Move confirmation drawer", () => {
+  async function moveGym() {
     const control = actions();
-    await render(gym, control, { confirmation });
+    await render(gym, control);
     await act(async () => button("Move for today").click());
     await vi.waitFor(() => expect(container.querySelector("[data-move-option='10:00']")).not.toBeNull());
     await act(async () => button("10:00 AM").click());
-    await render(movedGym, control, { confirmation });
+    await render(movedGym, control);
     return control;
   }
 
-  it("row: no pop-up; the row is highlighted, keeps Undo and reasons, and the move is announced", async () => {
-    await moveGym("row");
-    expect(document.querySelector("[data-move-toast]")).toBeNull();
-    expect(container.querySelector("[data-just-moved='true']")).not.toBeNull();
-    expect(container.querySelector("[data-move-announcement]")?.textContent).toBe("Gym moved to 10:00 AM for today.");
-    expect(container.querySelector("[data-moved-from]")?.textContent).toBe("Moved from 9:00 AM · Undo");
-    expect(document.querySelector("[data-move-reasons]")).not.toBeNull();
-  });
-
-  it("corner: a small note with from and to times and Undo; reasons stay on the row", async () => {
-    const control = await moveGym("corner");
-    const note = document.querySelector("[data-move-confirmation='corner']")!;
-    expect(note.textContent).toBe("Moved for todayGym · 9:00 AM → 10:00 AMUndo");
-    expect(note.querySelector("[data-move-reasons]")).toBeNull();
-    expect(container.querySelector("article [data-move-reasons]")).not.toBeNull();
-    await act(async () => button("Undo", note).click());
+  it("holds the move, Undo and the reasons, outside the row; Undo reverts", async () => {
+    const control = await moveGym();
+    const drawer = document.querySelector("[data-bottom-drawer]")!;
+    expect(drawer.getAttribute("role")).toBe("status");
+    expect(drawer.querySelector("[data-move-reasons]")).not.toBeNull();
+    expect(container.querySelector("article [data-move-reasons]")).toBeNull();
+    await act(async () => button("Undo", drawer).click());
     expect(control.revert).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: NEW_REV }));
   });
 
-  it("drawer: carries the reasons itself and closes on Close", async () => {
-    await moveGym("drawer");
-    const drawer = document.querySelector("[data-move-confirmation='drawer']")!;
-    expect(drawer.querySelector("[data-move-reasons]")).not.toBeNull();
-    expect(container.querySelector("article [data-move-reasons]")).toBeNull();
-    await act(async () => (drawer.querySelector("button[aria-label='Close']") as HTMLButtonElement).click());
-    expect(document.querySelector("[data-move-confirmation]")).toBeNull();
+  it("closes on Close", async () => {
+    await moveGym();
+    await act(async () => (document.querySelector("[data-bottom-drawer] button[aria-label='Close']") as HTMLButtonElement).click());
+    expect(document.querySelector("[data-bottom-drawer]")).toBeNull();
   });
 
-  it("dialog: a modal with reasons, Done and Undo", async () => {
-    await moveGym("dialog");
-    const dialog = document.querySelector("[role='dialog']")!;
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(dialog.querySelector("[data-move-reasons]")).not.toBeNull();
-    button("Undo", dialog);
-    await act(async () => button("Done", dialog).click());
-    expect(document.querySelector("[role='dialog']")).toBeNull();
+  it("stays until closed, and the next move replaces it", async () => {
+    const control = await moveGym();
+    vi.useFakeTimers();
+    try {
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      expect(document.querySelectorAll("[data-bottom-drawer]")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => button("Move for today").click());
+    await vi.waitFor(() => expect(container.querySelector("[data-move-option='11:30']")).not.toBeNull());
+    await act(async () => button("11:30 AM").click());
+    await vi.waitFor(() => expect(control.move).toHaveBeenCalledTimes(2));
+    expect(document.querySelectorAll("[data-bottom-drawer]")).toHaveLength(1);
+  });
+
+  it("can close on a timer that pauses while the pointer or focus is inside", async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    try {
+      await act(() => root.render(<BottomDrawerNotice onClose={onClose} autoCloseMs={1000}><button type="button">Inside</button></BottomDrawerNotice>));
+      const inside = button("Inside");
+      await act(async () => inside.focus());
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      expect(onClose).not.toHaveBeenCalled();
+      await act(async () => inside.blur());
+      await act(async () => { vi.advanceTimersByTime(1000); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -4,8 +4,6 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 import {
-  FIRST_MOVE_LINE,
-  MoveReasonLine,
   moveTimeLabel,
   useMoveCalendarBusy,
   useOccurrenceMoves,
@@ -127,25 +125,6 @@ export function OccurrenceMovedLine({ occurrence, toneClass }: Readonly<{ occurr
           onClick={(event) => { stopSummary(event); void moves.undo(occurrence); }}>Undo</button>
       </span> : null}
     </p>
-  );
-}
-
-/**
- * Right after a move: the one-time first-move line and the optional reasons, across
- * the row's full width under its summary, so they do not wrap beside the status
- * actions on a phone.
- */
-export function OccurrenceMoveFollowUp({ occurrence }: Readonly<{ occurrence: TimelineOccurrenceView }>) {
-  const moves = useOccurrenceMoves();
-  const rowMove = moves?.rowMove(occurrence.id) ?? null;
-  if (!moves || !rowMove || !occurrence.movedFromLabel || !moves.canMove(occurrence)) return null;
-  // The drawer and the dialog carry these lines themselves.
-  if (moves.confirmation !== "row" && moves.confirmation !== "corner") return null;
-  return (
-    <div className="grid gap-0.5 px-3 pb-2 text-xs leading-5 text-muted-readable sm:px-4">
-      {rowMove.first ? <p data-first-move>{FIRST_MOVE_LINE}</p> : null}
-      <MoveReasonLine occurrenceId={occurrence.id} />
-    </div>
   );
 }
 

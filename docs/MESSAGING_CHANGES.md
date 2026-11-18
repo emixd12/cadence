@@ -1879,8 +1879,8 @@ cite has not changed.
 - **Change:** implemented November 16, 2026 (advisor Phase 2C). An expanded Timeline row
   of today's Unresolved, set-time item offers **Move for today**: free times first, then
   **Other time**. The move happens at once. The row reads "Moved from 9:00 AM · Undo",
-  a short Undo message appears, and optional one-tap reasons (Running late, Conflict,
-  Low energy, Other) follow. The first move ever adds "This changes today only. Your
+  and a note at the bottom of the screen confirms it with Undo and optional
+  one-tap reasons (Running late, Conflict, Low energy, Other). The first move ever adds "This changes today only. Your
   schedule stays." A schedule edit that makes a moved time overlap another item asks
   "Keep it there? Yes · No · Other time". The Mac shows moves but cannot make them yet.
 - **Affected:** `components/timeline/OccurrenceMoveMenu.tsx`,

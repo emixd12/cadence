@@ -3,27 +3,15 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { TimelineOccurrenceView, TimelineView } from "@cadence/core/types/timeline";
 import { MoveConflictNotices } from "@/components/timeline/MoveConflictNotices";
-import {
-  MOVE_CONFIRMATION_STYLES,
-  OccurrenceMovesProvider,
-  type MoveConfirmationStyle,
-  type OccurrenceMoveActions,
-} from "@/components/timeline/OccurrenceMoves";
+import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 // The Timeline's own row layout, so the bench shows rows as the Timeline does.
 import timelineStyles from "@/components/timeline/day-progress-timeline.module.css";
 
 // Advisor plan Phase 2C. The web's own "Move for today" with synthetic rows and no
 // account: Gym moves and undoes in memory, Reading is always refused, and Walk shows
-// the schedule-edit overlap line. Open a row to see its menu. The four confirmation
-// options are side by side for Emi's choice (review of Nov 18).
-
-const STYLE_LABELS: Record<MoveConfirmationStyle, string> = {
-  row: "1. In the row",
-  corner: "2. Corner note",
-  drawer: "3. Bottom drawer",
-  dialog: "4. Dialog",
-};
+// the schedule-edit overlap line. Open a row to see its menu; a move opens the
+// confirmation drawer at the bottom of the page.
 
 // The Timeline measures each row; on a phone width its status actions are icons only.
 const NARROW = "(max-width: 639px)";
@@ -58,7 +46,6 @@ const noop = async () => ({ status: "idle" as const, message: "" });
 
 export function OccurrenceMoveBench() {
   const [gym, setGym] = useState(base);
-  const [style, setStyle] = useState<MoveConfirmationStyle>("drawer");
   const narrow = useNarrow();
   const actions = useMemo<OccurrenceMoveActions>(() => ({
     async suggest() { return ["2026-11-16T15:00:00Z", "2026-11-16T17:30:00Z", "2026-11-16T19:00:00Z"]; },
@@ -81,18 +68,7 @@ export function OccurrenceMoveBench() {
   }), []);
   const timeline = { timezone: TZ, todayLocalDate: TODAY, daySections: [{ localDate: TODAY, occurrences: [gym, reading, walk] }] } as unknown as TimelineView;
   return (
-    <OccurrenceMovesProvider key={style} confirmation={style} actions={actions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={false}>
-      <p className="mb-3 text-sm leading-6 text-muted-readable" data-move-style-picker>
-        Confirmation:{" "}
-        {MOVE_CONFIRMATION_STYLES.map((option, index) => (
-          <span key={option} className="whitespace-nowrap">
-            {index ? " · " : ""}
-            <button type="button" aria-pressed={style === option} data-move-style={option}
-              className={`-my-2 inline-block py-2 underline underline-offset-2 ${style === option ? "text-foreground" : ""}`}
-              onClick={() => { setGym(base); setStyle(option); }}>{STYLE_LABELS[option]}</button>
-          </span>
-        ))}
-      </p>
+    <OccurrenceMovesProvider actions={actions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={false}>
       <div className={`grid max-w-3xl gap-1 ${timelineStyles.timeline}`}>
         <MoveConflictNotices conflicts={[{ id: "bench-conflict", occurrenceId: walk.id, conflictingOccurrenceId: reading.id }]} timeline={timeline} />
         {[gym, reading, walk].map((occurrence) => (
