@@ -2741,4 +2741,4 @@ The technical rules are in `docs/DATETIME_STRATEGY.md`, "Brief moves". The choic
 Platform impact: web and Mac call the same routes (`/api/advisor/brief/answer`,
 `/replan`, `/length`, `/move-preference`); the rules live on the server, so a future
 phone app inherits them. Marketing: no change until the messaging pass. Messaging
-impact: P-065, P-066, P-067.
+impact: P-066, P-067, P-068.

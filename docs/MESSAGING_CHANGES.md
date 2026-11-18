@@ -121,9 +121,9 @@ Status values:
 | [P-059](#p-059-the-advisor-may-use-model-providers-other-than-openai) | The advisor may use model providers other than OpenAI | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ, user guide |
 | [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
 | [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
-| [P-065](#p-065-the-daily-brief-keeps-calendar-titles-and-answers-for-the-day) | The Daily Brief keeps calendar titles and answers for the day | logged | Advisor Phase 3A1 | Privacy, Trust, in-app copy |
-| [P-066](#p-066-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
-| [P-067](#p-067-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
+| [P-066](#p-066-the-daily-brief-keeps-calendar-titles-and-answers-for-the-day) | The Daily Brief keeps calendar titles and answers for the day | logged | Advisor Phase 3A1 | Privacy, Trust, in-app copy |
+| [P-067](#p-067-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
+| [P-068](#p-068-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1896,7 +1896,7 @@ cite has not changed.
 - **Related:** P-061, P-062.
 - **Status:** logged.
 
-## P-065: The Daily Brief keeps calendar titles and answers for the day
+## P-066: The Daily Brief keeps calendar titles and answers for the day
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3A1). When the Daily Brief
   proposes a move because of a calendar event, the line's reason may name that event
@@ -1916,10 +1916,10 @@ cite has not changed.
   that says calendar content is never stored on the server.
 - **Update needed:** say calendar titles named in a brief line are kept until the end
   of that day; say answers are kept as advisor content (P-060 retention).
-- **Related:** P-060, P-061.
+- **Related:** P-060, P-061, P-065 (3A2: the saved brief).
 - **Status:** logged.
 
-## P-066: The advisor estimates how long an item takes
+## P-067: The advisor estimates how long an item takes
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3A1). To find a free slot,
   every item needs a length. Cadence uses the Behavior's own duration, then the
@@ -1933,10 +1933,10 @@ cite has not changed.
   in-app copy, user guide.
 - **Conflicting current text:** none found.
 - **Update needed:** mention estimated lengths in the user guide's Daily Brief page.
-- **Related:** P-061, P-065.
+- **Related:** P-061, P-066.
 - **Status:** logged.
 
-## P-067: "Don't suggest moving this" per Behavior
+## P-068: "Don't suggest moving this" per Behavior
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3A1). A Behavior can be set
   so the Daily Brief never proposes moving it. Once the person has said No or Undo to
