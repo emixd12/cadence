@@ -409,7 +409,8 @@ begin
   returning * into v_row;
   if v_row.id is null then
     if exists (select 1 from public.behaviors b where b.user_id = v_user_id and b.id = p_behavior_id) then
-      raise exception 'behavior_revision_changed' using errcode = '40001';
+      -- Not 40001: PostgREST retries serialization failures until it times out.
+      raise exception 'behavior_revision_changed' using errcode = 'P0001';
     end if;
     raise exception 'Behavior not found.' using errcode = 'P0002';
   end if;

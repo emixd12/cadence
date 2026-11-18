@@ -251,5 +251,7 @@ export type BriefMoveErrorCode =
   | "proposal_not_found"
   | "proposal_closed"
   | "idempotency_key_reused"
+  /** The length correction's Behavior changed since it was read. */
+  | "revision_changed"
   | "rate_limited"
   | "advisor_unavailable";
