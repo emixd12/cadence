@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { assessNativeReminderCoverage, planNativeReminderRequests, resolveNativeReminderGenerationHorizon, selectNativeReminderRequests,
   type NativeReminderPendingRequest, type NativeReminderRequest } from "@cadence/core/resolvers/native-reminder.resolver";
 import { ensureLocalOccurrencesFresh } from "./local-generation.service";
+import { withLocalMoves } from "./local-moves.service";
 import { localCommand, localMutation, type NativeReminderRow, type NativeReminderState } from "./local-store";
 import { notifications, type DeliveredReminder, type NativeDeliveryProof, type NativeEvent } from "./native-spike";
 
@@ -69,8 +70,11 @@ async function reconcile(now: Temporal.Instant): Promise<LocalReminderResult> {
   if (resolveNativeReminderGenerationHorizon(graphs.map(({ behavior }) => behavior)).unsupportedOffset) {
     throw new Error("Reminder coverage is unverified: an imported reminder offset exceeds the one-year planning limit. Edit that Behavior’s reminder offset.");
   }
-  const occurrences = await localCommand("readOccurrences", { profileId,
+  const stored = await localCommand("readOccurrences", { profileId,
     startLocalDate: "0001-01-01", endLocalDate: "9999-12-31" });
+  // Advisor Phase 2B: a moved Occurrence reminds at its moved time. Only unresolved rows can remind.
+  const occurrences = [...stored.filter((row) => row.status !== "unresolved"),
+    ...await withLocalMoves(profileId, stored.filter((row) => row.status === "unresolved"))];
   const targetThrough = now.toZonedDateTimeISO(profile.timezone).add({ days: 30 }).toInstant();
   const requests = planNativeReminderRequests({ behaviors: graphs.map(({ behavior }) => behavior), occurrences, now, targetThrough });
   const context = { requests, now, targetThrough };

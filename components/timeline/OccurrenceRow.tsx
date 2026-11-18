@@ -199,6 +199,9 @@ export function OccurrenceRow({
               >
                 {visibleOccurrence.title}
               </h3>
+              {visibleOccurrence.movedFromLabel ? <p className="timeline-occurrence-moved col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable" data-moved-from>
+                Moved from {visibleOccurrence.movedFromLabel}
+              </p> : null}
               {sourceLine ? <p className={["timeline-occurrence-source col-start-2 min-w-0 text-xs font-normal leading-5", TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")} data-source-completion={occurrence.sourceEvidence?.source}>
                 {sourceLine}
               </p> : null}

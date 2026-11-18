@@ -6,6 +6,7 @@ import { macLeaveReminderDigest, macLeaveReminderDigestFromId } from "@cadence/c
 import type { NativeEvent } from "./native-spike";
 import { localCommand } from "./local-store";
 import { toTimeSession } from "./local-occurrence.service";
+import { withLocalMoves } from "./local-moves.service";
 
 export type NotificationTarget = { requestKey: number } & (
   | { status: "loading" }
@@ -81,8 +82,10 @@ export async function loadNotificationOccurrence(input: {
   const history = await localCommand("readOccurrenceHistory", {
     profileId: input.profile.id, occurrenceIds: [occurrence.id],
   });
+  // Advisor Phase 2B: a reminder opens the Occurrence at its moved time.
+  const [moved] = await withLocalMoves(input.profile.id, [occurrence]);
   return resolvePersistedTimelineOccurrence({
-    occurrence, behavior, timeSessions: history.timeSessions.map(toTimeSession),
+    occurrence: moved ?? occurrence, behavior, timeSessions: history.timeSessions.map(toTimeSession),
     now: input.now, timezone: input.profile.timezone,
   });
 }

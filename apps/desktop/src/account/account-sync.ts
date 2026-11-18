@@ -37,6 +37,8 @@ type HostedApplyResult = { fingerprint: string; snapshot: HostedEnvelope };
 type ConnectorRecordRow = Readonly<Record<string, unknown> & { id: string }>;
 type AccountSyncPortabilitySnapshot = PortabilitySnapshot & {
   noteShortcutStates?: NoteShortcutState[]; sourceLinks?: ConnectorRecordRow[]; sourceMatches?: ConnectorRecordRow[];
+  // Advisor Phase 2B: read-only per-day move records (contract 6).
+  occurrenceMoves?: ConnectorRecordRow[];
 };
 
 export async function readAccountSyncInputs(profileId: string, client: SupabaseClient, operations: Partial<AccountSyncReadOperations> = {}): Promise<AccountSyncInputs> {
@@ -210,6 +212,7 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "day_note", snapshot.dayNotes ?? []);
   add(entities, "behavior_source_link", snapshot.sourceLinks ?? []);
   add(entities, "occurrence_source_match", snapshot.sourceMatches ?? []);
+  add(entities, "occurrence_move", snapshot.occurrenceMoves ?? []);
   return entities;
 }
 
