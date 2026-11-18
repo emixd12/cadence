@@ -310,7 +310,7 @@ export function validateDailyBrief(result: unknown, validation: DailyBriefValida
     versions: { configuration: configurationRevision, references: references.version, planner: plan.version, pipeline: pipelineVersion, recipe: `${config.recipe.id}@${config.recipe.version}`, policy: DAILY_BRIEF_POLICY_VERSION },
     text, localDate: context.localDate, timezone: context.timezone,
     generatedAt: now.toString(), expiresAt: context.expiresAt, coverage: facts.status,
-    warnings: ["Suggestions only. No changes were applied."],
+    warnings: [],
     ...(briefingUsesWeather(facts.travel) ? { attributions: ["open_meteo"] as const } : {}),
   };
 }

@@ -6,7 +6,7 @@ import type { Json } from "@/lib/db/database.types";
 // agent and the person from the token, never from arguments, and refuses
 // session, MCP and job tokens.
 
-export type AgentRunTrigger = "on_demand" | "retry" | "scheduled" | "chat_turn";
+export type AgentRunTrigger = "on_demand" | "retry" | "refresh" | "scheduled" | "chat_turn";
 export type AgentRunOutcome =
   | "success"
   | "refused_budget"
@@ -133,6 +133,31 @@ export async function settleAgentSpend(client: AppSupabaseClient, input: Readonl
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   return data === true;
+}
+
+/**
+ * Advisor Phase 3: whether a Daily Brief refresh leaves one morning brief funded for
+ * every remaining day of the month. `briefMicrodollars` is the caller's estimate of
+ * one brief; the database uses this month's average when that is higher.
+ */
+export async function agentBriefRefreshFunded(client: AppSupabaseClient, briefMicrodollars: number, signal?: AbortSignal): Promise<Readonly<{
+  funded: boolean; neededMicrodollars: number; remainingMicrodollars: number; resetsAt: string;
+}>> {
+  const request = client.rpc("agent_brief_refresh_funded", { p_brief_microdollars: Math.max(1, Math.min(1_000_000, Math.ceil(briefMicrodollars))) });
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  const row = data?.[0];
+  if (!row || typeof row.funded !== "boolean" || typeof row.resets_at !== "string") throw new AgentRunStorageError("malformed_result");
+  return { funded: row.funded, neededMicrodollars: Number(row.needed_microdollars), remainingMicrodollars: Number(row.remaining_microdollars), resetsAt: row.resets_at };
+}
+
+/** Service role only: clears saved brief text once its local day has ended (advisor Phase 3). */
+export async function purgeEndedDailyBriefDays(serviceClient: AppSupabaseClient, signal?: AbortSignal): Promise<number> {
+  const request = serviceClient.rpc("purge_ended_daily_brief_days");
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  if (typeof data !== "number") throw new AgentRunStorageError("malformed_result");
+  return data;
 }
 
 /** Service role only: the scheduled deletion job. */

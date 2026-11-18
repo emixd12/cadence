@@ -1892,3 +1892,32 @@ cite has not changed.
 - **Update needed:** when Mac moves ship, say so in the user guide's Mac notes.
 - **Related:** P-061, P-062.
 - **Status:** logged.
+
+## P-064: The Daily Brief is saved for the day, can be refreshed, and sends less to the model
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3, 3A2). Cadence saves the shown
+  Daily Brief on its servers for the rest of that local day so it reopens on any device with
+  no new model call, then clears the text when the day ends (the run log keeps its usual 30
+  days). A person can refresh the brief up to two times a day while the month's budget still
+  covers the remaining morning briefs. The hosted brief now sends the model only today's
+  items (title, time, open or done), the proposed moves, and busy calendar times. A calendar
+  event's title is sent only when a proposed move works around that event. It no longer sends 90 days of completion history or analysis findings. The
+  "Suggestions never change the record" rule and the "Suggestions only. No changes were
+  applied." line are gone, because a Yes now applies a move (P-061).
+- **Affected:** `lib/services/daily-brief.service.ts`, `lib/services/brief-opening.ts`,
+  `supabase/migrations/20261118130000_daily_brief_saved_days.sql`,
+  `packages/core/src/data/briefing-references.json`.
+- **Surfaces:** Privacy ("Optional Daily Brief": what is sent to OpenAI, that the brief is
+  stored for the day, "read-only"), in-app copy (Daily Brief settings panel description,
+  `SettingsRegroupBench`, the bubble's loading line "Preparing today's read-only briefing…"),
+  FAQ and user guide pages about the Daily Brief.
+- **Conflicting current text:** "Cadence sends today's Behavior schedule and completion
+  history, including findings calculated from it, to OpenAI. The briefing cannot change
+  tracking or Calendar records." (`components/settings/LegalContent.tsx`, Privacy);
+  "Daily Brief is an optional, read-only feature" (Terms); "Cadence can prepare one
+  read-only briefing when you first open Timeline each day." (settings panel).
+- **Update needed:** say the brief is stored until the day ends, can be refreshed twice a
+  day, sends today's items and busy times (not history), and changes an item's time only
+  when the person says yes.
+- **Related:** P-061, P-063.
+- **Status:** logged.

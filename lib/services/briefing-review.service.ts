@@ -236,7 +236,7 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
     "- Make the smallest change that answers the feedback. State what you are not changing.",
     "- If the evidence itself is wrong, the owner is `resolver` or `evidence`. Prompt wording cannot repair incorrect calculations.",
     "- Feedback never becomes a production rule by itself. Promotion is a separate reviewed repository change.",
-    "- Marks describe logging time, not when a Behavior happened. Suggestions stay read-only.",
+    "- Marks describe logging time, not when a Behavior happened.",
     `- Target reading length: about ${BRIEFING_READING_TARGET.minWords}–${BRIEFING_READING_TARGET.maxWords} visible words. Do not hide material uncertainty to meet it.`,
     "",
     "## Case",

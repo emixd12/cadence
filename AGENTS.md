@@ -42,8 +42,9 @@ testing is owner-deferred; the compiled minimum does not establish compatibility
 Tickets 116–122 implement optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
-root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
-in-app horse briefing. Tickets 220–232 implement one remote MCP server, a
+root. Tickets 146–148 implement the authenticated Cadence Daily Brief in-app horse
+briefing; advisor Phase 3 lets it propose moves for today that apply only when the
+person says yes. Tickets 220–232 implement one remote MCP server, a
 Cadence-owned OAuth server, and Claude and ChatGPT plugins; the MCP server is
 live on production since October 29, 2026 (Ticket 232). See
 `docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
@@ -243,7 +244,8 @@ In scope:
 - Public Astro marketing site
 - Local-first macOS desktop tracking parity under Tickets 107–114
 - Optional desktop Google account linking and synchronization under Tickets 116–122
-- In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
+- In-app Cadence Daily Brief in the horse bubble under Tickets 146–148; since advisor
+  Phase 3 it proposes same-day moves that apply only on the person's Yes (with Undo)
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241. One Daily Brief choice covers every connected source, including
   one connected later, with per-source exclusions under Advanced (Ticket 306).
@@ -284,8 +286,9 @@ Out of scope for v1:
 - Structured measurement templates
 - Supply/refill inventory
 - General AI chat and autonomous execution, until ticketed. D30 positions Cadence as a
-  behavioral remodeling assistant and adds no assistant feature. Tickets 146–148 implement only
-  the in-app read-only daily briefing in the horse bubble. Outside AI clients may
+  behavioral remodeling assistant and adds no assistant feature. Tickets 146–148 implement
+  the in-app daily briefing in the horse bubble; advisor Phase 3 adds same-day moves it
+  proposes and applies only on the person's Yes. Calendar records stay read-only. Outside AI clients may
   call scoped MCP tools at the user's direction (Tickets 220–232); Cadence itself
   runs no server-side AI agent or autonomous execution through MCP
 - MCP follow-ups: MCP Apps widgets, a REST/webhook adapter, Facets sync, a local

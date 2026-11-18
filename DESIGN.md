@@ -876,6 +876,19 @@ overview, move line and tip. Weight stays 400 under the no-bold rule. A Cadence-
 "Setup tip" uses the same tip block and label style. An empty overview is omitted; an empty brief renders no bubble.
 `DailyBriefBubbleBench` shows the 1.2 state after the 1.1 state.
 
+## Daily Brief words — advisor Phase 3
+
+The Phase 3 brief has three parts: an opening about today, the move lines, then Cadence's
+travel section. The model writes only the opening (one or two sentences, at most 40 words)
+and one reason per move line (one sentence, at most 30 words). Cadence decides every move
+and every time; the travel section is never model text. A quiet day shows the stock opening
+"Nothing needs moving today." with no model call. Any model field that fails a check (too
+long, a link, an internal word, a clock time Cadence did not supply) falls back to Cadence's
+stock text for that field only. Notices (`calendar_stale`, `budget_reached`,
+`words_unavailable`) are Cadence's own sentences in the existing alert style; they say what
+still works. The bubble no longer shows "Suggestions only. No changes were applied." The web
+bubble's layout is in the web Phase 3 section (3B).
+
 ## ChatGPT plan card and Daily Brief plan states — Ticket 299
 
 Mac only, and hidden: Cadence for Mac renders none of this unless its build sets

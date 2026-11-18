@@ -2,19 +2,22 @@ import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { BRIEFING_PRESETS, parseBriefingConfig } from "@cadence/core/services/briefing-config";
-import type { BriefingConfig } from "@cadence/core/types/briefing-config";
-import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import { BRIEFING_FIXTURE_IDS, briefingFixture } from "@/lib/services/briefing-fixtures";
-import fixture from "./fixtures/advisor-day-context.valid.json";
 import { connectorDayContext } from "./helpers/connector-day-context";
+import type { CalendarCaller } from "@/lib/services/google-calendar.service";
+import fixture from "./fixtures/advisor-day-context.valid.json";
 
-// Ticket 290: production stays pinned to DAILY_BRIEF_MODEL, effort "low" and the layered
-// prompt. The hashes below were computed from the code before Ticket 290 changed the
-// consumer, the instructions module and the adapter. Any byte change fails these tests.
-// Updated Nov 16, 2026 (owner-approved plain-words rules from the model-graded eval, PR #293).
-const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), prepare: vi.fn(), current: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), config: vi.fn() }));
+// Production stays pinned to DAILY_BRIEF_MODEL, effort "low" and a known prompt. Any byte
+// change to the instructions or schema fails these tests, so a prompt change is always a
+// reviewed, deliberate edit here.
+// Advisor plan Phase 3 (3A2, Nov 18, 2026): the hosted brief now sends the short opening
+// prompt (brief-opening.ts) in place of the ~38 KB layered prompt. The layered prompt still
+// serves the workbench and the paused device path; its hash below changed once more because
+// "Suggestions never change the record." left briefing-references.json (Emi, Phase 3).
+const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
-  readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
+  saveDailyBrief: mocks.saveBrief }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), ensureBehaviorEstimates: vi.fn() }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
   const actual = await original<typeof import("@/lib/services/briefing-pipeline")>();
   const active = () => mocks.config() ?? actual.activeBriefingConfig();
@@ -28,80 +31,75 @@ vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConn
 vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: vi.fn() }));
 
 import { requestInAppDailyBrief } from "@/lib/services/daily-brief.service";
-import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief } from "@/lib/services/daily-brief-consumer";
+import { generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-model";
-import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "@/lib/services/daily-brief-schema";
-import { dailyBriefRequestBody } from "../scripts/chatgpt-plan-spike-hosted-adapter";
+import { BRIEF_OPENING_INSTRUCTIONS, BRIEF_OPENING_PROMPT_REVISION, BRIEF_OPENING_SCHEMA, BRIEF_OPENING_SCHEMA_NAME } from "@/lib/services/brief-opening";
 import { responsesReply } from "./helpers/model-responses";
+import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
-import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 const prefs = dailyBriefPreferences({ revision: 1 });
-const preset = (version: "1.1" | "1.2") => BRIEFING_PRESETS.find((item) => item.config.recipe.version === version)!.config;
+const candidate = {
+  key: "line_1", occurrenceId: "occ-1", behaviorId: "beh-1", behaviorRevision: "r", title: fixture.cadence.occurrences[0]!.title,
+  localDate: fixture.localDate, timezone: fixture.timezone, expectedRevision: "r",
+  from: { startAt: "2026-09-20T16:30:00Z", endAt: "2026-09-20T17:00:00Z" }, to: { startAt: "2026-09-20T18:00:00Z", endAt: "2026-09-20T18:30:00Z" },
+  length: { minutes: 30, source: "behavior_duration", assumed: false }, reasonCode: "calendar_overlap", reason: "It runs into Team sync.",
+  anchor: { kind: "calendar_event", title: "Team sync" }, otherTimes: [], travel: "not_needed", late: false, offerNeverMove: false,
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("OPENAI_API_KEY", "synthetic-key");
   mocks.read.mockResolvedValue(prefs);
-  mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate });
+  mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate, refresh: false, refreshesUsed: 0 });
   mocks.finish.mockResolvedValue(true);
+  mocks.saveBrief.mockResolvedValue(true);
   mocks.current.mockResolvedValue(undefined);
   mocks.prepare.mockImplementation(async (_caller, options) => ({ contexts: [fixture], assertCurrent: mocks.current, configurationRefs: {}, preferences: options.preferences }));
-  mocks.tipHistory.mockResolvedValue([]);
-  mocks.recordTip.mockResolvedValue(true);
+  mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
+  mocks.proposals.mockImplementation(async (_client, value) => value.lines.map(({ key: _key, ...line }: typeof candidate) => ({ ...line, proposalId: "p-1", status: "proposed", moveId: null })));
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 /** Runs `/api/advisor/brief`'s service with the real model adapter and returns the exact request bodies it sent. */
-async function productionBodies(config?: BriefingConfig): Promise<string[]> {
-  mocks.config.mockReturnValue(config);
+async function productionBodies(features: readonly string[] = ["move_lines_v1"]): Promise<string[]> {
   const bodies: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     expect(String(url)).toBe("https://api.openai.com/v1/responses");
     bodies.push(init!.body as string);
-    return Response.json(responsesReply({ text: "Make room for your planned walk.", occurrenceRefs: [], suggestions: [], tip: null }));
+    return Response.json(responsesReply({ opening: "Walk needs a new time today.", reasons: [{ key: "line_1", text: "It runs into your Team sync." }] }));
   }));
-  await requestInAppDailyBrief(caller, { installationId: "11111111-1111-4111-8111-111111111111", retry: false },
+  await requestInAppDailyBrief(caller, { installationId: "11111111-1111-4111-8111-111111111111", retry: false, features },
     { now: () => Temporal.Instant.from(fixture.capturedAt) }).catch(() => undefined);
   return bodies;
 }
 
-/**
- * Phase 1B: the AI SDK builds a different wire body, so the pin is now on what the model
- * reads. The instructions and facts are put back into the pre-1B body builder; its hash
- * must equal the hash pinned before Ticket 290. Same text, same model, same effort.
- */
-function asPreAiSdkBody(body: string): string {
-  const parsed = JSON.parse(body);
-  const instructions = parsed.input.find((item: { role: string }) => item.role === "developer").content as string;
-  const facts = parsed.input.find((item: { role: string }) => item.role === "user").content[0].text as string;
-  return dailyBriefRequestBody({ instructions, facts, signal: new AbortController().signal }, DAILY_BRIEF_SCHEMA_NAME, DAILY_BRIEF_SCHEMA,
-    { model: parsed.model, effort: parsed.reasoning.effort });
-}
-
-describe("pinned production generation (Ticket 290)", () => {
-  it("keeps the prompt revision value", () => {
-    expect(DAILY_BRIEF_PROMPT_REVISION).toBe("5fdc1c2ec78153e9");
+describe("pinned production generation", () => {
+  it("keeps the brief prompt revision value", () => {
+    expect(BRIEF_OPENING_PROMPT_REVISION).toBe(sha(`${BRIEF_OPENING_INSTRUCTIONS}\0${JSON.stringify(BRIEF_OPENING_SCHEMA)}`).slice(0, 16));
+    expect(BRIEF_OPENING_PROMPT_REVISION).toBe("a332f75064155220");
   });
 
-  it("sends the same request body from the production path as before Ticket 290", async () => {
-    const hashes: string[] = [];
-    for (const config of [undefined, preset("1.1"), preset("1.2")]) {
-      const bodies = await productionBodies(config);
-      expect(bodies).toHaveLength(1);
-      const body = JSON.parse(bodies[0]!);
-      expect(`openai/${body.model}`).toBe(DAILY_BRIEF_MODEL);
-      expect(body.reasoning).toEqual({ effort: "low" });
-      expect(body).toMatchObject({ store: false, max_output_tokens: 2_000, text: { format: { type: "json_schema", strict: true, name: DAILY_BRIEF_SCHEMA_NAME, schema: DAILY_BRIEF_SCHEMA } } });
-      expect(body.tools).toBeUndefined();
-      hashes.push(sha(asPreAiSdkBody(bodies[0]!)));
-    }
-    expect(hashes).toEqual([
-      "f0191748c97b32c58d73822fe2070c640a42cca5b9249dbac0e471d44c00c554",
-      "121be422cd65edd8fdbc6e25a950737a516a4427b9f145c9b8bf064f6d8985c6",
-      "013197ab2ea5c6d7c7eeace7c45655f50ad2e1c92e99c7dd854ceccd5daf3183",
-    ]);
+  it("sends one short request with the pinned model, effort, schema and instructions", async () => {
+    const bodies = await productionBodies();
+    expect(bodies).toHaveLength(1);
+    const body = JSON.parse(bodies[0]!);
+    expect(`openai/${body.model}`).toBe(DAILY_BRIEF_MODEL);
+    expect(body.reasoning).toEqual({ effort: "low" });
+    expect(body).toMatchObject({ store: false, text: { format: { type: "json_schema", strict: true, name: BRIEF_OPENING_SCHEMA_NAME, schema: BRIEF_OPENING_SCHEMA } } });
+    expect(body.tools).toBeUndefined();
+    const instructions = body.input.find((item: { role: string }) => item.role === "developer").content as string;
+    expect(instructions).toBe(BRIEF_OPENING_INSTRUCTIONS);
+    // The 38 KB layered prompt is gone from the hosted brief; the whole request stays small.
+    expect(bodies[0]!.length).toBeLessThan(12_000);
+  });
+
+  it("makes no model call for a quiet day or an older client", async () => {
+    mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
+    expect(await productionBodies()).toHaveLength(0);
+    mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
+    expect(await productionBodies([])).toHaveLength(0);
   });
 
   it("builds the same instructions in the consumer for every recipe, fixture and flag", async () => {

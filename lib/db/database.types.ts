@@ -2436,14 +2436,34 @@ export type Database = {
         }
         Returns: Json
       }
-      begin_daily_brief: {
-        Args: {
-          p_expected_revision: number
-          p_installation_id: string
-          p_retry: boolean
-        }
-        Returns: Json
+      agent_brief_refresh_funded: {
+        Args: { p_brief_microdollars: number }
+        Returns: {
+          funded: boolean
+          needed_microdollars: number
+          remaining_microdollars: number
+          resets_at: string
+        }[]
       }
+      begin_daily_brief:
+        | {
+            Args: {
+              p_expected_revision: number
+              p_installation_id: string
+              p_retry: boolean
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_expected_revision: number
+              p_installation_id: string
+              p_moves: boolean
+              p_refresh: boolean
+              p_retry: boolean
+            }
+            Returns: Json
+          }
       bind_behaviorlog_restore_apply_payload: {
         Args: { restore_payload: Json }
         Returns: string
@@ -2628,6 +2648,19 @@ export type Database = {
           schedule_graph: Json
         }
         Returns: Json
+      }
+      purge_ended_daily_brief_days: { Args: never; Returns: number }
+      save_daily_brief: {
+        Args: {
+          p_briefing: Json
+          p_expected_revision: number
+          p_installation_id: string
+          p_lease_token: string
+          p_refresh: boolean
+          p_run_id: string
+          p_with_moves: boolean
+        }
+        Returns: boolean
       }
       finish_daily_brief: {
         Args: {

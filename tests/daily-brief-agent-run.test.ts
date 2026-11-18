@@ -10,13 +10,14 @@ import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 // tests/agent-caller.local-integration.test.ts.
 
 const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(),
-  tipHistory: vi.fn(), recordTip: vi.fn(), agentClient: vi.fn(), configured: vi.fn() }));
+  tipHistory: vi.fn(), recordTip: vi.fn(), agentClient: vi.fn(), configured: vi.fn(), saveBrief: vi.fn(), plan: vi.fn(), proposals: vi.fn() }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: vi.fn() }));
 vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: vi.fn() }));
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: vi.fn() }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin,
-  finishDailyBrief: mocks.finish, readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
+  finishDailyBrief: mocks.finish, readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip, saveDailyBrief: mocks.saveBrief }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), ensureBehaviorEstimates: vi.fn() }));
 vi.mock("@/lib/db/advisor-context.repo", () => ({ readAdvisorProfileTimezone: mocks.timezone }));
 vi.mock("@/lib/services/briefing-account-context.service", () => ({
   briefingAccountRef: (userId: string) => `account-${userId}`,
@@ -54,7 +55,14 @@ function fakeAgentClient(overrides: Record<string, (args: Record<string, unknown
 const refusal = () => ({ data: [{ allowed: false, reservation_id: null, reason: "agent_share", retry_after_seconds: 3600, resets_at: "2026-12-01T08:00:00Z" }], error: null });
 
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
-const input = { installationId: "11111111-1111-4111-8111-111111111111", retry: false };
+const input = { installationId: "11111111-1111-4111-8111-111111111111", retry: false, features: ["move_lines_v1"] };
+const candidate = {
+  key: "line_1", occurrenceId: "occ-1", behaviorId: "beh-1", behaviorRevision: "r", title: fixture.cadence.occurrences[0].title,
+  localDate: fixture.localDate, timezone: fixture.timezone, expectedRevision: "r",
+  from: { startAt: "2026-09-20T16:30:00Z", endAt: "2026-09-20T17:00:00Z" }, to: { startAt: "2026-09-20T18:00:00Z", endAt: "2026-09-20T18:30:00Z" },
+  length: { minutes: 30, source: "behavior_duration", assumed: false }, reasonCode: "item_overlap", reason: "It overlaps another item.",
+  anchor: null, otherTimes: [], travel: "not_needed", late: false, offerNeverMove: false,
+};
 const now = () => Temporal.Instant.from(fixture.capturedAt);
 const generate = vi.fn();
 
@@ -70,9 +78,12 @@ beforeEach(() => {
   mocks.tipHistory.mockResolvedValue([]);
   mocks.recordTip.mockResolvedValue(true);
   mocks.configured.mockReturnValue(true);
+  mocks.saveBrief.mockResolvedValue(true);
+  mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
+  mocks.proposals.mockImplementation(async (_client, value) => value.lines.map(({ key: _key, ...line }: typeof candidate) => ({ ...line, proposalId: "9d0f6c3e-0000-4000-8000-000000000001", status: "proposed", moveId: null })));
   generate.mockImplementation(async (request) => {
     request.onUsage?.({ inputTokens: 8700, cachedInputTokens: 0, outputTokens: 480, reasoningTokens: 300 });
-    return { suggestions: [], text: "Take time for your walk.", occurrenceRefs: [fixture.cadence.occurrences[0].ref] };
+    return { opening: "One item could use a different time today.", reasons: [{ key: "line_1", text: "It overlaps another item." }] };
   });
 });
 
@@ -86,8 +97,8 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
     expect(result.state).toBe("ready");
     expect(mocks.agentClient).toHaveBeenCalledWith("owner", "daily_brief");
     expect(fake.names()).toEqual(["agent_run_start", "reserve_agent_spend", "settle_agent_spend",
-      "agent_run_finish", "agent_run_store_content", "agent_run_store_content"]);
-    const [start, reserve, settle, finish, storedInput, storedOutput] = fake.calls;
+      "agent_brief_refresh_funded", "agent_run_finish", "agent_run_store_content", "agent_run_store_content"]);
+    const [start, reserve, settle, , finish, storedInput, storedOutput] = fake.calls;
     expect(start.args).toMatchObject({ p_trigger: "on_demand", p_model: "openai/gpt-5.6-luna" });
     expect(start.args.p_prompt_version).toMatch(/^[a-f0-9]{16}:[a-f0-9]{64}$/);
     expect(reserve.args).toMatchObject({ p_run_id: "run-1", p_model: "openai/gpt-5.6-luna" });
@@ -98,29 +109,33 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
       p_calendar_derived: dailyBriefContextIsCalendarDerived(fixture as never) });
     expect((storedInput.args.p_body as { facts: string }).facts).toBe(generate.mock.calls[0][0].facts);
     expect(storedOutput.args).toMatchObject({ p_kind: "output", p_body: result.state === "ready" ? JSON.parse(JSON.stringify(result.briefing)) : null });
-    expect(finish.args).toMatchObject({ p_run_id: "run-1", p_outcome: "success", p_model_calls: 1, p_input_tokens: 8700, p_output_tokens: 480 });
+    expect(finish.args).toMatchObject({ p_run_id: "run-1", p_outcome: "success", p_model_calls: 1, p_input_tokens: 8700, p_output_tokens: 480,
+      p_linked_proposal_ids: ["9d0f6c3e-0000-4000-8000-000000000001"] });
     expect(finish.args.p_input_hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("refuses a call that would pass the agent's share before the model is called", async () => {
+  it("refuses a call that would pass the agent's share before the model is called, and shows Cadence's short version", async () => {
     const fake = fakeAgentClient({ reserve_agent_spend: refusal });
     mocks.agentClient.mockReturnValue({ client: fake.client, tokenExpiresAt: () => new Date() });
 
-    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "budget_reached", retryAfterSeconds: 3600 });
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
 
     expect(generate).not.toHaveBeenCalled();
-    expect(fake.names()).toEqual(["agent_run_start", "reserve_agent_spend", "agent_run_finish"]);
-    expect(fake.calls[2].args).toMatchObject({ p_outcome: "refused_budget", p_error_code: "budget_reached",
-      p_error_reason: "budget_agent_share", p_model_calls: 0 });
-    // The lease is released, so a later attempt can run.
-    expect(mocks.finish).toHaveBeenCalledWith(caller.client, expect.objectContaining({ success: false }));
+    expect(result).toMatchObject({ state: "ready", briefing: { notices: [expect.objectContaining({ kind: "budget_reached" })] } });
+    const finish = fake.calls.find((call) => call.name === "agent_run_finish")!;
+    expect(finish.args).toMatchObject({ p_outcome: "refused_budget", p_error_code: "budget_reached", p_error_reason: "budget_agent_share", p_model_calls: 0 });
+    // The shown brief completes the lease through the save.
+    expect(mocks.saveBrief).toHaveBeenCalledTimes(1);
+    expect(mocks.finish).not.toHaveBeenCalled();
   });
 
   it("does not call the model when the budget cannot be checked", async () => {
     const fake = fakeAgentClient({ reserve_agent_spend: () => ({ data: null, error: { message: "agent_channel_required" } }) });
     mocks.agentClient.mockReturnValue({ client: fake.client, tokenExpiresAt: () => new Date() });
-    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "advisor_unavailable" });
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
     expect(generate).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { notices: [expect.objectContaining({ kind: "words_unavailable" })] } });
+    expect(fake.calls.find((call) => call.name === "agent_run_finish")!.args).toMatchObject({ p_error_reason: "budget_unavailable" });
   });
 
   it("records a failed model call and settles at the estimate when no usage was reported", async () => {
@@ -129,14 +144,15 @@ describe("Daily Brief agent run (advisor plan Phase 1A)", () => {
     const { DailyBriefError } = await import("@/lib/services/daily-brief-consumer");
     generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_body_missing"));
 
-    await expect(requestInAppDailyBrief(caller, { ...input, retry: true }, { generate, now })).rejects.toMatchObject({ code: "advisor_unavailable" });
+    await expect(requestInAppDailyBrief(caller, { ...input, retry: true }, { generate, now })).resolves.toMatchObject({ state: "ready" });
 
     const reserve = fake.calls.find((call) => call.name === "reserve_agent_spend")!;
     const settle = fake.calls.find((call) => call.name === "settle_agent_spend")!;
     expect(settle.args.p_actual_microdollars).toBe(reserve.args.p_estimated_microdollars);
     expect(fake.calls[0].args).toMatchObject({ p_trigger: "retry" });
-    expect(fake.calls.at(-1)).toMatchObject({ name: "agent_run_finish", args: { p_outcome: "model_error", p_error_reason: "provider_body_missing" } });
-    expect(fake.names()).not.toContain("agent_run_store_content");
+    expect(fake.calls.find((call) => call.name === "agent_run_finish")).toMatchObject({ args: { p_outcome: "model_error", p_error_reason: "provider_body_missing" } });
+    // The shown stock brief is still stored for replay.
+    expect(fake.names().filter((name) => name === "agent_run_store_content")).toHaveLength(2);
   });
 
   it("stops the brief when a configured agent signing key is invalid", async () => {
