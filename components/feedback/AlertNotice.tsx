@@ -35,20 +35,36 @@ export type AlertNoticeProps = Readonly<{
   label?: string;
   /** One optional text-link action, such as "Try again" or "Pick another time". */
   action?: ReactNode;
+  /**
+   * The warning icon. On by default; a Timeline row's refused move leaves it out
+   * for now (Emi, Nov 18), and the label alone marks the alert.
+   */
+  icon?: boolean;
+  /**
+   * "compact" sets the message at the row's detail size, so label, message and
+   * action share one size and leading inside a Timeline row.
+   */
+  size?: "body" | "compact";
   className?: string;
 }>;
 
-export function AlertNotice({ kind, children, label, action, className }: AlertNoticeProps) {
+export function AlertNotice({ kind, children, label, action, icon = true, size = "body", className }: AlertNoticeProps) {
+  const compact = size === "compact";
   return (
     <div
       role={ANNOUNCE[kind]}
       data-alert-kind={kind}
-      className={["grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-base leading-6 text-alert-foreground", className].filter(Boolean).join(" ")}
+      className={[
+        "grid gap-y-1 text-alert-foreground",
+        icon ? "grid-cols-[auto_1fr] gap-x-2" : "grid-cols-1",
+        compact ? "text-sm leading-5" : "text-base leading-6",
+        className,
+      ].filter(Boolean).join(" ")}
     >
-      <TriangleAlert aria-hidden="true" className="mt-1 size-4 text-alert-signal" strokeWidth={1.75} />
-      <p className="text-sm uppercase tracking-[1px] text-alert-signal">{label ?? ALERT_NOTICE_LABELS[kind]}</p>
-      <div className="col-start-2 max-w-prose">{children}</div>
-      {action ? <div className="col-start-2 text-sm">{action}</div> : null}
+      {icon ? <TriangleAlert aria-hidden="true" className={compact ? "mt-0.5 size-4 text-alert-signal" : "mt-1 size-4 text-alert-signal"} strokeWidth={1.75} /> : null}
+      <p className={["text-sm uppercase tracking-[1px] text-alert-signal", compact ? "leading-5" : ""].filter(Boolean).join(" ")}>{label ?? ALERT_NOTICE_LABELS[kind]}</p>
+      <div className={[icon ? "col-start-2" : "", "max-w-prose"].filter(Boolean).join(" ")}>{children}</div>
+      {action ? <div className={[icon ? "col-start-2" : "", "text-sm leading-5"].filter(Boolean).join(" ")}>{action}</div> : null}
     </div>
   );
 }

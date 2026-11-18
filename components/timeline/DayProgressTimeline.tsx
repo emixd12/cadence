@@ -41,6 +41,7 @@ import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
+import { MoveCalendarEventsContext } from "./OccurrenceMoves";
 import { useDayProgressClock } from "./day-progress-clock";
 import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
 import styles from "./day-progress-timeline.module.css";
@@ -520,6 +521,7 @@ export function DayProgressTimeline({
   const dayProgressStyle = firstMeasured ? { "--day-progress-axis-left": `${firstMeasured.axisX}px` } as CSSProperties : undefined;
 
   return (
+    <MoveCalendarEventsContext.Provider value={events}>
     <div
       ref={rootRef}
       className={styles.timeline}
@@ -617,6 +619,7 @@ export function DayProgressTimeline({
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
+    </MoveCalendarEventsContext.Provider>
   );
 }
 

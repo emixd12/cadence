@@ -354,11 +354,31 @@ A boundary's space always exceeds every boundary one level below it; header rule
 
 One look for "something is wrong", everywhere in the product: the model failed, data is out of date, the advisor's budget is reached, or a write was refused. `components/feedback/AlertNotice.tsx` (bench: `/design-system#ds-module-alert-notice`).
 
-- **Structure:** a 16px warning-triangle icon, then a short label in Label typography, uppercase, in Rust Signal (`--alert-signal`), then the message in Body text in Ink Black (`--alert-foreground`), then at most one underlined text-link action. No box, fill, border, stripe or shadow, so it sits in a text-like surface such as the brief.
+- **Structure:** a 16px warning-triangle icon (optional: a refused move inside a Timeline row leaves it out, at the owner's request of 2026-11-18), then a short label in Label typography, uppercase, in Rust Signal (`--alert-signal`), then the message in Body text in Ink Black (`--alert-foreground`), then at most one underlined text-link action. No box, fill, border, stripe or shadow, so it sits in a text-like surface such as the brief.
 - **Labels:** model failed, "Advice unavailable"; data out of date, "Out of date" (or a specific one such as "Calendar not current"); budget reached, "Advisor paused"; write refused, "Not changed".
 - **Message:** what happened, what still works, and when it returns or what to do ("Gym was just moved to 10:00 on another device."). No apology, no blame, no implementation terms.
 - **Announcing:** a refused write answers the person's own action and uses `role="alert"`. Standing states use `role="status"`.
 - **Never advice:** advice and advisor quips never use the warning icon, Rust Signal text or an alert label. An alert never carries a suggestion that could be read as the advisor's opinion; its one action only recovers.
+
+### Move for today
+
+The person's own per-day move on the web Timeline (advisor plan, Phase 2C). Components: `components/timeline/OccurrenceMoveMenu.tsx`, `OccurrenceMoves.tsx`, `MoveConflictNotices.tsx` (bench: `/design-system#ds-module-occurrence-move`).
+
+- **Menu:** "Move for today" is the last line of an expanded row, after Save note, as a secondary (Readable Ash) text button. Moves should come mostly from the advisor, so the person's own move is not promoted. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
+- **No confirmation:** a tap moves at once. Undo is the safety net: the move's notice in the bottom drawer (below) and the lasting "Moved from 9:00 AM · Undo" line on the row. Never a dark filled bar.
+- **Confirmation (owner decision, 2026-11-18):** the shared Bottom drawer notice holds "Gym moved to 10:00 AM for today. Undo", the one-time first-move line and the reasons. It stays until closed or replaced by the next notice, so the reasons are not missed (owner decision, 2026-11-18).
+- **Reasons:** right after a move, one muted line in the drawer offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
+- **Refusals** use the Alert notice with the "Not changed" label, without the icon and at the row's 12px size for label, message and action, and offer free times or "Move it again". Never advice.
+- **Overlap after a schedule edit:** one plain line above the Timeline with "Yes · No · Other time" as text links. Nothing failed, so it is not an alert.
+
+### Bottom drawer notice
+
+The one place for short notifications (owner decision, 2026-11-18). `components/feedback/BottomDrawerNotice.tsx`; first use: the move confirmation.
+
+- **Look:** the Calendar preview drawer: fixed to the bottom, full width, one Ash Line on top, Bleached Newsprint, no shadow or box, 16px padding, content capped at 72rem, a 44px Close icon action. Text and text-link actions only.
+- **Ending:** each notification chooses. By default it stays until Close or until the next notification replaces it, as the move confirmation does. A timer is an option only when everything in it can also be done elsewhere. A timer pauses while the pointer or keyboard focus is inside and starts over when they leave.
+- **Behavior:** non-modal; it never takes focus. Announced with `role="status"`, or `role="alert"` for something that needs action now. A new notification replaces the open one.
+- **Not for errors** about a specific row or field: those stay next to what failed, in the Alert notice.
 
 ### Chips
 

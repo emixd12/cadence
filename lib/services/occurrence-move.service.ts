@@ -158,6 +158,55 @@ export async function recordOccurrenceMoveReason(
   return data as MovePersonReason;
 }
 
+/**
+ * Free start times today for the web's "Move for today" menu (Phase 2C): the same
+ * free-slot search a refusal offers, nearest the item's current time (or now, once
+ * that has passed). Empty when the item cannot be moved.
+ */
+export async function suggestOccurrenceMoveTimes(
+  caller: OccurrenceMoveCaller,
+  request: Readonly<{ occurrenceId: string; calendarBusy?: readonly MoveCalendarBusy[]; limit?: number }>,
+): Promise<Temporal.Instant[]> {
+  const loaded = await loadTarget(caller, request.occurrenceId);
+  if (!loaded) return [];
+  const { occurrence, behavior } = loaded;
+  if (occurrence.status !== "unresolved" || occurrence.schedule_kind !== "exact"
+    || occurrence.local_date !== todayIn(fixedClock(caller.now), behavior.timezone)) return [];
+  const current = effectiveStartInstant(occurrence);
+  const requestedStart = Temporal.Instant.compare(current, caller.now) > 0 ? current : caller.now;
+  const duration = await moveDuration(caller, occurrence, behavior);
+  const day = await dayOccupants(caller, occurrence);
+  return moveAlternatives({
+    localDate: occurrence.local_date, timezone: behavior.timezone, requestedStart, durationSeconds: duration.seconds,
+    now: caller.now, blocks: [...day, ...(request.calendarBusy ?? [])], limit: (request.limit ?? 3) + 1,
+  }).filter((start) => !start.equals(current)).slice(0, request.limit ?? 3);
+}
+
+/** Open schedule-edit collision notices for one local date, oldest first. */
+export async function listOpenMoveConflicts(caller: OccurrenceMoveCaller, localDate: string)
+  : Promise<ReadonlyArray<Readonly<{ id: string; occurrenceId: string; conflictingOccurrenceId: string | null }>>> {
+  const { data, error } = await caller.supabase.from("move_conflicts")
+    .select("id, occurrence_id, conflicting_occurrence_id")
+    .eq("user_id", caller.userId).eq("local_date", localDate).eq("status", "open")
+    .order("detected_at").order("id");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ id: row.id, occurrenceId: row.occurrence_id, conflictingOccurrenceId: row.conflicting_occurrence_id }));
+}
+
+/** "Yes, keep it here" on a move_conflict notice. */
+export async function keepMovedOccurrence(supabase: AppSupabaseClient, conflictId: string): Promise<void> {
+  const { error } = await supabase.rpc("keep_moved_occurrence", { p_conflict_id: conflictId });
+  if (error) throw error;
+}
+
+/** Whether the person has ever moved an item themselves, for the one-time first-move line. */
+export async function hasPersonMovedBefore(caller: Pick<OccurrenceMoveCaller, "supabase" | "userId">): Promise<boolean> {
+  const { data, error } = await caller.supabase.from("occurrence_moves").select("id")
+    .eq("user_id", caller.userId).eq("kind", "move").eq("source", "person").limit(1);
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
 // ------------------------------------------------------------------ helpers
 
 type FunctionResult = Readonly<{

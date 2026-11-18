@@ -815,6 +815,41 @@
       ]
     },
     {
+      "path": "components/timeline/MoveConflictNotices.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-TIMELINE-017"
+      ]
+    },
+    {
+      "path": "components/feedback/BottomDrawerNotice.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TIMELINE-014"
+      ]
+    },
+    {
+      "path": "components/timeline/OccurrenceMoveMenu.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 19,
+      "interaction_ids": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015",
+        "INT-TIMELINE-016"
+      ]
+    },
+    {
+      "path": "components/timeline/OccurrenceMoves.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-TIMELINE-015",
+        "INT-TIMELINE-016"
+      ]
+    },
+    {
       "path": "components/timeline/StatusButtons.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 10,
@@ -18312,6 +18347,309 @@
           "evidence": [
             "tests/desktop-source-links.test.tsx"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-014",
+      "name": "Move an occurrence for today",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#move-an-item-for-today"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Move today's Occurrence to another time for today only, from the row's menu (advisor plan, Phase 2C).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Move for today in an expanded row, then a listed free time, or Other time and Move"
+        }
+      ],
+      "availability": "Web Timeline, on today's Unresolved rows of Behaviors scheduled at a set time.",
+      "success_result": "Cadence records a per-day move, the row redraws at the new time with Moved from the planned time and Undo, a drawer at the bottom confirms the move with Undo and optional reasons until closed, and reminders follow the new time. The schedule does not change.",
+      "failure_result": "A resolved item, a past time, a taken slot, a busy calendar time or a change on another device is refused under Not changed with the reason and up to three free times, or Move it again after another device's move. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/feedback/BottomDrawerNotice.tsx",
+        "components/timeline/OccurrenceMoveMenu.tsx",
+        "components/timeline/OccurrenceMoves.tsx",
+        "app/(app)/timeline/move-actions.ts",
+        "lib/services/occurrence-move.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the menu, the move and Undo calls, reason taps, refusals, the other-device notice and the collision notice. Server rules are covered by 2A's tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMoveMenu.tsx"
+          ],
+          "evidence": [
+            "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 2: the Mac shows synced moves read-only (Phase 2B); moving from the Mac is a later phase."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-015",
+      "name": "Undo a move for today",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#move-an-item-for-today"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Return a moved Occurrence to where it was before its latest move.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Undo in the Undo message or on the Moved from line"
+        }
+      ],
+      "availability": "Web Timeline, on today's Unresolved rows of Behaviors scheduled at a set time. Shown while the row is moved.",
+      "success_result": "Cadence records an undo, and the row returns to its earlier time.",
+      "failure_result": "A change on another device or a resolved item is refused under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMoveMenu.tsx",
+        "components/timeline/OccurrenceMoves.tsx",
+        "app/(app)/timeline/move-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the menu, the move and Undo calls, reason taps, refusals, the other-device notice and the collision notice. Server rules are covered by 2A's tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMoveMenu.tsx"
+          ],
+          "evidence": [
+            "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 2: the Mac shows synced moves read-only (Phase 2B); moving from the Mac is a later phase."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-016",
+      "name": "Record why an occurrence was moved",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#move-an-item-for-today"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Optionally say why, with one tap, right after a move.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Running late, Conflict, Low energy or Other under a just-moved row or in the move confirmation"
+        }
+      ],
+      "availability": "Web Timeline, on today's Unresolved rows of Behaviors scheduled at a set time. Shown after a move made in this page view.",
+      "success_result": "Cadence keeps the first reason tapped for that move and shows it as noted.",
+      "failure_result": "A failed save clears the noted reason so it can be tapped again. The move stays.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMoveMenu.tsx",
+        "components/timeline/OccurrenceMoves.tsx",
+        "app/(app)/timeline/move-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the menu, the move and Undo calls, reason taps, refusals, the other-device notice and the collision notice. Server rules are covered by 2A's tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMoveMenu.tsx",
+            "components/timeline/OccurrenceMoves.tsx"
+          ],
+          "evidence": [
+            "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 2: the Mac shows synced moves read-only (Phase 2B); moving from the Mac is a later phase."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-017",
+      "name": "Answer a moved-item overlap after a schedule change",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#move-an-item-for-today"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Decide what happens when a schedule edit makes today's moved time overlap another item.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes, No or Other time on the Timeline overlap line"
+        }
+      ],
+      "availability": "Web Timeline, while a schedule edit has made a moved item overlap another of today's items.",
+      "success_result": "Yes keeps the move and closes the notice; No undoes the move; Other time opens the row's move menu.",
+      "failure_result": "A failed Yes says the answer was not saved and keeps the line. No and Other time fail like Undo and Move.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/MoveConflictNotices.tsx",
+        "components/timeline/OccurrenceMoves.tsx",
+        "app/(app)/timeline/move-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the menu, the move and Undo calls, reason taps, refusals, the other-device notice and the collision notice. Server rules are covered by 2A's tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/MoveConflictNotices.tsx"
+          ],
+          "evidence": [
+            "tests/timeline-occurrence-moves-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 2: the Mac shows synced moves read-only (Phase 2B); moving from the Mac is a later phase."
         },
         "marketing": {
           "applicability": "not_applicable",

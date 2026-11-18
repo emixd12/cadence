@@ -92,6 +92,7 @@ function toTimelineOccurrenceInput(
     categoryName: behavior.category?.name ?? "No category",
     scheduleSummary: summarizeRecurrenceRule(recurrenceRule),
     ...occurrenceTimeLabels(occurrence, behavior.timezone),
+    revision: occurrence.updated_at,
     scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
     scheduleEndTime: occurrence.schedule_end_time ? normalizeScheduledTime(occurrence.schedule_end_time) : null,
     ...behaviorPlaceText(behavior),

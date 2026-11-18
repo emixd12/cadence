@@ -1717,6 +1717,26 @@
       "id": "INT-BEHAVIOR-032",
       "classification": "external_provider",
       "reason": "The Hevy link form reads routine titles from Hevy and saving binds the link to the connected Hevy account; load tests need separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-TIMELINE-014",
+      "classification": "destructive_serial_only",
+      "reason": "Per-day moves need today's clock in the account's timezone, the Occurrence's current revision and idempotency verification; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-015",
+      "classification": "destructive_serial_only",
+      "reason": "Undo reverses only the latest move and checks the Occurrence's revision; it needs a prior move from the same serial run."
+    },
+    {
+      "id": "INT-TIMELINE-016",
+      "classification": "destructive_serial_only",
+      "reason": "A move reason is kept once per move (first tap wins); it needs a fresh move from the same serial run."
+    },
+    {
+      "id": "INT-TIMELINE-017",
+      "classification": "destructive_serial_only",
+      "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
     }
   ]
 }
