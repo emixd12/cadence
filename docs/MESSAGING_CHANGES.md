@@ -1893,7 +1893,7 @@ cite has not changed.
 - **Related:** P-061, P-062.
 - **Status:** logged.
 
-## P-064: The Daily Brief shows move lines people can answer (web)
+## P-065: The Daily Brief shows move lines people can answer (web)
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3B). Inside the Daily Brief
   bubble, each proposed move is a line of text with **Yes · No · Other time**, plus
