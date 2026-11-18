@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DailyBriefing, DailyBriefSettings } from "@cadence/core/types/daily-brief";
 
 import {
+  DailyBriefRequestError,
   DAILY_BRIEF_CLIENT_DEADLINES,
   defaultWebDailyBriefClient,
   dailyBriefInstallationId,
@@ -22,8 +23,11 @@ import {
   type DailyBriefAttempt,
   type DailyBriefOutcome,
 } from "@/lib/ui/daily-brief-session";
-import { DAILY_BRIEF_TRAVEL_WAIT_MS, requestDailyBriefTravel, travelConclusionsToken, waitForDailyBriefTravel } from "@/lib/ui/travel";
+import { DAILY_BRIEF_TRAVEL_WAIT_MS, requestDailyBriefTravel, travelConclusionsToken, travelTimesToken, waitForDailyBriefTravel } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
+import { briefCalendarBusy } from "@/lib/ui/brief-calendar";
+import { DAILY_BRIEF_MOVE_FEATURES } from "@/lib/ui/daily-brief-moves";
+import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 
 type DailyBriefLauncherProps = Readonly<{
@@ -31,12 +35,12 @@ type DailyBriefLauncherProps = Readonly<{
   travelAccountId?: string | null;
   desktop?: boolean;
   sessionKey?: string;
-  /** Observed Timeline facts. A change withdraws a delivered brief instead of remounting the launcher. */
-  sourceKey?: string;
 }>;
 
 type View =
   | Readonly<{ kind: "hidden" }>
+  /** Advisor Phase 3: today's brief was shown and closed; a small link reopens it. */
+  | Readonly<{ kind: "closed" }>
   | Readonly<{ kind: "loading" }>
   | Readonly<{ kind: "ready"; briefing: DailyBriefing; attempt: DailyBriefAttempt }>
   | Readonly<{ kind: "notice"; message: string; retryLabel?: string; retryAt?: number; action?: PlanAction }>;
@@ -45,17 +49,29 @@ type View =
 type PlanAction = "manage_usage" | "connect";
 
 const HIDDEN: View = { kind: "hidden" };
+const CLOSED: View = { kind: "closed" };
+
+/**
+ * Advisor Phase 3: the last brief shown on this page, per client, so reopening after
+ * Close needs no request. A reload asks the server, which returns today's saved brief.
+ */
+const shownBriefings = new WeakMap<DailyBriefClient, Readonly<{ fence: string; briefing: DailyBriefing }>>();
+
+type RefreshState = Readonly<{ pending: boolean; error: string | null }>;
+const REFRESH_IDLE: RefreshState = { pending: false, error: null };
 const TRY_AGAIN = "Try again";
 
-export function DailyBriefLauncher({ client, desktop = false, sessionKey = "current", sourceKey = "", travelAccountId = null }: DailyBriefLauncherProps) {
+export function DailyBriefLauncher({ client, desktop = false, sessionKey = "current", travelAccountId = null }: DailyBriefLauncherProps) {
   const resolvedClient = useMemo(() => client === undefined ? defaultWebDailyBriefClient() : client, [client]);
   const [view, setView] = useState<View>(HIDDEN);
   const [viewSession, setViewSession] = useState(sessionKey);
   const travel = useBriefTravel();
+  const [refreshState, setRefreshState] = useState<RefreshState>(REFRESH_IDLE);
   const settingsRef = useRef<DailyBriefSettings | null>(null);
-  const sourceKeyRef = useRef(sourceKey);
   const epoch = useRef(0);
-  const actions = useRef<{ retry: () => void; dismiss: () => void }>({ retry: () => undefined, dismiss: () => undefined });
+  const actions = useRef<{ retry: () => void; dismiss: () => void; reopen: () => void; refresh: () => void }>({
+    retry: () => undefined, dismiss: () => undefined, reopen: () => undefined, refresh: () => undefined,
+  });
 
   useEffect(() => {
     settingsRef.current = null;
@@ -91,18 +107,18 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     const present = (settings: DailyBriefSettings, attempt: DailyBriefAttempt, outcome: DailyBriefOutcome) => {
       if (!live() || !isRememberedDailyBriefAttempt(briefClient, attempt)) return;
       const marker = readDailyBriefPresentation(settings.accountRef, settings.localDate);
-      if (marker.dismissed) { show(HIDDEN); return; }
+      if (marker.dismissed) { show(closedOrHidden(settings)); return; }
       if (outcome.kind === "ready") {
-        if (!(Date.parse(outcome.briefing.expiresAt) > Date.now())) { show(expiredNotice()); return; }
-        if (attempt.sourceKey !== sourceKeyRef.current) { show(staleNotice()); return; }
+        // Advisor Phase 3: a brief stays until it is closed or the day ends. Each move line is
+        // checked when it is answered, so neither a timer nor a Timeline change withdraws it.
         if (travelAccountId) requestDailyBriefTravel(travelAccountId, outcome.briefing.localDate, outcome.briefing.generatedAt);
         mark(settings, { attempted: true, delivered: true });
+        shownBriefings.set(briefClient, { fence: dailyBriefFence(settings), briefing: outcome.briefing });
         show({ kind: "ready", briefing: outcome.briefing, attempt });
-        later(() => { if (isRememberedDailyBriefAttempt(briefClient, attempt)) show(expiredNotice()); }, Date.parse(outcome.briefing.expiresAt));
         return;
       }
       if (outcome.kind === "already_attempted") {
-        show(marker.delivered ? HIDDEN : { kind: "notice", message: "Today’s Daily Brief was already started but not shown here.", retryLabel: TRY_AGAIN });
+        show(marker.delivered ? CLOSED : { kind: "notice", message: "Today’s Daily Brief was already started but not shown here.", retryLabel: TRY_AGAIN });
         return;
       }
       const notice = failureNotice(outcome);
@@ -117,11 +133,11 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     };
 
     const start = (settings: DailyBriefSettings, retry: boolean) => {
+      setRefreshState(REFRESH_IDLE);
       // The first brief of the day may first wait for travel (Ticket 272), so its claim covers that wait.
       const claim = Date.now() + DAILY_BRIEF_CLIENT_DEADLINES.installationMs + DAILY_BRIEF_CLIENT_DEADLINES.briefMs + (retry ? 0 : DAILY_BRIEF_TRAVEL_WAIT_MS);
       mark(settings, { attempted: true, pendingUntil: claim });
       const attempt = startDailyBriefAttempt(briefClient, settings, {
-        sourceKey: sourceKeyRef.current,
         retry,
         run: async (signal) => {
           // Ticket 219 Option A: the latest signed travel conclusions for this account and day, if any.
@@ -132,7 +148,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
             dailyBriefInstallationId(window.localStorage, signal),
             retry ? travelConclusionsToken(travelAccountId, settings.localDate) : waitForDailyBriefTravel(travelAccountId, settings.localDate, signal),
           ]);
-          return briefClient.requestBrief({ installationId, retry, ...(travelConclusions ? { travelConclusions } : {}) }, signal);
+          return briefClient.requestBrief({ installationId, retry, ...(travelConclusions ? { travelConclusions } : {}), ...moveRequestFields(briefClient, travelAccountId, settings.localDate) }, signal);
         },
       });
       // Clear this tab's cross-tab claim when the attempt settles, even if this launcher
@@ -150,14 +166,14 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       if (!live()) return;
       evaluated = true;
       const marker = readDailyBriefPresentation(settings.accountRef, settings.localDate);
-      if (marker.dismissed) { discardDailyBriefAttempt(briefClient); show(HIDDEN); return; }
+      if (marker.dismissed) { discardDailyBriefAttempt(briefClient); show(closedOrHidden(settings)); return; }
       const attempt = currentDailyBriefAttempt(briefClient, settings);
       if (attempt) { follow(settings, attempt); return; }
       if (!marker.attempted) {
         if (allowStart) start(settings, false); else show(HIDDEN);
         return;
       }
-      if (marker.delivered) { show(HIDDEN); return; }
+      if (marker.delivered) { show(closedOrHidden(settings)); return; }
       if (marker.pendingUntil && marker.pendingUntil > Date.now()) {
         // Another tab or an earlier page load owns the attempt; recheck when its client deadline passes.
         show(HIDDEN);
@@ -224,7 +240,47 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         if (settings) mark(settings, { attempted: true, dismissed: true });
         discardDailyBriefAttempt(briefClient);
         epoch.current += 1;
-        setView(HIDDEN);
+        generation = epoch.current;
+        setRefreshState(REFRESH_IDLE);
+        setView(settings ? closedOrHidden(settings) : HIDDEN);
+      },
+      reopen: () => {
+        const settings = settingsRef.current;
+        if (!settings || !live()) return;
+        // Reopening is the person's choice: clear Close for today, then show the brief.
+        mark(settings, { attempted: true, dismissed: false });
+        const remembered = shownBriefings.get(briefClient);
+        if (remembered && remembered.fence === dailyBriefFence(settings)) {
+          show({ kind: "ready", briefing: remembered.briefing, attempt: reopenedAttempt(settings) });
+          return;
+        }
+        // The server returns today's saved brief with no new model call (advisor Phase 3, 3A2).
+        start(settings, false);
+      },
+      refresh: () => {
+        const settings = settingsRef.current;
+        if (!settings || !live()) return;
+        const refreshEpoch = generation;
+        setRefreshState({ pending: true, error: null });
+        void (async () => {
+          try {
+            const installationId = await dailyBriefInstallationId(window.localStorage);
+            const travelConclusions = travelConclusionsToken(travelAccountId, settings.localDate);
+            const response = await briefClient.requestBrief({
+              installationId, retry: false, refresh: true,
+              ...(travelConclusions ? { travelConclusions } : {}),
+              ...moveRequestFields(briefClient, travelAccountId, settings.localDate),
+            });
+            if (!live() || refreshEpoch !== generation) return;
+            if (response.state !== "ready") { setRefreshState({ pending: false, error: "The new brief isn’t ready yet. Try again shortly." }); return; }
+            shownBriefings.set(briefClient, { fence: dailyBriefFence(settings), briefing: response.briefing });
+            setRefreshState(REFRESH_IDLE);
+            show({ kind: "ready", briefing: response.briefing, attempt: reopenedAttempt(settings) });
+          } catch (error) {
+            if (!live() || refreshEpoch !== generation) return;
+            setRefreshState({ pending: false, error: refreshFailure(error) });
+          }
+        })();
       },
     };
 
@@ -246,11 +302,11 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       const settings = settingsRef.current;
       if (!settings || !isDailyBriefPresentationKey(event.key)) return;
       const marker = readDailyBriefPresentation(settings.accountRef, settings.localDate);
-      if (marker.dismissed) { discardDailyBriefAttempt(briefClient); epoch.current += 1; setView(HIDDEN); return; }
+      if (marker.dismissed) { discardDailyBriefAttempt(briefClient); epoch.current += 1; generation = epoch.current; setView(closedOrHidden(settings)); return; }
       // Another tab delivered, failed or claimed an attempt; re-evaluate without starting automatically.
       const own = currentDailyBriefAttempt(briefClient, settings);
       if (!own) evaluate(settings, false);
-      else if (own.outcome && own.outcome.kind !== "ready" && marker.delivered) show(HIDDEN);
+      else if (own.outcome && own.outcome.kind !== "ready" && marker.delivered) show(CLOSED);
     };
     window.addEventListener("cadence:daily-brief-settings", onSettings);
     window.addEventListener("focus", onFocus);
@@ -268,15 +324,11 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     };
   }, [resolvedClient, desktop, sessionKey, travelAccountId]);
 
-  useEffect(() => {
-    sourceKeyRef.current = sourceKey;
-  }, [sourceKey]);
-
   if (!resolvedClient || view.kind === "hidden" || viewSession !== sessionKey) return null;
   const onDismiss = () => actions.current.dismiss();
+  if (view.kind === "closed") return <ReopenBriefLink onReopen={() => actions.current.reopen()} />;
   if (view.kind === "loading") return <DailyBriefBubble state="loading" onDismiss={onDismiss} />;
-  // Delivered text reflects the facts it was prepared from; changed Timeline facts withdraw it.
-  const shown = view.kind === "ready" && view.attempt.sourceKey !== sourceKey ? staleNotice() : view;
+  const shown = view;
   const planControls = resolvedClient.plan;
   // A cancelled or failed sign-in leaves the notice in place; a finished one retries the brief.
   const connectPlan = () => {
@@ -288,7 +340,21 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   if (shown.kind === "ready") {
     const usage = planControls?.usage(shown.briefing) ?? null;
     const plan = planControls && usage ? { usage, onManageUsage: planControls.manageUsage, onConnect: connectPlan } : null;
-    return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} />;
+    const moveClient = resolvedClient.moves;
+    const moves = moveClient ? {
+      client: moveClient,
+      planningContext: (): BriefPlanningContext => {
+        const travelTimes = travelTimesToken(travelAccountId, shown.briefing.localDate);
+        return { calendarBusy: briefCalendarBusy(), ...(travelTimes ? { travelTimes } : {}) };
+      },
+    } : null;
+    const refresh = moveClient ? {
+      onRefresh: () => actions.current.refresh(),
+      pending: refreshState.pending,
+      error: refreshState.error,
+      available: refreshAvailability(shown.briefing),
+    } : null;
+    return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} refresh={refresh} />;
   }
   if (shown.kind !== "notice") return null;
   const action = planControls && shown.action === "manage_usage" ? { label: "Manage usage", onClick: planControls.manageUsage }
@@ -306,12 +372,52 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   );
 }
 
-function expiredNotice(): View {
-  return { kind: "notice", message: "This Daily Brief’s timing has expired.", retryLabel: "Get a fresh brief" };
+/** A Timeline link that reopens today's brief after Close. Text-like, right-aligned under the horse. */
+function ReopenBriefLink({ onReopen }: Readonly<{ onReopen: () => void }>) {
+  return (
+    <p className="relative z-10 -mt-6 ml-auto w-fit text-sm leading-6 text-muted-readable sm:-mt-4" data-daily-brief-reopen>
+      <button type="button" onClick={onReopen} className="-my-2 inline-block min-h-11 py-2 underline underline-offset-2 hover:text-foreground">
+        Today’s brief
+      </button>
+    </p>
+  );
 }
 
-function staleNotice(): Extract<View, { kind: "notice" }> {
-  return { kind: "notice", message: "Your Timeline changed after this brief was prepared.", retryLabel: "Refresh brief" };
+/** Closed today: show the reopen link when a brief was delivered on this device, else nothing. */
+function closedOrHidden(settings: DailyBriefSettings): View {
+  return readDailyBriefPresentation(settings.accountRef, settings.localDate).delivered ? CLOSED : HIDDEN;
+}
+
+/** The brief request's move fields: only clients that can answer ask for move lines. */
+function moveRequestFields(client: DailyBriefClient, travelAccountId: string | null, localDate: string) {
+  if (!client.moves) return {};
+  const travelTimes = travelTimesToken(travelAccountId, localDate);
+  return { features: [...DAILY_BRIEF_MOVE_FEATURES], ...(travelTimes ? { travelTimes } : {}) };
+}
+
+/** A settled stand-in attempt for a brief shown again from memory or replaced by Refresh. */
+function reopenedAttempt(settings: DailyBriefSettings): DailyBriefAttempt {
+  return {
+    accountRef: settings.accountRef, localDate: settings.localDate, fence: dailyBriefFence(settings),
+    retry: false, controller: new AbortController(), promise: new Promise(() => undefined),
+  };
+}
+
+/** Advisor Phase 3 (3A2): the server says whether a refresh is still allowed today. */
+function refreshAvailability(briefing: DailyBriefing): boolean {
+  const refresh = (briefing as DailyBriefing & Readonly<{ refresh?: Readonly<{ available?: boolean }> }>).refresh;
+  return refresh?.available !== false;
+}
+
+function refreshFailure(error: unknown): string {
+  const code = error instanceof DailyBriefRequestError ? error.code : "brief_unavailable";
+  switch (code) {
+    case "refresh_limit_reached": return "You’ve used today’s refreshes. This brief stays, and every line still works.";
+    case "budget_reached": return "Refresh is paused to keep this month’s morning briefs. This brief stays, and every line still works.";
+    case "offline": return "You appear to be offline. This brief stays; try again when you’re connected.";
+    case "rate_limited": return "Too many requests. Try again in a minute.";
+    default: return "Cadence couldn’t refresh the brief. This one stays; try again later.";
+  }
 }
 
 function failureNotice(outcome: Extract<DailyBriefOutcome, { kind: "failed" }>): Extract<View, { kind: "notice" }> {

@@ -4,6 +4,7 @@ import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, Outloo
 import { LeaveReminderSettingBench, TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
+import { DailyBriefMovesBench } from "./DailyBriefMovesBench";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import type { Metadata } from "next";
@@ -2173,6 +2174,7 @@ const previewFactories: Record<
   "module.settings-saving": () => <ProductPreview><SettingsSavingBench /></ProductPreview>,
   "module.alert-notice": () => <ProductPreview><AlertNoticeBench /></ProductPreview>,
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
+  "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,
   "module.trust-and-legal-panel": () => (
       <ProductPreview>
         <TrustAndLegalPanel />

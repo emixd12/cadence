@@ -9,7 +9,7 @@ import { DayProgressTimeline, type DayProgressContext } from "@/components/timel
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { useTimelineWheelReload } from "@/lib/ui/timeline-wheel-reload";
-import { timelineBriefKey, type DailyBriefClient } from "@/lib/ui/daily-brief";
+import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import type { NotificationTarget } from "./notification-activation";
 import type { DesktopScreen } from "./desktop-app";
@@ -172,7 +172,7 @@ export function TimelineScreen({
             </picture>
           </div>
           <div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10">
-            <DailyBriefLauncher travelAccountId={dailyBriefSessionKey === "local" ? null : dailyBriefSessionKey} sourceKey={timelineBriefKey(timeline)} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
+            <DailyBriefLauncher travelAccountId={dailyBriefSessionKey === "local" ? null : dailyBriefSessionKey} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
           </div>
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">

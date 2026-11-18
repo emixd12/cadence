@@ -1892,3 +1892,25 @@ cite has not changed.
 - **Update needed:** when Mac moves ship, say so in the user guide's Mac notes.
 - **Related:** P-061, P-062.
 - **Status:** logged.
+
+## P-064: The Daily Brief shows move lines people can answer (web)
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3B). Inside the Daily Brief
+  bubble, each proposed move is a line of text with **Yes · No · Other time**, plus
+  **Already did it** on late items, **Accept all** and **Undo all**, "assumes 30 min ·
+  change", "travel not checked" and **Don't suggest moving this**. Yes moves the item for
+  today and opens the bottom move note with Undo. The brief no longer expires after five
+  minutes and is no longer withdrawn when the Timeline changes; **Close** leaves a
+  **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says
+  "read-only".
+- **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
+  `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
+  suggested move", updated in the same change).
+- **Surfaces:** user guide (updated), in-app copy (new). Privacy, Terms, marketing and
+  listings still call the brief read-only: covered by P-061.
+- **Conflicting current text:** "Cadence can prepare one read-only briefing" (Daily Brief
+  settings panel description) and "Cadence stores no briefing history" (user guide, until
+  advisor Phase 3A2 saves the shown brief) remain; P-061 owns them.
+- **Update needed:** none beyond P-061.
+- **Related:** P-061, P-063.
+- **Status:** logged.

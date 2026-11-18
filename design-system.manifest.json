@@ -646,7 +646,21 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Recipe 1.1 (Ticket 184 candidate) shows plain Suggested time lines and a Logging or Pattern tip label with evidence indented under the tip. Recipe 1.2 (candidate 3) lists every move as a bullet under one New suggested time heading with current → new times, Behavior names as compact chips, and hides an empty brief. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block. Ticket 266: the travel timing states bench shows the travel block before and after estimate expiry."
+      "notes": "Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Recipe 1.1 (Ticket 184 candidate) shows plain Suggested time lines and a Logging or Pattern tip label with evidence indented under the tip. Recipe 1.2 (candidate 3) lists every move as a bullet under one New suggested time heading with current → new times, Behavior names as compact chips, and hides an empty brief. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block. Ticket 266: the travel timing states bench shows the travel block before and after estimate expiry."
+    },
+    {
+      "id": "module.daily-brief-moves",
+      "name": "BriefMoveLines",
+      "kind": "module",
+      "source": "components/briefing/BriefMoveLines.tsx",
+      "exportName": "BriefMoveLines",
+      "usageNames": [
+        "BriefMoveLines"
+      ],
+      "benchAnchor": "design-system#ds-module-daily-brief-moves",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Advisor plan Phase 3B. The brief's move lines inside the Daily Brief bubble: Behavior, current \u2192 new time, a plain reason, then Yes \u00b7 No \u00b7 Other time as underlined text links, plus Already did it on late items, assumes N min \u00b7 change, travel not checked and Don\u2019t suggest moving this. Accept all above two or more lines, Undo all after it. Other time lists free times, a time picker and Re-plan. Yes opens the shared bottom move drawer with Undo. No fades the line. Refusals use the alert style. Text only: no boxes or filled buttons."
     },
     {
       "id": "module.daily-brief-settings-panel",

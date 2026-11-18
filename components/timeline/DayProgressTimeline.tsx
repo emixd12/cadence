@@ -41,13 +41,14 @@ import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
-import { MoveCalendarEventsContext } from "./OccurrenceMoves";
+import { calendarBusyFromEvents, MoveCalendarEventsContext } from "./OccurrenceMoves";
 import { useDayProgressClock } from "./day-progress-clock";
 import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
 import styles from "./day-progress-timeline.module.css";
 import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
+import { publishBriefCalendarBusy } from "@/lib/ui/brief-calendar";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
 import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
@@ -311,6 +312,11 @@ export function DayProgressTimeline({
   }, [travel, departure, travelEvents, now, timeline.daySections, timeline.todayLocalDate, timeline.timezone]);
   useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
   useEffect(() => () => publishBriefTravel(null), []);
+  // Advisor Phase 3: the brief's move answers send the busy times this screen holds.
+  useEffect(() => {
+    publishBriefCalendarBusy(calendarBusyFromEvents(events).map((busy) => ({ startAt: busy.start, endAt: busy.end, ...(busy.ref ? { ref: busy.ref } : {}) })));
+  }, [events]);
+  useEffect(() => () => publishBriefCalendarBusy([]), []);
   const refreshTravel: TravelRefreshAction | null = travelStatus && !travelStatus.resumesAt
     ? { onRefresh: travelStatus.refresh, pending: travelStatus.pending } : null;
   const travelLabels = useMemo(() => new Map(departure.trips.length ? [...travelEvents.map((event) => [event.id, event.title || "Untitled event"] as const),

@@ -30,12 +30,12 @@ it("leaves Timeline unobstructed when preferences fail before an attempt exists"
   expect(container.textContent).toBe("");
   expect(request).not.toHaveBeenCalled();
 });
-it("withdraws timing text at expiry without another render or model request", async () => {
+it("keeps a delivered brief past its preparation time (advisor Phase 3: no whole-brief expiry)", async () => {
   const request = vi.fn(async () => ready("Fresh advice"));
   await act(() => root.render(<DailyBriefLauncher client={client("owner", request)} />));
   expect(container.textContent).toContain("Fresh advice");
-  await act(() => vi.advanceTimersByTime(1001));
-  expect(container.textContent).not.toContain("Fresh advice");
+  await act(() => vi.advanceTimersByTime(60 * 60_000));
+  expect(container.textContent).toContain("Fresh advice");
   expect(request).toHaveBeenCalledTimes(1);
 });
 it("hides an old owner's output immediately on account switch and logout", async () => {
@@ -109,7 +109,7 @@ it.each([false, true])("preserves daily admission and dismissal across rollout a
     await act(() => window.dispatchEvent(new Event("focus")));
     await act(() => root.render(null));
     await act(() => root.render(<DailyBriefLauncher client={{ ...adapter, preferences }} />));
-    expect(container.textContent).toBe("");
+    expect(container.textContent).toBe("Today’s brief");
     expect(localStorage.getItem(key)).toBe(admission);
     expect(request).toHaveBeenCalledTimes(1);
   }
@@ -149,29 +149,54 @@ it("reattaches a remounted launcher to the in-flight attempt instead of losing i
   expect(request).toHaveBeenCalledTimes(1);
 });
 
-it("keeps loading through a Timeline change and offers a refresh instead of stale text", async () => {
-  let complete!: (value: DailyBriefResponse) => void;
-  const request = vi.fn(() => new Promise<DailyBriefResponse>((resolve) => { complete = resolve; }));
-  const adapter = client("owner", request);
-  await act(() => root.render(<DailyBriefLauncher client={adapter} sourceKey="before" />));
-  await act(() => root.render(<DailyBriefLauncher client={adapter} sourceKey="after" />));
-  expect(container.textContent).toContain("Preparing today’s");
-  await act(() => complete(ready("Prepared before the mark", 120_000)));
-  expect(container.textContent).not.toContain("Prepared before the mark");
-  expect(container.textContent).toContain("Your Timeline changed after this brief was prepared.");
-});
+describe("advisor Phase 3: reopen, Refresh and move lines", () => {
+  const moveClient = () => ({ answer: vi.fn(), replan: vi.fn(), length: vi.fn(), preference: vi.fn(), readPreference: vi.fn() });
 
-it("withdraws delivered text when Timeline facts change and refreshes only on request", async () => {
-  const request = vi.fn(async () => ready("Current advice", 120_000));
-  const adapter = client("owner", request);
-  await act(() => root.render(<DailyBriefLauncher client={adapter} sourceKey="before" />));
-  expect(container.textContent).toContain("Current advice");
-  await act(() => root.render(<DailyBriefLauncher client={adapter} sourceKey="after" />));
-  expect(container.textContent).not.toContain("Current advice");
-  expect(request).toHaveBeenCalledTimes(1);
-  await act(() => buttonNamed("Refresh brief")!.click());
-  expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ retry: true }), expect.any(AbortSignal));
-  expect(container.textContent).toContain("Current advice");
+  it("reopens today's brief after Close from memory, with no new request", async () => {
+    const request = vi.fn(async () => ready("Morning brief"));
+    await act(() => root.render(<DailyBriefLauncher client={client("owner", request)} />));
+    await act(() => container.querySelector<HTMLButtonElement>('[aria-label="Dismiss Daily Brief"]')!.click());
+    expect(container.textContent).toBe("Today’s brief");
+    await act(() => buttonNamed("Today’s brief")!.click());
+    expect(container.textContent).toContain("Morning brief");
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem(markerKey)!)).toMatchObject({ dismissed: false });
+  });
+
+  it("asks the server for the saved brief when reopening after a reload", async () => {
+    localStorage.setItem(markerKey, JSON.stringify({ attempted: true, delivered: true, dismissed: true }));
+    const request = vi.fn(async () => ready("Saved brief"));
+    await act(() => root.render(<DailyBriefLauncher client={client("owner", request)} />));
+    expect(container.textContent).toBe("Today’s brief");
+    await act(() => buttonNamed("Today’s brief")!.click());
+    expect(request).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ retry: false }), expect.any(AbortSignal));
+    expect(container.textContent).toContain("Saved brief");
+  });
+
+  it("asks for move lines only when the client can answer them", async () => {
+    const request = vi.fn(async () => ready("With moves"));
+    await act(() => root.render(<DailyBriefLauncher client={{ ...client("owner", request), moves: moveClient() }} />));
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ features: ["move_lines_v1"] }), expect.any(AbortSignal));
+    await act(() => root.render(null));
+    localStorage.clear();
+    const plain = vi.fn<DailyBriefClient["requestBrief"]>(async () => ready("Without moves"));
+    await act(() => root.render(<DailyBriefLauncher client={client("other", plain)} />));
+    expect(plain.mock.calls[0]![0]).not.toHaveProperty("features");
+  });
+
+  it("refreshes in place and keeps the brief when a refresh is refused", async () => {
+    const request = vi.fn<DailyBriefClient["requestBrief"]>()
+      .mockResolvedValueOnce(ready("First brief"))
+      .mockResolvedValueOnce(ready("Second brief"))
+      .mockRejectedValueOnce(new DailyBriefRequestError("refresh_limit_reached"));
+    await act(() => root.render(<DailyBriefLauncher client={{ ...client("owner", request), moves: moveClient() }} />));
+    await act(async () => { buttonNamed("Refresh")!.click(); });
+    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ refresh: true, retry: false }));
+    expect(container.textContent).toContain("Second brief");
+    await act(async () => { buttonNamed("Refresh")!.click(); });
+    expect(container.textContent).toContain("Second brief");
+    expect(container.textContent).toContain("used today’s refreshes");
+  });
 });
 
 it("offers recovery after a reload abandoned the automatic attempt", async () => {
@@ -204,7 +229,7 @@ it("waits for another tab's attempt, then hides when that tab delivers", async (
   expect(container.textContent).toContain("did not finish loading");
   localStorage.setItem(markerKey, JSON.stringify({ attempted: true, delivered: true, dismissed: false }));
   await act(() => window.dispatchEvent(new StorageEvent("storage", { key: markerKey })));
-  expect(container.textContent).toBe("");
+  expect(container.textContent).toBe("Today’s brief");
   expect(request).not.toHaveBeenCalled();
 });
 
@@ -214,7 +239,7 @@ it("hides a parallel tab's pending notice when the other tab delivers", async ()
   expect(container.textContent).toContain("still being prepared");
   localStorage.setItem(markerKey, JSON.stringify({ attempted: true, delivered: true, dismissed: false }));
   await act(() => window.dispatchEvent(new StorageEvent("storage", { key: markerKey })));
-  expect(container.textContent).toBe("");
+  expect(container.textContent).toBe("Today’s brief");
 });
 
 it("honors server retry timing before enabling the retry control", async () => {
@@ -244,15 +269,6 @@ it.each([
 it("shows returned recovery guidance for unrecognized failures", async () => {
   await act(() => root.render(<DailyBriefLauncher client={client("owner", async () => { throw new DailyBriefRequestError("calendar_reconnect_required", undefined, "Reconnect Google Calendar in Settings."); })} />));
   expect(container.textContent).toContain("Reconnect Google Calendar in Settings.");
-});
-
-it("keeps an expired brief's recovery state without regenerating", async () => {
-  const request = vi.fn(async () => ready("Timed advice", 1_000));
-  await act(() => root.render(<DailyBriefLauncher client={client("owner", request)} />));
-  await act(() => vi.advanceTimersByTime(1_001));
-  expect(container.textContent).toContain("timing has expired");
-  expect(buttonNamed("Get a fresh brief")).toBeDefined();
-  expect(request).toHaveBeenCalledTimes(1);
 });
 
 it("never reopens a dismissed attempt after remount or delivery", async () => {
@@ -426,7 +442,7 @@ describe("Ticket 272: the first brief waits up to 5 seconds for its travel concl
     await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
     expect(routes).toHaveBeenCalledOnce();
     expect(requestBrief).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Preparing today’s read-only briefing");
+    expect(container.textContent).toContain("Preparing today’s brief");
     await act(async () => { answer(travelView()); await vi.advanceTimersByTimeAsync(0); });
     expect(requestBrief).toHaveBeenCalledWith(expect.objectContaining({ travelConclusions: "signed.token", retry: false }), expect.any(AbortSignal));
     // Model input is unchanged: the request carries only the opaque signed token, never the

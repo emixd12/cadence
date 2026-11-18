@@ -4,17 +4,7 @@ import type {
   DailyBriefSettings,
   DailyBriefSourceFlags,
 } from "@cadence/core/types/daily-brief";
-import type { TimelineView } from "@cadence/core/types/timeline";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
-
-export function timelineBriefKey(timeline: TimelineView): string {
-  return JSON.stringify([
-    timeline.timezone, timeline.todayLocalDate, timeline.durationEstimates,
-    [...timeline.daySections, ...timeline.needsDecision.daySections].map((section) =>
-      section.occurrences.map((occurrence) => [occurrence.id, occurrence.title,
-        occurrence.scheduledFor, occurrence.status, occurrence.statusMarkedAt, occurrence.timeTracking])),
-  ]);
-}
 
 /** OpenAI's ChatGPT usage settings, where "Manage usage" goes (Ticket 299). */
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
@@ -64,6 +54,8 @@ export type DailyBriefRequestInput = Readonly<{
   features?: readonly string[];
   /** Advisor Phase 3: signed travel times from the latest routes response, passed back unchanged. */
   travelTimes?: string;
+  /** Advisor Phase 3 (3A2): run a new brief that replaces today's earlier one. */
+  refresh?: boolean;
 }>;
 
 /** Ticket 306: the one connected-sources choice, per-source exclusions, and the reminder-history and Notes choices. */
