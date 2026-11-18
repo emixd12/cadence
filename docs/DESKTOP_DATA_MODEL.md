@@ -39,8 +39,9 @@ reminders, leave reminders (through the Timeline's stops), an opened reminder an
 labels read those copies; native writes always re-read the stored row. A moved Occurrence
 keeps its reminder request ID, so its new fire time replaces the planned one. Rust test
 `account_sync_round_trips_read_only_occurrence_moves` covers apply, field rejection, chain
-order and the cascade. Export and restore carry moves once the web defines them in the
-`app.cadence` extension.
+order, the cascade and the export read. Mac export writes the moves of the export range to
+`raw/cadence/occurrence_moves.jsonl` in the `app.cadence` extension, as the web does, with
+`person_reason` null because that reason never syncs to a Mac. Restore does not replay moves.
 
 Schema version 24 adds read-only copies of the hosted connector completion records
 (Ticket 320, D28). Migration `0024_connector_completion_records.sql` creates

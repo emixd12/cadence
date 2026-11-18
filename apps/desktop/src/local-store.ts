@@ -112,7 +112,8 @@ export type LocalCommandMap = {
       occurrences: OccurrenceRecord[]; statusEvents: OccurrenceStatusEventRecord[]; reminderDeliveries: ReminderDelivery[];
       timeSessions: OccurrenceTimeSession[]; nativeReminders: NativeReminderRow[];
       importedNotes: PortabilityNoteRow[]; importedInterventions: PortabilityInterventionRow[];
-      importRuns: PortabilityImportRunRow[]; importMappings: PortabilityMappingRow[]; dayNotes: DayNoteRecord[] };
+      importRuns: PortabilityImportRunRow[]; importMappings: PortabilityMappingRow[]; dayNotes: DayNoteRecord[];
+      occurrenceMoves: OccurrenceMoveRecord[] };
   };
   readProfile: { input: Record<string, never>; result: Profile };
   readCategories: { input: Owned; result: Category[] };

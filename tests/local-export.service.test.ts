@@ -31,7 +31,7 @@ beforeEach(() => {
       id: "native-1", user_id: USER_ID, occurrence_id: storedExportOccurrence().id, request_id: "native-request",
       fire_at: "2026-05-01T22:00:00Z", title: "Private title", body: "Private body", error: "Private error",
       status: "scheduled", verified_at: row.created_at, created_at: row.created_at, updated_at: row.updated_at,
-    }],
+    }], occurrenceMoves: [],
   });
 });
 
@@ -112,6 +112,26 @@ describe("desktop export read and download", () => {
       expect(payload.bytes).toBeUndefined();
       expect(payload.filename).toMatch(format === "markdown" ? /\.md$/ : new RegExp(`\\.${format}$`));
     }
+  });
+
+  it("exports synced per-day moves in the Behavior Log archive only (advisor Phase 2B)", async () => {
+    const snapshot = await mocks.command();
+    const occurrence = storedExportOccurrence();
+    snapshot.occurrenceMoves = [{ id: "50000000-0000-4000-8000-000000000101", user_id: USER_ID, occurrence_id: occurrence.id,
+      behavior_id: occurrence.behavior_id, local_date: occurrence.local_date, weekday: 5, timezone: "America/New_York",
+      kind: "move", from_start_at: "2026-05-01T22:00:00.000000Z", from_end_at: "2026-05-01T22:00:00.000000Z",
+      from_planned: true, to_start_at: "2026-05-01T23:00:00.000000Z", to_end_at: "2026-05-01T23:00:00.000000Z",
+      to_planned: false, duration_source: "planned_length", revises_move_id: null,
+      chain_root_id: "50000000-0000-4000-8000-000000000101", chain_position: 1, reason: null, source: "person",
+      created_at: "2026-05-01T12:00:00.000000Z" }];
+    mocks.command.mockResolvedValue(snapshot);
+    const bundle = await getLocalExportPageData(profile, { now, range: "all" });
+    const file = bundle.behaviorLog.files.find(({ path }) => path === "raw/cadence/occurrence_moves.jsonl");
+    expect(JSON.parse(file!.content)).toMatchObject({ id: "50000000-0000-4000-8000-000000000101", occurrence_id: occurrence.id,
+      kind: "move", to_planned: false, person_reason: null, source: "person" });
+    expect(JSON.parse(file!.content)).not.toHaveProperty("user_id");
+    expect(JSON.parse(bundle.behaviorLog.files[0].content).extensions["app.cadence"].occurrence_moves)
+      .toMatchObject({ record_count: 1, import_restore_support: "export_only" });
   });
 
   it("propagates snapshot failure and never substitutes a partial export", async () => {

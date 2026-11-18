@@ -72,7 +72,7 @@ export type ExportOccurrenceMoveInput = {
   behaviorId: string;
   localDate: string;
   timezone: string;
-  kind: "move" | "revert";
+  kind: "move" | "revert" | "supersede";
   fromStartAt: string;
   fromEndAt: string;
   fromPlanned: boolean;
