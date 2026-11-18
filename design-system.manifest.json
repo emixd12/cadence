@@ -505,6 +505,24 @@
       "notes": "Advisor plan Phase 1C. The one style for something going wrong: model failed, data out of date, budget reached, write refused. Warning icon plus a Rust Signal label; never used for advice."
     },
     {
+      "id": "module.occurrence-move",
+      "name": "OccurrenceMoveMenu",
+      "kind": "module",
+      "source": "components/timeline/OccurrenceMoveMenu.tsx",
+      "exportName": "OccurrenceMoveMenu",
+      "usageNames": [
+        "OccurrenceMoveMenu",
+        "OccurrenceMovedLine",
+        "OccurrenceMoveNotice",
+        "OccurrenceMovesProvider",
+        "MoveConflictNotices"
+      ],
+      "benchAnchor": "design-system#ds-module-occurrence-move",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Advisor plan Phase 2C. The web Timeline's own Move for today: free times as text links then Other time, Moved from 9:00 AM \u00b7 Undo, a short Undo message, optional one-tap reasons, refusals in the alert style, and the schedule-edit overlap line with Yes / No / Other time. Text only: no boxes or filled buttons."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",

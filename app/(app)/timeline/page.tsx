@@ -20,12 +20,33 @@ import {
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
 } from "./actions";
+import {
+  keepMovedOccurrenceAction,
+  moveOccurrenceAction,
+  recordMoveReasonAction,
+  revertOccurrenceMoveAction,
+  suggestMoveTimesAction,
+} from "./move-actions";
+import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
+import { MoveConflictNotices, type MoveConflictNotice } from "@/components/timeline/MoveConflictNotices";
+import { hasPersonMovedBefore, listOpenMoveConflicts } from "@/lib/services/occurrence-move.service";
+import { systemClock } from "@/lib/services/clock";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Timeline",
 };
 
 export const dynamic = "force-dynamic";
+
+// Advisor plan, Phase 2C: the person's own per-day moves from the Timeline row.
+const MOVE_ACTIONS: OccurrenceMoveActions = {
+  move: moveOccurrenceAction,
+  revert: revertOccurrenceMoveAction,
+  reason: recordMoveReasonAction,
+  suggest: suggestMoveTimesAction,
+  keep: keepMovedOccurrenceAction,
+};
 
 const TIMELINE_BANNER_IMAGES = {
   desktop: {
@@ -94,11 +115,18 @@ async function TimelineContent({
   );
   const shortcutsByBehavior = await listAcceptedNoteShortcutsForCurrentUser();
   const { userId } = await getCurrentUserClaims();
+  const moveState = await loadMoveState(userId, timeline.todayLocalDate);
 
   return (
-    <>
+    <OccurrenceMovesProvider
+      actions={MOVE_ACTIONS}
+      timezone={timeline.timezone}
+      todayLocalDate={timeline.todayLocalDate}
+      hasMovedBefore={moveState.hasMovedBefore}
+    >
       <DailyBriefLauncher travelAccountId={userId} sourceKey={timelineBriefKey(timeline)} />
       <FirstRunOnboardingPanel onboarding={onboarding} />
+      <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
       <Timeline
         key={userId}
         travelAccountId={userId}
@@ -113,8 +141,27 @@ async function TimelineContent({
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
       />
-    </>
+    </OccurrenceMovesProvider>
   );
+}
+
+/**
+ * Whether the one-time first-move line is still owed, and today's open schedule-edit
+ * collision notices. A read failure hides both and leaves the Timeline working.
+ */
+async function loadMoveState(userId: string | null, todayLocalDate: string)
+  : Promise<Readonly<{ hasMovedBefore: boolean; conflicts: readonly MoveConflictNotice[] }>> {
+  if (!userId) return { hasMovedBefore: true, conflicts: [] };
+  try {
+    const caller = { supabase: await createClient(), userId, now: systemClock.now() };
+    const [hasMovedBefore, conflicts] = await Promise.all([
+      hasPersonMovedBefore(caller),
+      listOpenMoveConflicts(caller, todayLocalDate),
+    ]);
+    return { hasMovedBefore, conflicts };
+  } catch {
+    return { hasMovedBefore: true, conflicts: [] };
+  }
 }
 
 function TimelineBanner() {

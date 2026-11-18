@@ -1873,3 +1873,22 @@ cite has not changed.
   the scope summary and listings; say the planned schedule never changes.
 - **Related:** P-061.
 - **Status:** logged.
+
+## P-063: People can move today's items themselves on the web Timeline
+
+- **Change:** implemented November 16, 2026 (advisor Phase 2C). An expanded Timeline row
+  of today's Unresolved, set-time item offers **Move for today**: free times first, then
+  **Other time**. The move happens at once. The row reads "Moved from 9:00 AM · Undo",
+  and a note at the bottom of the screen confirms it with Undo and optional
+  one-tap reasons (Running late, Conflict, Low energy, Other). The first move ever adds "This changes today only. Your
+  schedule stays." A schedule edit that makes a moved time overlap another item asks
+  "Keep it there? Yes · No · Other time". The Mac shows moves but cannot make them yet.
+- **Affected:** `components/timeline/OccurrenceMoveMenu.tsx`,
+  `components/timeline/OccurrenceMoves.tsx`, `components/timeline/MoveConflictNotices.tsx`,
+  `docs/user-guide/timeline.md` ("Move an item for today", added in the same change).
+- **Surfaces:** user guide (updated), in-app copy (new). No marketing or store text
+  found that says Timeline items cannot be moved.
+- **Conflicting current text:** none found.
+- **Update needed:** when Mac moves ship, say so in the user guide's Mac notes.
+- **Related:** P-061, P-062.
+- **Status:** logged.

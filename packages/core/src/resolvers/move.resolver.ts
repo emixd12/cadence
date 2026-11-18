@@ -193,3 +193,18 @@ function roundUp(value: Temporal.Instant, seconds: number): Temporal.Instant {
   const unit = seconds * 1000;
   return Temporal.Instant.fromEpochMilliseconds(Math.ceil(epoch / unit) * unit);
 }
+
+/**
+ * Whether a Timeline row offers the person's own "Move for today" and Undo (Phase
+ * 2C): today's Unresolved items scheduled at an exact time, with a known revision.
+ * The database function enforces the same rules; this only decides what to show.
+ */
+export function canSelfMoveOccurrence(occurrence: Readonly<{
+  localDate: string;
+  status: string;
+  scheduleKind?: "exact" | "range";
+  revision?: string;
+}>, todayLocalDate: string): boolean {
+  return occurrence.localDate === todayLocalDate && occurrence.status === "unresolved"
+    && occurrence.scheduleKind !== "range" && Boolean(occurrence.revision);
+}

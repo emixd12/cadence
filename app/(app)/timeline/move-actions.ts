@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { MOVE_PERSON_REASONS, type MovePersonReason } from "@cadence/core/resolvers/move.resolver";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { invalidateBehaviorData } from "@/lib/cache/stable-user-data.cache";
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { systemClock } from "@/lib/services/clock";
 import {
   OccurrenceMoveKeyReusedError,
+  keepMovedOccurrence,
   moveOccurrenceForDay,
   recordOccurrenceMoveReason,
   revertOccurrenceMove,
+  suggestOccurrenceMoveTimes,
   type OccurrenceMoveResult,
 } from "@/lib/services/occurrence-move.service";
 import { createClient } from "@/lib/supabase/server";
@@ -38,6 +41,8 @@ export type MoveActionState =
     message: string;
     alternatives: readonly string[];
     revision: string | null;
+    /** Where the item sits now, so the web can say "was just moved to 10:00 on another device". */
+    currentStartAt: string | null;
   }>
   | Readonly<{ status: "error"; message: string }>;
 
@@ -60,9 +65,7 @@ export async function moveOccurrenceAction(input: MoveActionInput): Promise<Move
     const result = await moveOccurrenceForDay(caller, {
       occurrenceId: input.occurrenceId, expectedRevision: input.expectedRevision, startTime: input.startTime,
       proposalId: input.proposalId ?? null, idempotencyKey: input.idempotencyKey ?? null,
-      calendarBusy: (input.calendarBusy ?? []).map((event) => ({
-        start: Temporal.Instant.from(event.start), end: Temporal.Instant.from(event.end), ref: event.ref,
-      })),
+      calendarBusy: toBusy(input.calendarBusy),
     });
     return toState(result, input.occurrenceId);
   } catch (error) {
@@ -99,6 +102,41 @@ export async function recordMoveReasonAction(input: Readonly<{ moveId: string; r
   }
 }
 
+/** Free start times for the row's "Move for today" menu (Phase 2C), as UTC instants. */
+export async function suggestMoveTimesAction(input: Readonly<{
+  occurrenceId: string;
+  calendarBusy?: MoveActionInput["calendarBusy"];
+}>): Promise<readonly string[]> {
+  try {
+    const caller = await personCaller();
+    const starts = await suggestOccurrenceMoveTimes(caller, {
+      occurrenceId: input.occurrenceId, calendarBusy: toBusy(input.calendarBusy),
+    });
+    return starts.map((start) => start.toString());
+  } catch {
+    return [];
+  }
+}
+
+/** "Yes, keep it here" on a schedule-edit collision notice. */
+export async function keepMovedOccurrenceAction(input: Readonly<{ conflictId: string }>)
+  : Promise<Readonly<{ status: "kept" } | { status: "error"; message: string }>> {
+  try {
+    const caller = await personCaller();
+    await keepMovedOccurrence(caller.supabase, input.conflictId);
+    revalidatePath("/timeline");
+    return { status: "kept" };
+  } catch {
+    return { status: "error", message: "Cadence could not save that answer. Try again." };
+  }
+}
+
+function toBusy(events: MoveActionInput["calendarBusy"]) {
+  return (events ?? []).map((event) => ({
+    start: Temporal.Instant.from(event.start), end: Temporal.Instant.from(event.end), ref: event.ref,
+  }));
+}
+
 async function personCaller() {
   const userId = await requireCurrentUserId("Sign in again to move items.");
   return { supabase: await createClient(), userId, now: systemClock.now() };
@@ -109,6 +147,7 @@ function toState(result: OccurrenceMoveResult, occurrenceId: string): MoveAction
     return {
       status: "refused", occurrenceId, reason: result.reason, message: result.message,
       alternatives: result.alternatives.map((start) => start.toString()), revision: result.occurrence?.updated_at ?? null,
+      currentStartAt: result.occurrence ? effectiveStartAt(result.occurrence) : null,
     };
   }
   const userId = result.occurrence.user_id;
