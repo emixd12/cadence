@@ -1,4 +1,5 @@
 import { purgeEndedDailyBriefDays, purgeExpiredAgentRunContents } from "@/lib/db/agent-runs.repo";
+import { purgeEndedBriefMoveText } from "@/lib/services/brief-moves.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -10,10 +11,11 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
  * time they store new content, so a missed cron run delays nothing visible.
  */
 export async function runAgentRunContentMaintenance(
-  // Advisor Phase 3: saved brief text also goes once its local day has ended.
+  // Advisor Phase 3: saved brief text and move-line calendar titles also go once their local day has ended.
   purge: (signal: AbortSignal) => Promise<number> = async (signal) => {
     const client = createServiceRoleClient();
-    return await purgeExpiredAgentRunContents(client, signal) + await purgeEndedDailyBriefDays(client, signal);
+    return await purgeExpiredAgentRunContents(client, signal) + await purgeEndedDailyBriefDays(client, signal)
+      + await purgeEndedBriefMoveText(client, signal);
   },
 ): Promise<void> {
   const controller = new AbortController();

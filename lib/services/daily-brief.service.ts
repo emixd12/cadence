@@ -171,7 +171,7 @@ export function readDailyBriefAttemptInput(value: unknown): DailyBriefAttemptInp
   }
   const { features, travelTimes, calendarBusy, refresh } = value;
   if ((features !== undefined && (!Array.isArray(features) || features.length > 16 || features.some((item) => typeof item !== "string" || item.length > 64))) ||
-      (travelTimes !== undefined && (typeof travelTimes !== "string" || travelTimes.length > 16_384)) ||
+      (travelTimes !== undefined && (typeof travelTimes !== "string" || travelTimes.length > 32_768)) ||
       (refresh !== undefined && typeof refresh !== "boolean") ||
       (calendarBusy !== undefined && !validCalendarBusy(calendarBusy))) {
     throw new DailyBriefError("invalid_request");
