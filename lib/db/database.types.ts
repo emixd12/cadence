@@ -70,6 +70,44 @@ export type Database = {
         }
         Relationships: []
       }
+      behavior_advisor_estimates: {
+        Row: {
+          alongside: boolean
+          behavior_id: string
+          duration_minutes: number | null
+          input_hash: string
+          model: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alongside?: boolean
+          behavior_id: string
+          duration_minutes?: number | null
+          input_hash: string
+          model?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alongside?: boolean
+          behavior_id?: string
+          duration_minutes?: number | null
+          input_hash?: string
+          model?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_advisor_estimates_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       behavior_configuration_events: {
         Row: {
           behavior_id: string
@@ -178,6 +216,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "behavior_definition_events_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      behavior_move_preferences: {
+        Row: {
+          behavior_id: string
+          never_suggest_move: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          never_suggest_move?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          never_suggest_move?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_move_preferences_behavior_owner_fkey"
             columns: ["user_id", "behavior_id"]
             isOneToOne: false
             referencedRelation: "behaviors"
@@ -1156,6 +1223,72 @@ export type Database = {
           },
         ]
       }
+      move_proposal_answers: {
+        Row: {
+          batch_id: string | null
+          behavior_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          kind: string
+          local_date: string
+          move_id: string | null
+          occurrence_id: string
+          outcome: string
+          proposal_id: string
+          refusal_reason: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          batch_id?: string | null
+          behavior_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          kind: string
+          local_date: string
+          move_id?: string | null
+          occurrence_id: string
+          outcome: string
+          proposal_id: string
+          refusal_reason?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          batch_id?: string | null
+          behavior_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          local_date?: string
+          move_id?: string | null
+          occurrence_id?: string
+          outcome?: string
+          proposal_id?: string
+          refusal_reason?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "move_proposal_answers_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "move_proposal_answers_proposal_owner_fkey"
+            columns: ["user_id", "proposal_id"]
+            isOneToOne: false
+            referencedRelation: "move_proposals"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       move_proposals: {
         Row: {
           agent_run_id: string | null
@@ -1163,6 +1296,7 @@ export type Database = {
           created_at: string
           expected_revision: string
           id: string
+          line: Json
           local_date: string
           move_id: string | null
           occurrence_id: string
@@ -1183,6 +1317,7 @@ export type Database = {
           created_at?: string
           expected_revision: string
           id?: string
+          line?: Json
           local_date: string
           move_id?: string | null
           occurrence_id: string
@@ -1203,6 +1338,7 @@ export type Database = {
           created_at?: string
           expected_revision?: string
           id?: string
+          line?: Json
           local_date?: string
           move_id?: string | null
           occurrence_id?: string
@@ -2320,6 +2456,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      answer_move_proposal: {
+        Args: {
+          p_batch_id?: string
+          p_idempotency_key: string
+          p_kind: string
+          p_move_id?: string
+          p_outcome: string
+          p_proposal_id: string
+          p_refusal_reason?: string
+        }
+        Returns: Json
+      }
       apple_sign_in_forget_token: {
         Args: { apple_subject_digest: string; owner_id: string }
         Returns: undefined
@@ -3016,6 +3164,35 @@ export type Database = {
         Args: { target_behavior_id: string }
         Returns: Json
       }
+      record_brief_move_proposals: {
+        Args: {
+          p_agent_run_id: string
+          p_local_date: string
+          p_proposals: Json
+          p_supersede?: boolean
+        }
+        Returns: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          expected_revision: string
+          id: string
+          line: Json
+          local_date: string
+          move_id: string | null
+          occurrence_id: string
+          option_refs: Json
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }[]
+      }
       record_daily_brief_tip: {
         Args: {
           p_expected_revision: number
@@ -3194,6 +3371,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_behavior_default_length: {
+        Args: {
+          p_behavior_id: string
+          p_expected_revision: string
+          p_minutes: number
+        }
+        Returns: Json
+      }
+      set_behavior_move_preference: {
+        Args: {
+          p_behavior_id: string
+          p_never_suggest_move: boolean
+        }
+        Returns: {
+          behavior_id: string
+          never_suggest_move: boolean
+          updated_at: string
+          user_id: string
+        }
+      }
       settle_agent_spend: {
         Args: { p_actual_microdollars: number; p_reservation_id: string }
         Returns: boolean
@@ -3286,6 +3483,12 @@ export type Database = {
           target_timezone: string
         }
         Returns: Json
+      }
+      upsert_behavior_advisor_estimates: {
+        Args: {
+          p_estimates: Json
+        }
+        Returns: number
       }
     }
     Enums: {
