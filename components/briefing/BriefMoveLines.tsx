@@ -461,6 +461,7 @@ function requestRefusal(error: unknown): BriefMoveRefusal {
   const message = code === "offline" ? "You appear to be offline. Nothing changed."
     : code === "proposal_closed" ? "This suggestion was already answered on another device."
       : code === "proposal_not_found" ? "This suggestion is no longer available. Refresh the brief for current ones."
+        : code === "revision_changed" ? "This item changed since the brief was written. Nothing changed; refresh the brief to see it."
         : code === "rate_limited" ? "Too many changes at once. Try again in a moment."
           : code === "timeout" ? "That took too long. Nothing changed; try again."
             : "Cadence couldn’t apply that. Nothing changed.";
