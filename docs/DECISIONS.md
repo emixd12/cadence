@@ -2654,3 +2654,35 @@ Platform impact: web first; each phase is finished only when it reaches the Mac 
 output and export. Marketing: no change until the messaging pass. Future mobile: the race
 rules live on the server, so a phone app inherits them. Messaging impact: P-059, P-060,
 P-061.
+
+## 2026-11-18: The Daily Brief applies moves (advisor Phase 3A1)
+
+The Daily Brief now writes records. When the person answers Yes, Cadence moves that
+item for today through the Phase 2 move functions, recorded with source `daily_brief`.
+The technical rules are in `docs/DATETIME_STRATEGY.md`, "Brief moves". The choices:
+
+- **One free-slot rule** in `@cadence/core` decides every "is this time free" question,
+  for the brief, Yes, Other time, Re-plan and the Timeline's own moves.
+- **Every item has a length.** When neither the Behavior nor the logs give one, the
+  model estimates it from the title and description once per Behavior, and the brief
+  shows it as an estimate. A correction becomes the Behavior's default length.
+- **Calendar and travel arrive with each request.** The server keeps no calendar copy.
+  Travel times arrive as a signed token from the device's last travel check, used once.
+  Calendar events and travel are fixed; only Cadence items move. Planning makes no
+  extra route lookups; after a Yes, the normal travel refresh recomputes leave-by lines.
+- **Calendar titles for one day.** A line may name the event it avoids. That title is
+  replaced with a generic reason when the day ends.
+- **Every answer is recorded** (append-only) so the coach and evaluation can learn
+  from it. Retention follows advisor content (P-060).
+- **"Don't suggest moving this"** per Behavior; the brief offers it after No or Undo on
+  four different days.
+- **Re-plan and Other time** are limited to 30 per account per 10 minutes.
+- **Proposals last the day.** The 5-minute expiry and the withdrawal on any Timeline
+  change are gone; Yes is checked against the current day instead.
+- **The advisor sees moves.** Its day context carries each item's effective time, who
+  moved it, today's answers and open move conflicts.
+
+Platform impact: web and Mac call the same routes (`/api/advisor/brief/answer`,
+`/replan`, `/length`, `/move-preference`); the rules live on the server, so a future
+phone app inherits them. Marketing: no change until the messaging pass. Messaging
+impact: P-065, P-066, P-067.

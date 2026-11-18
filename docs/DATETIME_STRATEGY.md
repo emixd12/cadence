@@ -213,6 +213,41 @@ iPhone and Android apps, inherits them.
 | The same write arrives twice with the same idempotency key | The second returns the first result and applies nothing. |
 | Two moves of the same Occurrence with the same expected revision | The first to arrive wins. The second is refused with the current state. |
 
+### Brief moves
+
+The Daily Brief proposes moves as lines and applies one when the person answers Yes
+(advisor Phase 3). These rules sit on top of "Moves"; the code is
+`packages/core/src/resolvers/brief-move.resolver.ts` and
+`lib/services/brief-moves.service.ts`.
+
+- **One free-slot rule.** Brief lines, Yes, Accept all, Other time, Re-plan and the
+  Timeline's "Move for today" all ask the same resolver whether a time is free, so a
+  time the brief offers is not refused at Yes on the same data.
+- **Every item has a length.** The Behavior's duration, then the logged average,
+  then a cached model estimate, then 30 minutes. The estimate is stored per Behavior
+  and asked again only when its title, description or kind of place changes. A Yes applies
+  the length the line showed. A correction from the person becomes the Behavior's
+  default length.
+- **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time
+  item blocks its own length. A range item blocks its own length at the earliest
+  free point in its range. An item done alongside others (a pill, a device) blocks
+  nothing. Travel spans already carry their margins.
+- **Calendar and travel on each request.** The device sends today's busy calendar
+  events with each brief and answer request (at most 200). Travel times come as a
+  signed token from the device's last travel check; the server verifies it, uses it
+  for that request and stores nothing. Calendar events and travel are fixed: the
+  brief moves Cadence items around them, never the reverse.
+- **Route lookups.** Planning makes no route lookups of its own. After a Yes the
+  moved item changes the Timeline, so the normal travel route refresh on web and
+  Mac runs, about two legs per moved item that has a place. That refresh recomputes
+  leave-by lines from the new effective time.
+- **Revisions.** Each answer carries the revision the screen read. A changed
+  Occurrence or Behavior returns `revision_changed`, and the client reloads.
+- **Expiry.** A proposal stays open until its day ends or its item resolves. A change
+  to the Timeline no longer withdraws it; Yes is checked against the current day.
+- **Calendar text for one day.** A line may name the calendar event it avoids. When
+  the day ends, the server replaces that title with a generic reason.
+
 ## Tests are source-of-truth evidence
 
 The following tests are required before recurrence/timeline/status work is complete:

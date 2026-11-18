@@ -121,6 +121,9 @@ Status values:
 | [P-059](#p-059-the-advisor-may-use-model-providers-other-than-openai) | The advisor may use model providers other than OpenAI | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ, user guide |
 | [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
 | [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
+| [P-065](#p-065-the-daily-brief-keeps-calendar-titles-and-answers-for-the-day) | The Daily Brief keeps calendar titles and answers for the day | logged | Advisor Phase 3A1 | Privacy, Trust, in-app copy |
+| [P-066](#p-066-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
+| [P-067](#p-067-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1891,4 +1894,59 @@ cite has not changed.
 - **Conflicting current text:** none found.
 - **Update needed:** when Mac moves ship, say so in the user guide's Mac notes.
 - **Related:** P-061, P-062.
+- **Status:** logged.
+
+## P-065: The Daily Brief keeps calendar titles and answers for the day
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3A1). When the Daily Brief
+  proposes a move because of a calendar event, the line's reason may name that event
+  ("It overlaps Team sync"). Cadence stores that title with the brief line until the
+  day ends, then replaces it with "It overlapped a calendar event." Calendar events
+  still come from the device on each request; the server keeps no calendar copy. Each
+  answer (Yes, No, Other time, Already did it, Undo, Accept all) is recorded with the
+  line so the brief, the advisor and evaluation can see what the person chose. Travel
+  times reach the brief as a signed copy from the device's last travel check, used for
+  that one request and not stored.
+- **Affected:** `lib/services/brief-moves.service.ts`,
+  `supabase/migrations/20261118120000_brief_move_answers.sql`.
+- **Surfaces:** Privacy (what Daily Brief stores, and for how long), Trust, Settings'
+  Daily Brief disclosure ("states that the model cannot change Cadence or Calendar
+  records").
+- **Conflicting current text:** the Settings disclosure line above, and any Privacy text
+  that says calendar content is never stored on the server.
+- **Update needed:** say calendar titles named in a brief line are kept until the end
+  of that day; say answers are kept as advisor content (P-060 retention).
+- **Related:** P-060, P-061.
+- **Status:** logged.
+
+## P-066: The advisor estimates how long an item takes
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3A1). To find a free slot,
+  every item needs a length. Cadence uses the Behavior's own duration, then the
+  person's logged average. Only when neither exists does the model estimate a length
+  from the Behavior's title and description. Cadence stores the estimate on the
+  Behavior, and the brief shows it as an estimate. When the person corrects it, the
+  correction becomes the Behavior's default length.
+- **Affected:** `lib/services/brief-moves.service.ts` (`ensureBehaviorEstimates`,
+  `setBriefMoveLength`), `app/api/advisor/brief/length/route.ts`.
+- **Surfaces:** Privacy (Behavior titles and descriptions go to the model for this),
+  in-app copy, user guide.
+- **Conflicting current text:** none found.
+- **Update needed:** mention estimated lengths in the user guide's Daily Brief page.
+- **Related:** P-061, P-065.
+- **Status:** logged.
+
+## P-067: "Don't suggest moving this" per Behavior
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3A1). A Behavior can be set
+  so the Daily Brief never proposes moving it. Once the person has said No or Undo to
+  moves of the same Behavior on four different days, its brief line also offers
+  "Don't suggest moving this". The person can turn suggestions back on.
+- **Affected:** `app/api/advisor/brief/move-preference/route.ts`,
+  `lib/services/brief-moves.service.ts`.
+- **Surfaces:** in-app copy (Behavior settings, brief line), user guide.
+- **Conflicting current text:** none found.
+- **Update needed:** describe the setting where the user guide explains Daily Brief
+  moves.
+- **Related:** P-061.
 - **Status:** logged.
