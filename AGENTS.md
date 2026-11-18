@@ -184,6 +184,18 @@ Product and implementation docs:
 28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
 29. `/docs/NARRATIVE.md` — positioning, public claims and the marketing register
 
+## iOS running plan
+
+`docs/IOS_PLAN.md` is a running plan for a future iPhone and Apple Watch app. It is
+not a source-of-truth document and it authorizes nothing: mobile stays out of scope
+until the owner activates the track (`docs/DECISIONS.md`, 2026-11-18).
+
+- The plan follows web development. It never blocks or changes a web ticket, a merge
+  or a deployment. Web tickets owe it nothing beyond their "Future mobile" line.
+- Only the `ios-plan-sync` skill updates it, in docs-only pull requests that touch
+  that file alone.
+- Its `IOS-` step IDs are not ticket numbers. Do not cite them in tickets or code.
+
 ## Messaging changes
 
 Messaging and compliance is a separate track from development. When a feature
