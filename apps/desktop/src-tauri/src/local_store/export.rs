@@ -36,6 +36,7 @@ pub fn read(
         "SELECT r.* FROM reminder_deliveries r JOIN occurrences o ON o.user_id=r.user_id AND o.id=r.occurrence_id WHERE r.user_id=?1 AND (?2 IS NULL OR o.local_date>=?2) AND o.local_date<=?3 ORDER BY r.scheduled_send_at,r.id", &values)?;
     let native_reminders = db::read::<NativeReminderState>(db,
         "SELECT r.* FROM native_reminder_state r JOIN occurrences o ON o.user_id=r.user_id AND o.id=r.occurrence_id WHERE r.user_id=?1 AND (?2 IS NULL OR o.local_date>=?2) AND o.local_date<=?3 ORDER BY r.fire_at,r.id", &values)?;
+    let occurrence_moves = read_occurrence_moves(db, &values)?;
     let time_sessions = if include_time_tracking {
         let mut time_values = values.clone();
         time_values.push(through.into());
@@ -55,10 +56,18 @@ pub fn read(
         "reminderDeliveries":reminder_deliveries,
         "timeSessions":time_sessions,
         "nativeReminders":native_reminders,
+        "occurrenceMoves":occurrence_moves,
         "importedNotes":db::owned::<ImportedNote>(db,profile_id)?,
         "importedInterventions":db::owned::<ImportedIntervention>(db,profile_id)?,
         "importRuns":db::owned::<BehaviorLogImportRun>(db,profile_id)?.into_iter().filter(|row| row.status == "applied").collect::<Vec<_>>(),
         "importMappings":db::owned::<BehaviorLogImportRecordMapping>(db,profile_id)?,
         "dayNotes":super::day_note::owned_if_present(db,profile_id)?
     }))
+}
+
+/// Advisor Phase 2B: synced per-day moves in the export range, export only. Instants are
+/// stored in one canonical form, so text order is time order.
+pub(super) fn read_occurrence_moves(db: &Connection, values: &[SqlValue]) -> Result<Vec<OccurrenceMove>> {
+    db::read::<OccurrenceMove>(db,
+        "SELECT * FROM occurrence_moves WHERE user_id=?1 AND (?2 IS NULL OR local_date>=?2) AND local_date<=?3 ORDER BY created_at,id", values)
 }

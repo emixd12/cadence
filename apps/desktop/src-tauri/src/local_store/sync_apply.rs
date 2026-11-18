@@ -1577,6 +1577,17 @@ mod tests {
         let positions: Vec<i64> = read.as_array().unwrap().iter().map(|row| row["chain_position"].as_i64().unwrap()).collect();
         assert_eq!(positions, vec![1, 2, 3]);
         assert_eq!(read[1]["to_planned"], json!(true));
+        // Export reads the moves of its date range in created order (export only, never restored).
+        let export_moves = |start: &str, end: &str| {
+            let values: Vec<rusqlite::types::Value> = vec![profile.clone().into(), start.to_string().into(), end.to_string().into()];
+            super::super::export::read_occurrence_moves(&connection, &values)
+                .unwrap()
+                .into_iter()
+                .map(|row| row.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(export_moves("2026-09-01", "2026-09-01"), vec![first.id.clone(), undo.id.clone(), supersede.id.clone()]);
+        assert!(export_moves("2026-09-02", "2026-09-03").is_empty());
         // Server-only fields never reach a Mac.
         let mut leaky = synced(&first);
         leaky.as_object_mut().unwrap().insert("idempotency_key".into(), json!("key"));
