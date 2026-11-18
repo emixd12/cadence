@@ -226,10 +226,13 @@ export async function keepMovedOccurrence(supabase: AppSupabaseClient, conflictI
   if (error) throw error;
 }
 
-/** Whether the person has ever moved an item themselves, for the one-time first-move line. */
+/**
+ * Whether the person has ever moved an item, themselves or by a Yes to the Daily Brief,
+ * for the one-time first-move line (Phase 3A1: a brief Yes counts as their move).
+ */
 export async function hasPersonMovedBefore(caller: Pick<OccurrenceMoveCaller, "supabase" | "userId">): Promise<boolean> {
   const { data, error } = await caller.supabase.from("occurrence_moves").select("id")
-    .eq("user_id", caller.userId).eq("kind", "move").eq("source", "person").limit(1);
+    .eq("user_id", caller.userId).eq("kind", "move").in("source", ["person", "daily_brief"]).limit(1);
   if (error) throw error;
   return (data ?? []).length > 0;
 }

@@ -10,6 +10,7 @@ import { parseIntegrationSigningKey, type IntegrationSigningKey } from "@/lib/su
 import { registerOAuthClient, approveOAuthConsent } from "@/lib/db/oauth.repo";
 import { writeOperationHandlers } from "@/lib/integrations/operations/write";
 import { readBriefMoveDay } from "@/lib/services/brief-move-day.service";
+import { readAdvisorCadenceSnapshot } from "@/lib/db/advisor-context.repo";
 import {
   BriefMoveError,
   answerBriefMove,
@@ -212,6 +213,19 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
       startAt: tea.otherTimes[0]!, context: { calendarBusy }, idempotencyKey: "other-tea" });
     expect(other.results[0]).toMatchObject({ outcome: "applied", line: { status: "other_time" } });
     expect(Temporal.Instant.from((await occurrence(tea.occurrenceId)).effective_start_at!).toString()).toBe(tea.otherTimes[0]);
+
+    // The advisor's day snapshot now sees the moved item where it sits, and today's answers.
+    const snapshot = await readAdvisorCadenceSnapshot(person, { localDate: today, historyStartLocalDate: Temporal.PlainDate.from(today).subtract({ days: 90 }).toString(),
+      behaviorIds: [readId, walkId, stretchId, teaId, journalId, napId] });
+    const teaRow = snapshot.occurrences.find((row) => row.id === tea.occurrenceId)!;
+    expect(Temporal.Instant.from(teaRow.effectiveStartAt!).toString()).toBe(tea.otherTimes[0]);
+    expect(teaRow.movedBy).toBe("daily_brief");
+    expect(snapshot.occurrences.find((row) => row.id === walk.occurrenceId)!.effectiveStartAt).toBeNull();
+    expect(snapshot.moveAnswers).toEqual(expect.arrayContaining([
+      { occurrenceId: walk.occurrenceId, kind: "undo" }, { occurrenceId: tea.occurrenceId, kind: "other_time" },
+      { occurrenceId: stretch.occurrenceId, kind: "undo_all" },
+    ]));
+    expect(snapshot.moveConflicts).toEqual([]);
 
     // Already did it: recorded, then the item is Completed.
     const journal = line(journalId);
