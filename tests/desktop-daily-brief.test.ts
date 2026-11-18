@@ -58,3 +58,37 @@ it("keeps the client deadline when a caller signal is supplied, including a stal
     vi.useRealTimers();
   }
 });
+
+it("sends brief move answers to the hosted API with the Mac session and syncs only after a change", async () => {
+  const client = { auth: { getSession: async () => ({ data: { session: { access_token: "synthetic-session" } } }) } } as unknown as SupabaseClient;
+  const onAccountWrite = vi.fn();
+  const adapter = createDesktopDailyBriefClient(client, "https://cadence.invalid", null, onAccountWrite)!;
+  const applied = { kind: "yes", results: [{ proposalId: "p1", outcome: "applied", line: null, refusal: null, occurrence: null, moveId: "m1" }], batchId: null, replayed: false, firstMove: false };
+  const refused = { ...applied, results: [{ ...applied.results[0], outcome: "refused", moveId: null }] };
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(applied))
+    .mockResolvedValueOnce(Response.json(refused))
+    .mockResolvedValueOnce(Response.json({ ...applied, kind: "no" }))
+    .mockResolvedValueOnce(Response.json({ error: "proposal_closed" }, { status: 409 }))
+    .mockResolvedValueOnce(Response.json({ line: null, replacedProposalId: "p1" }))
+    .mockResolvedValueOnce(Response.json({ behaviorId: "b1", neverSuggestMove: true, updatedAt: null }));
+  vi.stubGlobal("fetch", fetcher);
+  const context = { calendarBusy: [{ startAt: "2026-11-18T15:00:00Z", endAt: "2026-11-18T16:00:00Z" }], travelTimes: "signed" };
+  const yes = { kind: "yes", idempotencyKey: "k1", proposalId: "p1", expectedRevision: "r1", context } as const;
+  expect(await adapter.moves!.answer(yes)).toEqual(applied);
+  expect(fetcher).toHaveBeenLastCalledWith("https://cadence.invalid/api/advisor/brief/answer", {
+    method: "POST", body: JSON.stringify(yes), signal: expect.any(AbortSignal), cache: "no-store", redirect: "error",
+    headers: { Authorization: "Bearer synthetic-session", "Content-Type": "application/json" },
+  });
+  expect(onAccountWrite).toHaveBeenCalledOnce();
+  // A refused Yes and a No change nothing on the Timeline, so no sync.
+  await adapter.moves!.answer(yes);
+  await adapter.moves!.answer({ kind: "no", idempotencyKey: "k2", proposalId: "p1" });
+  expect(onAccountWrite).toHaveBeenCalledOnce();
+  await expect(adapter.moves!.answer(yes)).rejects.toMatchObject({ code: "proposal_closed" });
+  expect(await adapter.moves!.replan({ proposalId: "p1", context })).toEqual({ line: null, replacedProposalId: "p1" });
+  expect(fetcher).toHaveBeenLastCalledWith("https://cadence.invalid/api/advisor/brief/replan", expect.objectContaining({ method: "POST" }));
+  await adapter.moves!.readPreference("b 1");
+  expect(fetcher).toHaveBeenLastCalledWith("https://cadence.invalid/api/advisor/brief/move-preference?behaviorId=b%201", expect.not.objectContaining({ method: expect.anything() }));
+  expect(onAccountWrite).toHaveBeenCalledOnce();
+});

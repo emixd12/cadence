@@ -6,7 +6,7 @@ import type {
 } from "@cadence/core/types/daily-brief";
 import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefPreferenceInput, DailyBriefRequestInput } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch, withDailyBriefDeadline } from "@/lib/ui/daily-brief";
-import { DAILY_BRIEF_MOVE_DEADLINE_MS, createDailyBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
+import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { ChatGPTPlanError, chooseChatGPTPlanModel, generateChatGPTPlanDailyBrief } from "@/lib/services/daily-brief-chatgpt-plan";
 import { readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
 import type { ChatGptConnection } from "./chatgpt/connection";
@@ -65,7 +65,7 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
     onAccountWrite: () => void = () => undefined,
   ) {
-    this.moves = createDailyBriefMoveClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
+    this.moves = createBriefMoveClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
     if (planPath) {
       this.plan = {
         usage: (briefing) => this.planBriefs.has(briefing) ? "plan" : this.planOffBriefs.has(briefing) ? "plan_off" : null,
