@@ -85,6 +85,8 @@ export type CoachSignalMove = Readonly<{
   timezone: string;
   kind: "move" | "revert" | "supersede";
   chainPosition: number;
+  /** True when this record put the Occurrence back at its planned time. */
+  toPlanned: boolean;
   fromStartAt: string;
   toStartAt: string;
   source: string;
@@ -174,7 +176,8 @@ type NetMove = Readonly<{ localDate: string; weekday: number; shiftMinutes: numb
 /**
  * A Behavior moved the same way on several days. Each Occurrence counts once, by its
  * net move that day: from its planned time to where its latest record left it. An
- * Occurrence that was moved back (Undo) or whose move was superseded counts as not moved.
+ * Occurrence that is back at its planned time (Undo of its only move, or a superseded
+ * move) counts as not moved. Undoing a second move leaves the first one standing.
  */
 function repeatedMoves(input: ResolveCoachSignalsInput, active: ReadonlyMap<string, CoachSignalBehavior>): CoachSignal[] {
   const windowStart = addDays(input.today, -T.repeatedMove.windowDays);
@@ -190,7 +193,10 @@ function repeatedMoves(input: ResolveCoachSignalsInput, active: ReadonlyMap<stri
     chain.sort((a, b) => a.chainPosition - b.chainPosition);
     const first = chain[0]!;
     const latest = chain[chain.length - 1]!;
-    if (first.chainPosition !== 1 || latest.kind !== "move") continue;
+    if (first.chainPosition !== 1 || latest.kind === "supersede" || latest.toPlanned) continue;
+    // The move that put the Occurrence where it is now: the latest record, or, after an
+    // Undo, the earlier move it restored.
+    const placedBy = [...chain].reverse().find((move) => move.kind === "move" && move.toStartAt === latest.toStartAt) ?? latest;
     const planned = Temporal.Instant.from(first.fromStartAt);
     const target = Temporal.Instant.from(latest.toStartAt);
     const shiftMinutes = Math.round(target.since(planned).total({ unit: "minutes" }));
@@ -202,7 +208,7 @@ function repeatedMoves(input: ResolveCoachSignalsInput, active: ReadonlyMap<stri
       weekday: Temporal.PlainDate.from(latest.localDate).dayOfWeek,
       shiftMinutes,
       targetMinute: local.hour * 60 + local.minute,
-      source: latest.source,
+      source: placedBy.source,
     });
     byBehavior.set(latest.behaviorId, moves);
   }

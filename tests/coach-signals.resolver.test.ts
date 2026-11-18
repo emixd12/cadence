@@ -73,7 +73,7 @@ describe("repeated_move", () => {
     const localDate = day(offset);
     return {
       occurrenceId, behaviorId: GYM.id, localDate, timezone: ZONE, kind: "move", chainPosition: 1,
-      fromStartAt: `${localDate}T12:00:00Z`, toStartAt: `${localDate}T${toUtc}:00Z`, source: "person", ...extra,
+      fromStartAt: `${localDate}T12:00:00Z`, toStartAt: `${localDate}T${toUtc}:00Z`, toPlanned: false, source: "person", ...extra,
     };
   }
 
@@ -99,7 +99,7 @@ describe("repeated_move", () => {
   it("does not count a move that was undone, and stays quiet below three days", () => {
     const undone: CoachSignalMove[] = [
       move("o3", -2, "23:30"),
-      { ...move("o3", -2, "12:00"), kind: "revert", chainPosition: 2, fromStartAt: `${day(-2)}T23:30:00Z` },
+      { ...move("o3", -2, "12:00"), kind: "revert", chainPosition: 2, fromStartAt: `${day(-2)}T23:30:00Z`, toPlanned: true },
     ];
     expect(resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...undone] }))).toEqual([]);
   });
@@ -111,6 +111,17 @@ describe("repeated_move", () => {
     ];
     const [signal] = resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...removed] }));
     expect(signal?.facts).toMatchObject({ moved_days: 3, same_direction_days: 3, median_shift_minutes: 690 });
+  });
+
+  it("keeps the first move when a second move is undone", () => {
+    // 07:00 -> 18:30 (by the person) -> 20:00 (by the brief), then Undo: back at 18:30.
+    const partial: CoachSignalMove[] = [
+      move("o3", -2, "23:30"),
+      { ...move("o3", -2, "01:00"), chainPosition: 2, fromStartAt: `${day(-2)}T23:30:00Z`, toStartAt: `${day(-1)}T01:00:00Z`, source: "daily_brief" },
+      { ...move("o3", -2, "23:30"), kind: "revert", chainPosition: 3, fromStartAt: `${day(-1)}T01:00:00Z`, source: "person" },
+    ];
+    const [signal] = resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...partial] }));
+    expect(signal?.facts).toMatchObject({ moved_days: 3, same_direction_days: 3, median_target_time: "18:30", by_source: { person: 3 } });
   });
 
   it("stays quiet when moves go both ways", () => {

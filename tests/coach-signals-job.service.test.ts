@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   coachSignalsEnabled,
-  createCoachSignalReads,
   processCoachSignals,
   visitCoachAccount,
   type CoachVisitPort,
   type DueCoachAccount,
 } from "@/lib/services/coach-signals-job.service";
+import { createCoachSignalReads } from "@/lib/db/coach-signals.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 
 // Advisor plan Phase 3, workstream 3D: the hourly coach signal job.

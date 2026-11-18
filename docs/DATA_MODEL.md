@@ -3194,7 +3194,7 @@ shown to the person; Phase 4 matches the signals to advice cards.
   re-run is safe.
 - Each visit is one `agent_runs` row: agent `coach`, trigger `scheduled`, no model
   call. Thresholds and definitions: `packages/core/src/resolvers/coach-signals.resolver.ts`.
-  Job: `lib/services/coach-signals-job.service.ts`, hourly cron
+  Job: `lib/services/coach-signals-job.service.ts` (database access in `lib/db/coach-signals.repo.ts`), hourly cron
   `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
   table exists (Phase 3A1) and each brief proposal's final status otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
