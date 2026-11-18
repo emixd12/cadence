@@ -58,7 +58,7 @@ beforeEach(() => {
   mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
   mocks.proposals.mockImplementation(async (_client, value) => stored(value.lines));
   mocks.estimates.mockResolvedValue(undefined);
-  generate.mockResolvedValue({ opening: "Walk needs a new time today.", reasons: [{ key: "line_1", text: "It runs into your Team sync." }] });
+  generate.mockResolvedValue({ opening: "Walk needs a new time today.", reasons: [{ key: "line_1", text: "It runs into your {event}." }] });
 });
 
 describe("first-party daily briefing service", () => {
@@ -363,8 +363,8 @@ describe("one Daily Brief choice for every connected source (Ticket 306)", () =>
     const call = generate.mock.calls[0]![0] as { instructions: string; facts: string };
     const facts = JSON.parse(call.facts);
     expect(Object.keys(facts).sort()).toEqual(["conflicts", "day", "lines", "now", "today"]);
-    expect(facts.lines).toEqual([expect.objectContaining({ key: "line_1", with: "Team sync", why: "calendar_overlap" })]);
-    expect(call.facts).not.toMatch(/Private review|hevy|routine|exercise|signed\.times|outlook|ref_/i);
+    expect(facts.lines).toEqual([expect.objectContaining({ key: "line_1", with: "{event}", why: "calendar_overlap" })]);
+    expect(call.facts).not.toMatch(/Team sync|Private review|hevy|routine|exercise|signed\.times|outlook|ref_/i);
 
     // A withdrawn disclosure or changed connection after generation never delivers text.
     generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { opening: "A brief.", reasons: [] }; });

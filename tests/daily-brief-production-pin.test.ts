@@ -78,7 +78,7 @@ async function productionBodies(features: readonly string[] = ["move_lines_v1"])
 describe("pinned production generation", () => {
   it("keeps the brief prompt revision value", () => {
     expect(BRIEF_OPENING_PROMPT_REVISION).toBe(sha(`${BRIEF_OPENING_INSTRUCTIONS}\0${JSON.stringify(BRIEF_OPENING_SCHEMA)}`).slice(0, 16));
-    expect(BRIEF_OPENING_PROMPT_REVISION).toBe("a332f75064155220");
+    expect(BRIEF_OPENING_PROMPT_REVISION).toBe("682cac22099e71e0");
   });
 
   it("sends one short request with the pinned model, effort, schema and instructions", async () => {

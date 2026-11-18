@@ -69,3 +69,10 @@ describe("Phase 3 brief eval (no model)", () => {
     expect(rules).toEqual(expect.arrayContaining(["declined_reoffered", "yes_check_alone", "after_latest_hour"]));
   });
 });
+
+describe("Phase 3 brief eval fixtures", () => {
+  it("are valid day contexts, so today's brief can run on them too", async () => {
+    const { validateVersionedAdvisorDayContext } = await import("@cadence/core/services/advisor-day-context");
+    for (const fixture of briefEvalFixtures()) expect(() => validateVersionedAdvisorDayContext(structuredClone(fixture.context))).not.toThrow();
+  });
+});

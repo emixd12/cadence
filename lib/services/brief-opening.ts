@@ -37,7 +37,7 @@ Cadence has already worked out every suggested move for today. The person sees e
 
 Facts:
 - why: calendar_overlap (it runs into a calendar event), item_overlap (it runs into another item), travel_overlap (travel to or from somewhere crowds it), tight_transition (it leaves no time in between with the item or event next to it), time_passed (its time passed and it is still open), conflict_after_schedule_edit (a schedule change made it clash).
-- with: the calendar event, trip or item the move works around. Calendar events and trips are fixed; Cadence moves Behaviors around them, never the reverse. When with is given, name it in the reason, for example "It runs into your Team sync." When with is null, do not guess what it is.
+- with: what the move works around. Calendar events and trips are fixed; Cadence moves Behaviors around them, never the reverse. When with is an item's title, name it in the reason. When with is {event}, it is a calendar event or trip whose name you are not shown: write {event} exactly where its name goes, for example "It runs into {event}.", and Cadence fills in the name. When with is null, do not guess what it is. Never write {event} in the opening.
 - late: true means its time has passed and it is still open.
 - lengthGuessed: true means Cadence assumed the length; do not state the length as fact.
 
@@ -68,9 +68,16 @@ const URL = /https?:|www\.|\b[a-z0-9-]+\.(com|net|org|io|ai|app|co)\b/i;
 export type BriefOpeningRequest = Readonly<{ instructions: string; facts: string; labels: readonly string[] }>;
 
 /**
+ * Stands for a calendar event's or trip's name in the model's reasons. Calendar titles
+ * never reach the model (the Privacy text says the brief gets event timing only);
+ * Cadence puts the name in after the model answers.
+ */
+export const BRIEF_EVENT_PLACEHOLDER = "{event}";
+
+/**
  * The model input: the lines plus a compact view of today. Calendar events carry
- * times only (the server has no event titles); a title reaches the model only as a
- * line's `with`, which the screen sent for that request. Travel times never do.
+ * times only; an event or trip a line works around is shown as {event}. Travel
+ * times never reach the model.
  */
 export function prepareBriefOpening(input: Readonly<{
   context: AdvisorDayContext;
@@ -101,7 +108,7 @@ export function prepareBriefOpening(input: Readonly<{
     now: label(input.now),
     lines: input.lines.map((line) => ({
       key: line.key, title: line.title, now: spanLabel(line.from), newTime: spanLabel(line.to), why: line.reasonCode,
-      with: line.anchor?.title ?? null, lengthMinutes: line.length.minutes, lengthGuessed: line.length.assumed, late: line.late,
+      with: !line.anchor ? null : line.anchor.kind === "item" ? line.anchor.title : BRIEF_EVENT_PLACEHOLDER, lengthMinutes: line.length.minutes, lengthGuessed: line.length.assumed, late: line.late,
     })),
     conflicts: input.conflicts.map((conflict) => ({ title: conflict.title, now: spanLabel(conflict.at), with: conflict.conflictingTitle })),
     day: { items, busyCalendarTimes: busy, calendar: input.calendar },
@@ -109,8 +116,8 @@ export function prepareBriefOpening(input: Readonly<{
   return { instructions: BRIEF_OPENING_INSTRUCTIONS, facts: JSON.stringify(facts), labels: [...labels] };
 }
 
-export type BriefOpeningFallback = "opening_shape" | "opening_words" | "opening_time" | "opening_jargon" | "opening_url"
-  | "reason_missing" | "reason_words" | "reason_time" | "reason_jargon" | "reason_url" | "output_shape";
+export type BriefOpeningFallback = "opening_shape" | "opening_words" | "opening_time" | "opening_jargon" | "opening_url" | "opening_placeholder"
+  | "reason_missing" | "reason_words" | "reason_time" | "reason_jargon" | "reason_url" | "reason_placeholder" | "output_shape";
 
 export type BriefOpeningText = Readonly<{
   opening: string;
@@ -135,14 +142,20 @@ export function validateBriefOpening(output: unknown, input: Readonly<{
   const value = output as Record<string, unknown>;
   const fallbacks: BriefOpeningFallback[] = [];
   const allowed = new Set(input.labels);
-  const check = (text: unknown, kind: "opening" | "reason", maxWords: number, maxCharacters: number): string | null => {
+  const check = (text: unknown, kind: "opening" | "reason", maxWords: number, maxCharacters: number, event: string | null = null): string | null => {
     if (typeof text !== "string" || !text.trim()) { fallbacks.push(kind === "opening" ? "opening_shape" : "reason_missing"); return null; }
-    const trimmed = text.trim().replace(/\s+/g, " ");
+    const raw = text.trim().replace(/\s+/g, " ");
+    // {event} may stand only for the line's own calendar event or trip; any other brace is a slip.
+    if (/[{}]/.test(raw.replaceAll(BRIEF_EVENT_PLACEHOLDER, "")) || (raw.includes(BRIEF_EVENT_PLACEHOLDER) && event === null)) {
+      fallbacks.push(`${kind}_placeholder`); return null;
+    }
+    const trimmed = raw.replaceAll(BRIEF_EVENT_PLACEHOLDER, "\u0000");
     if (trimmed.length > maxCharacters || trimmed.split(" ").length > maxWords) { fallbacks.push(`${kind}_words`); return null; }
     if (URL.test(trimmed)) { fallbacks.push(`${kind}_url`); return null; }
     if (BRIEF_INTERNAL_WORDS.test(trimmed)) { fallbacks.push(`${kind}_jargon`); return null; }
     if (briefClockTimes(trimmed).some((item) => !allowed.has(item))) { fallbacks.push(`${kind}_time`); return null; }
-    return trimmed;
+    // The name goes in after the checks: it is the person's own text, not the model's.
+    return event === null ? trimmed : trimmed.replaceAll("\u0000", event);
   };
   const opening = check(value.opening, "opening", OPENING_MAX_WORDS, OPENING_MAX_CHARACTERS) ?? stock.opening;
   const given = new Map<string, unknown>();
@@ -155,7 +168,8 @@ export function validateBriefOpening(output: unknown, input: Readonly<{
   }
   const reasons: Record<string, string> = {};
   for (const line of input.lines) {
-    reasons[line.key] = check(given.get(line.key), "reason", REASON_MAX_WORDS, REASON_MAX_CHARACTERS) ?? line.reason;
+    const event = line.anchor && line.anchor.kind !== "item" ? line.anchor.title : null;
+    reasons[line.key] = check(given.get(line.key), "reason", REASON_MAX_WORDS, REASON_MAX_CHARACTERS, event) ?? line.reason;
   }
   return { opening, reasons, fallbacks, source: "model" };
 }

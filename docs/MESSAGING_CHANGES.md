@@ -121,6 +121,7 @@ Status values:
 | [P-059](#p-059-the-advisor-may-use-model-providers-other-than-openai) | The advisor may use model providers other than OpenAI | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ, user guide |
 | [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
 | [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
+| [P-065](#p-065-the-daily-brief-is-saved-for-the-day-can-be-refreshed-and-sends-less-to-the-model) | The Daily Brief is saved for the day, can be refreshed, and sends less to the model | logged | Advisor plan Phase 3 (3A2) | Privacy, Terms, in-app copy, FAQ, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1893,15 +1894,16 @@ cite has not changed.
 - **Related:** P-061, P-062.
 - **Status:** logged.
 
-## P-064: The Daily Brief is saved for the day, can be refreshed, and sends less to the model
+## P-065: The Daily Brief is saved for the day, can be refreshed, and sends less to the model
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3, 3A2). Cadence saves the shown
   Daily Brief on its servers for the rest of that local day so it reopens on any device with
   no new model call, then clears the text when the day ends (the run log keeps its usual 30
   days). A person can refresh the brief up to two times a day while the month's budget still
   covers the remaining morning briefs. The hosted brief now sends the model only today's
-  items (title, time, open or done), the proposed moves, and busy calendar times. A calendar
-  event's title is sent only when a proposed move works around that event. It no longer sends 90 days of completion history or analysis findings. The
+  items (title, time, open or done), the proposed moves, and busy calendar times. Calendar
+  event titles are never sent: the model writes a placeholder and Cadence fills in the event's
+  name after the reply comes back. It no longer sends 90 days of completion history or analysis findings. The
   "Suggestions never change the record" rule and the "Suggestions only. No changes were
   applied." line are gone, because a Yes now applies a move (P-061).
 - **Affected:** `lib/services/daily-brief.service.ts`, `lib/services/brief-opening.ts`,

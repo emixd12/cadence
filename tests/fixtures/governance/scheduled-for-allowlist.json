@@ -28,6 +28,7 @@
     "lib/db/noteShortcuts.repo.ts": 5,
     "lib/db/occurrences.repo.ts": 9,
     "lib/services/advisor-day-context.service.ts": 1,
+    "lib/services/advisor-eval/brief-fixtures.ts": 1,
     "lib/services/advisor-eval/fixtures.ts": 2,
     "lib/services/behaviorlog-import-write.service.ts": 1,
     "lib/services/brief-opening.ts": 1,

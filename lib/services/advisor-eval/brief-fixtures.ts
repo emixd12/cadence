@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
 import type { AdvisorDayContext, AdvisorOccurrence } from "@cadence/core/types/advisor-day-context";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE, BRIEF_MOVE_FALLBACK_MINUTES, type BriefMoveLength } from "@cadence/core/types/brief-moves";
 import type { BriefMoveCalendarBusy, BriefMoveDayItem, BriefMovePlanInputs } from "@cadence/core/resolvers/brief-move.resolver";
@@ -123,7 +124,14 @@ function build(id: BriefEvalFixtureId, base: AdvisorEvalFixtureId, description: 
 
 function withTitles(context: AdvisorDayContext, titles: Readonly<Record<string, string>>, behaviorOf: Readonly<Record<string, string>>): AdvisorDayContext {
   const occurrences = context.cadence.occurrences.map((item) => ({ ...item, title: titles[item.ref] ?? item.title, behaviorRef: behaviorOf[item.ref] ?? item.behaviorRef }));
-  return { ...context, cadence: { ...context.cadence, occurrences } };
+  // A Behavior split off for one item gets a history row of its own, as the context requires.
+  const rows = context.cadence.history.behaviors;
+  const added = Object.entries(behaviorOf).flatMap(([ref, behaviorRef]) => {
+    const source = rows.find((row) => row.behaviorRef === context.cadence.occurrences.find((item) => item.ref === ref)?.behaviorRef);
+    return source && !rows.some((row) => row.behaviorRef === behaviorRef) ? [{ ...source, behaviorRef }] : [];
+  });
+  return validateVersionedAdvisorDayContext(structuredClone({ ...context,
+    cadence: { ...context.cadence, occurrences, history: { ...context.cadence.history, behaviors: [...rows, ...added] } } }));
 }
 
 /** A day where nothing clashes: three Behaviors spread out, no calendar events in the way. */
