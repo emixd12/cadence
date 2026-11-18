@@ -697,6 +697,19 @@ export async function setBehaviorMovePreference(person: OccurrenceMoveCaller, be
   return { behaviorId, neverSuggestMove: row.never_suggest_move, updatedAt: row.updated_at };
 }
 
+// ------------------------------------------------------------------ maintenance
+
+/**
+ * Daily maintenance (service role): a line's calendar-derived reason or anchor title
+ * is kept for its own local day only. Each new brief also does this for its person.
+ */
+export async function purgeEndedBriefMoveText(serviceClient: AppSupabaseClient, signal?: AbortSignal): Promise<number> {
+  const request = serviceClient.rpc("purge_ended_brief_move_text");
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw error;
+  return typeof data === "number" ? data : 0;
+}
+
 // ------------------------------------------------------------------ helpers
 
 /** The person a client acts as, read through their own profile row (RLS shows only theirs). */
