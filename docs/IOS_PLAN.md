@@ -1,5 +1,7 @@
 # Cadence iOS running plan
 
+Covers the iPhone app, the Apple Watch app and the Mac App Store listing.
+
 Status: running plan. Not authorized for implementation. No iOS code, ticket or
 ticket number exists. Mobile stays out of scope in `AGENTS.md` until the owner
 activates this track.
@@ -26,8 +28,12 @@ This plan follows web development and never leads it. The `ios-plan-sync` skill
 Recorded November 18, 2026 (`docs/DECISIONS.md`, "Running iOS plan follows web
 development").
 
-1. iOS work starts when the web app has every beta launch feature. Not before.
-2. The iPhone app has feature parity with the web app.
+1. iOS work starts when the web app has every beta launch feature, on the
+   owner's instruction. The plan keeps no list of those features.
+2. The iPhone app has feature parity with the web app. The web app guides:
+   every addition to it must be reflected in the iPhone app. Parity includes
+   accounts, so the first iOS release has sign-in and sync (answered November
+   18, 2026).
 3. It adds platform features the web cannot have, such as Live Activities and
    live notifications.
 4. The Apple Watch app is a distinct feature, planned on its own.
@@ -35,19 +41,33 @@ development").
    storage, are candidates where they fit.
 6. This plan is downstream. It must not interfere with web development.
 
-D30.5 (November 13, 2026) also records an intended Mac App Store listing near
-launch and a possible Android app later. This plan covers neither.
+The Mac App Store listing (D30.5) is part of this plan since November 18,
+2026 (A.9). D30.5 also records a possible Android app later. This plan does
+not cover Android.
 
 ### A.2 Where the principles and the baseline differ
 
-These are open. Each has a matching row in A.6.
+Each has a matching row in A.6.
 
 | Topic | Baseline (Part B) | Principle | State |
 |---|---|---|---|
-| Accounts at first release | v1.0 is local-only with no login; accounts arrive in v1.1 | Parity with the web app, which requires an account | Open. Sign in with Apple is live on web since November 13, which removes one reason for the split. The sync-speed finding (B 0, fact 1) still stands |
+| Accounts at first release | v1.0 is local-only with no login; accounts arrive in v1.1 | Parity with the web app, which requires an account | Decided November 18, 2026: the first release has accounts. Part B's release split and milestone order are superseded and not yet redrawn (see "Consequences" below) |
 | Reuse of the web app | TypeScript core reused unchanged; screens rebuilt in SwiftUI; no web view | "Refactor the web app" | The baseline's finding holds: widgets, Live Activities, notification actions and the watch cannot run a web view. Rules carry over; screens do not |
-| Apple-provided storage | CloudKit out of scope; desktop SQLite store plus Supabase sync | Consider Apple-provided services | Open, to evaluate at activation. CloudKit cannot serve web users, so it would be a second sync system beside Supabase. SwiftData was not evaluated in October |
+| Apple-provided storage | CloudKit out of scope; desktop SQLite store plus Supabase sync | Consider Apple-provided services | Decided November 18, 2026: evaluate CloudKit and SwiftData. The evaluation runs at activation. Known going in: CloudKit cannot serve web users, so it would be a second sync system beside Supabase. SwiftData was not evaluated in October |
 | Watch timing | Native watch app in v1.0.x, after the iPhone app | Watch is a distinct feature | Consistent |
+
+Consequences of accounts in the first release. These follow from Part B's own
+findings and are not yet worked into Part B:
+
+- Sync is on the critical path. Part B found the shared sync planner about 10
+  times slower without JIT (B 0, fact 1), so the sync-path decision (B 14,
+  item 7) now gates the first release, not a later one.
+- The accounts prerequisites and accounts milestones (M7, M8) move ahead of the
+  first release.
+- App Review needs a reviewer sign-in path, in-app account deletion and the
+  Daily Brief AI consent at the first submission (B 7.1, B 7.2).
+- Part B's statement that a local-only v1.0 avoids these no longer applies.
+  Whether the app also works before sign-in, as the Mac app does, is open.
 
 ### A.3 Parity snapshot
 
@@ -105,7 +125,9 @@ asked to close one. A sync records it when web work closes one anyway.
 ### A.5 Web scope added since the baseline
 
 Shipped or decided after October 15, 2026. The baseline does not cover these.
-The "First note" column is the sync's reading, not a decision.
+All are in iOS scope (A.1, principle 2), except a row the web app itself does
+not offer. The "First note" column says how each might land. It is the sync's
+reading, not a design.
 
 | Addition | Reference | First note for iOS |
 |---|---|---|
@@ -117,23 +139,25 @@ The "First note" column is the sync's reading, not a decision.
 | Sign-in by email and Apple | Tickets 331–337, D31 | Web flow exists. iOS needs native Sign in with Apple and an email-code screen |
 | Settings regroup: four groups, auto-save | Tickets 301–309 | Supersedes the Settings layout the baseline assumed in IOS-196 |
 | One Daily Brief choice for all sources | Tickets 306, 307 | Changes the consent design in B 5.7 |
-| Daily Brief on the user's ChatGPT plan | Tickets 294–300, D27 | Mac only and hidden. Not applicable to iOS today |
+| Daily Brief on the user's ChatGPT plan | Tickets 294–300, D27 | Not a web feature: Mac only and hidden. Outside the parity rule today |
 | Duration estimates from descriptions | Ticket 188 | Shared core logic. No iOS-specific work expected |
 | Advisor per-day moves and Undo | D32, PRs #296 and #297 | New Timeline interactions. Not yet in the parity snapshot's review |
 
 ### A.6 Open owner decisions
 
 None is needed before activation. The first thirteen are Part B, Section 14.
-Rows 14–18 come from the first refresh.
+Rows 14–18 come from the first refresh; the owner answered them on November
+18, 2026 (`docs/DECISIONS.md`, "Owner answers on the running iOS plan").
 
 | # | Decision | State |
 |---|---|---|
-| 1–13 | Part B, Section 14 | Open. Item 13 is reworded: CI exists |
-| 14 | Accounts in the first iOS release, or local-only first (A.2) | Open |
-| 15 | Evaluate CloudKit and SwiftData against the SQLite store and Supabase sync (A.2) | Open |
-| 16 | iOS scope for each A.5 addition, at least Travel, leave reminders and connectors | Open |
-| 17 | Whether the Mac App Store listing (D30.5) joins this plan or gets its own | Open |
-| 18 | Activation trigger: the list of beta launch features that must be done first | Open. No such list is recorded on `main` |
+| 1–13 | Part B, Section 14 | Open. Item 13 is reworded: CI exists. Item 2 (releases) is partly superseded by row 14. Item 7 (sync path) now gates the first release |
+| 14 | Accounts in the first iOS release, or local-only first (A.2) | Decided: accounts in the first release |
+| 15 | Evaluate CloudKit and SwiftData against the SQLite store and Supabase sync (A.2) | Decided: evaluate them, at activation |
+| 16 | iOS scope for each A.5 addition | Decided: every web addition is in iOS scope. How each lands is designed at activation |
+| 17 | Whether the Mac App Store listing (D30.5) joins this plan or gets its own | Decided: it joins this plan (A.9) |
+| 18 | Activation trigger: which web features must be finished before iOS work starts | Decided: no list. iOS work starts on the owner's instruction |
+| 19 | Whether the iPhone app also works before sign-in, as the Mac app does | Open |
 
 ### A.7 Claims to recheck at activation
 
@@ -153,7 +177,26 @@ these when the track activates:
 
 | Date | Synced through | Changes |
 |---|---|---|
+| 2026-11-18 | `1f80c1c3` | Owner answers recorded: accounts in the first release, CloudKit and SwiftData to be evaluated, every web addition in iOS scope, Mac App Store listing joins the plan (A.9), activation on the owner's instruction with no feature list. Cursor unchanged |
 | 2026-11-18 | `1f80c1c3` | Restored the October 15 proposal from tag `archive/advisor-analysis-wip-2026-10-22` (`985b6862`). Renamed its proposed ticket numbers 188–211 to plan-local `IOS-` IDs. Added Part A. Corrected ten stale lines in Part B: Xcode, CI, Travel, Sign in with Apple and the AI disclosure |
+
+### A.9 Mac App Store listing
+
+Joined this plan on November 18, 2026. Nothing is designed yet. Part B does not
+cover it. Known inputs:
+
+- D30.5: the owner intends a Mac App Store listing near launch.
+- Cadence for Mac ships today as a notarized, directly distributed Tauri app
+  with its own updater (`docs/DESKTOP_RELEASE.md`).
+- `docs/LEGAL.md` records that App Store guideline 4.8 will bind a Mac App
+  Store build that offers Google sign-in, and that guideline 5.1.1(v) on
+  account deletion will apply.
+- B 3.1 turns off running the iPhone app on Apple silicon Macs, because the
+  native Mac app covers the Mac. That still holds.
+
+To establish at activation, none checked: App Sandbox requirements for the
+Tauri app, what replaces the built-in updater, whether the direct download
+continues beside the store build, and native Sign in with Apple on the Mac.
 
 ## Part B. Baseline proposal (October 15, 2026)
 
@@ -190,6 +233,10 @@ write to the iPhone app process.
 
 A local-only v1.0 needs no login, account deletion, or AI consent at review,
 and it does not wait for the sync work that the measurements require.
+
+Superseded November 18, 2026: the owner decided the first release has accounts
+(A.2). This release table and the milestone order in Section 12 are not yet
+redrawn.
 
 **Five facts that shaped the plan.**
 

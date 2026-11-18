@@ -3170,6 +3170,37 @@ Repositories: `lib/db/agent-runs.repo.ts`. Local verification:
 `tests/sql/advisor-1a-agent-foundations-smoke.sql` and
 `tests/agent-caller.local-integration.test.ts`.
 
+## Coach signals in shadow (advisor plan Phase 3, workstream 3D)
+
+Migration `20261118233000_coach_shadow_signals.sql`. Plan: the advisor three-agent
+design plan, "Persistent coach", "How it runs", steps 1 and 2 in shadow. Nothing is
+shown to the person; Phase 4 matches the signals to advice cards.
+
+- `cadence_advisor_private.coach_signals`: one row per signal per account per local
+  day. `kind` is `completion_drop`, `repeated_move`, `late_marking`,
+  `new_behavior_settled` or `brief_answers`; `behavior_id` is null for an
+  account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
+  local times of day only, never titles, notes or calendar data; `signal_version`
+  names the resolver version; `run_id` links the visit's `agent_runs` row. RLS on,
+  no policies, no grants to any API role. Rows older than 180 days are removed when
+  the same account is visited again.
+- `coach_due_accounts(after, limit)`: service role only. Returns user ids (in id
+  order after the cursor) and local dates for accounts where it is 03:00 to 05:59
+  local time, active in the last seven days (a status mark, a move or a sign-in),
+  with no successful visit that local day and fewer than three tries. Reads no
+  other column for the caller.
+- `coach_record_signals(run_id, signal_version, signals)`: coach token only, for an
+  unfinished coach run of the caller. Replaces that local day's signals, so a
+  re-run is safe.
+- Each visit is one `agent_runs` row: agent `coach`, trigger `scheduled`, no model
+  call. Thresholds and definitions: `packages/core/src/resolvers/coach-signals.resolver.ts`.
+  Job: `lib/services/coach-signals-job.service.ts` (database access in `lib/db/coach-signals.repo.ts`), hourly cron
+  `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
+  table exists (Phase 3A1) and each brief proposal's final status otherwise.
+- Account deletion cascades; deleting a Behavior removes its signals.
+
+Local verification: `tests/coach-signals.local-integration.test.ts`.
+
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 
 Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
