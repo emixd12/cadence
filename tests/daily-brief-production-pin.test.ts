@@ -11,6 +11,7 @@ import { connectorDayContext } from "./helpers/connector-day-context";
 // Ticket 290: production stays pinned to DAILY_BRIEF_MODEL, effort "low" and the layered
 // prompt. The hashes below were computed from the code before Ticket 290 changed the
 // consumer, the instructions module and the adapter. Any byte change fails these tests.
+// Updated Nov 16, 2026 (owner-approved plain-words rules from the model-graded eval, PR #293).
 const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), prepare: vi.fn(), current: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), config: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
@@ -81,7 +82,7 @@ function asPreAiSdkBody(body: string): string {
 
 describe("pinned production generation (Ticket 290)", () => {
   it("keeps the prompt revision value", () => {
-    expect(DAILY_BRIEF_PROMPT_REVISION).toBe("5588d260d8e145ad");
+    expect(DAILY_BRIEF_PROMPT_REVISION).toBe("5fdc1c2ec78153e9");
   });
 
   it("sends the same request body from the production path as before Ticket 290", async () => {
@@ -97,9 +98,9 @@ describe("pinned production generation (Ticket 290)", () => {
       hashes.push(sha(asPreAiSdkBody(bodies[0]!)));
     }
     expect(hashes).toEqual([
-      "203330927b3fc0e3034e81a003667f7cbf746fe2721ea539647f20067ff1cded",
-      "e6e17fb33c4e7161b180231df2eb5a56d93aa29e0dfb09873b561d4e0721a33d",
-      "0555944f7d104df2384a9e69408539f760ee93abfe6ceab1fb918c8a769426d2",
+      "f0191748c97b32c58d73822fe2070c640a42cca5b9249dbac0e471d44c00c554",
+      "121be422cd65edd8fdbc6e25a950737a516a4427b9f145c9b8bf064f6d8985c6",
+      "013197ab2ea5c6d7c7eeace7c45655f50ad2e1c92e99c7dd854ceccd5daf3183",
     ]);
   });
 
@@ -115,6 +116,6 @@ describe("pinned production generation (Ticket 290)", () => {
       }
     }
     expect(all.length).toBeGreaterThan(20);
-    expect(sha(all.join("\0"))).toBe("9b02eab2c72fbcca7c3c64f586cb7ed4f69a6e250ee984dbea081a595dd3e532");
+    expect(sha(all.join("\0"))).toBe("10c295dca3a5882d0e292942a79c079714889d6cffb4d4e8fdd0db7b3a3b1618");
   }, 120_000);
 });

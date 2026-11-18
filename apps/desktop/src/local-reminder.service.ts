@@ -74,7 +74,7 @@ async function reconcile(now: Temporal.Instant): Promise<LocalReminderResult> {
     startLocalDate: "0001-01-01", endLocalDate: "9999-12-31" });
   // Advisor Phase 2B: a moved Occurrence reminds at its moved time. Only unresolved rows can remind.
   const occurrences = [...stored.filter((row) => row.status !== "unresolved"),
-    ...await withLocalMoves(profileId, stored.filter((row) => row.status === "unresolved"), graphs.map(({ behavior }) => behavior))];
+    ...await withLocalMoves(profileId, stored.filter((row) => row.status === "unresolved"))];
   const targetThrough = now.toZonedDateTimeISO(profile.timezone).add({ days: 30 }).toInstant();
   const requests = planNativeReminderRequests({ behaviors: graphs.map(({ behavior }) => behavior), occurrences, now, targetThrough });
   const context = { requests, now, targetThrough };

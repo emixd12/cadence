@@ -944,6 +944,66 @@ note-only updates preserve lineage. The generation-plan boundary performs its
 guarded snapshot update first, then restores the verified current event in a
 separate lineage-only update within the same transaction.
 
+### Per-day moves (advisor Phase 2A)
+
+Migrations `20261117100000_occurrence_moves.sql` and
+`20261117105000_occurrence_move_supersede_records.sql`. Rules for when a move is
+allowed live in `docs/DATETIME_STRATEGY.md`, "Moves".
+
+A move changes when one Occurrence happens on its own day. It never changes
+`scheduled_for`, the schedule snapshot or the Occurrence's identity, so
+generation, account sync and restore keep treating the row as planned.
+
+**`occurrences.effective_start_at`, `occurrences.effective_end_at`** (both
+`timestamptz`, nullable, set together, end not before start). Null means the
+Occurrence sits at its planned time. Only the move functions write them: the
+`keep_occurrence_effective_time` trigger ignores any other writer unless the
+transaction sets `cadence.occurrence_move_write`, and `authenticated` has no
+column privilege on them. Readers use `effectiveStartAt` and `effectiveEndAt` in
+`packages/core/src/resolvers/time.resolver.ts`.
+
+**`occurrence_moves`**: one append-only row per applied change, owned by
+`user_id`, read by the owner through RLS, written only by security-definer
+functions. Each Occurrence has a chain (`chain_root_id`, `chain_position` 1, 2,
+3..., `revises_move_id` pointing at the previous record).
+- `kind`: `move` (new time), `revert` (Undo back to the plan, `to_planned`
+  true) or `supersede` (written by the server, `source` = `system`, when the
+  Behavior's timezone changes).
+- `timezone`, `local_date`, `weekday`: where and when the record applies.
+- `from_*` and `to_*` instants with `from_planned` and `to_planned`, and
+  `duration_source` for where the length came from.
+- `reason` (planner code), `source` (`daily_brief`, `coach`, `chat`, `mcp`,
+  `person`, `system`), `proposal_id`.
+- `client_ref`, `idempotency_key`, `request_hash`: writer replay protection,
+  never synced or exported.
+- `occurrence_id` has no foreign key, so a removed Occurrence keeps its history.
+The latest record of a chain decides effective time on the server and on every
+device: a `move` places the Occurrence at `to_start_at`; `revert` and
+`supersede` return it to the plan.
+
+**Timezone change.** Changing a Behavior's timezone appends a `supersede` record
+to each unresolved moved Occurrence and clears its effective time. Resolved
+Occurrences keep their moved time as history. Changing back does not revive the
+move, because the chain now ends in the supersede.
+
+**`occurrence_move_reasons`**: the optional reason chip a person tapped after a
+move (`running_late`, `conflict`, `low_energy`, `other`). One per move; the first
+tap is kept. Cascades with its move.
+
+**`move_proposals`**: what an agent offered (`source` `daily_brief`, `coach`,
+`chat`) and what the person did with it (`status`). Server only, mutable status,
+never synced. Links to the move it produced through `move_id`.
+
+**`move_conflicts`**: a notice that a later base-schedule change put another
+Occurrence of the same Behavior next to a moved one on the same day. `status`
+`open` until the person keeps, reverts or moves it, or it clears on its own.
+
+**Account sync.** Contract 6 adds `occurrence_move` rows, read-only, without
+`user_id`, `client_ref`, `idempotency_key`, `request_hash` or `proposal_id`.
+Occurrence rows in the snapshot never carry effective time; each device derives
+it from the synced chain with `effectiveTimeFromMoves`. Reasons, proposals and
+conflicts are not synced.
+
 ### `occurrence_time_sessions`
 
 ```sql

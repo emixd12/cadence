@@ -24,7 +24,7 @@ export type OccurrenceSourceMatchRecord = {
 /** Advisor Phase 2B: a read-only copy of a hosted per-day move record, received through account sync. */
 export type OccurrenceMoveRecord = {
   id: string; user_id: string; occurrence_id: string; behavior_id: string; local_date: string; weekday: number;
-  timezone: string; kind: "move" | "revert"; from_start_at: string; from_end_at: string; from_planned: boolean;
+  timezone: string; kind: "move" | "revert" | "supersede"; from_start_at: string; from_end_at: string; from_planned: boolean;
   to_start_at: string; to_end_at: string; to_planned: boolean; duration_source: string; revises_move_id: string | null;
   chain_root_id: string; chain_position: number; reason: string | null; source: string; created_at: string;
 };

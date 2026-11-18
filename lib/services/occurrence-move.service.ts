@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   effectiveEndAt,
@@ -110,7 +111,7 @@ export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request
   // The database answers the basic refusals (resolved, not today, changed since read,
   // time passed). The slot check runs only on a request that passes those, so its
   // reason never hides a more basic one.
-  const day = await dayOccupants(caller, occurrence, behavior);
+  const day = await dayOccupants(caller, occurrence);
   if (passesBasicRules(caller, occurrence, behavior, request.expectedRevision, requestedStart)) {
     const slot = checkMoveSlot({ occurrenceId: occurrence.id, interval, others: day, calendarBusy: request.calendarBusy });
     if (!slot.ok) {
@@ -138,8 +139,7 @@ export async function revertOccurrenceMove(caller: OccurrenceMoveCaller, request
     p_occurrence_id: request.occurrenceId,
     p_expected_revision: request.expectedRevision,
     ...(request.moveId ? { p_move_id: request.moveId } : {}),
-    ...(request.idempotencyKey ? { p_idempotency_key: request.idempotencyKey } : {}),
-    ...(request.requestHash ? { p_request_hash: request.requestHash } : {}),
+    ...keyParams("revert_occurrence_move", request),
   });
   if (error) throw mapRpcError(error);
   const result = readFunctionResult(data, caller.userId);
@@ -175,7 +175,7 @@ export async function suggestOccurrenceMoveTimes(
   const current = effectiveStartInstant(occurrence);
   const requestedStart = Temporal.Instant.compare(current, caller.now) > 0 ? current : caller.now;
   const duration = await moveDuration(caller, occurrence, behavior);
-  const day = await dayOccupants(caller, occurrence, behavior);
+  const day = await dayOccupants(caller, occurrence);
   return moveAlternatives({
     localDate: occurrence.local_date, timezone: behavior.timezone, requestedStart, durationSeconds: duration.seconds,
     now: caller.now, blocks: [...day, ...(request.calendarBusy ?? [])], limit: (request.limit ?? 3) + 1,
@@ -244,14 +244,16 @@ async function moveDuration(caller: OccurrenceMoveCaller, occurrence: Occurrence
 }
 
 /**
- * The day's other Unresolved Occurrences at their effective times. An item with no
- * known length occupies only its start instant.
+ * The other Unresolved Occurrences from the day before to the day after, at their
+ * effective times. Neighbouring days stay in, so a move near midnight still sees an
+ * item that starts just after it or one that runs past midnight; the overlap check
+ * decides whether they block. An item with no known length occupies only its start.
  */
-async function dayOccupants(caller: OccurrenceMoveCaller, occurrence: Occurrence, behavior: BehaviorWithCategory): Promise<MoveOccupant[]> {
+async function dayOccupants(caller: OccurrenceMoveCaller, occurrence: Occurrence): Promise<MoveOccupant[]> {
   const rows = await listOccurrencesAround(caller, occurrence.local_date);
   const open = rows.filter((row) => row.id !== occurrence.id && row.status === "unresolved");
   const lengths = await behaviorLengths(caller, open);
-  return occupants(open, lengths).filter((item) => localDateAt(item.start, behavior.timezone) === occurrence.local_date);
+  return occupants(open, lengths);
 }
 
 type BehaviorLength = Readonly<{ minutes: number | null; timezone: string }>;
@@ -356,11 +358,36 @@ async function callMoveFunction(
     p_duration_source: duration.source,
     ...(request.reason ? { p_reason: request.reason } : {}),
     ...(request.proposalId ? { p_proposal_id: request.proposalId } : {}),
-    ...(request.idempotencyKey ? { p_idempotency_key: request.idempotencyKey } : {}),
-    ...(request.requestHash ? { p_request_hash: request.requestHash } : {}),
+    ...keyParams("move_occurrence_for_day", request),
   });
   if (error) throw mapRpcError(error);
   return readFunctionResult(data, caller.userId);
+}
+
+/**
+ * The database needs a request hash with every idempotency key. Integration callers
+ * pass the hash of their validated input; other callers (the web actions) get a hash
+ * of the request itself, so the same key with different details is refused.
+ */
+function keyParams(operation: string, request: OccurrenceMoveRequest | OccurrenceRevertRequest) {
+  if (!request.idempotencyKey) return {};
+  const details = { ...request, idempotencyKey: undefined, requestHash: undefined };
+  return {
+    p_idempotency_key: request.idempotencyKey,
+    p_request_hash: request.requestHash
+      ?? createHash("sha256").update(canonicalJson({ operation, request: details })).digest("hex"),
+  };
+}
+
+function canonicalJson(value: unknown): string {
+  if (value instanceof Temporal.Instant) return JSON.stringify(value.toString());
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value).filter(([, item]) => item !== undefined && item !== null)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 /** Reminders follow the item's new time; a time already passed gets none. */

@@ -9,6 +9,7 @@ import { registerOAuthClient, approveOAuthConsent } from "@/lib/db/oauth.repo";
 import { writeOperationHandlers } from "@/lib/integrations/operations/write";
 import { readOperationHandlers } from "@/lib/integrations/operations/read";
 import { applyOccurrenceStatusTransition } from "@/lib/services/occurrence.service";
+import { moveOccurrenceForDay, revertOccurrenceMove } from "@/lib/services/occurrence-move.service";
 
 // Advisor Phase 2A move-on checks against an isolated local Supabase:
 //   - an MCP client moves and undoes today's item and sees effective_start_at;
@@ -171,5 +172,46 @@ localDescribe("per-day moves on isolated local Supabase (advisor Phase 2A)", () 
     expect(undone.move).toMatchObject({ kind: "revert", to_planned: true, chain_position: 2 });
     const reminder = await admin.from("reminder_deliveries").select("scheduled_send_at").eq("occurrence_id", planned!.id).eq("status", "pending");
     expect(reminder.data?.map((row) => Temporal.Instant.from(row.scheduled_send_at).toString())).toEqual([localInstant("13:00")]);
+  }, 60_000);
+
+  it("refuses a late move that runs into tomorrow's first item", async () => {
+    const midnight = (await call("create_behavior", {
+      title: "Move midnight read", default_duration_minutes: 20,
+      schedules: [{ recurrence: { frequency: "daily", interval: 1 }, time_entries: [{ kind: "exact", start_time: "00:00" }] }],
+    })).behavior;
+    const tomorrow = Temporal.PlainDate.from(today).add({ days: 1 }).toString();
+    const next = await admin.from("occurrences").select("id").eq("behavior_id", midnight.id).eq("local_date", tomorrow);
+    expect(next.data).toHaveLength(1);
+    const late = (await call("create_behavior", {
+      title: "Move late walk", default_duration_minutes: 30,
+      schedules: [{ recurrence: { frequency: "daily", interval: 1 }, time_entries: [{ kind: "exact", start_time: "20:00" }] }],
+    })).behavior;
+    const [planned] = await occurrencesToday(late.id);
+    const read = await readOperationHandlers.get_occurrence({ ...mcp, now: new Date() }, { occurrence_id: planned!.id });
+    if (!read.ok) throw new Error("get_occurrence failed");
+    const refused = await call("move_occurrence_for_day", { occurrence_id: planned!.id, start_time: "23:45", expected_revision: read.value.occurrence.revision });
+    expect(refused).toMatchObject({ outcome: "refused", refusal: { reason: "slot_taken" } });
+    const fits = await call("move_occurrence_for_day", { occurrence_id: planned!.id, start_time: "23:15", expected_revision: read.value.occurrence.revision });
+    expect(fits.outcome).toBe("moved");
+  }, 60_000);
+
+  it("accepts an idempotency key from a caller that sends no request hash, as the web actions do", async () => {
+    const behavior = (await call("create_behavior", {
+      title: "Move web tidy",
+      schedules: [{ recurrence: { frequency: "daily", interval: 1 }, time_entries: [{ kind: "exact", start_time: "14:00" }] }],
+    })).behavior;
+    const [planned] = await occurrencesToday(behavior.id);
+    const caller = { supabase: mcp.supabase, userId, now: Temporal.Now.instant() };
+    const request = { occurrenceId: planned!.id, expectedRevision: planned!.updated_at, startTime: "18:00", idempotencyKey: "web-tidy-18" };
+    const moved = await moveOccurrenceForDay(caller, request);
+    expect(moved.outcome).toBe("moved");
+    if (moved.outcome === "refused") throw new Error("move refused");
+    const replay = await moveOccurrenceForDay(caller, request);
+    expect(replay).toMatchObject({ outcome: "moved", replayed: true, move: { id: moved.move.id } });
+    await expect(moveOccurrenceForDay(caller, { ...request, startTime: "19:00" })).rejects.toThrow();
+    const undone = await revertOccurrenceMove(caller, {
+      occurrenceId: planned!.id, expectedRevision: moved.occurrence.updated_at, idempotencyKey: "web-tidy-undo",
+    });
+    expect(undone.outcome).toBe("undone");
   }, 60_000);
 });

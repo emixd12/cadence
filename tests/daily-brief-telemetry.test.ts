@@ -26,6 +26,10 @@ describe("AI SDK usage parsing (Phase 1B)", () => {
     expect(parseUsage({ inputTokens: 1200, inputTokenDetails: { cacheReadTokens: 300 }, outputTokens: 150, outputTokenDetails: { reasoningTokens: 64 } }))
       .toEqual({ inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
   });
+  it("adds cache writes only when the provider reports some", () => {
+    expect(parseUsage({ inputTokens: 1200, inputTokenDetails: { cacheReadTokens: 0, cacheWriteTokens: 900 }, outputTokens: 150 }))
+      .toEqual({ inputTokens: 1200, cachedInputTokens: 0, cacheWriteTokens: 900, outputTokens: 150, reasoningTokens: null });
+  });
   it("turns missing or malformed counts into null and a missing object into null", () => {
     expect(parseUsage({ inputTokens: 10, outputTokens: -1, outputTokenDetails: { reasoningTokens: 1.5 } }))
       .toEqual({ inputTokens: 10, cachedInputTokens: null, outputTokens: null, reasoningTokens: null });

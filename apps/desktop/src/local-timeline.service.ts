@@ -21,7 +21,7 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
     localCommand("readOccurrences", { profileId, startLocalDate: "0001-01-01", endLocalDate: priorDate, status: "unresolved" }),
   ]);
   // Advisor Phase 2B: a moved Occurrence sits at its moved time; the planned time stays on the row.
-  const occurrences = await withLocalMoves(profileId, [...priorUnresolved, ...visibleOccurrences], graphs.map(({ behavior }) => behavior));
+  const occurrences = await withLocalMoves(profileId, [...priorUnresolved, ...visibleOccurrences]);
   const history = await localCommand("readOccurrenceHistory", { profileId, occurrenceIds: occurrences.map(({ id }) => id) });
   const historyOccurrences = await localCommand("readOccurrences", { profileId,
     startLocalDate: Temporal.PlainDate.from(window.startLocalDate).subtract({ days: 90 }).toString(), endLocalDate: priorDate });

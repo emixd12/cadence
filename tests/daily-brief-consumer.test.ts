@@ -83,6 +83,8 @@ describe("Daily Brief model adapter (Phase 1B, AI SDK)", () => {
     const body = JSON.parse(options!.body as string);
     expect(body).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 2000 });
     expect(JSON.stringify(body.system)).toContain(input.instructions.slice(0, 40));
+    // The shared instructions end in a cache breakpoint, so later briefs read them at the cached rate.
+    expect(body.system.at(-1)).toMatchObject({ cache_control: { type: "ephemeral" } });
     expect(usage[0]).toMatchObject({ inputTokens: 1_000, cachedInputTokens: 400, outputTokens: 120 });
     await expect(generateDailyBriefWithModel(input, { env: ANTHROPIC_ENV, fetch: async () => Response.json(anthropicReply(advice, undefined, "max_tokens")), model: "anthropic/claude-sonnet-5.5" }))
       .rejects.toMatchObject({ code: "advisor_unavailable", reason: "provider_incomplete_max_output_tokens" });
