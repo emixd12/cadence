@@ -81,6 +81,8 @@ export type BriefMoveLine = Readonly<{
   proposalId: string;
   occurrenceId: string;
   behaviorId: string;
+  /** The Behavior's revision (`updated_at`) when the line was built. Send it with a length correction. */
+  behaviorRevision: string;
   /** The Behavior's title, from Cadence's records, never from model text. */
   title: string;
   localDate: string;
