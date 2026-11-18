@@ -193,6 +193,18 @@ describe("bubble", () => {
     expect(text).not.toMatch(/read-only|Suggestions only/i);
   });
 
+  it("shows Cadence's notices in the alert style, without repeating a stale calendar the lines already show", async () => {
+    const briefing = { ...BRIEF_MOVE_FIXTURE_BRIEFING, moves: { ...BRIEF_MOVE_FIXTURE, calendar: "stale" as const },
+      notices: [{ kind: "calendar_stale", text: "Your calendar did not load." }, { kind: "budget_reached", text: "The written brief returns December 1." }] };
+    await act(() => root.render(<RefreshProvider onRefresh={refresh}>
+      <DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
+        moves={{ client: fixtureBriefMoveClient(), planningContext: () => context }} />
+    </RefreshProvider>));
+    expect(container.querySelector("[data-alert-kind='budget_reached']")!.textContent).toContain("The written brief returns December 1.");
+    expect(container.querySelectorAll("[data-alert-kind='data_stale']")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Your calendar did not load.");
+  });
+
   it("hides move lines from a client that cannot answer them", async () => {
     await act(() => root.render(<RefreshProvider onRefresh={refresh}>
       <DailyBriefBubble state="ready" briefing={BRIEF_MOVE_FIXTURE_BRIEFING} onDismiss={() => undefined} />

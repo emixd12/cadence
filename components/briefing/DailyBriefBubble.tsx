@@ -125,6 +125,8 @@ export function DailyBriefBubble({
             </p>
             {refresh?.error ? <AlertNotice kind="write_refused" label="Not refreshed" size="compact" className="mt-1">{refresh.error}</AlertNotice> : null}
             {briefing.warnings.length ? <p className="mt-1 text-xs leading-5 text-muted-readable">{briefing.warnings.join(" ")}</p> : null}
+            {briefNotices(briefing, Boolean(moves)).map((notice) => <AlertNotice key={notice.kind} kind={NOTICE_KIND[notice.kind]} size="compact" className="mt-1"
+              label={notice.kind === "calendar_stale" ? "Calendar not current" : undefined}>{notice.text}</AlertNotice>)}
             {plan?.usage === "plan" ? <p className="mt-2 flex flex-wrap items-center gap-x-3 border-t border-line pt-2 text-xs leading-5" data-brief-plan="plan">
               <span>Using ChatGPT plan</span>
               <button type="button" onClick={plan.onManageUsage} className="min-h-11 underline">Manage usage</button>
@@ -163,4 +165,16 @@ function NamedText({ text, names }: Readonly<{ text: string; names: readonly str
 /** Ticket 272: the departure model's sentence. The mode advice shows in development builds only (Ticket 260). */
 function travelLine(item: BriefTravelGuidanceItem, developmentBuild: boolean): string {
   return item.weather ? `${item.phrase} ${travelWeatherMarginText(item.weather, { developmentBuild })}` : item.phrase;
+}
+
+/** Advisor Phase 3 (3A2): Cadence's own notices about today's brief, read defensively for older servers. */
+type BriefNotice = Readonly<{ kind: "calendar_stale" | "budget_reached" | "words_unavailable"; text: string; until?: string }>;
+const NOTICE_KIND: Readonly<Record<BriefNotice["kind"], "data_stale" | "budget_reached" | "model_failed">> = {
+  calendar_stale: "data_stale", budget_reached: "budget_reached", words_unavailable: "model_failed",
+};
+function briefNotices(briefing: DailyBriefing, movesShown: boolean): readonly BriefNotice[] {
+  const notices = (briefing as DailyBriefing & { notices?: readonly BriefNotice[] }).notices ?? [];
+  // The move lines already say the calendar is stale; do not say it twice.
+  const lineSaysStale = movesShown && briefing.moves?.calendar === "stale";
+  return notices.filter((notice) => notice.kind in NOTICE_KIND && typeof notice.text === "string" && !(lineSaysStale && notice.kind === "calendar_stale"));
 }

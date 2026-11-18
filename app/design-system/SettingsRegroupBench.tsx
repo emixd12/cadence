@@ -153,7 +153,7 @@ function DailyBriefSketch({ state }: Readonly<{ state: SettingsFixtureState }>) 
             <input type="checkbox" defaultChecked disabled={!enabled || !useSources} />{source.title}</label></li>)}
         </ul>
       </details> : null}
-      <p className="text-muted-readable">The brief is read-only. It can suggest, and it never changes your tracking or your calendar.</p>
+      <p className="text-muted-readable">The brief can move items for today when you say Yes. It never changes your base schedule or your calendar.</p>
     </div>
   );
 }
