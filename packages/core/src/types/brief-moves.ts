@@ -81,6 +81,8 @@ export type BriefMoveLine = Readonly<{
   proposalId: string;
   occurrenceId: string;
   behaviorId: string;
+  /** The Behavior's revision (`updated_at`) when the line was built. Send it with a length correction. */
+  behaviorRevision: string;
   /** The Behavior's title, from Cadence's records, never from model text. */
   title: string;
   localDate: string;
@@ -209,8 +211,11 @@ export type BriefMoveAnswerResponse = Readonly<{
   batchId: string | null;
   /** True when the same idempotency key was already answered; nothing new was applied. */
   replayed: boolean;
-  /** Whether the person had moved anything before this answer (the one-time first-move line). */
-  firstMove: boolean;
+  /**
+   * True when this answer applied the person's first move ever (brief and self-moves
+   * both count): show the one-time line "This changes today only. Your schedule stays."
+   */
+  showFirstMoveLine: boolean;
 }>;
 
 // ---------------------------------------------------------------- Re-plan and length
