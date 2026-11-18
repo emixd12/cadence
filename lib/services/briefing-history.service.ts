@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { createHash, randomUUID } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
@@ -237,7 +238,7 @@ function retrospectiveAnalysis(rows: AccountRows, analysis: Awaited<ReturnType<t
   const occurrences = rows.occurrences.filter(row => row.local_date >= start && row.local_date < context.localDate);
   const ids = new Set(occurrences.map(row => row.id));
   return projectBriefingAnalysisSource({ timezone: context.timezone, observedAt: context.capturedAt, revision: digest([occurrences, analysis]),
-    occurrences: occurrences.map(row => ({ id: row.id, behaviorId: row.behavior_id, localDate: row.local_date, scheduledFor: row.scheduled_for, scheduleKind: row.schedule_kind,
+    occurrences: occurrences.map(row => ({ id: row.id, behaviorId: row.behavior_id, localDate: row.local_date, scheduledFor: effectiveStartAt(row), scheduleKind: row.schedule_kind,
       scheduleStartTime: row.schedule_start_time, scheduleEndTime: row.schedule_end_time, status: row.status, statusMarkedAt: row.status_marked_at, configurationEventId: row.behavior_configuration_event_id })),
     statusEvents: analysis.statusEvents.filter(row => ids.has(row.occurrence_id)).map(row => ({ id: row.id, occurrenceId: row.occurrence_id, previousStatus: row.previous_status,
       status: row.status, semantics: row.status_semantics, recordedAt: row.recorded_at, revisesEventId: row.revises_event_id })),
@@ -320,7 +321,7 @@ function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logi
     const behavior = byId.get(row.behavior_id);
     if (!behavior || (row.schedule_kind !== "exact" && row.schedule_kind !== "range") || !["unresolved", "completed", "not_completed"].includes(row.status)) throw new DailyBriefError("context_changed");
     const configured = resolveBehaviorDurationSources({ behaviorId: behavior.id, defaultDurationMinutes: behavior.default_duration_minutes, occurrences: [], now: logical, timezone }).configuredDefault;
-    return { id: row.id, behaviorId: row.behavior_id, title: behavior.title, status: row.status as OccurrenceStatus, localDate: row.local_date, scheduledFor: row.scheduled_for,
+    return { id: row.id, behaviorId: row.behavior_id, title: behavior.title, status: row.status as OccurrenceStatus, localDate: row.local_date, scheduledFor: effectiveStartAt(row),
       scheduleKind: row.schedule_kind as "exact" | "range", scheduleStartTime: row.schedule_start_time, scheduleEndTime: row.schedule_end_time, duration: configured ?? unknownAverage,
       durationCandidates: { configuredDefault: configured ? { kind: "known" as const, seconds: configured.seconds, source: "behavior_default" as const, sampleCount: 0, lookbackDays: 90 as const } : null,
         historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0, lookbackDays: 90 as const } } };

@@ -92,7 +92,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.2.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.3.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -111,6 +111,8 @@ Contract version: `1.2.0`. Generated from `packages/core/src/integration/`.
 | `fetch` | Fetch Cadence record | `cadence.read` | yes | no | yes |
 | `set_occurrence_status` | Set Occurrence status | `cadence.occurrences.write` | no | yes | yes |
 | `update_occurrence_note` | Update Occurrence note | `cadence.occurrences.write` | no | yes | yes |
+| `move_occurrence_for_day` | Move Occurrence for today | `cadence.occurrences.write` | no | yes | no |
+| `revert_occurrence_move` | Undo Occurrence move | `cadence.occurrences.write` | no | yes | no |
 | `update_day_note` | Update day note | `cadence.occurrences.write` | no | yes | yes |
 | `create_behavior` | Create Behavior | `cadence.behaviors.write` | no | no | no |
 | `update_behavior` | Update Behavior | `cadence.behaviors.write` | no | yes | yes |
@@ -124,7 +126,7 @@ Every tool sets `openWorldHint: false`.
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
 | `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `update_day_note` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior` |
 
 ## Error catalog
@@ -245,7 +247,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.2.0"` |
+| `contract_version` | yes | `"1.3.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -557,6 +559,61 @@ Output:
 |---|---|---|
 | `occurrence` | yes | object |
 | `changed` | yes | boolean |
+
+### `move_occurrence_for_day`
+
+**Move Occurrence for today.** Moves one of today's Unresolved Occurrences to another start time today. Only that day changes: the Behavior's schedule and the planned time stay the same, and `effective_start_at` shows the new time. The item keeps its length. Reminders follow the new time. Send the `revision` you last read as `expected_revision`. When a rule stops the move (the time has passed, something else is already there, the item changed since you read it), nothing changes and `refusal` explains why and offers up to three free times. Use revert_occurrence_move to undo it.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint false, openWorldHint false
+- Annotation rationale: Changes where today's Occurrence sits, so readOnlyHint is false. The planned time and the Behavior's schedule never change and revert_occurrence_move undoes a move, but Claude's review criteria ask for destructiveHint true on tools that modify data, so it is set. The same idempotency key returns the first result, but a call without one makes a new move each time, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`
+- Since: 1.3.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `occurrence_id` | yes | string (uuid) |
+| `start_time` | yes | string |
+| `expected_revision` | yes | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `outcome` | yes | `moved`, `refused` |
+| `occurrence` | yes | object |
+| `move` | yes | object or null |
+| `refusal` | yes | object or null |
+
+### `revert_occurrence_move`
+
+**Undo Occurrence move.** Undoes the latest move of one of today's Unresolved Occurrences, putting it back where it was before that move: its planned time, or an earlier move. Only the latest move can be undone. When there is nothing to undo or the item changed since you read it, nothing changes and `refusal` explains why.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint false, openWorldHint false
+- Annotation rationale: Changes where today's Occurrence sits, so readOnlyHint is false. The planned time and the Behavior's schedule never change and a later move can redo it, but Claude's review criteria ask for destructiveHint true on tools that modify data, so it is set. The same idempotency key returns the first result, but a call without one makes a new move each time, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`
+- Since: 1.3.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `occurrence_id` | yes | string (uuid) |
+| `expected_revision` | yes | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `outcome` | yes | `undone`, `refused` |
+| `occurrence` | yes | object |
+| `move` | yes | object or null |
+| `refusal` | yes | object or null |
 
 ### `update_day_note`
 

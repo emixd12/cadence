@@ -305,6 +305,37 @@ export const occurrenceScheduleOutput = object({
   label: string(),
 });
 
+/**
+ * Why a move or Undo was refused. Kept equal to `MOVE_REFUSAL_REASONS` in
+ * `resolvers/move.resolver.ts` (tests/move.resolver.test.ts checks it).
+ */
+export const MOVE_REFUSAL_REASON_VALUES = [
+  "occurrence_resolved", "not_today", "revision_changed", "range_behavior", "start_not_on_day", "time_passed",
+  "no_change", "nothing_to_undo", "not_latest_move", "slot_taken", "calendar_busy",
+] as const;
+
+export const MOVE_SOURCE_VALUES = ["daily_brief", "coach", "chat", "mcp", "person"] as const;
+
+/** One record of an Occurrence's per-day move history (a move or an Undo). */
+export const occurrenceMoveRecordOutput = object({
+  id: uuid(),
+  kind: enumOf(["move", "revert"] as const, { description: "`revert` is an Undo of the latest move." }),
+  from_start_at: utcInstant("Start before this record."),
+  to_start_at: utcInstant("Start after this record."),
+  to_end_at: utcInstant("End after this record."),
+  to_planned: boolean({ description: "True when this record put the Occurrence back at its planned time." }),
+  chain_position: integer({ minimum: 1, description: "1 for the day's first move or Undo, then 2, 3, and so on." }),
+  source: enumOf(MOVE_SOURCE_VALUES, { description: "Who made it: the person, Cadence's advisor, or an outside client." }),
+  created_at: utcInstant(),
+});
+
+/** A per-day move as an Occurrence shows it (contract 1.3.0). */
+export const occurrenceMoveSummary = object({
+  planned_start_at: utcInstant("The planned start. It does not change when the item moves."),
+  start_at: utcInstant("The moved start."),
+  end_at: utcInstant("The moved end. A move keeps the item's length."),
+});
+
 export const occurrenceShape = {
   id: uuid(),
   behavior_id: uuid(),
@@ -312,7 +343,9 @@ export const occurrenceShape = {
   category_name: nullable(string()),
   local_date: localDate(),
   timezone: timezone(),
-  scheduled_for: utcInstant("Scheduled start as a UTC instant."),
+  scheduled_for: utcInstant("Planned start as a UTC instant. It never changes when the Occurrence is moved for the day."),
+  effective_start_at: utcInstant("Where the Occurrence sits today: its moved start when `move` is set, otherwise the planned start. Show, remind and match by this time."),
+  move: nullable(occurrenceMoveSummary, { description: "Set while a per-day move places the Occurrence away from its planned time. Null otherwise." }),
   schedule: occurrenceScheduleOutput,
   status: occurrenceStatus("Stored status."),
   status_label: enumOf(STATUS_LABEL_VALUES),

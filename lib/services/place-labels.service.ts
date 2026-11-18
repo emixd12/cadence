@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 
 import {
@@ -139,7 +140,7 @@ async function readCaptureContext(caller: CalendarCaller, occurrenceId: string) 
     markers,
     occurrence: {
       id: occurrence.id, behaviorId: occurrence.behavior_id, status: occurrence.status, localDate: occurrence.local_date,
-      timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE, scheduledFor: occurrence.scheduled_for,
+      timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE, scheduledFor: effectiveStartAt(occurrence),
       scheduleKind: occurrence.schedule_kind, scheduleStartTime: occurrence.schedule_start_time, scheduleEndTime: occurrence.schedule_end_time,
     },
     latestMark: latest ? { status: latest.status, previousStatus: latest.previous_status,

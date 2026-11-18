@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { toExistingOccurrenceForGeneration } from "@cadence/core/services/occurrence-generation";
+import { syncMoveConflicts } from "@/lib/services/occurrence-move.service";
 
 import {
   type AppSupabaseClient,
@@ -342,6 +343,12 @@ export async function syncUserOccurrences(
               { now },
             ),
         );
+      }
+
+      // A schedule edit can put another item where a moved one now sits; record a
+      // notice for the person (advisor Phase 2A). Moves are rare, so this reads little.
+      if (mutatedOccurrences) {
+        await syncMoveConflicts({ supabase, userId, now });
       }
 
       if (plannedReminderDeliveries) {

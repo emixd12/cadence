@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { resolveDueBehaviorArchives } from "@/lib/resolvers/occurrence.resolver";
 
 import type {
@@ -942,7 +943,7 @@ function toReminderResolverOccurrence(
   return {
     id: occurrence.id,
     userId: occurrence.user_id,
-    scheduledFor: occurrence.scheduled_for,
+    scheduledFor: effectiveStartAt(occurrence),
     status: normalizeOccurrenceStatus(occurrence.status),
   };
 }

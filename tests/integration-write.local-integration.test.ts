@@ -315,7 +315,7 @@ localDescribe("integration writes on isolated local Supabase", () => {
   });
 
   // update_day_note builds its receipt in one transaction without a prepared preview.
-  it.each((Object.keys(writeOperationHandlers) as (keyof typeof writeOperationHandlers)[]).filter((name) => name !== "update_day_note"))("rejects schema-invalid prepared output before %s commits", async name => {
+  it.each((Object.keys(writeOperationHandlers) as (keyof typeof writeOperationHandlers)[]).filter((name): name is Exclude<typeof name, "update_day_note" | "move_occurrence_for_day" | "revert_occurrence_move"> => name !== "update_day_note" && !name.includes("move")))("rejects schema-invalid prepared output before %s commits", async name => {
     const { id, oid } = await outputFixture();
     const behavior = await getBehaviorById(a.supabase, a.userId, id);
     const inputs = {

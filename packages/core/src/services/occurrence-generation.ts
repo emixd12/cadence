@@ -48,6 +48,7 @@ export function toExistingOccurrenceForGeneration(
     scheduleEndTime: row.schedule_end_time ? normalizeTime(row.schedule_end_time) : null,
     note: row.note, hasTimeSessions: timeSessionOccurrenceIds.has(row.id),
     behaviorConfigurationEventId: row.behavior_configuration_event_id,
+    moved: Boolean(row.effective_start_at),
   };
 }
 

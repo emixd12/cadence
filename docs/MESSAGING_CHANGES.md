@@ -1849,3 +1849,27 @@ cite has not changed.
   records stay read-only.
 - **Related:** P-059, P-060.
 - **Status:** logged.
+
+## P-062: Outside AI clients can move today's items (MCP contract 1.3.0)
+
+- **Change:** implemented November 16, 2026 (advisor Phase 2A, second pull request).
+  MCP contract 1.3.0 adds `move_occurrence_for_day` and `revert_occurrence_move`. A
+  client with `cadence.occurrences.write` can move one of today's Unresolved
+  Occurrences to another time today and undo the latest move. Every Occurrence in MCP
+  output now carries `effective_start_at` and a `move` object. Reminders follow a moved
+  time. The Behavior's schedule and `scheduled_for` never change. Cadence's own agents
+  use a separate `cadence.occurrences.move` scope that is not on the consent screen.
+- **Affected:** `packages/core/src/integration/operations.ts`, `docs/MCP_CONTRACT.md`,
+  `apps/marketing/src/data/developer-reference.json` (regenerated), BehaviorLog export
+  (`raw/cadence/occurrence_moves.jsonl`, `docs/EXPORT_FORMATS.md`).
+- **Surfaces:** in-app copy (the consent screen's scope summary), provider submissions
+  and directory listings that list Cadence's tools, marketing developer pages, user guide
+  pages about connecting an AI app.
+- **Conflicting current text:** the consent summary for `cadence.occurrences.write`
+  ("Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes
+  and day notes.") does not mention moves; directory listings and reviewer text that
+  count or list tools stop at 18 tools.
+- **Update needed:** add "move today's items to another time today, and undo a move" to
+  the scope summary and listings; say the planned schedule never changes.
+- **Related:** P-061.
+- **Status:** logged.

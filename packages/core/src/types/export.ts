@@ -62,6 +62,32 @@ export type ExportNativeReminderInput = {
   updatedAt: string;
 };
 
+/**
+ * One per-day move or Undo (advisor Phase 2A), exported to
+ * `raw/cadence/occurrence_moves.jsonl`. Export-only: a restore never replays moves.
+ */
+export type ExportOccurrenceMoveInput = {
+  id: string;
+  occurrenceId: string;
+  behaviorId: string;
+  localDate: string;
+  timezone: string;
+  kind: "move" | "revert";
+  fromStartAt: string;
+  fromEndAt: string;
+  fromPlanned: boolean;
+  toStartAt: string;
+  toEndAt: string;
+  toPlanned: boolean;
+  durationSource: string;
+  chainPosition: number;
+  revisesMoveId: string | null;
+  reason: string | null;
+  personReason: string | null;
+  source: string;
+  createdAt: string;
+};
+
 export type ExportRangeKey = "7" | "30" | "90" | "all";
 
 export type ExportRangeOption = {

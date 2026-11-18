@@ -13,7 +13,7 @@ import type {
   ExportBehaviorDefinitionEventInput, ExportBehaviorConfigurationEventInput, ExportBehaviorConfigurationSnapshot,
   ExportBehaviorInput, ExportBundle, ExportCategoryInput, ExportOccurrenceInput, ExportOccurrenceStatus,
   ExportReminderDeliveryChannel, ExportReminderDeliveryInput, ExportReminderDeliveryStatus, ExportStatusEventInput,
-  ExportTimeSessionInput, ExportNativeReminderInput,
+  ExportTimeSessionInput, ExportNativeReminderInput, ExportOccurrenceMoveInput,
   ExportImportedHistory,
 } from "../types/export";
 import type {
@@ -38,6 +38,8 @@ export type ExportAssemblyInput = ExportOptions & ExportImportedHistory & {
   reminderDeliveries: ExportPageReminderDeliveryRow[]; timeSessions: ExportTimeSessionRow[];
   finalBehaviors?: ExportPageBehaviorRow[];
   nativeReminders?: ExportNativeReminderInput[];
+  /** Per-day moves (advisor Phase 2A); export-only. */
+  occurrenceMoves?: ExportOccurrenceMoveInput[];
   /** Day note rows (Ticket 292); exported only when notes are included. */
   dayNotes?: ReadonlyArray<{ id: string; local_date: string; note: string | null; created_at: string; updated_at: string }>;
 };
@@ -72,6 +74,7 @@ export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
       toExportReminderDeliveryInput,
     ),
     nativeReminders: input.nativeReminders,
+    occurrenceMoves: input.occurrenceMoves,
     importedNotes: input.importedNotes,
     importedInterventions: input.importedInterventions,
     importRuns: input.importRuns,

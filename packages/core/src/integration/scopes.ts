@@ -7,6 +7,18 @@ export const INTEGRATION_SCOPES = Object.freeze({
 
 export type IntegrationScope = (typeof INTEGRATION_SCOPES)[keyof typeof INTEGRATION_SCOPES];
 
+/**
+ * Scopes only Cadence's own agents hold (advisor plan, Phase 2A). They are never on
+ * the consent screen or in discovery: `cadence.occurrences.move` lets the Daily Brief
+ * and chat move today's items without any other write. Outside clients move with
+ * `cadence.occurrences.write`.
+ */
+export const INTEGRATION_AGENT_SCOPES = Object.freeze({
+  occurrencesMove: "cadence.occurrences.move",
+} as const);
+
+export type IntegrationAgentScope = (typeof INTEGRATION_AGENT_SCOPES)[keyof typeof INTEGRATION_AGENT_SCOPES];
+
 /** Display order for consent screens, discovery documents, and docs. */
 export const INTEGRATION_SCOPE_LIST: readonly IntegrationScope[] = Object.freeze([
   INTEGRATION_SCOPES.read,

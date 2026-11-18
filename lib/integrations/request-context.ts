@@ -29,7 +29,10 @@ export type IntegrationChannel = IntegrationTokenChannel | AgentTokenChannel;
 export type IntegrationScope =
   | "cadence.read"
   | "cadence.occurrences.write"
-  | "cadence.behaviors.write";
+  | "cadence.behaviors.write"
+  // Cadence's own agents only (Daily Brief, chat): per-day moves, no other writes.
+  // Never offered on the consent screen (advisor plan, Phase 2A).
+  | "cadence.occurrences.move";
 
 // A grant that the caller has already verified: the opaque access token was
 // valid, the grant is active, and the token's resource matched. This module

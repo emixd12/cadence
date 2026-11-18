@@ -1,3 +1,4 @@
+import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   resolveCompletionCheckSchedule,
@@ -200,7 +201,7 @@ async function todaysUnresolved(client: AppSupabaseClient, userId: string, behav
   if (behaviors.error) throw behaviors.error;
   const dates = [...new Set((behaviors.data ?? []).map((row) => now.toZonedDateTimeISO(row.timezone ?? DEFAULT_TIMEZONE).toPlainDate().toString()))];
   if (dates.length === 0) return [];
-  const occurrences = await client.from("occurrences").select("id,behavior_id,local_date,scheduled_for")
+  const occurrences = await client.from("occurrences").select("id,behavior_id,local_date,scheduled_for,effective_start_at")
     .eq("user_id", userId).eq("status", "unresolved").in("behavior_id", [...behaviorIds]).in("local_date", dates);
   if (occurrences.error) throw occurrences.error;
   const rows = occurrences.data ?? [];
@@ -209,7 +210,7 @@ async function todaysUnresolved(client: AppSupabaseClient, userId: string, behav
     .eq("user_id", userId).eq("status", "pending").in("occurrence_id", rows.map((row) => row.id));
   if (reminders.error) throw reminders.error;
   return rows.map((row) => ({
-    scheduledStartAt: Temporal.Instant.from(row.scheduled_for).toString(),
+    scheduledStartAt: Temporal.Instant.from(effectiveStartAt(row)).toString(),
     reminderAt: (reminders.data ?? []).filter((reminder) => reminder.occurrence_id === row.id)
       .map((reminder) => Temporal.Instant.from(reminder.scheduled_send_at).toString()),
   }));

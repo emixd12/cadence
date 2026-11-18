@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  ADHERENCE_DEFINITION, INTEGRATION_CONTRACT_VERSION, INTEGRATION_LIMITS as L,
+  ADHERENCE_DEFINITION, INTEGRATION_CONTRACT_VERSION, isIntegrationScope, INTEGRATION_LIMITS as L,
   createIntegrationError, type IntegrationError, type IntegrationErrorCode,
   type IntegrationOperationInput, type IntegrationOperationOutput,
   type OccurrenceDetailOutput,
@@ -141,7 +141,7 @@ export async function getIntegrationAccountContext(context: IntegrationContext):
   return {
     account_ref: digest(["cadence-account-v1", context.actor.clientId, context.userId]),
     timezone: account.timezone, today_local_date: account.today, local_time: account.localTime,
-    now: account.now.toString(), granted_scopes: [...context.actor.grantedScopes],
+    now: account.now.toString(), granted_scopes: context.actor.grantedScopes.filter(isIntegrationScope),
     contract_version: INTEGRATION_CONTRACT_VERSION, freshness: account.freshness,
   };
 }

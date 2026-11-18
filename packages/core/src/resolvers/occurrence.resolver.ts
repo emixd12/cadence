@@ -88,6 +88,12 @@ export type ExistingOccurrenceForGeneration = {
   note: string | null;
   hasTimeSessions: boolean;
   behaviorConfigurationEventId: string | null;
+  /**
+   * True while a per-day move places the Occurrence away from its planned time
+   * (advisor plan, Phase 2A). A schedule edit never deletes a moved Occurrence, and it
+   * stands in for the new plan's item on its day, so the day never gets a second copy.
+   */
+  moved?: boolean;
 };
 
 export type PlannedOccurrenceInsert = {
@@ -295,12 +301,19 @@ function planOccurrenceGenerationForWindow(
       occurrence,
     ]),
   );
+  const keptByMove = desiredKeysKeptByMoves(
+    input.existingOccurrences,
+    desiredOccurrences,
+    existingOccurrenceKeys,
+    desiredOccurrenceKeys,
+  );
 
   return {
     create: desiredOccurrences
       .filter(
         (occurrence) =>
-          !existingOccurrenceKeys.has(occurrenceIdentityKey(occurrence)),
+          !existingOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
+          !keptByMove.has(occurrenceIdentityKey(occurrence)),
       )
       .map((occurrence) => ({
         userId: input.behavior.userId,
@@ -378,6 +391,7 @@ function planOccurrenceGenerationForWindow(
             (endDate !== null && occurrence.localDate >= endDate)) &&
           !hasNonEmptyNote(occurrence.note) &&
           !occurrence.hasTimeSessions &&
+          !occurrence.moved &&
           !desiredOccurrenceKeys.has(occurrenceIdentityKey(occurrence)),
       )
       .map((occurrence) => ({
@@ -561,6 +575,39 @@ function dedupeDesiredOccurrences<T extends {
   }
 
   return Array.from(occurrencesByKey.values());
+}
+
+/**
+ * Desired items a moved Occurrence stands in for. When a schedule edit gives a moved
+ * Occurrence's day a new identity (a new planned time), the moved Occurrence keeps its
+ * row and its moved time, and the new plan's item for that day is not created. Each
+ * moved Occurrence keeps the desired item of its own schedule slot, otherwise the one
+ * nearest its planned time. Rules: docs/DATETIME_STRATEGY.md, "Moves".
+ */
+function desiredKeysKeptByMoves(
+  existing: readonly ExistingOccurrenceForGeneration[],
+  desired: readonly ReturnType<typeof resolveDesiredOccurrences>[number][],
+  existingKeys: ReadonlySet<string>,
+  desiredKeys: ReadonlySet<string>,
+): Set<string> {
+  const kept = new Set<string>();
+  const orphans = existing.filter((occurrence) =>
+    occurrence.moved && occurrence.status === "unresolved" && !desiredKeys.has(occurrenceIdentityKey(occurrence)));
+  for (const occurrence of orphans) {
+    const planned = normalizeInstant(occurrence.scheduledFor);
+    const candidates = desired.filter((item) => {
+      const key = occurrenceIdentityKey(item);
+      return item.localDate === occurrence.localDate && !existingKeys.has(key) && !kept.has(key);
+    });
+    const distance = (item: (typeof candidates)[number]) =>
+      Math.abs(item.scheduledFor.since(planned).total({ unit: "seconds" }));
+    const choice = [...candidates].sort((left, right) =>
+      Number(right.scheduleSlotId === occurrence.scheduleSlotId) - Number(left.scheduleSlotId === occurrence.scheduleSlotId)
+        || distance(left) - distance(right)
+        || Temporal.Instant.compare(left.scheduledFor, right.scheduledFor))[0];
+    if (choice) kept.add(occurrenceIdentityKey(choice));
+  }
+  return kept;
 }
 
 function occurrenceIdentityKey(occurrence: {

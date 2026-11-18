@@ -23,6 +23,8 @@ import {
   localDate,
   localTime,
   locationTextInput,
+  MOVE_REFUSAL_REASON_VALUES,
+  occurrenceMoveRecordOutput,
   nextCursor,
   occurrenceDetailOutput,
   occurrenceNoteInput,
@@ -442,6 +444,64 @@ const updateOccurrenceNote = writeOperation({
     "Replaces the previous note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same note, so idempotentHint is true. openWorldHint is false.",
 });
 
+const moveRefusal = nullable(object({
+  reason: enumOf(MOVE_REFUSAL_REASON_VALUES),
+  message: string({ description: "Plain-language reason to show the user." }),
+  alternatives: array(object({
+    start_at: utcInstant(),
+    start_time: localTime("Local start time in the Behavior's timezone."),
+  }), { maxItems: 3, description: "Up to three free start times today, nearest the requested time first. Empty for Undo." }),
+}), { description: "Set when nothing changed because a rule refused the request. Null when the move or Undo was applied." });
+
+const moveResultOutput = (applied: string) => object({
+  outcome: enumOf([applied, "refused"] as const),
+  occurrence: occurrenceOutput,
+  move: nullable(occurrenceMoveRecordOutput, { description: "The record this call added, or the first call's record on a replay. Null when refused." }),
+  refusal: moveRefusal,
+});
+
+const MOVE_RATIONALE =
+  "Changes where today's Occurrence sits, so readOnlyHint is false. The planned time and the Behavior's schedule never change and revert_occurrence_move undoes a move, but Claude's review criteria ask for destructiveHint true on tools that modify data, so it is set. The same idempotency key returns the first result, but a call without one makes a new move each time, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.";
+
+const moveOccurrenceForDay = writeOperation({
+  name: "move_occurrence_for_day",
+  since: "1.3.0",
+  title: "Move Occurrence for today",
+  description:
+    "Moves one of today's Unresolved Occurrences to another start time today. Only that day changes: the Behavior's schedule and the planned time stay the same, and `effective_start_at` shows the new time. The item keeps its length. Reminders follow the new time. Send the `revision` you last read as `expected_revision`. When a rule stops the move (the time has passed, something else is already there, the item changed since you read it), nothing changes and `refusal` explains why and offers up to three free times. Use revert_occurrence_move to undo it.",
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    occurrence_id: occurrenceIdInput(),
+    start_time: localTime("New start: a local time on the Occurrence's `local_date` in its Behavior's timezone."),
+    expected_revision: revision("Revision the client last read. If the Occurrence changed since, the move is refused with `revision_changed`."),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: moveResultOutput("moved"),
+  errors: ["not_found", "idempotency_key_reused"],
+  destructiveHint: true,
+  idempotentHint: false,
+  annotationRationale: MOVE_RATIONALE,
+});
+
+const revertOccurrenceMove = writeOperation({
+  name: "revert_occurrence_move",
+  since: "1.3.0",
+  title: "Undo Occurrence move",
+  description:
+    "Undoes the latest move of one of today's Unresolved Occurrences, putting it back where it was before that move: its planned time, or an earlier move. Only the latest move can be undone. When there is nothing to undo or the item changed since you read it, nothing changes and `refusal` explains why.",
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    occurrence_id: occurrenceIdInput(),
+    expected_revision: revision("Revision the client last read. If the Occurrence changed since, the Undo is refused with `revision_changed`."),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: moveResultOutput("undone"),
+  errors: ["not_found", "idempotency_key_reused"],
+  destructiveHint: true,
+  idempotentHint: false,
+  annotationRationale: MOVE_RATIONALE.replace("revert_occurrence_move undoes a move", "a later move can redo it"),
+});
+
 const updateDayNote = writeOperation({
   name: "update_day_note",
   since: "1.1.0",
@@ -594,6 +654,8 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   "fetch": fetchRecord,
   set_occurrence_status: setOccurrenceStatus,
   update_occurrence_note: updateOccurrenceNote,
+  move_occurrence_for_day: moveOccurrenceForDay,
+  revert_occurrence_move: revertOccurrenceMove,
   update_day_note: updateDayNote,
   create_behavior: createBehavior,
   update_behavior: updateBehavior,

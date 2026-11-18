@@ -47,6 +47,7 @@ vi.mock("@/lib/db/exportPageRead.repo", () => ({
   readExportPageSummary: mocks.readExportPageSummary,
 }));
 
+vi.mock("@/lib/db/occurrenceMoves.repo", () => ({ listOccurrenceMovesForExport: async () => [] }));
 vi.mock("@/lib/services/occurrence.service", () => ({
   ensureUserOccurrencesFresh: mocks.ensureUserOccurrencesFresh,
 }));

@@ -36,7 +36,7 @@ const scheduleCount = Math.floor(
 expandedBehavior.behavior.schedules = Array.from({ length: scheduleCount }, () => schedule);
 
 const cases = [
-  { name: "existing 70,000-character note", operation: "set_occurrence_status", output: statusOutput(70_624, "x".repeat(70_000)) },
+  { name: "existing 70,000-character note", operation: "set_occurrence_status", output: statusOutput(70_680, "x".repeat(70_000)) },
   { name: "one byte below the wire limit", operation: "set_occurrence_status", output: statusOutput(wireLimit - 1, "") },
   { name: "exact wire limit with Unicode and JSON escapes", operation: "set_occurrence_status", output: statusOutput(wireLimit, "é🐴\n\t\"\\'".repeat(2000)) },
   { name: "JSONB numeric expansion in Behavior schedules", operation: "update_behavior", output: expandedBehavior },

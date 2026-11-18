@@ -29,6 +29,7 @@ import type {
   ExportRangeOption,
   ExportReminderDeliveryInput,
   ExportNativeReminderInput,
+  ExportOccurrenceMoveInput,
   ExportStatusCounts,
   ExportStatusEventInput,
   ExportTimeSessionInput,
@@ -48,6 +49,7 @@ import {
 const BEHAVIORLOG_SCHEMA_VERSION = "0.3.0-draft";
 const BEHAVIORLOG_FORMAT = "behaviorlog.bundle";
 const BEHAVIORLOG_EXTENSION_NAMESPACE = "app.cadence";
+export const BEHAVIORLOG_OCCURRENCE_MOVES_PATH = "raw/cadence/occurrence_moves.jsonl";
 const BEHAVIORLOG_DEFINITION_HISTORY_PATH =
   "data/behavior_definition_events.jsonl";
 const BEHAVIORLOG_CONFIGURATION_HISTORY_PATH =
@@ -182,6 +184,7 @@ export type ResolveExportInput = ExportImportedHistory & {
   statusEvents?: ExportStatusEventInput[];
   reminderDeliveries?: ExportReminderDeliveryInput[];
   nativeReminders?: ExportNativeReminderInput[];
+  occurrenceMoves?: ExportOccurrenceMoveInput[];
   now: Temporal.Instant;
   timezone?: string;
   range?: string | number | null;
@@ -300,6 +303,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     statusEvents: input.statusEvents ?? [],
     reminderDeliveries: input.reminderDeliveries ?? [],
     nativeReminders: input.nativeReminders ?? [],
+    occurrenceMoves: input.occurrenceMoves ?? [],
     timeSessions,
     includeTimeTracking,
     importedNotes: includeNotes ? input.importedNotes ?? [] : [],
@@ -917,6 +921,7 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
   statusEvents: ExportStatusEventInput[];
   reminderDeliveries: ExportReminderDeliveryInput[];
   nativeReminders: ExportNativeReminderInput[];
+  occurrenceMoves: ExportOccurrenceMoveInput[];
   timeSessions: ExportJsonTimeSession[];
   includeTimeTracking: boolean;
 }): BehaviorLogBundle {
@@ -976,6 +981,19 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
         created_at_utc: formatUtc(row.createdAt), updated_at_utc: formatUtc(row.updatedAt),
       };
     });
+  const moveRecords = input.occurrenceMoves.filter((row) => occurrenceIds.has(row.occurrenceId))
+    .sort((left, right) => Temporal.Instant.compare(left.createdAt, right.createdAt) || left.id.localeCompare(right.id))
+    .map((row) => ({
+      id: row.id, occurrence_id: row.occurrenceId, behavior_id: row.behaviorId, local_date: row.localDate,
+      timezone: row.timezone, kind: row.kind,
+      from_start_at_utc: formatUtc(row.fromStartAt), from_end_at_utc: formatUtc(row.fromEndAt), from_planned: row.fromPlanned,
+      to_start_at_utc: formatUtc(row.toStartAt), to_end_at_utc: formatUtc(row.toEndAt), to_planned: row.toPlanned,
+      duration_source: row.durationSource, chain_position: row.chainPosition, revises_move_id: row.revisesMoveId,
+      reason: row.reason, person_reason: row.personReason, source: row.source, created_at_utc: formatUtc(row.createdAt),
+    }));
+  if (new Set(moveRecords.map((row) => row.id)).size !== moveRecords.length) {
+    throw new Error("Occurrence move export contains duplicate IDs.");
+  }
   if (new Set(nativeRecords.map((row) => row.id)).size !== nativeRecords.length) {
     throw new Error("Native reminder export contains duplicate IDs.");
   }
@@ -1133,6 +1151,12 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
     const readme = filesWithoutManifest.find((file) => file.path === "README.md")!;
     readme.content += "\nNative reminder state is preserved in `raw/cadence/native_reminders.jsonl`. These OS scheduling/observation states do not prove user receipt or reading. The notification title, body, and raw errors are omitted. This extension is export-only.\n";
   }
+  if (moveRecords.length > 0) {
+    filesWithoutManifest.push({ path: BEHAVIORLOG_OCCURRENCE_MOVES_PATH, mediaType: "application/jsonl",
+      content: toJsonlRecords(moveRecords) });
+    const readme = filesWithoutManifest.find((file) => file.path === "README.md")!;
+    readme.content += `\nPer-day moves are preserved in \`${BEHAVIORLOG_OCCURRENCE_MOVES_PATH}\`. Each record moved one Occurrence for one day, or undid the latest move (kind \`revert\`); the Behavior's schedule and each Occurrence's planned time are unchanged. Records are append-only and ordered by creation. This extension is export-only.\n`;
+  }
 
   const manifestContent = JSON.stringify(
     createBehaviorLogManifest({
@@ -1144,6 +1168,7 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
           behavior.archive_notes?.some((entry) => entry.note !== null),
         ),
       nativeReminderCount: nativeRecords.length,
+      occurrenceMoveCount: moveRecords.length,
       containsInterventions:
         interventionRecords.length > 0 || interventionRuleRecords.length > 0,
       containsDefinitionHistory: true,
@@ -1196,6 +1221,7 @@ function createBehaviorLogManifest(input: {
   profile: ExportProfileInput;
   containsNotes: boolean;
   nativeReminderCount: number;
+  occurrenceMoveCount?: number;
   containsInterventions: boolean;
   containsDefinitionHistory: boolean;
   containsTimeTracking: boolean;
@@ -1241,6 +1267,10 @@ function createBehaviorLogManifest(input: {
         ...(input.nativeReminderCount > 0 ? { native_reminders: {
           path: "raw/cadence/native_reminders.jsonl", record_count: input.nativeReminderCount,
           ordering: ["fire_at_utc", "id"], import_restore_support: "export_only", user_receipt: "unverified",
+        } } : {}),
+        ...((input.occurrenceMoveCount ?? 0) > 0 ? { occurrence_moves: {
+          path: BEHAVIORLOG_OCCURRENCE_MOVES_PATH, record_count: input.occurrenceMoveCount,
+          ordering: ["created_at_utc", "id"], import_restore_support: "export_only",
         } } : {}),
         ...(input.configurationHistoryIncluded
           ? {
