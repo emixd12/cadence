@@ -274,8 +274,10 @@ export function planBriefMoveLinesFromInputs(input: BriefMovePlanInputs): BriefM
     if (!problem) continue;
 
     const stop = input.travel?.stops.get(item.occurrenceId) ?? null;
-    const atPlace = input.travel?.unknown.has(item.occurrenceId) || (input.placeBehaviorIds?.has(item.behaviorId) ?? false);
-    const travel: BriefMoveTravel = stop ? "checked" : atPlace ? "not_checked" : "not_needed";
+    // Known travel is always kept clear; any unknown leg, or a place with no routes, means travel was not checked.
+    const unknownLeg = input.travel?.unknown.has(item.occurrenceId) ?? false;
+    const atPlace = input.placeBehaviorIds?.has(item.behaviorId) ?? false;
+    const travel: BriefMoveTravel = unknownLeg ? "not_checked" : stop ? "checked" : atPlace ? "not_checked" : "not_needed";
     const lengthSeconds = item.length.minutes * 60;
     const blocks = [...itemBlocks, ...calendarBlocks, ...travelBlocks];
     const near = problem.code === "time_passed" ? input.now : current.start;
