@@ -45,7 +45,10 @@ import {
 } from "@/lib/services/occurrence-move.service";
 import { behaviorEstimateInputHash, readBriefMoveDay, type BriefMoveBehaviorFacts, type BriefMoveDay } from "@/lib/services/brief-move-day.service";
 import { briefMoveTravelInput, verifyTravelTimesToken } from "@/lib/services/travel-times-token";
-import type { TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
+import { readTravelConclusionsSecrets, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
+import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
+import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
+import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
 
 /**
  * Advisor Phase 3A1: the Daily Brief's move lines and every answer to them. The planner
@@ -67,7 +70,7 @@ import type { TravelConclusionsSecrets } from "@/lib/services/travel-conclusions
  */
 
 export class BriefMoveError extends Error {
-  constructor(readonly code: BriefMoveErrorCode, message?: string) {
+  constructor(readonly code: BriefMoveErrorCode, message?: string, readonly retryAfterSeconds?: number) {
     super(message ?? code);
   }
 }
@@ -131,7 +134,7 @@ export function briefMoveTravel(token: string | null | undefined, input: Readonl
  * answers) as the caller; nothing is written. The brief's prompt gets the result
  * without calendar titles or travel (see 3A2's projection).
  */
-export async function planBriefMoveLines(input: Readonly<{
+export async function planBriefMoveDay(input: Readonly<{
   supabase: AppSupabaseClient;
   userId: string;
   localDate: string;
@@ -156,6 +159,27 @@ export async function planBriefMoveLines(input: Readonly<{
   return { ...plan, day };
 }
 
+/**
+ * The brief's call (3A2): the day from its context, the request's calendar events and
+ * travel times. `now` may be an instant string. Reads as `supabase`'s own person.
+ */
+export async function planBriefMoveLines(input: Readonly<{
+  context: AdvisorDayContext;
+  planning: BriefMovePlanningInput;
+  now: string | Temporal.Instant;
+  supabase: AppSupabaseClient;
+  userId?: string;
+  travelSecrets?: TravelConclusionsSecrets;
+}>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
+  return planBriefMoveDay({
+    supabase: input.supabase, userId: input.userId ?? await ownUserId(input.supabase),
+    localDate: input.context.localDate, timezone: input.context.timezone,
+    now: typeof input.now === "string" ? Temporal.Instant.from(input.now) : input.now,
+    context: input.context, planning: input.planning,
+    travelSecrets: input.travelSecrets ?? readTravelConclusionsSecrets(process.env),
+  });
+}
+
 async function readDayAnswers(supabase: AppSupabaseClient, userId: string, localDate: string) {
   const [today, declines] = await Promise.all([
     supabase.from("move_proposals").select("occurrence_id, status")
@@ -174,13 +198,46 @@ async function readDayAnswers(supabase: AppSupabaseClient, userId: string, local
   };
 }
 
+const ESTIMATE_BATCH = 40;
+
 /**
- * Asks for lengths and "alongside" answers the cache lacks, and stores them. `estimate`
- * is the brief's model call (3A2): it sees only each Behavior's title, description and
- * Where kind. Returns the day re-read with the new lengths, or the same day when
- * nothing was missing.
+ * Asks the model for lengths and "alongside" answers the cache lacks, and stores them.
+ * The model sees only each Behavior's title and description (as Ticket 188's estimate
+ * step does), under a short local ref, never an id. A failed or partial answer leaves
+ * those Behaviors at the next length source (30 minutes when none). No agent client
+ * (the agent caller is not configured): nothing is asked or stored.
  */
-export async function ensureBehaviorEstimates(input: Readonly<{
+export async function ensureBehaviorEstimates(
+  agent: AppSupabaseClient | null,
+  context: Pick<AdvisorDayContext, "localDate">,
+  generate: DailyBriefGenerator,
+  signal?: AbortSignal,
+  options: Readonly<{ userId?: string; model?: string }> = {},
+): Promise<void> {
+  if (!agent) return;
+  const userId = options.userId ?? await ownUserId(agent);
+  const day = await readBriefMoveDay(agent, userId, context.localDate);
+  await cacheBehaviorEstimates({ agent, userId, localDate: context.localDate, day, model: options.model ?? "daily_brief", estimate: async (behaviors) => {
+    const refs = new Map(behaviors.map((behavior, index) => [`b${index + 1}`, behavior.id]));
+    const items: DescriptionEstimateItem[] = behaviors.map((behavior, index) => ({
+      behaviorRef: `b${index + 1}`, title: behavior.title, description: behavior.description?.trim() ?? "",
+    }));
+    try {
+      const raw = await generate({
+        instructions: `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`,
+        facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal, estimateVariant: "alongside",
+      });
+      return parseDescriptionEstimates(raw, items, { alongside: true })
+        .map((estimate) => ({ behaviorId: refs.get(estimate.behaviorRef)!, minutes: estimate.minutes, alongside: estimate.alongside === true }));
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      return [];
+    }
+  } });
+}
+
+/** Stores estimates for the day's Behaviors whose cached answer is missing or out of date. Returns the day re-read. */
+export async function cacheBehaviorEstimates(input: Readonly<{
   agent: AppSupabaseClient;
   userId: string;
   localDate: string;
@@ -190,7 +247,8 @@ export async function ensureBehaviorEstimates(input: Readonly<{
   }>>>;
   model: string;
 }>): Promise<BriefMoveDay> {
-  const stale = [...input.day.staleEstimateBehaviorIds].map((id) => input.day.behaviors.get(id)).filter((item): item is BriefMoveBehaviorFacts => !!item);
+  const stale = [...input.day.staleEstimateBehaviorIds].map((id) => input.day.behaviors.get(id))
+    .filter((item): item is BriefMoveBehaviorFacts => !!item).slice(0, ESTIMATE_BATCH);
   if (!stale.length) return input.day;
   const answers = await input.estimate(stale);
   const byId = new Map(stale.map((behavior) => [behavior.id, behavior]));
@@ -208,16 +266,20 @@ export async function ensureBehaviorEstimates(input: Readonly<{
 }
 
 /** Saves the planner's lines as the run's proposals. A Refresh closes the day's undecided lines first. */
-export async function saveBriefProposals(agent: AppSupabaseClient, input: Readonly<{
-  runId: string | null; localDate: string; refresh: boolean; candidates: readonly BriefMoveCandidate[];
+export async function saveBriefProposals(agent: AppSupabaseClient | null, input: Readonly<{
+  runId: string | null; localDate: string; refresh: boolean;
+  /** The planner's lines, with the brief's own reason words when it wrote them. `candidates` is the same list. */
+  lines?: readonly BriefMoveCandidate[]; candidates?: readonly BriefMoveCandidate[];
   replaces?: ReadonlyMap<string, string>;
 }>): Promise<BriefMoveLine[]> {
-  if (!input.candidates.length && !input.refresh) return [];
+  const candidates = input.lines ?? input.candidates ?? [];
+  // No agent client: no proposals, so no lines the person could answer.
+  if (!agent || (!candidates.length && !input.refresh)) return [];
   const { data, error } = await agent.rpc("record_brief_move_proposals", {
-    p_agent_run_id: input.runId as string,
+    p_agent_run_id: (input.runId || null) as string,
     p_local_date: input.localDate,
     p_supersede: input.refresh,
-    p_proposals: input.candidates.map((candidate) => ({
+    p_proposals: candidates.map((candidate) => ({
       occurrence_id: candidate.occurrenceId,
       proposed_start_at: candidate.to.startAt,
       proposed_end_at: candidate.to.endAt,
@@ -273,16 +335,17 @@ const SHOWN_STATUSES: readonly BriefMoveProposalStatus[] = ["proposed", "accepte
  * can show what happened, and open schedule-edit notices.
  */
 export async function readBriefMoves(supabase: AppSupabaseClient, input: Readonly<{
-  userId: string; localDate: string; timezone: string; runId?: string | null;
+  userId?: string; localDate: string; timezone: string; runId?: string | null;
 }>): Promise<BriefMoves> {
+  const userId = input.userId ?? await ownUserId(supabase);
   const [proposals, conflicts, batches] = await Promise.all([
-    supabase.from("move_proposals").select("*").eq("user_id", input.userId).eq("local_date", input.localDate)
+    supabase.from("move_proposals").select("*").eq("user_id", userId).eq("local_date", input.localDate)
       .eq("source", "daily_brief").in("status", SHOWN_STATUSES as BriefMoveProposalStatus[])
       .order("created_at", { ascending: false }).limit(64),
     supabase.from("move_conflicts").select("id, occurrence_id, conflicting_occurrence_id")
-      .eq("user_id", input.userId).eq("local_date", input.localDate).eq("status", "open").order("detected_at"),
+      .eq("user_id", userId).eq("local_date", input.localDate).eq("status", "open").order("detected_at"),
     supabase.from("move_proposal_answers").select("batch_id, proposal_id, created_at")
-      .eq("user_id", input.userId).eq("local_date", input.localDate).eq("kind", "accept_all").eq("outcome", "applied")
+      .eq("user_id", userId).eq("local_date", input.localDate).eq("kind", "accept_all").eq("outcome", "applied")
       .order("created_at", { ascending: false }).limit(64),
   ]);
   for (const result of [proposals, conflicts, batches]) if (result.error) throw result.error;
@@ -302,7 +365,7 @@ export async function readBriefMoves(supabase: AppSupabaseClient, input: Readonl
     timezone: input.timezone,
     runId: input.runId ?? null,
     lines,
-    conflicts: await conflictLines(supabase, input.userId, input.localDate, conflicts.data ?? []),
+    conflicts: await conflictLines(supabase, userId, input.localDate, conflicts.data ?? []),
     acceptAll: lines.filter((line) => line.status === "proposed").length >= 2,
     undoAllBatchId,
     calendar: "current",
@@ -635,6 +698,14 @@ export async function setBehaviorMovePreference(person: OccurrenceMoveCaller, be
 }
 
 // ------------------------------------------------------------------ helpers
+
+/** The person a client acts as, read through their own profile row (RLS shows only theirs). */
+async function ownUserId(supabase: AppSupabaseClient): Promise<string> {
+  const { data, error } = await supabase.from("profiles").select("id").limit(2);
+  if (error) throw error;
+  if (data?.length !== 1) throw new BriefMoveError("unauthenticated");
+  return data[0]!.id;
+}
 
 async function agentCaller(callers: BriefMoveCallers): Promise<OccurrenceMoveCaller> {
   return { supabase: await callers.agent(), userId: callers.person.userId, now: callers.person.now };

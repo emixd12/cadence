@@ -13,7 +13,9 @@ import { readBriefMoveDay } from "@/lib/services/brief-move-day.service";
 import {
   BriefMoveError,
   answerBriefMove,
+  cacheBehaviorEstimates,
   ensureBehaviorEstimates,
+  planBriefMoveDay,
   planBriefMoveLines,
   readBehaviorMovePreference,
   readBriefMoves,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/services/brief-moves.service";
 import { NO_TRAVEL_CONCLUSIONS_SECRETS } from "@/lib/services/travel-conclusions-token";
 import type { BriefMoveLine } from "@cadence/core/types/brief-moves";
+import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
 
 // Advisor Phase 3A1 against an isolated local Supabase: the brief plans lines with the
 // one free-slot rule, saves them as proposals, and every answer (Yes, Undo, Re-plan,
@@ -141,13 +144,13 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
     let day = await readBriefMoveDay(person, userId, today);
     expect(day.staleEstimateBehaviorIds.has(stretchId)).toBe(true);
     const asked: string[] = [];
-    day = await ensureBehaviorEstimates({ agent, userId, localDate: today, day, model: "test-model",
+    day = await cacheBehaviorEstimates({ agent, userId, localDate: today, day, model: "test-model",
       estimate: async (behaviors) => behaviors.map((item) => { asked.push(item.title); return { behaviorId: item.id, minutes: item.id === stretchId ? 25 : null, alongside: false }; }) });
     expect(asked).toContain("Stretch");
     expect(day.staleEstimateBehaviorIds.size).toBe(0);
     expect(day.items.find((item) => item.behaviorId === stretchId)!.length).toEqual({ minutes: 25, source: "model_estimate", assumed: true });
 
-    const plan = await planBriefMoveLines({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
+    const plan = await planBriefMoveDay({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
       context: null, planning: { calendarBusy }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS, day });
     const byBehavior = new Map(plan.candidates.map((candidate) => [candidate.behaviorId, candidate]));
     expect([...byBehavior.keys()].sort()).toEqual([readId, walkId, stretchId, teaId, journalId, napId].sort());
@@ -227,8 +230,10 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
 
     // After all that, nothing answered today is offered again. Read was undone, so its
     // overlap with Gym is now offered as a move of Gym instead.
-    const later = await planBriefMoveLines({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
-      context: null, planning: { calendarBusy }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
+    // The brief's own call shape: the day from its context, the user from the client.
+    const context = { localDate: today, timezone, connectors: [] } as unknown as AdvisorDayContext;
+    const later = await planBriefMoveLines({ context, planning: { calendarBusy }, now: Temporal.Now.instant().toString(), supabase: person,
+      travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
     expect(later.candidates.map((candidate) => `${candidate.title} ${candidate.reasonCode}`)).toEqual(["Gym item_overlap"]);
 
     // The person's own length replaces the estimate.
@@ -239,5 +244,19 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
     expect(length.minutes).toBe(40);
     const estimate = await admin.from("behavior_advisor_estimates").select("behavior_id").eq("behavior_id", stretchId);
     expect(estimate.data).toEqual([]);
+
+    // The brief's estimate step asks the model only for the changed Behavior, under a local ref.
+    const facts: string[] = [];
+    await ensureBehaviorEstimates(agent, { localDate: today }, async (request) => {
+      facts.push(request.facts);
+      const items = (JSON.parse(request.facts) as { items: { behaviorRef: string }[] }).items;
+      return { estimates: items.map((item) => ({ behaviorRef: item.behaviorRef, minutes: 12, basis: "inferred", alongside: false })) };
+    });
+    expect(facts).toHaveLength(1);
+    expect(JSON.parse(facts[0]!)).toEqual({ items: [{ behaviorRef: "b1", title: "Stretch", description: "" }] });
+    expect(facts[0]).not.toContain(stretchId);
+    const cached = await admin.from("behavior_advisor_estimates").select("duration_minutes").eq("behavior_id", stretchId).single();
+    expect(cached.data!.duration_minutes).toBe(12);
+    await ensureBehaviorEstimates(agent, { localDate: today }, async () => { throw new Error("asked again"); });
   }, 90_000);
 });
