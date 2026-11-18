@@ -191,5 +191,28 @@ begin
   end if;
 end $$;
 
+reset role;
+-- Calendar titles in a line are kept for their own day only.
+do $$
+declare
+  today date := (select value from t3a1 where name = 'today')::date;
+  stripped integer;
+begin
+  insert into public.move_proposals (id, user_id, occurrence_id, behavior_id, local_date, source, status, proposed_start_at, proposed_end_at,
+    expected_revision, line) values
+    ('3a130000-0000-4000-8000-0000000000a1', '3a100000-0000-4000-8000-000000000001', '3a120000-0000-4000-8000-000000000001',
+     '3a110000-0000-4000-8000-000000000001', today - 1, 'daily_brief', 'declined', now() - interval '1 day', now() - interval '23 hours', now(),
+     '{"calendarDerived": true, "reason": "Moved out of Dentist with Dr Lee.", "anchor": {"kind": "calendar_event", "title": "Dentist with Dr Lee"}, "title": "Gym"}'),
+    ('3a130000-0000-4000-8000-0000000000a2', '3a100000-0000-4000-8000-000000000001', '3a120000-0000-4000-8000-000000000001',
+     '3a110000-0000-4000-8000-000000000001', today, 'daily_brief', 'declined', now(), now() + interval '1 hour', now(),
+     '{"calendarDerived": true, "reason": "Moved out of Team sync.", "anchor": {"kind": "calendar_event", "title": "Team sync"}, "title": "Gym"}');
+  stripped := public.purge_ended_brief_move_text();
+  if stripped < 1 or (select line::text from public.move_proposals where id = '3a130000-0000-4000-8000-0000000000a1') like '%Dentist%'
+    or (select line ->> 'title' from public.move_proposals where id = '3a130000-0000-4000-8000-0000000000a1') <> 'Gym'
+    or (select line ->> 'reason' from public.move_proposals where id = '3a130000-0000-4000-8000-0000000000a2') <> 'Moved out of Team sync.' then
+    raise exception 'Calendar text was not limited to its own day';
+  end if;
+end $$;
+
 select 'advisor 3A1 brief move answers: ok' as result;
 rollback;

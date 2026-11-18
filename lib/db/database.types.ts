@@ -3122,6 +3122,7 @@ export type Database = {
         Returns: Json
       }
       purge_expired_agent_run_contents: { Args: never; Returns: number }
+      purge_ended_brief_move_text: { Args: never; Returns: number }
       purge_expired_completion_place_labels: { Args: never; Returns: number }
       read_account_sync_snapshot:
         | { Args: never; Returns: Json }
