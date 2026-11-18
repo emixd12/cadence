@@ -35,6 +35,12 @@ export type TravelRoutesView = Readonly<{
   habitsRevision?: string | null;
   /** Ticket 219 Option A: signed conclusions, returned unchanged with the Daily Brief request. */
   conclusionsToken?: string;
+  /**
+   * Advisor Phase 3: signed travel times (occupied travel spans and each stop's travel
+   * before and after), returned unchanged with brief move answers. The server uses them
+   * for that request only. Absent from older servers.
+   */
+  travelTimesToken?: string;
   /** Ticket 267: the month's reserved spend after this request. Absent from older servers. */
   budget?: TravelBudgetState;
 }>;
