@@ -14,6 +14,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "advisor:eval": "CADENCE_ADVISOR_EVAL=1 vitest run tests/advisor-eval.live.test.ts --silent=false",
+    "advisor:brief-eval": "CADENCE_ADVISOR_EVAL=1 vitest run tests/advisor-brief-eval.live.test.ts --silent=false",
     "advisor:grade": "CADENCE_ADVISOR_GRADE=1 vitest run tests/advisor-grade.live.test.ts --silent=false",
     "test:web-client": "CADENCE_WEB_CLIENT_TEST=1 vitest run tests/acceptance-web-client.test.mjs",
     "mcp:oauth": "node scripts/acceptance/oauth-driver.mjs",
