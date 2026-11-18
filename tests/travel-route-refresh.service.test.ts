@@ -34,6 +34,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
+import { briefMoveTravelInput, verifyTravelTimesToken } from "@/lib/services/travel-times-token";
 import { ConnectorError } from "@/lib/types/connectors";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import {
@@ -740,6 +741,26 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
       snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 })) } };
   const decode = (token: string) => JSON.parse(Buffer.from(token.split(".")[0]!, "base64url").toString("utf8")) as Record<string, unknown>;
 
+  it("signs the day's travel times for brief moves: instants and seconds, no places", async () => {
+    located();
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready, secret);
+    expect(result.travelTimesToken).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/);
+    const verify = (token: unknown, overrides: Partial<{ userId: string; localDate: string; now: Temporal.Instant }> = {}) =>
+      verifyTravelTimesToken(token, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now, ...overrides });
+    const payload = verify(result.travelTimesToken)!;
+    expect(payload).toMatchObject({ v: 1, sub: "owner", date: "2026-09-22", exp: result.expiresAt });
+    expect(payload.stops["occurrence-1"]![0]).toBeGreaterThan(0);
+    expect(payload.spans.some(([, , refs]) => refs.includes("occurrence:occurrence-1"))).toBe(true);
+    expect(JSON.stringify(payload)).not.toMatch(/Main|Street|walking|meters/i);
+    expect(briefMoveTravelInput(payload)!.stops.get("occurrence-1")!.beforeSeconds).toBe(payload.stops["occurrence-1"]![0]);
+    // Another person, another day, an expired or altered token: all refused.
+    expect(verify(result.travelTimesToken, { userId: "someone" })).toBeNull();
+    expect(verify(result.travelTimesToken, { localDate: "2026-09-23" })).toBeNull();
+    expect(verify(result.travelTimesToken, { now: Temporal.Instant.from(result.expiresAt!) })).toBeNull();
+    expect(verify(`${result.travelTimesToken!.slice(0, -2)}AA`)).toBeNull();
+    expect(verify(result.conclusionsToken)).toBeNull();
+  });
+
   it("signs only Cadence's conclusions and weather rules for a one-day view", async () => {
     located();
     mocks.weather.mockResolvedValue(rainy);
@@ -892,7 +913,7 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
     // Released builds send the three-hour timeline scope, never trips, and read only the shipped fields.
     twoStops();
     const released = await refreshTravelRoutes(caller, { ...day, device, scope: "timeline" }, config, now, undefined, "test-only-conclusions-secret-0123456789");
-    expect(Object.keys(released).sort()).toEqual(["accountId", "budget", "conclusionsToken", "evidence", "expiresAt", "habitsRevision", "mode", "navigationPreference", "settingsRevision"]);
+    expect(Object.keys(released).sort()).toEqual(["accountId", "budget", "conclusionsToken", "evidence", "expiresAt", "habitsRevision", "mode", "navigationPreference", "settingsRevision", "travelTimesToken"]);
     // The timeline scope still leaves the trip home, due after the window, for a later refresh.
     expect(released.evidence?.legs.at(-1)).toMatchObject({ leg: { role: "return" }, state: "unavailable", reason: "outside_route_window" });
     expect(released.evidence?.legs[0]).toMatchObject({ leg: { role: "outbound" }, state: "current" });

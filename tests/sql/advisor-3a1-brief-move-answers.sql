@@ -181,7 +181,8 @@ begin
   begin
     perform public.set_behavior_default_length('3a110000-0000-4000-8000-000000000001', 40, rev - interval '1 second');
     raise exception 'A stale length correction was accepted';
-  exception when serialization_failure then null;
+  exception when raise_exception then
+    if sqlerrm <> 'behavior_revision_changed' then raise; end if;
   end;
   perform public.set_behavior_default_length('3a110000-0000-4000-8000-000000000001', 40, rev);
   if (select default_duration_minutes from public.behaviors where id = '3a110000-0000-4000-8000-000000000001') <> 40

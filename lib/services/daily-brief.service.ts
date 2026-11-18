@@ -286,7 +286,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const plan = wantsMoves ? await phase("moves", async () => {
         await ensureBehaviorEstimates(agentRun?.client ?? null, context,
           withAgentRun(agentRun, (input) => generateDurationEstimatesWithModel(input)), signal);
-        return planBriefMoveLines({ context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client });
+        return planBriefMoveLines({ context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
       }) : { candidates: [], calendar: dailyBriefCalendarState(context) };
       const conflicts: readonly BriefMoveConflictLine[] = [];
       const words = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
