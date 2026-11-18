@@ -16,6 +16,10 @@
     {
       "path": "/api/connectors/completions/process",
       "schedule": "7,22,37,52 * * * *"
+    },
+    {
+      "path": "/api/advisor/coach/signals/process",
+      "schedule": "41 * * * *"
     }
   ]
 }

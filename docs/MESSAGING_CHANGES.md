@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-062` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-065` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -121,6 +121,7 @@ Status values:
 | [P-059](#p-059-the-advisor-may-use-model-providers-other-than-openai) | The advisor may use model providers other than OpenAI | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ, user guide |
 | [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
 | [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
+| [P-064](#p-064-the-advisor-computes-coach-signals-from-records-overnight) | The advisor computes coach signals from records overnight | logged | Advisor plan Phase 3 (3D) | Privacy, Trust |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -1892,3 +1893,27 @@ cite has not changed.
 - **Update needed:** when Mac moves ship, say so in the user guide's Mac notes.
 - **Related:** P-061, P-062.
 - **Status:** logged.
+
+## P-064: The advisor computes coach signals from records overnight
+
+- **Change:** implemented November 18, 2026 (advisor plan Phase 3, workstream 3D). Once a
+  day, in the early morning, Cadence computes coach signals for accounts active in the
+  last seven days: a Behavior's completion rate dropped, the same Behavior was moved the
+  same way on several days, decisions are usually recorded on a later day, a new Behavior
+  passed its first two weeks, and how the person answered the brief's move lines. No model
+  sees the records for this; the signals are counts with no titles or notes, kept 180 days,
+  and not shown yet. Phase 4 uses them to choose the advisor's quips.
+- **Affected:** `cadence_advisor_private.coach_signals`, `/api/advisor/coach/signals/process`.
+- **Surfaces:** Privacy (Daily Brief / advisor section and the retention table), Trust if it
+  lists background processing.
+- **Conflicting current text:** Privacy ("Optional Daily Brief", `components/settings/LegalContent.tsx`)
+  describes advisor processing only as the opt-in Daily Brief, prepared "when you first open
+  Timeline each day". Coach signals run for every account active in the last seven days,
+  whether or not Daily Brief is on, and nothing describes this background count or a
+  retention row for it. No data leaves Cadence for it.
+- **Update needed:** say that the advisor computes pattern counts from the person's own
+  records overnight, with no model call, keeps them 180 days, and that account deletion
+  removes them. Ship with Phase 4's quips, when the signals start to affect what people see.
+- **Related:** P-060, P-061.
+- **Status:** logged.
+
