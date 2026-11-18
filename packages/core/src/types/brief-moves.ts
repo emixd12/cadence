@@ -209,8 +209,11 @@ export type BriefMoveAnswerResponse = Readonly<{
   batchId: string | null;
   /** True when the same idempotency key was already answered; nothing new was applied. */
   replayed: boolean;
-  /** Whether the person had moved anything before this answer (the one-time first-move line). */
-  firstMove: boolean;
+  /**
+   * True when this answer applied the person's first move ever (brief and self-moves
+   * both count): show the one-time line "This changes today only. Your schedule stays."
+   */
+  showFirstMoveLine: boolean;
 }>;
 
 // ---------------------------------------------------------------- Re-plan and length
