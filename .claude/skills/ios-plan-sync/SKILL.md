@@ -10,7 +10,11 @@ follows web development. This skill brings it up to date. It starts no iOS work.
 
 ## Rules
 
-- Edit `docs/IOS_PLAN.md` only. Edit this skill only when the procedure changes.
+- A sync edits `docs/IOS_PLAN.md` only.
+- When the owner decides something about the plan, that is not a sync: record
+  the decision in `docs/DECISIONS.md` and update the plan, and this skill if
+  the procedure changes, in one docs-only pull request (`AGENTS.md`, "iOS
+  running plan").
 - Never edit code, `STATUS.md`, `docs/TICKETS.md`, `interaction-registry.json`
   or any ticket's "Future mobile" line.
 - Allocate no ticket number and no decision number. Plan steps keep `IOS-` IDs.
@@ -53,7 +57,9 @@ follows web development. This skill brings it up to date. It starts no iOS work.
    - A.3: new counts and the registry's `updated` date.
    - A.4: new states, each with its evidence.
    - A.5: one row per web addition since the baseline that the plan does not
-     cover. Remove a row once Part B covers it.
+     cover. Every web addition is in iOS scope (A.1, principle 2); the note
+     says how it might land, never whether. Remove a row once Part B covers it.
+   - A.9: Mac App Store inputs that `main` now records.
    - A.6: add new open decisions; mark one decided only with a `DECISIONS.md`
      reference.
    - A.8: one log row with the date, the new cursor and the changes.
