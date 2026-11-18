@@ -5,6 +5,7 @@ import type {
   DailyBriefSourceFlags,
 } from "@cadence/core/types/daily-brief";
 import type { TimelineView } from "@cadence/core/types/timeline";
+import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
 
 export function timelineBriefKey(timeline: TimelineView): string {
   return JSON.stringify([
@@ -47,6 +48,8 @@ export type DailyBriefClient = Readonly<{
     input: DailyBriefRequestInput,
     signal?: AbortSignal,
   ) => Promise<DailyBriefResponse>;
+  /** Advisor Phase 3: move answers against the hosted API. Absent where answers cannot reach it (a local-only Mac). */
+  moves?: BriefMoveClient;
 }>;
 
 /**
@@ -103,6 +106,8 @@ export function createWebDailyBriefClient(fetcher: typeof fetch = fetch): DailyB
       method: "POST",
       body: JSON.stringify(input),
     }, { signal, deadlineMs: DAILY_BRIEF_CLIENT_DEADLINES.briefMs }),
+    // The web Timeline redraws through the brief UI's own refresh after an applied answer.
+    moves: createBriefMoveClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: DAILY_BRIEF_MOVE_DEADLINE_MS })),
   };
 }
 

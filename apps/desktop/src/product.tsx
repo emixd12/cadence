@@ -360,7 +360,10 @@ export function Product() {
     [accountUserId, chatGptAccountScope]);
   const dailyBriefPlan = useMemo<DesktopDailyBriefPlan | null>(() => accountChatGpt
     ? { connection: accountChatGpt, connect: async () => { await accountChatGpt.connect(); }, openUsage: openChatGptUsage } : null, [accountChatGpt]);
-  const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan) : null, [calendarClient, accountUserId, dailyBriefPlan]);
+  // Advisor Phase 3 (3C): a brief answer writes on the hosted server; account sync brings the move to this Mac.
+  const dailyBriefClient = useMemo(() => calendarClient && accountUserId
+    ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan, () => setSyncRequest((previous) => previous + 1)) : null,
+  [calendarClient, accountUserId, dailyBriefPlan]);
   useEffect(() => {
     activateDailyBriefClient(dailyBriefClient);
     if (!dailyBriefClient || !accountChatGpt) return;
