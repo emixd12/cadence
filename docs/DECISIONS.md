@@ -2655,6 +2655,62 @@ output and export. Marketing: no change until the messaging pass. Future mobile:
 rules live on the server, so a phone app inherits them. Messaging impact: P-059, P-060,
 P-061.
 
+## 2026-11-18: Running iOS plan follows web development
+
+The owner said on November 18, 2026 that iOS work starts once the web app has every beta
+launch feature, and asked for a plan that stays current until then without interfering
+with web development. The owner approved the design the same day ("Set it up").
+
+1. **One running plan.** `docs/IOS_PLAN.md` holds the October 15, 2026 iOS and watchOS
+   proposal, restored from tag `archive/advisor-analysis-wip-2026-10-22`, plus a
+   current-state part. It is not authorized for implementation.
+2. **Downstream only.** The `ios-plan-sync` skill reads merged work (decisions, tickets'
+   "Future mobile" lines, the interaction registry) and updates the plan. A sync edits
+   that file alone. It never blocks a ticket, a merge or a deployment, and web tickets
+   get no new duty.
+3. **No ticket numbers.** The proposal's ticket numbers 188–211 were never allocated and
+   Ticket 188 was reused. Plan steps now carry `IOS-` IDs. Real numbers are allocated at
+   activation.
+4. **Owner's guiding principles**, recorded in the plan (A.1): feature parity with the
+   web app; platform additions such as Live Activities; the Apple Watch app as a distinct
+   feature; architecture adapted to the platform, with Apple-provided services
+   considered.
+
+Open, recorded in the plan (A.6) and not decided here: whether the first iOS release has
+accounts, whether CloudKit or SwiftData replaces any part of the storage design, and the
+list of beta launch features that triggers activation.
+
+Scope is unchanged. Native mobile stays out of scope in `AGENTS.md` and D30.5 still
+applies: no mobile code starts without a ticket.
+
+Platform impact: planning process only. Web, desktop and marketing: not applicable.
+Future mobile: `docs/IOS_PLAN.md`. Messaging impact: none.
+
+## 2026-11-18: Owner answers on the running iOS plan
+
+The owner answered five of the plan's open decisions on November 18, 2026.
+
+1. **Accounts in the first iOS release.** "Feature parity means we have to offer
+   accounts." This supersedes the October proposal's local-only first release. Sync,
+   in-app account deletion, a reviewer sign-in path and the Daily Brief AI consent move
+   ahead of the first release. The plan records these consequences (A.2); its release
+   table and milestones are not yet redrawn.
+2. **CloudKit and SwiftData.** They can be evaluated. The evaluation runs at activation.
+3. **Scope of web additions.** The web app guides: every addition to it must be reflected
+   in the iPhone app. The plan's list of additions (A.5) now records how each might land,
+   not whether.
+4. **Mac App Store listing.** It joins the running plan (A.9). Nothing is designed.
+
+5. **Activation.** The plan keeps no list of beta launch features. iOS work starts when
+   the owner says so ("I'll just say when").
+
+Scope is unchanged. Native mobile and Mac App Store work stay out of scope in `AGENTS.md`
+until the owner activates the track.
+
+Platform impact: planning process only. Web, desktop and marketing: not applicable.
+Future mobile: `docs/IOS_PLAN.md`. Messaging impact: none.
+
+
 ## 2026-11-18: The Daily Brief applies moves (advisor Phase 3A1)
 
 The Daily Brief now writes records. When the person answers Yes, Cadence moves that
