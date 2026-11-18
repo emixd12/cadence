@@ -2686,3 +2686,27 @@ applies: no mobile code starts without a ticket.
 Platform impact: planning process only. Web, desktop and marketing: not applicable.
 Future mobile: `docs/IOS_PLAN.md`. Messaging impact: none.
 
+## 2026-11-18: Owner answers on the running iOS plan
+
+The owner answered four of the plan's open decisions on November 18, 2026.
+
+1. **Accounts in the first iOS release.** "Feature parity means we have to offer
+   accounts." This supersedes the October proposal's local-only first release. Sync,
+   in-app account deletion, a reviewer sign-in path and the Daily Brief AI consent move
+   ahead of the first release. The plan records these consequences (A.2); its release
+   table and milestones are not yet redrawn.
+2. **CloudKit and SwiftData.** They can be evaluated. The evaluation runs at activation.
+3. **Scope of web additions.** The web app guides: every addition to it must be reflected
+   in the iPhone app. The plan's list of additions (A.5) now records how each might land,
+   not whether.
+4. **Mac App Store listing.** It joins the running plan (A.9). Nothing is designed.
+
+Still open: which web features must be finished before iOS work starts. The owner asked
+what the question means.
+
+Scope is unchanged. Native mobile and Mac App Store work stay out of scope in `AGENTS.md`
+until the owner activates the track.
+
+Platform impact: planning process only. Web, desktop and marketing: not applicable.
+Future mobile: `docs/IOS_PLAN.md`. Messaging impact: none.
+

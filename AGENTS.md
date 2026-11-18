@@ -186,7 +186,7 @@ Product and implementation docs:
 
 ## iOS running plan
 
-`docs/IOS_PLAN.md` is a running plan for a future iPhone and Apple Watch app. It is
+`docs/IOS_PLAN.md` is a running plan for a future iPhone and Apple Watch app and a Mac App Store listing. It is
 not a source-of-truth document and it authorizes nothing: mobile stays out of scope
 until the owner activates the track (`docs/DECISIONS.md`, 2026-11-18).
 
