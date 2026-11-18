@@ -192,8 +192,11 @@ until the owner activates the track (`docs/DECISIONS.md`, 2026-11-18).
 
 - The plan follows web development. It never blocks or changes a web ticket, a merge
   or a deployment. Web tickets owe it nothing beyond their "Future mobile" line.
-- Only the `ios-plan-sync` skill updates it, in docs-only pull requests that touch
-  that file alone.
+- A sync runs through the `ios-plan-sync` skill, in a docs-only pull request that
+  touches that file alone.
+- An owner decision about the plan is the one other way it changes. That pull request
+  records the decision in `docs/DECISIONS.md` and updates the plan, and where needed
+  this section and the skill, together. It stays docs-only.
 - Its `IOS-` step IDs are not ticket numbers. Do not cite them in tickets or code.
 
 ## Messaging changes
