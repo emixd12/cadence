@@ -5,7 +5,7 @@ import { AlertNotice } from "@/components/feedback/AlertNotice";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 import {
   FIRST_MOVE_LINE,
-  MOVE_REASON_OPTIONS,
+  MoveReasonLine,
   moveTimeLabel,
   useMoveCalendarBusy,
   useOccurrenceMoves,
@@ -15,7 +15,8 @@ import {
 /**
  * Advisor plan, Phase 2C: the row's "Move for today" menu. Text only: free times as
  * plain links, then Other time with a time field. Picking a time moves at once; Undo
- * replaces a confirmation step.
+ * replaces a confirmation step. It is the last, quiet line of an open row: moves are
+ * meant to come mostly from the advisor (Emi, Nov 18).
  */
 
 const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:opacity-60";
@@ -63,7 +64,7 @@ export function OccurrenceMoveMenu({ occurrence }: Readonly<{ occurrence: Timeli
     <div ref={rootRef} className="grid gap-1" data-move-menu>
       <button
         type="button"
-        className={`justify-self-start text-sm font-bold leading-6 text-foreground ${LINK}`}
+        className={`justify-self-start text-sm leading-6 text-muted-readable ${LINK}`}
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => {
@@ -138,22 +139,12 @@ export function OccurrenceMoveFollowUp({ occurrence }: Readonly<{ occurrence: Ti
   const moves = useOccurrenceMoves();
   const rowMove = moves?.rowMove(occurrence.id) ?? null;
   if (!moves || !rowMove || !occurrence.movedFromLabel || !moves.canMove(occurrence)) return null;
-  const reasonLabel = rowMove.reason ? MOVE_REASON_OPTIONS.find((option) => option.value === rowMove.reason)?.label : null;
+  // The drawer and the dialog carry these lines themselves.
+  if (moves.confirmation !== "row" && moves.confirmation !== "corner") return null;
   return (
     <div className="grid gap-0.5 px-3 pb-2 text-xs leading-5 text-muted-readable sm:px-4">
       {rowMove.first ? <p data-first-move>{FIRST_MOVE_LINE}</p> : null}
-      <p data-move-reasons>
-        {reasonLabel ? <>Reason noted: {reasonLabel.toLowerCase()}</> : <>
-          Why?{" "}
-          {MOVE_REASON_OPTIONS.map((option, index) => (
-            <span key={option.value}>
-              {index ? " · " : ""}
-              <button type="button" className={LINK} data-move-reason={option.value}
-                onClick={() => void moves.recordReason(occurrence.id, option.value)}>{option.label}</button>
-            </span>
-          ))}
-        </>}
-      </p>
+      <MoveReasonLine occurrenceId={occurrence.id} />
     </div>
   );
 }
@@ -181,7 +172,7 @@ export function OccurrenceMoveNotice({ occurrence }: Readonly<{ occurrence: Time
       ))}</span>
       : <button type="button" className={LINK} onClick={() => moves.clearNotice(occurrence.id)}>Dismiss</button>;
   return (
-    <AlertNotice kind="write_refused" action={action} className="px-3 pb-3 sm:px-4">
+    <AlertNotice kind="write_refused" action={action} icon={false} size="compact" className="px-3 pb-3 sm:px-4">
       {notice.message}
     </AlertNotice>
   );

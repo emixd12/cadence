@@ -14,6 +14,7 @@ import {
   FIRST_MOVE_LINE,
   MoveCalendarEventsContext,
   OccurrenceMovesProvider,
+  type MoveConfirmationStyle,
   type OccurrenceMoveActions,
 } from "@/components/timeline/OccurrenceMoves";
 
@@ -75,16 +76,17 @@ function row(occurrence: TimelineOccurrenceView) {
 
 function render(occurrence: TimelineOccurrenceView, moveActions: OccurrenceMoveActions | null, options: Readonly<{
   hasMovedBefore?: boolean; events?: readonly NormalizedExternalEvent[]; onRefresh?: () => void; extra?: React.ReactNode;
+  confirmation?: MoveConfirmationStyle;
 }> = {}) {
   const content = <MoveCalendarEventsContext.Provider value={options.events ?? []}>{options.extra}{row(occurrence)}</MoveCalendarEventsContext.Provider>;
   return act(() => root.render(<RefreshProvider onRefresh={options.onRefresh ?? (() => undefined)}>
-    {moveActions ? <OccurrenceMovesProvider actions={moveActions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={options.hasMovedBefore ?? true}>
+    {moveActions ? <OccurrenceMovesProvider actions={moveActions} timezone={TZ} todayLocalDate={TODAY} hasMovedBefore={options.hasMovedBefore ?? true} confirmation={options.confirmation}>
       {content}
     </OccurrenceMovesProvider> : content}
   </RefreshProvider>));
 }
 
-function button(text: string, scope: ParentNode = container): HTMLButtonElement {
+function button(text: string, scope: ParentNode = document.body): HTMLButtonElement {
   const found = [...scope.querySelectorAll("button")].find((node) => node.textContent?.trim() === text);
   if (!found) throw new Error(`Missing button ${text}: ${container.textContent}`);
   return found as HTMLButtonElement;
@@ -119,7 +121,13 @@ describe("Move for today menu", () => {
     await act(async () => button("10:00 AM").click());
     expect(control.move).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: "o1", expectedRevision: REV, startTime: "10:00" }));
     expect(control.move.mock.calls[0]![0].idempotencyKey).toBeTruthy();
-    await vi.waitFor(() => expect(container.querySelector("[data-move-toast]")?.textContent).toBe("Gym moved to 10:00 AM. · Undo"));
+    await vi.waitFor(() => expect(document.querySelector("[data-move-toast]")?.textContent).toBe("Gym moved to 10:00 AM for today. UndoWhy? Running late · Conflict · Low energy · Other"));
+  });
+
+  it("is the last line of the open row, after the note", async () => {
+    await render(gym, actions());
+    const details = container.querySelector(".timeline-occurrence-details")!;
+    expect(details.lastElementChild?.hasAttribute("data-move-menu")).toBe(true);
   });
 
   it("moves to a typed Other time", async () => {
@@ -144,7 +152,7 @@ describe("Moved row", () => {
     expect(container.querySelector("[data-moved-from]")?.textContent).toBe("Moved from 9:00 AM · Undo");
     await act(async () => button("Undo").click());
     expect(control.revert).toHaveBeenCalledWith(expect.objectContaining({ occurrenceId: "o1", expectedRevision: NEW_REV }));
-    await vi.waitFor(() => expect(container.querySelector("[data-move-toast]")?.textContent).toBe("Gym moved back to 9:00 AM."));
+    await vi.waitFor(() => expect(document.querySelector("[data-move-toast]")?.textContent).toBe("Gym is back at 9:00 AM."));
   });
 
   it("offers one-tap reasons after a move and stores the first tap", async () => {
@@ -155,10 +163,10 @@ describe("Moved row", () => {
     await act(async () => button("10:00 AM").click());
     // The server redraws the row at its new time.
     await render(movedGym, control);
-    expect(container.querySelector("[data-move-reasons]")?.textContent).toBe("Why? Running late · Conflict · Low energy · Other");
+    expect(document.querySelector("[data-move-reasons]")?.textContent).toBe("Why? Running late · Conflict · Low energy · Other");
     await act(async () => button("Low energy").click());
     expect(control.reason).toHaveBeenCalledWith({ moveId: "m1", reason: "low_energy" });
-    await vi.waitFor(() => expect(container.querySelector("[data-move-reasons]")?.textContent).toBe("Reason noted: low energy"));
+    await vi.waitFor(() => expect(document.querySelector("[data-move-reasons]")?.textContent).toBe("Reason noted: low energy"));
   });
 
   it("shows the first-move line once, only for a person who never moved before", async () => {
@@ -168,7 +176,24 @@ describe("Moved row", () => {
     await vi.waitFor(() => expect(container.querySelector("[data-move-option='10:00']")).not.toBeNull());
     await act(async () => button("10:00 AM").click());
     await render(movedGym, control, { hasMovedBefore: false });
-    expect(container.querySelector("[data-first-move]")?.textContent).toBe(FIRST_MOVE_LINE);
+    expect(document.querySelector("[data-first-move]")?.textContent).toBe(FIRST_MOVE_LINE);
+    // A second move in the same visit no longer shows it.
+    await act(async () => button("Move for today").click());
+    await vi.waitFor(() => expect(container.querySelector("[data-move-option='11:30']")).not.toBeNull());
+    await act(async () => button("11:30 AM").click());
+    await vi.waitFor(() => expect(document.querySelector("[data-move-toast]")?.textContent).toContain("Gym moved to"));
+    expect(document.querySelector("[data-first-move]")).toBeNull();
+  });
+
+  it("never shows the first-move line to a person who moved before", async () => {
+    const control = actions();
+    await render(gym, control, { hasMovedBefore: true });
+    await act(async () => button("Move for today").click());
+    await vi.waitFor(() => expect(container.querySelector("[data-move-option='10:00']")).not.toBeNull());
+    await act(async () => button("10:00 AM").click());
+    await render(movedGym, control, { hasMovedBefore: true });
+    expect(document.querySelector("[data-move-toast]")).not.toBeNull();
+    expect(document.querySelector("[data-first-move]")).toBeNull();
   });
 
   it("offers nothing to undo on a resolved moved row", async () => {
@@ -195,6 +220,7 @@ describe("Refusals and other devices", () => {
     expect(alert.textContent).toContain("Not changed");
     expect(alert.textContent).toContain("Something else is already at that time.");
     expect(alert.textContent).toContain("Free instead: 11:00 AM");
+    expect(alert.querySelector("svg")).toBeNull();
     expect(onRefresh).toHaveBeenCalled();
     await act(async () => button("11:00 AM", alert).click());
     expect(control.move).toHaveBeenLastCalledWith(expect.objectContaining({ startTime: "11:00", expectedRevision: REV }));
@@ -261,5 +287,55 @@ describe("calendar busy times", () => {
       { id: "allday", kind: "all_day", startLocalDate: TODAY, endLocalDate: "2026-11-17" },
     ] as unknown as NormalizedExternalEvent[];
     expect(calendarBusyFromEvents(events).map((event) => event.ref)).toEqual(["keep"]);
+  });
+});
+
+describe("Confirmation options", () => {
+  async function moveGym(confirmation: MoveConfirmationStyle) {
+    const control = actions();
+    await render(gym, control, { confirmation });
+    await act(async () => button("Move for today").click());
+    await vi.waitFor(() => expect(container.querySelector("[data-move-option='10:00']")).not.toBeNull());
+    await act(async () => button("10:00 AM").click());
+    await render(movedGym, control, { confirmation });
+    return control;
+  }
+
+  it("row: no pop-up; the row is highlighted, keeps Undo and reasons, and the move is announced", async () => {
+    await moveGym("row");
+    expect(document.querySelector("[data-move-toast]")).toBeNull();
+    expect(container.querySelector("[data-just-moved='true']")).not.toBeNull();
+    expect(container.querySelector("[data-move-announcement]")?.textContent).toBe("Gym moved to 10:00 AM for today.");
+    expect(container.querySelector("[data-moved-from]")?.textContent).toBe("Moved from 9:00 AM · Undo");
+    expect(document.querySelector("[data-move-reasons]")).not.toBeNull();
+  });
+
+  it("corner: a small note with from and to times and Undo; reasons stay on the row", async () => {
+    const control = await moveGym("corner");
+    const note = document.querySelector("[data-move-confirmation='corner']")!;
+    expect(note.textContent).toBe("Moved for todayGym · 9:00 AM → 10:00 AMUndo");
+    expect(note.querySelector("[data-move-reasons]")).toBeNull();
+    expect(container.querySelector("article [data-move-reasons]")).not.toBeNull();
+    await act(async () => button("Undo", note).click());
+    expect(control.revert).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: NEW_REV }));
+  });
+
+  it("drawer: carries the reasons itself and closes on Close", async () => {
+    await moveGym("drawer");
+    const drawer = document.querySelector("[data-move-confirmation='drawer']")!;
+    expect(drawer.querySelector("[data-move-reasons]")).not.toBeNull();
+    expect(container.querySelector("article [data-move-reasons]")).toBeNull();
+    await act(async () => (drawer.querySelector("button[aria-label='Close']") as HTMLButtonElement).click());
+    expect(document.querySelector("[data-move-confirmation]")).toBeNull();
+  });
+
+  it("dialog: a modal with reasons, Done and Undo", async () => {
+    await moveGym("dialog");
+    const dialog = document.querySelector("[role='dialog']")!;
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.querySelector("[data-move-reasons]")).not.toBeNull();
+    button("Undo", dialog);
+    await act(async () => button("Done", dialog).click());
+    expect(document.querySelector("[role='dialog']")).toBeNull();
   });
 });

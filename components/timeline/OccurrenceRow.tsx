@@ -130,7 +130,14 @@ export function OccurrenceRow({
 
   // Advisor plan, Phase 2C: a notice's "Other time" or "Move it again" opens this row's menu.
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const moveMenuRequest = useOccurrenceMoves()?.menuRequest;
+  const moves = useOccurrenceMoves();
+  const moveMenuRequest = moves?.menuRequest;
+  // The "row" confirmation option: the moved row holds its open-row blue for a few seconds.
+  const justMoved = moves?.confirmation === "row" && moves.recentMoveId === occurrence.id;
+  useEffect(() => {
+    if (!justMoved || !detailsRef.current || typeof detailsRef.current.scrollIntoView !== "function") return;
+    detailsRef.current.scrollIntoView({ block: "nearest" });
+  }, [justMoved]);
   useEffect(() => {
     if (moveMenuRequest?.occurrenceId !== occurrence.id || !detailsRef.current) return;
     detailsRef.current.open = true;
@@ -168,9 +175,10 @@ export function OccurrenceRow({
       aria-busy={optimisticView.isPending ? "true" : undefined}
       data-optimistic-status={optimisticStatus.pendingStatus ?? undefined}
       data-visual-tone={visibleOccurrence.visualTone}
+      data-just-moved={justMoved ? "true" : undefined}
       className={[
         "timeline-occurrence-row transition-colors",
-        ROW_TONE_CLASSES[visibleOccurrence.visualTone],
+        justMoved && visibleOccurrence.visualTone === "default" ? "bg-timeline-row-hover text-foreground" : ROW_TONE_CLASSES[visibleOccurrence.visualTone],
       ].join(" ")}
     >
       {pendingStatusLabel ? (
@@ -225,8 +233,6 @@ export function OccurrenceRow({
             id={detailsId}
             className="timeline-occurrence-details mt-0 gap-2 px-3 pb-3 pt-0 text-sm leading-6 text-muted-readable sm:px-4 sm:pb-4"
           >
-            <OccurrenceMoveMenu occurrence={visibleOccurrence} />
-
             <DetailItem
               label="Description"
               value={visibleOccurrence.description || "No description."}
@@ -300,6 +306,8 @@ export function OccurrenceRow({
               shortcuts={shortcuts}
               compact
             />
+
+            <OccurrenceMoveMenu occurrence={visibleOccurrence} />
           </div>
         </details>
 

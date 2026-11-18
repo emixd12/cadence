@@ -14,6 +14,8 @@ import {
 import { canSelfMoveOccurrence } from "@cadence/core/resolvers/move.resolver";
 import { formatClockTimeLabel } from "@cadence/core/services/schedule";
 import { useRefresh } from "@cadence/ui/runtime";
+import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 
@@ -59,11 +61,31 @@ export type MoveRowNotice = Readonly<{
   moveAgain: boolean;
 }>;
 
-type MoveToast = Readonly<{ key: number; occurrenceId: string; title: string; text: string; revision: string | null; canUndo: boolean }>;
+/**
+ * How a move is confirmed, while Emi chooses (review of Nov 18): the row itself, a
+ * small note in the corner, a bottom drawer like the Calendar preview, or a dialog.
+ */
+export type MoveConfirmationStyle = "row" | "corner" | "drawer" | "dialog";
+export const MOVE_CONFIRMATION_STYLES: readonly MoveConfirmationStyle[] = ["row", "corner", "drawer", "dialog"];
+
+type MoveToast = Readonly<{
+  key: number;
+  occurrenceId: string;
+  title: string;
+  kind: "moved" | "undone";
+  /** Time labels: where the item was and where it is now. */
+  from: string | null;
+  to: string | null;
+  revision: string | null;
+  canUndo: boolean;
+}>;
 
 type RowMove = Readonly<{ moveId: string; reason: string | null; first: boolean }>;
 
 export type OccurrenceMovesController = Readonly<{
+  confirmation: MoveConfirmationStyle;
+  /** The item just moved, while its confirmation shows. */
+  recentMoveId: string | null;
   timezone: string;
   todayLocalDate: string;
   pendingId: string | null;
@@ -118,8 +140,10 @@ export function OccurrenceMovesProvider({
   timezone,
   todayLocalDate,
   hasMovedBefore,
+  confirmation = "drawer",
   children,
 }: Readonly<{
+  confirmation?: MoveConfirmationStyle;
   actions: OccurrenceMoveActions;
   timezone: string;
   todayLocalDate: string;
@@ -135,11 +159,13 @@ export function OccurrenceMovesProvider({
   const movedBefore = useRef(hasMovedBefore);
   const toastKey = useRef(0);
 
+  // The row and the corner note fade on their own; the drawer and the dialog wait to be closed.
+  const fades = confirmation === "row" || confirmation === "corner";
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || !fades) return;
     const timer = window.setTimeout(() => setToast((current) => current?.key === toast.key ? null : current), TOAST_MS);
     return () => window.clearTimeout(timer);
-  }, [toast]);
+  }, [fades, toast]);
 
   const setNotice = useCallback((occurrenceId: string, notice: MoveRowNotice | null) => {
     setNotices((current) => {
@@ -170,7 +196,10 @@ export function OccurrenceMovesProvider({
     refresh();
   }, [refresh, setNotice, timezone]);
 
+  const recentMoveId = toast?.kind === "moved" ? toast.occurrenceId : null;
   const controller = useMemo<OccurrenceMovesController>(() => ({
+    confirmation,
+    recentMoveId,
     timezone,
     todayLocalDate,
     pendingId,
@@ -196,7 +225,7 @@ export function OccurrenceMovesProvider({
         movedBefore.current = true;
         setRowMoves((current) => ({ ...current, [occurrence.id]: { moveId: state.moveId, reason: null, first } }));
         const to = state.effectiveStartAt ? moveTimeLabel(state.effectiveStartAt, timezone) : formatClockTimeLabel(startTime);
-        showToast({ occurrenceId: occurrence.id, title: occurrence.title, text: `${occurrence.title} moved to ${to}.`, revision: state.revision, canUndo: true });
+        showToast({ occurrenceId: occurrence.id, title: occurrence.title, kind: "moved", from: occurrence.scheduledTimeLabel, to, revision: state.revision, canUndo: true });
       } finally {
         setPendingId(null);
       }
@@ -218,8 +247,8 @@ export function OccurrenceMovesProvider({
           delete next[occurrence.id];
           return next;
         });
-        const back = state.effectiveStartAt ? ` to ${moveTimeLabel(state.effectiveStartAt, timezone)}` : "";
-        showToast({ occurrenceId: occurrence.id, title: occurrence.title, text: `${occurrence.title} moved back${back}.`, revision: null, canUndo: false });
+        const back = state.effectiveStartAt ? moveTimeLabel(state.effectiveStartAt, timezone) : null;
+        showToast({ occurrenceId: occurrence.id, title: occurrence.title, kind: "undone", from: null, to: back, revision: null, canUndo: false });
       } finally {
         setPendingId(null);
       }
@@ -239,32 +268,146 @@ export function OccurrenceMovesProvider({
     },
     menuRequest,
     openMenu: (occurrenceId) => setMenuRequest((current) => ({ occurrenceId, key: (current?.key ?? 0) + 1 })),
-  }), [actions, menuRequest, notices, pendingId, refusal, rowMoves, setNotice, showToast, timezone, todayLocalDate]);
+  }), [actions, confirmation, menuRequest, notices, pendingId, recentMoveId, refusal, rowMoves, setNotice, showToast, timezone, todayLocalDate]);
 
-  const undoFromToast = toast?.canUndo ? toast : null;
   return (
     <OccurrenceMovesContext.Provider value={controller}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-4 sm:bottom-6">
-        {toast ? (
-          <p data-move-toast className="pointer-events-auto max-w-md bg-foreground px-4 py-3 text-sm leading-5 text-background">
-            {toast.text}
-            {undoFromToast ? <>
-              {" · "}
-              <button
-                type="button"
-                className="font-bold underline underline-offset-2"
-                disabled={pendingId === undoFromToast.occurrenceId}
-                onClick={() => {
-                  setToast(null);
-                  void controller.undo({ id: undoFromToast.occurrenceId, title: undoFromToast.title, revision: undefined }, undoFromToast.revision);
-                }}
-              >Undo</button>
-            </> : null}
-          </p>
-        ) : null}
-      </div>
+      <MoveConfirmationPortal
+        style={confirmation}
+        toast={toast}
+        controller={controller}
+        onClose={() => setToast(null)}
+        onUndo={(value) => {
+          setToast(null);
+          void controller.undo({ id: value.occurrenceId, title: value.title, revision: undefined }, value.revision);
+        }}
+      />
     </OccurrenceMovesContext.Provider>
+  );
+}
+
+const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:opacity-60";
+
+function toastSentence(toast: MoveToast): string {
+  if (toast.kind === "undone") return toast.to ? `${toast.title} is back at ${toast.to}.` : `${toast.title} is back at its usual time.`;
+  return `${toast.title} moved to ${toast.to} for today.`;
+}
+
+/**
+ * The optional one-tap reasons after a move. A tap reads back as "Reason noted".
+ * Shared by the row's follow-up line, the drawer and the dialog.
+ */
+export function MoveReasonLine({ occurrenceId, className }: Readonly<{ occurrenceId: string; className?: string }>) {
+  const moves = useOccurrenceMoves();
+  const rowMove = moves?.rowMove(occurrenceId) ?? null;
+  if (!moves || !rowMove) return null;
+  const reasonLabel = rowMove.reason ? MOVE_REASON_OPTIONS.find((option) => option.value === rowMove.reason)?.label : null;
+  return (
+    <p className={className} data-move-reasons>
+      {reasonLabel ? <>Reason noted: {reasonLabel.toLowerCase()}</> : <>
+        Why?{" "}
+        {MOVE_REASON_OPTIONS.map((option, index) => (
+          <span key={option.value} className="whitespace-nowrap">
+            {index ? " · " : ""}
+            <button type="button" className={LINK} data-move-reason={option.value}
+              onClick={() => void moves.recordReason(occurrenceId, option.value)}>{option.label}</button>
+          </span>
+        ))}
+      </>}
+    </p>
+  );
+}
+
+type MoveConfirmationProps = Readonly<{
+  style: MoveConfirmationStyle;
+  toast: MoveToast | null;
+  controller: OccurrenceMovesController;
+  onClose: () => void;
+  onUndo: (toast: MoveToast) => void;
+}>;
+
+/** Fixed pop-ups render at the page's root, so no transformed parent can hold them in place. */
+function MoveConfirmationPortal(props: MoveConfirmationProps) {
+  const content = <MoveConfirmation {...props} />;
+  if (props.style === "row" || !props.toast || typeof document === "undefined") return content;
+  return createPortal(content, document.body);
+}
+
+function MoveConfirmation({ style, toast, controller, onClose, onUndo }: Readonly<{
+  style: MoveConfirmationStyle;
+  toast: MoveToast | null;
+  controller: OccurrenceMovesController;
+  onClose: () => void;
+  onUndo: (toast: MoveToast) => void;
+}>) {
+  const sentence = toast ? toastSentence(toast) : "";
+  // The row option has no pop-up: the row holds the news, and this announces it.
+  if (style === "row" || !toast) {
+    return <p aria-live="polite" className="sr-only" data-move-announcement>{sentence}</p>;
+  }
+  const rowMove = toast.kind === "moved" ? controller.rowMove(toast.occurrenceId) : null;
+  const undo = toast.canUndo ? (
+    <button type="button" className={`font-bold text-foreground ${LINK}`} disabled={controller.pendingId === toast.occurrenceId}
+      onClick={() => onUndo(toast)} data-move-confirmation-undo>Undo</button>
+  ) : null;
+  const close = (
+    <button type="button" aria-label="Close" title="Close" onClick={onClose}
+      className="product-icon-action -mr-2 -mt-2 min-h-11 min-w-11 shrink-0 sm:min-h-10 sm:min-w-10">
+      <X aria-hidden="true" size={16} strokeWidth={2.5} />
+    </button>
+  );
+  const firstLine = rowMove?.first ? <p className="text-sm leading-5 text-muted-readable" data-first-move>{FIRST_MOVE_LINE}</p> : null;
+  const reasons = rowMove ? <MoveReasonLine occurrenceId={toast.occurrenceId} className="text-sm leading-5 text-muted-readable" /> : null;
+
+  if (style === "corner") {
+    // A small flat note above the Needs decision button: what moved, and Undo. Reasons stay on the row.
+    return (
+      <div aria-live="polite" data-move-confirmation="corner" data-move-toast
+        className="fixed bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] left-4 right-4 z-40 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 border border-line bg-background p-4 text-foreground sm:bottom-24 sm:left-auto sm:right-6 sm:w-80">
+        <p className="text-sm uppercase leading-5 tracking-[1px] text-muted-readable">{toast.kind === "moved" ? "Moved for today" : "Moved back"}</p>
+        {close}
+        <p className="col-span-2 text-base leading-6">
+          {toast.kind === "moved" ? <>{toast.title} · {toast.from} → {toast.to}</> : sentence}
+        </p>
+        {undo ? <p className="col-span-2 text-sm leading-5">{undo}</p> : null}
+      </div>
+    );
+  }
+
+  if (style === "drawer") {
+    // Same drawer as the Calendar preview: full width at the bottom, one top line, stays until closed.
+    return (
+      <div aria-live="polite" data-move-confirmation="drawer" data-move-toast
+        className="fixed inset-x-0 bottom-0 z-[45] border-t border-line bg-background pb-[env(safe-area-inset-bottom)] text-foreground">
+        <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto] gap-x-3 gap-y-2 p-4">
+          <p className="text-base leading-6">
+            {sentence}
+            {undo ? <>{" "}{undo}</> : null}
+          </p>
+          {close}
+          {firstLine || reasons ? <div className="col-span-2 grid gap-1">{firstLine}{reasons}</div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  // Dialog: the heaviest option. It takes focus and waits for Done.
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/50 p-4" data-move-confirmation="dialog"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
+      <section role="dialog" aria-modal="true" aria-label={sentence} data-move-toast
+        className="grid w-[min(28rem,100%)] gap-3 border border-line bg-background p-4 text-foreground">
+        <h2 className="text-lg leading-tight">{sentence}</h2>
+        {firstLine}
+        {reasons}
+        <p className="flex gap-4 text-sm leading-5">
+          <button type="button" autoFocus className={`font-bold text-foreground ${LINK}`} onClick={onClose}>Done</button>
+          {undo}
+        </p>
+      </section>
+    </div>
   );
 }
 

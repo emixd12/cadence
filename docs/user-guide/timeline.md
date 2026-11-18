@@ -260,18 +260,19 @@ does not repeatedly announce itself.
 Unresolved, and scheduled at a set time. Items scheduled as a time range are
 not moved.
 
-1. Open the row and choose **Move for today**.
+1. Open the row and choose **Move for today**, at the end of the row.
 2. Pick one of the free times Cadence lists, or enter a time under
    **Other time** and choose **Move**.
 3. The item moves at once. Its row shows the new time and reads
    **Moved from** the planned time, with **Undo**.
-4. Optionally, tap one reason under the moved row: **Running late**,
-   **Conflict**, **Low energy**, or **Other**. You can ignore it.
+4. Optionally, tap one reason in the message at the bottom of the screen:
+   **Running late**, **Conflict**, **Low energy**, or **Other**. You can
+   ignore it.
 
 **Result and persistence:** The move changes today only. Your schedule stays
 as it is, and tomorrow the item is back at its planned time. Reminders follow
 the new time. The Mac app shows the move after it syncs. The first time you
-move something, the row says so: "This changes today only. Your schedule
+move something, the message says so: "This changes today only. Your schedule
 stays."
 
 **Recovery or undo:** Choose **Undo** in the short message at the bottom of the

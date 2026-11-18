@@ -457,6 +457,13 @@
       "reason": "Development-only bench for the shared alert notice (advisor plan Phase 1C). Its one sample action button does nothing. No account or provider access."
     },
     {
+      "path": "app/design-system/OccurrenceMoveBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 2,
+      "interaction_ids": [],
+      "reason": "Development-only bench for Move for today (advisor plan Phase 2C) with synthetic rows and in-memory actions. Its picker switches between confirmation options for review. No account or provider access."
+    },
+    {
       "path": "app/design-system/page.tsx",
       "classification": "excluded",
       "interaction_marker_count": 30,
@@ -825,7 +832,7 @@
     {
       "path": "components/timeline/OccurrenceMoveMenu.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 21,
+      "interaction_marker_count": 19,
       "interaction_ids": [
         "INT-TIMELINE-014",
         "INT-TIMELINE-015",
@@ -835,9 +842,10 @@
     {
       "path": "components/timeline/OccurrenceMoves.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 10,
       "interaction_ids": [
-        "INT-TIMELINE-015"
+        "INT-TIMELINE-015",
+        "INT-TIMELINE-016"
       ]
     },
     {
@@ -18525,7 +18533,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Running late, Conflict, Low energy or Other under a just-moved row"
+          "control": "Running late, Conflict, Low energy or Other under a just-moved row or in the move confirmation"
         }
       ],
       "availability": "Web Timeline, on today's Unresolved rows of Behaviors scheduled at a set time. Shown after a move made in this page view.",
@@ -18554,7 +18562,8 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/timeline/OccurrenceMoveMenu.tsx"
+            "components/timeline/OccurrenceMoveMenu.tsx",
+            "components/timeline/OccurrenceMoves.tsx"
           ],
           "evidence": [
             "tests/timeline-occurrence-moves-ui.dom.test.tsx"

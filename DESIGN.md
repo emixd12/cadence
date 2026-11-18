@@ -354,7 +354,7 @@ A boundary's space always exceeds every boundary one level below it; header rule
 
 One look for "something is wrong", everywhere in the product: the model failed, data is out of date, the advisor's budget is reached, or a write was refused. `components/feedback/AlertNotice.tsx` (bench: `/design-system#ds-module-alert-notice`).
 
-- **Structure:** a 16px warning-triangle icon, then a short label in Label typography, uppercase, in Rust Signal (`--alert-signal`), then the message in Body text in Ink Black (`--alert-foreground`), then at most one underlined text-link action. No box, fill, border, stripe or shadow, so it sits in a text-like surface such as the brief.
+- **Structure:** a 16px warning-triangle icon (optional: a refused move inside a Timeline row leaves it out, at the owner's request of 2026-11-18), then a short label in Label typography, uppercase, in Rust Signal (`--alert-signal`), then the message in Body text in Ink Black (`--alert-foreground`), then at most one underlined text-link action. No box, fill, border, stripe or shadow, so it sits in a text-like surface such as the brief.
 - **Labels:** model failed, "Advice unavailable"; data out of date, "Out of date" (or a specific one such as "Calendar not current"); budget reached, "Advisor paused"; write refused, "Not changed".
 - **Message:** what happened, what still works, and when it returns or what to do ("Gym was just moved to 10:00 on another device."). No apology, no blame, no implementation terms.
 - **Announcing:** a refused write answers the person's own action and uses `role="alert"`. Standing states use `role="status"`.
@@ -364,10 +364,10 @@ One look for "something is wrong", everywhere in the product: the model failed, 
 
 The person's own per-day move on the web Timeline (advisor plan, Phase 2C). Components: `components/timeline/OccurrenceMoveMenu.tsx`, `OccurrenceMoves.tsx`, `MoveConflictNotices.tsx` (bench: `/design-system#ds-module-occurrence-move`).
 
-- **Menu:** "Move for today" is the first line of an expanded row, as a bold text button. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
-- **No confirmation:** a tap moves at once. Undo is the safety net: a short dark message at the bottom ("Gym moved to 10:00 AM. · Undo") and the lasting "Moved from 9:00 AM · Undo" line on the row.
-- **Reasons:** right after a move, one muted line offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
-- **Refusals** use the Alert notice with the "Not changed" label, and offer free times or "Move it again". Never advice.
+- **Menu:** "Move for today" is the last line of an expanded row, after Save note, as a secondary (Readable Ash) text button. Moves should come mostly from the advisor, so the person's own move is not promoted. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
+- **No confirmation:** a tap moves at once. Undo is the safety net: a confirmation with Undo and the lasting "Moved from 9:00 AM · Undo" line on the row. The confirmation's form is under owner review (2026-11-18), with four options on the bench: the row itself (held in the open-row blue for 8 seconds), a corner note (flat bordered panel above Needs decision, fades after 8 seconds), a bottom drawer (the Calendar preview drawer: full width, one top Ash Line, stays until closed) and a dialog. The drawer is the default until the owner chooses. Never a dark filled bar.
+- **Reasons:** right after a move, one muted line (in the drawer or dialog, else under the row) offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
+- **Refusals** use the Alert notice with the "Not changed" label, without the icon and at the row's 12px size for label, message and action, and offer free times or "Move it again". Never advice.
 - **Overlap after a schedule edit:** one plain line above the Timeline with "Yes · No · Other time" as text links. Nothing failed, so it is not an alert.
 
 ### Chips
