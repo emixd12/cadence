@@ -25,6 +25,11 @@ export type TravelRoutesResponse = Readonly<{
    */
   conclusionsToken?: string;
   /**
+   * Advisor Phase 3: signed travel times for brief moves (lib/services/travel-times-token.ts).
+   * Used for one request; never stored and never sent to a model.
+   */
+  travelTimesToken?: string;
+  /**
    * Ticket 267: the month's reserved spend after this request. Absent when it could not be
    * read. From 80% of the ceiling the refresh plan stops automatic requests.
    */
