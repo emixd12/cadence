@@ -28,7 +28,8 @@ This plan follows web development and never leads it. The `ios-plan-sync` skill
 Recorded November 18, 2026 (`docs/DECISIONS.md`, "Running iOS plan follows web
 development").
 
-1. iOS work starts when the web app has every beta launch feature. Not before.
+1. iOS work starts when the web app has every beta launch feature, on the
+   owner's instruction. The plan keeps no list of those features.
 2. The iPhone app has feature parity with the web app. The web app guides:
    every addition to it must be reflected in the iPhone app. Parity includes
    accounts, so the first iOS release has sign-in and sync (answered November
@@ -145,7 +146,7 @@ reading, not a design.
 ### A.6 Open owner decisions
 
 None is needed before activation. The first thirteen are Part B, Section 14.
-Rows 14–18 come from the first refresh; the owner answered 14–17 on November
+Rows 14–18 come from the first refresh; the owner answered them on November
 18, 2026 (`docs/DECISIONS.md`, "Owner answers on the running iOS plan").
 
 | # | Decision | State |
@@ -155,7 +156,7 @@ Rows 14–18 come from the first refresh; the owner answered 14–17 on November
 | 15 | Evaluate CloudKit and SwiftData against the SQLite store and Supabase sync (A.2) | Decided: evaluate them, at activation |
 | 16 | iOS scope for each A.5 addition | Decided: every web addition is in iOS scope. How each lands is designed at activation |
 | 17 | Whether the Mac App Store listing (D30.5) joins this plan or gets its own | Decided: it joins this plan (A.9) |
-| 18 | Activation trigger: which web features must be finished before iOS work starts | Open. The owner asked what this means; no list of beta launch features is recorded on `main` |
+| 18 | Activation trigger: which web features must be finished before iOS work starts | Decided: no list. iOS work starts on the owner's instruction |
 | 19 | Whether the iPhone app also works before sign-in, as the Mac app does | Open |
 
 ### A.7 Claims to recheck at activation
@@ -176,7 +177,7 @@ these when the track activates:
 
 | Date | Synced through | Changes |
 |---|---|---|
-| 2026-11-18 | `1f80c1c3` | Owner answers recorded: accounts in the first release, CloudKit and SwiftData to be evaluated, every web addition in iOS scope, Mac App Store listing joins the plan (A.9). Cursor unchanged |
+| 2026-11-18 | `1f80c1c3` | Owner answers recorded: accounts in the first release, CloudKit and SwiftData to be evaluated, every web addition in iOS scope, Mac App Store listing joins the plan (A.9), activation on the owner's instruction with no feature list. Cursor unchanged |
 | 2026-11-18 | `1f80c1c3` | Restored the October 15 proposal from tag `archive/advisor-analysis-wip-2026-10-22` (`985b6862`). Renamed its proposed ticket numbers 188–211 to plan-local `IOS-` IDs. Added Part A. Corrected ten stale lines in Part B: Xcode, CI, Travel, Sign in with Apple and the AI disclosure |
 
 ### A.9 Mac App Store listing

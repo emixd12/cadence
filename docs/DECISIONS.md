@@ -2688,7 +2688,7 @@ Future mobile: `docs/IOS_PLAN.md`. Messaging impact: none.
 
 ## 2026-11-18: Owner answers on the running iOS plan
 
-The owner answered four of the plan's open decisions on November 18, 2026.
+The owner answered five of the plan's open decisions on November 18, 2026.
 
 1. **Accounts in the first iOS release.** "Feature parity means we have to offer
    accounts." This supersedes the October proposal's local-only first release. Sync,
@@ -2701,8 +2701,8 @@ The owner answered four of the plan's open decisions on November 18, 2026.
    not whether.
 4. **Mac App Store listing.** It joins the running plan (A.9). Nothing is designed.
 
-Still open: which web features must be finished before iOS work starts. The owner asked
-what the question means.
+5. **Activation.** The plan keeps no list of beta launch features. iOS work starts when
+   the owner says so ("I'll just say when").
 
 Scope is unchanged. Native mobile and Mac App Store work stay out of scope in `AGENTS.md`
 until the owner activates the track.
