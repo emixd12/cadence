@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { fillQuipSeed } from "@cadence/core/services/advice-library";
+import { fillQuipSeed, quipSeedsFor } from "@cadence/core/services/advice-library";
 import type { AdviceMatch } from "@cadence/core/types/advice-cards";
 
 import type { StoredTip, TipHistory, TipToWrite } from "@/lib/db/advisor-tips.repo";
@@ -161,7 +161,7 @@ function hasNumericFact(match: AdviceMatch): boolean {
 
 /** The card's own wording filled by code: the first seed that fills and passes the checks. */
 export function seedTipText(match: AdviceMatch, behaviorTitle: string | null): string | null {
-  for (const seed of match.card.quip_seeds) {
+  for (const seed of quipSeedsFor(match.card, match.behaviorId)) {
     const filled = fillQuipSeed(seed, { behavior: behaviorTitle, facts: match.signal.facts });
     if (filled && checkTipText(filled, match, behaviorTitle).ok) return filled.trim();
   }
