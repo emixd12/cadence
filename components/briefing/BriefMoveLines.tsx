@@ -470,12 +470,11 @@ function ActionLink({ label, onClick, disabled, strong = false, expanded }: Read
 
 /**
  * Where a moved line's item is now: this session's answer first, then the applied time the
- * server saved (3A1 `appliedTo`, read defensively until core types carry it), then the
- * suggestion. Without the saved time, a reload showed the suggested time after Other time.
+ * server saved (`appliedTo`), then the suggestion. Without the saved time, a reload showed
+ * the suggested time after Other time.
  */
 function movedToLabel(line: BriefMoveLine, movedTo: string | null | undefined, suggested: string): string {
-  const applied = (line as BriefMoveLine & Readonly<{ appliedTo?: Readonly<{ startAt?: string }> | null }>).appliedTo?.startAt;
-  const at = movedTo ?? applied;
+  const at = movedTo ?? line.appliedTo?.startAt;
   return at ? moveTimeLabel(at, line.timezone) : suggested;
 }
 
