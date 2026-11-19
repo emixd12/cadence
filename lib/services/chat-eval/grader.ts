@@ -60,10 +60,10 @@ export function scenarioFacts(scenario: ChatScenario): string {
     ...[...new Set(world.occurrences.map((item) => item.localDate))].sort().map((date) => `  ${date}: ${world.occurrences.filter((item) => item.localDate === date)
       .map((item) => `${title(item.behaviorId)} ${clockLabel(effectiveTime(item))} ${item.status}${item.note ? ` (note ${JSON.stringify(item.note)})` : ""}`).join(", ")}`),
     `Day notes: ${[...world.dayNotes].map(([date, row]) => `${date} ${JSON.stringify(row.note)}`).join("; ") || "none"}.`,
-    world.sourcesOff.has("calendar") ? "Calendar reading is turned OFF for chat in Settings; chat must not know or mention any event." :
-      `Calendar events: ${world.events.map((item) => `${item.localDate} ${clockLabel(item.start)}-${clockLabel(item.end)} ${JSON.stringify(item.title)}`).join("; ") || "none connected"}.`,
-    `Hevy workouts: ${world.workouts.map((item) => `${item.localDate} ${JSON.stringify(item.title)} ${item.minutes} min`).join("; ") || "none connected"}.`,
-    `Advice cards available to chat: ${world.adviceCards.map((card) => `${JSON.stringify(card.title)}: ${card.claim} Source: ${card.source}`).join(" | ")}`,
+    world.sourcesOff.has("calendar") ? "Settings: Google, Outlook and iCloud calendar reading are all turned OFF for chat (chat is told this); chat must not know or mention any event." :
+      `Calendar events (calendar name, location): ${world.events.map((item) => `${item.localDate} ${clockLabel(item.start)}-${clockLabel(item.end)} ${JSON.stringify(item.title)} (${item.calendar}${item.location ? `, ${item.location}` : ""})`).join("; ") || "none connected"}.`,
+    `Hevy workouts: ${world.id === "new_user" ? "Hevy not connected" : world.workouts.map((item) => `${item.localDate} ${JSON.stringify(item.title)} at ${clockLabel(item.start)}, ${item.minutes} min, ${item.exercises} exercises`).join("; ") || "none"}.`,
+    "Research: chat has no advice library yet, so it has no research cards. The right answer to a research question says it has no research to cite and may still help from the person's own records. Stating research findings would be unsupported.",
     `Scenario: ${scenario.description}`,
   ];
   return lines.join("\n");
@@ -83,7 +83,7 @@ export async function gradeScenario(input: Readonly<{
   const cost = () => price && usage ? usageMicrodollars(price, usage) : null;
   try {
     const raw = await generateStructured({
-      agent: "chat", setting: { model: input.grader, reasoning: "medium", maxOutputTokens: 4_000, timeoutMs: 180_000 },
+      agent: "chat", setting: { model: input.grader, reasoning: "medium", maxOutputTokens: 8_000, timeoutMs: 240_000 },
       instructions: CHAT_GRADER_INSTRUCTIONS,
       prompt: [`FACTS:\n${scenarioFacts(input.scenario)}`, ...lettered.map((item) => `TRANSCRIPT ${item.letter}:\n${item.text}`)].join("\n\n"),
       schemaName: "chat_grades", schema: GRADE_SCHEMA, signal: input.signal ?? new AbortController().signal,

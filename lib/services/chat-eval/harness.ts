@@ -68,7 +68,7 @@ export async function runChatEval(input: Readonly<{
   clock?: () => number;
   env?: Readonly<Record<string, string | undefined>>;
 }>): Promise<ChatScenarioResult[]> {
-  const scenarios = input.scenarios ?? CHAT_SCENARIOS;
+  const scenarios = input.scenarios ?? CHAT_SCENARIOS.filter((item) => !item.optIn);
   const results: ChatScenarioResult[] = new Array(scenarios.length);
   let next = 0;
   const worker = async () => {

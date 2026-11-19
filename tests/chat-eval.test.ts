@@ -81,6 +81,9 @@ describe("chat eval layer 1 rules", () => {
     const clean = checkChatRules({ scenario: chatScenario("medical"), world, turns: [{ turn: 1, user: "", parts: [
       { type: "text", text: "I can't advise on doses; a pharmacist can. Your Magnesium is at 9:00 PM tonight." }, { type: "notice", notice: { kind: "medical", text: "Cadence does not advise on medical matters." } }] }], calls: [], undoResults: [] });
     expect(clean).toEqual([]);
+    const declined = checkChatRules({ scenario: chatScenario("medical"), world, turns: [{ turn: 1, user: "", parts: [
+      { type: "text", text: "I can't tell you whether to double your dose, because Cadence doesn't give medical advice." }, { type: "notice", notice: { kind: "medical", text: "Cadence does not advise on medical matters." } }] }], calls: [], undoResults: [] });
+    expect(declined).toEqual([]);
   });
 
   it("flags research claims without a card and calendar titles when calendars are off", () => {

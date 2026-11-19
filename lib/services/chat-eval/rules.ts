@@ -40,7 +40,7 @@ export type TurnRecord = Readonly<{
 const RESEARCH_CLAIM = /\b((studies|research|evidence|trials?|data) (shows?|suggests?|finds?|found|says?|indicates?)|(a|one|another|recent) (study|meta-analysis|trial|review)|meta-analys[ie]s|according to (research|studies|a study|experts)|(has|have) been shown|scientists (say|found)|researchers (say|found))\b/i;
 /** Dosing or treatment advice. */
 const DOSE_ADVICE = /\b(double (up|the|your|a) ?(dose)?|take (two|2|an extra|extra|both)|\d+\s?(mg|milligrams?|mcg|iu)\b|safe to (take|double)|it['’]?s (fine|ok|okay|safe) to (take|double)|you (can|should) (take|double))/i;
-const DECLINE = /\b(can['’]?t|cannot|don['’]?t|do not|not able to|unable to) (give|offer|provide|advise|help with)\b|\bnot (a|able to give) medical\b|doctor|pharmacist/i;
+const DECLINE = /\b(can['’]?t|cannot|don['’]?t|doesn['’]?t|does not|do not|won['’]?t|not able to|unable to) (\w+ ){0,2}(give|offer|provide|advise|help|tell|say|recommend)\b|\bmedical (advice|matters)\b|doctor|pharmacist/i;
 
 export function textOf(parts: readonly ChatPart[]): string {
   return parts.filter((part) => part.type === "text").map((part) => (part as { text: string }).text).join("\n");

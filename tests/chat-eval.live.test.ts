@@ -25,7 +25,7 @@ describe.skipIf(process.env.CADENCE_CHAT_EVAL !== "1")("chat eval (live)", () =>
   it("plays every scenario for each candidate model", async () => {
     const specs = (process.env.CADENCE_CHAT_EVAL_MODELS ?? "openai/gpt-5.6-luna").split(",").map((item) => item.trim()).filter(Boolean);
     const only = process.env.CADENCE_CHAT_EVAL_SCENARIOS?.split(",").map((item) => item.trim()).filter(Boolean);
-    const scenarios = only?.length ? CHAT_SCENARIOS.filter((item) => only.includes(item.id)) : CHAT_SCENARIOS;
+    const scenarios = only?.length ? CHAT_SCENARIOS.filter((item) => only.includes(item.id)) : CHAT_SCENARIOS.filter((item) => !item.optIn);
     const runs: { label: string; results: ChatScenarioResult[] }[] = [];
     for (const spec of specs) {
       const [model, effort] = spec.split("@");

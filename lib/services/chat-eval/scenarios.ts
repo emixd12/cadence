@@ -56,6 +56,8 @@ export type ChatScenario = Readonly<{
   steps: readonly ScenarioStep[];
   allowedWrites: readonly AllowedWrite[];
   expect: ScenarioExpect;
+  /** Runs only when named in CADENCE_CHAT_EVAL_SCENARIOS (long or costly). */
+  optIn?: true;
 }>;
 
 /** The typical conversation the cost table prices: three questions, three replies. */
@@ -138,6 +140,10 @@ export const CHAT_SCENARIOS: readonly ChatScenario[] = [
 
   { id: "expensive_question", world: "long_history", description: "The costliest kind of question: long ranges, many records, several sources. Must stay under the per-question ceiling.",
     steps: [{ say: "Go through the last three months: every item I skipped, every note I wrote, my workouts, and my calendar for the next two weeks. Then tell me what pattern you see." }],
+    allowedWrites: [], expect: { final: [{ kind: "unchanged" }] } },
+
+  { id: "long_conversation", world: "everyday", optIn: true, description: "A 40-message conversation (20 read-only questions). Later questions must cost no more than the history cap allows.",
+    steps: [{ say: "What's on today?" }, { say: "What's on my calendar this afternoon?" }, { say: "When is my run?" }, { say: "How long is my run?" }, { say: "What did I do yesterday?" }, { say: "Which items need a decision?" }, { say: "How did my week go?" }, { say: "What's my best habit this week?" }, { say: "Which habit did I miss most?" }, { say: "Did I journal on Sunday?" }, { say: "What note did I leave on Friday's run?" }, { say: "What's on tomorrow?" }, { say: "When is my flight tomorrow?" }, { say: "How many workouts did I log this week?" }, { say: "Which workout was longest?" }, { say: "What's left today after 6 pm?" }, { say: "Is my evening busy?" }, { say: "What time is Magnesium?" }, { say: "Remind me what Stretch is set to." }, { say: "What's the last thing on my day?" }],
     allowedWrites: [], expect: { final: [{ kind: "unchanged" }] } },
 
   { id: "new_user_evening", world: "new_user", description: "First evening, no history: no invented track record.",
