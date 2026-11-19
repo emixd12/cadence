@@ -245,6 +245,16 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   Occurrence or Behavior returns `revision_changed`, and the client reloads.
 - **Expiry.** A proposal stays open until its day ends or its item resolves. A change
   to the Timeline no longer withdraws it; Yes is checked against the current day.
+- **Re-check on open.** Each time the brief opens, `POST /api/advisor/brief/recheck`
+  checks every undecided line against the current day with the same slot check Yes
+  uses. A line whose time is taken or has passed is re-planned by the one rule, with a
+  reason that names the cause ("5:30 PM is taken now, so 6:30 PM instead."). It makes
+  no model call and does not count against the Re-plan limit. When nothing else fits
+  today the line closes as `withdrawn`. Lines that still fit are left alone, so a
+  second call writes nothing. A re-planned reason names an item, never a calendar title.
+- **Named refusals.** A refused Yes or Other time names what is in the slot now and
+  whether it changed after the brief ("5:30 PM is taken now: you moved Piano practice
+  there after this brief was written."), with the same cause as `refusal.cause`.
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
 

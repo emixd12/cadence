@@ -2742,3 +2742,21 @@ Platform impact: web and Mac call the same routes (`/api/advisor/brief/answer`,
 `/replan`, `/length`, `/move-preference`); the rules live on the server, so a future
 phone app inherits them. Marketing: no change until the messaging pass. Messaging
 impact: P-066, P-067, P-068.
+
+## 2026-11-19: Brief moves name the cause and re-check on open
+
+The owner approved two changes after reviewing the web brief's refusal screens. A
+suggestion should rarely be refused, and when it is, the person should see why.
+
+- **Re-check when the brief opens.** Every time the brief opens or reopens, Cadence
+  checks each undecided line against the current Timeline with the same rule Yes uses.
+  A line whose time is now taken arrives already re-planned, with a reason that says
+  why ("5:30 PM is taken now, so 6:30 PM instead."). No model call, and it does not use
+  up Re-plan. When nothing else fits today the line is removed.
+- **Name the cause.** A refused Yes or Other time says what is in the slot now and that
+  it changed after the brief ("5:30 PM is taken now: you moved Piano practice there
+  after this brief was written."), and returns the same cause as data.
+
+Platform impact: `POST /api/advisor/brief/recheck` and `refusal.cause` serve web (3B)
+and Mac (3C) alike; a future phone app inherits them. Marketing: none. Messaging
+impact: none (in-app refusal wording only).

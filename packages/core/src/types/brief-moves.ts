@@ -180,11 +180,31 @@ export type BriefMoveAnswerRequest =
 
 export type BriefMoveAnswerKind = BriefMoveAnswerRequest["kind"];
 
+/**
+ * What a refusal is about, when Cadence can name it. `changedAfterBrief`: the thing in
+ * the way arrived or changed after the line was written (a line's time was free when
+ * it was written, so this is the usual case).
+ *   item_there          another item sits at (or too close to) the time; `title` names it
+ *   calendar_event      a calendar event is there; `title` when the screen sent one
+ *   item_changed        the item itself changed since the line (edited or moved elsewhere)
+ *   answered_elsewhere  the line or the item was already answered (another device, or marked)
+ */
+export type BriefMoveRefusalCause = Readonly<{
+  kind: "item_there" | "calendar_event" | "item_changed" | "answered_elsewhere";
+  title?: string;
+  changedAfterBrief: boolean;
+}>;
+
 /** Why a single line's answer was not applied. Move refusals reuse Phase 2's reasons and wording. */
 export type BriefMoveRefusal = Readonly<{
   reason: string;
-  /** Plain text for the existing alert style. */
+  /**
+   * Plain text for the existing alert style. Names the cause when Cadence knows it,
+   * e.g. "5:30 PM is taken now: you moved Piano practice there after this brief was written."
+   */
   message: string;
+  /** The same cause as data. Absent when Cadence cannot name one (travel, a basic rule). */
+  cause?: BriefMoveRefusalCause;
   /** Free starts the person can pick instead, when the refusal was about the time. */
   alternatives: readonly string[];
   /** The item's current revision, so the screen can redraw it. */
@@ -226,6 +246,21 @@ export type BriefMoveReplanRequest = Readonly<{ proposalId: string; context: Bri
 export type BriefMoveReplanResponse = Readonly<{ line: BriefMoveLine | null; replacedProposalId: string }>;
 
 /**
+ * Run when the brief opens or reopens: every undecided line is checked against the day
+ * as it is now, by the same slot check Yes uses. A line whose time is taken comes back
+ * re-planned (no model call, not counted against the Re-plan limit), with a reason
+ * that names the cause ("5:30 PM is taken now, so 6:30 PM instead."). Idempotent: a
+ * second call with nothing changed returns an empty list.
+ *
+ * `proposalIds`: the lines the screen shows. When given, a listed line that closed on
+ * its own (the person moved or marked the item elsewhere) comes back with `line: null`,
+ * or with the newer line that replaced it.
+ */
+export type BriefMoveRecheckRequest = Readonly<{ localDate: string; context: BriefPlanningContext; proposalIds?: readonly string[] }>;
+/** `line: null`: hide the line (nothing fits today, or the item was moved or marked). */
+export type BriefMoveRecheckResponse = Readonly<{ replaced: readonly Readonly<{ proposalId: string; line: BriefMoveLine | null }>[] }>;
+
+/**
  * "assumes 30 min · change": the person's correction becomes the Behavior's default
  * length (their own write) and replaces the cached estimate.
  */
@@ -239,6 +274,8 @@ export type BehaviorMovePreference = Readonly<{ behaviorId: string; neverSuggest
 export const BRIEF_MOVE_ROUTES = Object.freeze({
   answer: "/api/advisor/brief/answer",
   replan: "/api/advisor/brief/replan",
+  /** POST BriefMoveRecheckRequest each time the brief opens or reopens. */
+  recheck: "/api/advisor/brief/recheck",
   length: "/api/advisor/brief/length",
   /** GET and PUT { behaviorId, neverSuggestMove }. */
   preference: "/api/advisor/brief/move-preference",
