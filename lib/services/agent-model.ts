@@ -51,16 +51,18 @@ export function agentModelSetting(agent: AgentName, override: Partial<AgentModel
 
 const GATEWAY_MODEL_ID = /^[a-z0-9-]{1,32}\/[A-Za-z0-9._:-]{1,64}$/;
 const BARE_MODEL_ID = /^[A-Za-z0-9._:-]{1,64}$/;
+/** Eval-only: a model reached through OpenRouter, for example `openrouter/deepseek/deepseek-v4.1-flash-1017`. */
+const OPENROUTER_MODEL_ID = /^openrouter\/[a-z0-9-]{1,32}\/[A-Za-z0-9._:-]{1,64}$/;
 
 /** A bare OpenAI model ID saved before Phase 1B (for example `gpt-5.6-luna`) becomes `openai/gpt-5.6-luna`. */
 export function normalizeModelId(value: string): string {
-  if (GATEWAY_MODEL_ID.test(value)) return value;
+  if (GATEWAY_MODEL_ID.test(value) || OPENROUTER_MODEL_ID.test(value)) return value;
   if (BARE_MODEL_ID.test(value)) return `openai/${value}`;
   throw new AgentModelError("invalid_model", "model_id_invalid");
 }
 
 export function isModelId(value: unknown): value is string {
-  return typeof value === "string" && (GATEWAY_MODEL_ID.test(value) || BARE_MODEL_ID.test(value));
+  return typeof value === "string" && (GATEWAY_MODEL_ID.test(value) || OPENROUTER_MODEL_ID.test(value) || BARE_MODEL_ID.test(value));
 }
 
 export type ModelTransport = "gateway" | "direct";
