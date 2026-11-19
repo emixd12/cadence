@@ -112,7 +112,7 @@ Check the cited entry before acting on a row.
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.1`.
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
 - **Next:** live check against a real account (5D).
   Switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
   add `search_advice` once 4A's matcher merges.

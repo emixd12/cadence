@@ -245,12 +245,6 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
     await settle?.(actual ?? estimate).catch(() => undefined);
 
     if (calls.length === 0) break;
-    // The medical notice alone ends the turn when the answer is already written (5D
-    // finding). A model that calls it before writing anything gets one more step to answer.
-    if (stepText && calls.every((call) => call.toolName === MEDICAL_NOTICE_TOOL.name)) {
-      if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
-      break;
-    }
     messages.push(...responseMessages);
 
     const results: Array<{ toolCallId: string; toolName: string; value: string }> = [];
@@ -259,9 +253,11 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       const args = call.input && typeof call.input === "object" && !Array.isArray(call.input) ? stripServerKeys(call.input as Record<string, unknown>) : {};
       if (call.toolName === MEDICAL_NOTICE_TOOL.name) {
         if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
+        // The model keeps the turn after the notice, so it can still help from the person's
+        // records (5D: ending the turn here left sleep and timing questions with no help).
         answer(stepText
-          ? { shown: true, note: "Cadence shows the disclaimer. Do not repeat your answer." }
-          : { shown: true, note: "Notice shown. Now answer in one or two sentences; you may discuss timing." });
+          ? { shown: true, note: "Cadence shows the disclaimer. Do not repeat what you wrote. If the question also asks about timing or the person's items, look them up and add one or two sentences; otherwise write nothing more." }
+          : { shown: true, note: "Notice shown. Now answer in one or two sentences; you may discuss timing from the person's records." });
         continue;
       }
       if (!input.tools.some((tool) => tool.name === call.toolName)) { answer({ error: "unknown_tool" }); continue; }
@@ -380,7 +376,8 @@ export function budgetText(retryAt: string | null): string {
  * The messages sent to the model: the summary of older messages, the last
  * `cap` messages as plain text, today's Timeline on a conversation's first turn,
  * and this question. Cadence's own parts (outcomes, confirms, refusals) are
- * resent as short bracketed notes so the model knows what already happened.
+ * resent as short bracketed notes so the model knows what already happened. After
+ * any history, the question carries a note that earlier replies are not a source.
  */
 export function buildHistoryMessages(input: Pick<ChatTurnInput, "history" | "summary" | "timelineJson" | "userMessage">, cap: number): ModelMessage[] {
   const recent = input.history.slice(-cap);
@@ -394,17 +391,21 @@ export function buildHistoryMessages(input: Pick<ChatTurnInput, "history" | "sum
     if (!text) continue;
     messages.push(message.role === "user" ? { role: "user", content: text } : { role: "assistant", content: text });
   }
-  const question = preamble.length ? `${preamble.join("\n\n")}\n\nThe person asks:\n${input.userMessage}` : input.userMessage;
+  const reminder = recent.length ? "\n\n(Cadence note: earlier replies are not a source. Look up any record, note, time or event you state in this answer.)" : "";
+  const question = (preamble.length ? `${preamble.join("\n\n")}\n\nThe person asks:\n${input.userMessage}` : input.userMessage) + reminder;
   messages.push({ role: "user", content: question });
   return messages;
 }
 
-/** A stored message as text for the model. Tool lines stay, so the model knows what it read; notices are left out. */
+/**
+ * A stored message as text for the model. Read lines and notices are left out: with read lines
+ * in history the model copied them as text and answered from memory (5D finding).
+ */
 export function messageText(message: ChatMessage): string {
   return message.parts.map((part) => {
     switch (part.type) {
       case "text": return part.text;
-      case "tool": return `[Cadence: ${part.tool.text}]`;
+      case "tool": return "";
       case "outcome": return `[Cadence: ${part.outcome.text}${part.outcome.undo === "done" ? " Then undone." : ""}]`;
       case "confirm": return `[Cadence asked: ${part.confirm.question} ${part.confirm.items.map((item) => item.text).join("; ")}. Answer: ${part.confirm.state}]`;
       case "refusal": return `[Cadence: ${part.refusal.text}]`;
