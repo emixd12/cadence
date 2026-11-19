@@ -1757,6 +1757,16 @@
       "id": "INT-TIMELINE-017",
       "classification": "destructive_serial_only",
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-018",
+      "classification": "destructive_serial_only",
+      "reason": "The done-at line appears only right after a late Completed mark and appends status history; it needs a seeded late item and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-019",
+      "classification": "destructive_serial_only",
+      "reason": "The reason line appears only right after a Not Completed mark and appends status history; it needs serial verification."
     }
   ]
 }

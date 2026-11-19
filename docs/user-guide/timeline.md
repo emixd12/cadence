@@ -196,6 +196,28 @@ the action and press Enter or Space. Each action keeps at least a 44-pixel
 mobile target, even when adjacent text truncates. Saving status is announced to
 assistive technology.
 
+## Add when or why to a mark
+
+**Prerequisites:** You just marked a Timeline row, on the web or on the Mac.
+
+1. If you mark an item **Completed** more than two hours after its set time,
+   a line under the row offers **Done at** its set time, **Just now**, and
+   **Other time**. A time range offers **Done earlier? Just now · Other time**
+   once two hours have passed after it ends.
+2. Choose **Done at** to save the set time, or **Other time** to type the time
+   you did it and choose **Save**. **Just now** closes the line.
+3. If you mark an item **Not Completed**, a line offers **Why?** with **No
+   time**, **Forgot**, **Low energy**, **Away** and **Chose not to**. One tap
+   saves the reason.
+
+**Result and persistence:** Cadence adds the time or reason to the item's
+history and keeps the time you tapped. The status does not change. The detail
+syncs between web and Mac like any mark and appears in export.
+
+**Recovery or undo:** Both lines are optional. Ignoring them changes nothing.
+A time after you marked the item, or before its day, is refused with one line
+that starts **Not changed.**
+
 ## Unmark a decision from the Timeline
 
 **Prerequisites:** You just marked an expanded Timeline Occurrence
