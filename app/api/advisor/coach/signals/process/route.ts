@@ -9,6 +9,8 @@ import {
   coachSignalsProcessAuthFailureLimiter,
 } from "@/lib/security/auth-failure-rate-limits";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { agentModelConfigured, agentModelSetting } from "@/lib/services/agent-model";
+import { createHostedTipVisitPort, hostedDueTipAccounts, processCoachTips, visitAdvisorTips } from "@/lib/services/advisor-tips-job.service";
 import {
   coachSignalsEnabled,
   createHostedCoachVisitPort,
@@ -19,13 +21,21 @@ import {
 
 // Advisor plan Phase 3, workstream 3D: coach signals in shadow. Vercel Cron calls this
 // hourly with `Authorization: Bearer $CRON_SECRET`. It visits accounts where it is
-// early morning local time and stores their signals; nothing is shown. Set
-// CADENCE_COACH_SIGNALS=off to stop it. Responses and monitoring carry counts only.
+// early morning local time and stores their signals. Set CADENCE_COACH_SIGNALS=off to
+// stop it. Responses and monitoring carry counts only.
+//
+// Phase 4, workstream 4B (review call T6): a second step writes the day's advisor tips
+// for accounts whose signals are stored, with its own time allowance, so a slow model
+// call never costs a signals visit. Accounts it cannot reach in time are reported as
+// left over and picked up by the next hourly run (tips are due 03:00 to 08:59 local).
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const ROUTE = "/api/advisor/coach/signals/process";
+/** Signals first, then tips; together they stay inside maxDuration with room to answer. */
+const SIGNALS_BUDGET_MS = 22_000;
+const TIPS_BUDGET_MS = 26_000;
 const RATE_LIMIT_SCOPE = "coach-signals-process-auth";
 
 export async function GET(request: NextRequest) {
@@ -64,12 +74,24 @@ async function processRequest(request: NextRequest) {
       reportMonitoringEvent({ name: "coach_signals_process_not_configured", severity: "error", context: routeContext(request) });
       return jsonError("Coach signal processing is not configured.", 503);
     }
+    const serviceRole = createServiceRoleClient();
     const result = await processCoachSignals({
-      selectDue: hostedDueCoachAccounts(createServiceRoleClient()),
+      runBudgetMs: SIGNALS_BUDGET_MS,
+      selectDue: hostedDueCoachAccounts(serviceRole),
       visit: (account) => visitCoachAccount(createHostedCoachVisitPort(account.userId)),
     });
     reportMonitoringEvent({ name: "coach_signals_process_completed", context: { ...routeContext(request), ...result } });
-    return NextResponse.json({ ok: true, enabled: true, result });
+    let tips = null;
+    if (agentModelConfigured()) {
+      const setting = agentModelSetting("coach");
+      tips = await processCoachTips({
+        runBudgetMs: TIPS_BUDGET_MS,
+        selectDue: hostedDueTipAccounts(serviceRole),
+        visit: (account) => visitAdvisorTips(createHostedTipVisitPort(account.userId, { setting }), { setting }),
+      });
+      reportMonitoringEvent({ name: "coach_tips_process_completed", context: { ...routeContext(request), ...tips } });
+    }
+    return NextResponse.json({ ok: true, enabled: true, result, tips });
   } catch (error) {
     reportMonitoringError("coach_signals_process_failed", error, routeContext(request));
     return jsonError("Unable to process coach signals.", 500);

@@ -155,7 +155,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
             </div> : null}
           </div>
         </details> : null}
-        <p className="max-w-2xl text-muted-readable">Cadence sends today’s Behavior schedule and completion history, including findings calculated from it, to OpenAI. Connected sources, reminder history and Notes are optional: nothing from them is sent unless a choice here covers it. The brief moves an item to a new time today only when you say yes. It never changes Calendar records. <a className="underline underline-offset-2" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noreferrer">OpenAI data retention may apply.</a></p>
+        <p className="max-w-2xl text-muted-readable">Cadence sends today’s Behavior schedule and completion history, including findings calculated from it, to OpenAI. Connected sources, reminder history and Notes are optional: nothing from them is sent unless a choice here covers it. The briefing cannot change tracking or Calendar records. <a className="underline underline-offset-2" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noreferrer">OpenAI data retention may apply.</a></p>
         {desktop ? <p className="max-w-2xl text-muted-readable">Hosted context does not include unsynchronized or local-only desktop data.</p> : null}
         {error ? <p role="alert" className="text-accent">{error}</p> : null}
       </div>}

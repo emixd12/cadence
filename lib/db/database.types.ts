@@ -2438,6 +2438,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      advisor_next_tip: {
+        Args: { p_spacing_minutes?: number }
+        Returns: Json
+      }
+      advisor_react_tip: {
+        Args: { p_reaction: string; p_tip_id: string }
+        Returns: Json
+      }
       agent_run_start: {
         Args: { p_model: string; p_prompt_version: string; p_trigger: string }
         Returns: {
@@ -2713,6 +2721,25 @@ export type Database = {
       }
       coach_record_signals: {
         Args: { p_run_id: string; p_signal_version: string; p_signals: Json }
+        Returns: number
+      }
+      coach_read_signals: {
+        Args: { p_local_date: string }
+        Returns: Json
+      }
+      coach_tip_history: {
+        Args: { p_since: string }
+        Returns: Json
+      }
+      coach_tips_due_accounts: {
+        Args: { p_after: string; p_limit: number }
+        Returns: {
+          local_date: string
+          user_id: string
+        }[]
+      }
+      coach_write_tips: {
+        Args: { p_run_id: string; p_tips: Json }
         Returns: number
       }
       commit_note_shortcut_state: {

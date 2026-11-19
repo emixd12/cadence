@@ -209,8 +209,7 @@ describe("Daily Brief UI", () => {
     await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, useConnectedSources: true, excludedSources: none,
       includeReminderHistory: false, includeNotes: false }));
     expect(container.querySelector('a[href="https://developers.openai.com/api/docs/guides/your-data"]')).not.toBeNull();
-    expect(container.textContent).toContain("moves an item to a new time today only when you say yes");
-    expect(container.textContent).not.toContain("cannot change tracking");
+    expect(container.textContent).toContain("cannot change tracking or Calendar records");
     expect(container.textContent).toContain("nothing from them is sent unless a choice here covers it");
   });
 });
