@@ -2665,6 +2665,15 @@ export type Database = {
         }
         Returns: Json
       }
+      answer_behavior_change_proposal: {
+        Args: {
+          p_answer: string
+          p_check_in_date?: string
+          p_proposal_id: string
+          p_today: string
+        }
+        Returns: Json
+      }
       apple_sign_in_forget_token: {
         Args: { apple_subject_digest: string; owner_id: string }
         Returns: undefined
@@ -2901,12 +2910,17 @@ export type Database = {
         }
         Returns: string
       }
+      coach_behavior_change_state: { Args: never; Returns: Json }
       coach_due_accounts: {
         Args: { p_after: string; p_limit: number }
         Returns: {
           local_date: string
           user_id: string
         }[]
+      }
+      coach_propose_behavior_change: {
+        Args: { p_proposal: Json; p_run_id: string }
+        Returns: Json
       }
       coach_record_signals: {
         Args: { p_run_id: string; p_signal_version: string; p_signals: Json }
@@ -3369,6 +3383,10 @@ export type Database = {
       read_daily_brief_preferences: { Args: never; Returns: Json }
       read_daily_brief_tip_history: { Args: never; Returns: Json }
       read_day_note_shortcut_context: { Args: never; Returns: Json }
+      read_behavior_change_proposal: {
+        Args: { p_today: string }
+        Returns: Json
+      }
       read_note_shortcut_context: {
         Args: { target_behavior_id: string }
         Returns: Json
