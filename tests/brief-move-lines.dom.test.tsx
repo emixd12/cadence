@@ -81,7 +81,7 @@ describe("move lines", () => {
     expect(answer).toHaveBeenCalledWith(expect.objectContaining({ kind: "yes", proposalId: "walk", expectedRevision: BRIEF_MOVE_FIXTURE_LINES[0]!.expectedRevision, context }));
     expect(refresh).toHaveBeenCalled();
     expect(line("walk").textContent).toContain("moved to 11:30 AM");
-    expect(line("walk").textContent).toContain(BRIEF_MOVE_LINE_EXPLAINER_YES);
+    expect(line("walk").querySelector("[data-brief-explainer]")).toBeNull();
     const drawer = document.querySelector("[data-move-toast]")!;
     expect(drawer.textContent).toContain("Walk moved to 11:30 AM for today.");
     expect(drawer.textContent).toContain(FIRST_MOVE_LINE);
@@ -89,16 +89,17 @@ describe("move lines", () => {
     await click(button(drawer, "Undo"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "undo", proposalId: "walk" }));
     expect(line("walk").dataset.briefMoveStatus).toBe("undone");
-    expect(line("walk").textContent).toContain("Not moving this today.");
+    expect(line("walk").textContent).toContain("Walk stays at 9:00 AM");
+    expect(line("walk").textContent).toContain("No more suggestions for it today.");
   });
 
-  it("shows each answer's explainer only the first time", async () => {
+  it("shows a declined line at full strength, saying where the item stays", async () => {
     await render(fixtureBriefMoveClient());
-    await click(button(line("walk"), "No"));
-    expect(line("walk").textContent).toContain("No: no more suggestions for this today.");
-    expect(line("walk").className).toContain("opacity-60");
-    await click(button(line("gym"), "No"));
-    expect(line("gym").textContent).not.toContain("No: no more suggestions");
+    await click(button(line("vitamins"), "No"));
+    expect(line("vitamins").className).not.toContain("opacity");
+    expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("No more suggestions for it today. Don’t suggest moving this");
+    expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
   });
 
   it("shows a refused Yes in the alert style with free times to pick", async () => {
@@ -219,7 +220,7 @@ describe("bubble", () => {
 
   it("shows Cadence's notices in the alert style, without repeating a stale calendar the lines already show", async () => {
     const briefing = { ...BRIEF_MOVE_FIXTURE_BRIEFING, moves: { ...BRIEF_MOVE_FIXTURE, calendar: "stale" as const },
-      notices: [{ kind: "calendar_stale", text: "Your calendar did not load." }, { kind: "budget_reached", text: "The written brief returns December 1." }] };
+      notices: [{ kind: "calendar_stale" as const, text: "Your calendar did not load." }, { kind: "budget_reached" as const, text: "The written brief returns December 1." }] };
     await act(() => root.render(<RefreshProvider onRefresh={refresh}>
       <DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
         moves={{ client: fixtureBriefMoveClient(), planningContext: () => context }} />
@@ -238,4 +239,3 @@ describe("bubble", () => {
   });
 });
 
-const BRIEF_MOVE_LINE_EXPLAINER_YES = "Yes: moves it for today only. Undo puts it back.";

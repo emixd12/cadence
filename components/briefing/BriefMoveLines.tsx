@@ -36,11 +36,7 @@ export type BriefMoveLinesProps = Readonly<{
 
 /** One short line the first time a person uses each answer (stored per browser). */
 export const BRIEF_ANSWER_EXPLAINERS: Readonly<Partial<Record<BriefMoveAnswerKind, string>>> = Object.freeze({
-  yes: "Yes: moves it for today only. Undo puts it back.",
-  no: "No: no more suggestions for this today.",
-  other_time: "Other time: moves it to the time you pick, for today only.",
-  already_done: "Already did it: marks it Completed.",
-  undo: "Undo: puts it back, and no more suggestions for this today.",
+  // Yes, No, Other time, Already did it and Undo need none: the line's own note already says what happened.
   accept_all: "Accept all: moves every item above for today. Undo all puts them back.",
   never_move: "The brief won’t suggest moving this again. You can change this in the Behavior’s settings.",
 });
@@ -321,13 +317,17 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
   const moved = (line.status === "accepted" || line.status === "other_time") && !!line.moveId;
   const pending = !!ui.pending;
   return (
-    <li className={`break-words text-sm leading-6 transition-opacity [overflow-wrap:anywhere] motion-reduce:transition-none ${closed ? "opacity-60" : ""}`}
+    <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]"
       data-brief-move-line={line.proposalId} data-brief-move-status={line.status}>
       <p>
         <span className="font-bold">{line.title}</span>{" "}
         {moved
           ? <span className="whitespace-nowrap">moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to}</span>
-          : <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>}
+          : line.status === "already_done"
+            ? <span className="whitespace-nowrap">done</span>
+            : closed
+              ? <span className="whitespace-nowrap tabular-nums">stays at {from}</span>
+              : <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>}
       </p>
       {!closed && !moved ? <p className="text-foreground">{line.reason}</p> : null}
       {!closed && !moved && (line.length.assumed || line.travel === "not_checked") ? <p className="text-xs leading-5 text-muted-readable">
@@ -344,7 +344,7 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.offerNeverMove ? <><Dot /><ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
         {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
-        {line.status === "declined" || line.status === "undone" ? "Not moving this today." : null}
+        {line.status === "declined" || line.status === "undone" ? "No more suggestions for it today." : null}
         {line.status === "already_done" ? "Marked Completed." : null}
         {line.offerNeverMove && line.status === "declined" ? <> <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
       </p>}

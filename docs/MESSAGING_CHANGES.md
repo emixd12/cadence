@@ -2016,7 +2016,10 @@ cite has not changed.
   **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says
   "read-only". Each time the brief opens, its lines are re-checked against the current
   Timeline; a line whose time was taken arrives re-planned with the cause in its reason,
-  and a refused answer names what is in the slot now (Emi, November 19).
+  and a refused answer names what is in the slot now (Emi, November 19). After No or Undo
+  a line reads "Vitamins stays at 8:00 AM" over "No more suggestions for it today." at full
+  strength, and answers no longer add a first-use explainer that repeats the line (Emi,
+  November 19).
 - **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
   `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
   suggested move", updated in the same change).

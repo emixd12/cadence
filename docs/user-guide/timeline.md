@@ -85,8 +85,8 @@ checked" means Cadence had no travel time for the new slot. Each time the brief 
 Cadence checks its lines against your Timeline as it is now. If a suggested time was taken
 after the brief was written, the line arrives with a new time and says why. Each answer
 is checked again when you tap it; if the time is no longer free, the line says **Not
-changed**, names what is there now, and offers free times instead. The first time you
-use each answer, one short line explains it.
+changed**, names what is there now, and offers free times instead. After **No**, the line says where the item stays
+("Vitamins stays at 8:00 AM") and that the brief won't suggest it again today.
 
 Linked, online desktop accounts use hosted information. Unsynchronized and
 local-only records are absent; offline tracking still works without Daily Brief.
