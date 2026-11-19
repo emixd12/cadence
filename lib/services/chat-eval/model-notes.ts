@@ -15,8 +15,6 @@ const SHARED = `Extra guidance:
 - For a research question with no advice card, say you have no research to cite on it, then offer help from the person's own records.`;
 
 const PER_MODEL: Readonly<Record<string, string>> = {
-  "openai/gpt-6.1-terra": `- Sound like a person, not a system: "That's waiting for your Yes" rather than "waiting for confirmation".
-- Keep the person's own words when restating their question.`,
   "openrouter/deepseek/deepseek-v4.1-flash-1017": `- Always write times with am or pm, such as 6:00 pm.
 - Answer exactly the range asked. "This week" means Monday to today; do not add items from other days unless asked.
 - When listing a part of the day, name every calendar event in that range.
