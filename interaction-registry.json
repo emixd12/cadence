@@ -964,13 +964,31 @@
       "reason": "Development-only Daily Brief review components for Tickets 175\u2013177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
     },
     {
+      "path": "components/briefing/BriefMoveLines.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 33,
+      "interaction_ids": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    {
+      "path": "components/briefing/DailyBriefLauncher.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-BRIEF-009"
+      ]
+    },
+    {
       "path": "components/briefing/DailyBriefBubble.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 11,
+      "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-BRIEF-002",
         "INT-BRIEF-003",
         "INT-BRIEF-005",
+        "INT-BRIEF-008",
         "INT-WEATHER-001",
         "INT-SETTINGS-019",
         "INT-SETTINGS-020"
@@ -18650,6 +18668,324 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Advisor plan Phase 2: the Mac shows synced moves read-only (Phase 2B); moving from the Mac is a later phase."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-006",
+      "name": "Answer a Daily Brief move line",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Answer one of the brief's proposed moves for today: Yes, No, Other time, Already did it, Undo, or Stop suggesting moves for <item> (advisor plan, Phase 3B).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes, No, Other time or Already did it under a move line"
+        },
+        {
+          "kind": "activate",
+          "control": "A free time, a picked time and Move, or Re-plan under Other time"
+        },
+        {
+          "kind": "activate",
+          "control": "Undo on a moved line or in the move drawer"
+        },
+        {
+          "kind": "activate",
+          "control": "Stop suggesting moves for <item>"
+        },
+        {
+          "kind": "activate",
+          "control": "change next to an assumed length, then Save"
+        }
+      ],
+      "availability": "Web Timeline, inside a ready Daily Brief that carries move lines, while the line is undecided (Undo after a move). Already did it shows on late items; Stop suggesting moves for <item> after repeated declines.",
+      "success_result": "Yes and Other time move the item for today only, the Timeline redraws and the bottom drawer confirms with Undo; No fades the line and stops suggestions for that item today; Undo puts the item back and counts as a No; Already did it marks the item Completed; Stop suggesting moves for <item> stops future suggestions for that Behavior; a corrected length becomes the Behavior's usual length and the line is re-planned. The first use of each answer shows one short line explaining it.",
+      "failure_result": "A time that is no longer free, a change on another device or a failed request shows under Not changed in the alert style with free times where there are some. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request",
+        "local_preference"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/BriefMoveLines.tsx",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "components/timeline/OccurrenceMoves.tsx",
+        "lib/ui/daily-brief-moves.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/brief-move-lines.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover each answer's request (with the screen's calendar and travel), the drawer and its brief Undo, refusals and free times, Other time, Re-plan, length correction, first-use lines and the stale-calendar notice. Server rules are covered by 3A1's tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/BriefMoveLines.tsx"
+          ],
+          "evidence": [
+            "tests/brief-move-lines.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-007",
+      "name": "Accept all or undo all Daily Brief moves",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Answer Yes to every undecided move line at once, and reverse that batch (advisor plan, Phase 3B).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Accept all above two or more undecided lines"
+        },
+        {
+          "kind": "activate",
+          "control": "Undo all after Accept all"
+        }
+      ],
+      "availability": "Web Timeline, in a ready Daily Brief with two or more undecided move lines; Undo all after Accept all.",
+      "success_result": "Each line is checked on its own at tap time; applied lines show as moved and the Timeline redraws. Undo all puts back every move of that batch that is still its item's latest move.",
+      "failure_result": "Lines that could not move keep their answers and show the refusal; a summary line says how many. A failed request changes nothing.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/BriefMoveLines.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/brief-move-lines.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the batch request, a partial refusal and Undo all."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/BriefMoveLines.tsx"
+          ],
+          "evidence": [
+            "tests/brief-move-lines.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-008",
+      "name": "Refresh the Daily Brief",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Replace today's brief with a new one that reflects the day as it is now (advisor plan, Phase 3).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh next to the brief's generated time"
+        }
+      ],
+      "availability": "Web Timeline, in a ready Daily Brief, while the server allows a refresh today (up to two, within the month's budget).",
+      "success_result": "A new brief replaces the shown one; its earlier undecided lines are closed by the server.",
+      "failure_result": "When today's refreshes are used or the budget would not cover them, or the request fails, the current brief stays and a Not refreshed notice explains why.",
+      "effects": [
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/DailyBriefLauncher.tsx",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/daily-brief-lifecycle.dom.test.tsx"
+        ],
+        "notes": "Lifecycle checks cover the refresh request, the replaced text and a refused refresh that keeps the brief."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/DailyBriefLauncher.tsx"
+          ],
+          "evidence": [
+            "tests/daily-brief-lifecycle.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-009",
+      "name": "Reopen today's Daily Brief",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Show today's brief again after Close, with its undecided lines (advisor plan, Phase 3).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Today's brief link on the Timeline"
+        }
+      ],
+      "availability": "Web Timeline, after today's brief was shown on this browser and then closed or the page reloaded.",
+      "success_result": "The same brief reappears: from page memory, or from the server's saved brief with no new model call.",
+      "failure_result": "If the saved brief cannot be loaded, the bubble shows the usual recovery notice.",
+      "effects": [
+        "local_preference",
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/DailyBriefLauncher.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/daily-brief-lifecycle.dom.test.tsx"
+        ],
+        "notes": "Lifecycle checks cover reopening from memory with no request and from the server after a reload."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/DailyBriefLauncher.tsx"
+          ],
+          "evidence": [
+            "tests/daily-brief-lifecycle.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
         },
         "marketing": {
           "applicability": "not_applicable",

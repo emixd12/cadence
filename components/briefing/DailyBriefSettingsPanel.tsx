@@ -114,7 +114,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
   const useSources = !!settings && settings.enabled && settings.useConnectedSources === true;
 
   return (
-    <SettingsPanel title="Daily Brief" description="Cadence can prepare one read-only briefing when you first open Timeline each day.">
+    <SettingsPanel title="Daily Brief" description="Cadence can prepare one brief when you first open Timeline each day.">
       {!settings ? <p role="status" className="text-sm text-muted-readable">{error || "Loading Daily Brief settings…"}</p> : !settings.available ? <p className="text-sm leading-6 text-muted-readable">This Cadence server does not offer Daily Brief.</p> : <div className="grid gap-3 text-sm leading-6">
         <label className="flex min-h-11 items-center gap-3">
           <input type="checkbox" checked={settings.enabled} disabled={saving} onChange={(event) => save({ enabled: event.target.checked })} />

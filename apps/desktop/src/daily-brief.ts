@@ -6,6 +6,7 @@ import type {
 } from "@cadence/core/types/daily-brief";
 import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefPreferenceInput, DailyBriefRequestInput } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch, withDailyBriefDeadline } from "@/lib/ui/daily-brief";
+import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { ChatGPTPlanError, chooseChatGPTPlanModel, generateChatGPTPlanDailyBrief } from "@/lib/services/daily-brief-chatgpt-plan";
 import { readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
 import type { ChatGptConnection } from "./chatgpt/connection";
@@ -34,16 +35,24 @@ const DEVICE_RELEASE_MS = 10_000;
 /** The model call ends this long before the envelope does, leaving time for complete. */
 const COMPLETE_RESERVE_MS = 8_000;
 
+/**
+ * `onAccountWrite` runs after a brief answer changed hosted records (a move, an Undo, a
+ * Completed mark, a Behavior length): the Mac pulls it through account sync, the same
+ * path every other hosted change takes. The Mac never writes the move locally.
+ */
 export function createDesktopDailyBriefClient(
   client: SupabaseClient,
   origin = readDesktopCalendarBrokerOrigin(),
   plan: DesktopDailyBriefPlan | null = null,
+  onAccountWrite: () => void = () => undefined,
 ): DailyBriefClient | null {
-  return origin ? new DesktopDailyBriefClient(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null, plan) : null;
+  return origin ? new DesktopDailyBriefClient(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null, plan, undefined, onAccountWrite) : null;
 }
 
 export class DesktopDailyBriefClient implements DailyBriefClient {
   readonly plan?: DailyBriefPlanControls;
+  /** Advisor Phase 3 (3C): brief move answers go to the hosted API with this Mac's bearer session. */
+  readonly moves: BriefMoveClient;
   /** The latest settings read; `deviceModelAvailable` decides whether the plan path can run. */
   private settings: DailyBriefSettings | null = null;
   private readonly planBriefs = new WeakSet<DailyBriefing>();
@@ -54,7 +63,9 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     private readonly accessToken: () => Promise<string | null>,
     private readonly planPath: DesktopDailyBriefPlan | null = null,
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
+    onAccountWrite: () => void = () => undefined,
   ) {
+    this.moves = createBriefMoveClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
     if (planPath) {
       this.plan = {
         usage: (briefing) => this.planBriefs.has(briefing) ? "plan" : this.planOffBriefs.has(briefing) ? "plan_off" : null,

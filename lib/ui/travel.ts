@@ -329,7 +329,7 @@ function clearTravelCacheForAccount(accountId: string): void {
 }
 /** Settings and Behavior location saves fire this event from screens where no Timeline is mounted, so invalidate at module level too. */
 function invalidateAllTravel(): void {
-  travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear(); travelOffAccounts.clear();
+  travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear(); travelTimesTokens.clear(); travelOffAccounts.clear();
   travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelTomorrowTrips.clear(); travelHomeTexts.clear(); removeTravelSession();
 }
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
@@ -342,12 +342,12 @@ export function clearTravelSession(): void { invalidateAllTravel(); clearTravelL
 /** Test-only reset of the in-memory travel view cache. `keepSession` simulates a page reload. */
 export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: boolean }> = {}): void {
   if (options.keepSession) {
-    travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
+    travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear(); travelTimesTokens.clear();
     travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear();
     travelTomorrowTrips.clear(); travelHomeTexts.clear();
     return;
   }
-  travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
+  travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear(); travelTimesTokens.clear();
   travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear(); removeTravelSession();
   travelTomorrowTrips.clear(); travelHomeTexts.clear();
 }
@@ -412,6 +412,19 @@ function rememberTravelConclusions(accountId: string, localDate: string, view: T
   const key = JSON.stringify([accountId, localDate]);
   if (view.conclusionsToken && view.expiresAt) travelConclusionTokens.set(key, { token: view.conclusionsToken, expiresAt: view.expiresAt });
   else travelConclusionTokens.delete(key);
+  if (view.travelTimesToken && view.expiresAt) travelTimesTokens.set(key, { token: view.travelTimesToken, expiresAt: view.expiresAt });
+  else travelTimesTokens.delete(key);
+}
+/**
+ * Advisor Phase 3: the latest signed travel times per account and local date, in page
+ * memory only, sent unchanged with the brief request and its move answers.
+ */
+const travelTimesTokens = new Map<string, Readonly<{ token: string; expiresAt: string }>>();
+/** The unexpired travel-times token for brief moves, or null. */
+export function travelTimesToken(accountId: string | null, localDate: string, nowMs = Date.now()): string | null {
+  if (!accountId) return null;
+  const entry = travelTimesTokens.get(JSON.stringify([accountId, localDate]));
+  return entry && Date.parse(entry.expiresAt) > nowMs ? entry.token : null;
 }
 /** The unexpired token for a Daily Brief request, or null. */
 export function travelConclusionsToken(accountId: string | null, localDate: string, nowMs = Date.now()): string | null {

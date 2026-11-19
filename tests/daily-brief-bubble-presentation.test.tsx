@@ -127,7 +127,7 @@ describe("Daily Brief visible text and quote validation", () => {
     const container = document.createElement("div");
     container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={laned} onDismiss={() => undefined} />);
     // One heading for all moves, each move a bullet with its times only.
-    const moves = container.querySelector('[aria-label="Suggestions only"]')!;
+    const moves = container.querySelector('[aria-label="Suggestions"]')!;
     expect([...moves.querySelectorAll("p")].map((item) => item.textContent)).toEqual(["New suggested time"]);
     expect([...moves.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
       "Walk: 12:30 PM–12:50 PM → 12:00 PM–12:30 PM", "Read: 12:30 PM–12:50 PM → 12:00 PM–12:30 PM",
@@ -152,7 +152,7 @@ describe("Daily Brief visible text and quote validation", () => {
     };
     const container = document.createElement("div");
     container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={laned} travel={weatherTravel} onDismiss={() => undefined} />);
-    const moves = container.querySelector('[aria-label="Suggestions only"]')!;
+    const moves = container.querySelector('[aria-label="Suggestions"]')!;
     expect(moves.textContent).toContain("New suggested time");
     expect(moves.querySelector("strong")?.textContent).toBe("Walk");
     expect(moves.textContent).toContain("overlaps planned travel.");

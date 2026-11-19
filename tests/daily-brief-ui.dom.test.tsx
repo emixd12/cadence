@@ -80,7 +80,8 @@ describe("Daily Brief UI", () => {
       plan: { usage: () => null, manageUsage, connect } });
     await act(() => root.render(<DailyBriefLauncher client={failing} desktop />));
     await vi.waitFor(() => expect(container.textContent).toContain("ChatGPT usage limit reached."));
-    const labels = [...container.querySelectorAll("button")].map((element) => element.textContent);
+    // Close sits on the title row, before the brief's own actions.
+    const labels = [...container.querySelectorAll("button")].map((element) => element.textContent).filter((label) => label !== "Close");
     expect(labels.slice(0, 2)).toEqual(["Manage usage", "Try again"]);
     await act(() => [...container.querySelectorAll("button")].find((element) => element.textContent === "Manage usage")!.click());
     expect(manageUsage).toHaveBeenCalledOnce();

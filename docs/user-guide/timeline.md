@@ -54,15 +54,45 @@ waiting for your decision; it never allows one again for you. Turning Daily Brie
 off turns all of these off, and an older Cadence app that saves Daily Brief settings
 also turns them off.
 
-The briefing can recommend changes but cannot apply them. Cadence stores no
-briefing history. When its timing expires, the bubble offers **Get a fresh brief**.
-After you mark an occurrence or other Timeline facts change, it offers **Refresh brief**.
-Neither regenerates automatically. Disable Daily Brief in Settings to stop generation.
+The brief stays until you close it or the day ends. Marking an item or another
+Timeline change does not take it away. After **Close**, a small **Today's brief**
+link on the Timeline shows it again. **Refresh**, next to the time the brief was
+made, replaces it with a new one; Cadence allows two refreshes a day while the
+month's budget covers them, and says so when it cannot. Nothing regenerates
+automatically. Disable Daily Brief in Settings to stop generation.
+
+### Answer a suggested move
+
+When something gets in the way of an item today, the brief offers one move for it as a
+line of text: the item, its current and new time ("9:00 AM → 11:30 AM") and a
+plain reason. Calendar events and travel stay where they are; the brief moves your
+items around them. Answer with the text links under the line:
+
+- **Yes** moves the item to that time for today only. The Timeline redraws and a note at
+  the bottom of the screen confirms it with **Undo**. Your schedule does not change.
+- **No** leaves the item where it is, and the brief suggests nothing more for it today.
+  The line leaves the brief, unless it offers **Stop suggesting moves for** *item*: then it
+  stays, with its reason, and says "Staying at 8:00 AM."
+- **Other time** lists other free times, lets you pick a time, or **Re-plan** finds a new
+  time with what is on your calendar now.
+- **Already did it** appears on items whose time has passed and marks the item Completed.
+- **Undo** puts a moved item back; the brief then suggests nothing more for it today, and
+  the line leaves the brief like a No.
+- **Accept all** above two or more lines answers Yes to each; **Undo all** puts that batch back.
+- **Stop suggesting moves for** *item* appears after you have said No to the same item on
+  several days. The brief then stops suggesting moves for it.
+
+"30 min is a guess · set length" means Cadence does not know how long the item takes.
+Choose **set length** to enter its usual length; the line is planned again with it. Each time the brief opens,
+Cadence checks its lines against your Timeline as it is now. If a suggested time was taken
+after the brief was written, the line arrives with a new time and says why. Each answer
+is checked again when you tap it; if the time is no longer free, the line says **Not
+changed**, names what is there now, and offers free times instead.
 
 Linked, online desktop accounts use hosted information. Unsynchronized and
 local-only records are absent; offline tracking still works without Daily Brief.
 
-Daily Brief suggestions are read-only. Any displayed scheduling option is hypothetical.
+A suggestion changes nothing until you answer it.
 A source link opens trusted catalog provenance. Editorial guidance is labeled separately
 from research. A citation is not a guarantee that advice applies to you.
 

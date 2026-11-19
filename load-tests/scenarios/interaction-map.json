@@ -1519,6 +1519,26 @@
       "reason": "Dismissal changes installation presentation metadata without a server mutation."
     },
     {
+      "id": "INT-BRIEF-006",
+      "classification": "destructive_serial_only",
+      "reason": "Brief move answers need a stored proposal, today's clock in the account's timezone, the Occurrence's revision and idempotency verification; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-BRIEF-007",
+      "classification": "destructive_serial_only",
+      "reason": "Accept all and Undo all write several moves as one batch and need stored proposals from the same serial run."
+    },
+    {
+      "id": "INT-BRIEF-008",
+      "classification": "external_provider",
+      "reason": "Refresh invokes the model provider and needs separate synthetic provider testing."
+    },
+    {
+      "id": "INT-BRIEF-009",
+      "classification": "browser_only",
+      "reason": "Reopening reads page memory or today's saved brief without a model call or server mutation."
+    },
+    {
       "id": "INT-BRIEF-003",
       "classification": "external_provider",
       "reason": "Explicit retry invokes the model provider and needs separate synthetic provider testing."

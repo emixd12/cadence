@@ -46,7 +46,6 @@
     "lib/services/reminder.service.ts": 2,
     "lib/services/travel-conclusions-token.ts": 2,
     "lib/services/travel-route-refresh.service.ts": 1,
-    "lib/ui/daily-brief.ts": 1,
     "lib/ui/leave-reminder-link.ts": 2,
     "lib/ui/travel.ts": 2,
     "packages/core/src/data-store.ts": 1,

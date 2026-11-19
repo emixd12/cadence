@@ -19,7 +19,6 @@ export type DailyBriefAttempt = Readonly<{
   accountRef: string;
   localDate: string;
   fence: string;
-  sourceKey: string;
   retry: boolean;
   controller: AbortController;
   promise: Promise<DailyBriefOutcome>;
@@ -44,7 +43,7 @@ export function currentDailyBriefAttempt(client: DailyBriefClient, settings: Dai
 export function startDailyBriefAttempt(
   client: DailyBriefClient,
   settings: DailyBriefSettings,
-  input: Readonly<{ sourceKey: string; retry: boolean; run: (signal: AbortSignal) => Promise<DailyBriefResponse> }>,
+  input: Readonly<{ retry: boolean; run: (signal: AbortSignal) => Promise<DailyBriefResponse> }>,
 ): DailyBriefAttempt {
   discardDailyBriefAttempt(client);
   const controller = new AbortController();
@@ -67,10 +66,29 @@ export function startDailyBriefAttempt(
     accountRef: settings.accountRef,
     localDate: settings.localDate,
     fence: dailyBriefFence(settings),
-    sourceKey: input.sourceKey,
     retry: input.retry,
     controller,
     promise,
+  };
+  attemptsByClient.set(client, attempt);
+  return attempt;
+}
+
+/**
+ * Remembers a brief that arrived outside an attempt (advisor Phase 3: Refresh) as the
+ * settled attempt, so a remounted launcher shows it rather than the brief it replaced.
+ */
+export function rememberSettledDailyBriefAttempt(client: DailyBriefClient, settings: DailyBriefSettings, briefing: DailyBriefing): DailyBriefAttempt {
+  discardDailyBriefAttempt(client);
+  const outcome: DailyBriefOutcome = { kind: "ready", briefing };
+  const attempt: DailyBriefAttempt = {
+    accountRef: settings.accountRef,
+    localDate: settings.localDate,
+    fence: dailyBriefFence(settings),
+    retry: false,
+    controller: new AbortController(),
+    promise: Promise.resolve(outcome),
+    outcome,
   };
   attemptsByClient.set(client, attempt);
   return attempt;

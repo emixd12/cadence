@@ -4,7 +4,6 @@ import { Suspense } from "react";
 
 import { ScreenContentLoading } from "@/components/layout/ScreenFrame";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
-import { timelineBriefKey } from "@/lib/ui/daily-brief";
 import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getCurrentUserClaims } from "@/lib/auth/current-user";
@@ -124,7 +123,7 @@ async function TimelineContent({
       todayLocalDate={timeline.todayLocalDate}
       hasMovedBefore={moveState.hasMovedBefore}
     >
-      <DailyBriefLauncher travelAccountId={userId} sourceKey={timelineBriefKey(timeline)} />
+      <DailyBriefLauncher travelAccountId={userId} />
       <FirstRunOnboardingPanel onboarding={onboarding} />
       <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
       <Timeline

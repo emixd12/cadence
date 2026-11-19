@@ -175,7 +175,8 @@ describe("Daily Brief plan states", () => {
   it("makes Manage usage the primary action of the usage-limit notice", async () => {
     await act(() => root.render(<DailyBriefBubble state="error" message="ChatGPT usage limit reached." onDismiss={noop}
       action={{ label: "Manage usage", onClick: noop }} onRetry={noop} retryLabel="Try again" />));
-    const actions = [...container.querySelectorAll("[data-daily-brief-state=error] button")].map((element) => element.textContent);
+    // Close sits on the title row, before the notice's own actions.
+    const actions = [...container.querySelectorAll("[data-daily-brief-state=error] button")].map((element) => element.textContent).filter((label) => label !== "Close");
     expect(actions.slice(0, 2)).toEqual(["Manage usage", "Try again"]);
     expect(button("Manage usage")!.className).toContain("product-action-primary");
   });

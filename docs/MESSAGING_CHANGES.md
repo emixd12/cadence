@@ -2004,4 +2004,35 @@ cite has not changed.
 - **Update needed:** describe the setting where the user guide explains Daily Brief
   moves.
 - **Related:** P-061.
+
+## P-069: The Daily Brief shows move lines people can answer (web)
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3B). Inside the Daily Brief
+  bubble, each proposed move is a line of text with **Yes · No · Other time**, plus
+  **Already did it** on late items, **Accept all** and **Undo all**, "30 min is a guess ·
+  set length" and **Don't suggest moving this**. Yes moves the item for
+  today and opens the bottom move note with Undo. The brief no longer expires after five
+  minutes and is no longer withdrawn when the Timeline changes; **Close** leaves a
+  **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says
+  "read-only". Each time the brief opens, its lines are re-checked against the current
+  Timeline; a line whose time was taken arrives re-planned with the cause in its reason,
+  and a refused answer names what is in the slot now (Emi, November 19). Each line is one
+  sentence, "Walk 9:00 AM → 11:30 AM: <reason>", and keeps its reason after an answer. After
+  No or Undo the line leaves the brief, unless it offers the lasting opt-out; then the
+  suggestion stays as written with the outcome "Staying at 8:00 AM." in italics. Every
+  outcome ("Moved to 11:30 AM for today. Undo", "Marked Completed.") uses that italic style.
+  "travel not checked" is no longer shown, a refusal is one red sentence ("Not changed. 5:30 PM is taken now: …") with no icon, and answers no
+  longer add a first-use explainer that repeats the line (Emi, November 19). The P-068
+  link now reads "Stop suggesting moves for [item]" (for example "Stop suggesting moves for
+  Vitamins") so it names the item and reads as lasting (Emi, November 19).
+- **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
+  `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
+  suggested move", updated in the same change).
+- **Surfaces:** user guide (updated), in-app copy (new). Privacy, Terms, marketing and
+  listings still call the brief read-only: covered by P-061.
+- **Conflicting current text:** "Cadence stores no briefing history" (user guide, until
+  advisor Phase 3A2 saves the shown brief) remains; P-061 owns it. The Daily Brief settings
+  panel no longer says "read-only".
+- **Update needed:** none beyond P-061.
+- **Related:** P-061, P-063.
 - **Status:** logged.

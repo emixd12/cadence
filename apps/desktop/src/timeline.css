@@ -7,4 +7,6 @@
 @source "../../../components/settings";
 /* Advisor plan Phase 1C: the shared alert notice. */
 @source "../../../components/feedback";
+/* Advisor plan Phase 3C: the shared Daily Brief bubble and its move lines. */
+@source "../../../components/briefing";
 @source "./";

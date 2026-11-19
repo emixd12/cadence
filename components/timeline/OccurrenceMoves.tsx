@@ -61,6 +61,8 @@ export type MoveRowNotice = Readonly<{
 
 type MoveToast = Readonly<{
   key: number;
+  /** Advisor Phase 3: a brief move's Undo goes through the brief's own answer (it counts as a No). */
+  onUndo?: () => Promise<void>;
   occurrenceId: string;
   title: string;
   kind: "moved" | "undone";
@@ -72,6 +74,19 @@ type MoveToast = Readonly<{
 }>;
 
 type RowMove = Readonly<{ moveId: string; reason: string | null; first: boolean }>;
+
+/** A move the Daily Brief applied (Yes, Other time), shown in the same drawer as a self-move. */
+export type BriefMoveConfirmation = Readonly<{
+  occurrenceId: string;
+  title: string;
+  moveId: string;
+  /** Time labels: where the item was and where it is now. */
+  from: string | null;
+  to: string;
+  /** From the answer: this was the person's first move ever (brief and self-moves count). */
+  showFirstMoveLine: boolean;
+  onUndo: () => Promise<void>;
+}>;
 
 export type OccurrenceMovesController = Readonly<{
   timezone: string;
@@ -88,6 +103,10 @@ export type OccurrenceMovesController = Readonly<{
   keep: (conflictId: string) => Promise<boolean>;
   menuRequest: Readonly<{ occurrenceId: string; key: number }> | null;
   openMenu: (occurrenceId: string) => void;
+  /** Advisor Phase 3: open the move drawer for a move the brief applied. */
+  confirmBriefMove: (move: BriefMoveConfirmation) => void;
+  /** Advisor Phase 3: close the drawer when it shows this item (its brief move was undone elsewhere). */
+  dismissMoveConfirmation: (occurrenceId: string) => void;
 }>;
 
 const OccurrenceMovesContext = createContext<OccurrenceMovesController | null>(null);
@@ -242,6 +261,21 @@ export function OccurrenceMovesProvider({
     },
     menuRequest,
     openMenu: (occurrenceId) => setMenuRequest((current) => ({ occurrenceId, key: (current?.key ?? 0) + 1 })),
+    confirmBriefMove(move) {
+      const first = move.showFirstMoveLine && !movedBefore.current;
+      movedBefore.current = true;
+      setRowMoves((current) => ({ ...current, [move.occurrenceId]: { moveId: move.moveId, reason: null, first } }));
+      showToast({ occurrenceId: move.occurrenceId, title: move.title, kind: "moved", from: move.from, to: move.to, revision: null, canUndo: true, onUndo: move.onUndo });
+    },
+    dismissMoveConfirmation(occurrenceId) {
+      setToast((current) => current?.occurrenceId === occurrenceId ? null : current);
+      setRowMoves((current) => {
+        if (!current[occurrenceId]) return current;
+        const next = { ...current };
+        delete next[occurrenceId];
+        return next;
+      });
+    },
   }), [actions, menuRequest, notices, pendingId, refusal, rowMoves, setNotice, showToast, timezone, todayLocalDate]);
 
   return (
@@ -254,6 +288,7 @@ export function OccurrenceMovesProvider({
         onClose={() => setToast(null)}
         onUndo={(value) => {
           setToast(null);
+          if (value.onUndo) { void value.onUndo(); return; }
           void controller.undo({ id: value.occurrenceId, title: value.title, revision: undefined }, value.revision);
         }}
       />
