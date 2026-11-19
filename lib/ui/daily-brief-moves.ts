@@ -3,27 +3,15 @@ import {
   type BehaviorMovePreference,
   type BriefMoveAnswerRequest,
   type BriefMoveAnswerResponse,
-  type BriefMoveLine,
   type BriefMoveLengthRequest,
   type BriefMoveLengthResponse,
   type BriefMoveReplanRequest,
+  type BriefMoveRecheckRequest,
+  type BriefMoveRecheckResponse,
   type BriefMoveReplanResponse,
-  type BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
 
-/**
- * Re-check on open (Emi, Nov 19): the server tests each open line against the Timeline
- * as it is now and re-plans the ones whose time was taken after the brief was written.
- * `line: null` drops a line that no longer fits or was already handled. Planner only.
- */
-export type BriefMoveRecheckRequest = Readonly<{
-  localDate: string;
-  context: BriefPlanningContext;
-  /** The lines the screen shows; a listed line that closed elsewhere comes back as null. */
-  proposalIds?: readonly string[];
-}>;
-export type BriefMoveRecheckResponse = Readonly<{ replaced: readonly Readonly<{ proposalId: string; line: BriefMoveLine | null }>[] }>;
-export const BRIEF_MOVE_RECHECK_ROUTE = "/api/advisor/brief/recheck";
+export type { BriefMoveRecheckRequest, BriefMoveRecheckResponse } from "@cadence/core/types/brief-moves";
 
 /**
  * Advisor plan Phase 3: the brief's move answers, one transport for the web (3B) and
@@ -79,6 +67,6 @@ export function createBriefMoveClient(
     readPreference: (behaviorId, signal) =>
       request<BehaviorMovePreference>(`${BRIEF_MOVE_ROUTES.preference}?behaviorId=${encodeURIComponent(behaviorId)}`, {}, signal),
     recheck: (body, signal) =>
-      request<BriefMoveRecheckResponse>(BRIEF_MOVE_RECHECK_ROUTE, { method: "POST", body: JSON.stringify(body) }, signal),
+      request<BriefMoveRecheckResponse>(BRIEF_MOVE_ROUTES.recheck, { method: "POST", body: JSON.stringify(body) }, signal),
   };
 }
