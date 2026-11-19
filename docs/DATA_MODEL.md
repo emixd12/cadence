@@ -3279,6 +3279,10 @@ the tip run turns up to three matched advice cards into one-line tips.
   model call). Job: `lib/services/advisor-tips-job.service.ts`; wording and checks:
   `lib/services/advisor-tips-writer.ts`; routes: `lib/services/advisor-tips-request.ts`
   behind `GET /api/advisor/tips/next` and `POST /api/advisor/tips/reaction`.
+- 4E (migration `20261120140000_advisor_recent_tips.sql`): `advisor_recent_tips(days, limit)`,
+  the person only, returns tips shown on the last `days` local days before today, newest
+  first (at most `limit`), for the advisor panel's "Earlier" list behind
+  `GET /api/advisor/tips/recent`. Read only.
 
 Local verification: `tests/sql/advisor-4b-tips.sql`.
 

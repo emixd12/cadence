@@ -5,6 +5,7 @@ import type {
   DailyBriefSourceFlags,
 } from "@cadence/core/types/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
+import { ADVISOR_REQUEST_DEADLINE_MS, createAdvisorClient, type AdvisorClient } from "./advisor";
 
 /** OpenAI's ChatGPT usage settings, where "Manage usage" goes (Ticket 299). */
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
@@ -40,6 +41,8 @@ export type DailyBriefClient = Readonly<{
   ) => Promise<DailyBriefResponse>;
   /** Advisor Phase 3: move answers against the hosted API. Absent where answers cannot reach it (a local-only Mac). */
   moves?: BriefMoveClient;
+  /** Advisor Phase 4 (4E): tips and schedule questions. Absent on a Mac not linked to an account. */
+  advisor?: AdvisorClient;
 }>;
 
 /**
@@ -100,6 +103,8 @@ export function createWebDailyBriefClient(fetcher: typeof fetch = fetch): DailyB
     }, { signal, deadlineMs: DAILY_BRIEF_CLIENT_DEADLINES.briefMs }),
     // The web Timeline redraws through the brief UI's own refresh after an applied answer.
     moves: createBriefMoveClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: DAILY_BRIEF_MOVE_DEADLINE_MS })),
+    // The advisor UI redraws the web Timeline through the runtime refresh after a schedule answer.
+    advisor: createAdvisorClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: ADVISOR_REQUEST_DEADLINE_MS })),
   };
 }
 
