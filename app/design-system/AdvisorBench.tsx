@@ -75,7 +75,7 @@ const OPTIONS: Readonly<Record<AdvisorBenchState, AdvisorFixtureOptions>> = {
 
 function benchBriefClient(state: AdvisorBenchState): DailyBriefClient {
   // A fresh account ref per load, so the bench's brief is never "already shown" from an earlier visit.
-  const accountRef = `advisor-bench-${Math.random().toString(36).slice(2)}`;
+  const accountRef = `advisor-bench-${crypto.randomUUID()}`;
   return {
     preferences: async () => ({ accountRef, available: true, enabled: state === "brief", revision: 1, localDate: "2026-11-19",
       timezone: TIMEZONE, includeCalendar: false }),
