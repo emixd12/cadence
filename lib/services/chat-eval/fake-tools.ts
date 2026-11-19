@@ -23,7 +23,7 @@ export type ChatToolResult =
   | Readonly<{ ok: true; result: unknown }>
   | Readonly<{ ok: false; error: Readonly<{ code: string; message: string; alternatives?: readonly unknown[] }> }>;
 
-export type ChatToolExecutor = (name: string, args: unknown, meta: Readonly<{ idempotencyKey?: string }>) => Promise<ChatToolResult>;
+export type ChatToolExecutor = (name: string, args: unknown, meta: Readonly<{ idempotencyKey?: string | null }>) => Promise<ChatToolResult>;
 
 export type ToolCallRecord = Readonly<{
   name: string;
@@ -453,27 +453,33 @@ function move(world: ChatWorld, input: Record<string, unknown>): ChatToolResult 
 
 function rangeInput(args: unknown): { start: string; end: string } | null {
   if (!isRecord(args)) return null;
-  const start = args.start_local_date;
-  const end = args.end_local_date ?? start;
+  // 5A's connector tools take start_date and end_date.
+  const start = args.start_date ?? args.start_local_date;
+  const end = args.end_date ?? args.end_local_date ?? start;
   const valid = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
   return valid(start) && valid(end) && start <= end ? { start, end } : null;
 }
 
+/** 5A's connector result: the rows, which sources were read, and a note for the model. */
 function calendarEvents(world: ChatWorld, args: unknown): ChatToolResult {
   const range = rangeInput(args);
-  if (!range) return fail("invalid_input", "Send start_local_date and end_local_date as YYYY-MM-DD.");
-  if (world.sourcesOff.has("calendar")) return ok({ status: "off", message: "The person turned off calendar reading for chat in Settings.", events: [] });
-  return ok({ status: "ok", timezone: world.timezone, events: world.events.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
-    .map((item) => ({ title: item.title, calendar: item.calendar, local_date: item.localDate, start_time: item.start, end_time: item.end, location: item.location })) });
+  if (!range) return fail("invalid_input", "Send start_date and end_date as YYYY-MM-DD.");
+  if (world.sourcesOff.has("calendar")) return ok({ events: [], sources: [{ source: "google_calendar", state: "off" }], note: "Calendars are off in Settings." });
+  return ok({ events: world.events.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
+    .map((item) => ({ title: item.title, start: toInstant(world, item.localDate, item.start), end: toInstant(world, item.localDate, item.end),
+      start_local: `${item.localDate} ${item.start}`, end_local: `${item.localDate} ${item.end}`, calendar: item.calendar, location: item.location })),
+    sources: [{ source: "google_calendar", state: "read" }], note: null });
 }
 
 function workouts(world: ChatWorld, args: unknown): ChatToolResult {
   const range = rangeInput(args);
-  if (!range) return fail("invalid_input", "Send start_local_date and end_local_date as YYYY-MM-DD.");
-  if (world.sourcesOff.has("workouts")) return ok({ status: "off", message: "The person turned off Hevy reading for chat in Settings.", workouts: [] });
-  if (world.id === "new_user") return ok({ status: "not_connected", message: "Hevy is not connected.", workouts: [] });
-  return ok({ status: "ok", workouts: world.workouts.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
-    .map((item) => ({ title: item.title, local_date: item.localDate, start_time: item.start, duration_minutes: item.minutes, exercise_count: item.exercises })) });
+  if (!range) return fail("invalid_input", "Send start_date and end_date as YYYY-MM-DD.");
+  if (world.sourcesOff.has("workouts")) return ok({ workouts: [], sources: [{ source: "hevy", state: "off" }], note: "Hevy is off in Settings." });
+  if (world.id === "new_user") return ok({ workouts: [], sources: [], note: "Hevy is not connected." });
+  return ok({ workouts: world.workouts.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
+    .map((item) => ({ title: item.title, start: toInstant(world, item.localDate, item.start),
+      end: toInstant(world, item.localDate, timeOf(minutesOf(item.start) + item.minutes)), duration_minutes: item.minutes, exercise_count: item.exercises })),
+    sources: [{ source: "hevy", state: "read" }], note: null });
 }
 
 function searchAdvice(world: ChatWorld, args: unknown): ChatToolResult {

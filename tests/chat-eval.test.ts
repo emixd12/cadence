@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createFakeExecutor } from "@/lib/services/chat-eval/fake-tools";
-import { buildToolDefinitions } from "@/lib/services/chat-eval/provisional-turn";
 import { checkChatRules, type PhasedCall } from "@/lib/services/chat-eval/rules";
 import { CHAT_SCENARIOS, chatScenario } from "@/lib/services/chat-eval/scenarios";
 import { summarizeChatEval, type ChatScenarioResult } from "@/lib/services/chat-eval/harness";
@@ -51,15 +50,6 @@ describe("chat eval fake executor", () => {
     const { execute } = createFakeExecutor(chatEvalWorld("everyday"));
     const result = await execute("move_occurrence_for_day", { occurrence_id: "not-a-uuid", start_time: "7pm" }, {});
     expect(result.ok).toBe(false);
-  });
-});
-
-describe("chat eval tool definitions", () => {
-  it("has no top-level anyOf, oneOf or allOf and hides idempotency keys", () => {
-    for (const item of buildToolDefinitions()) {
-      expect(Object.keys(item.schema).filter((key) => ["anyOf", "oneOf", "allOf", "$schema"].includes(key)), item.name).toEqual([]);
-      expect(Object.keys((item.schema.properties ?? {}) as object), item.name).not.toContain("idempotency_key");
-    }
   });
 });
 

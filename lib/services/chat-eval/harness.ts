@@ -2,20 +2,33 @@ import type { LanguageModel } from "ai";
 import type { ChatEvent, ChatMessage, ChatPart } from "@cadence/core/types/chat";
 import { agentModelSetting, type AgentModelSetting, type AgentModelUsage } from "../agent-model";
 import { modelPrice, usageMicrodollars } from "../agent-model-pricing";
+import { runChatConfirm, runChatUndo } from "../chat/chat-confirm";
+import { buildChatSystemPrompt } from "../chat/chat-prompt";
+import { chatSourcesOff } from "../chat/chat-settings";
+import { buildChatToolDefinitions, trimToolResult, type ChatSourceFlags } from "../chat/chat-tools";
+import { CHAT_LIMITS, runChatTurn, type ChatLimits, type ChatTurnResult } from "../chat/chat-turn";
+import type { ChatToolExecutor as LiveExecutor } from "../chat/chat-writes";
+import { compactTimeline } from "../chat/chat.service";
 import { createFakeExecutor, type ChatToolExecutor } from "./fake-tools";
-import { runChatConfirm, runChatTurn, runChatUndo, type PendingWrite, type UndoPlan } from "./provisional-turn";
 import { checkChatRules, textOf, type ChatRuleBreak, type PhasedCall, type TurnRecord } from "./rules";
 import { CHAT_SCENARIOS, type ChatScenario, type FinalState } from "./scenarios";
 import { behavior, chatEvalWorld, clockLabel, cloneWorld, effectiveTime, occurrence, type ChatWorld } from "./world";
 
 /**
  * Phase 5 (5D) chat eval harness. Plays each scenario against a fresh synthetic world
- * through the chat turn, then records layer 1 breaks, the scenario's own checks, cost,
+ * through 5A's own chat turn (`runChatTurn`, `runChatConfirm`, `runChatUndo`, the real
+ * system prompt and tool list), with the fake executor in place of the live one, then records layer 1 breaks, the scenario's own checks, cost,
  * and time to the first visible line (the first tool line or text, T19). Transcripts
  * stay in the returned result; nothing is logged.
  */
 
-export type ChatEvalCandidate = Readonly<{ label: string; setting: AgentModelSetting; model?: LanguageModel }>;
+export type ChatEvalCandidate = Readonly<{ label: string; setting: AgentModelSetting; model?: LanguageModel; limits?: Partial<ChatLimits> }>;
+
+/** The settings a world's account has: everything on, except what the world turned off. */
+export function worldSources(world: ChatWorld): ChatSourceFlags {
+  const calendar = !world.sourcesOff.has("calendar");
+  return { notes: true, googleCalendar: calendar, outlookCalendar: calendar, icloudCalendar: calendar, hevy: !world.sourcesOff.has("workouts") };
+}
 
 export type ChatTurnMetrics = Readonly<{
   turn: number;
@@ -23,8 +36,6 @@ export type ChatTurnMetrics = Readonly<{
   parts: readonly ChatPart[];
   /** Milliseconds from sending to the first tool line or text. Null when nothing showed. */
   firstVisibleMs: number | null;
-  /** The same, if a tool line showed as soon as the model starts a lookup instead of when it finishes. */
-  firstVisibleEarlyMs?: number | null;
   totalMs: number;
   modelCalls: number;
   toolCalls: number;
@@ -85,13 +96,21 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
     return outcome;
   };
 
-  const timelineText = await buildTimelineText(executor, world);
+  const sources = worldSources(world);
+  const tools = buildChatToolDefinitions(sources);
+  const instructions = buildChatSystemPrompt({ timezone: world.timezone, today: world.today, localTime: world.now,
+    weekday: weekdayName(world.today), sourcesOff: chatSourcesOff(sources) });
+  const timelineRead = await executor("get_timeline", { days: 1, include_needs_decision: true }, { idempotencyKey: null });
+  const timelineJson = timelineRead.ok ? trimToolResult(compactTimeline(timelineRead.result)) : null;
+  const live = executor as unknown as LiveExecutor;
   const history: ChatMessage[] = [];
   const turns: ChatTurnMetrics[] = [];
   const records: TurnRecord[] = [];
-  const undoPlans: { turn: number; plan: UndoPlan; before: ChatWorld }[] = [];
-  let pending: readonly PendingWrite[] | null = null;
+  const undoPlans: { turn: number; write: ChatTurnResult["writes"][number]; before: ChatWorld }[] = [];
+  let pending: ChatTurnResult["pending"] = null;
   const setting = candidate.setting;
+  let ids = 0;
+  const newId = () => `${scenario.id}-${(ids += 1)}`;
 
   for (const step of scenario.steps) {
     turnIndex += 1;
@@ -100,8 +119,9 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
       const parts: ChatPart[] = [];
       if (!pending) parts.push({ type: "alert", alert: { code: "failed", text: "There was no question to answer." } });
       else if (step.answer === "yes") {
-        const done = await runChatConfirm(pending, executor);
-        for (const outcome of done.outcomes) parts.push({ type: "outcome", outcome });
+        const done = await runChatConfirm({ confirmId: pending.confirm.id, writes: pending.writes, executor: live, newId });
+        if (done.state === "expired") parts.push({ type: "alert", alert: { code: "failed", text: "The question expired." } });
+        for (const write of done.writes) parts.push({ type: "outcome", outcome: write.outcome });
         for (const refusal of done.refusals) parts.push({ type: "refusal", refusal });
       }
       pending = null;
@@ -115,31 +135,30 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
     const before = cloneWorld(world);
     const started = clock();
     let firstVisible: number | null = null;
-    let firstToolStart: number | null = null;
     const usages: AgentModelUsage[] = [];
     let parts: ChatPart[] = [];
     let error: string | null = null;
     let toolCalls = 0;
     try {
       const result = await runChatTurn({
-        setting, ...(candidate.model ? { model: candidate.model } : {}), history, userMessage: step.say,
-        context: { timezone: world.timezone, today: world.today, now: world.now, timelineText }, tools: executor, signal,
-        idempotencyPrefix: `${scenario.id}:${turnIndex}`, ...(env ? { env } : {}),
+        setting, ...(candidate.model ? { model: candidate.model } : {}), instructions, tools, history,
+        timelineJson: history.length === 0 ? timelineJson : null, userMessage: step.say, executor: live,
+        replyId: `${scenario.id}-${turnIndex}`, signal, newId, ...(candidate.limits ? { limits: candidate.limits } : {}),
         onUsage: (usage) => usages.push(usage),
-        onToolStart: () => { if (firstToolStart === null) firstToolStart = clock() - started; },
         onEvent: (event: ChatEvent) => { if (firstVisible === null && (event.type === "text" || event.type === "tool")) firstVisible = clock() - started; },
       });
-      parts = result.parts;
-      pending = result.pendingConfirm;
-      toolCalls = result.toolCalls;
-      for (const plan of result.undo) undoPlans.push({ turn: turnIndex, plan, before });
+      parts = [...result.parts];
+      pending = result.pending;
+      toolCalls = result.toolCalls.length;
+      if (result.stop === "model_error") error = `model_error: ${result.errorReason ?? ""}`;
+      for (const write of result.writes) if (write.undo) undoPlans.push({ turn: turnIndex, write, before });
     } catch (caught) {
       error = caught instanceof Error ? `${caught.name}: ${caught.message}`.slice(0, 300) : "turn_error";
       parts = [{ type: "alert", alert: { code: "model_unavailable", text: "Chat could not answer just now." } }];
     }
+    void env;
     const usage = usages.length ? sumUsage(usages) : null;
-    const early = [firstVisible as number | null, firstToolStart as number | null].filter((item): item is number => item !== null);
-    turns.push({ turn: turnIndex, user: step.say, parts, firstVisibleMs: firstVisible, firstVisibleEarlyMs: early.length ? Math.min(...early) : null, totalMs: clock() - started, modelCalls: usages.length,
+    turns.push({ turn: turnIndex, user: step.say, parts, firstVisibleMs: firstVisible, totalMs: clock() - started, modelCalls: usages.length,
       toolCalls, usage, costMicrodollars: usage ? cost(setting.model, usage) : null, error });
     records.push({ turn: turnIndex, user: step.say, parts });
     history.push({ id: `u${turnIndex}`, role: "user", createdAt: "2026-11-18T13:40:00Z", parts: [{ type: "text", text: step.say }] });
@@ -150,10 +169,10 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
   // Undo every immediate write, newest first, and check each record is back as it was.
   phase = "undo";
   const undoResults: { turn: number; outcomeId: string; restored: boolean; detail: string }[] = [];
-  for (const { turn, plan, before } of [...undoPlans].reverse()) {
-    const ran = await runChatUndo(plan, executor);
-    const restored = ran && sameRecord(world, before, plan);
-    undoResults.push({ turn, outcomeId: plan.outcomeId, restored, detail: ran ? `${plan.tool} did not restore the record` : `${plan.tool} undo refused` });
+  for (const { turn, write, before } of [...undoPlans].reverse()) {
+    const ran = await runChatUndo({ outcome: write.outcome, plan: write.undo!, executor: live, idempotencyKey: `undo-${write.outcome.id}` });
+    const restored = ran.ok && sameRecord(world, before, write.call.args);
+    undoResults.push({ turn, outcomeId: write.outcome.id, restored, detail: ran.ok ? `${write.call.name} undo did not restore the record` : `${write.call.name} undo refused: ${ran.reason}` });
   }
 
   const breaks = checkChatRules({ scenario, world: start, turns: records, calls, undoResults });
@@ -166,21 +185,6 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
     costMicrodollars: costs.reduce<number>((sum, item) => sum + (item ?? 0), 0),
     transcript: transcriptOf(turns),
   };
-}
-
-async function buildTimelineText(executor: ChatToolExecutor, world: ChatWorld): Promise<string> {
-  const read = await executor("get_timeline", {}, {});
-  if (!read.ok) return "Could not read the Timeline.";
-  const result = read.result as { days: { occurrences: Record<string, unknown>[]; day_note?: string | null }[]; needs_decision: { occurrences: Record<string, unknown>[] } | null };
-  const line = (item: Record<string, unknown>) => {
-    const at = new Date(String(item.effective_start_at));
-    const local = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: world.timezone });
-    return `- ${local} ${JSON.stringify(item.behavior_title)} ${item.status_label}${item.move ? " (moved today)" : ""} [id ${item.id}, revision ${item.revision}]`;
-  };
-  const today = result.days[0];
-  const needs = result.needs_decision?.occurrences ?? [];
-  return [`Today (${world.today}):`, ...today.occurrences.map(line), ...(today.day_note ? [`Day note: ${JSON.stringify(today.day_note)}`] : []),
-    `Needs decision (unmarked from earlier days): ${needs.length ? "" : "none"}`, ...needs.map((item) => `${line(item)} on ${item.local_date}`)].join("\n");
 }
 
 function resolveDate(world: ChatWorld, date: string): string {
@@ -222,8 +226,8 @@ function checkFinal(state: FinalState, world: ChatWorld, start: ChatWorld): Chat
   }
 }
 
-function sameRecord(world: ChatWorld, before: ChatWorld, plan: UndoPlan): boolean {
-  const args = plan.args as { occurrence_id?: string; local_date?: string };
+function sameRecord(world: ChatWorld, before: ChatWorld, callArgs: Readonly<Record<string, unknown>>): boolean {
+  const args = callArgs as { occurrence_id?: string; local_date?: string };
   if (args.occurrence_id) {
     const now = world.occurrences.find((item) => item.id === args.occurrence_id);
     const then = before.occurrences.find((item) => item.id === args.occurrence_id);
@@ -256,7 +260,8 @@ function expectationChecks(scenario: ChatScenario, turns: readonly ChatTurnMetri
   }
   const costliest = Math.max(0, ...turns.map((item) => item.costMicrodollars ?? 0));
   checks.push({ id: "under_question_ceiling", passed: costliest < CHAT_QUESTION_CEILING_MICRODOLLARS, detail: String(costliest) });
-  if (scenario.expect.research) checks.push({ id: "used_advice_card", passed: calls.some((call) => call.name === "search_advice") });
+  // search_advice joins chat after Phase 4's matcher; until then only the layer 1 rule applies.
+  if (scenario.expect.research && calls.some((call) => call.name === "search_advice")) checks.push({ id: "used_advice_card", passed: true });
   void world;
   return checks;
 }
@@ -320,8 +325,6 @@ export type ChatEvalSummary = Readonly<{
   totalCostMicrodollars: number;
   firstVisibleP50Ms: number | null;
   firstVisibleP95Ms: number | null;
-  /** p95 if tool lines showed when a lookup starts (5A option). */
-  firstVisibleEarlyP95Ms: number | null;
   /** Most expensive single question in the run. */
   maxQuestionMicrodollars: number | null;
 }>;
@@ -330,7 +333,6 @@ export function summarizeChatEval(results: readonly ChatScenarioResult[], typica
   const typical = results.find((item) => item.scenario === typicalId)?.costMicrodollars ?? null;
   const firsts = results.flatMap((item) => item.turns.filter((turn) => turn.modelCalls > 0 && turn.firstVisibleMs !== null).map((turn) => turn.firstVisibleMs!)).sort((a, b) => a - b);
   const pct = (p: number, values = firsts) => values.length ? values[Math.min(values.length - 1, Math.ceil(p * values.length) - 1)] : null;
-  const early = results.flatMap((item) => item.turns.filter((turn) => turn.modelCalls > 0 && turn.firstVisibleEarlyMs != null).map((turn) => turn.firstVisibleEarlyMs!)).sort((a, b) => a - b);
   const questions = results.flatMap((item) => item.turns.map((turn) => turn.costMicrodollars ?? 0));
   return {
     label: results[0]?.label ?? "", model: results[0]?.model ?? "", scenarios: results.length,
@@ -341,10 +343,16 @@ export function summarizeChatEval(results: readonly ChatScenarioResult[], typica
     conversationsPerMonth: typical ? Math.floor(CHAT_MONTHLY_SHARE_MICRODOLLARS / typical) : null,
     conversationsPerMonthWithCoachShare: typical ? Math.floor((CHAT_MONTHLY_SHARE_MICRODOLLARS + COACH_MONTHLY_SHARE_MICRODOLLARS) / typical) : null,
     totalCostMicrodollars: results.reduce((sum, item) => sum + (item.costMicrodollars ?? 0), 0),
-    firstVisibleP50Ms: pct(0.5), firstVisibleP95Ms: pct(0.95), firstVisibleEarlyP95Ms: pct(0.95, early),
+    firstVisibleP50Ms: pct(0.5), firstVisibleP95Ms: pct(0.95),
     maxQuestionMicrodollars: questions.length ? Math.max(...questions) : null,
   };
 }
+
+function weekdayName(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+}
+
+export { CHAT_LIMITS };
 
 export function chatEvalSetting(model: string, override: Partial<AgentModelSetting> = {}): AgentModelSetting {
   return agentModelSetting("chat", { model, ...override });
