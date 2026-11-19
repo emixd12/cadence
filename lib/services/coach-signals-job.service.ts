@@ -124,9 +124,11 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
     const T = COACH_SIGNAL_THRESHOLDS;
     const [behaviors, occurrences, decisions, moves, answers] = await Promise.all([
       port.reads.behaviors(),
-      port.reads.occurrences(addDays(today, -T.historyDays), today),
+      // Through today: today's items give the per-weekday move counts and account facts.
+      // Every rate still ends yesterday.
+      port.reads.occurrences(addDays(today, -T.historyDays), addDays(today, 1)),
       port.reads.decisions(addDays(today, -T.lateMarking.windowDays), today),
-      port.reads.moves(addDays(today, -T.repeatedMove.windowDays)),
+      port.reads.moves(addDays(today, -T.repeatedMove.weekdayLookbackDays)),
       port.reads.answers(addDays(today, -T.briefAnswers.windowDays)),
     ]);
     const signals = resolveCoachSignals({ today, behaviors, occurrences, decisions, moves, answers: answers.rows });

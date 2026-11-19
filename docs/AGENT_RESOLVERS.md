@@ -329,6 +329,15 @@ of day, never titles or notes. Paired test: `tests/coach-signals.resolver.test.t
 Allowed caller: `lib/services/coach-signals-job.service.ts`. Storage and the job:
 `docs/DATA_MODEL.md`, "Coach signals in shadow".
 
+Version 2 (`coach-signals-2`, advisor plan Phase 4, workstream 4B) adds thirteen kinds in
+`packages/core/src/resolvers/coach-signals-v2.resolver.ts`, called from the same resolver,
+and widens the reads to 56 days of Occurrences (through today, with set time, schedule
+kind and planned start) and 35 days of moves. Rates count Completed and Not Completed
+marks only; time of day is the set time. It also exports `resolveCoachAccountFacts`, the
+setup facts the advice matcher uses, and `repeated_move` gains per-weekday move counts.
+Fact names follow `ADVICE_SIGNAL_FACTS` in `packages/core/src/types/advice-cards.ts`.
+Paired test: `tests/coach-signals-v2.resolver.test.ts`.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

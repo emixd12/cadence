@@ -78,9 +78,9 @@ describe("visitCoachAccount", () => {
   it("reads bounded windows ending today, stores the signals and finishes the run with no model call", async () => {
     const visit = port();
     await expect(visitCoachAccount(visit)).resolves.toEqual({ signals: 1, answersSource: "proposals" });
-    expect(visit.reads.occurrences).toHaveBeenCalledWith("2026-10-08", "2026-11-19");
+    expect(visit.reads.occurrences).toHaveBeenCalledWith("2026-09-24", "2026-11-20");
     expect(visit.reads.decisions).toHaveBeenCalledWith("2026-11-05", "2026-11-19");
-    expect(visit.reads.moves).toHaveBeenCalledWith("2026-10-22");
+    expect(visit.reads.moves).toHaveBeenCalledWith("2026-10-15");
     expect(visit.reads.answers).toHaveBeenCalledWith("2026-10-22");
     expect(visit.record).toHaveBeenCalledWith("run-1", [expect.objectContaining({ kind: "new_behavior_settled", behaviorId: "b1" })]);
     expect(visit.finishRun).toHaveBeenCalledWith("run-1", "success", null);

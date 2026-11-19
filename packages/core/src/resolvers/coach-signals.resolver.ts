@@ -1,5 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import { resolveCoachSignalsV2, weekdayMoveCounts } from "./coach-signals-v2.resolver";
+
 /**
  * Coach signals (advisor plan, Phase 3 workstream 3D; "Persistent coach", "How it runs").
  *
@@ -17,13 +19,18 @@ import { Temporal } from "@js-temporal/polyfill";
  * midnight but before the visit is already a fact.
  */
 
-export const COACH_SIGNAL_VERSION = "coach-signals-1";
+export const COACH_SIGNAL_VERSION = "coach-signals-2";
 
 export const COACH_SIGNAL_THRESHOLDS = Object.freeze({
-  /** Read this many days of Occurrences before today. */
-  historyDays: 42,
+  /** Read this many days of Occurrences before today (version 2: eight weeks for dip and recovery). */
+  historyDays: 56,
   completionDrop: { recentDays: 14, baselineDays: 28, minRecentResolved: 5, minBaselineResolved: 8, minDrop: 0.25 },
-  repeatedMove: { windowDays: 28, minSameDirectionDays: 3, minShare: 2 / 3 },
+  /**
+   * `windowDays` drives the version 1 rule. Version 2 also reads moves over
+   * `weekdayLookbackDays` for the per-weekday counts that workstream 4C uses
+   * ("4 of the last 5 matching weekdays"), and fires on `weekdayMinSameDirection`.
+   */
+  repeatedMove: { windowDays: 28, minSameDirectionDays: 3, minShare: 2 / 3, weekdayLookbackDays: 35, weekdayMinSameDirection: 4 },
   lateMarking: {
     windowDays: 14,
     behavior: { minDecisions: 5, minLateShare: 0.5 },
@@ -35,12 +42,30 @@ export const COACH_SIGNAL_THRESHOLDS = Object.freeze({
 
 const T = COACH_SIGNAL_THRESHOLDS;
 
-export type CoachSignalKind =
-  | "completion_drop"
-  | "repeated_move"
-  | "late_marking"
-  | "new_behavior_settled"
-  | "brief_answers";
+export const COACH_SIGNAL_KINDS = [
+  // Version 1 (3D).
+  "completion_drop",
+  "repeated_move",
+  "late_marking",
+  "new_behavior_settled",
+  "brief_answers",
+  // Version 2 (4B, ./coach-signals-v2.ts).
+  "weekly_numbers",
+  "weekday_gap",
+  "time_of_day_gap",
+  "timing_mode_gap",
+  "steady_behavior",
+  "never_done",
+  "dip_recovery",
+  "day_shape",
+  "unmarked_items",
+  "marking_time",
+  "done_together",
+  "crowded_hour",
+  "setup_gaps",
+] as const;
+
+export type CoachSignalKind = (typeof COACH_SIGNAL_KINDS)[number];
 
 export type CoachSignalFacts = Readonly<Record<string, string | number | boolean | null | readonly number[] | Readonly<Record<string, number>>>>;
 
@@ -58,12 +83,24 @@ export type CoachSignalBehavior = Readonly<{
   timezone: string;
   /** False for archived or paused Behaviors: they get no signal. */
   active: boolean;
+  /** Version 2: has a length (default duration). Undefined when not read. */
+  hasLength?: boolean;
+  /** Version 2: has a Where set (anywhere, home or a place). Undefined when not read. */
+  hasPlace?: boolean;
 }>;
 
 export type CoachSignalOccurrence = Readonly<{
   behaviorId: string;
   localDate: string;
   status: "unresolved" | "completed" | "not_completed";
+  /** Version 2 fields. Optional so version 1 fixtures stay valid; a signal that needs one skips rows without it. */
+  id?: string;
+  /** "exact" = a set time, "range" = a time range. */
+  scheduleKind?: "exact" | "range";
+  /** The set start time, local "HH:MM" or "HH:MM:SS". Time-of-day facts use this, never the mark time (T3). */
+  startTime?: string;
+  /** The planned start instant (ISO), before any move. */
+  plannedStartAt?: string;
 }>;
 
 /** The first explicit decision on an Occurrence (not a correction, not an import). */
@@ -125,6 +162,7 @@ export function resolveCoachSignals(input: ResolveCoachSignalsInput): CoachSigna
     ...lateMarking(input, active),
     ...newBehaviorsSettled(input, active),
     ...briefAnswers(input, active),
+    ...resolveCoachSignalsV2(input, active),
   ];
 }
 
@@ -181,9 +219,10 @@ type NetMove = Readonly<{ localDate: string; weekday: number; shiftMinutes: numb
  */
 function repeatedMoves(input: ResolveCoachSignalsInput, active: ReadonlyMap<string, CoachSignalBehavior>): CoachSignal[] {
   const windowStart = addDays(input.today, -T.repeatedMove.windowDays);
+  const lookbackStart = addDays(input.today, -T.repeatedMove.weekdayLookbackDays);
   const chains = new Map<string, CoachSignalMove[]>();
   for (const move of input.moves) {
-    if (!active.has(move.behaviorId) || move.localDate < windowStart || move.localDate > input.today) continue;
+    if (!active.has(move.behaviorId) || move.localDate < lookbackStart || move.localDate > input.today) continue;
     const chain = chains.get(move.occurrenceId) ?? [];
     chain.push(move);
     chains.set(move.occurrenceId, chain);
@@ -221,26 +260,44 @@ function repeatedMoves(input: ResolveCoachSignalsInput, active: ReadonlyMap<stri
       const current = perDay.get(move.localDate);
       if (!current || Math.abs(move.shiftMinutes) > Math.abs(current.shiftMinutes)) perDay.set(move.localDate, move);
     }
-    const days = [...perDay.values()];
-    const later = days.filter((move) => move.shiftMinutes > 0);
-    const earlier = days.filter((move) => move.shiftMinutes < 0);
-    const same = later.length >= earlier.length ? later : earlier;
-    if (same.length < T.repeatedMove.minSameDirectionDays || same.length / days.length < T.repeatedMove.minShare) continue;
+    // Version 2: per-weekday counts over the last five matching weekdays (workstream 4C).
+    const scheduledDates = input.occurrences.filter((row) => row.behaviorId === behaviorId).map((row) => row.localDate);
+    const weekdays = weekdayMoveCounts(input.today, scheduledDates,
+      new Map([...perDay].map(([date, move]) => [date, move.shiftMinutes])));
+    const weekdayRule = Object.keys(weekdays.weekday_matching).some((day) =>
+      Math.max(weekdays.weekday_later[day] ?? 0, weekdays.weekday_earlier[day] ?? 0) >= T.repeatedMove.weekdayMinSameDirection);
+
+    const recent = [...perDay.values()].filter((move) => move.localDate >= windowStart);
+    const pick = (days: readonly NetMove[]) => {
+      const later = days.filter((move) => move.shiftMinutes > 0);
+      const earlier = days.filter((move) => move.shiftMinutes < 0);
+      return { days, same: later.length >= earlier.length ? later : earlier, direction: later.length >= earlier.length ? "later" : "earlier" };
+    };
+    const inPeriod = pick(recent);
+    const windowRule = inPeriod.same.length >= T.repeatedMove.minSameDirectionDays
+      && inPeriod.same.length / inPeriod.days.length >= T.repeatedMove.minShare;
+    if (!windowRule && !weekdayRule) continue;
+    // The weekday rule can fire on moves older than 28 days; then the facts
+    // describe the whole lookback.
+    const basis = windowRule ? inPeriod : pick([...perDay.values()]);
+    const windowDays = windowRule ? T.repeatedMove.windowDays : T.repeatedMove.weekdayLookbackDays;
+    const { same, days, direction } = basis;
     const targetMedian = median(same.map((move) => move.targetMinute));
     signals.push({
       kind: "repeated_move",
       behaviorId,
       facts: {
-        window_days: T.repeatedMove.windowDays,
+        window_days: windowDays,
         moved_days: days.length,
         same_direction_days: same.length,
-        direction: same === later ? "later" : "earlier",
+        direction,
         median_shift_minutes: Math.round(median(same.map((move) => move.shiftMinutes))),
         median_target_time: clockTime(targetMedian),
         target_spread_minutes: Math.max(...same.map((move) => Math.abs(move.targetMinute - targetMedian))),
         weekdays: [...new Set(same.map((move) => move.weekday))].sort((a, b) => a - b),
         by_source: tallyBy(same.map((move) => move.source)),
         last_moved_date: same.map((move) => move.localDate).sort().at(-1)!,
+        ...weekdays,
       },
     });
   }

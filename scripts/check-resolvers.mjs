@@ -51,6 +51,7 @@ const resolverRegistry = [
   { domain: "briefing planner", resolver: "packages/core/src/resolvers/briefing-plan.resolver.ts", test: "tests/briefing-plan.resolver.test.ts", source: "docs/TICKETS.md" },
   { domain: "briefing analysis lanes", resolver: "packages/core/src/resolvers/briefing-analysis.resolver.ts", test: "tests/briefing-analysis.resolver.test.ts", source: "docs/TICKETS.md" },
   { domain: "coach signals", resolver: "packages/core/src/resolvers/coach-signals.resolver.ts", test: "tests/coach-signals.resolver.test.ts", source: "docs/DATA_MODEL.md" },
+  { domain: "coach signals version 2", resolver: "packages/core/src/resolvers/coach-signals-v2.resolver.ts", test: "tests/coach-signals-v2.resolver.test.ts", source: "docs/DATA_MODEL.md" },
   {
     domain: "day-progress layout",
     resolver: "packages/core/src/resolvers/day-progress.resolver.ts",

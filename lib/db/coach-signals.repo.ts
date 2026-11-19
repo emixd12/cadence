@@ -82,18 +82,23 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
   return {
     async behaviors() {
       const { data, error } = await client.from("behaviors")
-        .select("id,created_at,timezone,active,archived_at").eq("user_id", userId);
+        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind").eq("user_id", userId);
       if (error) throw new CoachSignalsError("read_behaviors_failed");
       return (data ?? []).map((row) => ({
         id: row.id, createdAt: row.created_at, timezone: row.timezone, active: row.active && row.archived_at === null,
+        hasLength: row.default_duration_minutes !== null, hasPlace: row.where_kind !== null,
       }));
     },
     async occurrences(since, before) {
       const rows = await pages("read_occurrences_failed", (from, to) => client.from("occurrences")
-        .select("id,behavior_id,local_date,status").eq("user_id", userId)
+        .select("id,behavior_id,local_date,status,schedule_kind,schedule_start_time,scheduled_for").eq("user_id", userId)
         .gte("local_date", since).lt("local_date", before).order("id").range(from, to));
       return rows.flatMap((row) => isStatus(row.status)
-        ? [{ behaviorId: row.behavior_id, localDate: row.local_date, status: row.status }] : []);
+        ? [{
+          id: row.id, behaviorId: row.behavior_id, localDate: row.local_date, status: row.status,
+          scheduleKind: row.schedule_kind === "range" ? "range" as const : "exact" as const,
+          startTime: row.schedule_start_time, plannedStartAt: row.scheduled_for,
+        }] : []);
     },
     async decisions(since, before) {
       // First explicit decisions only: a mark from Unresolved, made by the person.

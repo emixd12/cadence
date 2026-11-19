@@ -2040,3 +2040,23 @@ cite has not changed.
 - **Update needed:** none beyond P-061.
 - **Related:** P-061, P-063.
 - **Status:** logged.
+
+## P-070: Daily Brief settings no longer say the brief cannot change records
+
+- **Change:** implemented November 19, 2026 (advisor plan Phase 4, workstream 4B, review
+  call T18). The Daily Brief settings panel said "The briefing cannot change tracking or
+  Calendar records", untrue since Phase 3 (P-061). It now says: "The brief moves an item to
+  a new time today only when you say yes. It never changes Calendar records." The same
+  change widens the overnight coach signals (P-064) from five patterns to eighteen, still
+  counts only, no model call, no titles or notes: weekly numbers, weekday gap, time-of-day
+  gap, set time or window, steady item, never done, dip and recovery, day shape, unmarked
+  items, marking time, done together, crowded hour and setup gaps.
+- **Affected:** `components/briefing/DailyBriefSettingsPanel.tsx`,
+  `packages/core/src/resolvers/coach-signals-v2.ts`.
+- **Surfaces:** in-app Settings (fixed here). Privacy and Terms still carry the old sentence
+  (`components/settings/LegalContent.tsx`, already logged as P-065) and the five-pattern
+  description of P-064.
+- **Update needed:** when P-064 is written up, list the pattern families in general terms
+  rather than the original five.
+- **Related:** P-061, P-064, P-065.
+- **Status:** in-app line fixed; legal text logged.
