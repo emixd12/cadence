@@ -201,6 +201,12 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       });
       for await (const part of result.fullStream) {
         if (part.type === "text-delta" && part.text) emit({ type: "text", delta: part.text });
+        // The muted line shows as soon as the model starts a lookup, not after it finishes,
+        // so the first visible line comes early (5D's 2-second bar). A failed read adds its own line.
+        else if (part.type === "tool-input-start" && toolsAllowed && !isChatWrite(part.toolName)
+          && input.tools.some((tool) => tool.name === part.toolName) && toolCalls.length < limits.maxToolCalls) {
+          toolLine(CHAT_TOOL_SUBJECT[part.toolName], "done");
+        }
         else if (part.type === "tool-call") calls.push({ toolCallId: part.toolCallId, toolName: part.toolName, input: part.input });
         else if (part.type === "error") throw part.error;
       }
@@ -222,6 +228,11 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
     await settle?.(actual ?? estimate).catch(() => undefined);
 
     if (calls.length === 0) break;
+    // The medical notice alone ends the turn: the answer is already written (5D finding).
+    if (calls.every((call) => call.toolName === MEDICAL_NOTICE_TOOL.name)) {
+      if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
+      break;
+    }
     messages.push(...responseMessages);
 
     const results: Array<{ toolCallId: string; toolName: string; value: string }> = [];
@@ -230,7 +241,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       const args = call.input && typeof call.input === "object" && !Array.isArray(call.input) ? stripServerKeys(call.input as Record<string, unknown>) : {};
       if (call.toolName === MEDICAL_NOTICE_TOOL.name) {
         if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
-        answer({ shown: true });
+        answer({ shown: true, note: "Cadence shows the disclaimer. Do not repeat your answer." });
         continue;
       }
       if (!input.tools.some((tool) => tool.name === call.toolName)) { answer({ error: "unknown_tool" }); continue; }

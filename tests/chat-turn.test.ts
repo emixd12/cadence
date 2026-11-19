@@ -29,6 +29,8 @@ function scriptedModel(steps: Step[]) {
       const chunks: unknown[] = [{ type: "stream-start", warnings: [] }];
       if (step.text) chunks.push({ type: "text-start", id: "t" }, { type: "text-delta", id: "t", delta: step.text }, { type: "text-end", id: "t" });
       for (const call of step.calls ?? []) {
+        chunks.push({ type: "tool-input-start", id: `call-${callId}`, toolName: call.name });
+        chunks.push({ type: "tool-input-end", id: `call-${callId}` });
         chunks.push({ type: "tool-call", toolCallId: `call-${callId++}`, toolName: call.name, input: JSON.stringify(call.input) });
       }
       chunks.push({ type: "finish", usage, finishReason: { unified: step.calls?.length ? "tool-calls" : "stop", raw: undefined } });
@@ -108,6 +110,16 @@ describe("chat turn (5A)", () => {
     expect(result.pending).toBeNull();
   });
 
+  it("shows the lookup line when the model starts the call, before the read finishes", async () => {
+    const order: string[] = [];
+    const fake = fakeExecutor();
+    const executor: ChatToolExecutor = async (...args) => { order.push(`run:${args[0]}`); return fake.executor(...args); };
+    const { promise } = turn([{ calls: [{ name: "get_timeline", input: {} }] }, { text: "ok" }], { ...fake, executor },
+      { onEvent: (event) => { if (event.type === "tool") order.push("line"); } });
+    await promise;
+    expect(order).toEqual(["line", "run:get_timeline"]);
+  });
+
   it("runs the first single-record write at once with an Undo", async () => {
     const { promise, fake } = turn([{ calls: [{ name: "set_occurrence_status", input: { occurrence_id: "o1", status: "completed" } }] }, { text: "Done." }]);
     const result = await promise;
@@ -153,8 +165,11 @@ describe("chat turn (5A)", () => {
   });
 
   it("shows the medical disclaimer once when the model declines", async () => {
-    const { promise } = turn([{ text: "Cadence does not advise on medical matters.", calls: [{ name: "medical_notice", input: {} }] }, { text: "" }]);
+    const { promise } = turn([{ text: "Cadence does not advise on medical matters.", calls: [{ name: "medical_notice", input: {} }] }, { text: "Repeated answer." }]);
     const result = await promise;
+    // The notice alone ends the turn: no second model call repeats the answer.
+    expect(result.modelCalls).toBe(1);
+    expect(result.parts.filter((part) => part.type === "text")).toEqual([{ type: "text", text: "Cadence does not advise on medical matters." }]);
     expect(result.parts.filter((part) => part.type === "notice")).toEqual([{ type: "notice", notice: { kind: "medical", text: "Cadence does not advise on medical matters." } }]);
     expect(result.toolCalls).toEqual([]);
   });
