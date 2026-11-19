@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-19.4",
+  "version": "2026-11-19.5",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -235,7 +235,8 @@
       "limitation": "The studies tested monitoring more often, not marking sooner; marking on the same day is our reading of it.",
       "quip_seeds": [
         "{later_day} of your last {decisions|mark|marks} came a day or more late.",
-        "Your marks usually land {median_lag_days|day|days} after the item."
+        "Your marks usually land {median_lag_days|day|days} after the item.",
+        "{behavior}: {later_day} of the last {decisions|mark|marks} came a day or more late."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -297,7 +298,8 @@
       "limitation": "The programs targeted eating and physical activity; other kinds of routines were not studied.",
       "quip_seeds": [
         "This week: {week_completed} done, {week_not_completed} not done ({week_rate_pct}). Your usual is {prior_rate_pct}.",
-        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks|week|weeks} before."
+        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks|week|weeks} before.",
+        "{behavior} this week: {week_rate_pct}, against {prior_rate_pct} usually."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -390,7 +392,8 @@
       "limitation": "The trial studied one eating habit; it shows no difference on average, and individuals may differ.",
       "quip_seeds": [
         "Window items get done {window_rate_pct} of the time, set-time items {set_time_rate_pct}.",
-        "Window items: {window_rate_pct}. Set-time items: {set_time_rate_pct}. One of the two suits you better."
+        "Window items: {window_rate_pct}. Set-time items: {set_time_rate_pct}. One of the two suits you better.",
+        "{behavior} with a time range: {window_rate_pct} done. With a set time: {set_time_rate_pct}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -501,7 +504,8 @@
       "limitation": "The study looked at single missed days, not long breaks.",
       "quip_seeds": [
         "Most misses land on just {bad_days|day|days}.",
-        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days|day|days}."
+        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days|day|days}.",
+        "Misses of {behavior} bunch up on {bad_days|day|days}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -563,7 +567,8 @@
       "limitation": "A Cadence product rule, not research evidence.",
       "quip_seeds": [
         "{unmarked|item waits|items wait} unmarked; the oldest is {oldest_days|day|days} old.",
-        "{unmarked|item has|items have} no mark yet."
+        "{unmarked|item has|items have} no mark yet.",
+        "{behavior} has {unmarked|item|items} waiting for a mark."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -594,7 +599,8 @@
       "limitation": "The studies compared recording with not recording; they did not test how soon to record.",
       "quip_seeds": [
         "You usually mark items around {median_mark_time_clock}, {median_lag_hours_duration} after they are set. Try marking as you finish.",
-        "{same_day_share_pct} of your marks are made the same day. Marking as you finish keeps the record exact."
+        "{same_day_share_pct} of your marks are made the same day. Marking as you finish keeps the record exact.",
+        "{behavior} usually gets marked around {median_mark_time_clock}, {median_lag_hours_duration} after it is set."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -662,7 +668,8 @@
       "limitation": "Lab and field experiments with short tasks; a full day of routines may behave differently.",
       "quip_seeds": [
         "{items_in_hour|item is|items are} set for {hour_label}, done {hour_rate_pct} of the time.",
-        "Items at {hour_label}: {hour_rate_pct} done. Other hours: {other_rate_pct}."
+        "Items at {hour_label}: {hour_rate_pct} done. Other hours: {other_rate_pct}.",
+        "{behavior} shares {hour_label} with other items and gets done {hour_rate_pct} of the time there."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -773,7 +780,8 @@
       "limitation": "The review tested if-then plans that people made themselves, not phone reminders.",
       "quip_seeds": [
         "Items get done within 30 minutes of the reminder {quick_share_pct} of the time.",
-        "Marked items are usually done {median_minutes_after_duration} after the reminder."
+        "Marked items are usually done {median_minutes_after_duration} after the reminder.",
+        "{behavior} gets done within 30 minutes of its reminder {quick_share_pct} of the time."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -847,7 +855,8 @@
       "limitation": "The trial studied one everyday eating habit over 84 days; some moves are unavoidable and still worth making.",
       "quip_seeds": [
         "Moved items got done {moved_rate_pct} of the time; items left in place, {unmoved_rate_pct}.",
-        "Items left at their usual time: {unmoved_rate_pct} done. Moved: {moved_rate_pct}."
+        "Items left at their usual time: {unmoved_rate_pct} done. Moved: {moved_rate_pct}.",
+        "{behavior}: {unmoved_rate_pct} done at its usual time, {moved_rate_pct} when moved."
       ],
       "audience": "any_account",
       "reviewed_at": null,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import document from "@/packages/core/src/data/advice-library.json";
-import { ADVICE_CARDS, ADVICE_SOURCES, adviceSourceFor, fillQuipSeed, parseAdviceLibrary } from "@cadence/core/services/advice-library";
+import { ADVICE_CARDS, ADVICE_SOURCES, adviceSourceFor, fillQuipSeed, parseAdviceLibrary, quipSeedsFor } from "@cadence/core/services/advice-library";
 import { BRIEFING_REFERENCES } from "@cadence/core/services/briefing-references";
 import { ADVICE_SIGNAL_FACTS, ADVICE_SIGNAL_KINDS_V1, ADVICE_SIGNAL_KINDS_V2 } from "@cadence/core/types/advice-cards";
 
@@ -42,6 +42,8 @@ describe("parseAdviceLibrary", () => {
     ["product rule on research", { evidence: { ...CARD.evidence, strength: "product_rule" } }, "product_rule"],
     ["advice without full stop", { advice: "Plan the cue" }, "full stop"],
     ["bad review date", { reviewed_at: "2026-02-30" }, "real date"],
+    ["no Behavior line for a Behavior rule", { quip_seeds: ["{recent_completed}.", "Two."] }, "starts from {behavior}"],
+    ["no account line for an either rule", { applies_when: [{ signal: "completion_drop", scope: "either", facts: [] }], quip_seeds: ["{behavior}.", "{behavior} two."] }, "without {behavior}"],
     ["duration on a count", { quip_seeds: ["{recent_completed_duration}.", "Two."] }, "have a duration"],
   ])("rejects %s", (_, change, message) => {
     expect(() => parseAdviceLibrary(lib([{ ...CARD, ...change }]))).toThrow(message);
@@ -54,6 +56,23 @@ describe("parseAdviceLibrary", () => {
     expect(() => parseAdviceLibrary(lib([], [{ ...SOURCE, doi: "abc", url: "https://doi.org/abc" }]))).toThrow("not a DOI");
     expect(() => parseAdviceLibrary(lib([], [{ ...SOURCE, url: "http://x.org", doi: null }]))).toThrow("https");
     expect(() => parseAdviceLibrary(lib([], [{ ...SOURCE, id: BRIEFING_REFERENCES[0]!.id }]))).toThrow("not unique");
+  });
+});
+
+describe("quipSeedsFor", () => {
+  it("names the Behavior for a Behavior signal and never for an account-wide one", () => {
+    const card = parseAdviceLibrary(lib([{ ...CARD, applies_when: [{ signal: "completion_drop", scope: "either", facts: [] }] }])).cards[0]!;
+    expect(quipSeedsFor(card, "b-gym")).toEqual([CARD.quip_seeds[0]]);
+    expect(quipSeedsFor(card, null)).toEqual([CARD.quip_seeds[1]]);
+  });
+
+  it("leaves every shipped match at least one line", () => {
+    for (const card of ADVICE_CARDS) {
+      for (const rule of card.applies_when) {
+        if (rule.scope !== "account") expect(quipSeedsFor(card, "b-1"), card.id).not.toEqual([]);
+        if (rule.scope !== "behavior") expect(quipSeedsFor(card, null), card.id).not.toEqual([]);
+      }
+    }
   });
 });
 
