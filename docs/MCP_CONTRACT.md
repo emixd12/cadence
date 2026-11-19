@@ -92,7 +92,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.3.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.4.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -247,7 +247,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.3.0"` |
+| `contract_version` | yes | `"1.4.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`

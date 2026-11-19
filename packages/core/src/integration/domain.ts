@@ -6,6 +6,7 @@
  * records carry an opaque `revision`. Needs decision is derived and never
  * stored. Account identity appears only as a per-client pairwise id.
  */
+import { NOT_DONE_REASONS } from "../resolvers/status.resolver";
 import { WEEKDAYS } from "../types/recurrence";
 import { INTEGRATION_LIMITS, INTEGRATION_REMINDER_OFFSETS } from "./limits";
 import {
@@ -368,7 +369,8 @@ export const statusHistoryEntry = object({
   semantics: enumOf(STATUS_SEMANTICS),
   capture_method: enumOf(CAPTURE_METHODS),
   recorded_at: utcInstant(),
-  effective_at: nullable(utcInstant()),
+  effective_at: nullable(utcInstant(), { description: "When it really happened. For Completed it can be earlier than recorded_at when the person said when they did it (contract 1.4.0)." }),
+  not_done_reason: nullable(enumOf(NOT_DONE_REASONS), { description: "The optional one-tap reason the person gave on a Not Completed mark. Null otherwise (contract 1.4.0)." }),
   local_date: localDate(),
   timezone: timezone(),
 });

@@ -10,6 +10,7 @@ import { resolvePersistedTimeline } from "@cadence/core/services/timeline.servic
 import { resolveAdherenceCounts } from "@cadence/core/resolvers/analytics.resolver";
 import { resolveOccurrenceTimeTracking } from "@cadence/core/resolvers/time-tracking.resolver";
 import { normalizeOccurrenceStatus } from "@cadence/core/services/occurrence.service";
+import { notDoneReasonOf } from "@cadence/core/resolvers/status.resolver";
 import { TIMELINE_MAX_FUTURE_DAYS } from "@cadence/core/resolvers/timeline.resolver";
 import { DEFAULT_TIMEZONE } from "@cadence/core/types/recurrence";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
@@ -123,6 +124,7 @@ async function occurrenceDetail(context: IntegrationContext, account: Account, i
       capture_method: event.source_capture_method as OccurrenceDetailOutput["status_history"][number]["capture_method"],
       recorded_at: integrationInstant(event.recorded_at),
       effective_at: event.effective_at === null ? null : integrationInstant(event.effective_at),
+      not_done_reason: notDoneReasonOf(event.reason_code),
       local_date: event.local_date, timezone: event.timezone,
     })),
     time_sessions: sessions.map((session) => ({

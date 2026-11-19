@@ -57,7 +57,9 @@ beforeEach(() => {
   mocks.categories.mockResolvedValue([{ id: id(20), user_id: id(1), name: "Health", description: null, sort_order: 1, created_at: at, updated_at: at }]);
   mocks.references.mockResolvedValue(new Map([[id(10), "external-walk"]]));
   mocks.events.mockResolvedValue([{ id: id(40), user_id: id(1), previous_status: null, status: "unresolved", status_semantics: "system_rule_declared",
-    source_capture_method: "system_generated", recorded_at: at, effective_at: null, local_date: "2026-03-08", timezone: "America/New_York" }]);
+    source_capture_method: "system_generated", recorded_at: at, effective_at: null, local_date: "2026-03-08", timezone: "America/New_York" },
+    { id: id(41), user_id: id(1), previous_status: "not_completed", status: "not_completed", status_semantics: "explicit_user_correction",
+      source_capture_method: "manual_tap", recorded_at: at, effective_at: at, local_date: "2026-03-08", timezone: "America/New_York", reason_code: "not_done:low_energy" }]);
   mocks.sessions.mockResolvedValue([{ id: id(50), user_id: id(1), started_at: "2026-03-08T07:00:00Z", stopped_at: "2026-03-08T07:10:00Z" }]);
   mocks.fresh.mockResolvedValue({ synced: true });
   mocks.dayNotes.mockResolvedValue([
@@ -212,7 +214,7 @@ describe("integration read handlers", () => {
 
   it("keeps existing long notes unchanged and exposes full detail with seconds", async () => {
     occurrences[0].note = "n".repeat(3000);
-    expect(await readOperationHandlers.get_occurrence(context, inputs.get_occurrence)).toMatchObject({ ok: true, value: { occurrence: { note: occurrences[0].note, status_history: [{ id: id(40) }], time_sessions: [{ duration_seconds: 600 }] } } });
+    expect(await readOperationHandlers.get_occurrence(context, inputs.get_occurrence)).toMatchObject({ ok: true, value: { occurrence: { note: occurrences[0].note, status_history: [{ id: id(40), not_done_reason: null }, { id: id(41), not_done_reason: "low_energy" }], time_sessions: [{ duration_seconds: 600 }] } } });
   });
 
   it("returns not_found without exposing another account's record or error details", async () => {

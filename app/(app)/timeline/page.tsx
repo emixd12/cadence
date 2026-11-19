@@ -27,6 +27,8 @@ import {
   suggestMoveTimesAction,
 } from "./move-actions";
 import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
+import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
+import { recordDoneAtAction, recordNotDoneReasonAction } from "./mark-detail-actions";
 import { MoveConflictNotices, type MoveConflictNotice } from "@/components/timeline/MoveConflictNotices";
 import { hasPersonMovedBefore, listOpenMoveConflicts } from "@/lib/services/occurrence-move.service";
 import { systemClock } from "@/lib/services/clock";
@@ -39,6 +41,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 // Advisor plan, Phase 2C: the person's own per-day moves from the Timeline row.
+const MARK_DETAIL_ACTIONS: OccurrenceMarkDetailActions = {
+  doneAt: recordDoneAtAction,
+  notDoneReason: recordNotDoneReasonAction,
+};
+
 const MOVE_ACTIONS: OccurrenceMoveActions = {
   move: moveOccurrenceAction,
   revert: revertOccurrenceMoveAction,
@@ -123,6 +130,7 @@ async function TimelineContent({
       todayLocalDate={timeline.todayLocalDate}
       hasMovedBefore={moveState.hasMovedBefore}
     >
+      <OccurrenceMarkDetailsProvider actions={MARK_DETAIL_ACTIONS} timezone={timeline.timezone}>
       <DailyBriefLauncher travelAccountId={userId} />
       <FirstRunOnboardingPanel onboarding={onboarding} />
       <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
@@ -140,6 +148,7 @@ async function TimelineContent({
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
       />
+      </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>
   );
 }

@@ -1,5 +1,5 @@
 import type { OccurrenceStatus } from "./types/database";
-import type { OccurrenceStatusEventPlan } from "./resolvers/status.resolver";
+import type { MarkDetailEventPlan, OccurrenceStatusEventPlan } from "./resolvers/status.resolver";
 
 // Portable persisted records. Web's generated rows must satisfy these contracts.
 export type OccurrenceRecord = {
@@ -64,6 +64,20 @@ export type StatusTransitionResult = {
   statusEvent: OccurrenceStatusEventRecord | null;
 };
 
+/** Advisor plan 4G: a same-status detail event ("Done at" or "Why not done"). */
+export type MarkDetailCommit = {
+  occurrenceId: string;
+  expectedLatestEventId: string;
+  /** The Occurrence's `completed_at` after the commit. */
+  completedAt: string | null;
+  event: MarkDetailEventPlan;
+};
+
+export type MarkDetailResult = {
+  occurrence: OccurrenceRecord;
+  statusEvent: OccurrenceStatusEventRecord;
+};
+
 // Each adapter is scoped to one authorized web user or the stable local profile.
 // Commits must check preconditions and write history/reminder changes atomically.
 export type OccurrenceDataStore = {
@@ -73,6 +87,8 @@ export type OccurrenceDataStore = {
     timezone: string;
   } | null>;
   applyStatusTransition(input: StatusTransitionCommit): Promise<StatusTransitionResult>;
+  /** Appends the detail event and sets `completed_at`, only while the latest event is still the expected one. */
+  applyMarkDetail(input: MarkDetailCommit): Promise<MarkDetailResult>;
   updateOccurrenceNote(input: {
     occurrenceId: string;
     expectedNote: string | null;

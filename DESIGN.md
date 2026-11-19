@@ -890,6 +890,24 @@ stock text for that field only. Notices (`calendar_stale`, `budget_reached`,
 still works. The bubble no longer shows "Suggestions only. No changes were applied." The web
 bubble's layout is in the web Phase 3 section (3B).
 
+## Mark details on Timeline rows — advisor Phase 4G
+
+Two optional text lines can appear under a row right after it is marked, on web and Mac
+alike. Neither ever opens a dialog by itself, and ignoring them changes nothing.
+
+- **Done at.** A Completed mark made more than two hours after the item's set time shows
+  "Done at 7:00 AM · Just now · Other time". "Done at" saves the set time; "Just now"
+  closes the line and keeps the tap time; "Other time" opens one time field with Save and
+  Cancel. A time range counts as late two hours after its end and offers "Done earlier?
+  Just now · Other time", because it has no single set time.
+- **Not-done reason.** A Not Completed mark shows "Why? No time · Forgot · Low energy ·
+  Away · Chose not to". One tap saves the reason.
+- Answers show as italic outcome text ("Saved as done at 7:00 AM.", "Reason noted: Low
+  energy."). A refusal shows one red line that starts "Not changed.". The line uses the
+  row's time colour for its actions and no buttons or outlines.
+
+Design bench: `module.occurrence-mark-details`.
+
 ## ChatGPT plan card and Daily Brief plan states — Ticket 299
 
 Mac only, and hidden: Cadence for Mac renders none of this unless its build sets

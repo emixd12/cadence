@@ -1,6 +1,7 @@
 import { parseOccurrenceId, parseOccurrenceNote, parseOccurrenceStatus } from "@cadence/core/services/occurrence.service";
 import type { OccurrenceFormAction, TimeTrackingFormAction } from "../../../lib/types/timeline";
-import { markLocalOccurrence, saveLocalOccurrenceNote, trackLocalOccurrence } from "./local-occurrence.service";
+import { markLocalOccurrence, recordLocalDoneAt, recordLocalNotDoneReason, saveLocalOccurrenceNote, trackLocalOccurrence } from "./local-occurrence.service";
+import type { MarkDetailState, OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
@@ -68,8 +69,20 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
       return { status: "success", message: result.note === null ? "Day note cleared." : "Day note saved." };
     } catch (error) { return { status: "error", message: localErrorMessage(error) }; }
   };
+  // Advisor plan 4G: "Done at" and "Why?" lines after a mark, stored locally and synced.
+  const detail = async (save: () => Promise<unknown>): Promise<MarkDetailState> => {
+    try {
+      await save();
+      refresh();
+      return { status: "saved" };
+    } catch (error) { return { status: "refused", message: localErrorMessage(error) }; }
+  };
+  const markDetailActions: OccurrenceMarkDetailActions = {
+    doneAt: (input) => detail(() => recordLocalDoneAt(profileId, input)),
+    notDoneReason: (input) => detail(() => recordLocalNotDoneReason(profileId, input)),
+  };
   return { statusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
-    stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset") };
+    stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset"), markDetailActions };
 }
 
 export function localErrorMessage(error: unknown): string {

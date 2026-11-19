@@ -6,6 +6,7 @@ import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
 
 import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
+import { OccurrenceMarkDetailLine, type JustMarked } from "@/components/timeline/OccurrenceMarkDetails";
 import { OccurrenceMovedLine, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
 import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
@@ -146,12 +147,18 @@ export function OccurrenceRow({
     },
     [serverStatusKey],
   );
+  // Advisor plan 4G: a mark made here offers "Done at" (late Completed) or "Why?" (Not
+  // Completed) on the next line. Held by the row, so a refresh keeps the line.
+  const [justMarked, setJustMarked] = useState<JustMarked | null>(null);
   const handleStatusConfirmed = useCallback(
     (nextStatus: TimelineStatusActionStatus | null) => {
       setKeyedOptimisticStatus({
         serverStatusKey,
         value: confirmOptimisticStatus(nextStatus),
       });
+      setJustMarked(nextStatus === "completed" || nextStatus === "not_completed"
+        ? { status: nextStatus, at: new Date().toISOString() }
+        : null);
     },
     [serverStatusKey],
   );
@@ -336,6 +343,7 @@ export function OccurrenceRow({
         ) : null}
 
       </div>
+      <OccurrenceMarkDetailLine occurrence={visibleOccurrence} justMarked={justMarked} toneClass={TIME_TONE_CLASSES[visibleOccurrence.visualTone]} />
       <OccurrenceMoveNotice occurrence={visibleOccurrence} />
     </article>
   );
