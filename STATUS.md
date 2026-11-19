@@ -94,6 +94,27 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 5 (5A): chat server — November 19, 2026
+
+- **In review (draft PR, branch `claude/project-thread-w6f46m`).** `POST /api/advisor/chat`
+  streams chat replies as NDJSON events; confirm, Undo and conversation routes sit beside it.
+  The turn runs as the person on the `chat` agent token over every MCP operation plus two
+  chat-only reads (`list_calendar_events` with event titles, `list_workouts`). Moves are
+  checked against calendar events. The first single-record write in a question runs at
+  once with Undo; Behavior changes and further writes wait for one Yes (stored in
+  `chat_confirms`, 15 minutes). Medical questions get a one-line refusal and the disclaimer.
+  Limits: 8 tool calls, US$0.25 per question, 12 KB per tool result, last 20 messages plus
+  a summary. Wire types: `packages/core/src/types/chat.ts`. Docs: `docs/DATA_MODEL.md`,
+  "Chat conversations"; `docs/ROUTE_MAP.md`.
+- **Verification:** `tests/chat-turn.test.ts` (21 tests, scripted model); migration and RLS
+  checked on a local Postgres 16 (chat token reads and writes its own rows; the person,
+  MCP grants, other agents and other users see none; delete refused; account delete
+  cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
+  fail the same way on main in this container. No live run against a real model yet.
+- **Next:** apply the migration to production (needs the owner's OK), then a live check.
+  Switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
+  add `search_advice` once 4A's matcher merges; set the model and caps from 5D's eval.
+
 ## Advisor plan Phase 3 (3D): coach signals in shadow — November 18, 2026
 
 - **In review (draft PR, branch `claude/project-thread-vfk26s`).** An hourly cron
