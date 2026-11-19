@@ -2010,16 +2010,18 @@ cite has not changed.
 - **Change:** implemented November 18, 2026 (advisor Phase 3B). Inside the Daily Brief
   bubble, each proposed move is a line of text with **Yes · No · Other time**, plus
   **Already did it** on late items, **Accept all** and **Undo all**, "30 min is a guess ·
-  set length", "travel not checked" and **Don't suggest moving this**. Yes moves the item for
+  set length" and **Don't suggest moving this**. Yes moves the item for
   today and opens the bottom move note with Undo. The brief no longer expires after five
   minutes and is no longer withdrawn when the Timeline changes; **Close** leaves a
   **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says
   "read-only". Each time the brief opens, its lines are re-checked against the current
   Timeline; a line whose time was taken arrives re-planned with the cause in its reason,
-  and a refused answer names what is in the slot now (Emi, November 19). After No or Undo
-  a line reads "Vitamins stays at 8:00 AM" over "No more suggestions for it today." at full
-  strength, and answers no longer add a first-use explainer that repeats the line (Emi,
-  November 19).
+  and a refused answer names what is in the slot now (Emi, November 19). Each line is one
+  sentence, "Walk 9:00 AM → 11:30 AM: <reason>", and keeps its reason after an answer. After
+  No or Undo the line leaves the brief, unless it offers Don't suggest moving this; then it
+  reads "Vitamins stays at 8:00 AM: <reason>" over "No more suggestions for it today."
+  "travel not checked" is no longer shown, refusals have no warning icon, and answers no
+  longer add a first-use explainer that repeats the line (Emi, November 19).
 - **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
   `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
   suggested move", updated in the same change).

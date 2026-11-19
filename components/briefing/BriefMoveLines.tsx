@@ -36,9 +36,9 @@ export type BriefMoveLinesProps = Readonly<{
 
 /** One short line the first time a person uses each answer (stored per browser). */
 export const BRIEF_ANSWER_EXPLAINERS: Readonly<Partial<Record<BriefMoveAnswerKind, string>>> = Object.freeze({
-  // Yes, No, Other time, Already did it and Undo need none: the line's own note already says what happened.
+  // Yes, No, Other time, Already did it, Undo and Don't suggest moving this need none:
+  // the line's own note already says what happened.
   accept_all: "Accept all: moves every item above for today. Undo all puts them back.",
-  never_move: "The brief won’t suggest moving this again. You can change this in the Behavior’s settings.",
 });
 
 const EXPLAINED_KEY = "cadence.daily-brief.answers-explained.v1";
@@ -52,6 +52,8 @@ type LineUi = Readonly<{
   revision?: string;
   /** After a move: where the item is now. */
   movedTo?: string | null;
+  /** The person turned suggestions off for this Behavior from this line. */
+  neverMoved?: boolean;
 }>;
 
 const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:cursor-default disabled:opacity-60";
@@ -123,6 +125,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
       patchUi(line.proposalId, {
         panel: null,
         explainer: firstUseExplainer(request.kind),
+        ...(request.kind === "never_move" ? { neverMoved: true } : {}),
         ...(result.occurrence ? { revision: result.occurrence.revision, movedTo: result.occurrence.effectiveStartAt } : {}),
       });
       if (result.occurrence) refresh();
@@ -201,7 +204,10 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
   };
 
   const open = moves.lines.filter((line) => OPEN_STATUSES.has(line.status));
-  const shown = moves.lines.filter((line) => line.status !== "superseded" && line.status !== "withdrawn");
+  // A line answered No (or undone) leaves the brief, unless it still offers "Don't suggest
+  // moving this" or has something to say: the person needs its reason to make that choice.
+  const shown = moves.lines.filter((line) => line.status !== "superseded" && line.status !== "withdrawn"
+    && !((line.status === "declined" || line.status === "undone") && !line.offerNeverMove && !ui[line.proposalId]?.neverMoved && !ui[line.proposalId]?.refusal));
   const conflicts = moves.conflicts.filter((conflict) => !keptConflicts.has(conflict.conflictId));
 
   const acceptAll = async () => {
@@ -255,7 +261,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
 
   return (
     <div className="mt-3 border-t border-line pt-2" data-brief-moves>
-      {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" size="compact" className="mb-2">
+      {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" icon={false} size="compact" className="mb-2">
         Your calendar couldn’t be read just now, so times that depend on it aren’t offered.
       </AlertNotice> : null}
       {(moves.acceptAll && open.length >= 2) || moves.undoAllBatchId ? <p className="text-sm leading-6" data-brief-accept-all>
@@ -267,7 +273,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
           ? <button type="button" className={LINK} disabled={batchPending} onClick={() => void undoAll()} data-brief-undo-all>Undo all</button>
           : null}
       </p> : null}
-      {batchNotice ? <AlertNotice kind="write_refused" size="compact" className="mb-2">{batchNotice}</AlertNotice> : null}
+      {batchNotice ? <AlertNotice kind="write_refused" icon={false} size="compact" className="mb-2">{batchNotice}</AlertNotice> : null}
       {batchExplainer ? <p className="text-xs leading-5 text-muted-readable" data-brief-explainer>{batchExplainer}</p> : null}
       <ul className="grid gap-3">
         {shown.map((line) => <MoveLine
@@ -319,7 +325,8 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
   return (
     <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]"
       data-brief-move-line={line.proposalId} data-brief-move-status={line.status}>
-      <p>
+      {/* One sentence: the item, its times, then why. The reason stays after an answer. */}
+      <p data-brief-move-head>
         <span className="font-bold">{line.title}</span>{" "}
         {moved
           ? <span className="whitespace-nowrap">moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to}</span>
@@ -328,13 +335,11 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
             : closed
               ? <span className="whitespace-nowrap tabular-nums">stays at {from}</span>
               : <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>}
+        {line.reason ? <>: {line.reason}</> : null}
       </p>
-      {!closed && !moved ? <p className="text-foreground">{line.reason}</p> : null}
-      {!closed && !moved && (line.length.assumed || line.travel === "not_checked") ? <p className="text-xs leading-5 text-muted-readable">
-        {line.length.assumed ? <>{line.length.minutes} min is a guess ·{" "}
-          <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button></> : null}
-        {line.length.assumed && line.travel === "not_checked" ? " · " : null}
-        {line.travel === "not_checked" ? "travel not checked" : null}
+      {!closed && !moved && line.length.assumed ? <p className="text-xs leading-5 text-muted-readable">
+        {line.length.minutes} min is a guess ·{" "}
+        <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button>
       </p> : null}
       {line.status === "proposed" ? <p data-brief-move-actions>
         <ActionLink label="Yes" strong disabled={pending} onClick={onYes} />
@@ -344,13 +349,14 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.offerNeverMove ? <><Dot /><ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
         {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
-        {line.status === "declined" || line.status === "undone" ? "No more suggestions for it today." : null}
+        {ui.neverMoved ? "The brief won’t suggest moving this again. You can change this in the Behavior’s settings."
+          : line.status === "declined" || line.status === "undone" ? "No more suggestions for it today." : null}
         {line.status === "already_done" ? "Marked Completed." : null}
         {line.offerNeverMove && line.status === "declined" ? <> <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
       </p>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}
-      {ui.refusal ? <AlertNotice kind="write_refused" size="compact" className="mt-1"
+      {ui.refusal ? <AlertNotice kind="write_refused" icon={false} size="compact" className="mt-1"
         action={ui.refusal.alternatives.length ? <span>Free:{" "}{ui.refusal.alternatives.map((instant, index) => <span key={instant} className="whitespace-nowrap">
           {index ? " · " : ""}<button type="button" className={LINK} disabled={pending} onClick={() => onOtherTime(instant)}>{moveTimeLabel(instant, line.timezone)}</button>
         </span>)}</span> : undefined}>
@@ -418,8 +424,7 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
   const at = moveTimeLabel(conflict.at.startAt, timezone);
   return (
     <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]" data-brief-conflict={conflict.conflictId}>
-      <p><span className="font-bold">{conflict.title}</span> <span className="whitespace-nowrap tabular-nums">at {at}</span></p>
-      <p>{conflict.conflictingTitle
+      <p><span className="font-bold">{conflict.title}</span> <span className="whitespace-nowrap tabular-nums">at {at}</span>: {conflict.conflictingTitle
         ? `Your schedule change put it on top of ${conflict.conflictingTitle}.`
         : "Your schedule change put another item at the same time."}</p>
       {onKeep || onMove ? <p>

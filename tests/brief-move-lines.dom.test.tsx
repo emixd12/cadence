@@ -62,10 +62,10 @@ describe("move lines", () => {
   it("reads like text: title, times, reason, then Yes · No · Other time, with late and assumed-length extras", async () => {
     await render(fixtureBriefMoveClient());
     const walk = line("walk");
-    expect(walk.textContent).toContain("Walk 9:00 AM → 11:30 AM");
-    expect(walk.textContent).toContain("Your 9:00 design review runs until 10:30");
+    expect(walk.querySelector("[data-brief-move-head]")!.textContent).toMatch(/^Walk 9:00 AM → 11:30 AM: Your 9:00 design review runs until 10:30/);
     expect(walk.querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time");
-    expect(line("gym").textContent).toContain("30 min is a guess · set length · travel not checked");
+    expect(line("gym").textContent).toContain("30 min is a guess · set length");
+    expect(container.textContent).not.toContain("travel not checked");
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time · Already did it · Don’t suggest moving this");
     expect(container.querySelector("[data-brief-accept-all]")!.textContent).toBe("Accept all");
     expect(container.querySelector('[data-brief-conflict="conflict-stretch"]')!.textContent).toContain("on top of Piano practice");
@@ -88,18 +88,26 @@ describe("move lines", () => {
     // Undo in the drawer goes through the brief's own answer, so it counts as a No.
     await click(button(drawer, "Undo"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "undo", proposalId: "walk" }));
-    expect(line("walk").dataset.briefMoveStatus).toBe("undone");
-    expect(line("walk").textContent).toContain("Walk stays at 9:00 AM");
-    expect(line("walk").textContent).toContain("No more suggestions for it today.");
+    // Undo counts as a No, so the line leaves the brief.
+    expect(line("walk")).toBeNull();
   });
 
   it("shows a declined line at full strength, saying where the item stays", async () => {
     await render(fixtureBriefMoveClient());
     await click(button(line("vitamins"), "No"));
     expect(line("vitamins").className).not.toContain("opacity");
-    expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM");
+    expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM: 8:00 has passed; lunch is the next quiet moment.");
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("No more suggestions for it today. Don’t suggest moving this");
     expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
+    await click(button(line("vitamins"), "Don’t suggest moving this"));
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("The brief won’t suggest moving this again. You can change this in the Behavior’s settings.");
+  });
+
+  it("drops a line answered No from the brief when there is nothing more to choose", async () => {
+    await render(fixtureBriefMoveClient());
+    await click(button(line("walk"), "No"));
+    expect(line("walk")).toBeNull();
+    expect(line("gym")).not.toBeNull();
   });
 
   it("shows a refused Yes in the alert style with free times to pick", async () => {
@@ -108,6 +116,7 @@ describe("move lines", () => {
     await render(client);
     await click(button(line("gym"), "Yes"));
     const alert = line("gym").querySelector("[data-alert-kind='write_refused']")!;
+    expect(alert.querySelector("svg")).toBeNull();
     expect(alert.textContent).toContain("5:30 PM is taken now: you moved Piano practice there after this brief was written.");
     await click(button(alert, "4:00 PM"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "other_time", proposalId: "gym", startAt: "2026-11-18T21:00:00.000Z" }));
@@ -179,7 +188,7 @@ describe("move lines", () => {
     expect(container.textContent).toContain("One item could not be moved");
     await click(button(container, "Undo all"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "undo_all", batchId: "batch-bench" }));
-    expect(line("walk").dataset.briefMoveStatus).toBe("undone");
+    expect(line("walk")).toBeNull();
   });
 
   it("Already did it marks Completed; a failed request says nothing changed", async () => {
