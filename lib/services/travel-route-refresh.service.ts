@@ -37,6 +37,7 @@ import { readTravelWeather } from "@/lib/services/weather-forecast.service";
 import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
 import { advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import { issueTravelTimesToken, travelTimesFromEvidence } from "@/lib/services/travel-times-token";
 import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision, type TravelConclusionsStops } from "@/lib/services/travel-conclusions-token";
 
 const PLACE_LOOKUP_CONCURRENCY = 4;
@@ -251,8 +252,15 @@ export async function refreshTravelRoutesReportingCalendars(
       baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
       calendar: calendar, connectors: travelConnectorFence(calendars), behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
+  // Advisor Phase 3A1: the brief's move lines keep room for travel with these times, for one request only.
+  const timesToken = (expiresAt: string) => {
+    if (!signConclusions) return null;
+    const times = travelTimesFromEvidence(evidence, new Set(behaviorOccurrences.map((occurrence) => occurrence.id)));
+    return times ? issueTravelTimesToken({ sub: caller.user.id, date: request.startLocalDate, iat: now.toString(), exp: expiresAt, ...times }, conclusionsSecret!) : null;
+  };
+  const tokens = (expiresAt: string) => ({ conclusionsToken: conclusionsToken(expiresAt), travelTimesToken: timesToken(expiresAt) });
   const budget = await readTravelBudget(caller, timezone, now);
-  return { calendarsLeftOut: calendarEvents.unavailable, response: response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
+  return { calendarsLeftOut: calendarEvents.unavailable, response: response(caller.user.id, source, tokens, budget, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(effectiveStartAt(occurrence), now) ||
       (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
         notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
@@ -600,13 +608,16 @@ async function readTravelBudget(caller: CalendarReadCaller, timezone: string, no
   }
 }
 
-function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, conclusionsToken: ((expiresAt: string) => string | null) | null,
+function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>,
+  tokens: ((expiresAt: string) => Readonly<{ conclusionsToken: string | null; travelTimesToken: string | null }>) | null,
   budget: TravelBudgetState | null, evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
   const expiresAt = evidence?.legs.reduce<string | null>((earliest, leg) => !leg.estimate ? earliest : !earliest || leg.estimate.expiresAt < earliest ? leg.estimate.expiresAt : earliest, null)
     ?? Temporal.Now.instant().add({ seconds: TRAVEL_ESTIMATE_LIFETIME_SECONDS }).toString();
-  const token = conclusionsToken?.(expiresAt) ?? null;
+  const signed = tokens?.(expiresAt) ?? null;
   return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision,
-    habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}), ...(budget ? { budget } : {}) };
+    habitsRevision: source.habitsRevision, expiresAt, evidence,
+    ...(signed?.conclusionsToken ? { conclusionsToken: signed.conclusionsToken } : {}),
+    ...(signed?.travelTimesToken ? { travelTimesToken: signed.travelTimesToken } : {}), ...(budget ? { budget } : {}) };
 }
 
 /**

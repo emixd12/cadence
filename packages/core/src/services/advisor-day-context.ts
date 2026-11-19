@@ -4,6 +4,8 @@ import type { BehaviorDurationEstimate } from "../types/day-progress";
 import {
   ADVISOR_CALENDAR_SOURCES,
   ADVISOR_CONNECTOR_KINDS,
+  ADVISOR_MOVE_ANSWER_KINDS,
+  ADVISOR_MOVE_SOURCES,
   ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT,
   ADVISOR_DAY_CONTEXT_LIMITS,
   ADVISOR_DAY_CONTEXT_VERSION,
@@ -20,7 +22,9 @@ import {
   type AdvisorDurationCandidates,
   type AdvisorHistoricalCompletionTimes,
   type AdvisorOpaqueRef,
+  type AdvisorMoveDay,
   type AdvisorOccurrence,
+  type AdvisorOccurrenceMove,
   type AdvisorSourceFailureCode,
 } from "../types/advisor-day-context";
 import {
@@ -65,7 +69,10 @@ type AdvisorCadenceOccurrenceInput = Readonly<{
   title: string;
   status: OccurrenceStatus;
   localDate: string;
-  scheduledFor: string;
+  /** The time the item sits at today: its effective start (packages/core/src/resolvers/time.resolver.ts). */
+  startAt: string;
+  /** Phase 3A1: set when the item was moved for today. */
+  move?: AdvisorOccurrenceMove;
   scheduleKind: "exact" | "range";
   scheduleStartTime: string;
   scheduleEndTime: string | null;
@@ -128,6 +135,11 @@ export function projectAdvisorCadenceSource(input: Readonly<{
   historyOccurrences: readonly AdvisorHistoryOccurrenceInput[];
   historyComplete: boolean;
   occurrences: readonly AdvisorCadenceOccurrenceInput[];
+  /** Phase 3A1: today's answered brief lines and open schedule-edit notices, by occurrence id. */
+  moveDay?: Readonly<{
+    answers: readonly Readonly<{ occurrenceId: string; kind: AdvisorMoveDay["answers"][number]["kind"] }>[];
+    conflicts: readonly Readonly<{ occurrenceId: string; conflictingOccurrenceId: string | null }>[];
+  }>;
   recordedElapsedDurations?: readonly Readonly<{
     behaviorId: string;
     localDate: string;
@@ -187,7 +199,7 @@ export function projectAdvisorCadenceSource(input: Readonly<{
       throw new AdvisorDayContextValidationError("Cadence occurrence has no selected Behavior.");
     }
     plainDate(occurrence.localDate, "occurrence.localDate");
-    instant(occurrence.scheduledFor, "occurrence.scheduledFor");
+    instant(occurrence.startAt, "occurrence.startAt");
     time(occurrence.scheduleStartTime, "occurrence.schedule.startTime");
     if (occurrence.scheduleKind === "exact" && occurrence.scheduleEndTime !== null) {
       throw new AdvisorDayContextValidationError("Exact schedules cannot have an end time.");
@@ -202,7 +214,7 @@ export function projectAdvisorCadenceSource(input: Readonly<{
       title: occurrence.title,
       status: occurrence.status,
       localDate: occurrence.localDate,
-      scheduledFor: occurrence.scheduledFor,
+      scheduledFor: occurrence.startAt,
       schedule: {
         kind: occurrence.scheduleKind,
         startTime: occurrence.scheduleStartTime,
@@ -210,6 +222,7 @@ export function projectAdvisorCadenceSource(input: Readonly<{
       },
       duration: projectDuration(occurrence.duration),
       ...(occurrence.durationCandidates ? { durationCandidates: occurrence.durationCandidates } : {}),
+      ...(occurrence.move ? { move: occurrence.move } : {}),
     };
   });
 
@@ -235,6 +248,16 @@ export function projectAdvisorCadenceSource(input: Readonly<{
         };
       }),
     },
+    ...(input.moveDay ? { moveDay: {
+      answers: input.moveDay.answers.filter((answer) => occurrenceIds.has(answer.occurrenceId)).map((answer) => ({
+        occurrenceRef: input.makeOpaqueRef("occurrence", answer.occurrenceId), kind: answer.kind,
+      })),
+      conflicts: input.moveDay.conflicts.filter((conflict) => occurrenceIds.has(conflict.occurrenceId)).map((conflict) => ({
+        occurrenceRef: input.makeOpaqueRef("occurrence", conflict.occurrenceId),
+        conflictingOccurrenceRef: conflict.conflictingOccurrenceId && occurrenceIds.has(conflict.conflictingOccurrenceId)
+          ? input.makeOpaqueRef("occurrence", conflict.conflictingOccurrenceId) : null,
+      })),
+    } } : {}),
     ...(input.historicalCompletionTimes ? { historicalCompletionTimes: input.historicalCompletionTimes } : {}),
     ...(input.recordedElapsedDurations ? {
       recordedElapsedDurations: input.recordedElapsedDurations.map((sample) => ({
@@ -490,7 +513,7 @@ function validateContext(value: unknown, mode: "1.0_only" | "versioned"): Adviso
   integer(root.grantGeneration, "context.grantGeneration", 0);
 
   const cadence = record(root.cadence, "context.cadence");
-  exactOptionalKeys(cadence, ["observedAt", "revision", "coverage", "occurrences", "history"], ["recordedElapsedDurations", "historicalCompletionTimes"], "context.cadence");
+  exactOptionalKeys(cadence, ["observedAt", "revision", "coverage", "occurrences", "history"], ["recordedElapsedDurations", "historicalCompletionTimes", "moveDay"], "context.cadence");
   const cadenceObservedAt = instant(cadence.observedAt, "context.cadence.observedAt");
   if (Temporal.Instant.compare(cadenceObservedAt, capturedAt) > 0 || Temporal.Instant.compare(expiresAt, cadenceObservedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) > 0) fail("Cadence observation bounds are invalid.");
   nonempty(cadence.revision, "context.cadence.revision");
@@ -507,6 +530,7 @@ function validateContext(value: unknown, mode: "1.0_only" | "versioned"): Adviso
   });
   if (behaviorRefs.size > ADVISOR_DAY_CONTEXT_LIMITS.behaviors) fail("Behavior ref limit exceeded.");
   const historyBehaviorRefs = validateCompletionHistory(cadence.history, root.localDate as string, behaviorRefs);
+  if ("moveDay" in cadence) validateMoveDay(cadence.moveDay, occurrenceRefs);
   if ("historicalCompletionTimes" in cadence) {
     validateHistoricalCompletionTimes(cadence.historicalCompletionTimes, cadence.history, root.timezone as string, historyBehaviorRefs);
   }
@@ -825,7 +849,7 @@ function projectDuration(estimate: AdvisorCadenceOccurrenceInput["duration"]): A
 
 function validateOccurrence(value: unknown, index: number, localDate: string): void {
   const occurrence = record(value, `occurrence[${index}]`);
-  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates"], `occurrence[${index}]`);
+  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates", "move"], `occurrence[${index}]`);
   nonempty(occurrence.ref, "occurrence.ref");
   nonempty(occurrence.behaviorRef, "occurrence.behaviorRef");
   if (typeof occurrence.title !== "string" || occurrence.title.length > 200) fail("occurrence.title is invalid.");
@@ -841,6 +865,32 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
   if (schedule.kind === "range") time(schedule.endTime, "occurrence.schedule.endTime");
   validateDuration(occurrence.duration);
   if ("durationCandidates" in occurrence) validateDurationCandidates(occurrence.durationCandidates);
+  if ("move" in occurrence) {
+    const move = record(occurrence.move, "occurrence.move");
+    exactKeys(move, ["plannedFor", "endAt", "by"], "occurrence.move");
+    instant(move.plannedFor, "occurrence.move.plannedFor");
+    if (move.endAt !== null) instant(move.endAt, "occurrence.move.endAt");
+    if (move.by !== null && !(ADVISOR_MOVE_SOURCES as readonly unknown[]).includes(move.by)) fail("occurrence.move.by is invalid.");
+  }
+}
+
+function validateMoveDay(value: unknown, occurrenceRefs: ReadonlySet<unknown>): void {
+  const moveDay = record(value, "cadence.moveDay");
+  exactKeys(moveDay, ["answers", "conflicts"], "cadence.moveDay");
+  if (!Array.isArray(moveDay.answers) || moveDay.answers.length > ADVISOR_DAY_CONTEXT_LIMITS.occurrences * 4) fail("cadence.moveDay.answers is invalid.");
+  for (const item of moveDay.answers) {
+    const answer = record(item, "cadence.moveDay.answer");
+    exactKeys(answer, ["occurrenceRef", "kind"], "cadence.moveDay.answer");
+    if (!occurrenceRefs.has(answer.occurrenceRef)) fail("cadence.moveDay.answer.occurrenceRef is unknown.");
+    if (!(ADVISOR_MOVE_ANSWER_KINDS as readonly unknown[]).includes(answer.kind)) fail("cadence.moveDay.answer.kind is invalid.");
+  }
+  if (!Array.isArray(moveDay.conflicts) || moveDay.conflicts.length > ADVISOR_DAY_CONTEXT_LIMITS.occurrences) fail("cadence.moveDay.conflicts is invalid.");
+  for (const item of moveDay.conflicts) {
+    const conflict = record(item, "cadence.moveDay.conflict");
+    exactKeys(conflict, ["occurrenceRef", "conflictingOccurrenceRef"], "cadence.moveDay.conflict");
+    if (!occurrenceRefs.has(conflict.occurrenceRef)) fail("cadence.moveDay.conflict.occurrenceRef is unknown.");
+    if (conflict.conflictingOccurrenceRef !== null && !occurrenceRefs.has(conflict.conflictingOccurrenceRef)) fail("cadence.moveDay.conflict.conflictingOccurrenceRef is unknown.");
+  }
 }
 
 function validateDurationCandidates(value: unknown): void {

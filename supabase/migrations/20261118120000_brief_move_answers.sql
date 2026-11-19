@@ -19,6 +19,7 @@
 --    answer_move_proposal (the person or the Daily Brief agent),
 --    set_behavior_move_preference and set_behavior_default_length (the person),
 --    upsert_behavior_advisor_estimates (Daily Brief agent only).
+-- 7. Launch rate limit action brief_move_replan: Re-plan and Other time, 30 per 10 minutes.
 begin;
 
 -- 1. move_proposals --------------------------------------------------------------------
@@ -157,6 +158,45 @@ end $$;
 
 revoke all on function cadence_private.require_daily_brief_agent() from public, anon, authenticated, service_role;
 
+-- Calendar text: a line's reason or anchor can name a calendar event (the title came with
+-- the request). It is kept for that local day only, then replaced by plain words. The
+-- daily maintenance cron calls purge_ended_brief_move_text; each new brief also does it
+-- for its own person.
+create function cadence_private.strip_brief_move_calendar_text(p_user_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  update public.move_proposals p
+  set line = (p.line - 'reason' - 'anchor' - 'calendarDerived')
+    || jsonb_build_object('reason', 'It overlapped a calendar event.', 'anchor', null, 'calendarDerived', false)
+  from public.profiles profile
+  where profile.id = p.user_id
+    and (p_user_id is null or p.user_id = p_user_id)
+    and p.line ->> 'calendarDerived' = 'true'
+    and p.local_date < (statement_timestamp() at time zone profile.timezone)::date;
+  get diagnostics v_count = row_count;
+  return v_count;
+end $$;
+
+revoke all on function cadence_private.strip_brief_move_calendar_text(uuid) from public, anon, authenticated, service_role;
+
+create function public.purge_ended_brief_move_text()
+returns integer
+language sql
+security definer
+set search_path = ''
+as $$
+  select cadence_private.strip_brief_move_calendar_text(null);
+$$;
+
+revoke all on function public.purge_ended_brief_move_text() from public, anon, authenticated;
+grant execute on function public.purge_ended_brief_move_text() to service_role;
+
 -- Writes the brief's lines as proposals, linked to the run. p_proposals:
 -- [{"occurrence_id", "proposed_start_at", "proposed_end_at", "reason", "expected_revision",
 --   "option_refs", "line", "replaces_proposal_id"}]. With p_supersede (a Refresh), the
@@ -185,6 +225,8 @@ begin
     raise exception 'move_proposal_invalid_input' using errcode = '22023';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(v_user_id::text || p_local_date::text, 303));
+  -- Calendar titles in earlier days' lines go now, as well as with the daily purge.
+  perform cadence_private.strip_brief_move_calendar_text(v_user_id);
 
   if p_supersede then
     update public.move_proposals p
@@ -409,7 +451,8 @@ begin
   returning * into v_row;
   if v_row.id is null then
     if exists (select 1 from public.behaviors b where b.user_id = v_user_id and b.id = p_behavior_id) then
-      raise exception 'behavior_revision_changed' using errcode = '40001';
+      -- Not 40001: PostgREST retries serialization failures until it times out.
+      raise exception 'behavior_revision_changed' using errcode = 'P0001';
     end if;
     raise exception 'Behavior not found.' using errcode = 'P0002';
   end if;
@@ -449,5 +492,113 @@ end $$;
 
 revoke all on function public.upsert_behavior_advisor_estimates(jsonb) from public, anon, service_role;
 grant execute on function public.upsert_behavior_advisor_estimates(jsonb) to authenticated;
+
+-- 7. Rate limit ----------------------------------------------------------------------
+-- Re-plan and Other time reuse the account-scoped launch rate limit with their own
+-- action. The other actions keep their limits. The counter stores no request body.
+alter table public.launch_rate_limits
+  drop constraint launch_rate_limits_action_check;
+
+alter table public.launch_rate_limits
+  add constraint launch_rate_limits_action_check
+  check (action in ('export_download', 'push_subscription_registration', 'travel_home_lookup', 'brief_move_replan'));
+
+create or replace function public.consume_launch_rate_limit(p_action text)
+returns table (
+  allowed boolean,
+  limit_count integer,
+  remaining integer,
+  reset_at timestamptz,
+  retry_after_seconds integer
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  observed_at timestamptz := statement_timestamp();
+  window_seconds integer := 60;
+  rate_limit_record public.launch_rate_limits%rowtype;
+begin
+  if actor_id is null then
+    raise exception 'Authentication is required to consume a launch rate limit.'
+      using errcode = '42501';
+  end if;
+
+  if p_action not in ('export_download', 'push_subscription_registration', 'travel_home_lookup', 'brief_move_replan') then
+    raise exception 'Unsupported launch rate limit action.'
+      using errcode = '22023';
+  end if;
+
+  limit_count := 6;
+  -- Ticket 308: five Home lookups per account in one hour.
+  if p_action = 'travel_home_lookup' then
+    limit_count := 5;
+    window_seconds := 3600;
+  end if;
+  -- Advisor Phase 3A1: Re-plan and Other time, thirty per account in ten minutes.
+  if p_action = 'brief_move_replan' then
+    limit_count := 30;
+    window_seconds := 600;
+  end if;
+
+  insert into public.launch_rate_limits as launch_rate_limit (
+    user_id,
+    action,
+    window_started_at,
+    attempt_count,
+    updated_at
+  )
+  values (
+    actor_id,
+    p_action,
+    observed_at,
+    1,
+    observed_at
+  )
+  on conflict (user_id, action) do update
+  set
+    window_started_at = case
+      when launch_rate_limit.window_started_at
+        + make_interval(secs => window_seconds) <= observed_at
+        then observed_at
+      else launch_rate_limit.window_started_at
+    end,
+    attempt_count = case
+      when launch_rate_limit.window_started_at
+        + make_interval(secs => window_seconds) <= observed_at
+        then 1
+      else launch_rate_limit.attempt_count + 1
+    end,
+    updated_at = observed_at
+  returning launch_rate_limit.* into rate_limit_record;
+
+  return query
+  select
+    rate_limit_record.attempt_count <= limit_count,
+    limit_count,
+    greatest(0, limit_count - rate_limit_record.attempt_count),
+    rate_limit_record.window_started_at
+      + make_interval(secs => window_seconds),
+    greatest(
+      1,
+      ceil(
+        extract(
+          epoch from (
+            rate_limit_record.window_started_at
+              + make_interval(secs => window_seconds)
+              - observed_at
+          )
+        )
+      )::integer
+    );
+end;
+$$;
+
+revoke all on function public.consume_launch_rate_limit(text) from public;
+revoke all on function public.consume_launch_rate_limit(text) from anon;
+revoke all on function public.consume_launch_rate_limit(text) from service_role;
+grant execute on function public.consume_launch_rate_limit(text) to authenticated;
 
 commit;

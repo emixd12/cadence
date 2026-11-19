@@ -113,6 +113,26 @@ export type AdvisorOccurrence = Readonly<{
   duration: AdvisorDuration;
   /** Internal source candidates. Model projections must apply recipe controls first. */
   durationCandidates?: AdvisorDurationCandidates;
+  /**
+   * Phase 3A1: present when the item was moved for today. The start time above is then
+   * the time it sits at (its effective start); `plannedFor` is where the plan put it.
+   */
+  move?: AdvisorOccurrenceMove;
+}>;
+
+export const ADVISOR_MOVE_SOURCES = ["person", "daily_brief", "coach", "chat", "mcp"] as const;
+export type AdvisorOccurrenceMove = Readonly<{
+  plannedFor: string;
+  endAt: string | null;
+  by: (typeof ADVISOR_MOVE_SOURCES)[number] | null;
+}>;
+
+export const ADVISOR_MOVE_ANSWER_KINDS = ["yes", "no", "other_time", "already_done", "undo", "accept_all", "undo_all", "never_move"] as const;
+
+/** Phase 3A1: today's answered brief lines (latest applied answer per line) and open schedule-edit notices. */
+export type AdvisorMoveDay = Readonly<{
+  answers: readonly Readonly<{ occurrenceRef: string; kind: (typeof ADVISOR_MOVE_ANSWER_KINDS)[number] }>[];
+  conflicts: readonly Readonly<{ occurrenceRef: string; conflictingOccurrenceRef: string | null }>[];
 }>;
 
 export type AdvisorCompletionHistoryBehavior = Readonly<{
@@ -146,6 +166,8 @@ export type AdvisorCadenceSource = Readonly<{
   coverage: "complete";
   occurrences: AdvisorOccurrence[];
   history: AdvisorCompletionHistory;
+  /** Phase 3A1. Omitted by contexts that predate it and by synthetic fixtures. */
+  moveDay?: AdvisorMoveDay;
   /** Eligible completed, stopped samples. Omitted by legacy/synthetic contexts. */
   recordedElapsedDurations?: AdvisorRecordedElapsedDuration[];
   historicalCompletionTimes?: AdvisorHistoricalCompletionTimes;
