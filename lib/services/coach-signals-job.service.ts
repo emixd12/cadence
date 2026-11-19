@@ -122,16 +122,19 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
   try {
     const today = run.localDate;
     const T = COACH_SIGNAL_THRESHOLDS;
-    const [behaviors, occurrences, decisions, moves, answers] = await Promise.all([
+    const [behaviors, occurrences, decisions, moves, answers, reminders, sessions] = await Promise.all([
       port.reads.behaviors(),
       // Through today: today's items give the per-weekday move counts and account facts.
       // Every rate still ends yesterday.
       port.reads.occurrences(addDays(today, -T.historyDays), addDays(today, 1)),
-      port.reads.decisions(addDays(today, -T.lateMarking.windowDays), today),
+      // 28 days: reminder response reads the whole period; late marking keeps its own 14.
+      port.reads.decisions(addDays(today, -T.reminderDecisionDays), today),
       port.reads.moves(addDays(today, -T.repeatedMove.weekdayLookbackDays)),
       port.reads.answers(addDays(today, -T.briefAnswers.windowDays)),
+      port.reads.reminders(addDays(today, -T.reminderDecisionDays), today),
+      port.reads.sessions(addDays(today, -T.reminderDecisionDays), today),
     ]);
-    const signals = resolveCoachSignals({ today, behaviors, occurrences, decisions, moves, answers: answers.rows });
+    const signals = resolveCoachSignals({ today, behaviors, occurrences, decisions, moves, answers: answers.rows, reminders, sessions });
     const stored = await port.record(run.runId, signals);
     await port.finishRun(run.runId, "success", null);
     return { signals: stored, answersSource: answers.source };

@@ -276,6 +276,71 @@ describe("setup_gaps", () => {
   });
 });
 
+describe("reminder_response", () => {
+  it("compares marks within 30 minutes of a reminder with later ones, marked items only", () => {
+    // Six marked A items, each reminded at 13:00Z. Marks after 10, 20, 25, 90, 120 and
+    // 600 minutes: 3 within 30. One more reminded item is never marked and is left out.
+    const rows = run(A.id, -7, [c, c, c, n, c, n, u]);
+    const lags = [10, 20, 25, 90, 120, 600];
+    const reminders = rows.map((r) => ({ occurrenceId: r.id!, sentAt: `${r.localDate}T13:00:00Z` }));
+    const decisions: CoachSignalDecision[] = rows.slice(0, 6).map((r, index) => ({
+      occurrenceId: r.id!, behaviorId: A.id, localDate: r.localDate, timezone: ZONE,
+      recordedAt: Temporal.Instant.from(`${r.localDate}T13:00:00Z`).add({ minutes: lags[index]! }).toString(),
+    }));
+    expect(only("reminder_response", input({ occurrences: rows, decisions, reminders }))).toEqual([{
+      kind: "reminder_response",
+      behaviorId: A.id,
+      // Median of 10, 20, 25, 90, 120, 600 = (25 + 90) / 2 = 57.5 -> 58.
+      facts: { window_days: 28, reminded_marked: 6, within_30_min: 3, later: 3, quick_share: 0.5, median_minutes_after: 58 },
+    }]);
+  });
+});
+
+describe("session_length", () => {
+  it("compares timed sessions with the length the person set", () => {
+    const set = behavior("b-a", { hasLength: true, lengthMinutes: 30 });
+    // Sessions: 15, 20, 30, 18, 45 minutes -> ratios .5, .67, 1, .6, 1.5: 3 shorter, 1 longer, 1 on target. Median 20.
+    const rows = run(set.id, -5, [c, c, c, c, c]);
+    const minutes = [15, 20, 30, 18, 45];
+    const sessions = rows.map((r, index) => ({
+      occurrenceId: r.id!, behaviorId: set.id, startedAt: `${r.localDate}T13:00:00Z`,
+      stoppedAt: Temporal.Instant.from(`${r.localDate}T13:00:00Z`).add({ minutes: minutes[index]! }).toString(),
+    }));
+    expect(only("session_length", input({ behaviors: [set], occurrences: rows, sessions }))).toEqual([{
+      kind: "session_length",
+      behaviorId: set.id,
+      facts: { window_days: 28, sessions: 5, planned_minutes: 30, median_minutes: 20, shorter: 3, longer: 1, on_target: 1, pattern: "shorter" },
+    }]);
+  });
+
+  it("stays silent for a Behavior with no length the person set", () => {
+    const unset = behavior("b-a", { hasLength: false, lengthMinutes: null });
+    const rows = run(unset.id, -5, [c, c, c, c, c]);
+    const sessions = rows.map((r) => ({ occurrenceId: r.id!, behaviorId: unset.id, startedAt: `${r.localDate}T13:00:00Z`, stoppedAt: `${r.localDate}T13:10:00Z` }));
+    expect(only("session_length", input({ behaviors: [unset], occurrences: rows, sessions }))).toEqual([]);
+  });
+});
+
+describe("moved_vs_unmoved", () => {
+  it("compares items moved for the day with the same Behavior left in place", () => {
+    // A over 10 days: the first 5 moved later (4 of 5 done), the last 5 left in place (1 of 5 done).
+    const rows = run(A.id, -10, [c, c, c, c, n, c, n, n, n, n]);
+    const moves = rows.slice(0, 5).map((r) => ({
+      occurrenceId: r.id!, behaviorId: A.id, localDate: r.localDate, timezone: ZONE, kind: "move" as const, chainPosition: 1,
+      toPlanned: false, fromStartAt: `${r.localDate}T13:00:00Z`, toStartAt: `${r.localDate}T22:00:00Z`, source: "person",
+    }));
+    // An undone move counts as unmoved.
+    const undone = { ...moves[4]!, kind: "revert" as const, chainPosition: 2, toPlanned: true };
+    expect(only("moved_vs_unmoved", input({ occurrences: rows, moves: [...moves, undone] }))).toEqual([]);
+    // With all five moves standing: moved 4/5 = 0.8, unmoved 1/5 = 0.2.
+    expect(only("moved_vs_unmoved", input({ occurrences: rows, moves }))).toEqual([{
+      kind: "moved_vs_unmoved",
+      behaviorId: A.id,
+      facts: { window_days: 28, moved_rate: 0.8, moved_resolved: 5, unmoved_rate: 0.2, unmoved_resolved: 5, gap: 0.6, pattern: "moved_better" },
+    }]);
+  });
+});
+
 describe("account facts", () => {
   it("describes a brand-new account from today's items", () => {
     const fresh = [

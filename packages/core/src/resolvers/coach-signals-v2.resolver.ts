@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import type {
   CoachSignal,
   CoachSignalBehavior,
+  CoachSignalMove,
   CoachSignalOccurrence,
   ResolveCoachSignalsInput,
 } from "./coach-signals.resolver";
@@ -43,6 +44,9 @@ export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
   doneTogether: { minSharedDays: 8, together: 0.85, minMissedDays: 2, onlyWithMaxRate: 0.1, onlyWithMinRate: 0.6, onlyWithMinMissedDays: 3 },
   crowdedHour: { minItemsPerDay: 3, minResolved: 6, minOtherResolved: 10, minGap: 0.15 },
   repeatedMoveWeekday: { matchingDays: 5, lookbackDays: 35 },
+  reminderResponse: { quickMinutes: 30, behavior: { minMarked: 6 }, account: { minMarked: 10 } },
+  sessionLength: { minSessions: 4, shorterBelow: 0.8, longerAbove: 1.2, maxSessionMinutes: 12 * 60 },
+  movedVsUnmoved: { behavior: { minEach: 5 }, account: { minEach: 8 }, minGap: 0.15 },
 });
 
 const V = COACH_SIGNAL_V2_THRESHOLDS;
@@ -87,6 +91,9 @@ export function resolveCoachSignalsV2(input: ResolveCoachSignalsInput, active: R
     ...doneTogether(ctx),
     ...crowdedHour(ctx),
     ...setupGaps(ctx),
+    ...reminderResponse(ctx),
+    ...sessionLength(ctx),
+    ...movedVsUnmoved(ctx),
   ];
 }
 
@@ -578,6 +585,141 @@ function setupGaps(ctx: Ctx): CoachSignal[] {
     });
   }
   return signals;
+}
+
+// ---------------------------------------------------------------------------
+// Reminder response: marks that come within 30 minutes of a sent reminder against marks
+// that come later. Only marked items count (D5): an item never marked is not "ignored".
+
+function reminderResponse(ctx: Ctx): CoachSignal[] {
+  const T = V.reminderResponse;
+  if (!ctx.input.reminders?.length) return [];
+  const byId = new Map(ctx.recent.filter((row) => row.id && row.status !== "unresolved").map((row) => [row.id!, row]));
+  const firstMark = new Map<string, string>();
+  for (const decision of ctx.input.decisions) {
+    const current = firstMark.get(decision.occurrenceId);
+    if (!current || decision.recordedAt < current) firstMark.set(decision.occurrenceId, decision.recordedAt);
+  }
+  const firstReminder = new Map<string, string>();
+  for (const reminder of ctx.input.reminders) {
+    if (!byId.has(reminder.occurrenceId)) continue;
+    const current = firstReminder.get(reminder.occurrenceId);
+    if (!current || reminder.sentAt < current) firstReminder.set(reminder.occurrenceId, reminder.sentAt);
+  }
+  const items: { behaviorId: string; minutes: number; completed: boolean }[] = [];
+  for (const [occurrenceId, sentAt] of firstReminder) {
+    const markedAt = firstMark.get(occurrenceId);
+    if (!markedAt) continue;
+    const minutes = Math.round(Temporal.Instant.from(markedAt).since(Temporal.Instant.from(sentAt)).total({ unit: "minutes" }));
+    if (minutes < 0) continue; // Marked before the reminder went out: not a response.
+    const row = byId.get(occurrenceId)!;
+    items.push({ behaviorId: row.behaviorId, minutes, completed: row.status === "completed" });
+  }
+  const facts = (list: typeof items) => {
+    const quick = list.filter((item) => item.minutes <= T.quickMinutes);
+    return {
+      window_days: V.windowDays,
+      reminded_marked: list.length,
+      within_30_min: quick.length,
+      later: list.length - quick.length,
+      quick_share: round(quick.length / list.length),
+      median_minutes_after: Math.round(median(list.map((item) => item.minutes))),
+    };
+  };
+  const signals: CoachSignal[] = [];
+  for (const [behaviorId, list] of groupBy(items, (item) => item.behaviorId)) {
+    if (list.length >= T.behavior.minMarked) signals.push({ kind: "reminder_response", behaviorId, facts: facts(list) });
+  }
+  if (items.length >= T.account.minMarked) signals.push({ kind: "reminder_response", behaviorId: null, facts: facts(items) });
+  return signals;
+}
+
+// ---------------------------------------------------------------------------
+// Time spent against planned length: timed sessions against the length the person set.
+// Only a length the person set counts as planned: never a model estimate or a default (D8).
+
+function sessionLength(ctx: Ctx): CoachSignal[] {
+  const T = V.sessionLength;
+  if (!ctx.input.sessions?.length) return [];
+  const inPeriod = new Map(ctx.recent.filter((row) => row.id).map((row) => [row.id!, row]));
+  const minutesByOccurrence = new Map<string, { behaviorId: string; minutes: number }>();
+  for (const session of ctx.input.sessions) {
+    if (!inPeriod.has(session.occurrenceId)) continue;
+    const minutes = Temporal.Instant.from(session.stoppedAt).since(Temporal.Instant.from(session.startedAt)).total({ unit: "minutes" });
+    if (!(minutes > 0) || minutes > T.maxSessionMinutes) continue;
+    const entry = minutesByOccurrence.get(session.occurrenceId) ?? { behaviorId: session.behaviorId, minutes: 0 };
+    entry.minutes += minutes;
+    minutesByOccurrence.set(session.occurrenceId, entry);
+  }
+  const signals: CoachSignal[] = [];
+  for (const [behaviorId, list] of groupBy([...minutesByOccurrence.values()], (item) => item.behaviorId)) {
+    const planned = ctx.active.get(behaviorId)?.lengthMinutes;
+    if (!planned || planned <= 0 || list.length < T.minSessions) continue;
+    const ratios = list.map((item) => item.minutes / planned);
+    const shorter = ratios.filter((ratio) => ratio < T.shorterBelow).length;
+    const longer = ratios.filter((ratio) => ratio > T.longerAbove).length;
+    const medianRatio = median(ratios);
+    signals.push({
+      kind: "session_length",
+      behaviorId,
+      facts: {
+        window_days: V.windowDays,
+        sessions: list.length,
+        planned_minutes: planned,
+        median_minutes: Math.round(median(list.map((item) => item.minutes))),
+        shorter,
+        longer,
+        on_target: list.length - shorter - longer,
+        pattern: medianRatio < T.shorterBelow ? "shorter" : medianRatio > T.longerAbove ? "longer" : "on_target",
+      },
+    });
+  }
+  return signals;
+}
+
+// ---------------------------------------------------------------------------
+// Moved against unmoved: items moved for the day get done more or less often than the
+// same Behavior left in place. Silent until there are enough marked moved items.
+
+function movedVsUnmoved(ctx: Ctx): CoachSignal[] {
+  const T = V.movedVsUnmoved;
+  if (ctx.input.moves.length === 0) return [];
+  const moved = netMovedOccurrences(ctx.input.moves);
+  const marked = ctx.recent.filter((row) => row.id && row.status !== "unresolved");
+  const facts = (list: readonly CoachSignalOccurrence[], minEach: number) => {
+    const movedRows = tallyRows(list.filter((row) => moved.has(row.id!)));
+    const unmovedRows = tallyRows(list.filter((row) => !moved.has(row.id!)));
+    if (resolved(movedRows) < minEach || resolved(unmovedRows) < minEach) return null;
+    const gap = round(rate(movedRows)! - rate(unmovedRows)!);
+    if (Math.abs(gap) < T.minGap) return null;
+    return {
+      window_days: V.windowDays,
+      moved_rate: rate(movedRows)!,
+      moved_resolved: resolved(movedRows),
+      unmoved_rate: rate(unmovedRows)!,
+      unmoved_resolved: resolved(unmovedRows),
+      gap,
+      pattern: gap > 0 ? "moved_better" : "moved_worse",
+    };
+  };
+  const signals: CoachSignal[] = [];
+  for (const [behaviorId, list] of groupBy(marked, (row) => row.behaviorId)) {
+    const f = facts(list, T.behavior.minEach);
+    if (f) signals.push({ kind: "moved_vs_unmoved", behaviorId, facts: f });
+  }
+  const account = facts(marked, T.account.minEach);
+  if (account) signals.push({ kind: "moved_vs_unmoved", behaviorId: null, facts: account });
+  return signals;
+}
+
+/** Occurrences whose latest move record leaves them away from their planned time. */
+function netMovedOccurrences(moves: readonly CoachSignalMove[]): Set<string> {
+  const latest = new Map<string, CoachSignalMove>();
+  for (const move of moves) {
+    const current = latest.get(move.occurrenceId);
+    if (!current || move.chainPosition > current.chainPosition) latest.set(move.occurrenceId, move);
+  }
+  return new Set([...latest.values()].filter((move) => move.kind !== "supersede" && !move.toPlanned).map((move) => move.occurrenceId));
 }
 
 // ---------------------------------------------------------------------------

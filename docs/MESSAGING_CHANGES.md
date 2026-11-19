@@ -2047,10 +2047,12 @@ cite has not changed.
   call T18). The Daily Brief settings panel said "The briefing cannot change tracking or
   Calendar records", untrue since Phase 3 (P-061). It now says: "The brief moves an item to
   a new time today only when you say yes. It never changes Calendar records." The same
-  change widens the overnight coach signals (P-064) from five patterns to eighteen, still
+  change widens the overnight coach signals (P-064) from five patterns to twenty-one, still
   counts only, no model call, no titles or notes: weekly numbers, weekday gap, time-of-day
-  gap, set time or window, steady item, never done, dip and recovery, day shape, unmarked
-  items, marking time, done together, crowded hour and setup gaps.
+  gap, set time or range, steady item, never done, dip and recovery, day shape, unmarked
+  items, marking time, done together, crowded hour, setup gaps, reminder response, time
+  spent against the set length, and moved against unmoved items. They now also read sent
+  reminders and timed sessions.
 - **Affected:** `components/briefing/DailyBriefSettingsPanel.tsx`,
   `packages/core/src/resolvers/coach-signals-v2.ts`.
 - **Surfaces:** in-app Settings (fixed here). Privacy and Terms still carry the old sentence

@@ -3219,7 +3219,8 @@ shown to the person; Phase 4 matches the signals to advice cards.
   `new_behavior_settled` or `brief_answers` (version 1), or, since version 2 (Phase 4,
   migration `20261119220000`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
   `timing_mode_gap`, `steady_behavior`, `never_done`, `dip_recovery`, `day_shape`,
-  `unmarked_items`, `marking_time`, `done_together`, `crowded_hour` or `setup_gaps`. At most
+  `unmarked_items`, `marking_time`, `done_together`, `crowded_hour`, `setup_gaps`,
+  `reminder_response`, `session_length` or `moved_vs_unmoved`. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
   local times of day only, never titles, notes or calendar data; `signal_version`

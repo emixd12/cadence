@@ -38,6 +38,8 @@ export const COACH_SIGNAL_THRESHOLDS = Object.freeze({
   },
   newBehavior: { settledAfterDays: 14, reportForDays: 7 },
   briefAnswers: { windowDays: 28 },
+  /** Version 2: decisions, reminders and timed sessions are read over this many days. */
+  reminderDecisionDays: 28,
 });
 
 const T = COACH_SIGNAL_THRESHOLDS;
@@ -63,6 +65,10 @@ export const COACH_SIGNAL_KINDS = [
   "done_together",
   "crowded_hour",
   "setup_gaps",
+  // Version 2, added after Emi's review (D8).
+  "reminder_response",
+  "session_length",
+  "moved_vs_unmoved",
 ] as const;
 
 export type CoachSignalKind = (typeof COACH_SIGNAL_KINDS)[number];
@@ -83,8 +89,10 @@ export type CoachSignalBehavior = Readonly<{
   timezone: string;
   /** False for archived or paused Behaviors: they get no signal. */
   active: boolean;
-  /** Version 2: has a length (default duration). Undefined when not read. */
+  /** Version 2: has a length the person set (default duration). Undefined when not read. */
   hasLength?: boolean;
+  /** Version 2: the length the person set, in minutes. Never a model estimate or a default. */
+  lengthMinutes?: number | null;
   /** Version 2: has a Where set (anywhere, home or a place). Undefined when not read. */
   hasPlace?: boolean;
 }>;
@@ -152,7 +160,17 @@ export type ResolveCoachSignalsInput = Readonly<{
   decisions: readonly CoachSignalDecision[];
   moves: readonly CoachSignalMove[];
   answers: readonly CoachSignalAnswer[];
+  /** Version 2: sent reminders (any channel), for `reminder_response`. */
+  reminders?: readonly CoachSignalReminder[];
+  /** Version 2: timed sessions, for `session_length`. */
+  sessions?: readonly CoachSignalSession[];
 }>;
+
+/** One reminder that was sent for an Occurrence. */
+export type CoachSignalReminder = Readonly<{ occurrenceId: string; sentAt: string }>;
+
+/** One timed session on an Occurrence. Open sessions (no stop) are left out by the reader. */
+export type CoachSignalSession = Readonly<{ occurrenceId: string; behaviorId: string; startedAt: string; stoppedAt: string }>;
 
 export function resolveCoachSignals(input: ResolveCoachSignalsInput): CoachSignal[] {
   const active = new Map(input.behaviors.filter((behavior) => behavior.active).map((behavior) => [behavior.id, behavior]));

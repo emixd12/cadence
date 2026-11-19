@@ -14,8 +14,8 @@
  * - At most one new tip per app open, and at least `minimumSpacingMinutes` (120) after the
  *   previous new tip. Inside the spacing, `next` returns the tip already shown, with
  *   `fresh: false`, so a reload shows the same line.
- * - The only hold: today's Daily Brief has move lines that wait for an answer. Needs
- *   decision items never hold tips (review decision D5).
+ * - Nothing holds tips back: they show while brief move lines or Needs decision items wait
+ *   (review decision D5). Facts never count an unmarked day or an undecided item.
  * - Tips off in Settings: `state: "none"`, reason `tips_off`. Nothing is shown.
  *
  * Old installed Macs never call these routes, so they show nothing new. Web sends its
@@ -75,15 +75,15 @@ export type AdvisorTip = Readonly<{
   research: AdvisorTipResearch;
 }>;
 
-export type AdvisorTipsHoldReason = "brief_lines_waiting";
-
 export type AdvisorTipsNoneReason =
   /** Advisor tips are off in Settings. */
   | "tips_off"
   /** Nothing true and new today (no filler, D1), or the nightly visit has not run yet. */
   | "no_tips_today"
   /** Every tip for today has been shown or reacted to. */
-  | "all_shown";
+  | "all_shown"
+  /** The last tip was answered with "not now" or "don't suggest"; another may come at `nextAt`. */
+  | "later";
 
 export type AdvisorTipsNextResponse =
   | Readonly<{
@@ -94,8 +94,7 @@ export type AdvisorTipsNextResponse =
     /** Earliest time another new tip may appear today (ISO instant), or null if none is left. */
     nextAt: string | null;
   }>
-  | Readonly<{ state: "hold"; reason: AdvisorTipsHoldReason }>
-  | Readonly<{ state: "none"; reason: AdvisorTipsNoneReason }>;
+  | Readonly<{ state: "none"; reason: AdvisorTipsNoneReason; nextAt: string | null }>;
 
 export type AdvisorTipReactionRequest = Readonly<{
   tipId: string;
