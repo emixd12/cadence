@@ -349,4 +349,68 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
     expect((await admin.from("move_proposals").select("status").eq("id", ink!.proposalId).single()).data!.status).toBe("withdrawn");
     expect(await recheckBriefMoves(callers(), { localDate: today, context: allDay })).toEqual({ replaced: [] });
   }, 90_000);
+
+  it("keeps new times off other open lines, and shows where answered items went", async () => {
+    const sketchId = await behavior("Sketch", "21:30", 20);
+    const bakeId = await behavior("Bake", "22:30", 20);
+    const calendarBusy = [
+      { startAt: local("21:30").toString(), endAt: local("21:50").toString() },
+      { startAt: local("22:30").toString(), endAt: local("22:50").toString() },
+    ];
+    const context = { calendarBusy };
+    const plan = await planBriefMoveDay({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
+      context: null, planning: { calendarBusy }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
+    const planned = (behaviorId: string) => plan.candidates.find((item) => item.behaviorId === behaviorId)!;
+    // Both lines offer the same time, as a Re-plan could leave them before it saw open lines.
+    const shared = { startAt: local("23:00").toString(), endAt: local("23:20").toString() };
+    const firstRun = randomUUID();
+    const first = await saveBriefProposals(agent, { runId: firstRun, localDate: today, refresh: false,
+      candidates: [{ ...planned(sketchId), to: shared }, { ...planned(bakeId), to: shared }] });
+    expect(first).toHaveLength(2);
+    const minutesApart = (left: BriefMoveLine, right: BriefMoveLine) => {
+      const [early, late] = left.to.startAt < right.to.startAt ? [left, right] : [right, left];
+      return Temporal.Instant.from(early.to.endAt).until(Temporal.Instant.from(late.to.startAt)).total("minutes");
+    };
+
+    // Opening the brief moves one of them off the other's time, and says why.
+    const checked = await recheckBriefMoves(callers(), { localDate: today, context });
+    expect(checked.replaced).toHaveLength(1);
+    const moved = checked.replaced[0]!.line!;
+    const kept = first.find((line) => line.proposalId !== checked.replaced[0]!.proposalId)!;
+    expect(moved.reason).toMatch(/ is (suggested for|too close to the time suggested for) (Sketch|Bake), so /);
+    expect(minutesApart(moved, kept)).toBeGreaterThanOrEqual(10);
+
+    // Re-plan treats the other open line's time as taken.
+    const replanned = (await replanBriefMove(callers(), { proposalId: kept.proposalId, context })).line!;
+    expect(minutesApart(replanned, moved)).toBeGreaterThanOrEqual(10);
+
+    // A Refresh writes a new run whose lines again share a time.
+    const secondRun = randomUUID();
+    const second = await saveBriefProposals(agent, { runId: secondRun, localDate: today, refresh: true,
+      candidates: [{ ...planned(sketchId), to: shared }, { ...planned(bakeId), to: shared }] });
+    const sketch = second.find((line) => line.behaviorId === sketchId)!;
+    const bake = second.find((line) => line.behaviorId === bakeId)!;
+
+    // Accept all: Sketch moves, then Bake is refused without blaming the person for Sketch.
+    const all = await answerBriefMove(callers(), { kind: "accept_all", idempotencyKey: "all-shared", context,
+      lines: [{ proposalId: sketch.proposalId, expectedRevision: sketch.expectedRevision },
+        { proposalId: bake.proposalId, expectedRevision: bake.expectedRevision }] });
+    expect(all.results.map((result) => result.outcome)).toEqual(["applied", "refused"]);
+    expect(all.results[0]!.line!.appliedTo).toEqual(shared);
+    expect(all.results[1]!.refusal!.cause).toEqual({ kind: "item_there", title: "Sketch", changedAfterBrief: false });
+    expect(all.results[1]!.refusal!.message).toMatch(/ is taken: Accept all just moved Sketch there\.$/);
+
+    // The saved brief shows only the refreshed run's lines, with where Sketch went.
+    const shown = await readBriefMoves(person, { userId, localDate: today, timezone, runId: secondRun });
+    expect(shown.lines.map((line) => line.title).sort()).toEqual(["Bake", "Sketch"]);
+    expect(shown.lines.find((line) => line.behaviorId === sketchId)!.appliedTo).toEqual(shared);
+    expect(shown.lines.find((line) => line.behaviorId === bakeId)!.appliedTo).toBeNull();
+    expect((await readBriefMoves(person, { userId, localDate: today, timezone })).lines.length).toBeGreaterThan(2);
+
+    // Undo all clears it.
+    const undone = await answerBriefMove(callers(), { kind: "undo_all", batchId: all.batchId!, idempotencyKey: "undo-all-shared" });
+    expect(undone.results[0]!.line!.appliedTo).toBeNull();
+    const after = await readBriefMoves(person, { userId, localDate: today, timezone, runId: secondRun });
+    expect(after.lines.find((line) => line.behaviorId === sketchId)!.appliedTo).toBeNull();
+  }, 90_000);
 });

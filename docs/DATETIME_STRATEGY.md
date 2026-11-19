@@ -252,9 +252,18 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   no model call and does not count against the Re-plan limit. When nothing else fits
   today the line closes as `withdrawn`. Lines that still fit are left alone, so a
   second call writes nothing. A re-planned reason names an item, never a calendar title.
+- **Open lines hold their times.** Re-plan and Re-check treat the time each other
+  undecided line offers as taken, as the planner does, so two lines never offer the same
+  time ("5:30 PM is suggested for Piano practice, so 6:00 PM instead.").
 - **Named refusals.** A refused Yes or Other time names what is in the slot now and
   whether it changed after the brief ("5:30 PM is taken now: you moved Piano practice
-  there after this brief was written."), with the same cause as `refusal.cause`.
+  there after this brief was written."), with the same cause as `refusal.cause`. A line
+  refused because an earlier line of the same Accept all moved there says so, with
+  `changedAfterBrief: false` ("5:30 PM is taken: Accept all just moved Piano practice there.").
+- **Where it went.** While a Yes, Other time or Accept all move stands, the line carries
+  `appliedTo` (the move's start and end, UTC). Undo clears it.
+- **Saved brief.** Reopening a saved brief shows only its own run's lines. After a
+  Refresh, the earlier brief's lines (answered or not) are not shown again.
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
 

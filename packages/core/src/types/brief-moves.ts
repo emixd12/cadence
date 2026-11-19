@@ -108,6 +108,11 @@ export type BriefMoveLine = Readonly<{
   status: BriefMoveProposalStatus;
   /** Set once answered with Yes or Other time: the applied move, for Undo. */
   moveId: string | null;
+  /**
+   * Where the item went (UTC instants) while a Yes, Other time or Accept all move stands.
+   * Null when nothing was applied or Undo reverted it. Missing from older servers.
+   */
+  appliedTo?: BriefMoveSpan | null;
 }>;
 
 /** An open schedule-edit collision (Phase 2 move_conflicts) shown as a line in the brief. */
