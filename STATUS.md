@@ -94,6 +94,15 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
+  mobile layout and a `/design-system` bench with fixture conversations.
+
 ## Advisor plan Phase 3 (3D): coach signals in shadow — November 18, 2026
 
 - **In review (draft PR, branch `claude/project-thread-vfk26s`).** An hourly cron
