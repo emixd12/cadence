@@ -36,7 +36,7 @@ export type BriefMoveLinesProps = Readonly<{
 
 /** One short line the first time a person uses each answer (stored per browser). */
 export const BRIEF_ANSWER_EXPLAINERS: Readonly<Partial<Record<BriefMoveAnswerKind, string>>> = Object.freeze({
-  // Yes, No, Other time, Already did it, Undo and Don't suggest moving this need none:
+  // Yes, No, Other time, Already did it, Undo and Stop suggesting moves need none:
   // the line's own note already says what happened.
   accept_all: "Accept all: moves every item above for today. Undo all puts them back.",
 });
@@ -346,13 +346,13 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         <Dot /><ActionLink label="No" disabled={pending} onClick={onNo} />
         <Dot /><ActionLink label="Other time" disabled={pending} onClick={() => onPanel(ui.panel === "other_time" ? null : "other_time")} expanded={ui.panel === "other_time"} />
         {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
-        {line.offerNeverMove ? <><Dot /><ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
+        {line.offerNeverMove ? <><Dot /><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
         {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
-        {ui.neverMoved ? "The brief won’t suggest moving this again. You can change this in the Behavior’s settings." : null}
+        {ui.neverMoved ? `The brief won’t suggest moving ${line.title} again. You can change this in its settings.` : null}
         {line.status === "already_done" ? "Marked Completed." : null}
         {/* "stays at" on the line already says No worked; only the lasting choice remains. */}
-        {line.offerNeverMove && (line.status === "declined" || line.status === "undone") ? <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /> : null}
+        {line.offerNeverMove && (line.status === "declined" || line.status === "undone") ? <ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /> : null}
       </p>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}

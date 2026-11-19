@@ -71,7 +71,7 @@ items around them. Answer with the text links under the line:
 - **Yes** moves the item to that time for today only. The Timeline redraws and a note at
   the bottom of the screen confirms it with **Undo**. Your schedule does not change.
 - **No** leaves the item where it is, and the brief suggests nothing more for it today.
-  The line leaves the brief, unless it offers **Don't suggest moving this**: then it stays,
+  The line leaves the brief, unless it offers **Stop suggesting moves for** *item*: then it stays,
   with its reason, as "Vitamins stays at 8:00 AM".
 - **Other time** lists other free times, lets you pick a time, or **Re-plan** finds a new
   time with what is on your calendar now.
@@ -79,7 +79,7 @@ items around them. Answer with the text links under the line:
 - **Undo** puts a moved item back; the brief then suggests nothing more for it today, and
   the line leaves the brief like a No.
 - **Accept all** above two or more lines answers Yes to each; **Undo all** puts that batch back.
-- **Don't suggest moving this** appears after you have said No to the same item on
+- **Stop suggesting moves for** *item* appears after you have said No to the same item on
   several days. The brief then stops suggesting moves for it.
 
 "30 min is a guess · set length" means Cadence does not know how long the item takes.

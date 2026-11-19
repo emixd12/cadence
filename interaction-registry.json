@@ -18700,7 +18700,7 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Answer one of the brief's proposed moves for today: Yes, No, Other time, Already did it, Undo, or Don't suggest moving this (advisor plan, Phase 3B).",
+      "intent": "Answer one of the brief's proposed moves for today: Yes, No, Other time, Already did it, Undo, or Stop suggesting moves for <item> (advisor plan, Phase 3B).",
       "triggers": [
         {
           "kind": "activate",
@@ -18716,15 +18716,15 @@
         },
         {
           "kind": "activate",
-          "control": "Don't suggest moving this"
+          "control": "Stop suggesting moves for <item>"
         },
         {
           "kind": "activate",
           "control": "change next to an assumed length, then Save"
         }
       ],
-      "availability": "Web Timeline, inside a ready Daily Brief that carries move lines, while the line is undecided (Undo after a move). Already did it shows on late items; Don't suggest moving this after repeated declines.",
-      "success_result": "Yes and Other time move the item for today only, the Timeline redraws and the bottom drawer confirms with Undo; No fades the line and stops suggestions for that item today; Undo puts the item back and counts as a No; Already did it marks the item Completed; Don't suggest moving this stops future suggestions for that Behavior; a corrected length becomes the Behavior's usual length and the line is re-planned. The first use of each answer shows one short line explaining it.",
+      "availability": "Web Timeline, inside a ready Daily Brief that carries move lines, while the line is undecided (Undo after a move). Already did it shows on late items; Stop suggesting moves for <item> after repeated declines.",
+      "success_result": "Yes and Other time move the item for today only, the Timeline redraws and the bottom drawer confirms with Undo; No fades the line and stops suggestions for that item today; Undo puts the item back and counts as a No; Already did it marks the item Completed; Stop suggesting moves for <item> stops future suggestions for that Behavior; a corrected length becomes the Behavior's usual length and the line is re-planned. The first use of each answer shows one short line explaining it.",
       "failure_result": "A time that is no longer free, a change on another device or a failed request shows under Not changed in the alert style with free times where there are some. Nothing changes.",
       "effects": [
         "database_write",

@@ -2021,7 +2021,9 @@ cite has not changed.
   No or Undo the line leaves the brief, unless it offers Don't suggest moving this; then it
   reads "Vitamins stays at 8:00 AM: <reason>" over the link alone.
   "travel not checked" is no longer shown, a refusal is one red sentence ("Not changed. 5:30 PM is taken now: …") with no icon, and answers no
-  longer add a first-use explainer that repeats the line (Emi, November 19).
+  longer add a first-use explainer that repeats the line (Emi, November 19). The P-068
+  link now reads "Stop suggesting moves for [item]" (for example "Stop suggesting moves for
+  Vitamins") so it names the item and reads as lasting (Emi, November 19).
 - **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
   `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
   suggested move", updated in the same change).

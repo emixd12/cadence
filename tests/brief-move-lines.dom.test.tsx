@@ -66,7 +66,7 @@ describe("move lines", () => {
     expect(walk.querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time");
     expect(line("gym").textContent).toContain("30 min is a guess · set length");
     expect(container.textContent).not.toContain("travel not checked");
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time · Already did it · Don’t suggest moving this");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time · Already did it · Stop suggesting moves for Vitamins");
     expect(container.querySelector("[data-brief-accept-all]")!.textContent).toBe("Accept all");
     expect(container.querySelector('[data-brief-conflict="conflict-stretch"]')!.textContent).toContain("on top of Piano practice");
     // Text links only: no filled or outlined buttons.
@@ -97,10 +97,10 @@ describe("move lines", () => {
     await click(button(line("vitamins"), "No"));
     expect(line("vitamins").className).not.toContain("opacity");
     expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM: 8:00 has passed; lunch is the next quiet moment.");
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Don’t suggest moving this");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Stop suggesting moves for Vitamins");
     expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
-    await click(button(line("vitamins"), "Don’t suggest moving this"));
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("The brief won’t suggest moving this again. You can change this in the Behavior’s settings.");
+    await click(button(line("vitamins"), "Stop suggesting moves for Vitamins"));
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("The brief won’t suggest moving Vitamins again. You can change this in its settings.");
   });
 
   it("drops a line answered No from the brief when there is nothing more to choose", async () => {
