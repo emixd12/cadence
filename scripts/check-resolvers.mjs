@@ -46,7 +46,7 @@ function walk(relativePath) {
 const resolverRegistry = [
   { domain: "time helper and effective time", resolver: "packages/core/src/resolvers/time.resolver.ts", test: "tests/time.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "per-day moves", resolver: "packages/core/src/resolvers/move.resolver.ts", test: "tests/move.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
-  { domain: "brief move lines", resolver: "packages/core/src/resolvers/brief-move.resolver.ts", test: "tests/brief-move.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
+  { domain: "brief moves free-slot rule", resolver: "packages/core/src/resolvers/brief-move.resolver.ts", test: "tests/brief-move.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "historical completion timing", resolver: "packages/core/src/resolvers/completion-timing.resolver.ts", test: "tests/completion-timing.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "briefing planner", resolver: "packages/core/src/resolvers/briefing-plan.resolver.ts", test: "tests/briefing-plan.resolver.test.ts", source: "docs/TICKETS.md" },
   { domain: "briefing analysis lanes", resolver: "packages/core/src/resolvers/briefing-analysis.resolver.ts", test: "tests/briefing-analysis.resolver.test.ts", source: "docs/TICKETS.md" },
