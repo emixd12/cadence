@@ -281,6 +281,8 @@ function AdvisorPanel({ view, onView }: Readonly<{ view: PlacementView; onView: 
 
 
 // ---------- Option K: window horse at the top, one line under the date, panel beside the Timeline ----------
+// Emi picked K on Nov 19, 2026. The panel sits beside the Timeline from 1280px wide and covers the window below that,
+// so the Timeline rows never get squeezed (checked at a 1100 × 720 Mac-sized window).
 
 const linkClass = "underline underline-offset-2";
 
@@ -348,7 +350,7 @@ function KPanel({ onClose, showBrief = true }: Readonly<{ onClose: () => void; s
   const section = "mt-6 border-t border-line pt-4 text-sm leading-6";
   const heading = "text-xs font-bold text-muted-readable";
   return (
-    <section aria-label="Advisor" className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-8 pt-4 lg:inset-y-0 lg:left-auto lg:right-0 lg:w-[26rem] lg:border-l lg:border-line" data-advisor-panel>
+    <section aria-label="Advisor" className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-8 pt-4 xl:inset-y-0 xl:left-auto xl:right-0 xl:w-[26rem] xl:border-l xl:border-line [&>*]:mx-auto [&>*]:max-w-xl" data-advisor-panel>
       <div className="flex justify-end">
         <button type="button" onClick={onClose} className="min-h-11 min-w-11 text-right text-muted-readable underline underline-offset-2 hover:text-foreground"><span className="text-sm">Close</span></button>
       </div>
@@ -559,7 +561,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
       inline = keepsBrief && view === "brief" ? undefined : { anchor: "day-heading", position: "after", content: <KLine view={view} onView={setView} /> };
       overlay = (
         <>
-          <div className="pointer-events-none fixed left-0 right-0 top-0.5 z-50 flex justify-center lg:left-64 lg:top-3 lg:z-30">
+          <div className={["pointer-events-none fixed left-0 right-0 top-0.5 z-50 flex justify-center lg:left-64 lg:top-3 lg:z-30", view === "panel" ? "xl:right-[26rem]" : ""].join(" ")}>
             <button type="button" onClick={() => setView(view === "panel" ? "open" : "panel")} aria-label={hasNew ? "Open the advisor, 1 new" : "Open the advisor"}
               className="pointer-events-auto flex flex-col items-center">
               <span className="lg:hidden"><HorseMark size={40} /></span>
@@ -597,7 +599,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
     }
 
     page = (
-      <div className={["flex w-full flex-col", (option === "k" || option === "k2") && view === "panel" ? "lg:pr-[26rem]" : ""].join(" ")}>
+      <div className={["flex w-full flex-col", (option === "k" || option === "k2") && view === "panel" ? "xl:pr-[26rem]" : ""].join(" ")}>
         <h1 className="sr-only">Timeline</h1>
         {banner}
         <div className="relative mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
