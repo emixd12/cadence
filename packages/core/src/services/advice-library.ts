@@ -163,7 +163,7 @@ function allowedFacts(kind: AdviceSignalKind): readonly string[] {
   return kind === "account" ? ADVICE_SIGNAL_FACTS.account : [...ADVICE_SIGNAL_FACTS[kind], ...ADVICE_COMMON_FACTS];
 }
 
-const PLACEHOLDER = /\{([a-z_]+)\}/g;
+const PLACEHOLDER = /\{([a-z0-9_]+)\}/g;
 const FORMATTED_SUFFIX = /_(pct)$/;
 
 function placeholders(line: string): string[] {

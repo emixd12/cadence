@@ -1,5 +1,961 @@
 {
-  "version": "2026-11-19.1",
-  "sources": [],
-  "cards": []
+  "version": "2026-11-19.2",
+  "sources": [
+    {
+      "id": "gollwitzer-sheeran-2006",
+      "citation": "Gollwitzer PM, Sheeran P (2006). Implementation intentions and goal achievement: a meta-analysis of effects and processes. Advances in Experimental Social Psychology 38, 69-119.",
+      "url": "https://doi.org/10.1016/S0065-2601(06)38002-1",
+      "doi": "10.1016/S0065-2601(06)38002-1",
+      "year": 2006,
+      "kind": "meta_analysis",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "wang-wang-gai-2021",
+      "citation": "Wang G, Wang Y, Gai X (2021). A meta-analysis of the effects of mental contrasting with implementation intentions on goal attainment. Frontiers in Psychology 12, 565202.",
+      "url": "https://doi.org/10.3389/fpsyg.2021.565202",
+      "doi": "10.3389/fpsyg.2021.565202",
+      "year": 2021,
+      "kind": "meta_analysis",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "harkin-2016",
+      "citation": "Harkin B, Webb TL, Chang BPI, et al. (2016). Does monitoring goal progress promote goal attainment? A meta-analysis of the experimental evidence. Psychological Bulletin 142(2), 198-229.",
+      "url": "https://doi.org/10.1037/bul0000025",
+      "doi": "10.1037/bul0000025",
+      "year": 2016,
+      "kind": "meta_analysis",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "michie-2009",
+      "citation": "Michie S, Abraham C, Whittington C, McAteer J, Gupta S (2009). Effective techniques in healthy eating and physical activity interventions: a meta-regression. Health Psychology 28(6), 690-701.",
+      "url": "https://doi.org/10.1037/a0016136",
+      "doi": "10.1037/a0016136",
+      "year": 2009,
+      "kind": "meta_analysis",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "lally-2010",
+      "citation": "Lally P, van Jaarsveld CHM, Potts HWW, Wardle J (2010). How are habits formed: modelling habit formation in the real world. European Journal of Social Psychology 40(6), 998-1009.",
+      "url": "https://doi.org/10.1002/ejsp.674",
+      "doi": "10.1002/ejsp.674",
+      "year": 2010,
+      "kind": "observational_study",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "gardner-lally-wardle-2012",
+      "citation": "Gardner B, Lally P, Wardle J (2012). Making health habitual: the psychology of 'habit-formation' and general practice. British Journal of General Practice 62(605), 664-666.",
+      "url": "https://doi.org/10.3399/bjgp12X659466",
+      "doi": "10.3399/bjgp12X659466",
+      "year": 2012,
+      "kind": "theory_review",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "wood-neal-2007",
+      "citation": "Wood W, Neal DT (2007). A new look at habits and the habit-goal interface. Psychological Review 114(4), 843-863.",
+      "url": "https://doi.org/10.1037/0033-295X.114.4.843",
+      "doi": "10.1037/0033-295X.114.4.843",
+      "year": 2007,
+      "kind": "theory_review",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "keller-2021",
+      "citation": "Keller J, Kwasnicka D, Klaiber P, Sichert L, Lally P, Fleig L (2021). Habit formation following routine-based versus time-based cue planning: a randomized controlled trial. British Journal of Health Psychology 26(3), 807-824.",
+      "url": "https://doi.org/10.1111/bjhp.12504",
+      "doi": "10.1111/bjhp.12504",
+      "year": 2021,
+      "kind": "randomized_trial",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "fournier-2017",
+      "citation": "Fournier M, d'Arripe-Longueville F, Rovere C, et al. (2017). Effects of circadian cortisol on the development of a health habit. Health Psychology 36(11), 1059-1064.",
+      "url": "https://doi.org/10.1037/hea0000510",
+      "doi": "10.1037/hea0000510",
+      "year": 2017,
+      "kind": "randomized_trial",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "judah-2013",
+      "citation": "Judah G, Gardner B, Aunger R (2013). Forming a flossing habit: an exploratory study of the psychological determinants of habit formation. British Journal of Health Psychology 18(2), 338-353.",
+      "url": "https://doi.org/10.1111/j.2044-8287.2012.02086.x",
+      "doi": "10.1111/j.2044-8287.2012.02086.x",
+      "year": 2013,
+      "kind": "experiment",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "dalton-spiller-2012",
+      "citation": "Dalton AN, Spiller SA (2012). Too much of a good thing: the benefits of implementation intentions depend on the number of goals. Journal of Consumer Research 39(3), 600-614.",
+      "url": "https://doi.org/10.1086/664500",
+      "doi": "10.1086/664500",
+      "year": 2012,
+      "kind": "experiment",
+      "checked_at": "2026-11-19"
+    },
+    {
+      "id": "buehler-1994",
+      "citation": "Buehler R, Griffin D, Ross M (1994). Exploring the 'planning fallacy': why people underestimate their task completion times. Journal of Personality and Social Psychology 67(3), 366-381.",
+      "url": "https://doi.org/10.1037/0022-3514.67.3.366",
+      "doi": "10.1037/0022-3514.67.3.366",
+      "year": 1994,
+      "kind": "experiment",
+      "checked_at": "2026-11-19"
+    }
+  ],
+  "cards": [
+    {
+      "id": "plan-when-and-where-after-a-drop",
+      "revision": 1,
+      "status": "draft",
+      "advice": "When something starts slipping, a specific when-and-where plan helps more than trying harder.",
+      "applies_when": [
+        {
+          "signal": "completion_drop",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Give the item a fixed time and place, and think of it as: when this happens, I do it.",
+      "evidence": {
+        "source_id": "gollwitzer-sheeran-2006",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Across 94 tests, people who planned when, where and how to act reached their goals more often than people who only intended to.",
+        "quote": "Findings from 94 independent tests showed that implementation intentions had a positive effect of medium‐to‐large magnitude ( d = .65) on goal attainment.",
+        "locator": "Abstract"
+      },
+      "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
+      "quip_seeds": [
+        "{behavior}: {recent_completed} of {recent_resolved} done in the last {recent_days} days, down from {baseline_rate_pct}.",
+        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A fixed time and place for it may help."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "name-the-obstacle",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Name the obstacle that keeps getting in the way, and decide now what you will do when it shows up.",
+      "applies_when": [
+        {
+          "signal": "completion_drop",
+          "scope": "behavior",
+          "facts": [
+            {
+              "fact": "drop",
+              "op": "gte",
+              "value": 0.4
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Write the usual obstacle and your fallback in today's note.",
+      "evidence": {
+        "source_id": "wang-wang-gai-2021",
+        "kind": "meta_analysis",
+        "strength": "moderate",
+        "claim": "Picturing the goal, naming the obstacle and planning a response (mental contrasting with implementation intentions) helped people reach goals, with a small to medium effect.",
+        "quote": "Results showed that MCII to be effective for goal attainment with a small to medium effect size (g = 0.336).",
+        "locator": "Abstract"
+      },
+      "limitation": "The effect is small to moderate and, because of publication bias, may be smaller than reported.",
+      "quip_seeds": [
+        "{behavior} dropped from {baseline_rate_pct} to {recent_rate_pct} over {recent_days} days. What usually gets in the way?",
+        "{behavior}: {recent_completed} of {recent_resolved} lately. Plan for the usual obstacle."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "set-it-where-you-keep-moving-it",
+      "revision": 1,
+      "status": "draft",
+      "advice": "A routine sticks when it is repeated at the same cue, so set the time where you actually do it.",
+      "applies_when": [
+        {
+          "signal": "repeated_move",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Change the item's set time to where you keep moving it.",
+      "evidence": {
+        "source_id": "keller-2021",
+        "kind": "randomized_trial",
+        "strength": "moderate",
+        "claim": "In a trial with 192 adults, carrying out the plan again and again at its planned cue was a key predictor of the routine becoming automatic.",
+        "quote": "Repeated plan enactment was a key predictor for automaticity.",
+        "locator": "Abstract, results"
+      },
+      "limitation": "The trial studied one everyday eating habit over 84 days; schedules with a fixed external constraint may not move.",
+      "quip_seeds": [
+        "You moved {behavior} {direction} on {same_direction_days} days in the last {window_days}.",
+        "{behavior} keeps landing near {median_target_time}. Setting it there may stick better."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "check-in-more-often",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Checking on your progress more often goes with reaching goals more often.",
+      "applies_when": [
+        {
+          "signal": "late_marking",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Mark items the same day, right after you do them.",
+      "evidence": {
+        "source_id": "harkin-2016",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Across 138 randomized studies, prompting people to monitor their progress more often helped them reach goals, and the extra monitoring explained the effect.",
+        "quote": "Furthermore, changes in the frequency of progress monitoring mediated the effect of the interventions on goal attainment.",
+        "locator": "Abstract"
+      },
+      "limitation": "The studies tested monitoring more often, not marking sooner; marking on the same day is our reading of it.",
+      "quip_seeds": [
+        "{later_day} of your last {decisions} marks came a day or more late.",
+        "Your marks usually land {median_lag_days} days after the item."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "weeks-not-days",
+      "revision": 1,
+      "status": "draft",
+      "advice": "New routines take weeks to months to feel automatic, and the time varies a lot from person to person.",
+      "applies_when": [
+        {
+          "signal": "new_behavior_settled",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Keep the same time and place for now rather than changing it early.",
+      "evidence": {
+        "source_id": "lally-2010",
+        "kind": "observational_study",
+        "strength": "moderate",
+        "claim": "In 82 people building a daily habit, the time to reach most of its automaticity ranged from 18 to 254 days.",
+        "quote": "The time it took participants to reach 95% of their asymptote of automaticity ranged from 18 to 254 days; indicating considerable variation in how long it takes people to reach their limit of automaticity and highlighting that it can take a very long time.",
+        "locator": "Abstract"
+      },
+      "limitation": "One study of simple daily eating, drinking and activity habits; less frequent items may take longer.",
+      "quip_seeds": [
+        "First two weeks of {behavior}: {completed} done, {not_completed} not done.",
+        "{behavior} is {age_days} days old. Most routines need weeks more to feel automatic."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "look-at-the-week",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Comparing what you did against what you planned, and adjusting, works better than tracking alone.",
+      "applies_when": [
+        {
+          "signal": "weekly_numbers",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Look at this week on the Behaviors page and adjust one item.",
+      "evidence": {
+        "source_id": "michie-2009",
+        "kind": "meta_analysis",
+        "strength": "moderate",
+        "claim": "In 122 evaluations of eating and activity programs, those that paired self-monitoring with goal setting, feedback or review did better than the rest.",
+        "quote": "Interventions that combined self-monitoring with at least one other technique derived from control theory were significantly more effective than the other interventions (0.42 vs. 0.26).",
+        "locator": "Abstract, results"
+      },
+      "limitation": "The programs targeted eating and physical activity; other kinds of routines were not studied.",
+      "quip_seeds": [
+        "This week: {week_completed} done, {week_not_completed} not done ({week_rate_pct}). Your usual is {prior_rate_pct}.",
+        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks} weeks before."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "same-cue-every-day",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Habits form best at a time and place that comes up the same way every day.",
+      "applies_when": [
+        {
+          "signal": "weekday_gap",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Check what is different on that weekday, then move the item or drop it from that day.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers advise repeating an action in a context met every day of the week, so the cue stays the same.",
+        "quote": "Be consistent: choose a time and place that you encounter every day of the week.",
+        "locator": "Box 1, step 3"
+      },
+      "limitation": "This is expert advice drawn from habit research, not a trial of weekday schedules.",
+      "quip_seeds": [
+        "{weekday_name}s are the weak day: {weekday_rate_pct} done against {other_rate_pct} on other days.",
+        "{behavior} on {weekday_name}s: {weekday_rate_pct}. Other days: {other_rate_pct}."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "time-of-day-matters",
+      "revision": 1,
+      "status": "draft",
+      "advice": "The time of day can change how quickly a routine becomes automatic.",
+      "applies_when": [
+        {
+          "signal": "time_of_day_gap",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Try moving one item from the weaker part of the day to the stronger one.",
+      "evidence": {
+        "source_id": "fournier-2017",
+        "kind": "randomized_trial",
+        "strength": "limited",
+        "claim": "In a trial of 48 students, a stretch done on waking became automatic sooner than the same stretch done at bedtime.",
+        "quote": "Extrapolation of the curves indicated that the morning group achieved automaticity at an earlier time point (105.95 days) than did the evening group (154.01 days).",
+        "locator": "Abstract, results"
+      },
+      "limitation": "One small trial of a single stretching exercise in students; your own numbers matter more than this finding.",
+      "quip_seeds": [
+        "Items set for the {part_of_day}: {part_rate_pct} done, against {other_rate_pct} the rest of the day.",
+        "{behavior} in the {part_of_day} gets done {part_rate_pct} of the time."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "routine-or-clock",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Tying an item to a routine or to a clock time worked equally well, so use whichever you actually keep.",
+      "applies_when": [
+        {
+          "signal": "timing_mode_gap",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Switch one weaker item to the other kind of timing for two weeks.",
+      "evidence": {
+        "source_id": "keller-2021",
+        "kind": "randomized_trial",
+        "strength": "moderate",
+        "claim": "In a randomized trial, linking a daily habit to a routine or to a set time led to similar habit formation.",
+        "quote": "Linking one's nutrition behaviour to a daily routine or a specific time was similarly effective for habit formation.",
+        "locator": "Abstract, conclusions"
+      },
+      "limitation": "The trial studied one eating habit; it shows no difference on average, and individuals may differ.",
+      "quip_seeds": [
+        "Window items get done {window_rate_pct} of the time, set-time items {set_time_rate_pct}.",
+        "Window items: {window_rate_pct}. Set-time items: {set_time_rate_pct}. One of the two suits you better."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "leave-steady-items-alone",
+      "revision": 1,
+      "status": "draft",
+      "advice": "A steady routine runs on its cue, so keep its time and place as they are.",
+      "applies_when": [
+        {
+          "signal": "steady_behavior",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Leave this item's time and place unchanged when you reshuffle your day.",
+      "evidence": {
+        "source_id": "wood-neal-2007",
+        "kind": "theory_review",
+        "strength": "moderate",
+        "claim": "Once a habit forms, the setting itself starts the action, without needing a conscious goal each time.",
+        "quote": "Once a habit is formed, perception of contexts triggers the associated response without a mediating goal.",
+        "locator": "Abstract"
+      },
+      "limitation": "A theory review; it explains why changing the cue can disrupt a habit but does not measure how often it does.",
+      "quip_seeds": [
+        "{behavior}: {completed} of {resolved} over {weeks} weeks.",
+        "{behavior} has held at {rate_pct} for {weeks} weeks."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "make-it-smaller",
+      "revision": 1,
+      "status": "draft",
+      "advice": "When an item rarely gets done, a smaller version is easier to start and repeat.",
+      "applies_when": [
+        {
+          "signal": "never_done",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Shorten it, move it to a better time, or pause it for now.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers advise small, manageable changes, because failure is discouraging and simpler actions become habits faster.",
+        "quote": "Patients should be encouraged to aim for small and manageable behaviour changes, because failure can be discouraging.",
+        "locator": "Making healthy habits"
+      },
+      "limitation": "Expert advice drawn from habit research, written for clinicians; not a trial of shrinking a routine.",
+      "quip_seeds": [
+        "{behavior}: {completed} of {resolved} in {weeks} weeks.",
+        "{behavior} is at {rate_pct} for {weeks} weeks. A smaller version, a new time, or a pause?"
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "one-miss-is-fine",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Missing a day does not undo a routine; what matters is picking it up the next time.",
+      "applies_when": [
+        {
+          "signal": "day_shape",
+          "scope": "either",
+          "facts": [
+            {
+              "fact": "pattern",
+              "op": "eq",
+              "value": "clustered"
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "After a bad day, keep the next day's plan as it is.",
+      "evidence": {
+        "source_id": "lally-2010",
+        "kind": "observational_study",
+        "strength": "moderate",
+        "claim": "In a study of people building daily habits, missing a single day did not noticeably set back habit formation.",
+        "quote": "Missing one opportunity to perform the behaviour did not materially affect the habit formation process.",
+        "locator": "Abstract"
+      },
+      "limitation": "The study looked at single missed days, not long breaks.",
+      "quip_seeds": [
+        "Most misses land on just {bad_days} days.",
+        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days} days."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "plan-for-the-dip",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Plan ahead for the weeks that go badly, so getting back is a step you already know.",
+      "applies_when": [
+        {
+          "signal": "dip_recovery",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Write down what helped you get back on track, for the next dip.",
+      "evidence": {
+        "source_id": "nice-ph49-planning",
+        "kind": "guidance",
+        "strength": "moderate",
+        "claim": "NICE recommends helping people make coping plans to prevent and manage lapses, as part of goals and planning.",
+        "quote": "develop coping plans to prevent and manage relapses",
+        "locator": "Recommendation 7, Goals and planning"
+      },
+      "limitation": "National guidance for health behaviour programs; it recommends the technique rather than testing it in an app.",
+      "quip_seeds": [
+        "{behavior} dipped to {dip_rate_pct} for {dip_weeks} weeks, against {usual_rate_pct} usually.",
+        "{behavior} is back to {recent_rate_pct} after a dip."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "unmarked-is-not-missed",
+      "revision": 1,
+      "status": "draft",
+      "advice": "An unmarked item is not a failure; it just has no decision yet.",
+      "applies_when": [
+        {
+          "signal": "unmarked_items",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Mark what you remember and leave the rest unmarked.",
+      "evidence": {
+        "source_id": "cadence-manual-truth",
+        "kind": "editorial_guidance",
+        "strength": "product_rule",
+        "claim": "Cadence treats an unmarked item as missing a decision, never as a miss.",
+        "quote": "Unresolved remains missing decision data.",
+        "locator": "docs/PRODUCT_SPEC.md, analysis lanes"
+      },
+      "limitation": "A Cadence product rule, not research evidence.",
+      "quip_seeds": [
+        "{unmarked} items wait unmarked; the oldest is {oldest_days} days old.",
+        "{unmarked} items have no mark yet."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "write-it-down",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Recording progress, not just keeping it in mind, goes with better results.",
+      "applies_when": [
+        {
+          "signal": "marking_time",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Mark items when you finish them, or pick one daily check-in time.",
+      "evidence": {
+        "source_id": "harkin-2016",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Monitoring progress helped more when the information was physically recorded or shared.",
+        "quote": "Moderation tests revealed that progress monitoring had larger effects on goal attainment when the outcomes were reported or made public, and when the information was physically recorded.",
+        "locator": "Abstract"
+      },
+      "limitation": "The studies compared recording with not recording; they did not test how soon to record.",
+      "quip_seeds": [
+        "You usually mark items around {median_mark_time}, {median_lag_hours} hours after they are set.",
+        "{same_day_share_pct} of your marks are made the same day."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "stack-after-a-routine",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Doing a newer routine right after an established one can help it stick.",
+      "applies_when": [
+        {
+          "signal": "done_together",
+          "scope": "behavior",
+          "facts": [
+            {
+              "fact": "pattern",
+              "op": "eq",
+              "value": "together"
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Set the newer item to start right after the one it goes with.",
+      "evidence": {
+        "source_id": "judah-2013",
+        "kind": "experiment",
+        "strength": "limited",
+        "claim": "People told to floss after brushing formed stronger flossing habits than people told to floss before, and still flossed more 8 months later.",
+        "quote": "Those who flossed after brushing (rather than before) tended to form stronger flossing habits and, at 8-month follow-up, had stronger habits and flossed more frequently.",
+        "locator": "Abstract, results"
+      },
+      "limitation": "An exploratory study of 50 people and one habit.",
+      "quip_seeds": [
+        "{behavior} goes with another item on {together_days} of {either_days} days.",
+        "{behavior} and another item get done together on {together_days} days."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "one-slot-one-item",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Detailed plans help one goal at a time, but piling many into the same slot works against them.",
+      "applies_when": [
+        {
+          "signal": "crowded_hour",
+          "scope": "either",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Spread items set for the same hour across the day.",
+      "evidence": {
+        "source_id": "dalton-spiller-2012",
+        "kind": "experiment",
+        "strength": "moderate",
+        "claim": "Making detailed plans helped with one goal but not with several, because planning made the combined load feel hard.",
+        "quote": "An investigation into this question suggests that the benefits of implemental planning for attaining a single goal do not typically extend to multiple goals.",
+        "locator": "Abstract"
+      },
+      "limitation": "Lab and field experiments with short tasks; a full day of routines may behave differently.",
+      "quip_seeds": [
+        "{items_in_hour} items are set for {hour_label}; they get done {hour_rate_pct} of the time.",
+        "Items at {hour_label}: {hour_rate_pct} done. Other hours: {other_rate_pct}."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "give-it-a-length",
+      "revision": 1,
+      "status": "draft",
+      "advice": "People underestimate how long their own tasks take, unless they think back to how long it took before.",
+      "applies_when": [
+        {
+          "signal": "setup_gaps",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "without_length",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Add a length to items, based on how long they took last time.",
+      "evidence": {
+        "source_id": "buehler-1994",
+        "kind": "experiment",
+        "strength": "moderate",
+        "claim": "People's estimates of how long their own tasks would take were too optimistic, and recalling past times removed the bias.",
+        "quote": "The optimistic bias was eliminated for Ss instructed to connect relevant past experiences with their predictions.",
+        "locator": "Abstract"
+      },
+      "limitation": "Studied with student projects and tasks, not daily routines.",
+      "quip_seeds": [
+        "{without_length} of your {active_behaviors} items have no length set.",
+        "{without_length} items have no length yet. How long did they take last time?"
+      ],
+      "audience": "history_needed",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "give-it-a-place",
+      "revision": 1,
+      "status": "draft",
+      "advice": "A plan that names where, as well as when, is easier to act on.",
+      "applies_when": [
+        {
+          "signal": "setup_gaps",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "without_place",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Add a place to the items that have none.",
+      "evidence": {
+        "source_id": "gollwitzer-sheeran-2006",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Plans that spell out when, where and how to act helped people reach their goals.",
+        "quote": "This review analyzes whether realization of goal intentions is facilitated by forming an implementation intention that spells out the when, where, and how of goal striving in advance (“If situation Y is encountered, then I will initiate goal‐directed behavior X!”).",
+        "locator": "Abstract"
+      },
+      "limitation": "The review tested complete when-where-how plans; a place alone is part of such a plan.",
+      "quip_seeds": [
+        "{without_place} of your {active_behaviors} items have no place set.",
+        "{without_place} items have no place yet. Where will they happen?"
+      ],
+      "audience": "history_needed",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "start-with-when-and-where",
+      "revision": 1,
+      "status": "draft",
+      "advice": "A new routine starts more reliably with a plan for when and where it happens.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "behaviors_without_place",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Add a place to each new item, next to its time.",
+      "evidence": {
+        "source_id": "gollwitzer-sheeran-2006",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Across 94 tests, people who planned when, where and how to act reached their goals more often than people who only intended to.",
+        "quote": "Findings from 94 independent tests showed that implementation intentions had a positive effect of medium‐to‐large magnitude ( d = .65) on goal attainment.",
+        "locator": "Abstract"
+      },
+      "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
+      "quip_seeds": [
+        "{behaviors_without_place} of your {active_behaviors} items have no place yet.",
+        "{behaviors_without_place} items have a time but no place. Where will they happen?"
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "start-with-a-length",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Set a realistic length for each new item; people tend to underestimate their own tasks.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "behaviors_without_length",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Add a length to each item, thinking of how long it took the last time.",
+      "evidence": {
+        "source_id": "buehler-1994",
+        "kind": "experiment",
+        "strength": "moderate",
+        "claim": "People's estimates of how long their own tasks would take were too optimistic for many kinds of tasks.",
+        "quote": "Ss' predictions of their completion times were too optimistic for a variety of academic and nonacademic tasks.",
+        "locator": "Abstract"
+      },
+      "limitation": "Studied with student projects and tasks, not daily routines.",
+      "quip_seeds": [
+        "{behaviors_without_length} of your {active_behaviors} items have no length yet.",
+        "{behaviors_without_length} items have no length set. A realistic one helps plan the day."
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "start-with-fewer",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Starting many new routines at once makes each one harder to keep; a few at a time works better.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "active_behaviors",
+              "op": "gte",
+              "value": 6
+            },
+            {
+              "fact": "behaviors_created_last_14_days",
+              "op": "gte",
+              "value": 4
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Pick the items that matter most this month and pause the rest.",
+      "evidence": {
+        "source_id": "dalton-spiller-2012",
+        "kind": "experiment",
+        "strength": "moderate",
+        "claim": "Detailed planning helped people with one goal but not with several, because it made the combined load feel hard.",
+        "quote": "An investigation into this question suggests that the benefits of implemental planning for attaining a single goal do not typically extend to multiple goals.",
+        "locator": "Abstract"
+      },
+      "limitation": "Lab and field experiments with short tasks; the right number of routines differs from person to person.",
+      "quip_seeds": [
+        "You are starting with {active_behaviors} items.",
+        "{behaviors_created_last_14_days} new items in two weeks is a lot to plan in detail."
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "expect-about-ten-weeks",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Expect a new daily routine to take around ten weeks to feel automatic, not three.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "active_behaviors",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Keep each new item at the same time and place while it settles.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers suggest telling people to expect a daily habit to take around 10 weeks to form, based on a study that found an average near 66 days.",
+        "quote": "Therefore, it may be helpful to tell patients to expect habit formation (based on daily repetition) to take around 10 weeks.",
+        "locator": "Making healthy habits"
+      },
+      "limitation": "An average from one study of daily habits; individuals ranged from under three weeks to over eight months.",
+      "quip_seeds": [
+        "{active_behaviors} items set up. New routines usually take weeks to feel automatic.",
+        "Day {account_age_days} of {active_behaviors} new routines. Around ten weeks is typical."
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "anchor-to-an-existing-routine",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Tie each new item to something you already do every day.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "active_behaviors",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Set each new item right after a daily routine, such as breakfast or arriving at work.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers suggest using a cue from an existing daily routine as a stable starting point for a new habit.",
+        "quote": "A cue located within an existing daily routine (for example, ‘when I go on my lunch break’) provides a convenient and stable starting point.",
+        "locator": "Making healthy habits"
+      },
+      "limitation": "Expert advice drawn from habit research, written for clinicians.",
+      "quip_seeds": [
+        "{active_behaviors} items set up. Tie each one to something you already do daily.",
+        "{behaviors_with_set_time} items have a clock time. A daily routine next to each makes a stronger cue."
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "marking-is-the-core",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Keeping a record of what you did was the strongest single ingredient in eating and activity programs.",
+      "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "active_behaviors",
+              "op": "gte",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Mark each item as Completed or Not Completed when it is done or skipped.",
+      "evidence": {
+        "source_id": "michie-2009",
+        "kind": "meta_analysis",
+        "strength": "moderate",
+        "claim": "Across 122 program evaluations, self-monitoring explained more of the difference between programs than any other technique.",
+        "quote": "The technique, \"self-monitoring,\" explained the greatest amount of among-study heterogeneity (13%).",
+        "locator": "Abstract, results"
+      },
+      "limitation": "The programs targeted eating and physical activity; the finding is about programs, not individual people.",
+      "quip_seeds": [
+        "{active_behaviors} items to track. Marking each one is the core of it.",
+        "Marking your {active_behaviors} items as you go is the part that helps most."
+      ],
+      "audience": "first_two_weeks",
+      "reviewed_at": null,
+      "reviewer": null
+    }
+  ]
 }
