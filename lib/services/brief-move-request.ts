@@ -4,6 +4,7 @@ import type {
   BriefMoveAnswerRequest,
   BriefMoveErrorCode,
   BriefMoveLengthRequest,
+  BriefMoveRecheckRequest,
   BriefMoveReplanRequest,
   BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
@@ -170,6 +171,17 @@ export function parseBriefMoveAnswer(value: unknown): BriefMoveAnswerRequest {
 export function parseBriefMoveReplan(value: unknown): BriefMoveReplanRequest {
   const item = record(value, ["proposalId"], ["context"]);
   return { proposalId: text(item.proposalId, UUID), context: parsePlanningContext(item.context) };
+}
+
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function parseBriefMoveRecheck(value: unknown): BriefMoveRecheckRequest {
+  const item = record(value, ["localDate"], ["context", "proposalIds"]);
+  const localDate = text(item.localDate, LOCAL_DATE);
+  try { Temporal.PlainDate.from(localDate); } catch { invalid(); }
+  const ids = item.proposalIds ?? [];
+  if (!Array.isArray(ids) || ids.length > 64) invalid();
+  return { localDate, context: parsePlanningContext(item.context), proposalIds: [...new Set(ids.map((id) => text(id, UUID)))] };
 }
 
 export function parseBriefMoveLength(value: unknown): BriefMoveLengthRequest {

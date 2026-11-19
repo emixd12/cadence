@@ -103,3 +103,15 @@ describe("brief move routes", () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("brief move recheck request (3A1 follow-up)", () => {
+  it("takes a local date, the screen's context and the lines it shows", async () => {
+    const { parseBriefMoveRecheck } = await import("@/lib/services/brief-move-request");
+    expect(parseBriefMoveRecheck({ localDate: "2026-11-19", proposalIds: [PROPOSAL, PROPOSAL] }))
+      .toEqual({ localDate: "2026-11-19", context: { calendarBusy: [] }, proposalIds: [PROPOSAL] });
+    for (const bad of [{}, { localDate: "2026-13-40" }, { localDate: "11/19/2026" }, { localDate: "2026-11-19", proposalIds: ["x"] },
+      { localDate: "2026-11-19", extra: 1 }, { localDate: "2026-11-19", proposalIds: Array.from({ length: 65 }, () => PROPOSAL) }]) {
+      expect(() => parseBriefMoveRecheck(bad)).toThrow(BriefMoveError);
+    }
+  });
+});
