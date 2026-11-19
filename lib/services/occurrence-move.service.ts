@@ -10,22 +10,26 @@ import {
   zonedInstant,
 } from "@cadence/core/resolvers/time.resolver";
 import {
+  MOVE_ALTERNATIVES_LIMIT,
   MOVE_REFUSAL_MESSAGES,
-  checkMoveSlot,
   findMoveConflicts,
-  loggedAverageSeconds,
-  moveAlternatives,
-  resolveMoveDuration,
   type MoveCalendarBusy,
-  type MoveDurationSource,
-  type MoveInterval,
-  type MoveOccupant,
   type MovePersonReason,
   type MoveRefusalReason,
 } from "@cadence/core/resolvers/move.resolver";
+import {
+  briefMoveFreeStarts,
+  briefMoveItemBlocks,
+  checkBriefMoveSlot,
+  travelBlocksFor,
+  type BriefMoveBlock,
+  type BriefMoveTravelInput,
+} from "@cadence/core/resolvers/brief-move.resolver";
+import type { BriefMoveLength, BriefMoveLengthSource } from "@cadence/core/types/brief-moves";
 import type { AppSupabaseClient, BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 import { getBehaviorById } from "@/lib/db/behaviors.repo";
-import { getOccurrenceById, listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { getOccurrenceById } from "@/lib/db/occurrences.repo";
+import { readBriefMoveDay, type BriefMoveDay } from "@/lib/services/brief-move-day.service";
 import { syncReminderDeliveriesForBehavior } from "@/lib/services/reminder.service";
 import type { Occurrence } from "@/lib/types/database";
 import type { Tables } from "@/lib/db/database.types";
@@ -38,6 +42,10 @@ import type { Tables } from "@/lib/db/database.types";
  * revision, today, range and same-day rules. This service adds what needs durations
  * and the day's other items: the item's length, the free-slot check, alternatives
  * for a refusal, and the reminder resync. Rules: docs/DATETIME_STRATEGY.md, "Moves".
+ *
+ * Phase 3A1: the free-slot check and the "other times" list are the one rule set the
+ * Daily Brief's planner uses (packages/core/src/resolvers/brief-move.resolver.ts): a
+ * 10-minute gap, a range item blocks only its own length, every item has a length.
  */
 
 export type OccurrenceMoveRecord = Omit<Tables<"occurrence_moves">, "user_id" | "client_ref" | "idempotency_key" | "request_hash">;
@@ -62,6 +70,13 @@ export type OccurrenceMoveRequest = Readonly<{
   requestHash?: string | null;
   /** Today's calendar events, when the caller holds them. The server keeps no copy. */
   calendarBusy?: readonly MoveCalendarBusy[];
+  /**
+   * The length a brief line showed, so Yes applies exactly what was offered. Absent:
+   * a moved item keeps its length, otherwise the shared length order decides.
+   */
+  length?: BriefMoveLength | null;
+  /** Verified signed travel times for this request only (never stored). */
+  travel?: BriefMoveTravelInput | null;
 }>;
 
 export type OccurrenceRevertRequest = Readonly<{
@@ -83,6 +98,11 @@ export type OccurrenceMoveResult =
   | Readonly<{
     outcome: "refused";
     reason: MoveRefusalReason | "occurrence_not_found";
+    /**
+     * The one rule's finer reason when it differs from `reason`: `too_close` (the
+     * 10-minute gap) and `travel_busy` read as `slot_taken` to MCP clients.
+     */
+    detail?: "too_close" | "travel_busy";
     message: string;
     alternatives: readonly Temporal.Instant[];
     occurrence: Occurrence | null;
@@ -95,7 +115,10 @@ export class OccurrenceMoveKeyReusedError extends Error {
 }
 
 const ALTERNATIVE_REASONS: ReadonlySet<string> = new Set(["time_passed", "start_not_on_day", "slot_taken", "calendar_busy"]);
-const SESSION_SAMPLE = 20;
+const DETAIL_MESSAGES = Object.freeze({
+  too_close: "That is too close to something else. Cadence keeps 10 minutes between items.",
+  travel_busy: "That time is needed for travel.",
+});
 
 /** Move today's Occurrence to a new start. Refusals come back as values, not errors. */
 export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request: OccurrenceMoveRequest): Promise<OccurrenceMoveResult> {
@@ -105,18 +128,20 @@ export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request
   const requestedStart = request.startTime
     ? zonedInstant(occurrence.local_date, request.startTime, behavior.timezone)
     : Temporal.Instant.from(request.startAt ?? "");
-  const duration = await moveDuration(caller, occurrence, behavior);
+  const day = await readBriefMoveDay(caller.supabase, caller.userId, occurrence.local_date);
+  const duration = moveDuration(occurrence, day, request.length ?? null);
   const interval = { start: requestedStart, end: requestedStart.add({ seconds: duration.seconds }) };
+  const slot = slotInputs(occurrence.id, day, request.calendarBusy, request.travel ?? null);
 
   // The database answers the basic refusals (resolved, not today, changed since read,
   // time passed). The slot check runs only on a request that passes those, so its
   // reason never hides a more basic one.
-  const day = await dayOccupants(caller, occurrence);
   if (passesBasicRules(caller, occurrence, behavior, request.expectedRevision, requestedStart)) {
-    const slot = checkMoveSlot({ occurrenceId: occurrence.id, interval, others: day, calendarBusy: request.calendarBusy });
-    if (!slot.ok) {
-      return refused(slot.reason, occurrence, behavior,
-        alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, day, request.calendarBusy));
+    const check = checkBriefMoveSlot({ interval, blocks: slot.blocks, travelBeforeSeconds: slot.before, travelAfterSeconds: slot.after });
+    if (!check.ok) {
+      const reason = check.reason === "calendar_busy" ? "calendar_busy" : "slot_taken";
+      const detail = check.reason === "too_close" || check.reason === "travel_busy" ? check.reason : undefined;
+      return refused(reason, occurrence, behavior, alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, slot), detail);
     }
   }
 
@@ -124,7 +149,7 @@ export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request
   if (result.outcome === "refused") {
     const reason = result.reason as MoveRefusalReason;
     const alternatives = ALTERNATIVE_REASONS.has(reason)
-      ? alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, day, request.calendarBusy)
+      ? alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, slot)
       : [];
     return refused(reason, result.occurrence ?? occurrence, behavior, alternatives);
   }
@@ -165,7 +190,7 @@ export async function recordOccurrenceMoveReason(
  */
 export async function suggestOccurrenceMoveTimes(
   caller: OccurrenceMoveCaller,
-  request: Readonly<{ occurrenceId: string; calendarBusy?: readonly MoveCalendarBusy[]; limit?: number }>,
+  request: Readonly<{ occurrenceId: string; calendarBusy?: readonly MoveCalendarBusy[]; travel?: BriefMoveTravelInput | null; limit?: number }>,
 ): Promise<Temporal.Instant[]> {
   const loaded = await loadTarget(caller, request.occurrenceId);
   if (!loaded) return [];
@@ -174,12 +199,14 @@ export async function suggestOccurrenceMoveTimes(
     || occurrence.local_date !== todayIn(fixedClock(caller.now), behavior.timezone)) return [];
   const current = effectiveStartInstant(occurrence);
   const requestedStart = Temporal.Instant.compare(current, caller.now) > 0 ? current : caller.now;
-  const duration = await moveDuration(caller, occurrence, behavior);
-  const day = await dayOccupants(caller, occurrence);
-  return moveAlternatives({
-    localDate: occurrence.local_date, timezone: behavior.timezone, requestedStart, durationSeconds: duration.seconds,
-    now: caller.now, blocks: [...day, ...(request.calendarBusy ?? [])], limit: (request.limit ?? 3) + 1,
-  }).filter((start) => !start.equals(current)).slice(0, request.limit ?? 3);
+  const day = await readBriefMoveDay(caller.supabase, caller.userId, occurrence.local_date);
+  const duration = moveDuration(occurrence, day, null);
+  const slot = slotInputs(occurrence.id, day, request.calendarBusy, request.travel ?? null);
+  return briefMoveFreeStarts({
+    localDate: occurrence.local_date, timezone: behavior.timezone, now: caller.now, near: requestedStart,
+    lengthSeconds: duration.seconds, blocks: slot.blocks, travelBeforeSeconds: slot.before, travelAfterSeconds: slot.after,
+    limit: request.limit ?? MOVE_ALTERNATIVES_LIMIT, exclude: [current],
+  });
 }
 
 /** Open schedule-edit collision notices for one local date, oldest first. */
@@ -199,10 +226,13 @@ export async function keepMovedOccurrence(supabase: AppSupabaseClient, conflictI
   if (error) throw error;
 }
 
-/** Whether the person has ever moved an item themselves, for the one-time first-move line. */
+/**
+ * Whether the person has ever moved an item, themselves or by a Yes to the Daily Brief,
+ * for the one-time first-move line (Phase 3A1: a brief Yes counts as their move).
+ */
 export async function hasPersonMovedBefore(caller: Pick<OccurrenceMoveCaller, "supabase" | "userId">): Promise<boolean> {
   const { data, error } = await caller.supabase.from("occurrence_moves").select("id")
-    .eq("user_id", caller.userId).eq("kind", "move").eq("source", "person").limit(1);
+    .eq("user_id", caller.userId).eq("kind", "move").in("source", ["person", "daily_brief"]).limit(1);
   if (error) throw error;
   return (data ?? []).length > 0;
 }
@@ -223,69 +253,39 @@ async function loadTarget(caller: OccurrenceMoveCaller, occurrenceId: string) {
   return behavior ? { occurrence, behavior } : null;
 }
 
-/** A move that is not the first keeps the length it already has. */
-async function moveDuration(caller: OccurrenceMoveCaller, occurrence: Occurrence, behavior: BehaviorWithCategory)
-  : Promise<Readonly<{ seconds: number; source: MoveDurationSource | "kept_length" }>> {
+/**
+ * The length a move applies: the length the brief line showed, else the length a
+ * moved item already has, else the shared length order (setting, logged average,
+ * cached estimate, 30 minutes).
+ */
+function moveDuration(occurrence: Occurrence, day: BriefMoveDay, shown: BriefMoveLength | null)
+  : Readonly<{ seconds: number; source: BriefMoveLengthSource | "kept_length" }> {
+  if (shown) return { seconds: shown.minutes * 60, source: shown.source };
   const end = effectiveEndAt(occurrence);
   if (end) {
     const seconds = effectiveStartInstant(occurrence).until(Temporal.Instant.from(end)).total({ unit: "seconds" });
     if (seconds > 0) return { seconds, source: "kept_length" };
   }
-  const { data, error } = await caller.supabase.from("occurrence_time_sessions")
-    .select("started_at, stopped_at")
-    .eq("user_id", caller.userId).eq("behavior_id", behavior.id).not("stopped_at", "is", null)
-    .order("started_at", { ascending: false }).limit(SESSION_SAMPLE);
-  if (error) throw error;
-  return resolveMoveDuration({
-    behaviorDefaultMinutes: behavior.default_duration_minutes ?? null,
-    loggedAverageSeconds: loggedAverageSeconds(data ?? []),
-    plannedSeconds: null,
-  });
+  const item = day.items.find((candidate) => candidate.occurrenceId === occurrence.id);
+  const length = item?.length ?? { minutes: 30, source: "fallback" as const };
+  return { seconds: length.minutes * 60, source: length.source };
 }
 
-/**
- * The other Unresolved Occurrences from the day before to the day after, at their
- * effective times. Neighbouring days stay in, so a move near midnight still sees an
- * item that starts just after it or one that runs past midnight; the overlap check
- * decides whether they block. An item with no known length occupies only its start.
- */
-async function dayOccupants(caller: OccurrenceMoveCaller, occurrence: Occurrence): Promise<MoveOccupant[]> {
-  const rows = await listOccurrencesAround(caller, occurrence.local_date);
-  const open = rows.filter((row) => row.id !== occurrence.id && row.status === "unresolved");
-  const lengths = await behaviorLengths(caller, open);
-  return occupants(open, lengths);
-}
+type SlotInputs = Readonly<{ blocks: readonly BriefMoveBlock[]; before: number; after: number }>;
 
-type BehaviorLength = Readonly<{ minutes: number | null; timezone: string }>;
-
-function listOccurrencesAround(caller: OccurrenceMoveCaller, localDate: string): Promise<Occurrence[]> {
-  const date = Temporal.PlainDate.from(localDate);
-  return listOccurrencesBetweenLocalDates(caller.supabase, caller.userId,
-    date.subtract({ days: 1 }).toString(), date.add({ days: 1 }).toString());
-}
-
-async function behaviorLengths(caller: OccurrenceMoveCaller, rows: readonly Occurrence[]): Promise<Map<string, BehaviorLength>> {
-  const behaviorIds = [...new Set(rows.map((row) => row.behavior_id))];
-  const lengths = new Map<string, BehaviorLength>();
-  if (behaviorIds.length === 0) return lengths;
-  const { data, error } = await caller.supabase.from("behaviors").select("id, default_duration_minutes, timezone")
-    .eq("user_id", caller.userId).in("id", behaviorIds);
-  if (error) throw error;
-  for (const row of data ?? []) lengths.set(row.id, { minutes: row.default_duration_minutes, timezone: row.timezone });
-  return lengths;
-}
-
-function occupants(rows: readonly Occurrence[], lengths: ReadonlyMap<string, BehaviorLength>): MoveOccupant[] {
-  return rows.map((row) => {
-    const start = effectiveStartInstant(row);
-    const info = lengths.get(row.behavior_id);
-    const moved = effectiveEndAt(row);
-    const end = moved ? Temporal.Instant.from(moved)
-      : row.schedule_kind !== "exact" && row.schedule_end_time && info
-        ? zonedInstant(row.local_date, row.schedule_end_time.slice(0, 5), info.timezone)
-        : info?.minutes ? start.add({ minutes: info.minutes }) : start;
-    return { occurrenceId: row.id, start, end: Temporal.Instant.compare(end, start) > 0 ? end : start };
-  });
+/** The other items (neighbouring days included), calendar events and travel spans, and the item's own travel. */
+function slotInputs(occurrenceId: string, day: BriefMoveDay, calendarBusy: readonly MoveCalendarBusy[] | undefined,
+  travel: BriefMoveTravelInput | null): SlotInputs {
+  const stop = travel?.stops.get(occurrenceId);
+  return {
+    blocks: [
+      ...briefMoveItemBlocks(day.items, occurrenceId),
+      ...(calendarBusy ?? []).map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
+      ...travelBlocksFor(travel, occurrenceId),
+    ],
+    before: stop?.beforeSeconds ?? 0,
+    after: stop?.afterSeconds ?? 0,
+  };
 }
 
 /**
@@ -301,11 +301,12 @@ export async function syncMoveConflicts(caller: OccurrenceMoveCaller): Promise<n
   if (error) throw error;
   let open = 0;
   for (const localDate of [...new Set((data ?? []).map((row) => row.local_date))].sort()) {
-    const rows = (await listOccurrencesAround(caller, localDate)).filter((row) => row.local_date === localDate);
-    const lengths = await behaviorLengths(caller, rows);
-    const intervals = new Map(occupants(rows, lengths).map((item) => [item.occurrenceId, item]));
-    const conflicts = findMoveConflicts(rows.map((row) => ({
-      id: row.id, status: row.status, moved: isMoved(row), interval: intervals.get(row.id)!,
+    const day = await readBriefMoveDay(caller.supabase, caller.userId, localDate);
+    const items = day.items.filter((item) => item.localDate === localDate);
+    const blocks = new Map(briefMoveItemBlocks(items, null).map((block) => [block.ref, block]));
+    const conflicts = findMoveConflicts(items.filter((item) => blocks.has(item.occurrenceId)).map((item) => ({
+      id: item.occurrenceId, status: item.status, moved: isMoved(day.occurrences.get(item.occurrenceId)!),
+      interval: blocks.get(item.occurrenceId)!,
     })));
     const result = await caller.supabase.rpc("sync_move_conflicts", { p_local_date: localDate, p_conflicts: conflicts });
     if (result.error) throw result.error;
@@ -335,18 +336,17 @@ function passesBasicRules(
 
 function alternativesFor(
   caller: OccurrenceMoveCaller, occurrence: Occurrence, behavior: BehaviorWithCategory,
-  requestedStart: Temporal.Instant, durationSeconds: number,
-  day: readonly MoveOccupant[], calendarBusy: readonly MoveCalendarBusy[] | undefined,
+  requestedStart: Temporal.Instant, durationSeconds: number, slot: SlotInputs,
 ): Temporal.Instant[] {
-  const blocks: MoveInterval[] = [...day, ...(calendarBusy ?? [])];
-  return moveAlternatives({
-    localDate: occurrence.local_date, timezone: behavior.timezone, requestedStart, durationSeconds,
-    now: caller.now, blocks,
+  return briefMoveFreeStarts({
+    localDate: occurrence.local_date, timezone: behavior.timezone, now: caller.now, near: requestedStart,
+    lengthSeconds: durationSeconds, blocks: slot.blocks, travelBeforeSeconds: slot.before, travelAfterSeconds: slot.after,
+    limit: MOVE_ALTERNATIVES_LIMIT,
   });
 }
 
 async function callMoveFunction(
-  caller: OccurrenceMoveCaller, request: OccurrenceMoveRequest, interval: MoveInterval,
+  caller: OccurrenceMoveCaller, request: OccurrenceMoveRequest, interval: Readonly<{ start: Temporal.Instant; end: Temporal.Instant }>,
   duration: Readonly<{ seconds: number; source: string }>,
 ): Promise<FunctionResult> {
   const { data, error } = await caller.supabase.rpc("move_occurrence_for_day", {
@@ -371,7 +371,8 @@ async function callMoveFunction(
  */
 function keyParams(operation: string, request: OccurrenceMoveRequest | OccurrenceRevertRequest) {
   if (!request.idempotencyKey) return {};
-  const details = { ...request, idempotencyKey: undefined, requestHash: undefined };
+  // Travel times are a signed, request-only input; they do not make two taps different.
+  const details = { ...request, idempotencyKey: undefined, requestHash: undefined, travel: undefined };
   return {
     p_idempotency_key: request.idempotencyKey,
     p_request_hash: request.requestHash
@@ -409,9 +410,12 @@ async function finish(
 
 function refused(
   reason: MoveRefusalReason | "occurrence_not_found", occurrence: Occurrence | null, behavior: BehaviorWithCategory | null,
-  alternatives: readonly Temporal.Instant[] = [],
+  alternatives: readonly Temporal.Instant[] = [], detail?: "too_close" | "travel_busy",
 ): OccurrenceMoveResult {
-  return { outcome: "refused", reason, message: MOVE_REFUSAL_MESSAGES[reason], alternatives, occurrence, behavior };
+  return {
+    outcome: "refused", reason, ...(detail ? { detail } : {}), message: detail ? DETAIL_MESSAGES[detail] : MOVE_REFUSAL_MESSAGES[reason],
+    alternatives, occurrence, behavior,
+  };
 }
 
 function readFunctionResult(data: unknown, userId: string): FunctionResult {

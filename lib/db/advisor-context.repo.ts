@@ -15,6 +15,9 @@ export type AdvisorCadenceSnapshot = Readonly<{
   syncState: AdvisorSyncStateRow | null;
   dueArchiveCount: number;
   staleConfigurationCount: number;
+  /** Phase 3A1: today's answered brief lines and open schedule-edit notices. Absent before that migration. */
+  moveAnswers?: readonly Readonly<{ occurrenceId: string; kind: string }>[];
+  moveConflicts?: readonly Readonly<{ occurrenceId: string; conflictingOccurrenceId: string | null }>[];
 }>;
 
 export type AdvisorBehaviorRow = Readonly<{
@@ -37,6 +40,10 @@ export type AdvisorOccurrenceRow = Readonly<{
   scheduleEndTime: string | null;
   status: string;
   updatedAt: string;
+  /** Phase 3A1: the time the item sits at when moved for today, and who moved it. Absent before that migration. */
+  effectiveStartAt?: string | null;
+  effectiveEndAt?: string | null;
+  movedBy?: string | null;
 }>;
 
 export type AdvisorHistoryOccurrenceRow = Readonly<{
@@ -153,6 +160,11 @@ function parseSnapshot(value: unknown): AdvisorCadenceSnapshot {
         scheduleEndTime: nullableString(occurrence.scheduleEndTime, "occurrence.scheduleEndTime"),
         status: string(occurrence.status, "occurrence.status"),
         updatedAt: string(occurrence.updatedAt, "occurrence.updatedAt"),
+        ...("effectiveStartAt" in occurrence ? {
+          effectiveStartAt: nullableString(occurrence.effectiveStartAt, "occurrence.effectiveStartAt"),
+          effectiveEndAt: nullableString(occurrence.effectiveEndAt, "occurrence.effectiveEndAt"),
+          movedBy: nullableString(occurrence.movedBy, "occurrence.movedBy"),
+        } : {}),
       };
     }),
     historyOccurrences: list(row.historyOccurrences, "historyOccurrences").map((item) => {
@@ -175,6 +187,17 @@ function parseSnapshot(value: unknown): AdvisorCadenceSnapshot {
         stoppedAt: nullableString(session.stoppedAt, "historySession.stoppedAt"),
       };
     }),
+    ...("moveAnswers" in row ? {
+      moveAnswers: list(row.moveAnswers, "moveAnswers").map((item) => {
+        const answer = record(item, "moveAnswer");
+        return { occurrenceId: string(answer.occurrenceId, "moveAnswer.occurrenceId"), kind: string(answer.kind, "moveAnswer.kind") };
+      }),
+      moveConflicts: list(row.moveConflicts, "moveConflicts").map((item) => {
+        const conflict = record(item, "moveConflict");
+        return { occurrenceId: string(conflict.occurrenceId, "moveConflict.occurrenceId"),
+          conflictingOccurrenceId: nullableString(conflict.conflictingOccurrenceId, "moveConflict.conflictingOccurrenceId") };
+      }),
+    } : {}),
     syncState: row.syncState === null ? null : parseSyncState(row.syncState),
     dueArchiveCount: integer(row.dueArchiveCount, "dueArchiveCount"),
     staleConfigurationCount: integer(row.staleConfigurationCount, "staleConfigurationCount"),

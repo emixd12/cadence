@@ -2,6 +2,7 @@ import { resolveCompletionTiming } from "@cadence/core/resolvers/completion-timi
 import { listConnectorMarkedOccurrenceIds } from "@/lib/db/sourceMatches.repo";
 import { createHmac } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
+import { effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import type { User } from "@supabase/supabase-js";
 
 import {
@@ -21,6 +22,10 @@ import {
   ADVISOR_DAY_CONTEXT_LIMITS,
   ADVISOR_DAY_CONTEXT_VERSION,
   ADVISOR_DAY_CONTEXT_VERSION_1_1,
+  ADVISOR_MOVE_ANSWER_KINDS,
+  ADVISOR_MOVE_SOURCES,
+  type AdvisorMoveDay,
+  type AdvisorOccurrenceMove,
   type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
   type AdvisorCalendarConnectorV1_1,
@@ -287,13 +292,20 @@ async function assembleDayContexts(
     if (scheduleKind !== "exact" && scheduleKind !== "range") {
       throw new AdvisorDayContextServiceError("context_incomplete", false);
     }
+    // Phase 3A1: the brief sees each item where it sits today, through the time helper.
+    const timing = { scheduled_for: occurrence.scheduledFor, effective_start_at: occurrence.effectiveStartAt ?? null, effective_end_at: occurrence.effectiveEndAt ?? null };
     return {
       id: occurrence.id,
       behaviorId: occurrence.behaviorId,
       title: behavior.title,
       status: normalizeOccurrenceStatus(occurrence.status),
       localDate: occurrence.localDate,
-      scheduledFor: occurrence.scheduledFor,
+      startAt: effectiveStartAt(timing),
+      ...(isMoved(timing) ? { move: {
+        plannedFor: plannedStartAt(timing),
+        endAt: timing.effective_end_at ?? null,
+        by: (ADVISOR_MOVE_SOURCES as readonly string[]).includes(occurrence.movedBy ?? "") ? occurrence.movedBy as AdvisorOccurrenceMove["by"] : null,
+      } } : {}),
       scheduleKind: scheduleKind as "exact" | "range",
       scheduleStartTime: occurrence.scheduleStartTime,
       scheduleEndTime: occurrence.scheduleEndTime,
@@ -417,6 +429,12 @@ async function assembleDayContexts(
       } : {}),
       makeOpaqueRef: opaqueRef,
       occurrences: occurrenceInputs,
+      // Phase 3A1: only when today has answered brief lines or open notices.
+      ...((cadenceSnapshot.moveAnswers?.length || cadenceSnapshot.moveConflicts?.length) ? { moveDay: {
+        answers: (cadenceSnapshot.moveAnswers ?? []).filter((answer) => (ADVISOR_MOVE_ANSWER_KINDS as readonly string[]).includes(answer.kind))
+          .map((answer) => ({ occurrenceId: answer.occurrenceId, kind: answer.kind as AdvisorMoveDay["answers"][number]["kind"] })),
+        conflicts: cadenceSnapshot.moveConflicts ?? [],
+      } } : {}),
       ...(input.includeHistoricalCompletionTimes ? {
         historicalCompletionTimes: {
           semantics: "completion_mark" as const,

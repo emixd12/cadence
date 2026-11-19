@@ -321,7 +321,7 @@ function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logi
     const behavior = byId.get(row.behavior_id);
     if (!behavior || (row.schedule_kind !== "exact" && row.schedule_kind !== "range") || !["unresolved", "completed", "not_completed"].includes(row.status)) throw new DailyBriefError("context_changed");
     const configured = resolveBehaviorDurationSources({ behaviorId: behavior.id, defaultDurationMinutes: behavior.default_duration_minutes, occurrences: [], now: logical, timezone }).configuredDefault;
-    return { id: row.id, behaviorId: row.behavior_id, title: behavior.title, status: row.status as OccurrenceStatus, localDate: row.local_date, scheduledFor: effectiveStartAt(row),
+    return { id: row.id, behaviorId: row.behavior_id, title: behavior.title, status: row.status as OccurrenceStatus, localDate: row.local_date, startAt: effectiveStartAt(row),
       scheduleKind: row.schedule_kind as "exact" | "range", scheduleStartTime: row.schedule_start_time, scheduleEndTime: row.schedule_end_time, duration: configured ?? unknownAverage,
       durationCandidates: { configuredDefault: configured ? { kind: "known" as const, seconds: configured.seconds, source: "behavior_default" as const, sampleCount: 0, lookbackDays: 90 as const } : null,
         historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0, lookbackDays: 90 as const } } };

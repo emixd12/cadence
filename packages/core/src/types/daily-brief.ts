@@ -1,5 +1,6 @@
 import type { BriefingReference } from "../services/briefing-references";
 import type { BriefingPlanOption } from "./briefing-plan";
+import type { BriefMoves } from "./brief-moves";
 
 /** Daily Brief interprets practical constraints; it does not recap the ledger. */
 export const DAILY_BRIEF_POLICY_VERSION = "3.0" as const;
@@ -29,6 +30,12 @@ export type DailyBriefing = Readonly<{
   versions?: Readonly<{ configuration: string; references: string; planner: string; pipeline: string; recipe?: string; policy?: string }>;
   /** Credits owed for facts the model used (Ticket 219): Open-Meteo weather is CC BY 4.0. */
   attributions?: readonly "open_meteo"[];
+  /**
+   * Advisor Phase 3: the brief's move lines, sent only to clients that request
+   * `move_lines_v1` (packages/core/src/types/brief-moves.ts). Older clients keep the
+   * opening and travel and see no move lines.
+   */
+  moves?: BriefMoves;
 }>;
 
 export type DailyBriefSourceAttention = "changed" | "no_calendars" | "unavailable";

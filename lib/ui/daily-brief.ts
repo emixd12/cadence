@@ -53,7 +53,15 @@ export type DailyBriefClient = Readonly<{
  * `travelConclusions` is the signed token from the latest travel view (Ticket 219
  * Option A), passed back unchanged. Clients without one omit it.
  */
-export type DailyBriefRequestInput = Readonly<{ installationId: string; retry: boolean; travelConclusions?: string }>;
+export type DailyBriefRequestInput = Readonly<{
+  installationId: string;
+  retry: boolean;
+  travelConclusions?: string;
+  /** Advisor Phase 3: `["move_lines_v1"]` asks for move lines; older clients omit it. */
+  features?: readonly string[];
+  /** Advisor Phase 3: signed travel times from the latest routes response, passed back unchanged. */
+  travelTimes?: string;
+}>;
 
 /** Ticket 306: the one connected-sources choice, per-source exclusions, and the reminder-history and Notes choices. */
 export type DailyBriefPreferenceInput = Readonly<{
