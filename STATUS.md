@@ -103,6 +103,20 @@ Check the cited entry before acting on a row.
 - **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
   mobile layout and a `/design-system` bench with fixture conversations.
 
+## Advisor plan Phase 4 (4C): base schedule proposals — November 19, 2026
+
+- **In review (draft PR, branch `claude/project-thread-d8ll9x`).** The advisor can propose
+  a schedule change when the same Behavior was moved the same way on 4 of the last 5
+  matching weekdays: "Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday,
+  Nov 24 (now 7:00 AM)." Try for two weeks, Change for good, No; a trial asks Keep or Go
+  back after 14 days. Server only for now: table, coach-token proposal function, person
+  answer functions, `/api/advisor/coach/schedule-proposal`. 4B's nightly job calls
+  `proposeBehaviorChangesForVisit`; 4E draws the lines. Docs: `docs/DATA_MODEL.md`, "Base
+  schedule proposals"; `docs/DATETIME_STRATEGY.md`; `docs/ROUTE_MAP.md`. Messaging: none.
+- **Verification:** migration applies on a fresh local database and
+  `tests/sql/behavior-change-proposals-smoke.sql` passes; unit and service tests pass.
+- **Next:** owner go-ahead for the production migration; 4B wires the call; 4E builds the UI.
+
 ## Advisor plan Phase 3 (3D): coach signals in shadow — November 18, 2026
 
 - **In review (draft PR, branch `claude/project-thread-vfk26s`).** An hourly cron
