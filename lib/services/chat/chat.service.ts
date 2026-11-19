@@ -245,7 +245,7 @@ export function compactTimeline(value: unknown): unknown {
   const out = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const item = (raw: unknown) => {
     const occurrence = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-    const keep = ["id", "behavior_title", "local_date", "effective_start_at", "scheduled_for", "status", "revision", "note"];
+    const keep = ["id", "behavior_title", "local_date", "effective_start_at", "status", "revision", "note"];
     const schedule = occurrence.schedule && typeof occurrence.schedule === "object" ? occurrence.schedule as Record<string, unknown> : null;
     return { ...Object.fromEntries(keep.filter((key) => key in occurrence).map((key) => [key, occurrence[key]])),
       ...(occurrence.move ? { moved_today: true } : {}), ...(schedule ? { schedule: schedule.label } : {}) };

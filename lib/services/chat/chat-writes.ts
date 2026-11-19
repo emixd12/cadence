@@ -87,7 +87,6 @@ export function outcomeKind(name: ChatWriteName): ChatOutcomeKind { return CHAT_
 export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts): string {
   const args = call.args;
   const title = str(obj(facts.occurrence).behavior_title) ?? str(obj(facts.behavior).title) ?? "this item";
-  const timezone = str(obj(facts.occurrence).timezone) ?? "UTC";
   switch (call.name) {
     case "set_occurrence_status": {
       const status = str(args.status) ?? "";
@@ -99,10 +98,7 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
       return str(args.note) ? `Save your note for ${date}` : `Clear your note for ${date}`;
     }
     case "move_occurrence_for_day": return `Move ${title} to ${chatClockFromLocal(str(args.start_time) ?? "")} today`;
-    case "revert_occurrence_move": {
-      const planned = str(obj(facts.occurrence).scheduled_for);
-      return planned ? `Move ${title} back to ${chatClockText(planned, timezone)}` : `Undo the move of ${title}`;
-    }
+    case "revert_occurrence_move": return `Move ${title} back to where it was`;
     case "create_behavior": return `Create a new Behavior, ${str(args.title) ?? "untitled"}`;
     case "update_behavior": return `Change ${title}${changedFields(args)}`;
     case "archive_behavior": return `Archive ${title}`;
