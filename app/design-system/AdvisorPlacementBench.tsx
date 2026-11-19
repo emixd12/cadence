@@ -15,7 +15,7 @@ import type { OccurrenceFormAction, TimeTrackingFormAction, TimelineOccurrenceIn
 // Placements on the real app shell and Timeline, synthetic data, nothing is saved.
 // One URL reproduces one view: ?preview=advisor-placement&option=a&view=why
 
-export type PlacementOption = "a" | "a2" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j" | "k";
+export type PlacementOption = "a" | "a2" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j" | "k" | "k2";
 export type PlacementView = "closed" | "open" | "why" | "answered" | "scrolled" | "scrolled-open" | "panel" | "brief" | "checkin" | "none";
 
 export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: string; summary: string }>[] = [
@@ -29,6 +29,7 @@ export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: 
   { id: "g", label: "G · Under the date", summary: "Round 1b. A short tip sits under today’s date." },
   { id: "h", label: "H · Under its Behavior", summary: "Round 1b. The tip sits under the Behavior it is about, like a reply." },
   { id: "k", label: "K · Window + line under the date", summary: "Round 1c, from the review. The window horse at the top opens the advisor’s panel, which pushes the Timeline aside. One line under today’s date shows the most important thing: the brief, a question, or the tip." },
+  { id: "k2", label: "K2 · K, banner horse keeps the brief", summary: "Round 1c, Emi’s idea. The Timeline’s own horse stays and only gives the Daily Brief. The window horse at the top holds tips, questions and the panel." },
   { id: "j", label: "J · Banner horse speaks", summary: "Round 1b. The Timeline’s horse shows the tip. Scroll past it and a small window horse waits at the top." },
 ];
 
@@ -323,7 +324,27 @@ function KLine({ view, onView }: Readonly<{ view: PlacementView; onView: (view: 
   );
 }
 
-function KPanel({ onClose }: Readonly<{ onClose: () => void }>) {
+/** A stand-in for the Daily Brief bubble (components/briefing/DailyBriefBubble.tsx), for option K2. */
+function BriefBubbleMock({ onClose }: Readonly<{ onClose: () => void }>) {
+  return (
+    <section aria-label="Daily Brief" className="relative z-10 mb-6 ml-auto -mt-8 w-full border border-line bg-background p-4 sm:-mt-6 sm:w-[min(40rem,100%)]" data-brief-mock>
+      <span aria-hidden="true" className="absolute -top-2 right-[20%] h-4 w-4 rotate-45 border-l border-t border-line bg-background" />
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <p className="font-bold">Daily Brief</p>
+        <button type="button" onClick={onClose} className="-my-3 min-h-11 min-w-11 py-3 text-right text-muted-readable underline underline-offset-2 hover:text-foreground">Close</button>
+      </div>
+      <div className="text-sm leading-6">
+        <p className="mt-1">A full evening. Gym and Read fit better with a small shift.</p>
+        <div className="mt-2 border-t border-line pt-2">
+          <p><strong>Gym</strong>: 6:30 PM to 6:00 PM. <button type="button" className={linkClass}>Yes</button><span aria-hidden="true"> · </span><button type="button" className={linkClass}>No</button><span aria-hidden="true"> · </span><button type="button" className={linkClass}>Other time</button></p>
+          <p><strong>Read</strong>: 9:30 PM to 9:00 PM. <button type="button" className={linkClass}>Yes</button><span aria-hidden="true"> · </span><button type="button" className={linkClass}>No</button><span aria-hidden="true"> · </span><button type="button" className={linkClass}>Other time</button></p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function KPanel({ onClose, showBrief = true }: Readonly<{ onClose: () => void; showBrief?: boolean }>) {
   const section = "mt-6 border-t border-line pt-4 text-sm leading-6";
   const heading = "text-xs font-bold text-muted-readable";
   return (
@@ -335,11 +356,13 @@ function KPanel({ onClose }: Readonly<{ onClose: () => void }>) {
         <HorseMark size={120} />
         <h2 className="mt-2 text-xl">Advisor</h2>
       </div>
-      <div className={section}>
-        <p className={heading}>Today’s brief</p>
-        <p>2 moves suggested for today.</p>
-        <p><button type="button" className={linkClass}>Open the brief</button></p>
-      </div>
+      {showBrief ? (
+        <div className={section}>
+          <p className={heading}>Today’s brief</p>
+          <p>2 moves suggested for today.</p>
+          <p><button type="button" className={linkClass}>Open the brief</button></p>
+        </div>
+      ) : null}
       <div className={section}>
         <p className={heading}>Needs your answer</p>
         <p>Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday, Nov 24 (now 7:00 AM).</p>
@@ -405,7 +428,7 @@ function AdvisorChatPage({ view, onView }: Readonly<{ view: PlacementView; onVie
 // ---------- The bench ----------
 
 const ROUND_1: readonly PlacementOption[] = ["a", "a2", "b", "c", "d"];
-const ROUND_1B: readonly PlacementOption[] = ["e", "f", "g", "h", "j", "k"];
+const ROUND_1B: readonly PlacementOption[] = ["e", "f", "g", "h", "j", "k", "k2"];
 const SCROLLED_TOP = 320;
 
 /** Option J: true once the Timeline's banner horse has scrolled out of view. */
@@ -515,15 +538,25 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
         </>
       );
     }
-    if (option === "k") {
-      const hasNew = view !== "none" && view !== "answered" && view !== "panel";
-      banner = (
+    if (option === "k" || option === "k2") {
+      const keepsBrief = option === "k2";
+      const hasNew = view !== "none" && view !== "answered" && view !== "panel" && !(keepsBrief && view === "brief");
+      banner = keepsBrief ? (
+        <>
+          <Banner dot={false} onHorse={() => setView(view === "brief" ? "open" : "brief")} />
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10">
+            {view === "brief" ? <BriefBubbleMock onClose={() => setView("open")} />
+              : <ReopenRow><button type="button" onClick={() => setView("brief")} className="underline underline-offset-2">Today’s brief</button></ReopenRow>}
+          </div>
+        </>
+      ) : (
         <div>
           <CadencePageBanner />
           <div className="h-12 sm:h-14" />
         </div>
       );
-      inline = { anchor: "day-heading", position: "after", content: <KLine view={view} onView={setView} /> };
+      // While the brief has undecided moves, tips wait (brief-lines hold), so the line under the date stays empty.
+      inline = keepsBrief && view === "brief" ? undefined : { anchor: "day-heading", position: "after", content: <KLine view={view} onView={setView} /> };
       overlay = (
         <>
           <div className="pointer-events-none fixed left-0 right-0 top-0.5 z-50 flex justify-center lg:left-64 lg:top-3 lg:z-30">
@@ -534,7 +567,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
               <span className="bg-background px-1 text-xs leading-4">{hasNew ? "Advisor · 1 new" : "Advisor"}</span>
             </button>
           </div>
-          {view === "panel" ? <KPanel onClose={() => setView("open")} /> : null}
+          {view === "panel" ? <KPanel onClose={() => setView("open")} showBrief={!keepsBrief} /> : null}
         </>
       );
     }
@@ -564,7 +597,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
     }
 
     page = (
-      <div className={["flex w-full flex-col", option === "k" && view === "panel" ? "lg:pr-[26rem]" : ""].join(" ")}>
+      <div className={["flex w-full flex-col", (option === "k" || option === "k2") && view === "panel" ? "lg:pr-[26rem]" : ""].join(" ")}>
         <h1 className="sr-only">Timeline</h1>
         {banner}
         <div className="relative mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
@@ -576,7 +609,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
           ) : null}
           <OccurrenceMovesProvider actions={NO_MOVES} timezone={TIMEZONE} todayLocalDate="2026-11-19" hasMovedBefore>
             <TimelineScreen statusAction={statusAction} noteAction={noteAction} timeAction={timeAction}
-              beforeTimeline={option === "e" || option === "k" ? null : beforeTimeline} inline={inline} />
+              beforeTimeline={option === "e" || option === "k" || option === "k2" ? null : beforeTimeline} inline={inline} />
           </OccurrenceMovesProvider>
           {option === "j" ? <div aria-hidden="true" className="h-[70vh]" /> : null}
           {overlay}
@@ -588,7 +621,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
   const optionRow = (ids: readonly PlacementOption[]) => (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
       {PLACEMENT_OPTIONS.filter((item) => ids.includes(item.id)).map((item) => (
-        <button key={item.id} type="button" onClick={() => { setOption(item.id); setView(item.id === "f" || item.id === "g" || item.id === "h" || item.id === "j" || item.id === "k" ? "open" : "closed"); }}
+        <button key={item.id} type="button" onClick={() => { setOption(item.id); setView(item.id === "f" || item.id === "g" || item.id === "h" || item.id === "j" || item.id === "k" || item.id === "k2" ? "open" : "closed"); }}
           className={option === item.id ? "font-bold underline underline-offset-4" : "underline underline-offset-4"}>{item.label}</button>
       ))}
     </div>

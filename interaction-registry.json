@@ -445,7 +445,7 @@
     {
       "path": "app/design-system/AdvisorPlacementBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 59,
+      "interaction_marker_count": 69,
       "interaction_ids": [],
       "reason": "Advisor plan 4D development-only placement bench with synthetic tips. Not a product surface; no account or provider access."
     },
