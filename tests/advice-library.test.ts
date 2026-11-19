@@ -42,6 +42,7 @@ describe("parseAdviceLibrary", () => {
     ["product rule on research", { evidence: { ...CARD.evidence, strength: "product_rule" } }, "product_rule"],
     ["advice without full stop", { advice: "Plan the cue" }, "full stop"],
     ["bad review date", { reviewed_at: "2026-02-30" }, "real date"],
+    ["duration on a count", { quip_seeds: ["{recent_completed_duration}.", "Two."] }, "have a duration"],
   ])("rejects %s", (_, change, message) => {
     expect(() => parseAdviceLibrary(lib([{ ...CARD, ...change }]))).toThrow(message);
   });
@@ -62,6 +63,23 @@ describe("fillQuipSeed", () => {
       .toBe("Gym: 3 of 8, 38%.");
     expect(fillQuipSeed("{weekday_name} at {hour_label} and {hour_label}.", { facts: { weekday: 2, hour: 0 } })).toBe("Tuesday at 12 AM and 12 AM.");
     expect(fillQuipSeed("{hour_label}.", { facts: { hour: 13 } })).toBe("1 PM.");
+  });
+
+  it("agrees counted nouns with one and many", () => {
+    expect(fillQuipSeed("{n|item has|items have} no place.", { facts: { n: 1 } })).toBe("1 item has no place.");
+    expect(fillQuipSeed("{n|item has|items have} no place.", { facts: { n: 3 } })).toBe("3 items have no place.");
+    expect(fillQuipSeed("{n|item|items}.", { facts: { n: "3" } })).toBeNull();
+  });
+
+  it("reads clock times and durations the way people say them", () => {
+    expect(fillQuipSeed("{mark_time_clock}", { facts: { mark_time: "21:46" } })).toBe("9:46 PM");
+    expect(fillQuipSeed("{mark_time_clock}", { facts: { mark_time: "00:05" } })).toBe("12:05 AM");
+    expect(fillQuipSeed("{mark_time_clock}", { facts: { mark_time: "9pm" } })).toBeNull();
+    expect(fillQuipSeed("{lag_hours_duration}", { facts: { lag_hours: 0.8 } })).toBe("about 50 minutes");
+    expect(fillQuipSeed("{lag_hours_duration}", { facts: { lag_hours: 5.2 } })).toBe("about 5 hours");
+    expect(fillQuipSeed("{lag_hours_duration}", { facts: { lag_hours: 60 } })).toBe("about 3 days");
+    expect(fillQuipSeed("{after_minutes_duration}", { facts: { after_minutes: 1 } })).toBe("about 1 minute");
+    expect(fillQuipSeed("{after_minutes_duration}", { facts: { after_minutes: 0.2 } })).toBe("under a minute");
   });
 
   it("returns null instead of a half-filled line", () => {
@@ -110,6 +128,19 @@ describe("shipped quip seeds", () => {
         const line = fillQuipSeed(seed, { behavior: "Gym", facts });
         expect(line, `${card.id}: ${seed}`).not.toBeNull();
         expect(line).not.toMatch(/[{}]/);
+      }
+    }
+  });
+
+  it("read correctly when every count is 1", () => {
+    for (const card of ADVICE_CARDS) {
+      const facts = Object.fromEntries(
+        card.applies_when.flatMap((rule) => [...(ADVICE_SIGNAL_FACTS[rule.signal] ?? []), "window_days"])
+          .map((name) => [name, typeof SAMPLE[name] === "string" || /(rate|share|gap|drop|change)$/.test(name) ? valueFor(name) : 1]),
+      );
+      for (const seed of card.quip_seeds) {
+        const line = fillQuipSeed(seed, { behavior: "Gym", facts });
+        expect(line, `${card.id}: ${seed}`).not.toMatch(/\b1 (items|days|weeks|marks|minutes|sessions|routines|new routines)\b|\b1 of your 1 items\b/);
       }
     }
   });

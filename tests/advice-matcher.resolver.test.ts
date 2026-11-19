@@ -64,6 +64,24 @@ describe("matchAdviceCards", () => {
     expect(matchAdviceCards({ cards: [setup], signals: [DROP], account: ACCOUNT, today: TODAY })).toEqual([]);
   });
 
+  it("can hold back a card while items sit unmarked", () => {
+    const steady = card({
+      id: "steady", applies_when: [{ signal: "steady_behavior", scope: "behavior", facts: [] }], quip_seeds: ["{behavior}.", "Two."],
+      does_not_apply_when: [{ signal: "unmarked_items", scope: "either", facts: [{ fact: "oldest_days", op: "gte", value: 5 }] }],
+    });
+    const held: AdviceSignalInput = { kind: "steady_behavior", behaviorId: "b-gym", facts: { rate: 0.95 } };
+    const lapsed: AdviceSignalInput = { kind: "unmarked_items", behaviorId: null, facts: { unmarked: 9, oldest_days: 9 } };
+    const fresh: AdviceSignalInput = { kind: "unmarked_items", behaviorId: null, facts: { unmarked: 1, oldest_days: 1 } };
+    expect(matchAdviceCards({ cards: [steady], signals: [held, lapsed], account: ACCOUNT, today: TODAY })).toEqual([]);
+    expect(matchAdviceCards({ cards: [steady], signals: [held, fresh], account: ACCOUNT, today: TODAY })).toHaveLength(1);
+  });
+
+  it("names facts behind counted and formatted placeholders", () => {
+    const c = card({ id: "f", quip_seeds: ["{recent_completed|item|items} by {mark_time_clock}.", "Two."] });
+    const [match] = matchAdviceCards({ cards: [c], signals: [{ ...DROP, facts: { ...DROP.facts, mark_time: "21:00" } }], account: ACCOUNT, today: TODAY });
+    expect(match!.factNames).toEqual(["mark_time", "recent_completed"]);
+  });
+
   it("serves first-two-weeks cards from setup facts alone, only to new accounts", () => {
     const starter = card({
       id: "starter", audience: "first_two_weeks",
