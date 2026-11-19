@@ -2019,7 +2019,7 @@ cite has not changed.
   and a refused answer names what is in the slot now (Emi, November 19). Each line is one
   sentence, "Walk 9:00 AM → 11:30 AM: <reason>", and keeps its reason after an answer. After
   No or Undo the line leaves the brief, unless it offers Don't suggest moving this; then it
-  reads "Vitamins stays at 8:00 AM: <reason>" over "No more suggestions for it today."
+  reads "Vitamins stays at 8:00 AM: <reason>" over the link alone.
   "travel not checked" is no longer shown, a refusal is one red sentence ("Not changed. 5:30 PM is taken now: …") with no icon, and answers no
   longer add a first-use explainer that repeats the line (Emi, November 19).
 - **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,

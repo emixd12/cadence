@@ -349,10 +349,10 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.offerNeverMove ? <><Dot /><ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
         {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
-        {ui.neverMoved ? "The brief won’t suggest moving this again. You can change this in the Behavior’s settings."
-          : line.status === "declined" || line.status === "undone" ? "No more suggestions for it today." : null}
+        {ui.neverMoved ? "The brief won’t suggest moving this again. You can change this in the Behavior’s settings." : null}
         {line.status === "already_done" ? "Marked Completed." : null}
-        {line.offerNeverMove && line.status === "declined" ? <> <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
+        {/* "stays at" on the line already says No worked; only the lasting choice remains. */}
+        {line.offerNeverMove && (line.status === "declined" || line.status === "undone") ? <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /> : null}
       </p>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}

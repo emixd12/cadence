@@ -97,7 +97,7 @@ describe("move lines", () => {
     await click(button(line("vitamins"), "No"));
     expect(line("vitamins").className).not.toContain("opacity");
     expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM: 8:00 has passed; lunch is the next quiet moment.");
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("No more suggestions for it today. Don’t suggest moving this");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Don’t suggest moving this");
     expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
     await click(button(line("vitamins"), "Don’t suggest moving this"));
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("The brief won’t suggest moving this again. You can change this in the Behavior’s settings.");
