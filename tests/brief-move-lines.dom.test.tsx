@@ -226,7 +226,8 @@ describe("move lines", () => {
     const client = fixtureBriefMoveClient();
     await render(client);
     await click(button(line("vitamins"), "Already did it"));
-    expect(line("vitamins").textContent).toContain("Marked Completed.");
+    // The fixture answers after a timer; wait for the line instead of racing it.
+    await vi.waitFor(() => expect(line("vitamins").textContent).toContain("Marked Completed."));
     vi.spyOn(client, "answer").mockRejectedValueOnce(new DailyBriefRequestError("offline"));
     await click(button(line("walk"), "Yes"));
     expect(line("walk").textContent).toContain("Not changed. You appear to be offline.");
