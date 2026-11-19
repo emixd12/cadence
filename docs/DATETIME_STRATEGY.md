@@ -267,6 +267,22 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
 
+### Base schedule proposals
+
+Advisor Phase 4C (`packages/core/src/services/behavior-change-proposal.ts`).
+
+- **Today's item never moves.** A schedule edit applies at once and regenerates today's
+  unresolved future items. So a proposal, and a trial's Go back, is not offered on a local
+  day whose weekday the change touches. The line always names a later first day, computed
+  when it is shown ("from Tuesday, Nov 24"). A change on all seven weekdays is never proposed.
+- **Trial dates are calendar dates.** The check-in day is fourteen calendar days after the
+  local day of Try, moved forward past any weekday the change touches. "Today" is the
+  profile timezone's local date at the moment of reading, so a clock change or a move to
+  another timezone asks on the right local day. Seven calendar days without an answer keep
+  the change.
+- **Patterns use set times.** "Moved the same way" compares the planned local time with the
+  local time it was moved to, on the same local day, never the stored completion time.
+
 ## Tests are source-of-truth evidence
 
 The following tests are required before recurrence/timeline/status work is complete:

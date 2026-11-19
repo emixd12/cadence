@@ -3267,6 +3267,36 @@ MCP grants and the other agents see no rows. Chat writes to Cadence records use
 fixed idempotency keys: `chat:<replyId>:<n>` at once, `chat:<confirmId>:<n>`
 after Yes, `chat:undo:<outcomeId>` for Undo.
 
+## Base schedule proposals (advisor plan Phase 4, workstream 4C)
+
+Migration `20261119213000_behavior_change_proposals.sql`. When the person keeps moving
+the same Behavior the same way on the same weekday, the advisor proposes changing the
+schedule itself: "Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday, Nov 24
+(now 7:00 AM)." Answers: Try for two weeks, Change for good, No. Rules that need no
+database: `packages/core/src/services/behavior-change-proposal.ts`. Service:
+`lib/services/behavior-change-proposals.service.ts`.
+
+- `cadence_advisor_private.behavior_change_proposals`: server only, never synced or
+  exported. Behavior, weekdays, old and new exact time, direction, the exact schedule
+  list before and after (integration-contract shape, at most six each), first affected
+  day, reason (one sentence, at most 200 characters), evidence (counts and ids only),
+  `status` (`proposed`, `accepted_trial`, `accepted`, `declined`, `kept`, `reverted`,
+  `expired`), `close_reason`, trial dates and the one-time notice. RLS on, no policies,
+  no grants to any API role. One open proposal (`proposed` or `accepted_trial`) per
+  account, enforced by a partial unique index. Deleting the account or the Behavior
+  deletes its proposals.
+- `coach_propose_behavior_change(run_id, proposal)`: coach token only, for an unfinished
+  coach run of the caller. Refuses (as data, not an error) when a proposal is open, when
+  the same Behavior and direction got a No in the last 30 days, or when the Behavior is not
+  active. `coach_behavior_change_state()` gives the nightly job the same facts.
+- `read_behavior_change_proposal(today)` and `answer_behavior_change_proposal(id, answer,
+  today, check_in_date)`: the person only (no agent channel, no MCP grant). Reading first
+  closes what time has closed: a proposal unanswered for seven days expires; a trial's
+  check-in unanswered for seven days is kept and the person is told once.
+- The coach never edits a Behavior. Try, Change for good and Go back run the person's own
+  schedule edit (`updateBehaviorForUser`, with the Behavior's revision), then record the
+  answer. Go back is offered only while the schedule still equals what the trial set.
+
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 
 Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
