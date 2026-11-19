@@ -35,12 +35,14 @@ export type AgentModelSetting = Readonly<{
 
 /**
  * Per-agent defaults. The Daily Brief values are today's production values
- * (`gpt-5.6-luna`, effort low, 2,000 output tokens). Coach and chat are placeholders until
- * Phases 4 and 5 pick theirs with the eval harness.
+ * (`gpt-5.6-luna`, effort low, 2,000 output tokens). The coach uses `gpt-5.6-terra` at
+ * effort low, picked by the Phase 4 coach eval (Nov 19, 2026): grade 4.83 against luna's
+ * 4.42, about US$0.09 per account per month at the 95th percentile. Chat is a placeholder
+ * until Phase 5 picks its model.
  */
 export const AGENT_MODEL_SETTINGS = {
   daily_brief: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 30_000 },
-  coach: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
+  coach: { model: "openai/gpt-5.6-terra", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
   chat: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 60_000 },
 } as const satisfies Record<AgentName, AgentModelSetting>;
 
