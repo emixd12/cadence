@@ -3469,6 +3469,30 @@ export type Database = {
         }
         Returns: number
       }
+      withdraw_brief_move_proposal: {
+        Args: { p_proposal_id: string }
+        Returns: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          expected_revision: string
+          id: string
+          line: Json
+          local_date: string
+          move_id: string | null
+          occurrence_id: string
+          option_refs: Json
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+      }
     }
     Enums: {
       [_ in never]: never

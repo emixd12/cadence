@@ -10,6 +10,7 @@ import { parseIntegrationSigningKey, type IntegrationSigningKey } from "@/lib/su
 import { registerOAuthClient, approveOAuthConsent } from "@/lib/db/oauth.repo";
 import { writeOperationHandlers } from "@/lib/integrations/operations/write";
 import { readBriefMoveDay } from "@/lib/services/brief-move-day.service";
+import { moveOccurrenceForDay } from "@/lib/services/occurrence-move.service";
 import { readAdvisorCadenceSnapshot } from "@/lib/db/advisor-context.repo";
 import {
   BriefMoveError,
@@ -20,6 +21,7 @@ import {
   planBriefMoveLines,
   readBehaviorMovePreference,
   readBriefMoves,
+  recheckBriefMoves,
   replanBriefMove,
   saveBriefProposals,
   setBriefMoveLength,
@@ -272,5 +274,79 @@ localDescribe("Daily Brief move lines on isolated local Supabase (advisor Phase 
     const cached = await admin.from("behavior_advisor_estimates").select("duration_minutes").eq("behavior_id", stretchId).single();
     expect(cached.data!.duration_minutes).toBe(12);
     await ensureBehaviorEstimates(agent, { localDate: today }, async () => { throw new Error("asked again"); });
+  }, 90_000);
+
+  it("names what took a line's time, and re-checks open lines when the brief opens", async () => {
+    const lettersId = await behavior("Letters", "12:00", 30);
+    const pianoId = await behavior("Piano", "13:30", 20);
+    const calendarBusy = [{ startAt: local("12:00").toString(), endAt: local("12:30").toString() }];
+    const plan = await planBriefMoveDay({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
+      context: null, planning: { calendarBusy }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
+    const candidate = plan.candidates.find((item) => item.behaviorId === lettersId)!;
+    const [letters] = await saveBriefProposals(agent, { runId: null, localDate: today, refresh: false, candidates: [candidate] });
+    const context = { calendarBusy };
+
+    // Nothing changed: the re-check writes nothing and returns nothing.
+    expect(await recheckBriefMoves(callers(), { localDate: today, context, proposalIds: [letters!.proposalId] })).toEqual({ replaced: [] });
+
+    // After the brief, the person moves Piano into the line's time.
+    const piano = (await readBriefMoveDay(person, userId, today)).items.find((item) => item.behaviorId === pianoId)!;
+    const self = await moveOccurrenceForDay(callers().person, { occurrenceId: piano.occurrenceId, expectedRevision: piano.revision,
+      startAt: letters!.to.startAt, idempotencyKey: "self-piano" });
+    expect(self.outcome).toBe("moved");
+
+    // Yes is refused, and the refusal names what is there now.
+    const yes = await answerBriefMove(callers(), { kind: "yes", proposalId: letters!.proposalId, expectedRevision: letters!.expectedRevision,
+      context, idempotencyKey: "yes-letters" });
+    const refusal = yes.results[0]!.refusal!;
+    expect(yes.results[0]!.outcome).toBe("refused");
+    expect(refusal.cause).toEqual({ kind: "item_there", title: "Piano", changedAfterBrief: true });
+    expect(refusal.message).toMatch(/ is taken now: you moved Piano there after this brief was written\.$/);
+
+    // Opening the brief re-plans the line around Piano, with a reason that says why.
+    const first = await recheckBriefMoves(callers(), { localDate: today, context, proposalIds: [letters!.proposalId] });
+    expect(first.replaced).toHaveLength(1);
+    const fresh = first.replaced[0]!.line!;
+    expect(first.replaced[0]!.proposalId).toBe(letters!.proposalId);
+    expect(fresh.proposalId).not.toBe(letters!.proposalId);
+    expect(fresh.to.startAt).not.toBe(letters!.to.startAt);
+    expect(fresh.reason).toMatch(/^\d{1,2}:\d{2}\s?[AP]M is (taken by|too close to) Piano now, so \d{1,2}:\d{2}\s?[AP]M instead\.$/);
+    expect((await admin.from("move_proposals").select("status").eq("id", letters!.proposalId).single()).data!.status).toBe("superseded");
+    // The re-check does not use up Re-plan.
+    expect((await admin.from("launch_rate_limits").select("action").eq("user_id", userId).eq("action", "brief_move_replan")).data ?? []).toEqual([]);
+
+    // Opening again with the new line changes nothing.
+    expect(await recheckBriefMoves(callers(), { localDate: today, context, proposalIds: [fresh.proposalId] })).toEqual({ replaced: [] });
+
+    // The new line's Yes applies.
+    const applied = await answerBriefMove(callers(), { kind: "yes", proposalId: fresh.proposalId, expectedRevision: fresh.expectedRevision,
+      context, idempotencyKey: "yes-letters-2" });
+    expect(applied.results[0]!.outcome).toBe("applied");
+
+    // A line the screen still shows that closed on its own comes back as null.
+    const read = (await readBriefMoveDay(person, userId, today)).items.find((item) => item.behaviorId === pianoId)!;
+    const pianoPlan = await planBriefMoveDay({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(), context: null,
+      planning: { calendarBusy: [{ startAt: read.start.toString(), endAt: read.end.toString() }] }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
+    const pianoCandidate = pianoPlan.candidates.find((item) => item.behaviorId === pianoId);
+    expect(pianoCandidate).toBeTruthy();
+    if (pianoCandidate) {
+      const [pianoLine] = await saveBriefProposals(agent, { runId: null, localDate: today, refresh: false, candidates: [pianoCandidate] });
+      const marked = await admin.from("occurrences").update({ status: "completed" }).eq("id", piano.occurrenceId);
+      expect(marked.error).toBeNull();
+      expect(await recheckBriefMoves(callers(), { localDate: today, context, proposalIds: [pianoLine!.proposalId] }))
+        .toEqual({ replaced: [{ proposalId: pianoLine!.proposalId, line: null }] });
+    }
+
+    // Nothing else fits today: the line closes, and the next re-check finds nothing to do.
+    const inkId = await behavior("Ink", "12:00", 30);
+    const inkPlan = await planBriefMoveDay({ supabase: person, userId, localDate: today, timezone, now: Temporal.Now.instant(),
+      context: null, planning: { calendarBusy }, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS });
+    const [ink] = await saveBriefProposals(agent, { runId: null, localDate: today, refresh: false,
+      candidates: [inkPlan.candidates.find((item) => item.behaviorId === inkId)!] });
+    const allDay = { calendarBusy: [{ startAt: Temporal.Now.instant().toString(), endAt: local("23:59").toString() }] };
+    expect(await recheckBriefMoves(callers(), { localDate: today, context: allDay, proposalIds: [ink!.proposalId] }))
+      .toEqual({ replaced: [{ proposalId: ink!.proposalId, line: null }] });
+    expect((await admin.from("move_proposals").select("status").eq("id", ink!.proposalId).single()).data!.status).toBe("withdrawn");
+    expect(await recheckBriefMoves(callers(), { localDate: today, context: allDay })).toEqual({ replaced: [] });
   }, 90_000);
 });

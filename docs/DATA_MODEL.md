@@ -992,7 +992,9 @@ tap is kept. Cascades with its move.
 
 **`move_proposals`**: what an agent offered (`source` `daily_brief`, `coach`,
 `chat`) and what the person did with it (`status`). Server only, mutable status,
-never synced. Links to the move it produced through `move_id`.
+never synced. Links to the move it produced through `move_id`. The brief's re-check
+on open (`withdraw_brief_move_proposal`, Daily Brief agent token only) closes an
+undecided brief line as `withdrawn` when nothing else fits today.
 
 **`move_conflicts`**: a notice that a later base-schedule change put another
 Occurrence of the same Behavior next to a moved one on the same day. `status`

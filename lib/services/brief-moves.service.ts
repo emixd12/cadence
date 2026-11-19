@@ -5,8 +5,10 @@ import {
   BRIEF_MOVE_OTHER_TIMES,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
+  checkBriefMoveSlot,
   planBriefMoveLinesFromInputs,
   travelBlocksFor,
+  type BriefMoveBlock,
   type BriefMoveCalendarBusy,
   type BriefMoveCandidate,
   type BriefMovePlan,
@@ -26,6 +28,10 @@ import {
   type BriefMoveLine,
   type BriefMoveLineResult,
   type BriefMoveProposalStatus,
+  type BriefMoveRecheckRequest,
+  type BriefMoveRecheckResponse,
+  type BriefMoveRefusal,
+  type BriefMoveRefusalCause,
   type BriefMoveReplanRequest,
   type BriefMoveReplanResponse,
   type BriefMoves,
@@ -49,6 +55,7 @@ import { readTravelConclusionsSecrets, type TravelConclusionsSecrets } from "@/l
 import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
 import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
 import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
+import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
 
 /**
  * Advisor Phase 3A1: the Daily Brief's move lines and every answer to them. The planner
@@ -481,7 +488,7 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
   if (prior) return { result: await lineResult(callers.person, prior.proposal, prior.answer.outcome, null, prior.answer.move_id), replayed: true };
   if (proposal.status !== "proposed") {
     if (!options.allowClosed) throw new BriefMoveError("proposal_closed");
-    return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(), null), replayed: false };
+    return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(proposal), null), replayed: false };
   }
   const line = lineFromRow(proposal);
   const moved = await moveOccurrenceForDay(await agentCaller(callers), {
@@ -495,7 +502,8 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
   }).catch(rethrowKeyReused);
-  return settleMove(callers, proposal, moved, { kind: request.kind, key: request.idempotencyKey, batchId: request.batchId });
+  return settleMove(callers, proposal, moved, { kind: request.kind, key: request.idempotencyKey, batchId: request.batchId,
+    asked: { startAt: proposal.proposed_start_at, context: request.context } });
 }
 
 async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
@@ -517,7 +525,8 @@ async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
   }).catch(rethrowKeyReused);
-  return settleMove(callers, proposal, moved, { kind: "other_time", key: request.idempotencyKey, batchId: null });
+  return settleMove(callers, proposal, moved, { kind: "other_time", key: request.idempotencyKey, batchId: null,
+    asked: { startAt: start.toString(), context: request.context } });
 }
 
 async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key: string, kind: "undo" | "undo_all",
@@ -526,7 +535,7 @@ async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key:
   if (prior) return { result: await lineResult(callers.person, prior.proposal, prior.answer.outcome, null, prior.answer.move_id), replayed: true };
   if ((proposal.status !== "accepted" && proposal.status !== "other_time") || !proposal.move_id) {
     if (!options.allowClosed) throw new BriefMoveError("proposal_closed");
-    return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(), null), replayed: false };
+    return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(proposal), null), replayed: false };
   }
   const occurrence = await callers.person.supabase.from("occurrences").select("updated_at")
     .eq("user_id", callers.person.userId).eq("id", proposal.occurrence_id).maybeSingle();
@@ -540,13 +549,19 @@ async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key:
 
 /** Records the answer to a move or undo that ran, applied or refused. */
 async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, moved: OccurrenceMoveResult,
-  answer: Readonly<{ kind: BriefMoveAnswerRequest["kind"]; key: string; batchId: string | null }>): Promise<AnswerOutcome> {
+  answer: Readonly<{ kind: BriefMoveAnswerRequest["kind"]; key: string; batchId: string | null;
+    /** The time a Yes or Other time asked for, so a refusal can name what is there now. */
+    asked?: Readonly<{ startAt: string; context: BriefPlanningContext }>;
+  }>): Promise<AnswerOutcome> {
   if (moved.outcome === "refused") {
-    const refusal = {
-      reason: moved.detail ?? moved.reason,
-      message: moved.message,
+    const reason = moved.detail ?? moved.reason;
+    const named = answer.asked ? await refusalCause(callers, proposal, reason, answer.asked).catch(() => null) : null;
+    const refusal: BriefMoveRefusal = {
+      reason,
+      message: named?.message ?? moved.message,
       alternatives: moved.alternatives.map((instant) => instant.toString()),
       revision: moved.occurrence?.updated_at ?? null,
+      ...(named ? { cause: named.cause } : {}),
     };
     const recorded = await recordAnswer(callers.person, { proposal, kind: answer.kind, outcome: "refused", key: answer.key,
       refusalReason: refusal.reason === "occurrence_not_found" ? "occurrence_not_found" : refusal.reason, batchId: answer.batchId });
@@ -557,8 +572,207 @@ async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, move
   return { result: await lineResult(callers.person, recorded.proposal, "applied", null, moved.move.id, moved.occurrence), replayed: moved.replayed || recorded.replayed };
 }
 
-function closedRefusal() {
-  return { reason: "proposal_closed", message: "This suggestion was already answered.", alternatives: [], revision: null };
+function closedRefusal(proposal: ProposalRow): BriefMoveRefusal {
+  const title = lineFromRow(proposal)?.title;
+  return {
+    reason: "proposal_closed", message: "This suggestion was already answered.", alternatives: [], revision: null,
+    cause: { kind: "answered_elsewhere", ...(title ? { title } : {}), changedAfterBrief: true },
+  };
+}
+
+// ------------------------------------------------------------------ naming the cause
+
+/** What the one rule sees for one item's move: the day's other items, the calendar, travel. */
+function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonly BriefMoveCalendarBusy[], travel: BriefMoveTravelInput | null)
+  : Readonly<{ blocks: BriefMoveBlock[]; before: number; after: number }> {
+  const stop = travel?.stops.get(occurrenceId);
+  return {
+    blocks: [
+      ...briefMoveItemBlocks(day.items, occurrenceId),
+      ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
+      ...travelBlocksFor(travel, occurrenceId),
+    ],
+    before: stop?.beforeSeconds ?? 0,
+    after: stop?.afterSeconds ?? 0,
+  };
+}
+
+type NamedCause = Readonly<{ cause: BriefMoveRefusalCause; message: string }>;
+
+/**
+ * The refusal's cause in plain words, from the day as it is now. Null when Cadence
+ * cannot name one: the move service's own message then stands.
+ */
+async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, reason: string,
+  asked: Readonly<{ startAt: string; context: BriefPlanningContext }>): Promise<NamedCause | null> {
+  const line = lineFromRow(proposal);
+  if (!line) return null;
+  if (reason === "proposal_closed") return { cause: closedRefusal(proposal).cause!, message: "This suggestion was already answered." };
+  if (reason === "occurrence_resolved") {
+    return { cause: { kind: "answered_elsewhere", title: line.title, changedAfterBrief: true }, message: `${line.title} is already marked.` };
+  }
+  if (reason === "revision_changed") {
+    return { cause: { kind: "item_changed", title: line.title, changedAfterBrief: true }, message: `${line.title} changed after this brief was written.` };
+  }
+  if (reason !== "slot_taken" && reason !== "calendar_busy" && reason !== "too_close") return null;
+  const { person } = callers;
+  const day = await readBriefMoveDay(person.supabase, person.userId, proposal.local_date);
+  const travel = briefMoveTravel(asked.context.travelTimes, travelInput(callers, proposal.local_date));
+  const view = slotView(day, proposal.occurrence_id, requestBusy(asked.context), travel);
+  const start = Temporal.Instant.from(asked.startAt);
+  const check = checkBriefMoveSlot({
+    interval: { start, end: start.add({ minutes: line.length.minutes }) },
+    blocks: view.blocks, travelBeforeSeconds: view.before, travelAfterSeconds: view.after,
+  });
+  if (check.ok) return null;
+  return describeBlock(day, proposal, view.blocks.find((block) => block.ref === check.ref) ?? null, check.reason,
+    formatBriefingTime(start.toString(), line.timezone));
+}
+
+/** The words for one block in the way of `time`. */
+function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMoveBlock | null,
+  reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy", time: string): NamedCause | null {
+  if (!block || block.kind === "travel") return null;
+  if (block.kind === "calendar") {
+    // The line's time was free when it was written, so the event arrived since.
+    const cause: BriefMoveRefusalCause = { kind: "calendar_event", ...(block.title ? { title: block.title } : {}), changedAfterBrief: true };
+    const what = block.title ? `${block.title} was added to your calendar` : "a calendar event was added there";
+    return { cause, message: reason === "too_close"
+      ? `${time} is too close to a calendar event now: ${block.title ? `${block.title} was added` : "one was added"} after this brief was written.`
+      : `${time} is taken now: ${what} after this brief was written.` };
+  }
+  const occurrence = day.occurrences.get(block.ref);
+  const item = day.items.find((candidate) => candidate.occurrenceId === block.ref);
+  const title = block.title ?? item?.title ?? "another item";
+  const changed = !!item && Temporal.Instant.compare(Temporal.Instant.from(item.revision), Temporal.Instant.from(proposal.created_at)) > 0;
+  const moved = changed && !!occurrence?.effective_start_at;
+  const cause: BriefMoveRefusalCause = { kind: "item_there", title, changedAfterBrief: changed };
+  if (reason === "too_close") {
+    return { cause, message: moved ? `${time} is too close to ${title} now: you moved it after this brief was written.`
+      : changed ? `${time} is too close to ${title} now: it changed after this brief was written.`
+        : `${time} is too close to ${title}. Cadence keeps 10 minutes between items.` };
+  }
+  return { cause, message: moved ? `${time} is taken now: you moved ${title} there after this brief was written.`
+    : changed ? `${time} is taken now: ${title} changed after this brief was written.`
+      : `${time} is taken: ${title} is there.` };
+}
+
+// ------------------------------------------------------------------ Re-check on open
+
+/**
+ * Each time the brief opens: every undecided line is checked against the day as it is
+ * now with the same slot check Yes uses. A line whose time is taken or has passed is
+ * re-planned by the one rule (no model call; not counted against the Re-plan limit),
+ * with a reason that names the cause. Nothing that fits today closes the line. Lines
+ * that still fit are left alone, so a second call with nothing changed writes nothing
+ * and returns an empty list.
+ */
+export async function recheckBriefMoves(callers: BriefMoveCallers, request: BriefMoveRecheckRequest): Promise<BriefMoveRecheckResponse> {
+  const { person } = callers;
+  const [rows, day] = await Promise.all([
+    person.supabase.from("move_proposals").select("*").eq("user_id", person.userId).eq("local_date", request.localDate)
+      .eq("source", "daily_brief").order("created_at", { ascending: false }).limit(64),
+    readBriefMoveDay(person.supabase, person.userId, request.localDate),
+  ]);
+  if (rows.error) throw rows.error;
+  const all = (rows.data ?? []) as ProposalRow[];
+  const latest = new Map<string, ProposalRow>();
+  for (const row of all) if (!latest.has(row.occurrence_id)) latest.set(row.occurrence_id, row);
+
+  const calendar = requestBusy(request.context);
+  const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, request.localDate));
+  /** Occurrence id to the line that now stands for it (null: none). */
+  const outcome = new Map<string, Readonly<{ proposalId: string; line: BriefMoveLine | null }>>();
+
+  for (const row of latest.values()) {
+    if (row.status !== "proposed") continue;
+    const line = lineFromRow(row);
+    const item = day.items.find((candidate) => candidate.occurrenceId === row.occurrence_id);
+    if (!line || !item || item.status !== "unresolved") continue;
+    const view = slotView(day, item.occurrenceId, calendar, travel);
+    const start = Temporal.Instant.from(line.to.startAt);
+    const passed = Temporal.Instant.compare(start, person.now) < 0;
+    const check = checkBriefMoveSlot({
+      interval: { start, end: start.add({ minutes: line.length.minutes }) },
+      blocks: view.blocks, travelBeforeSeconds: view.before, travelAfterSeconds: view.after,
+    });
+    const sameItem = item.revision === line.expectedRevision && item.start.toString() === Temporal.Instant.from(line.from.startAt).toString();
+    if (check.ok && !passed && sameItem) continue;
+
+    const time = formatBriefingTime(start.toString(), line.timezone);
+    let candidate: BriefMoveCandidate | null;
+    if (check.ok && !passed) {
+      // The time still fits but the item changed (edited, or moved and back): the same
+      // move, rebuilt from the item as it is, so Yes is not refused for a stale revision.
+      candidate = rebuiltCandidate(row, line, item, start, line.otherTimes.map((value) => Temporal.Instant.from(value)).filter((value) => !value.equals(start)), line.reason);
+    } else {
+      const starts = briefMoveFreeStarts({
+        localDate: row.local_date, timezone: line.timezone, now: person.now, near: start, lengthSeconds: line.length.minutes * 60,
+        blocks: view.blocks, travelBeforeSeconds: view.before, travelAfterSeconds: view.after,
+        limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [effectiveStartInstant(day.occurrences.get(item.occurrenceId)!), start],
+      });
+      const [next, ...others] = starts;
+      const why = passed ? `${time} has passed` : check.ok ? `${time} is taken now` : causeClause(day, row, view.blocks, check, time);
+      candidate = next ? rebuiltCandidate(row, line, item, next, others, `${why}, so ${formatBriefingTime(next.toString(), line.timezone)} instead.`) : null;
+    }
+    if (!candidate) {
+      await withdrawProposal(await callers.agent(), row.id);
+      outcome.set(row.occurrence_id, { proposalId: row.id, line: null });
+      continue;
+    }
+    const [saved] = await saveBriefProposals(await callers.agent(), {
+      runId: row.agent_run_id, localDate: row.local_date, refresh: false, candidates: [candidate],
+      replaces: new Map([[item.occurrenceId, row.id]]),
+    });
+    outcome.set(row.occurrence_id, { proposalId: row.id, line: saved ?? null });
+  }
+
+  const replaced = [...outcome.values()];
+  // Lines the screen shows that closed on their own: the item was moved or marked elsewhere,
+  // or a newer line replaced them.
+  const byId = new Map(all.map((row) => [row.id, row]));
+  for (const id of new Set(request.proposalIds ?? [])) {
+    const row = byId.get(id);
+    if (!row || row.status === "proposed" || replaced.some((entry) => entry.proposalId === id)) continue;
+    if (row.status !== "superseded" && row.status !== "withdrawn") continue;
+    const standing = outcome.get(row.occurrence_id);
+    const newest = latest.get(row.occurrence_id);
+    replaced.push({ proposalId: id, line: standing ? standing.line
+      : newest && newest.id !== id && newest.status === "proposed" ? lineFromRow(newest) : null });
+  }
+  return { replaced };
+}
+
+function rebuiltCandidate(row: ProposalRow, line: BriefMoveLine, item: BriefMoveDay["items"][number], next: Temporal.Instant,
+  others: readonly Temporal.Instant[], reason: string): BriefMoveCandidate {
+  return {
+    ...line, key: item.occurrenceId, expectedRevision: item.revision, behaviorRevision: item.behaviorRevision,
+    from: { startAt: item.start.toString(), endAt: item.end.toString() },
+    to: { startAt: next.toString(), endAt: next.add({ minutes: line.length.minutes }).toString() },
+    otherTimes: others.slice(0, BRIEF_MOVE_OTHER_TIMES).map((value) => value.toString()),
+    reason,
+    // A re-planned reason names an item, never a calendar title.
+    anchor: reason === line.reason ? line.anchor : null,
+    calendarDerived: reason === line.reason ? (row.line as { calendarDerived?: boolean } | null)?.calendarDerived ?? false : false,
+  };
+}
+
+/** "5:30 PM is taken now" / "5:30 PM is too close to Piano practice now", never a calendar title. */
+function causeClause(day: BriefMoveDay, row: ProposalRow, blocks: readonly BriefMoveBlock[],
+  check: Extract<ReturnType<typeof checkBriefMoveSlot>, { ok: false }>, time: string): string {
+  const block = blocks.find((candidate) => candidate.ref === check.ref);
+  if (block?.kind === "travel") return `${time} is needed for travel now`;
+  if (block?.kind === "item") {
+    const title = block.title ?? day.items.find((item) => item.occurrenceId === block.ref)?.title;
+    if (title) return check.reason === "too_close" ? `${time} is too close to ${title} now` : `${time} is taken by ${title} now`;
+  }
+  if (block?.kind === "calendar") return check.reason === "too_close" ? `${time} is too close to a calendar event now` : `${time} is taken by a calendar event now`;
+  return `${time} is taken now`;
+}
+
+async function withdrawProposal(agent: AppSupabaseClient, proposalId: string): Promise<void> {
+  const { error } = await agent.rpc("withdraw_brief_move_proposal", { p_proposal_id: proposalId });
+  if (error) throw error;
 }
 
 async function recordAnswer(person: OccurrenceMoveCaller, input: Readonly<{
