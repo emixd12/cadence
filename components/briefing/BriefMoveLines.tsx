@@ -59,24 +59,40 @@ type LineUi = Readonly<{
 const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:cursor-default disabled:opacity-60";
 const OPEN_STATUSES = new Set(["proposed"]);
 
+/**
+ * Answers given in this page session, per brief. Close unmounts the lines, and Today's
+ * brief or a Timeline remount shows the same brief object again; without this the lines
+ * would come back unanswered and a second Yes would be refused as closed.
+ */
+type AnsweredLines = Readonly<{ moves: BriefMoves; ui: Readonly<Record<string, LineUi>>; keptConflicts: ReadonlySet<string> }>;
+const answeredByBrief = new WeakMap<BriefMoves, AnsweredLines>();
+
+/** Keeps what an answer left on the line; drops transient state such as an open panel. */
+function settledUi(ui: Readonly<Record<string, LineUi>>): Readonly<Record<string, LineUi>> {
+  return Object.fromEntries(Object.entries(ui).map(([id, line]) => [id, { ...line, pending: false, panel: null, explainer: null }]));
+}
+
 export function BriefMoveLines({ moves: initial, client, planningContext }: BriefMoveLinesProps) {
   const refresh = useRefresh();
   const timeline = useOccurrenceMoves();
-  const [moves, setMoves] = useState(initial);
-  const [ui, setUi] = useState<Readonly<Record<string, LineUi>>>({});
+  const [restored] = useState(() => answeredByBrief.get(initial));
+  const [moves, setMoves] = useState(restored?.moves ?? initial);
+  const [ui, setUi] = useState<Readonly<Record<string, LineUi>>>(restored?.ui ?? {});
   const [batchPending, setBatchPending] = useState(false);
   const [batchNotice, setBatchNotice] = useState<string | null>(null);
   const [batchExplainer, setBatchExplainer] = useState<string | null>(null);
-  const [keptConflicts, setKeptConflicts] = useState<ReadonlySet<string>>(new Set());
+  const [keptConflicts, setKeptConflicts] = useState<ReadonlySet<string>>(restored?.keptConflicts ?? new Set());
   // Answers read the newest lines and revisions, including from the drawer's Undo later on.
-  // A Refresh or reopen remounts this component (the bubble keys it by brief), so local
-  // answers never carry over to another brief.
+  // A Refresh brings a new brief object, so answers never carry over to another brief.
   const movesRef = useRef(moves);
   const uiRef = useRef(ui);
   useEffect(() => {
     movesRef.current = moves;
     uiRef.current = ui;
   }, [moves, ui]);
+  useEffect(() => {
+    answeredByBrief.set(initial, { moves, ui: settledUi(ui), keptConflicts });
+  }, [initial, moves, ui, keptConflicts]);
 
   const patchUi = useCallback((proposalId: string, patch: LineUi) => {
     setUi((current) => ({ ...current, [proposalId]: { ...current[proposalId], ...patch } }));
@@ -94,9 +110,10 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
   // Re-check on open: lines whose time was taken after the brief was written arrive
   // already re-planned. Failures change nothing; Yes still checks again on the server.
   useEffect(() => {
-    if (!client.recheck || !initial.lines.some((line) => OPEN_STATUSES.has(line.status))) return;
+    const shownLines = movesRef.current.lines;
+    if (!client.recheck || !shownLines.some((line) => OPEN_STATUSES.has(line.status))) return;
     const controller = new AbortController();
-    const proposalIds = initial.lines.filter((line) => OPEN_STATUSES.has(line.status)).map((line) => line.proposalId);
+    const proposalIds = shownLines.filter((line) => OPEN_STATUSES.has(line.status)).map((line) => line.proposalId);
     client.recheck({ localDate: initial.localDate, context: planningContext(), proposalIds }, controller.signal)
       .then((response) => {
         if (controller.signal.aborted) return;

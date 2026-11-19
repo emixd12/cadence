@@ -37,7 +37,7 @@ const timelineActions: OccurrenceMoveActions = {
   keep: vi.fn(async () => ({ status: "kept" as const })),
 };
 
-async function render(client: BriefMoveClient, moves: BriefMoves = BRIEF_MOVE_FIXTURE, withTimeline = true) {
+async function render(client: BriefMoveClient, moves: BriefMoves = structuredClone(BRIEF_MOVE_FIXTURE), withTimeline = true) {
   const lines = <BriefMoveLines moves={moves} client={client} planningContext={() => context} />;
   await act(() => root.render(<RefreshProvider onRefresh={refresh}>
     {withTimeline
@@ -110,6 +110,24 @@ describe("move lines", () => {
     await click(button(line("walk"), "No"));
     expect(line("walk")).toBeNull();
     expect(line("gym")).not.toBeNull();
+  });
+
+  it("keeps answers when the same brief is shown again after Close or a Timeline remount", async () => {
+    const client = fixtureBriefMoveClient();
+    const answer = vi.spyOn(client, "answer");
+    const moves = structuredClone(BRIEF_MOVE_FIXTURE);
+    await render(client, moves);
+    await click(button(line("walk"), "Yes"));
+    await click(button(line("vitamins"), "No"));
+    await act(() => root.render(null));
+    await render(client, moves);
+    expect(line("walk").textContent).toContain("Moved to 11:30 AM for today.");
+    expect(line("vitamins").textContent).toContain("Staying at 8:00 AM.");
+    expect(answer).toHaveBeenCalledTimes(2);
+    // A different brief object (a Refresh) starts unanswered.
+    await act(() => root.render(null));
+    await render(client);
+    expect(button(line("walk"), "Yes")).toBeTruthy();
   });
 
   it("shows a refused Yes in the alert style with free times to pick", async () => {
@@ -220,7 +238,7 @@ describe("move lines", () => {
 describe("bubble", () => {
   it("shows the opening, then the move lines, then Refresh, with no read-only wording", async () => {
     await act(() => root.render(<RefreshProvider onRefresh={refresh}>
-      <DailyBriefBubble state="ready" briefing={BRIEF_MOVE_FIXTURE_BRIEFING} onDismiss={() => undefined}
+      <DailyBriefBubble state="ready" briefing={{ ...BRIEF_MOVE_FIXTURE_BRIEFING, moves: structuredClone(BRIEF_MOVE_FIXTURE) }} onDismiss={() => undefined}
         moves={{ client: fixtureBriefMoveClient(), planningContext: () => context }}
         refresh={{ onRefresh: () => undefined, pending: false, available: true, error: null }} />
     </RefreshProvider>));
