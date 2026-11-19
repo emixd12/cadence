@@ -3217,7 +3217,7 @@ shown to the person; Phase 4 matches the signals to advice cards.
 - `cadence_advisor_private.coach_signals`: one row per signal per account per local
   day. `kind` is `completion_drop`, `repeated_move`, `late_marking`,
   `new_behavior_settled` or `brief_answers` (version 1), or, since version 2 (Phase 4,
-  migration `20261119220000`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
+  migration `20261119220500`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
   `timing_mode_gap`, `steady_behavior`, `never_done`, `dip_recovery`, `day_shape`,
   `unmarked_items`, `marking_time`, `done_together`, `crowded_hour`, `setup_gaps`,
   `reminder_response`, `session_length` or `moved_vs_unmoved`. At most
