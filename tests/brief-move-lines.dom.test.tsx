@@ -99,6 +99,7 @@ describe("move lines", () => {
     expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins 8:00 AM → 12:15 PM: 8:00 has passed; lunch is the next quiet moment.");
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Staying at 8:00 AM. Stop suggesting moves for Vitamins");
     expect(line("vitamins").querySelector("[data-brief-outcome]")!.className).toContain("italic");
+    expect(button(line("vitamins"), "Stop suggesting moves for Vitamins").parentElement!.className).toContain("not-italic");
     expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
     await click(button(line("vitamins"), "Stop suggesting moves for Vitamins"));
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Staying at 8:00 AM. The brief won’t suggest moving Vitamins again; you can change this in its settings.");

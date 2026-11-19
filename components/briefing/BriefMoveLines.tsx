@@ -343,12 +343,12 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
         {line.offerNeverMove ? <><Dot /><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <BriefOutcome data-brief-move-actions>
-        {moved ? <>Moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to} for today. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
+        {moved ? <>Moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to} for today. <span className="not-italic"><ActionLink label="Undo" disabled={pending} onClick={onUndo} /></span></> : null}
         {line.status === "already_done" ? "Marked Completed." : null}
         {line.status === "declined" || line.status === "undone" ? <>Staying at {from}.</> : null}
         {ui.neverMoved ? <> The brief won’t suggest moving {line.title} again; you can change this in its settings.</> : null}
         {!ui.neverMoved && line.offerNeverMove && (line.status === "declined" || line.status === "undone")
-          ? <> <ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
+          ? <> <span className="not-italic"><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></span></> : null}
       </BriefOutcome>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}
@@ -435,7 +435,9 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
 /**
  * Outcome text: what an answer did ("Moved to 11:30 AM for today. Undo"). Ink italic at
  * the line's size, one style for every outcome in the brief (Emi, Nov 19). Errors use the
- * inline Alert notice instead; notes and assumptions use Readable Ash `text-xs`.
+ * inline Alert notice instead; notes and assumptions use Readable Ash `text-xs`. Links
+ * inside it stay upright (Emi, Nov 19): wrap them in `not-italic`, because the global
+ * `button {font: inherit}` ignores font utilities on the button itself.
  */
 const OUTCOME_TEXT = "italic";
 function BriefOutcome({ children, ...rest }: Readonly<{ children: ReactNode; "data-brief-move-actions"?: boolean }>) {
