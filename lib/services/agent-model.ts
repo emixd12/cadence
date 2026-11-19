@@ -161,6 +161,11 @@ export async function generateStructured(input: StructuredCallInput): Promise<un
   catch { throw new AgentModelError("rejected", "output_not_json"); }
 }
 
+/** The AI SDK model for a model string, over the configured transport. Tool-using agents (chat) call the AI SDK with it directly. */
+export function resolveAgentModel(id: string, env: Env = process.env, customFetch?: typeof fetch): LanguageModel {
+  return resolveModel(id, env, customFetch);
+}
+
 function resolveModel(id: string, env: Env, customFetch?: typeof fetch): LanguageModel {
   if (modelTransport(env) === "gateway") {
     const apiKey = env.AI_GATEWAY_API_KEY;
