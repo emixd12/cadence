@@ -552,15 +552,39 @@ the coach (advisor quips) or Chat goes through one Postgres budget
 | One account's total or share | none set | `agent_budget_account_overrides` (agent `total`, `daily_brief`, `coach` or `chat`) |
 
 All amounts are microdollars (US$1 = 1,000,000). Changing a value is an owner-approved
-SQL update on the hosted database, with no deploy. For example, to raise the Chat share:
+SQL update on the hosted database, with no deploy.
 
-```sql
-update cadence_advisor_private.agent_budget_shares
-set monthly_microdollars = 4000000, updated_at = now()
-where agent = 'chat';
+To move money between the three shares while keeping the total (decision D3, Phase 4),
+run the rebalance script with a service-role connection, in US dollars. It refuses
+shares that do not add up to the monthly total and changes nothing then:
+
+```sh
+psql "$DATABASE_URL" -v brief=0.50 -v coach=1.00 -v chat=3.50 -f scripts/advisor-budget-rebalance.sql
+# Change the total in the same step (owner decision):
+psql "$DATABASE_URL" -v brief=0.50 -v coach=1.50 -v chat=4.00 -v total=6.00 -f scripts/advisor-budget-rebalance.sql
+```
+
+Before rebalancing, read what each agent actually cost per account per month, overall and
+per model, with the mean, 95th percentile and how many accounts came near their share:
+
+```sh
+psql "$DATABASE_URL" -v months=3 -f scripts/advisor-cost-report.sql
 ```
 
 Record every change in the change log below.
+
+### Advisor tips (coach, Phase 4B)
+
+The nightly tip run makes at most one model call per account per day, and only when a
+research card matched that was not used in the last 14 days or a used card has a new
+fact. A day with nothing new makes no call. A new account's first tips, a used-up share,
+and a failed call all use the cards' own wording, filled by code, at no cost. Model:
+`openai/gpt-5.6-luna` (US$0.20 per million input tokens, US$1.20 output), output cap
+1,000 tokens. Assumed, not measured yet: about 1,000 input and 300 output tokens, about
+US$0.0006 per call, at most about US$0.02 per account per month. Each call reserves
+about US$0.002 first. The coach share (US$1.00) also covers workstream 4C's proposals.
+The coach eval (`npm run advisor:coach-eval`) reports cost per account for each model,
+with a pass bar of US$0.25 per account per month at the 95th percentile.
 
 ## QA-only acceptance model calls
 
