@@ -46,7 +46,7 @@ export const CHAT_LIMITS = Object.freeze({
   historyMessages: 20,
 });
 
-export type ChatLimits = typeof CHAT_LIMITS;
+export type ChatLimits = Readonly<{ [K in keyof typeof CHAT_LIMITS]: number }>;
 
 /** Reserves spend before one model call; `settle` records what it cost. */
 export type ChatSpendGate = (estimateMicrodollars: number) => Promise<
