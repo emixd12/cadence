@@ -256,7 +256,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         // The model keeps the turn after the notice, so it can still help from the person's
         // records (5D: ending the turn here left sleep and timing questions with no help).
         answer(stepText
-          ? { shown: true, note: "Cadence shows the disclaimer. Do not repeat what you wrote. If the question also asks about timing or the person's items, look them up and add one or two sentences; otherwise write nothing more." }
+          ? { shown: true, note: "Cadence shows the disclaimer. Do not repeat what you wrote. If the question is about a dose or an item on a particular day or time, look that item up and add one sentence on when it is scheduled; otherwise write nothing more." }
           : { shown: true, note: "Notice shown. Now answer in one or two sentences; you may discuss timing from the person's records." });
         continue;
       }
