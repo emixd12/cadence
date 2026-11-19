@@ -65,7 +65,7 @@ describe("move lines", () => {
     expect(walk.textContent).toContain("Walk 9:00 AM → 11:30 AM");
     expect(walk.textContent).toContain("Your 9:00 design review runs until 10:30");
     expect(walk.querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time");
-    expect(line("gym").textContent).toContain("assumes 30 min · change · travel not checked");
+    expect(line("gym").textContent).toContain("30 min is a guess · set length · travel not checked");
     expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time · Already did it · Don’t suggest moving this");
     expect(container.querySelector("[data-brief-accept-all]")!.textContent).toBe("Accept all");
     expect(container.querySelector('[data-brief-conflict="conflict-stretch"]')!.textContent).toContain("on top of Piano practice");
@@ -155,7 +155,7 @@ describe("move lines", () => {
     const length = vi.spyOn(client, "length");
     const replan = vi.spyOn(client, "replan");
     await render(client);
-    await click(button(line("gym"), "change"));
+    await click(button(line("gym"), "set length"));
     const input = line("gym").querySelector<HTMLInputElement>("[data-brief-length] input")!;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;

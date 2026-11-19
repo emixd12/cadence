@@ -1978,8 +1978,8 @@ cite has not changed.
 
 - **Change:** implemented November 18, 2026 (advisor Phase 3B). Inside the Daily Brief
   bubble, each proposed move is a line of text with **Yes · No · Other time**, plus
-  **Already did it** on late items, **Accept all** and **Undo all**, "assumes 30 min ·
-  change", "travel not checked" and **Don't suggest moving this**. Yes moves the item for
+  **Already did it** on late items, **Accept all** and **Undo all**, "30 min is a guess ·
+  set length", "travel not checked" and **Don't suggest moving this**. Yes moves the item for
   today and opens the bottom move note with Undo. The brief no longer expires after five
   minutes and is no longer withdrawn when the Timeline changes; **Close** leaves a
   **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says

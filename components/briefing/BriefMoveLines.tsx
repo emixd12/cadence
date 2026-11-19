@@ -331,8 +331,8 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
       </p>
       {!closed && !moved ? <p className="text-foreground">{line.reason}</p> : null}
       {!closed && !moved && (line.length.assumed || line.travel === "not_checked") ? <p className="text-xs leading-5 text-muted-readable">
-        {line.length.assumed ? <>assumes {line.length.minutes} min ·{" "}
-          <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>change</button></> : null}
+        {line.length.assumed ? <>{line.length.minutes} min is a guess ·{" "}
+          <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button></> : null}
         {line.length.assumed && line.travel === "not_checked" ? " · " : null}
         {line.travel === "not_checked" ? "travel not checked" : null}
       </p> : null}

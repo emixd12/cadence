@@ -79,8 +79,8 @@ items around them. Answer with the text links under the line:
 - **Don't suggest moving this** appears after you have said No to the same item on
   several days. The brief then stops suggesting moves for it.
 
-"assumes 30 min · change" means Cadence does not know how long the item takes. Choose
-**change** to set its usual length; the line is planned again with it. "travel not
+"30 min is a guess · set length" means Cadence does not know how long the item takes.
+Choose **set length** to enter its usual length; the line is planned again with it. "travel not
 checked" means Cadence had no travel time for the new slot. Each time the brief opens,
 Cadence checks its lines against your Timeline as it is now. If a suggested time was taken
 after the brief was written, the line arrives with a new time and says why. Each answer
