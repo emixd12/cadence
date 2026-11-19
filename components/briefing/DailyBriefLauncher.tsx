@@ -19,6 +19,7 @@ import {
   dailyBriefFence,
   discardDailyBriefAttempt,
   isRememberedDailyBriefAttempt,
+  rememberSettledDailyBriefAttempt,
   startDailyBriefAttempt,
   type DailyBriefAttempt,
   type DailyBriefOutcome,
@@ -275,7 +276,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
             if (response.state !== "ready") { setRefreshState({ pending: false, error: "The new brief isn’t ready yet. Try again shortly." }); return; }
             shownBriefings.set(briefClient, { fence: dailyBriefFence(settings), briefing: response.briefing });
             setRefreshState(REFRESH_IDLE);
-            show({ kind: "ready", briefing: response.briefing, attempt: reopenedAttempt(settings) });
+            show({ kind: "ready", briefing: response.briefing, attempt: rememberSettledDailyBriefAttempt(briefClient, settings, response.briefing) });
           } catch (error) {
             if (!live() || refreshEpoch !== generation) return;
             setRefreshState({ pending: false, error: refreshFailure(error) });
@@ -395,7 +396,7 @@ function moveRequestFields(client: DailyBriefClient, travelAccountId: string | n
   return { features: [...DAILY_BRIEF_MOVE_FEATURES], ...(travelTimes ? { travelTimes } : {}) };
 }
 
-/** A settled stand-in attempt for a brief shown again from memory or replaced by Refresh. */
+/** A settled stand-in attempt for a brief shown again from memory. */
 function reopenedAttempt(settings: DailyBriefSettings): DailyBriefAttempt {
   return {
     accountRef: settings.accountRef, localDate: settings.localDate, fence: dailyBriefFence(settings),

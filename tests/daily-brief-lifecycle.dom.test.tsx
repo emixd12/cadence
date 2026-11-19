@@ -197,6 +197,21 @@ describe("advisor Phase 3: reopen, Refresh and move lines", () => {
     expect(container.textContent).toContain("Second brief");
     expect(container.textContent).toContain("used today’s refreshes");
   });
+
+  it("keeps the refreshed brief when Timeline remounts", async () => {
+    const request = vi.fn<DailyBriefClient["requestBrief"]>()
+      .mockResolvedValueOnce(ready("First brief"))
+      .mockResolvedValueOnce(ready("Second brief"));
+    const adapter = { ...client("owner", request), moves: moveClient() };
+    await act(() => root.render(<DailyBriefLauncher client={adapter} />));
+    await act(async () => { buttonNamed("Refresh")!.click(); });
+    expect(container.textContent).toContain("Second brief");
+    await act(() => root.render(null));
+    await act(() => root.render(<DailyBriefLauncher client={adapter} />));
+    expect(container.textContent).toContain("Second brief");
+    expect(container.textContent).not.toContain("First brief");
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });
 
 it("offers recovery after a reload abandoned the automatic attempt", async () => {

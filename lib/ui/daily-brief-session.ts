@@ -74,6 +74,26 @@ export function startDailyBriefAttempt(
   return attempt;
 }
 
+/**
+ * Remembers a brief that arrived outside an attempt (advisor Phase 3: Refresh) as the
+ * settled attempt, so a remounted launcher shows it rather than the brief it replaced.
+ */
+export function rememberSettledDailyBriefAttempt(client: DailyBriefClient, settings: DailyBriefSettings, briefing: DailyBriefing): DailyBriefAttempt {
+  discardDailyBriefAttempt(client);
+  const outcome: DailyBriefOutcome = { kind: "ready", briefing };
+  const attempt: DailyBriefAttempt = {
+    accountRef: settings.accountRef,
+    localDate: settings.localDate,
+    fence: dailyBriefFence(settings),
+    retry: false,
+    controller: new AbortController(),
+    promise: Promise.resolve(outcome),
+    outcome,
+  };
+  attemptsByClient.set(client, attempt);
+  return attempt;
+}
+
 /** Cancels and forgets the remembered attempt, for example after a disclosure or account change. */
 export function discardDailyBriefAttempt(client: DailyBriefClient) {
   const attempt = attemptsByClient.get(client);
