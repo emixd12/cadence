@@ -45,10 +45,13 @@ function rows(): TimelineOccurrenceView[] {
   ];
 }
 
+const BENCH_STATUSES = ["completed", "not_completed", "unresolved"] as const;
+
 const markAction = async (_state: OccurrenceActionState, formData: FormData): Promise<OccurrenceActionState> => {
-  const status = formData.get("status");
+  const status = String(formData.get("status"));
   await new Promise((resolve) => setTimeout(resolve, 150));
-  return { status: "success", message: "", ...(status === "completed" || status === "not_completed" || status === "unresolved" ? { nextStatus: status } : {}) };
+  const nextStatus = BENCH_STATUSES.find((value) => value === status);
+  return { status: "success", message: "", ...(nextStatus ? { nextStatus } : {}) };
 };
 const noop = async () => ({ status: "idle" as const, message: "" });
 

@@ -12,8 +12,8 @@ import type { BehaviorDurationEstimate, NormalizedExternalEvent } from "../types
  * - Cadence items: every Occurrence on the day, whatever its status. An item counts
  *   only when its Behavior has a length the person set or a logged completion average
  *   (`resolveBehaviorDurationEstimate`: provenance "behavior_default" or
- *   "completed_stopped_occurrence_mean"). Never a model's estimate, never the default
- *   30-minute window. Items with neither are counted in `itemsNoLength`.
+ *   "completed_stopped_occurrence_mean"). Never a model's estimate, never the
+ *   30-minute default length. Items with neither are counted in `itemsNoLength`.
  *
  * Nothing about titles is read or kept.
  */
