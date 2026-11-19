@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-19.2",
+  "version": "2026-11-19.3",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -727,6 +727,117 @@
         "{without_place} items have no place yet. Where will they happen?"
       ],
       "audience": "history_needed",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "act-when-the-reminder-fires",
+      "revision": 1,
+      "status": "draft",
+      "advice": "A reminder works best as the cue to start right then, so set it for a moment when you can act.",
+      "applies_when": [
+        {
+          "signal": "reminder_response",
+          "scope": "either",
+          "facts": [
+            {
+              "fact": "quick_share",
+              "op": "lt",
+              "value": 0.5
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Move the reminder to the time you usually end up doing the item.",
+      "evidence": {
+        "source_id": "gollwitzer-sheeran-2006",
+        "kind": "meta_analysis",
+        "strength": "strong",
+        "claim": "Plans that tie an action to a specific situation (if this happens, then I do that) helped people reach their goals.",
+        "quote": "This review analyzes whether realization of goal intentions is facilitated by forming an implementation intention that spells out the when, where, and how of goal striving in advance (“If situation Y is encountered, then I will initiate goal‐directed behavior X!”).",
+        "locator": "Abstract"
+      },
+      "limitation": "The review tested if-then plans that people made themselves, not phone reminders.",
+      "quip_seeds": [
+        "Items get done within 30 minutes of the reminder {quick_share_pct} of the time.",
+        "Marked items are usually done {median_minutes_after} minutes after the reminder."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "set-the-length-it-takes",
+      "revision": 1,
+      "status": "draft",
+      "advice": "If sessions keep running longer than planned, plan for the time they actually take.",
+      "applies_when": [
+        {
+          "signal": "session_length",
+          "scope": "behavior",
+          "facts": [
+            {
+              "fact": "pattern",
+              "op": "eq",
+              "value": "longer"
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Change the item's length to the time it usually takes.",
+      "evidence": {
+        "source_id": "buehler-1994",
+        "kind": "experiment",
+        "strength": "moderate",
+        "claim": "People's estimates of how long their own tasks would take were too optimistic, and recalling past times removed the bias.",
+        "quote": "The optimistic bias was eliminated for Ss instructed to connect relevant past experiences with their predictions.",
+        "locator": "Abstract"
+      },
+      "limitation": "Studied with student projects and tasks, not daily routines.",
+      "quip_seeds": [
+        "{behavior} is planned for {planned_minutes} minutes and usually takes {median_minutes}.",
+        "{longer} of {sessions} sessions of {behavior} ran past the planned length."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "moving-it-costs-something",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Doing an item at its usual time helps it become routine, so moving it often can work against that.",
+      "applies_when": [
+        {
+          "signal": "moved_vs_unmoved",
+          "scope": "either",
+          "facts": [
+            {
+              "fact": "pattern",
+              "op": "eq",
+              "value": "moved_worse"
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Before moving an item, check whether a smaller version fits at its usual time.",
+      "evidence": {
+        "source_id": "keller-2021",
+        "kind": "randomized_trial",
+        "strength": "moderate",
+        "claim": "In a trial with 192 adults, carrying out the plan again and again at its planned cue was a key predictor of the routine becoming automatic.",
+        "quote": "Repeated plan enactment was a key predictor for automaticity.",
+        "locator": "Abstract, results"
+      },
+      "limitation": "The trial studied one everyday eating habit over 84 days; some moves are unavoidable and still worth making.",
+      "quip_seeds": [
+        "Moved items got done {moved_rate_pct} of the time; items left in place, {unmoved_rate_pct}.",
+        "Items left at their usual time: {unmoved_rate_pct} done. Moved: {moved_rate_pct}."
+      ],
+      "audience": "any_account",
       "reviewed_at": null,
       "reviewer": null
     },
