@@ -116,6 +116,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
   let position = 0;
   let modelCalls = 0;
   let spent = 0;
+  let lastActual: number | null = null;
   let stop: ChatTurnResult["stop"] = "answered";
   let errorReason: string | undefined;
 
@@ -164,7 +165,12 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       + (toolsAllowed ? JSON.stringify(input.tools).length : 0);
     const estimate = price ? estimateCallMicrodollars(price, { requestCharacters, maxOutputTokens: input.setting.maxOutputTokens }) : 0;
     if (!price && !input.model) throw new AgentModelError("not_configured", "model_price_unknown");
-    if (spent + estimate > limits.questionCeilingMicrodollars && modelCalls > 0) {
+    // The reservation stays conservative (every character priced as a fresh token, full
+    // output cap). The ceiling uses a realistic next call instead: the last call's measured
+    // cost with headroom. Otherwise one Opus reservation (~21 cents) trips 25 cents on the
+    // second call of any two-step question (5D finding).
+    const likelyNext = lastActual === null ? estimate : Math.min(estimate, Math.ceil(lastActual * 1.5));
+    if (spent + likelyNext > limits.questionCeilingMicrodollars && modelCalls > 0) {
       stop = "ceiling";
       alert({ code: "tool_limit", text: "That question needs more than chat can do in one go. Try asking about one part of it." });
       break;
@@ -183,6 +189,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
     let callUsage: AgentModelUsage | null = null;
     const calls: Array<{ toolCallId: string; toolName: string; input: unknown }> = [];
     let responseMessages: ModelMessage[] = [];
+    let stepText = false;
     try {
       const result = streamText({
         model,
@@ -200,7 +207,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         },
       });
       for await (const part of result.fullStream) {
-        if (part.type === "text-delta" && part.text) emit({ type: "text", delta: part.text });
+        if (part.type === "text-delta" && part.text) { stepText = true; emit({ type: "text", delta: part.text }); }
         // The muted line shows as soon as the model starts a lookup, not after it finishes,
         // so the first visible line comes early (5D's 2-second bar). A failed read adds its own line.
         else if (part.type === "tool-input-start" && toolsAllowed && !isChatWrite(part.toolName)
@@ -225,11 +232,13 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
     if (callUsage) { usage.push(callUsage); input.onUsage?.(callUsage); }
     const actual = callUsage && price ? usageMicrodollars(price, callUsage) : null;
     spent += actual ?? estimate;
+    if (actual !== null) lastActual = actual;
     await settle?.(actual ?? estimate).catch(() => undefined);
 
     if (calls.length === 0) break;
-    // The medical notice alone ends the turn: the answer is already written (5D finding).
-    if (calls.every((call) => call.toolName === MEDICAL_NOTICE_TOOL.name)) {
+    // The medical notice alone ends the turn when the answer is already written (5D
+    // finding). A model that calls it before writing anything gets one more step to answer.
+    if (stepText && calls.every((call) => call.toolName === MEDICAL_NOTICE_TOOL.name)) {
       if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
       break;
     }
@@ -241,7 +250,9 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       const args = call.input && typeof call.input === "object" && !Array.isArray(call.input) ? stripServerKeys(call.input as Record<string, unknown>) : {};
       if (call.toolName === MEDICAL_NOTICE_TOOL.name) {
         if (!medicalShown) { medicalShown = true; emit({ type: "notice", notice: CHAT_MEDICAL_NOTICE }); }
-        answer({ shown: true, note: "Cadence shows the disclaimer. Do not repeat your answer." });
+        answer(stepText
+          ? { shown: true, note: "Cadence shows the disclaimer. Do not repeat your answer." }
+          : { shown: true, note: "Notice shown. Now answer in one or two sentences; you may discuss timing." });
         continue;
       }
       if (!input.tools.some((tool) => tool.name === call.toolName)) { answer({ error: "unknown_tool" }); continue; }

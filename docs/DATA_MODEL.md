@@ -3239,6 +3239,34 @@ shown to the person; Phase 4 matches the signals to advice cards.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.
 
+## Chat conversations (advisor plan Phase 5, workstream 5A)
+
+Migration `20261119220000_chat_conversations.sql` adds four tables. All are
+owned by `auth.users` with `on delete cascade`, so deleting the account deletes
+them; nothing else expires them.
+
+- `chat_conversations`: title (first question, 1 to 120 characters) and a
+  code-written `summary` of messages beyond the 20 that are resent to the model.
+- `chat_messages`: `role`, `parts` (the stored `ChatPart` list, at most 256 KB),
+  `client_message_id` (user messages; unique per user, so a retried question
+  replays the stored reply), `reply_to` (assistant messages; unique), `state`
+  (`streaming` or `complete`) and `agent_run_id`.
+- `chat_actions`: one row per change chat made. `id` is the outcome id the
+  client sends to Undo. `undo_plan` holds the exact write that reverses it;
+  `undo_state` is `available`, `undoing`, `done` or `unavailable`.
+- `chat_confirms`: the writes waiting for one Yes. `state` is `pending`,
+  `answering`, `accepted`, `declined` or `expired`; `expires_at` is 15 minutes
+  after creation (the check allows at most an hour). A newer question in the
+  conversation expires pending confirms, and a Yes re-reads every listed record
+  and expires the confirm if its revision changed.
+
+Access: RLS on all four; `authenticated` has select, insert and update, no
+delete. The only policy admits the `chat` agent token for its own user
+(`cadence_channel = 'chat'` and no `cadence_grant_id`). The person's own session,
+MCP grants and the other agents see no rows. Chat writes to Cadence records use
+fixed idempotency keys: `chat:<replyId>:<n>` at once, `chat:<confirmId>:<n>`
+after Yes, `chat:undo:<outcomeId>` for Undo.
+
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 
 Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the
