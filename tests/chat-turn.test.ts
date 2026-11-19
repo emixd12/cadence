@@ -165,14 +165,18 @@ describe("chat turn (5A)", () => {
     expect(result.pending?.confirm.items[0]!.text).toBe("Move Walk to 8:30 pm today");
   });
 
-  it("shows the medical disclaimer once when the model declines", async () => {
-    const { promise } = turn([{ text: "Cadence does not advise on medical matters.", calls: [{ name: "medical_notice", input: {} }] }, { text: "Repeated answer." }]);
+  it("shows the medical disclaimer once and lets the model still help with timing", async () => {
+    const { promise } = turn([
+      { text: "Cadence does not advise on dosing.", calls: [{ name: "medical_notice", input: {} }] },
+      { calls: [{ name: "get_timeline", input: {} }, { name: "medical_notice", input: {} }] },
+      { text: "Your Magnesium is at 9 pm tonight." },
+    ]);
     const result = await promise;
-    // The notice alone ends the turn: no second model call repeats the answer.
-    expect(result.modelCalls).toBe(1);
-    expect(result.parts.filter((part) => part.type === "text")).toEqual([{ type: "text", text: "Cadence does not advise on medical matters." }]);
+    expect(result.modelCalls).toBe(3);
+    expect(result.parts.filter((part) => part.type === "text").map((part) => part.type === "text" && part.text))
+      .toEqual(["Cadence does not advise on dosing.", "Your Magnesium is at 9 pm tonight."]);
     expect(result.parts.filter((part) => part.type === "notice")).toEqual([{ type: "notice", notice: { kind: "medical", text: "Cadence does not advise on medical matters." } }]);
-    expect(result.toolCalls).toEqual([]);
+    expect(result.toolCalls).toEqual(["get_timeline"]);
   });
 
   it("lets the model answer when it calls the medical notice before writing anything", async () => {
@@ -322,13 +326,20 @@ describe("chat history and tools (5A)", () => {
     expect(String(messages.at(-1)!.content)).toContain("Person: message 0");
   });
 
-  it("keeps tool lines and outcomes in resent history", () => {
+  it("tells the model after any history that earlier replies are not a source", () => {
+    const first = buildHistoryMessages({ history: [], userMessage: "hi" }, 20);
+    expect(first.at(-1)!.content).toBe("hi");
+    const later = buildHistoryMessages({ history: [message("user", "hi", 0), message("assistant", "Hello.", 1)], userMessage: "and Walk?" }, 20);
+    expect(String(later.at(-1)!.content)).toMatch(/^and Walk\?\n\n\(Cadence note: earlier replies are not a source\./);
+  });
+
+  it("leaves read lines out of resent history but keeps outcomes", () => {
     const text = messageText({ id: "a", role: "assistant", createdAt: "", parts: [
       { type: "tool", tool: { id: "t", subject: "calendar", text: "Looked at your calendar", state: "done" } },
       { type: "text", text: "You have Team dinner at 7." },
       { type: "outcome", outcome: { id: "o", kind: "status", text: "Marked Meds done.", confirmed: false, undo: "done" } },
     ] });
-    expect(text).toBe("[Cadence: Looked at your calendar]\nYou have Team dinner at 7.\n[Cadence: Marked Meds done. Then undone.]");
+    expect(text).toBe("You have Team dinner at 7.\n[Cadence: Marked Meds done. Then undone.]");
   });
 
   it("cuts tool results to 12 KB, shortening lists first", () => {
