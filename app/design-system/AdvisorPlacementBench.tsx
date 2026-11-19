@@ -1,21 +1,22 @@
 "use client";
 
 import { Temporal } from "@js-temporal/polyfill";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { CadencePageBanner } from "@/components/layout/ScreenFrame";
 import { Timeline } from "@/components/timeline/Timeline";
 import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
 import { resolveTimeline } from "@cadence/core/resolvers/timeline.resolver";
 import type { OccurrenceFormAction, TimeTrackingFormAction, TimelineOccurrenceInput } from "@/lib/types/timeline";
 
-// Advisor plan 4D, round 1: where the advisor (the horse) shows its tips.
-// Five placements on the real app shell and Timeline, synthetic data, nothing is saved.
+// Advisor plan 4D, rounds 1 and 1b: where the advisor (the horse) shows its tips.
+// Placements on the real app shell and Timeline, synthetic data, nothing is saved.
 // One URL reproduces one view: ?preview=advisor-placement&option=a&view=why
 
-export type PlacementOption = "a" | "a2" | "b" | "c" | "d";
-export type PlacementView = "closed" | "open" | "why" | "answered";
+export type PlacementOption = "a" | "a2" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j";
+export type PlacementView = "closed" | "open" | "why" | "answered" | "scrolled" | "scrolled-open";
 
 export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: string; summary: string }>[] = [
   { id: "a", label: "A · Horse in the menu", summary: "An Advisor line in the main menu, with the horse as its icon. A dot means a new tip." },
@@ -23,9 +24,16 @@ export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: 
   { id: "b", label: "B · Banner horse", summary: "The Timeline’s own horse gets a dot. Tapping it opens the tip in the brief’s bubble." },
   { id: "c", label: "C · Corner horse", summary: "A small horse waits in a screen corner on every page. A dot means a new tip." },
   { id: "d", label: "D · Line in the Timeline", summary: "The tip is a quiet line between what is done today and what comes next." },
+  { id: "e", label: "E · Window at the top", summary: "Round 1b. The horse looks out of a round window at the top of the page and stays there as you scroll. Tapping it opens the advisor’s panel." },
+  { id: "f", label: "F · Top of today", summary: "Round 1b. The tip is the first line of today’s list." },
+  { id: "g", label: "G · Under the date", summary: "Round 1b. A short tip sits under today’s date." },
+  { id: "h", label: "H · Under its Behavior", summary: "Round 1b. The tip sits under the Behavior it is about, like a reply." },
+  { id: "j", label: "J · Banner horse speaks", summary: "Round 1b. The Timeline’s horse shows the tip. Scroll past it and a small window horse waits at the top." },
 ];
 
 const TIMEZONE = "America/New_York";
+
+const QUIP_SHORT = "Two skipped journal days do not undo 11 in a row. Keep tomorrow’s 8:00 AM.";
 
 const QUIP = "Morning journal was done 11 days running, then not done on Tuesday or Wednesday. In habit research a skipped day or two did not set the habit back. Keep tomorrow’s 8:00 AM as it is.";
 
@@ -77,28 +85,29 @@ const NO_MOVES: OccurrenceMoveActions = {
 
 // ---------- The horse ----------
 
-/** The advisor's head, cropped from the avatar artwork. `dot` marks an unseen tip. */
+/**
+ * The advisor looking out of a round window: the whole head shows, and the neck runs out of the bottom edge.
+ * Draft artwork for this round only. `dot` marks an unseen tip.
+ */
 function HorseMark({ size = 28, dot = false }: Readonly<{ size?: number; dot?: boolean }>) {
-  // The head spans about x 75–330 and y 85–330 in the 400 × 400 artwork.
-  const scale = size / 250;
+  const dotSize = Math.max(8, Math.round(size * 0.22));
   return (
     <span aria-hidden="true" className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      <span className="absolute inset-0 overflow-hidden">
+      <span className="absolute inset-0 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--primary)_9%,var(--background))] ring-1 ring-line">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/cadence-horse-avatar.png" alt="" className="absolute max-w-none"
-          style={{ width: 400 * scale, height: 400 * scale, left: -75 * scale, top: -85 * scale }} />
+        <img src={size > 72 ? "/brand/cadence-advisor-window-draft.webp" : "/brand/cadence-advisor-window-draft-small.webp"} alt="" className="h-full w-full mix-blend-multiply" />
       </span>
-      {dot ? <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" /> : null}
+      {dot ? <span className="absolute right-0 top-0 rounded-full bg-primary ring-2 ring-background" style={{ width: dotSize, height: dotSize }} /> : null}
     </span>
   );
 }
 
 // ---------- The tip itself (shared by every option) ----------
 
-function TipBody({ view, onView }: Readonly<{ view: PlacementView; onView: (view: PlacementView) => void }>) {
+function TipBody({ view, onView, short = false }: Readonly<{ view: PlacementView; onView: (view: PlacementView) => void; short?: boolean }>) {
   return (
     <div className="text-sm leading-6">
-      <p className="break-words text-foreground">{QUIP}</p>
+      <p className="break-words text-foreground">{short && view !== "why" ? QUIP_SHORT : QUIP}</p>
       {view === "why" ? (
         <div className="mt-2 border-l border-line pl-3" data-advisor-card>
           <p className="text-foreground">{CARD.claim}</p>
@@ -131,9 +140,10 @@ function TipBody({ view, onView }: Readonly<{ view: PlacementView; onView: (view
 /** The square bubble the brief already uses, titled Advisor. `pointer` says where the horse is. */
 function TipBubble({ view, onView, pointer, className = "" }: Readonly<{
   view: PlacementView; onView: (view: PlacementView) => void;
-  pointer: "top-right" | "top-left" | "left" | "bottom-left" | "bottom-right"; className?: string;
+  pointer: "top-right" | "top-left" | "top-center" | "left" | "bottom-left" | "bottom-right"; className?: string;
 }>) {
   const pointerClass = {
+    "top-center": "-top-2 left-1/2 -ml-2 border-l border-t",
     "top-right": "-top-2 right-[12%] border-l border-t",
     "top-left": "-top-2 left-6 border-l border-t",
     left: "-left-2 top-5 -rotate-90 border-l border-t",
@@ -179,35 +189,91 @@ function ReopenRow({ children }: Readonly<{ children: ReactNode }>) {
   return <p className="relative z-10 -mt-6 ml-auto w-fit text-sm leading-6 text-muted-readable sm:-mt-4">{children}</p>;
 }
 
-function TimelineScreen({ statusAction, noteAction, timeAction, beforeTimeline, afterRow }: Readonly<{
+type InlineTip = Readonly<{ anchor: "row" | "day-heading"; occurrenceId?: string; position: "before" | "after"; content: ReactNode }>;
+
+function findAnchor(inline: InlineTip): Element | null {
+  if (inline.anchor === "day-heading") {
+    const label = Array.from(document.querySelectorAll("p, span, div"))
+      .find((element) => element.childElementCount === 0 && element.textContent?.trim() === "Current day");
+    return label?.parentElement ?? null;
+  }
+  const row = document.querySelector(`[data-occurrence-id="${inline.occurrenceId}"]`);
+  return row?.closest("li") ?? row;
+}
+
+function TimelineScreen({ statusAction, noteAction, timeAction, beforeTimeline, inline }: Readonly<{
   statusAction: OccurrenceFormAction; noteAction: OccurrenceFormAction; timeAction: TimeTrackingFormAction;
-  beforeTimeline?: ReactNode; afterRow?: Readonly<{ occurrenceId: string; content: ReactNode }>;
+  beforeTimeline?: ReactNode; inline?: InlineTip;
 }>) {
-  // The Timeline owns its rows, so the bench line is mounted in its own root after the chosen row.
+  // The Timeline owns its rows, so the bench line is mounted in its own root next to the chosen element.
   const rootRef = useRef<Readonly<{ root: Root; holder: HTMLElement }> | null>(null);
-  const rowId = afterRow?.occurrenceId;
+  const placeKey = inline ? `${inline.anchor}:${inline.occurrenceId ?? ""}:${inline.position}` : "";
+  const inlineRef = useRef(inline);
+  useLayoutEffect(() => { inlineRef.current = inline; });
   useLayoutEffect(() => {
-    if (!rowId) return;
-    const row = document.querySelector(`[data-occurrence-id="${rowId}"]`);
-    const anchor = row?.closest("li") ?? row;
+    const current = inlineRef.current;
+    if (!placeKey || !current) return;
+    const anchor = findAnchor(current);
     if (!anchor?.parentElement) return;
     const holder = document.createElement(anchor.tagName === "LI" ? "li" : "div");
     holder.dataset.advisorInline = "";
-    anchor.after(holder);
+    if (current.position === "before") anchor.before(holder); else anchor.after(holder);
     rootRef.current = { root: createRoot(holder), holder };
     return () => {
       const mounted = rootRef.current;
       rootRef.current = null;
       queueMicrotask(() => { mounted?.root.unmount(); mounted?.holder.remove(); });
     };
-  }, [rowId]);
-  useLayoutEffect(() => { rootRef.current?.root.render(afterRow?.content ?? null); });
+  }, [placeKey]);
+  useLayoutEffect(() => { rootRef.current?.root.render(inline?.content ?? null); });
   return (
     <>
       {beforeTimeline}
       <Timeline timeline={TIMELINE} statusAction={statusAction} noteAction={noteAction}
         startTimeTrackingAction={timeAction} stopTimeTrackingAction={timeAction} resetTimeTrackingAction={timeAction} />
     </>
+  );
+}
+
+// ---------- Option E: the advisor's panel (Muse-style) ----------
+
+function AdvisorPanel({ view, onView }: Readonly<{ view: PlacementView; onView: (view: PlacementView) => void }>) {
+  return (
+    <section aria-label="Advisor" className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-8 pt-4 lg:inset-y-0 lg:left-auto lg:right-0 lg:w-[26rem] lg:border-l lg:border-line" data-advisor-panel>
+      <div className="flex justify-end">
+        <button type="button" onClick={() => onView("closed")}
+          className="min-h-11 min-w-11 text-right text-sm text-muted-readable underline underline-offset-2 hover:text-foreground">Close</button>
+      </div>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <HorseMark size={128} />
+        <h2 className="mt-2 text-xl">Advisor</h2>
+        <p className="text-xs leading-5 text-muted-readable">Tips from what you track, with the research behind them.</p>
+      </div>
+      <div className="mt-6 border-t border-line pt-4">
+        <p className="text-xs font-bold text-muted-readable">Today</p>
+        <div className="mt-1"><TipBody view={view === "closed" ? "open" : view} onView={onView} /></div>
+      </div>
+      <div className="mt-6 border-t border-line pt-4 text-sm leading-6">
+        <p className="text-xs font-bold text-muted-readable">Trying for two weeks</p>
+        <p className="mt-1">Gym at 6:30 PM on Tuesdays</p>
+        <p className="text-xs leading-5 text-muted-readable">Day 3 of 14. Ends Tuesday, Dec 8.</p>
+      </div>
+      <div className="mt-6 grid gap-3 border-t border-line pt-4 text-sm leading-6">
+        <p className="text-xs font-bold text-muted-readable">Earlier</p>
+        <div>
+          <p>Gym moved to 6:30 PM three Tuesdays running. Doing it at one steady time makes it easier to keep.</p>
+          <p className="italic">Saved as helpful.</p>
+          <p className="text-xs leading-5 text-muted-readable">Tuesday, Nov 17</p>
+        </div>
+        <div>
+          <p>Read was done on 5 of the last 7 nights when it came before 10:00 PM, and on none after.</p>
+          <p className="text-xs leading-5 text-muted-readable">Monday, Nov 16</p>
+        </div>
+      </div>
+      <div className="mt-6 border-t border-line pt-4 text-sm">
+        <a href="#chat" className="underline underline-offset-2">Chat with the advisor</a>
+      </div>
+    </section>
   );
 }
 
@@ -242,6 +308,24 @@ function AdvisorChatPage({ view, onView }: Readonly<{ view: PlacementView; onVie
 
 // ---------- The bench ----------
 
+const ROUND_1: readonly PlacementOption[] = ["a", "a2", "b", "c", "d"];
+const ROUND_1B: readonly PlacementOption[] = ["e", "f", "g", "h", "j"];
+const SCROLLED_TOP = 320;
+
+/** Option J: true once the Timeline's banner horse has scrolled out of view. */
+function usePastBanner(enabled: boolean, startScrolled: boolean) {
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const onScroll = () => setPast(window.scrollY > 200);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    if (startScrolled) window.scrollTo({ top: SCROLLED_TOP });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [enabled, startScrolled]);
+  return enabled && past;
+}
+
 export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, initialOption, initialView, shot }: Readonly<{
   statusAction: OccurrenceFormAction; noteAction: OccurrenceFormAction; timeAction: TimeTrackingFormAction;
   initialOption: PlacementOption; initialView: PlacementView; shot: boolean;
@@ -250,63 +334,120 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
   const [view, setView] = useState<PlacementView>(initialView);
   const open = view !== "closed";
   const unseen = view === "closed";
+  const startScrolled = initialView === "scrolled" || initialView === "scrolled-open";
+  const pastBanner = usePastBanner(option === "j", startScrolled);
 
   const navHorse = option === "a" || option === "a2";
   const navLine = (collapsed: boolean) => navHorse ? (
     <button type="button" onClick={() => setView(open ? "closed" : "open")} aria-current={option === "a2" && open ? "page" : undefined}
       className={["group flex h-10 w-full items-center overflow-hidden text-sm", option === "a2" && open ? "bg-timeline-row-hover text-foreground" : "text-muted-foreground hover:bg-surface hover:text-foreground"].join(" ")}>
-      <span className="flex h-10 w-16 shrink-0 items-center justify-center"><HorseMark size={26} dot={unseen} /></span>
+      <span className="flex h-10 w-16 shrink-0 items-center justify-center"><HorseMark size={28} dot={unseen} /></span>
       {collapsed ? null : <span className="whitespace-nowrap text-sm">Advisor</span>}
     </button>
   ) : null;
   const headerHorse = navHorse ? (
     <button type="button" aria-label="Advisor" onClick={() => setView(open ? "closed" : "open")} className="flex h-16 w-14 items-center justify-center">
-      <HorseMark size={30} dot={unseen} />
+      <HorseMark size={34} dot={unseen} />
     </button>
   ) : null;
 
   const tip = (pointer: Parameters<typeof TipBubble>[0]["pointer"], className?: string) =>
     <TipBubble view={view} onView={setView} pointer={pointer} className={className} />;
+  const reopen = (links: ReactNode = <button type="button" className="underline underline-offset-2">Today’s brief</button>) => <ReopenRow>{links}</ReopenRow>;
 
   let page: ReactNode;
   if (option === "a2" && open) {
     page = <AdvisorChatPage view={view} onView={setView} />;
   } else {
-    let beforeTimeline: ReactNode = null;
-    let afterRow: Readonly<{ occurrenceId: string; content: ReactNode }> | undefined;
+    let banner: ReactNode = <Banner dot={option === "b" && unseen} onHorse={option === "b" || option === "j" ? () => setView(open ? "closed" : "open") : undefined} />;
+    let beforeTimeline: ReactNode = reopen();
+    let inline: InlineTip | undefined;
     let overlay: ReactNode = null;
-    if (option === "b") {
-      beforeTimeline = open ? tip("top-right", "ml-auto -mt-8 w-full sm:-mt-6 sm:w-[min(40rem,100%)] mb-6")
-        : <ReopenRow><button type="button" className="underline underline-offset-2">Today’s brief</button></ReopenRow>;
-    } else {
-      beforeTimeline = <ReopenRow><button type="button" className="underline underline-offset-2">Today’s brief</button></ReopenRow>;
+    const tipOpen = view === "open" || view === "why" || view === "answered";
+
+    if (option === "b" && open) beforeTimeline = tip("top-right", "ml-auto -mt-8 w-full sm:-mt-6 sm:w-[min(40rem,100%)] mb-6");
+    if (option === "d" && open) {
+      inline = { anchor: "row", occurrenceId: "walk", position: "after", content: (
+        <div className="flex gap-3 border-b border-line py-4 sm:pl-2" data-advisor-line>
+          <HorseMark size={32} />
+          <div className="min-w-0 flex-1"><TipBody view={view} onView={setView} /></div>
+        </div>
+      ) };
     }
-    if (option === "d" && view !== "closed") {
-      afterRow = {
-        occurrenceId: "walk",
-        content: (
-          <div className="flex gap-3 border-b border-line py-4 sm:pl-2" data-advisor-line>
-            <HorseMark size={32} />
-            <div className="min-w-0 flex-1"><TipBody view={view} onView={setView} /></div>
-          </div>
-        ),
-      };
+    if (option === "f" && open) {
+      inline = { anchor: "row", occurrenceId: "journal", position: "before", content: (
+        <div className="mb-2 flex gap-3 border-b border-line pb-4 pt-1 sm:pl-2" data-advisor-line>
+          <HorseMark size={36} />
+          <div className="min-w-0 flex-1"><TipBody view={view} onView={setView} /></div>
+        </div>
+      ) };
     }
-    if (option === "c") {
-      overlay = (
-        <div className="fixed bottom-24 right-3 z-40 flex flex-col items-end gap-3 lg:bottom-6 lg:left-[17rem] lg:right-auto lg:items-start">
-          {open ? tip("bottom-right", "w-[min(22rem,calc(100vw-1.5rem))] lg:order-none") : null}
-          <button type="button" aria-label="Advisor" onClick={() => setView(open ? "closed" : "open")}
-            className="flex h-14 w-14 items-center justify-center bg-background">
-            <HorseMark size={44} dot={unseen} />
-          </button>
+    if (option === "g" && open) {
+      inline = { anchor: "day-heading", position: "after", content: (
+        <div className="flex gap-3 pt-3" data-advisor-line>
+          <HorseMark size={28} />
+          <div className="min-w-0 flex-1"><TipBody short view={view} onView={setView} /></div>
+        </div>
+      ) };
+    }
+    if (option === "h" && open) {
+      inline = { anchor: "row", occurrenceId: "journal", position: "after", content: (
+        <div className="flex gap-3 py-3 pl-4 sm:pl-[7.25rem]" data-advisor-line>
+          <HorseMark size={28} />
+          <div className="min-w-0 flex-1"><TipBody view={view} onView={setView} /></div>
+        </div>
+      ) };
+    }
+    if (option === "e") {
+      banner = (
+        <div className="relative">
+          <CadencePageBanner />
+          <div className="h-10 sm:h-12" />
         </div>
       );
+      overlay = (
+        <>
+          <div className="pointer-events-none fixed left-0 right-0 top-1 z-50 flex justify-center lg:left-64 lg:top-3 lg:z-30">
+            <button type="button" onClick={() => setView(open ? "closed" : "open")} aria-label={unseen ? "Open the advisor, 1 new tip" : "Open the advisor"}
+              className="pointer-events-auto flex flex-col items-center">
+              <span className="rounded-full bg-background p-1 shadow-sm lg:hidden"><HorseMark size={44} dot={unseen} /></span>
+              <span className="hidden rounded-full bg-background p-1 shadow-sm lg:block"><HorseMark size={64} dot={unseen} /></span>
+              <span className="-mt-1.5 rounded-full bg-background px-2.5 py-0.5 text-xs shadow-sm">Advisor</span>
+            </button>
+          </div>
+          {open ? <AdvisorPanel view={view} onView={setView} /> : null}
+        </>
+      );
     }
+    if (option === "j") {
+      if (tipOpen || view === "scrolled" || view === "scrolled-open") beforeTimeline = tip("top-right", "ml-auto -mt-8 w-full sm:-mt-6 sm:w-[min(40rem,100%)] mb-6");
+      else beforeTimeline = reopen(<>
+        <button type="button" className="underline underline-offset-2">Today’s brief</button>
+        <span aria-hidden="true"> · </span>
+        <button type="button" onClick={() => setView("open")} className="underline underline-offset-2">Today’s tip</button>
+      </>);
+      if (pastBanner) {
+        const floatingOpen = view === "scrolled-open";
+        overlay = (
+          <div className="pointer-events-none fixed left-0 right-0 top-2 z-50 flex flex-col items-center gap-3 px-3 lg:left-64 lg:top-3 lg:z-30">
+            <button type="button" onClick={() => setView(floatingOpen ? "scrolled" : "scrolled-open")} aria-label="Today’s tip from the advisor"
+              className="pointer-events-auto rounded-full bg-background p-1 shadow-sm">
+              <HorseMark size={44} dot={!floatingOpen} />
+            </button>
+            {floatingOpen ? (
+              <div className="pointer-events-auto w-[min(30rem,100%)]">
+                <TipBubble view="open" onView={(next) => setView(next === "closed" ? "scrolled" : next)} pointer="top-center" className="shadow-sm" />
+              </div>
+            ) : null}
+          </div>
+        );
+      }
+    }
+
     page = (
       <div className="flex w-full flex-col">
         <h1 className="sr-only">Timeline</h1>
-        <Banner dot={option === "b" && unseen} onHorse={option === "b" ? () => setView(open ? "closed" : "open") : undefined} />
+        {banner}
         <div className="relative mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
           {option === "a" && open ? (
             <div className="fixed left-3 right-3 top-[4.5rem] z-40 lg:left-[16.75rem] lg:right-auto lg:top-[14.25rem] lg:w-[24rem]">
@@ -316,13 +457,23 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
           ) : null}
           <OccurrenceMovesProvider actions={NO_MOVES} timezone={TIMEZONE} todayLocalDate="2026-11-19" hasMovedBefore>
             <TimelineScreen statusAction={statusAction} noteAction={noteAction} timeAction={timeAction}
-              beforeTimeline={beforeTimeline} afterRow={afterRow} />
+              beforeTimeline={option === "e" ? null : beforeTimeline} inline={inline} />
           </OccurrenceMovesProvider>
+          {option === "j" ? <div aria-hidden="true" className="h-[70vh]" /> : null}
           {overlay}
         </div>
       </div>
     );
   }
+
+  const optionRow = (ids: readonly PlacementOption[]) => (
+    <div className="flex flex-wrap gap-x-4 gap-y-1">
+      {PLACEMENT_OPTIONS.filter((item) => ids.includes(item.id)).map((item) => (
+        <button key={item.id} type="button" onClick={() => { setOption(item.id); setView(item.id === "f" || item.id === "g" || item.id === "h" || item.id === "j" ? "open" : "closed"); }}
+          className={option === item.id ? "font-bold underline underline-offset-4" : "underline underline-offset-4"}>{item.label}</button>
+      ))}
+    </div>
+  );
 
   return (
     <AppShell user={{ name: "Emi" }} navAccessory={navHorse ? navLine : undefined} mobileHeaderAccessory={headerHorse}>
@@ -331,15 +482,13 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
           style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <a href="/design-system" className="underline underline-offset-4">Back to the design-system bench</a>
-            <strong>Advisor placement, round 1</strong>
+            <strong>Advisor placement</strong>
             <span className="text-neutral-600">Real app shell and Timeline, synthetic data, nothing is saved.</span>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {PLACEMENT_OPTIONS.map((item) => (
-              <button key={item.id} type="button" onClick={() => { setOption(item.id); setView("closed"); }}
-                className={option === item.id ? "font-bold underline underline-offset-4" : "underline underline-offset-4"}>{item.label}</button>
-            ))}
-          </div>
+          <p className="text-neutral-600">Round 1</p>
+          {optionRow(ROUND_1)}
+          <p className="text-neutral-600">Round 1b</p>
+          {optionRow(ROUND_1B)}
           <p className="text-neutral-700">{PLACEMENT_OPTIONS.find((item) => item.id === option)?.summary}</p>
         </aside>
       )}

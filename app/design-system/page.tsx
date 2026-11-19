@@ -416,11 +416,14 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
 
   if (selectedPreviewId === "advisor-placement") {
-    // Advisor plan 4D, round 1: five places for the advisor's tips. ?option=a|a2|b|c|d&view=closed|open|why|answered&shot=1
+    // Advisor plan 4D, rounds 1 and 1b: places for the advisor's tips.
+    // ?option=a|a2|b|c|d|e|f|g|h|j&view=closed|open|why|answered|scrolled|scrolled-open&shot=1
     const optionParam = firstSearchParam(params?.option);
-    const option: PlacementOption = optionParam === "a2" || optionParam === "b" || optionParam === "c" || optionParam === "d" ? optionParam : "a";
+    const options: readonly PlacementOption[] = ["a2", "b", "c", "d", "e", "f", "g", "h", "j"];
+    const option: PlacementOption = options.find((item) => item === optionParam) ?? "a";
     const viewParam = firstSearchParam(params?.view);
-    const view: PlacementView = viewParam === "open" || viewParam === "why" || viewParam === "answered" ? viewParam : "closed";
+    const views: readonly PlacementView[] = ["open", "why", "answered", "scrolled", "scrolled-open"];
+    const view: PlacementView = views.find((item) => item === viewParam) ?? "closed";
     return (
       <AdvisorPlacementBench statusAction={benchOccurrenceAction} noteAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction}
         initialOption={option} initialView={view} shot={firstSearchParam(params?.shot) === "1"} />
