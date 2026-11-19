@@ -318,6 +318,17 @@ computing timing; provider adapters writing statuses; the matcher reading clocks
 providers, Supabase or environment variables. The database functions of Ticket 314
 recheck every precondition and stay the only write path.
 
+## Coach signals (advisor plan Phase 3, workstream 3D)
+
+`packages/core/src/resolvers/coach-signals.resolver.ts` computes the coach's shadow
+signals from injected records: the visit's local date, Behaviors, 42 days of
+Occurrence statuses, first explicit decisions, today's and the last 28 days' move
+records, and brief answers. It reads no clock, database or environment. Thresholds
+live in `COACH_SIGNAL_THRESHOLDS`; facts carry counts, dates, weekdays and local times
+of day, never titles or notes. Paired test: `tests/coach-signals.resolver.test.ts`.
+Allowed caller: `lib/services/coach-signals-job.service.ts`. Storage and the job:
+`docs/DATA_MODEL.md`, "Coach signals in shadow".
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

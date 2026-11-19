@@ -94,6 +94,24 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 3 (3D): coach signals in shadow — November 18, 2026
+
+- **In review (draft PR, branch `claude/project-thread-vfk26s`).** An hourly cron
+  (`/api/advisor/coach/signals/process`, minute 41) visits accounts at 03:00 to 05:59 local
+  time that were active in the last seven days, computes coach signals with no model call
+  and stores them in `cadence_advisor_private.coach_signals`. Nothing is shown. Signals:
+  completion rate dropped, same Behavior moved the same way, late marking, new Behavior past
+  two weeks, brief answers. Owner approved the cron and production table on November 18.
+  Off switch: `CADENCE_COACH_SIGNALS=off`. Docs: `docs/DATA_MODEL.md`, "Coach signals in
+  shadow"; `docs/ROUTE_MAP.md`; `docs/MESSAGING_CHANGES.md` P-064.
+- **Verification (local stack):** migration replays on a fresh local database;
+  `tests/coach-signals.local-integration.test.ts` passes (due selection, visit as the
+  person, re-run, token isolation); resolver, job and route tests pass; lint, typecheck and
+  core check pass. `npm run test`: 16 failures in 4 files that fail the same way on main in
+  this container (Node 24-only and Preview access suites).
+- **Next:** apply the migration to production, merge, and confirm the first hourly runs.
+  Answer reading switches to Phase 3A1's `move_proposal_answers` once it exists.
+
 ## Advisor plan Phase 1A: data foundations in source — November 16, 2026
 
 - **Merged (PR #290) and applied to the hosted database** on November 16, 2026, with the

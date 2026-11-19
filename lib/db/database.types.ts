@@ -2684,6 +2684,17 @@ export type Database = {
         }
         Returns: string
       }
+      coach_due_accounts: {
+        Args: { p_after: string; p_limit: number }
+        Returns: {
+          local_date: string
+          user_id: string
+        }[]
+      }
+      coach_record_signals: {
+        Args: { p_run_id: string; p_signal_version: string; p_signals: Json }
+        Returns: number
+      }
       commit_note_shortcut_state: {
         Args: {
           expected_context: Json
