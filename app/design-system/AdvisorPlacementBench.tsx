@@ -46,7 +46,7 @@ function occurrence(id: string, title: string, scheduledFor: string, localDate: 
   status: TimelineOccurrenceInput["status"] = "unresolved"): TimelineOccurrenceInput {
   return {
     id, behaviorId: `behavior-${id}`, title, scheduledFor, scheduledTimeLabel: label, localDate, status,
-    statusMarkedAt: status === "unresolved" ? null : scheduledFor,
+    statusMarkedAt: { unresolved: null, completed: scheduledFor, not_completed: scheduledFor }[status],
     description: "", categoryName: "Bench", scheduleSummary: `Every day at ${label}`, note: "",
     timeTracking: { recordedSeconds: 0, runningStartedAt: null }, canStartTimeTracking: false,
   };
