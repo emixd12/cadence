@@ -3,13 +3,14 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
-const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), begin: vi.fn(), finish: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(), calendar: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), config: vi.fn(),
-  outlook: vi.fn(), hevy: vi.fn(), icloud: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(), calendar: vi.fn(), config: vi.fn(),
+  outlook: vi.fn(), hevy: vi.fn(), icloud: vi.fn(), plan: vi.fn(), proposals: vi.fn(), readMoves: vi.fn(), conflicts: vi.fn(async (): Promise<unknown[]> => []), estimates: vi.fn() }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
 vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: mocks.hevy }));
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: mocks.save, beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
-  readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
+  saveDailyBrief: mocks.saveBrief }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: mocks.readMoves, readOpenBriefConflicts: mocks.conflicts, ensureBehaviorEstimates: mocks.estimates }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
   const actual = await original<typeof import("@/lib/services/briefing-pipeline")>();
   const active = () => mocks.config() ?? actual.activeBriefingConfig();
@@ -22,17 +23,30 @@ vi.mock("@/lib/services/briefing-account-context.service", () => ({
 }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar }));
 import { requestInAppDailyBrief, updateDailyBriefSettings } from "@/lib/services/daily-brief.service";
+import { DailyBriefError } from "@/lib/services/daily-brief-consumer";
+import { BRIEF_QUIET_OPENING } from "@/lib/services/brief-opening";
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
-const input = { installationId: "11111111-1111-4111-8111-111111111111", retry: false };
+const plain = { installationId: "11111111-1111-4111-8111-111111111111", retry: false };
+const input = { ...plain, features: ["move_lines_v1"] };
 const prefs = dailyBriefPreferences({ revision: 1 });
 const now = () => Temporal.Instant.from(fixture.capturedAt);
 const generate = vi.fn();
+const walk = fixture.cadence.occurrences[0];
+const candidate = {
+  key: "line_1", occurrenceId: "occ-1", behaviorId: "beh-1", behaviorRevision: "2026-11-01T10:00:00Z", title: walk.title,
+  localDate: fixture.localDate, timezone: fixture.timezone, expectedRevision: "2026-11-01T10:00:00Z",
+  from: { startAt: "2026-09-20T16:30:00Z", endAt: "2026-09-20T17:00:00Z" }, to: { startAt: "2026-09-20T18:00:00Z", endAt: "2026-09-20T18:30:00Z" },
+  length: { minutes: 30, source: "fallback", assumed: true }, reasonCode: "calendar_overlap", reason: "It runs into Team sync.",
+  anchor: { kind: "calendar_event", title: "Team sync" }, otherTimes: [], travel: "not_needed", late: false, offerNeverMove: false,
+} as const;
+const stored = (lines: readonly (typeof candidate & { reason: string })[]) => lines.map(({ key, ...line }) => ({ ...line, proposalId: `9d0f6c3e-0000-4000-8000-00000000000${key.slice(-1)}`, status: "proposed", moveId: null }));
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("OPENAI_API_KEY", "synthetic-key");
   mocks.read.mockResolvedValue(prefs);
-  mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate });
+  mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate, refresh: false, refreshesUsed: 0 });
   mocks.finish.mockResolvedValue(true);
+  mocks.saveBrief.mockResolvedValue(true);
   mocks.timezone.mockResolvedValue(fixture.timezone);
   mocks.current.mockResolvedValue(undefined);
   mocks.prepare.mockImplementation(async (_caller, options) => ({
@@ -41,9 +55,11 @@ beforeEach(() => {
     configurationRefs: {},
     preferences: options.preferences,
   }));
-  generate.mockResolvedValue({ suggestions: [], text: "Take time for your walk.", occurrenceRefs: [fixture.cadence.occurrences[0].ref] });
-  mocks.tipHistory.mockResolvedValue([]);
-  mocks.recordTip.mockResolvedValue(true);
+  mocks.conflicts.mockResolvedValue([]);
+  mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
+  mocks.proposals.mockImplementation(async (_client, value) => stored(value.lines));
+  mocks.estimates.mockResolvedValue(undefined);
+  generate.mockResolvedValue({ opening: "Walk needs a new time today.", reasons: [{ key: "line_1", text: "It runs into your {event}." }] });
 });
 
 describe("first-party daily briefing service", () => {
@@ -72,13 +88,110 @@ describe("first-party daily briefing service", () => {
     } finally { vi.unstubAllEnvs(); }
   });
 
-  it("uses authenticated repositories, rechecks fences and completes one lease", async () => {
+  it("plans lines, writes the words once, stores proposals, then saves the brief, which completes the lease", async () => {
     const result = await requestInAppDailyBrief(caller, input, { generate, now });
-    expect(result.state).toBe("ready");
-    expect(mocks.begin).toHaveBeenCalledWith(caller.client, { ...input, expectedRevision: 1 }, expect.any(AbortSignal));
+    expect(mocks.begin).toHaveBeenCalledWith(caller.client, { ...plain, expectedRevision: 1, refresh: false, moves: true }, expect.any(AbortSignal));
     expect(generate).toHaveBeenCalledTimes(1);
     expect(mocks.current).toHaveBeenCalledTimes(2);
-    expect(mocks.finish).toHaveBeenCalledWith(caller.client, expect.objectContaining({ success: true, leaseToken: "lease" }), expect.any(AbortSignal));
+    expect(mocks.proposals).toHaveBeenCalledWith(null, expect.objectContaining({ refresh: false, localDate: fixture.localDate,
+      lines: [expect.objectContaining({ key: "line_1", reason: "It runs into your Team sync." })] }));
+    expect(mocks.saveBrief).toHaveBeenCalledExactlyOnceWith(caller.client, expect.objectContaining({ leaseToken: "lease", refresh: false, withMoves: true,
+      briefing: expect.objectContaining({ text: "Walk needs a new time today.", warnings: [] }) }), expect.any(AbortSignal));
+    // The saved copy holds no move lines; they are rebuilt from the proposals on reopen.
+    expect(mocks.saveBrief.mock.calls[0]![1].briefing).not.toHaveProperty("moves");
+    expect(mocks.finish).not.toHaveBeenCalledWith(caller.client, expect.objectContaining({ success: true }), expect.anything());
+    expect(result).toMatchObject({ state: "ready", briefing: { text: "Walk needs a new time today.", expiresAt: fixture.dayEndAt,
+      refresh: { remaining: 2, available: true },
+      moves: { version: "1", acceptAll: false, lines: [expect.objectContaining({ title: walk.title, reason: "It runs into your Team sync.", status: "proposed" })] } } });
+    expect(JSON.stringify(result)).not.toMatch(/Suggestions only|No changes were applied/);
+  });
+
+  it("makes no model call on a quiet day and shows the stock opening", async () => {
+    mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(generate).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { text: BRIEF_QUIET_OPENING, moves: { lines: [] } } });
+    expect(mocks.saveBrief).toHaveBeenCalledOnce();
+  });
+
+  it("gives clients from before Phase 3 a true opening only: no lines and no proposals", async () => {
+    generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_error"));
+    const result = await requestInAppDailyBrief(caller, plain, { generate, now });
+    expect(mocks.begin).toHaveBeenCalledWith(caller.client, expect.objectContaining({ moves: false }), expect.any(AbortSignal));
+    // Cadence still plans the day, so the opening never says nothing needs moving when something does.
+    expect(mocks.plan).toHaveBeenCalled();
+    expect(mocks.proposals).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { text: `${walk.title} could use a different time today.` } });
+    expect(result.state === "ready" && result.briefing).not.toHaveProperty("moves");
+    expect(mocks.saveBrief).toHaveBeenCalledWith(caller.client, expect.objectContaining({ withMoves: false }), expect.any(AbortSignal));
+  });
+
+  it("shows today's open schedule-change conflicts in the first brief", async () => {
+    mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
+    const conflict = { conflictId: "c1", occurrenceId: "o1", behaviorId: "b1", title: "Stretch", expectedRevision: 1,
+      at: { startAt: "2026-11-18T17:00:00Z", endAt: "2026-11-18T17:30:00Z" }, conflictingTitle: "Lunch" };
+    mocks.conflicts.mockResolvedValue([conflict]);
+    generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_error"));
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(generate).toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { text: expect.stringContaining("Stretch clashing"), moves: { conflicts: [{ conflictId: "c1" }] } } });
+  });
+
+  it("keeps each good sentence and falls back to stock text only where the model broke a rule", async () => {
+    generate.mockResolvedValue({ opening: "Visit https://example.com now.", reasons: [{ key: "line_1", text: "It runs into your Team sync at 3:15 PM." }] });
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(result).toMatchObject({ briefing: { text: `${walk.title} could use a different time today.`, moves: { lines: [{ reason: candidate.reason }] } } });
+    expect(result.state === "ready" && result.briefing.notices).toBeUndefined();
+  });
+
+  it("shows the lines with stock text and a notice when the model fails or the budget is reached", async () => {
+    generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_error"));
+    expect(await requestInAppDailyBrief(caller, input, { generate, now })).toMatchObject({ state: "ready", briefing: {
+      moves: { lines: [{ reason: candidate.reason }] }, notices: [{ kind: "words_unavailable" }] } });
+    generate.mockRejectedValue(new DailyBriefError("budget_reached", 3600, "budget_agent_share"));
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(result).toMatchObject({ state: "ready", briefing: { notices: [{ kind: "budget_reached", until: expect.any(String) }] } });
+    expect(result.state === "ready" && result.briefing.notices?.[0]?.text).toMatch(/limit.*Yes and Undo still work/);
+  });
+
+  it("says when the calendar did not load", async () => {
+    mocks.plan.mockResolvedValue({ candidates: [], calendar: "stale" });
+    expect(await requestInAppDailyBrief(caller, input, { generate, now })).toMatchObject({ briefing: { notices: [{ kind: "calendar_stale" }], moves: { calendar: "stale" } } });
+  });
+
+  it("reopens today's saved brief on any device with no model call and the lines' current answers", async () => {
+    const saved = { text: "Walk needs a new time today.", localDate: fixture.localDate, timezone: fixture.timezone, generatedAt: fixture.capturedAt,
+      expiresAt: fixture.dayEndAt, coverage: "complete", warnings: [] };
+    mocks.begin.mockResolvedValue({ state: "saved", briefing: saved, runId: "run-1", withMoves: true, refreshesUsed: 1, localDate: fixture.localDate });
+    const moves = { version: "1", localDate: fixture.localDate, timezone: fixture.timezone, runId: "run-1", lines: [], conflicts: [], acceptAll: false, undoAllBatchId: null, calendar: "current" };
+    mocks.readMoves.mockResolvedValue(moves);
+    expect(await requestInAppDailyBrief(caller, input, { generate, now })).toEqual({ state: "ready", briefing: { ...saved, moves, refresh: { remaining: 1, available: true } } });
+    expect(mocks.readMoves).toHaveBeenCalledWith(caller.client, { localDate: fixture.localDate, timezone: fixture.timezone, runId: "run-1" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.saveBrief).not.toHaveBeenCalled();
+  });
+
+  it("runs a refresh as a new brief that replaces the earlier one, and refuses past two a day", async () => {
+    mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate, refresh: true, refreshesUsed: 1 });
+    const result = await requestInAppDailyBrief(caller, { ...input, refresh: true }, { generate, now });
+    expect(mocks.begin).toHaveBeenCalledWith(caller.client, expect.objectContaining({ refresh: true }), expect.any(AbortSignal));
+    expect(mocks.proposals).toHaveBeenCalledWith(null, expect.objectContaining({ refresh: true }));
+    expect(mocks.saveBrief).toHaveBeenCalledWith(caller.client, expect.objectContaining({ refresh: true }), expect.any(AbortSignal));
+    expect(result).toMatchObject({ briefing: { refresh: { remaining: 0, available: false } } });
+    mocks.begin.mockResolvedValue({ state: "refresh_limit_reached", refreshesUsed: 2 });
+    await expect(requestInAppDailyBrief(caller, { ...input, refresh: true }, { generate, now })).rejects.toMatchObject({ code: "refresh_limit_reached" });
+    await expect(requestInAppDailyBrief(caller, { ...input, refresh: "yes" }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
+  });
+
+  it("accepts the screen's calendar events for this request only and rejects malformed ones", async () => {
+    const busy = [{ startAt: "2026-09-20T16:00:00Z", endAt: "2026-09-20T17:00:00Z", title: "Team sync" }];
+    await requestInAppDailyBrief(caller, { ...input, calendarBusy: busy, travelTimes: "signed.times" }, { generate, now });
+    expect(mocks.plan).toHaveBeenCalledWith(expect.objectContaining({ planning: { calendarBusy: busy, travelTimes: "signed.times" } }));
+    expect(JSON.stringify(mocks.saveBrief.mock.calls[0]![1].briefing)).not.toContain("signed.times");
+    for (const calendarBusy of [[{ startAt: "x", endAt: "y" }], [{ startAt: busy[0].endAt, endAt: busy[0].startAt }], [{ ...busy[0], extra: 1 }], "busy"]) {
+      await expect(requestInAppDailyBrief(caller, { ...input, calendarBusy }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
+    }
   });
   it.each(["pending", "already_attempted"])("does not generate for %s", async (state) => {
     mocks.begin.mockResolvedValue({ state });
@@ -120,16 +233,16 @@ describe("first-party daily briefing service", () => {
     expect(generate).not.toHaveBeenCalled();
   });
   it("drops output when disclosure revision changes during the model call", async () => {
-    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { suggestions: [], text: "A brief", occurrenceRefs: [] }; });
+    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { opening: "A brief.", reasons: [] }; });
     await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
+    expect(mocks.saveBrief).not.toHaveBeenCalled();
   });
-  it("drops output when cadence changes or a lease is superseded", async () => {
-    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { suggestions: [], text: "A brief", occurrenceRefs: [] }; });
+  it("never shows a brief it could not save", async () => {
+    mocks.saveBrief.mockResolvedValue(false);
     await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
-    mocks.current.mockResolvedValue(undefined);
-    mocks.finish.mockResolvedValue(false);
-    generate.mockResolvedValue({ suggestions: [], text: "A brief", occurrenceRefs: [] });
-    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
+    mocks.saveBrief.mockRejectedValue(new Error("storage"));
+    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toThrow("storage");
+    expect(mocks.finish).toHaveBeenCalledWith(caller.client, expect.objectContaining({ success: false, leaseToken: "lease" }));
   });
   it("rejects Calendar scope changes before model disclosure", async () => {
     mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, allow: ["googleCalendar"] }));
@@ -137,9 +250,10 @@ describe("first-party daily briefing service", () => {
     await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
     expect(generate).not.toHaveBeenCalled();
   });
-  it("stops a stalled model and leaves no late result", async () => {
+  it("stops at the request deadline and leaves no late result", async () => {
     generate.mockImplementation(() => new Promise(() => {}));
     await expect(requestInAppDailyBrief(caller, input, { generate, now, deadlineMs: 10 })).rejects.toMatchObject({ code: "timeout" });
+    expect(mocks.saveBrief).not.toHaveBeenCalled();
   });
   it("maps older per-source saves to the one choice, excluding every source they leave off (Ticket 306)", async () => {
     mocks.timezone.mockResolvedValue(fixture.timezone);
@@ -254,74 +368,21 @@ describe("one Daily Brief choice for every connected source (Ticket 306)", () =>
     expect(mocks.prepare.mock.calls[0]![1].connectorSources.deadlineAt).toBeLessThanOrEqual(Date.now() + 10_000);
   });
 
-  it("sends disclosed sources to the model in separate branches with past-activity policy, and drops stale output", async () => {
+  it("sends the model only the lines and today's items and busy times: no recorded activity, no event details, no travel times", async () => {
     const { connectorDayContext } = await import("./helpers/connector-day-context");
     const context = connectorDayContext();
     mocks.prepare.mockImplementation(async (_caller, options) => ({ contexts: [context], assertCurrent: mocks.current, configurationRefs: {}, preferences: options.preferences }));
-    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    const result = await requestInAppDailyBrief(caller, { ...input, travelTimes: "signed.times" }, { generate, now });
     expect(result).toMatchObject({ state: "ready", briefing: { coverage: "complete" } });
     const call = generate.mock.calls[0]![0] as { instructions: string; facts: string };
-    expect(call.instructions).toContain("recordedActivity lists past workouts");
     const facts = JSON.parse(call.facts);
-    expect(facts.context.version).toBe("1.1");
-    expect(facts.context.connectors).toHaveLength(1);
-    expect(facts.context.connectorSources.calendars[0].source).toBe("outlook_calendar");
-    expect(facts.context.connectorSources.recordedActivity).toMatchObject({ semantics: "past_recorded_activity", source: "hevy" });
-    expect(call.facts).not.toMatch(/Private review|hevy\/[0-9a-f]{16}|routine|exercise/);
+    expect(Object.keys(facts).sort()).toEqual(["conflicts", "day", "lines", "now", "today"]);
+    expect(facts.lines).toEqual([expect.objectContaining({ key: "line_1", with: "{event}", why: "calendar_overlap" })]);
+    expect(call.facts).not.toMatch(/Team sync|Private review|hevy|routine|exercise|signed\.times|outlook|ref_/i);
 
     // A withdrawn disclosure or changed connection after generation never delivers text.
-    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { suggestions: [], text: "A brief", occurrenceRefs: [] }; });
+    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { opening: "A brief.", reasons: [] }; });
     await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
-  });
-
-  it("omits connector policy and branches when no source is disclosed", async () => {
-    await requestInAppDailyBrief(caller, input, { generate, now });
-    const call = generate.mock.calls[0]![0] as { instructions: string; facts: string };
-    expect(call.instructions).not.toContain("recordedActivity");
-    expect(JSON.parse(call.facts).context).not.toHaveProperty("connectorSources");
-  });
-});
-
-describe("tip delivery accounting", () => {
-  const walk = fixture.cadence.occurrences[0];
-  const history = Array.from({ length: 15 }, (_, index) => ({ ref: `history_${index}`, behaviorRef: walk.behaviorRef,
-    localDate: Temporal.PlainDate.from(fixture.localDate).subtract({ days: 15 - index }).toString(), scheduledFor: "2026-10-20T16:30:00Z",
-    scheduleKind: "exact", startTime: "12:30", endTime: null, status: index % 5 < 2 ? "unresolved" : "completed", statusMarkedAt: null, configurationRef: null }));
-  const analysisSource = { version: "1.0", observedAt: fixture.capturedAt, revision: "r", timezone: fixture.timezone, localDate: fixture.localDate,
-    startLocalDate: "2026-08-03", lookbackDays: 90, completeness: "complete", occurrences: history,
-    statusEvents: { state: "not_requested" }, configurationPeriods: { state: "available", records: [] }, reminders: { state: "not_requested" }, notes: { state: "not_requested" },
-    today: { scheduledCount: 1, unresolved: [{ ref: walk.ref, behaviorRef: walk.behaviorRef, startTime: "12:30" }] } };
-  const tipped = { suggestions: [], text: "Walk at 12:30.", occurrenceRefs: [walk.ref], tip: { findingId: "tip", text: "Record the walk right after it.", noteRefs: [] } };
-  beforeEach(async () => {
-    const { parseBriefingConfig, BRIEFING_PRESETS } = await import("@cadence/core/services/briefing-config");
-    const candidate = BRIEFING_PRESETS.find((preset) => preset.id === "advisor-analysis")!.config;
-    mocks.config.mockReturnValue(parseBriefingConfig({ ...candidate, analysis: { ...candidate.analysis, lanes: ["decision-debt", "reminder-effectiveness"] } }));
-    mocks.prepare.mockImplementation(async (_caller, options) => ({ contexts: [fixture], assertCurrent: mocks.current, configurationRefs: {}, preferences: options.preferences,
-      analysisSource, tipFingerprint: () => "f".repeat(64) }));
-  });
-
-  it("requests analysis sources only for selected lanes and records a delivered tip against the lease", async () => {
-    generate.mockResolvedValue(tipped);
-    const result = await requestInAppDailyBrief(caller, input, { generate, now });
-    expect(result).toMatchObject({ state: "ready", briefing: { tip: { laneId: "decision-debt" } } });
-    expect(mocks.prepare).toHaveBeenCalledWith(caller, expect.objectContaining({ analysis: { includeReminders: true, includeNotes: false } }));
-    expect(mocks.recordTip).toHaveBeenCalledExactlyOnceWith(caller.client, { installationId: input.installationId, leaseToken: "lease", expectedRevision: 1, fingerprint: "f".repeat(64) }, expect.any(AbortSignal));
-  });
-
-  it.each([
-    ["a failed model call", () => generate.mockRejectedValue(new Error("provider"))],
-    ["a superseded lease", () => { generate.mockResolvedValue(tipped); mocks.finish.mockResolvedValue(false); }],
-    ["a changed context after generation", () => { generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("changed"), { code: "context_changed" })); return tipped; }); }],
-  ])("does not consume the tip after %s", async (_label, arrange) => {
-    arrange();
-    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toBeDefined();
-    expect(mocks.recordTip).not.toHaveBeenCalled();
-  });
-
-  it("keeps the brief when the tip record fails", async () => {
-    generate.mockResolvedValue(tipped);
-    mocks.recordTip.mockRejectedValue(new Error("storage"));
-    expect(await requestInAppDailyBrief(caller, input, { generate, now })).toMatchObject({ state: "ready" });
   });
 });
 
@@ -334,7 +395,7 @@ describe("Ticket 288 model span usage", () => {
     try {
       generate.mockImplementation(async (request: { onUsage?: (usage: object) => void }) => {
         request.onUsage?.({ inputTokens: 1200, cachedInputTokens: 300, outputTokens: 150, reasoningTokens: 64 });
-        return { suggestions: [], text: "Take time for your walk.", occurrenceRefs: [fixture.cadence.occurrences[0].ref] };
+        return { opening: "Walk needs a new time today.", reasons: [{ key: "line_1", text: "It runs into your Team sync." }] };
       });
       const result = await requestInAppDailyBrief(caller, input, { generate, now });
       expect(result.state).toBe("ready");
@@ -344,18 +405,17 @@ describe("Ticket 288 model span usage", () => {
     } finally { info.mockRestore(); vi.unstubAllEnvs(); }
   });
 
-  it("records the reason beside the public error code and the usage of the rejected call", async () => {
+  it("keeps the usage of a call whose words fell back to stock text", async () => {
     vi.stubEnv("CADENCE_PERF_LOG", "1");
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
       generate.mockImplementation(async (request: { onUsage?: (usage: object) => void }) => {
         request.onUsage?.({ inputTokens: 900, cachedInputTokens: null, outputTokens: 400, reasoningTokens: null });
-        return { suggestions: [], text: "word ".repeat(200), occurrenceRefs: [] };
+        return { opening: "word ".repeat(200), reasons: [] };
       });
-      await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "advisor_unavailable", reason: "validation_word_limit" });
+      expect(await requestInAppDailyBrief(caller, input, { generate, now })).toMatchObject({ state: "ready", briefing: { text: `${walk.title} could use a different time today.` } });
       const [event] = events(info);
-      expect(event).toMatchObject({ status: "error", error_code: "advisor_unavailable", error_reason: "validation_word_limit",
-        counts: { usage_calls: 1, input_tokens: 900, output_tokens: 400 } });
+      expect(event).toMatchObject({ status: "success", counts: { usage_calls: 1, input_tokens: 900, output_tokens: 400 } });
       expect(event.counts).not.toHaveProperty("cached_input_tokens");
     } finally { info.mockRestore(); vi.unstubAllEnvs(); }
   });
