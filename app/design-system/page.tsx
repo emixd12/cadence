@@ -7,6 +7,7 @@ import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerCont
 import { DailyBriefMovesBench } from "./DailyBriefMovesBench";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
+import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -393,6 +394,9 @@ type DesignSystemPageProps = Readonly<{
     preview?: string | string[];
     state?: string | string[];
     layout?: string | string[];
+    option?: string | string[];
+    view?: string | string[];
+    shot?: string | string[];
   }>;
 }>;
 
@@ -410,6 +414,21 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
 
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
+
+  if (selectedPreviewId === "advisor-placement") {
+    // Advisor plan 4D, rounds 1 and 1b: places for the advisor's tips.
+    // ?option=a|a2|b|c|d|e|f|g|h|j|k|k2&view=closed|open|why|answered|scrolled|scrolled-open|panel|brief|checkin|none&shot=1
+    const optionParam = firstSearchParam(params?.option);
+    const options: readonly PlacementOption[] = ["a2", "b", "c", "d", "e", "f", "g", "h", "j", "k", "k2"];
+    const option: PlacementOption = options.find((item) => item === optionParam) ?? "a";
+    const viewParam = firstSearchParam(params?.view);
+    const views: readonly PlacementView[] = ["open", "why", "answered", "scrolled", "scrolled-open", "panel", "brief", "checkin", "none"];
+    const view: PlacementView = views.find((item) => item === viewParam) ?? "closed";
+    return (
+      <AdvisorPlacementBench statusAction={benchOccurrenceAction} noteAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction}
+        initialOption={option} initialView={view} shot={firstSearchParam(params?.shot) === "1"} />
+    );
+  }
 
   if (selectedPreviewId === "day-progress") {
     return (
