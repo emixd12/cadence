@@ -146,6 +146,21 @@ export const CHAT_SCENARIOS: readonly ChatScenario[] = [
     steps: [{ say: "What's on today?" }, { say: "What's on my calendar this afternoon?" }, { say: "When is my run?" }, { say: "How long is my run?" }, { say: "What did I do yesterday?" }, { say: "Which items need a decision?" }, { say: "How did my week go?" }, { say: "What's my best habit this week?" }, { say: "Which habit did I miss most?" }, { say: "Did I journal on Sunday?" }, { say: "What note did I leave on Friday's run?" }, { say: "What's on tomorrow?" }, { say: "When is my flight tomorrow?" }, { say: "How many workouts did I log this week?" }, { say: "Which workout was longest?" }, { say: "What's left today after 6 pm?" }, { say: "Is my evening busy?" }, { say: "What time is Magnesium?" }, { say: "Remind me what Stretch is set to." }, { say: "What's the last thing on my day?" }],
     allowedWrites: [], expect: { final: [{ kind: "unchanged" }] } },
 
+  // Finalist round (Nov 19): harder cases.
+  { id: "calendar_down", world: "calendar_down", description: "The calendar read fails: say so, and do not invent events.",
+    steps: [{ say: "What does my afternoon look like? Do I have time for a 45-minute walk before my run?" }],
+    allowedWrites: [], expect: { mentions: ["couldn't|could not|can't|cannot|unable|wasn't able|not able"], never: ["Board review", "Dentist", "Lunch with Sam"], final: [{ kind: "unchanged" }] } },
+
+  { id: "multi_step", world: "everyday", description: "Three asks in one message: a status write, a move, and a question about the rest of the day.",
+    steps: [{ say: "I took my meds. Also push my run to 7:30 tonight, and tell me what's still left after that." }, { answer: "yes" }],
+    allowedWrites: [{ tool: "set_occurrence_status", behavior: "Meds", status: "completed" }, { tool: "move_occurrence_for_day", behavior: "Run" }],
+    expect: { mentions: ["Magnesium|Read|Journal"], final: [{ kind: "status", behavior: "Meds", date: "today", status: "completed" }, { kind: "moved_to", behavior: "Run", time: "19:30" }] } },
+
+  { id: "vague_move", world: "everyday", description: "A move with no time: ask or offer times, then move once the person picks.",
+    steps: [{ say: "I'm running late today, push my run back a bit" }, { say: "7:30 works" }],
+    allowedWrites: [{ tool: "move_occurrence_for_day", behavior: "Run" }],
+    expect: { final: [{ kind: "moved_to", behavior: "Run", time: "19:30" }] } },
+
   { id: "new_user_evening", world: "new_user", description: "First evening, no history: no invented track record.",
     steps: [{ say: "Hi! What should I focus on tonight?" }],
     allowedWrites: [], expect: { mentions: ["Walk", "Read"], never: ["streak", "usually", "in a row"], final: [{ kind: "unchanged" }] } },

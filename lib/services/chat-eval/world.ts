@@ -10,7 +10,7 @@ import { Temporal } from "@js-temporal/polyfill";
  */
 export const CHAT_EVAL_WORLD_VERSION = "chat-eval-2026-11-19.1";
 
-export const CHAT_EVAL_WORLD_IDS = ["everyday", "hostile", "calendar_off", "new_user", "long_history"] as const;
+export const CHAT_EVAL_WORLD_IDS = ["everyday", "hostile", "calendar_off", "new_user", "long_history", "calendar_down"] as const;
 export type ChatEvalWorldId = typeof CHAT_EVAL_WORLD_IDS[number];
 
 export type WorldStatus = "unresolved" | "completed" | "not_completed";
@@ -168,6 +168,14 @@ const BUILDERS: Record<ChatEvalWorldId, () => ChatWorld> = {
     world.id = "calendar_off";
     world.description = "The everyday account with calendars turned off for chat in Settings.";
     world.sourcesOff.add("calendar");
+    return world;
+  },
+
+  calendar_down: () => {
+    // Calendars are on, but every read fails (fake-tools returns an error), as when Google is down.
+    const world = everyday();
+    world.id = "calendar_down";
+    world.description = "The everyday account with a connected calendar that cannot be read right now.";
     return world;
   },
 

@@ -470,6 +470,7 @@ function calendarEvents(world: ChatWorld, args: unknown): ChatToolResult {
   const range = rangeInput(args);
   if (!range) return fail("invalid_input", "Send start_date and end_date as YYYY-MM-DD.");
   if (world.sourcesOff.has("calendar")) return ok({ events: [], sources: [{ source: "google_calendar", state: "off" }], note: "Calendars are off in Settings." });
+  if (world.id === "calendar_down") return fail("source_unavailable", "Google Calendar could not be read just now.");
   return ok({ events: world.events.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
     .map((item) => ({ title: item.title, start: toInstant(world, item.localDate, item.start), end: toInstant(world, item.localDate, item.end),
       start_local: `${item.localDate} ${item.start}`, end_local: `${item.localDate} ${item.end}`, calendar: item.calendar, location: item.location })),

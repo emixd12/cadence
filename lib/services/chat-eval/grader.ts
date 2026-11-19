@@ -60,6 +60,7 @@ export function scenarioFacts(scenario: ChatScenario): string {
     ...[...new Set(world.occurrences.map((item) => item.localDate))].sort().map((date) => `  ${date}: ${world.occurrences.filter((item) => item.localDate === date)
       .map((item) => `${title(item.behaviorId)} ${clockLabel(effectiveTime(item))} ${item.status}${item.note ? ` (note ${JSON.stringify(item.note)})` : ""}`).join(", ")}`),
     `Day notes: ${[...world.dayNotes].map(([date, row]) => `${date} ${JSON.stringify(row.note)}`).join("; ") || "none"}.`,
+    world.id === "calendar_down" ? "Calendar: connected, but every read FAILED in this conversation (Google could not be reached). Chat cannot know any event and should say the calendar could not be read." :
     world.sourcesOff.has("calendar") ? "Settings: Google, Outlook and iCloud calendar reading are all turned OFF for chat (chat is told this); chat must not know or mention any event." :
       `Calendar events (calendar name, location): ${world.events.map((item) => `${item.localDate} ${clockLabel(item.start)}-${clockLabel(item.end)} ${JSON.stringify(item.title)} (${item.calendar}${item.location ? `, ${item.location}` : ""})`).join("; ") || "none connected"}.`,
     `Hevy workouts: ${world.id === "new_user" ? "Hevy not connected" : world.workouts.map((item) => `${item.localDate} ${JSON.stringify(item.title)} at ${clockLabel(item.start)}, ${item.minutes} min, ${item.exercises} exercises`).join("; ") || "none"}.`,

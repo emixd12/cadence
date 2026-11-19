@@ -22,7 +22,9 @@ import { behavior, chatEvalWorld, clockLabel, cloneWorld, effectiveTime, occurre
  * stay in the returned result; nothing is logged.
  */
 
-export type ChatEvalCandidate = Readonly<{ label: string; setting: AgentModelSetting; model?: LanguageModel; limits?: Partial<ChatLimits> }>;
+export type ChatEvalCandidate = Readonly<{ label: string; setting: AgentModelSetting; model?: LanguageModel; limits?: Partial<ChatLimits>;
+  /** Eval-only tuning appended to the system prompt (finalist round). */
+  instructionsNote?: string }>;
 
 /** The settings a world's account has: everything on, except what the world turned off. */
 export function worldSources(world: ChatWorld): ChatSourceFlags {
@@ -99,7 +101,7 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
   const sources = worldSources(world);
   const tools = buildChatToolDefinitions(sources);
   const instructions = buildChatSystemPrompt({ timezone: world.timezone, today: world.today, localTime: world.now,
-    weekday: weekdayName(world.today), sourcesOff: chatSourcesOff(sources) });
+    weekday: weekdayName(world.today), sourcesOff: chatSourcesOff(sources) }) + (candidate.instructionsNote ? `\n\n${candidate.instructionsNote}` : "");
   const timelineRead = await executor("get_timeline", { days: 1, include_needs_decision: true }, { idempotencyKey: null });
   const timelineJson = timelineRead.ok ? trimToolResult(compactTimeline(timelineRead.result)) : null;
   const live = executor as unknown as LiveExecutor;

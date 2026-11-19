@@ -22,7 +22,8 @@ describe("chat eval fake executor", () => {
         ["search_advice", { query: "evening run sleep" }],
       ];
       // The fake throws when its own output breaks the real output schema.
-      for (const [name, args] of reads) expect((await execute(name, args, {})).ok, `${id} ${name}`).toBe(true);
+      // calendar_down is the one world whose calendar read fails on purpose.
+      for (const [name, args] of reads) expect((await execute(name, args, {})).ok, `${id} ${name}`).toBe(!(id === "calendar_down" && name === "list_calendar_events"));
     }
   });
 

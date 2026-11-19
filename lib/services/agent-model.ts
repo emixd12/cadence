@@ -186,8 +186,17 @@ function resolveModel(id: string, env: Env, customFetch?: typeof fetch): Languag
     // Eval-only route to models neither direct provider serves ("openrouter/deepseek/...").
     if (!env.OPENROUTER_API_KEY) throw new AgentModelError("not_configured", "openrouter_key_missing");
     if (!name.includes("/")) throw new AgentModelError("invalid_model", "model_id_invalid");
+    const hosts = (env.OPENROUTER_PROVIDERS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+    const baseFetch = customFetch ?? fetch;
+    // OPENROUTER_PROVIDERS pins the hosts OpenRouter may route to (in order, no fallback to others),
+    // since one model id is served by many hosts at different precisions.
+    const routedFetch: typeof fetch = hosts.length ? (async (url, init) => {
+      if (typeof init?.body !== "string") return baseFetch(url, init);
+      const body = JSON.parse(init.body) as Record<string, unknown>;
+      return baseFetch(url, { ...init, body: JSON.stringify({ ...body, provider: { order: hosts, allow_fallbacks: false } }) });
+    }) as typeof fetch : baseFetch;
     return createOpenAI({ apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1", name: "openrouter",
-      ...(customFetch ? { fetch: customFetch } : {}) }).chat(name);
+      ...(customFetch || hosts.length ? { fetch: routedFetch } : {}) }).chat(name);
   }
   if (creator === "openai") {
     if (!env.OPENAI_API_KEY) throw new AgentModelError("not_configured", "openai_key_missing");

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { isModelId, type AgentReasoningEffort } from "@/lib/services/agent-model";
 import { chatEvalSetting, runChatEval, summarizeChatEval, type ChatScenarioResult } from "@/lib/services/chat-eval/harness";
 import { gradeScenario, summarizeChatQuality, type ChatQualityGrade } from "@/lib/services/chat-eval/grader";
+import { chatEvalModelNote } from "@/lib/services/chat-eval/model-notes";
 import { CHAT_SCENARIOS } from "@/lib/services/chat-eval/scenarios";
 
 /**
@@ -27,14 +28,22 @@ describe.skipIf(process.env.CADENCE_CHAT_EVAL !== "1")("chat eval (live)", () =>
     const only = process.env.CADENCE_CHAT_EVAL_SCENARIOS?.split(",").map((item) => item.trim()).filter(Boolean);
     const scenarios = only?.length ? CHAT_SCENARIOS.filter((item) => only.includes(item.id)) : CHAT_SCENARIOS.filter((item) => !item.optIn);
     const runs: { label: string; results: ChatScenarioResult[] }[] = [];
-    for (const spec of specs) {
+    // CADENCE_CHAT_EVAL_REPEATS plays everything n times (labels gain "#1".."#n");
+    // CADENCE_CHAT_EVAL_TUNED=1 appends each model's tuning note (model-notes.ts).
+    const repeats = Math.max(1, Number(process.env.CADENCE_CHAT_EVAL_REPEATS ?? "1"));
+    const tuned = process.env.CADENCE_CHAT_EVAL_TUNED === "1";
+    await Promise.all(specs.map(async (spec) => {
       const [model, effort] = spec.split("@");
       if (!isModelId(model)) throw new Error(`invalid model ${model}`);
       const setting = chatEvalSetting(model, effort ? { reasoning: effort as AgentReasoningEffort } : {});
-      const results = await runChatEval({ candidate: { label: spec, setting }, scenarios, concurrency: 4 });
-      runs.push({ label: spec, results });
-      console.log(JSON.stringify(summarizeChatEval(results)));
-    }
+      for (let round = 1; round <= repeats; round += 1) {
+        const label = repeats > 1 ? `${spec}#${round}` : spec;
+        const results = await runChatEval({ candidate: { label, setting, ...(tuned ? { instructionsNote: chatEvalModelNote(model) } : {}) }, scenarios, concurrency: 4 });
+        runs.push({ label, results });
+        console.log(JSON.stringify(summarizeChatEval(results)));
+      }
+    }));
+    runs.sort((a, b) => a.label.localeCompare(b.label));
     const report = { generatedAt: new Date().toISOString(), scenarios: scenarios.map((item) => item.id),
       candidates: runs.map((run) => ({ summary: summarizeChatEval(run.results), results: run.results })) };
     mkdirSync(DIR, { recursive: true });
