@@ -11,6 +11,7 @@ import {
   type BriefMoveBlock,
   type BriefMoveCalendarBusy,
   type BriefMoveCandidate,
+  type BriefMoveInterval,
   type BriefMovePlan,
   type BriefMoveTravelInput,
 } from "@cadence/core/resolvers/brief-move.resolver";
@@ -33,6 +34,7 @@ import {
   type BriefMoveRefusal,
   type BriefMoveRefusalCause,
   type BriefMoveReplanRequest,
+  type BriefMoveSpan,
   type BriefMoveReplanResponse,
   type BriefMoves,
   type BriefPlanningContext,
@@ -329,8 +331,12 @@ function lineFromRow(row: ProposalRow): BriefMoveLine | null {
     offerNeverMove: line.offerNeverMove ?? false,
     status: row.status as BriefMoveProposalStatus,
     moveId: row.move_id,
+    appliedTo: null,
   };
 }
+
+/** Lines whose move stands: Yes, Other time or Accept all, not undone. */
+const APPLIED_STATUSES: readonly BriefMoveProposalStatus[] = ["accepted", "other_time"];
 
 // ------------------------------------------------------------------ reading
 
@@ -359,7 +365,12 @@ export async function readBriefMoves(supabase: AppSupabaseClient, input: Readonl
 
   const latest = new Map<string, ProposalRow>();
   for (const row of (proposals.data ?? []) as ProposalRow[]) if (!latest.has(row.occurrence_id)) latest.set(row.occurrence_id, row);
-  const lines = [...latest.values()].map(lineFromRow).filter((line): line is BriefMoveLine => !!line)
+  // A saved brief shows its own run's lines: after a Refresh, lines from the earlier
+  // brief (answered or not) belong to that brief, not this one.
+  const rows = [...latest.values()].filter((row) => !input.runId || row.agent_run_id === input.runId);
+  const applied = await appliedSpans(supabase, userId, rows);
+  const lines = rows.map(lineFromRow).filter((line): line is BriefMoveLine => !!line)
+    .map((line) => applied.has(line.proposalId) ? { ...line, appliedTo: applied.get(line.proposalId)! } : line)
     .sort((left, right) => left.from.startAt.localeCompare(right.from.startAt) || left.proposalId.localeCompare(right.proposalId));
 
   const accepted = new Set(lines.filter((line) => line.status === "accepted").map((line) => line.proposalId));
@@ -377,6 +388,21 @@ export async function readBriefMoves(supabase: AppSupabaseClient, input: Readonl
     undoAllBatchId,
     calendar: "current",
   };
+}
+
+/** Proposal id to where its standing move put the item, from the move records. */
+async function appliedSpans(supabase: AppSupabaseClient, userId: string, rows: readonly ProposalRow[]): Promise<Map<string, BriefMoveSpan>> {
+  const moved = rows.filter((row) => row.move_id && APPLIED_STATUSES.includes(row.status as BriefMoveProposalStatus));
+  if (!moved.length) return new Map();
+  const { data, error } = await supabase.from("occurrence_moves").select("id, to_start_at, to_end_at")
+    .eq("user_id", userId).in("id", moved.map((row) => row.move_id!));
+  if (error) throw error;
+  const spans = new Map((data ?? []).map((move) => [move.id, spanOf(move.to_start_at, move.to_end_at)]));
+  return new Map(moved.flatMap((row) => spans.has(row.move_id!) ? [[row.id, spans.get(row.move_id!)!] as const] : []));
+}
+
+function spanOf(startAt: string, endAt: string): BriefMoveSpan {
+  return { startAt: Temporal.Instant.from(startAt).toString(), endAt: Temporal.Instant.from(endAt).toString() };
 }
 
 /** Today's open schedule-edit conflicts, as the brief shows them (first brief, refresh and reopen alike). */
@@ -564,7 +590,7 @@ async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, move
   }>): Promise<AnswerOutcome> {
   if (moved.outcome === "refused") {
     const reason = moved.detail ?? moved.reason;
-    const named = answer.asked ? await refusalCause(callers, proposal, reason, answer.asked).catch(() => null) : null;
+    const named = answer.asked ? await refusalCause(callers, proposal, reason, answer.asked, answer.batchId).catch(() => null) : null;
     const refusal: BriefMoveRefusal = {
       reason,
       message: named?.message ?? moved.message,
@@ -592,12 +618,13 @@ function closedRefusal(proposal: ProposalRow): BriefMoveRefusal {
 // ------------------------------------------------------------------ naming the cause
 
 /** What the one rule sees for one item's move: the day's other items, the calendar, travel. */
-function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonly BriefMoveCalendarBusy[], travel: BriefMoveTravelInput | null)
+function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonly BriefMoveCalendarBusy[], travel: BriefMoveTravelInput | null,
+  positions: ReadonlyMap<string, BriefMoveInterval> = new Map())
   : Readonly<{ blocks: BriefMoveBlock[]; before: number; after: number }> {
   const stop = travel?.stops.get(occurrenceId);
   return {
     blocks: [
-      ...briefMoveItemBlocks(day.items, occurrenceId),
+      ...briefMoveItemBlocks(day.items, occurrenceId, positions),
       ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
       ...travelBlocksFor(travel, occurrenceId),
     ],
@@ -609,11 +636,35 @@ function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonl
 type NamedCause = Readonly<{ cause: BriefMoveRefusalCause; message: string }>;
 
 /**
+ * Where the brief's undecided lines would put their items. Re-plan and Re-check treat
+ * those times as taken, the way the planner does, so a new time never lands on a time
+ * another line still offers.
+ */
+function openLinePositions(latest: Iterable<ProposalRow>): Map<string, BriefMoveInterval> {
+  const positions = new Map<string, BriefMoveInterval>();
+  for (const row of latest) {
+    if (row.status !== "proposed") continue;
+    positions.set(row.occurrence_id, { start: Temporal.Instant.from(row.proposed_start_at), end: Temporal.Instant.from(row.proposed_end_at) });
+  }
+  return positions;
+}
+
+async function latestDayLines(person: OccurrenceMoveCaller, localDate: string): Promise<Readonly<{ all: ProposalRow[]; latest: Map<string, ProposalRow> }>> {
+  const { data, error } = await person.supabase.from("move_proposals").select("*").eq("user_id", person.userId).eq("local_date", localDate)
+    .eq("source", "daily_brief").order("created_at", { ascending: false }).limit(64);
+  if (error) throw error;
+  const all = (data ?? []) as ProposalRow[];
+  const latest = new Map<string, ProposalRow>();
+  for (const row of all) if (!latest.has(row.occurrence_id)) latest.set(row.occurrence_id, row);
+  return { all, latest };
+}
+
+/**
  * The refusal's cause in plain words, from the day as it is now. Null when Cadence
  * cannot name one: the move service's own message then stands.
  */
 async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, reason: string,
-  asked: Readonly<{ startAt: string; context: BriefPlanningContext }>): Promise<NamedCause | null> {
+  asked: Readonly<{ startAt: string; context: BriefPlanningContext }>, batchId: string | null): Promise<NamedCause | null> {
   const line = lineFromRow(proposal);
   if (!line) return null;
   if (reason === "proposal_closed") return { cause: closedRefusal(proposal).cause!, message: "This suggestion was already answered." };
@@ -635,12 +686,21 @@ async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, re
   });
   if (check.ok) return null;
   return describeBlock(day, proposal, view.blocks.find((block) => block.ref === check.ref) ?? null, check.reason,
-    formatBriefingTime(start.toString(), line.timezone));
+    formatBriefingTime(start.toString(), line.timezone), batchId ? await batchMoved(person, batchId) : new Set());
+}
+
+/** Items an Accept all has moved so far: those moves are part of the same answer, not news. */
+async function batchMoved(person: OccurrenceMoveCaller, batchId: string): Promise<Set<string>> {
+  const { data, error } = await person.supabase.from("move_proposal_answers").select("occurrence_id")
+    .eq("user_id", person.userId).eq("batch_id", batchId).eq("outcome", "applied");
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.occurrence_id));
 }
 
 /** The words for one block in the way of `time`. */
 function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMoveBlock | null,
-  reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy", time: string): NamedCause | null {
+  reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy", time: string,
+  sameBatch: ReadonlySet<string> = new Set()): NamedCause | null {
   if (!block || block.kind === "travel") return null;
   if (block.kind === "calendar") {
     // The line's time was free when it was written, so the event arrived since.
@@ -653,6 +713,12 @@ function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMov
   const occurrence = day.occurrences.get(block.ref);
   const item = day.items.find((candidate) => candidate.occurrenceId === block.ref);
   const title = block.title ?? item?.title ?? "another item";
+  if (sameBatch.has(block.ref)) {
+    // Moved by this same Accept all, a moment ago: nothing changed behind the brief's back.
+    const cause: BriefMoveRefusalCause = { kind: "item_there", title, changedAfterBrief: false };
+    return { cause, message: reason === "too_close" ? `${time} is too close to ${title}, which Accept all just moved.`
+      : `${time} is taken: Accept all just moved ${title} there.` };
+  }
   const changed = !!item && Temporal.Instant.compare(Temporal.Instant.from(item.revision), Temporal.Instant.from(proposal.created_at)) > 0;
   const moved = changed && !!occurrence?.effective_start_at;
   const cause: BriefMoveRefusalCause = { kind: "item_there", title, changedAfterBrief: changed };
@@ -678,15 +744,12 @@ function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMov
  */
 export async function recheckBriefMoves(callers: BriefMoveCallers, request: BriefMoveRecheckRequest): Promise<BriefMoveRecheckResponse> {
   const { person } = callers;
-  const [rows, day] = await Promise.all([
-    person.supabase.from("move_proposals").select("*").eq("user_id", person.userId).eq("local_date", request.localDate)
-      .eq("source", "daily_brief").order("created_at", { ascending: false }).limit(64),
+  const [{ all, latest }, day] = await Promise.all([
+    latestDayLines(person, request.localDate),
     readBriefMoveDay(person.supabase, person.userId, request.localDate),
   ]);
-  if (rows.error) throw rows.error;
-  const all = (rows.data ?? []) as ProposalRow[];
-  const latest = new Map<string, ProposalRow>();
-  for (const row of all) if (!latest.has(row.occurrence_id)) latest.set(row.occurrence_id, row);
+  /** Updated as lines are re-planned, so two lines never take the same new time. */
+  const positions = openLinePositions(latest.values());
 
   const calendar = requestBusy(request.context);
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, request.localDate));
@@ -698,7 +761,7 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
     const line = lineFromRow(row);
     const item = day.items.find((candidate) => candidate.occurrenceId === row.occurrence_id);
     if (!line || !item || item.status !== "unresolved") continue;
-    const view = slotView(day, item.occurrenceId, calendar, travel);
+    const view = slotView(day, item.occurrenceId, calendar, travel, positions);
     const start = Temporal.Instant.from(line.to.startAt);
     const passed = Temporal.Instant.compare(start, person.now) < 0;
     const check = checkBriefMoveSlot({
@@ -721,14 +784,16 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
         limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [effectiveStartInstant(day.occurrences.get(item.occurrenceId)!), start],
       });
       const [next, ...others] = starts;
-      const why = passed ? `${time} has passed` : check.ok ? `${time} is taken now` : causeClause(day, row, view.blocks, check, time);
+      const why = passed ? `${time} has passed` : check.ok ? `${time} is taken now` : causeClause(day, row, view.blocks, check, time, positions);
       candidate = next ? rebuiltCandidate(row, line, item, next, others, `${why}, so ${formatBriefingTime(next.toString(), line.timezone)} instead.`) : null;
     }
     if (!candidate) {
       await withdrawProposal(await callers.agent(), row.id);
+      positions.delete(row.occurrence_id);
       outcome.set(row.occurrence_id, { proposalId: row.id, line: null });
       continue;
     }
+    positions.set(row.occurrence_id, { start: Temporal.Instant.from(candidate.to.startAt), end: Temporal.Instant.from(candidate.to.endAt) });
     const [saved] = await saveBriefProposals(await callers.agent(), {
       runId: row.agent_run_id, localDate: row.local_date, refresh: false, candidates: [candidate],
       replaces: new Map([[item.occurrenceId, row.id]]),
@@ -768,11 +833,14 @@ function rebuiltCandidate(row: ProposalRow, line: BriefMoveLine, item: BriefMove
 
 /** "5:30 PM is taken now" / "5:30 PM is too close to Piano practice now", never a calendar title. */
 function causeClause(day: BriefMoveDay, row: ProposalRow, blocks: readonly BriefMoveBlock[],
-  check: Extract<ReturnType<typeof checkBriefMoveSlot>, { ok: false }>, time: string): string {
+  check: Extract<ReturnType<typeof checkBriefMoveSlot>, { ok: false }>, time: string,
+  suggested: ReadonlyMap<string, BriefMoveInterval> = new Map()): string {
   const block = blocks.find((candidate) => candidate.ref === check.ref);
   if (block?.kind === "travel") return `${time} is needed for travel now`;
   if (block?.kind === "item") {
     const title = block.title ?? day.items.find((item) => item.occurrenceId === block.ref)?.title;
+    // Another line of this brief offers that time: name it as a suggestion, not a change.
+    if (title && suggested.has(block.ref)) return check.reason === "too_close" ? `${time} is too close to the time suggested for ${title}` : `${time} is suggested for ${title}`;
     if (title) return check.reason === "too_close" ? `${time} is too close to ${title} now` : `${time} is taken by ${title} now`;
   }
   if (block?.kind === "calendar") return check.reason === "too_close" ? `${time} is too close to a calendar event now` : `${time} is taken by a calendar event now`;
@@ -831,8 +899,12 @@ async function lineResult(person: OccurrenceMoveCaller, proposal: ProposalRow, o
     if (error) throw error;
     current = data;
   }
+  const line = lineFromRow(proposal);
+  const standing = APPLIED_STATUSES.includes(proposal.status as BriefMoveProposalStatus)
+    && current?.effective_start_at && current.effective_end_at;
   return {
-    proposalId: proposal.id, outcome, line: lineFromRow(proposal), refusal,
+    proposalId: proposal.id, outcome, refusal,
+    line: line && standing ? { ...line, appliedTo: spanOf(current!.effective_start_at!, current!.effective_end_at!) } : line,
     occurrence: current ? { id: current.id, effectiveStartAt: current.effective_start_at ?? null, effectiveEndAt: current.effective_end_at ?? null,
       revision: current.updated_at, status: current.status } : null,
     moveId: moveId ?? (outcome === "applied" ? proposal.move_id : null),
@@ -851,7 +923,10 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   const old = lineFromRow(proposal);
   if (!old) throw new BriefMoveError("proposal_not_found");
   const { person } = callers;
-  const day = await readBriefMoveDay(person.supabase, person.userId, proposal.local_date);
+  const [day, { latest }] = await Promise.all([
+    readBriefMoveDay(person.supabase, person.userId, proposal.local_date),
+    latestDayLines(person, proposal.local_date),
+  ]);
   const item = day.items.find((candidate) => candidate.occurrenceId === proposal.occurrence_id);
   if (!item || item.status !== "unresolved") throw new BriefMoveError("proposal_closed");
   const calendar = briefMoveCalendar(null, request.context.calendarBusy);
@@ -862,7 +937,7 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     localDate: proposal.local_date, timezone: old.timezone, now: person.now,
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
     blocks: [
-      ...briefMoveItemBlocks(day.items, item.occurrenceId),
+      ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
       ...calendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
       ...travelBlocksFor(travel, item.occurrenceId),
     ],
