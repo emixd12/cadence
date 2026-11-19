@@ -17,7 +17,7 @@ vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConn
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin,
   finishDailyBrief: mocks.finish, readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip, saveDailyBrief: mocks.saveBrief }));
-vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), ensureBehaviorEstimates: vi.fn() }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), readOpenBriefConflicts: vi.fn(async () => []), ensureBehaviorEstimates: vi.fn() }));
 vi.mock("@/lib/db/advisor-context.repo", () => ({ readAdvisorProfileTimezone: mocks.timezone }));
 vi.mock("@/lib/services/briefing-account-context.service", () => ({
   briefingAccountRef: (userId: string) => `account-${userId}`,

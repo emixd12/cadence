@@ -10,7 +10,7 @@ import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { agentCallerConfigured, createAgentClient } from "@/lib/integrations/agent-caller";
 import { modelPrice } from "./agent-model-pricing";
 import { BRIEF_OPENING_PROMPT_REVISION, prepareBriefOpening, stockBriefOpening, validateBriefOpening, type BriefOpeningLine, type BriefOpeningText } from "./brief-opening";
-import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, saveBriefProposals } from "./brief-moves.service";
+import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBriefConflicts, saveBriefProposals } from "./brief-moves.service";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator, type DailyBriefModelUsage } from "./daily-brief-consumer";
 import { dailyBriefModelSetting, generateBriefOpeningWithModel, generateDurationEstimatesWithModel } from "./daily-brief-model";
@@ -283,12 +283,17 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const now = clock().toString();
       // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
-      const plan = wantsMoves ? await phase("moves", async () => {
-        await ensureBehaviorEstimates(agentRun?.client ?? null, context,
-          withAgentRun(agentRun, (input) => generateDurationEstimatesWithModel(input)), signal);
-        return planBriefMoveLines({ context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
-      }) : { candidates: [], calendar: dailyBriefCalendarState(context) };
-      const conflicts: readonly BriefMoveConflictLine[] = [];
+      // Cadence plans the lines for every client, so the opening says what really needs a new
+      // time. A client without move lines gets the opening only; its lines are not stored.
+      const [plan, conflicts] = await phase("moves", async () => {
+        const [, open] = await Promise.all([
+          ensureBehaviorEstimates(agentRun?.client ?? null, context,
+            withAgentRun(agentRun, (input) => generateDurationEstimatesWithModel(input)), signal),
+          readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
+        ]);
+        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
+        return [planned, open] as const;
+      });
       const words = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
         () => writeBriefWords({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, requestSignal: signal,
           signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(setting.timeoutMs, DAILY_BRIEF_WORDS_TIMEOUT_MS))]),
@@ -443,12 +448,6 @@ function dailyBriefAgentClient(userId: string): AppSupabaseClient | null {
     return createAgentClient(userId, "daily_brief").client;
   }
   catch { throw new DailyBriefError("advisor_unavailable", undefined, "agent_key_invalid"); }
-}
-
-function dailyBriefCalendarState(context: AdvisorDayContext): "current" | "stale" | "none" {
-  const calendars = context.connectors.filter((connector) => "events" in connector);
-  if (!calendars.length) return "none";
-  return calendars.some((connector) => "state" in connector && connector.state !== "current") ? "stale" : "current";
 }
 
 function briefMovesFor(context: AdvisorDayContext, runId: string | null, lines: readonly BriefMoveLine[], conflicts: readonly BriefMoveConflictLine[], calendar: BriefMoves["calendar"]): BriefMoves {

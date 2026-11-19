@@ -11,6 +11,8 @@
 --   6. agent_brief_refresh_funded is for the daily_brief agent only and protects the
 --      rest of the month's morning briefs.
 --   7. The day-end purge clears the saved text and keeps the count row.
+--   8. A preference change clears the saved text (the next open is a new morning
+--      brief under the new choice) and keeps the refresh count.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
@@ -148,6 +150,28 @@ reset role;
 do $$ begin
   if (select refreshes_used from cadence_advisor_private.daily_brief_days) <> 0 then raise exception 'The upgrade counted as a refresh'; end if;
   if (select briefing ->> 'text' from cadence_advisor_private.daily_brief_days) <> 'With moves.' then raise exception 'The upgrade was not saved'; end if;
+end $$;
+
+-- 8. A preference change clears the saved brief and keeps the refresh count.
+update cadence_advisor_private.daily_brief_days set refreshes_used = 1;
+set local role authenticated;
+do $$
+declare
+  person constant text := '{"sub":"3a200000-0000-4000-8000-000000000001","role":"authenticated","session_id":"3a200000-0000-4000-8000-000000000011"}';
+  phone constant uuid := '3a200000-0000-4000-8000-000000000101';
+  decision jsonb;
+begin
+  perform set_config('request.jwt.claims', person, true);
+  perform public.save_daily_brief_preferences(true, true, 1);
+  decision := public.begin_daily_brief(phone, false, 2, true, true);
+  if decision ->> 'state' <> 'acquired' or (decision ->> 'refresh')::boolean or (decision ->> 'refreshes_used')::integer <> 1 then
+    raise exception 'Open after a preference change was %', decision;
+  end if;
+end $$;
+reset role;
+do $$ begin
+  if exists (select 1 from cadence_advisor_private.daily_brief_days where briefing is not null) then raise exception 'A preference change kept the saved brief'; end if;
+  if (select refreshes_used from cadence_advisor_private.daily_brief_days) <> 1 then raise exception 'A preference change reset the refresh count'; end if;
 end $$;
 
 rollback;

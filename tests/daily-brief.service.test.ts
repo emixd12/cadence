@@ -4,13 +4,13 @@ import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(), calendar: vi.fn(), config: vi.fn(),
-  outlook: vi.fn(), hevy: vi.fn(), icloud: vi.fn(), plan: vi.fn(), proposals: vi.fn(), readMoves: vi.fn(), estimates: vi.fn() }));
+  outlook: vi.fn(), hevy: vi.fn(), icloud: vi.fn(), plan: vi.fn(), proposals: vi.fn(), readMoves: vi.fn(), conflicts: vi.fn(async (): Promise<unknown[]> => []), estimates: vi.fn() }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
 vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: mocks.hevy }));
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: mocks.save, beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   saveDailyBrief: mocks.saveBrief }));
-vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: mocks.readMoves, ensureBehaviorEstimates: mocks.estimates }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: mocks.readMoves, readOpenBriefConflicts: mocks.conflicts, ensureBehaviorEstimates: mocks.estimates }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
   const actual = await original<typeof import("@/lib/services/briefing-pipeline")>();
   const active = () => mocks.config() ?? actual.activeBriefingConfig();
@@ -55,6 +55,7 @@ beforeEach(() => {
     configurationRefs: {},
     preferences: options.preferences,
   }));
+  mocks.conflicts.mockResolvedValue([]);
   mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
   mocks.proposals.mockImplementation(async (_client, value) => stored(value.lines));
   mocks.estimates.mockResolvedValue(undefined);
@@ -113,14 +114,27 @@ describe("first-party daily briefing service", () => {
     expect(mocks.saveBrief).toHaveBeenCalledOnce();
   });
 
-  it("gives clients from before Phase 3 the opening only: no lines, no proposals and no model call", async () => {
+  it("gives clients from before Phase 3 a true opening only: no lines and no proposals", async () => {
+    generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_error"));
     const result = await requestInAppDailyBrief(caller, plain, { generate, now });
     expect(mocks.begin).toHaveBeenCalledWith(caller.client, expect.objectContaining({ moves: false }), expect.any(AbortSignal));
-    expect(mocks.plan).not.toHaveBeenCalled();
+    // Cadence still plans the day, so the opening never says nothing needs moving when something does.
+    expect(mocks.plan).toHaveBeenCalled();
     expect(mocks.proposals).not.toHaveBeenCalled();
-    expect(generate).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { text: `${walk.title} could use a different time today.` } });
     expect(result.state === "ready" && result.briefing).not.toHaveProperty("moves");
     expect(mocks.saveBrief).toHaveBeenCalledWith(caller.client, expect.objectContaining({ withMoves: false }), expect.any(AbortSignal));
+  });
+
+  it("shows today's open schedule-change conflicts in the first brief", async () => {
+    mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
+    const conflict = { conflictId: "c1", occurrenceId: "o1", behaviorId: "b1", title: "Stretch", expectedRevision: 1,
+      at: { startAt: "2026-11-18T17:00:00Z", endAt: "2026-11-18T17:30:00Z" }, conflictingTitle: "Lunch" };
+    mocks.conflicts.mockResolvedValue([conflict]);
+    generate.mockRejectedValue(new DailyBriefError("advisor_unavailable", undefined, "provider_error"));
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(generate).toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "ready", briefing: { text: expect.stringContaining("Stretch clashing"), moves: { conflicts: [{ conflictId: "c1" }] } } });
   });
 
   it("keeps each good sentence and falls back to stock text only where the model broke a rule", async () => {

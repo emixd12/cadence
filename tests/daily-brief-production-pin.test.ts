@@ -17,7 +17,7 @@ import fixture from "./fixtures/advisor-day-context.valid.json";
 const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   saveDailyBrief: mocks.saveBrief }));
-vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), ensureBehaviorEstimates: vi.fn() }));
+vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), readOpenBriefConflicts: vi.fn(async () => []), ensureBehaviorEstimates: vi.fn() }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
   const actual = await original<typeof import("@/lib/services/briefing-pipeline")>();
   const active = () => mocks.config() ?? actual.activeBriefingConfig();
@@ -95,10 +95,9 @@ describe("pinned production generation", () => {
     expect(bodies[0]!.length).toBeLessThan(12_000);
   });
 
-  it("makes no model call for a quiet day or an older client", async () => {
+  it("makes no model call for a quiet day, for any client", async () => {
     mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
     expect(await productionBodies()).toHaveLength(0);
-    mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
     expect(await productionBodies([])).toHaveLength(0);
   });
 
