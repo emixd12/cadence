@@ -231,7 +231,12 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     const items = sortedOccurrences(world.occurrences.filter((item) => item.localDate >= (input.start_local_date as string) && item.localDate <= (input.end_local_date as string)
       && (!statuses || statuses.includes(item.status)) && (!behaviorIds || behaviorIds.includes(item.behaviorId))
       && (!input.needs_decision_only || (item.status === "unresolved" && item.localDate < world.today))));
-    return ok({ timezone: world.timezone, occurrences: items.map((item) => occurrenceOutput(world, item)), next_cursor: null, freshness: freshness(world) });
+    // Pages like the server: page_size (default 50, max 100), and an opaque cursor for the next page.
+    const size = (input.page_size as number | undefined) ?? 50;
+    const offset = typeof input.cursor === "string" && /^p\d+$/.test(input.cursor) ? Number(input.cursor.slice(1)) : 0;
+    const page = items.slice(offset, offset + size);
+    return ok({ timezone: world.timezone, occurrences: page.map((item) => occurrenceOutput(world, item)),
+      next_cursor: offset + size < items.length ? `p${offset + size}` : null, freshness: freshness(world) });
   },
 
   list_day_notes: (world, input) => ok({ timezone: world.timezone,
