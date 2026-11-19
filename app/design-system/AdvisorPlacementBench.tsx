@@ -15,8 +15,8 @@ import type { OccurrenceFormAction, TimeTrackingFormAction, TimelineOccurrenceIn
 // Placements on the real app shell and Timeline, synthetic data, nothing is saved.
 // One URL reproduces one view: ?preview=advisor-placement&option=a&view=why
 
-export type PlacementOption = "a" | "a2" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j";
-export type PlacementView = "closed" | "open" | "why" | "answered" | "scrolled" | "scrolled-open";
+export type PlacementOption = "a" | "a2" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j" | "k";
+export type PlacementView = "closed" | "open" | "why" | "answered" | "scrolled" | "scrolled-open" | "panel" | "brief" | "checkin" | "none";
 
 export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: string; summary: string }>[] = [
   { id: "a", label: "A · Horse in the menu", summary: "An Advisor line in the main menu, with the horse as its icon. A dot means a new tip." },
@@ -28,6 +28,7 @@ export const PLACEMENT_OPTIONS: readonly Readonly<{ id: PlacementOption; label: 
   { id: "f", label: "F · Top of today", summary: "Round 1b. The tip is the first line of today’s list." },
   { id: "g", label: "G · Under the date", summary: "Round 1b. A short tip sits under today’s date." },
   { id: "h", label: "H · Under its Behavior", summary: "Round 1b. The tip sits under the Behavior it is about, like a reply." },
+  { id: "k", label: "K · Window + line under the date", summary: "Round 1c, from the review. The window horse at the top opens the advisor’s panel, which pushes the Timeline aside. One line under today’s date shows the most important thing: the brief, a question, or the tip." },
   { id: "j", label: "J · Banner horse speaks", summary: "Round 1b. The Timeline’s horse shows the tip. Scroll past it and a small window horse waits at the top." },
 ];
 
@@ -277,6 +278,101 @@ function AdvisorPanel({ view, onView }: Readonly<{ view: PlacementView; onView: 
   );
 }
 
+
+// ---------- Option K: window horse at the top, one line under the date, panel beside the Timeline ----------
+
+const linkClass = "underline underline-offset-2";
+
+/** The one line under today's date. It shows the most pressing thing, in a fixed order: brief, question, tip. */
+function KLine({ view, onView }: Readonly<{ view: PlacementView; onView: (view: PlacementView) => void }>) {
+  if (view === "none" || view === "panel") return null;
+  if (view === "brief") {
+    return (
+      <p className="pt-3 text-sm leading-6" data-advisor-line>
+        2 moves suggested for today. <button type="button" className={linkClass} onClick={() => onView("panel")}>Open</button>
+      </p>
+    );
+  }
+  if (view === "checkin") {
+    return (
+      <div className="pt-3 text-sm leading-6" data-advisor-line>
+        <p>Keep Gym at 6:30 PM on Tuesdays? <button type="button" className={linkClass} onClick={() => onView("answered")}>Keep</button>
+          <span aria-hidden="true"> · </span><button type="button" className={linkClass} onClick={() => onView("answered")}>Go back</button></p>
+        <p className="text-xs leading-5 text-muted-readable">Your two-week try ends today.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="pt-3 text-sm leading-6" data-advisor-line>
+      <p className="text-foreground">{QUIP_SHORT}</p>
+      {view === "why" ? (
+        <div className="mt-2 border-l border-line pl-3" data-advisor-card>
+          <p className="text-foreground">{CARD.claim}</p>
+          <p><a href={CARD.url} target="_blank" rel="noreferrer" className={linkClass}>{CARD.source}</a></p>
+          <p className="text-xs leading-5 text-muted-readable">{CARD.kind} · {CARD.strength}</p>
+        </div>
+      ) : null}
+      {view === "answered" ? <p className="italic">Saved as helpful.</p> : (
+        <p className="whitespace-nowrap">
+          <button type="button" className={linkClass} onClick={() => onView(view === "why" ? "open" : "why")}>{view === "why" ? "Hide research" : "Why this?"}</button>
+          <span aria-hidden="true"> · </span><button type="button" className={linkClass} onClick={() => onView("answered")}>Helpful</button>
+          <span aria-hidden="true"> · </span><button type="button" className={linkClass} onClick={() => onView("none")}>Not now</button>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function KPanel({ onClose }: Readonly<{ onClose: () => void }>) {
+  const section = "mt-6 border-t border-line pt-4 text-sm leading-6";
+  const heading = "text-xs font-bold text-muted-readable";
+  return (
+    <section aria-label="Advisor" className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-8 pt-4 lg:inset-y-0 lg:left-auto lg:right-0 lg:w-[26rem] lg:border-l lg:border-line" data-advisor-panel>
+      <div className="flex justify-end">
+        <button type="button" onClick={onClose} className="min-h-11 min-w-11 text-right text-muted-readable underline underline-offset-2 hover:text-foreground"><span className="text-sm">Close</span></button>
+      </div>
+      <div className="flex flex-col items-center gap-1 text-center">
+        <HorseMark size={120} />
+        <h2 className="mt-2 text-xl">Advisor</h2>
+      </div>
+      <div className={section}>
+        <p className={heading}>Today’s brief</p>
+        <p>2 moves suggested for today.</p>
+        <p><button type="button" className={linkClass}>Open the brief</button></p>
+      </div>
+      <div className={section}>
+        <p className={heading}>Needs your answer</p>
+        <p>Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday, Nov 24 (now 7:00 AM).</p>
+        <p><button type="button" className={linkClass}>Try for two weeks</button><span aria-hidden="true"> · </span>
+          <button type="button" className={linkClass}>Change for good</button><span aria-hidden="true"> · </span>
+          <button type="button" className={linkClass}>No</button></p>
+      </div>
+      <div className={section}>
+        <p className={heading}>Today’s tip</p>
+        <p>{QUIP}</p>
+        <p><button type="button" className={linkClass}>Why this?</button><span aria-hidden="true"> · </span>
+          <button type="button" className={linkClass}>Helpful</button><span aria-hidden="true"> · </span>
+          <button type="button" className={linkClass}>Not now</button><span aria-hidden="true"> · </span>
+          <button type="button" className={linkClass}>Don’t suggest this again</button></p>
+      </div>
+      <div className={section}>
+        <p className={heading}>Trying for two weeks</p>
+        <p>Read at 9:00 PM every day</p>
+        <p className="text-xs leading-5 text-muted-readable">Day 3 of 14. Ends Tuesday, Dec 1.</p>
+      </div>
+      <div className={section}>
+        <p className={heading}>Earlier</p>
+        <p>Gym moved to 6:30 PM three Tuesdays running. Doing it at one steady time makes it easier to keep.</p>
+        <p className="italic">Saved as helpful.</p>
+        <p className="text-xs leading-5 text-muted-readable">Tuesday, Nov 17</p>
+      </div>
+      <div className={section}>
+        <a href="#chat" style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>Chat with the advisor</a>
+      </div>
+    </section>
+  );
+}
+
 // ---------- Option A2: the Advisor page with Chat ----------
 
 function AdvisorChatPage({ view, onView }: Readonly<{ view: PlacementView; onView: (view: PlacementView) => void }>) {
@@ -309,7 +405,7 @@ function AdvisorChatPage({ view, onView }: Readonly<{ view: PlacementView; onVie
 // ---------- The bench ----------
 
 const ROUND_1: readonly PlacementOption[] = ["a", "a2", "b", "c", "d"];
-const ROUND_1B: readonly PlacementOption[] = ["e", "f", "g", "h", "j"];
+const ROUND_1B: readonly PlacementOption[] = ["e", "f", "g", "h", "j", "k"];
 const SCROLLED_TOP = 320;
 
 /** Option J: true once the Timeline's banner horse has scrolled out of view. */
@@ -419,6 +515,29 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
         </>
       );
     }
+    if (option === "k") {
+      const hasNew = view !== "none" && view !== "answered" && view !== "panel";
+      banner = (
+        <div>
+          <CadencePageBanner />
+          <div className="h-12 sm:h-14" />
+        </div>
+      );
+      inline = { anchor: "day-heading", position: "after", content: <KLine view={view} onView={setView} /> };
+      overlay = (
+        <>
+          <div className="pointer-events-none fixed left-0 right-0 top-0.5 z-50 flex justify-center lg:left-64 lg:top-3 lg:z-30">
+            <button type="button" onClick={() => setView(view === "panel" ? "open" : "panel")} aria-label={hasNew ? "Open the advisor, 1 new" : "Open the advisor"}
+              className="pointer-events-auto flex flex-col items-center">
+              <span className="lg:hidden"><HorseMark size={40} /></span>
+              <span className="hidden lg:block"><HorseMark size={48} /></span>
+              <span className="bg-background px-1 text-xs leading-4">{hasNew ? "Advisor · 1 new" : "Advisor"}</span>
+            </button>
+          </div>
+          {view === "panel" ? <KPanel onClose={() => setView("open")} /> : null}
+        </>
+      );
+    }
     if (option === "j") {
       if (tipOpen || view === "scrolled" || view === "scrolled-open") beforeTimeline = tip("top-right", "ml-auto -mt-8 w-full sm:-mt-6 sm:w-[min(40rem,100%)] mb-6");
       else beforeTimeline = reopen(<>
@@ -445,7 +564,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
     }
 
     page = (
-      <div className="flex w-full flex-col">
+      <div className={["flex w-full flex-col", option === "k" && view === "panel" ? "lg:pr-[26rem]" : ""].join(" ")}>
         <h1 className="sr-only">Timeline</h1>
         {banner}
         <div className="relative mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
@@ -457,7 +576,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
           ) : null}
           <OccurrenceMovesProvider actions={NO_MOVES} timezone={TIMEZONE} todayLocalDate="2026-11-19" hasMovedBefore>
             <TimelineScreen statusAction={statusAction} noteAction={noteAction} timeAction={timeAction}
-              beforeTimeline={option === "e" ? null : beforeTimeline} inline={inline} />
+              beforeTimeline={option === "e" || option === "k" ? null : beforeTimeline} inline={inline} />
           </OccurrenceMovesProvider>
           {option === "j" ? <div aria-hidden="true" className="h-[70vh]" /> : null}
           {overlay}
@@ -469,7 +588,7 @@ export function AdvisorPlacementBench({ statusAction, noteAction, timeAction, in
   const optionRow = (ids: readonly PlacementOption[]) => (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
       {PLACEMENT_OPTIONS.filter((item) => ids.includes(item.id)).map((item) => (
-        <button key={item.id} type="button" onClick={() => { setOption(item.id); setView(item.id === "f" || item.id === "g" || item.id === "h" || item.id === "j" ? "open" : "closed"); }}
+        <button key={item.id} type="button" onClick={() => { setOption(item.id); setView(item.id === "f" || item.id === "g" || item.id === "h" || item.id === "j" || item.id === "k" ? "open" : "closed"); }}
           className={option === item.id ? "font-bold underline underline-offset-4" : "underline underline-offset-4"}>{item.label}</button>
       ))}
     </div>

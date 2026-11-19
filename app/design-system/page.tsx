@@ -417,12 +417,12 @@ export default async function DesignSystemPage({
 
   if (selectedPreviewId === "advisor-placement") {
     // Advisor plan 4D, rounds 1 and 1b: places for the advisor's tips.
-    // ?option=a|a2|b|c|d|e|f|g|h|j&view=closed|open|why|answered|scrolled|scrolled-open&shot=1
+    // ?option=a|a2|b|c|d|e|f|g|h|j|k&view=closed|open|why|answered|scrolled|scrolled-open|panel|brief|checkin|none&shot=1
     const optionParam = firstSearchParam(params?.option);
-    const options: readonly PlacementOption[] = ["a2", "b", "c", "d", "e", "f", "g", "h", "j"];
+    const options: readonly PlacementOption[] = ["a2", "b", "c", "d", "e", "f", "g", "h", "j", "k"];
     const option: PlacementOption = options.find((item) => item === optionParam) ?? "a";
     const viewParam = firstSearchParam(params?.view);
-    const views: readonly PlacementView[] = ["open", "why", "answered", "scrolled", "scrolled-open"];
+    const views: readonly PlacementView[] = ["open", "why", "answered", "scrolled", "scrolled-open", "panel", "brief", "checkin", "none"];
     const view: PlacementView = views.find((item) => item === viewParam) ?? "closed";
     return (
       <AdvisorPlacementBench statusAction={benchOccurrenceAction} noteAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction}
