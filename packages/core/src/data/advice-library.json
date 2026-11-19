@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-19.3",
+  "version": "2026-11-19.4",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -135,7 +135,7 @@
       },
       "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
       "quip_seeds": [
-        "{behavior}: {recent_completed} of {recent_resolved} done in the last {recent_days} days, down from {baseline_rate_pct}.",
+        "{behavior}: {recent_completed} of {recent_resolved} done in the last {recent_days|day|days}, down from {baseline_rate_pct}.",
         "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A fixed time and place for it may help."
       ],
       "audience": "any_account",
@@ -172,7 +172,7 @@
       },
       "limitation": "The effect is small to moderate and, because of publication bias, may be smaller than reported.",
       "quip_seeds": [
-        "{behavior} dropped from {baseline_rate_pct} to {recent_rate_pct} over {recent_days} days. What usually gets in the way?",
+        "{behavior} dropped from {baseline_rate_pct} to {recent_rate_pct} over {recent_days|day|days}. What usually gets in the way?",
         "{behavior}: {recent_completed} of {recent_resolved} lately. Plan for the usual obstacle."
       ],
       "audience": "any_account",
@@ -203,8 +203,8 @@
       },
       "limitation": "The trial studied one everyday eating habit over 84 days; schedules with a fixed external constraint may not move.",
       "quip_seeds": [
-        "You moved {behavior} {direction} on {same_direction_days} days in the last {window_days}.",
-        "{behavior} keeps landing near {median_target_time}. Setting it there may stick better."
+        "You moved {behavior} {direction} on {same_direction_days|day|days} in the last {window_days|day|days}.",
+        "{behavior} keeps landing near {median_target_time_clock}. Setting it there may stick better."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -234,8 +234,8 @@
       },
       "limitation": "The studies tested monitoring more often, not marking sooner; marking on the same day is our reading of it.",
       "quip_seeds": [
-        "{later_day} of your last {decisions} marks came a day or more late.",
-        "Your marks usually land {median_lag_days} days after the item."
+        "{later_day} of your last {decisions|mark|marks} came a day or more late.",
+        "Your marks usually land {median_lag_days|day|days} after the item."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -266,7 +266,7 @@
       "limitation": "One study of simple daily eating, drinking and activity habits; less frequent items may take longer.",
       "quip_seeds": [
         "First two weeks of {behavior}: {completed} done, {not_completed} not done.",
-        "{behavior} is {age_days} days old. Most routines need weeks more to feel automatic."
+        "{behavior} is {age_days|day|days} old. Most routines need weeks more to feel automatic."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -297,7 +297,7 @@
       "limitation": "The programs targeted eating and physical activity; other kinds of routines were not studied.",
       "quip_seeds": [
         "This week: {week_completed} done, {week_not_completed} not done ({week_rate_pct}). Your usual is {prior_rate_pct}.",
-        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks} weeks before."
+        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks|week|weeks} before."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -408,7 +408,19 @@
           "facts": []
         }
       ],
-      "does_not_apply_when": [],
+      "does_not_apply_when": [
+        {
+          "signal": "unmarked_items",
+          "scope": "either",
+          "facts": [
+            {
+              "fact": "oldest_days",
+              "op": "gte",
+              "value": 5
+            }
+          ]
+        }
+      ],
       "action": "Leave this item's time and place unchanged when you reshuffle your day.",
       "evidence": {
         "source_id": "wood-neal-2007",
@@ -420,8 +432,8 @@
       },
       "limitation": "A theory review; it explains why changing the cue can disrupt a habit but does not measure how often it does.",
       "quip_seeds": [
-        "{behavior}: {completed} of {resolved} over {weeks} weeks.",
-        "{behavior} has held at {rate_pct} for {weeks} weeks."
+        "{behavior}: {completed} of {resolved} over {weeks|week|weeks}.",
+        "{behavior} has held at {rate_pct} for {weeks|week|weeks}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -451,8 +463,8 @@
       },
       "limitation": "Expert advice drawn from habit research, written for clinicians; not a trial of shrinking a routine.",
       "quip_seeds": [
-        "{behavior}: {completed} of {resolved} in {weeks} weeks.",
-        "{behavior} is at {rate_pct} for {weeks} weeks. A smaller version, a new time, or a pause?"
+        "{behavior}: {completed} of {resolved} in {weeks|week|weeks}.",
+        "{behavior} is at {rate_pct} for {weeks|week|weeks}. A smaller version, a new time, or a pause?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -488,8 +500,8 @@
       },
       "limitation": "The study looked at single missed days, not long breaks.",
       "quip_seeds": [
-        "Most misses land on just {bad_days} days.",
-        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days} days."
+        "Most misses land on just {bad_days|day|days}.",
+        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days|day|days}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -519,7 +531,7 @@
       },
       "limitation": "National guidance for health behaviour programs; it recommends the technique rather than testing it in an app.",
       "quip_seeds": [
-        "{behavior} dipped to {dip_rate_pct} for {dip_weeks} weeks, against {usual_rate_pct} usually.",
+        "{behavior} dipped to {dip_rate_pct} for {dip_weeks|week|weeks}, against {usual_rate_pct} usually.",
         "{behavior} is back to {recent_rate_pct} after a dip."
       ],
       "audience": "any_account",
@@ -550,8 +562,8 @@
       },
       "limitation": "A Cadence product rule, not research evidence.",
       "quip_seeds": [
-        "{unmarked} items wait unmarked; the oldest is {oldest_days} days old.",
-        "{unmarked} items have no mark yet."
+        "{unmarked|item waits|items wait} unmarked; the oldest is {oldest_days|day|days} old.",
+        "{unmarked|item has|items have} no mark yet."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -581,8 +593,8 @@
       },
       "limitation": "The studies compared recording with not recording; they did not test how soon to record.",
       "quip_seeds": [
-        "You usually mark items around {median_mark_time}, {median_lag_hours} hours after they are set.",
-        "{same_day_share_pct} of your marks are made the same day."
+        "You usually mark items around {median_mark_time_clock}, {median_lag_hours_duration} after they are set. Try marking as you finish.",
+        "{same_day_share_pct} of your marks are made the same day. Marking as you finish keeps the record exact."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -618,8 +630,8 @@
       },
       "limitation": "An exploratory study of 50 people and one habit.",
       "quip_seeds": [
-        "{behavior} goes with another item on {together_days} of {either_days} days.",
-        "{behavior} and another item get done together on {together_days} days."
+        "{behavior} goes with another item on {together_days} of {either_days|day|days}.",
+        "{behavior} and another item get done together on {together_days|day|days}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -649,7 +661,7 @@
       },
       "limitation": "Lab and field experiments with short tasks; a full day of routines may behave differently.",
       "quip_seeds": [
-        "{items_in_hour} items are set for {hour_label}; they get done {hour_rate_pct} of the time.",
+        "{items_in_hour|item is|items are} set for {hour_label}, done {hour_rate_pct} of the time.",
         "Items at {hour_label}: {hour_rate_pct} done. Other hours: {other_rate_pct}."
       ],
       "audience": "any_account",
@@ -686,8 +698,8 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "{without_length} of your {active_behaviors} items have no length set.",
-        "{without_length} items have no length yet. How long did they take last time?"
+        "Items with no length set: {without_length} of {active_behaviors}.",
+        "{without_length|item has|items have} no length yet. How long does each one take?"
       ],
       "audience": "history_needed",
       "reviewed_at": null,
@@ -723,8 +735,8 @@
       },
       "limitation": "The review tested complete when-where-how plans; a place alone is part of such a plan.",
       "quip_seeds": [
-        "{without_place} of your {active_behaviors} items have no place set.",
-        "{without_place} items have no place yet. Where will they happen?"
+        "Items with no place set: {without_place} of {active_behaviors}.",
+        "{without_place|item has|items have} no place yet. Where does each one happen?"
       ],
       "audience": "history_needed",
       "reviewed_at": null,
@@ -761,7 +773,7 @@
       "limitation": "The review tested if-then plans that people made themselves, not phone reminders.",
       "quip_seeds": [
         "Items get done within 30 minutes of the reminder {quick_share_pct} of the time.",
-        "Marked items are usually done {median_minutes_after} minutes after the reminder."
+        "Marked items are usually done {median_minutes_after_duration} after the reminder."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -797,8 +809,8 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "{behavior} is planned for {planned_minutes} minutes and usually takes {median_minutes}.",
-        "{longer} of {sessions} sessions of {behavior} ran past the planned length."
+        "{behavior} is planned for {planned_minutes|minute|minutes} and usually takes {median_minutes|minute|minutes}.",
+        "Sessions of {behavior} that ran past the planned length: {longer} of {sessions}."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -871,8 +883,8 @@
       },
       "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
       "quip_seeds": [
-        "{behaviors_without_place} of your {active_behaviors} items have no place yet.",
-        "{behaviors_without_place} items have a time but no place. Where will they happen?"
+        "Items with no place yet: {behaviors_without_place} of {active_behaviors}.",
+        "{behaviors_without_place|item has|items have} a time but no place. Where does each one happen?"
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -908,8 +920,8 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "{behaviors_without_length} of your {active_behaviors} items have no length yet.",
-        "{behaviors_without_length} items have no length set. A realistic one helps plan the day."
+        "Items with no length yet: {behaviors_without_length} of {active_behaviors}.",
+        "{behaviors_without_length|item has|items have} no length set. A realistic one helps plan the day."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -950,8 +962,8 @@
       },
       "limitation": "Lab and field experiments with short tasks; the right number of routines differs from person to person.",
       "quip_seeds": [
-        "You are starting with {active_behaviors} items.",
-        "{behaviors_created_last_14_days} new items in two weeks is a lot to plan in detail."
+        "You are starting with {active_behaviors|item|items}.",
+        "{behaviors_created_last_14_days|new item|new items} in two weeks is a lot to plan in detail."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -987,8 +999,8 @@
       },
       "limitation": "An average from one study of daily habits; individuals ranged from under three weeks to over eight months.",
       "quip_seeds": [
-        "{active_behaviors} items set up. New routines usually take weeks to feel automatic.",
-        "Day {account_age_days} of {active_behaviors} new routines. Around ten weeks is typical."
+        "{active_behaviors|item|items} set up. New routines usually take weeks to feel automatic.",
+        "Day {account_age_days} of {active_behaviors|new routine|new routines}. Around ten weeks is typical."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -1024,8 +1036,8 @@
       },
       "limitation": "Expert advice drawn from habit research, written for clinicians.",
       "quip_seeds": [
-        "{active_behaviors} items set up. Tie each one to something you already do daily.",
-        "{behaviors_with_set_time} items have a clock time. A daily routine next to each makes a stronger cue."
+        "{active_behaviors|item|items} set up. Tie each one to something you already do daily.",
+        "{behaviors_with_set_time|item has|items have} a clock time. A daily routine next to each makes a stronger cue."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -1061,8 +1073,8 @@
       },
       "limitation": "The programs targeted eating and physical activity; the finding is about programs, not individual people.",
       "quip_seeds": [
-        "{active_behaviors} items to track. Marking each one is the core of it.",
-        "Marking your {active_behaviors} items as you go is the part that helps most."
+        "{active_behaviors|item|items} to track. Marking each one is the core of it.",
+        "Marking your {active_behaviors|item|items} as you go is the part that helps most."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
