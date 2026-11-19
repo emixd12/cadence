@@ -3,6 +3,7 @@ import { MockLanguageModelV4 } from "ai/test";
 import { simulateReadableStream } from "ai";
 import type { ChatEvent, ChatMessage } from "@cadence/core/types/chat";
 import { agentModelSetting } from "@/lib/services/agent-model";
+import { modelPrice, usageMicrodollars } from "@/lib/services/agent-model-pricing";
 import { buildChatSystemPrompt } from "@/lib/services/chat/chat-prompt";
 import { buildChatToolDefinitions, trimToolResult } from "@/lib/services/chat/chat-tools";
 import { buildHistoryMessages, messageText, runChatTurn, summarizeOlderMessages } from "@/lib/services/chat/chat-turn";
@@ -174,6 +175,13 @@ describe("chat turn (5A)", () => {
     expect(result.toolCalls).toEqual([]);
   });
 
+  it("lets the model answer when it calls the medical notice before writing anything", async () => {
+    const { promise } = turn([{ calls: [{ name: "medical_notice", input: {} }] }, { text: "Cadence does not advise on medical matters; a pharmacist can help." }]);
+    const result = await promise;
+    expect(result.modelCalls).toBe(2);
+    expect(result.parts.map((part) => part.type)).toEqual(["notice", "text"]);
+  });
+
   it("stops at 8 tool calls and answers", async () => {
     const reads = Array.from({ length: 12 }, () => ({ calls: [{ name: "get_timeline", input: {} }] } as Step));
     const { promise, fake } = turn([...reads, { text: "Here is what I found." }]);
@@ -204,6 +212,18 @@ describe("chat turn (5A)", () => {
     const result = await promise;
     expect(result.stop).toBe("ceiling");
     expect(result.modelCalls).toBe(1);
+  });
+
+  it("judges the ceiling on measured spend, not the reservation estimate", async () => {
+    const setting = agentModelSetting("chat");
+    const perCall = usageMicrodollars(modelPrice(setting.model)!, { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 50 })!;
+    const { promise } = turn([{ calls: [{ name: "get_timeline", input: {} }] }, { calls: [{ name: "get_timeline", input: {} }] }, { text: "ok" }], fakeExecutor(), {
+      setting, limits: { questionCeilingMicrodollars: perCall * 4 },
+      spend: async () => ({ ok: true, settle: async () => undefined }),
+    });
+    const result = await promise;
+    expect(result.stop).toBe("answered");
+    expect(result.modelCalls).toBe(3);
   });
 
   it("never lets the model choose an idempotency key", async () => {
