@@ -266,6 +266,8 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
         if (result.outcome === "applied" && result.line) timeline?.dismissMoveConfirmation(result.line.occurrenceId);
       }
       setMoves((current) => ({ ...current, undoAllBatchId: null }));
+      // The explainer names Accept all and Undo all; once both links are gone it describes nothing.
+      setBatchExplainer(null);
       if (response.results.some((result) => result.outcome === "applied")) refresh();
     } catch (error) {
       setBatchNotice(requestRefusal(error).message);
@@ -360,7 +362,7 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
         {line.offerNeverMove ? <><Dot /><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <BriefOutcome data-brief-move-actions>
-        {moved ? <>Moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to} for today. <span className="not-italic"><ActionLink label="Undo" disabled={pending} onClick={onUndo} /></span></> : null}
+        {moved ? <>Moved to {movedToLabel(line, ui.movedTo, to)} for today. <span className="not-italic"><ActionLink label="Undo" disabled={pending} onClick={onUndo} /></span></> : null}
         {line.status === "already_done" ? "Marked Completed." : null}
         {line.status === "declined" || line.status === "undone" ? <>Staying at {from}.</> : null}
         {ui.neverMoved ? <> The brief won’t suggest moving {line.title} again; you can change this in its settings.</> : null}
@@ -464,6 +466,16 @@ function BriefOutcome({ children, ...rest }: Readonly<{ children: ReactNode; "da
 function ActionLink({ label, onClick, disabled, strong = false, expanded }: Readonly<{ label: string; onClick: () => void; disabled?: boolean; strong?: boolean; expanded?: boolean }>) {
   return <button type="button" className={`${strong ? "font-bold text-foreground " : ""}${LINK}`} disabled={disabled} onClick={onClick}
     {...(expanded === undefined ? {} : { "aria-expanded": expanded })}>{label}</button>;
+}
+
+/**
+ * Where a moved line's item is now: this session's answer first, then the applied time the
+ * server saved (`appliedTo`), then the suggestion. Without the saved time, a reload showed
+ * the suggested time after Other time.
+ */
+function movedToLabel(line: BriefMoveLine, movedTo: string | null | undefined, suggested: string): string {
+  const at = movedTo ?? line.appliedTo?.startAt;
+  return at ? moveTimeLabel(at, line.timezone) : suggested;
 }
 
 function Dot() {
