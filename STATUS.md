@@ -111,9 +111,11 @@ Check the cited entry before acting on a row.
   MCP grants, other agents and other users see none; delete refused; account delete
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
-- **Next:** apply the migration to production (needs the owner's OK), then a live check.
+- **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.1`.
+- **Next:** live check against a real account (5D).
   Switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
-  add `search_advice` once 4A's matcher merges; set the model and caps from 5D's eval.
+  add `search_advice` once 4A's matcher merges.
 
 ## Advisor plan Phase 4 (4C): base schedule proposals — November 19, 2026
 
