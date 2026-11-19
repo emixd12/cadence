@@ -6,7 +6,7 @@ import type {
 
 // Advisor plan Phase 5 (5A). Every call runs on the chat agent client
 // (lib/integrations/agent-caller.ts, channel "chat"); the table policies refuse
-// every other token (migration 20261119220000).
+// every other token (migration 20261119230000).
 
 export class ChatStorageError extends Error {
   constructor(public readonly code: "not_found" | "database_error", options?: ErrorOptions) {

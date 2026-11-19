@@ -3241,7 +3241,7 @@ Local verification: `tests/coach-signals.local-integration.test.ts`.
 
 ## Chat conversations (advisor plan Phase 5, workstream 5A)
 
-Migration `20261119220000_chat_conversations.sql` adds four tables. All are
+Migration `20261119230000_chat_conversations.sql` adds four tables. All are
 owned by `auth.users` with `on delete cascade`, so deleting the account deletes
 them; nothing else expires them.
 
