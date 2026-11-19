@@ -266,6 +266,8 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
         if (result.outcome === "applied" && result.line) timeline?.dismissMoveConfirmation(result.line.occurrenceId);
       }
       setMoves((current) => ({ ...current, undoAllBatchId: null }));
+      // The explainer names Accept all and Undo all; once both links are gone it describes nothing.
+      setBatchExplainer(null);
       if (response.results.some((result) => result.outcome === "applied")) refresh();
     } catch (error) {
       setBatchNotice(requestRefusal(error).message);

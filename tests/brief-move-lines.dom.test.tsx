@@ -203,6 +203,7 @@ describe("move lines", () => {
     const answer = vi.spyOn(client, "answer");
     await render(client);
     await click(button(container, "Accept all"));
+    expect(container.querySelector("[data-brief-explainer]")?.textContent).toContain("Undo all puts them back");
     expect(answer).toHaveBeenCalledWith(expect.objectContaining({ kind: "accept_all", context, lines: expect.arrayContaining([expect.objectContaining({ proposalId: "walk" })]) }));
     expect(line("walk").dataset.briefMoveStatus).toBe("accepted");
     expect(line("gym").dataset.briefMoveStatus).toBe("proposed");
@@ -210,6 +211,7 @@ describe("move lines", () => {
     await click(button(container, "Undo all"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "undo_all", batchId: "batch-bench" }));
     expect(line("walk")).toBeNull();
+    expect(container.querySelector("[data-brief-explainer]")).toBeNull();
   });
 
   it("Already did it marks Completed; a failed request says nothing changed", async () => {
