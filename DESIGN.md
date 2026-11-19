@@ -906,6 +906,12 @@ sit to the right of the item's name and wrap under it only when the row has no r
   energy."). A refusal shows one red line that starts "Not changed.". The line uses the
   row's time colour for its actions and no buttons or outlines.
 
+How often they appear is set in one place, `MARK_DETAIL_PROMPTS` in
+`packages/core/src/resolvers/status.resolver.ts`: the late threshold for Done at (120
+minutes) and, for each line, the share of eligible marks that show it (1 = every time).
+The pick is fixed per item and day. Web and Mac read the same numbers; the Mac picks up a
+change with its next release.
+
 Design bench: `module.occurrence-mark-details`.
 
 ## ChatGPT plan card and Daily Brief plan states — Ticket 299

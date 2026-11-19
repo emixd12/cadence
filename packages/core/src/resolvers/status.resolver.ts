@@ -237,8 +237,43 @@ export const DONE_AT_REASON_CODE = "done_at";
 export const NOT_DONE_REASON_PREFIX = "not_done:";
 export const NOT_DONE_REASONS = ["no_time", "forgot", "low_energy", "away", "chose_not_to"] as const;
 export type NotDoneReason = (typeof NOT_DONE_REASONS)[number];
-/** A mark this long after the set time offers the "Done at" line (tune from data). */
-export const LATE_MARK_THRESHOLD_MINUTES = 120;
+/**
+ * How often the two mark-detail lines appear (Emi, Nov 19: keep it tunable). Change the
+ * numbers here; web and Mac both read them.
+ *
+ * - `lateAfterMinutes`: a Completed mark this long after the set time (or after a time
+ *   range ends) offers "Done at". Raise it to ask less often.
+ * - `share`: the part of eligible marks that show the line, from 0 (never) to 1 (every
+ *   time). The pick is fixed per item and day, so the same mark never flickers between
+ *   showing and not.
+ */
+export type MarkDetailPromptSettings = Readonly<{
+  doneAt: Readonly<{ lateAfterMinutes: number; share: number }>;
+  notDoneReason: Readonly<{ share: number }>;
+}>;
+
+export const MARK_DETAIL_PROMPTS: MarkDetailPromptSettings = Object.freeze({
+  doneAt: Object.freeze({ lateAfterMinutes: 120, share: 1 }),
+  notDoneReason: Object.freeze({ share: 1 }),
+});
+
+/** Kept for callers that read the late threshold directly. */
+export const LATE_MARK_THRESHOLD_MINUTES = MARK_DETAIL_PROMPTS.doneAt.lateAfterMinutes;
+
+/**
+ * Whether this item's line is in the shown share: a stable number in [0, 1) from the
+ * line kind, Occurrence id and local date, compared with `share`.
+ */
+export function markDetailPromptPicked(kind: "done_at" | "not_done_reason", occurrenceId: string, localDate: string, share: number): boolean {
+  if (share >= 1) return true;
+  if (share <= 0) return false;
+  let hash = 2166136261;
+  for (const char of `${kind}:${occurrenceId}:${localDate}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967296 < share;
+}
 
 export type MarkDetailEventPlan = Readonly<{
   previousStatus: "completed" | "not_completed";

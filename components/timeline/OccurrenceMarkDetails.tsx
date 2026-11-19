@@ -2,7 +2,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { createContext, Fragment, useContext, useId, useState, type ReactNode } from "react";
-import { LATE_MARK_THRESHOLD_MINUTES, NOT_DONE_REASONS, type NotDoneReason } from "@cadence/core/resolvers/status.resolver";
+import { MARK_DETAIL_PROMPTS, markDetailPromptPicked, NOT_DONE_REASONS, type MarkDetailPromptSettings, type NotDoneReason } from "@cadence/core/resolvers/status.resolver";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 
 /**
@@ -36,15 +36,17 @@ export const NOT_DONE_REASON_LABELS: Readonly<Record<NotDoneReason, string>> = {
   chose_not_to: "Chose not to",
 };
 
-type MarkDetailsContextValue = Readonly<{ actions: OccurrenceMarkDetailActions; timezone: string }>;
+type MarkDetailsContextValue = Readonly<{ actions: OccurrenceMarkDetailActions; timezone: string; prompts: MarkDetailPromptSettings }>;
 const MarkDetailsContext = createContext<MarkDetailsContextValue | null>(null);
 
-export function OccurrenceMarkDetailsProvider({ actions, timezone, children }: Readonly<{
+/** `prompts` defaults to `MARK_DETAIL_PROMPTS`; the design bench and tests pass their own. */
+export function OccurrenceMarkDetailsProvider({ actions, timezone, prompts = MARK_DETAIL_PROMPTS, children }: Readonly<{
   actions: OccurrenceMarkDetailActions;
   timezone: string;
+  prompts?: MarkDetailPromptSettings;
   children: ReactNode;
 }>) {
-  return <MarkDetailsContext.Provider value={{ actions, timezone }}>{children}</MarkDetailsContext.Provider>;
+  return <MarkDetailsContext.Provider value={{ actions, timezone, prompts }}>{children}</MarkDetailsContext.Provider>;
 }
 
 export function useOccurrenceMarkDetails(): MarkDetailsContextValue | null {
@@ -59,7 +61,7 @@ export type JustMarked = Readonly<{ status: "completed" | "not_completed"; at: s
  * range Behavior is late after its range ends and offers no set time.
  */
 export function lateMarkOffer(occurrence: Pick<TimelineOccurrenceView, "scheduledFor" | "scheduledTimeLabel" | "scheduleKind" | "scheduleEndTime" | "localDate">,
-  markedAt: string, timezone: string): Readonly<{ setTime: string | null; setTimeLabel: string | null }> | null {
+  markedAt: string, timezone: string, lateAfterMinutes: number = MARK_DETAIL_PROMPTS.doneAt.lateAfterMinutes): Readonly<{ setTime: string | null; setTimeLabel: string | null }> | null {
   const marked = Temporal.Instant.from(markedAt);
   const range = occurrence.scheduleKind === "range";
   let due = Temporal.Instant.from(occurrence.scheduledFor);
@@ -69,7 +71,7 @@ export function lateMarkOffer(occurrence: Pick<TimelineOccurrenceView, "schedule
         .toZonedDateTime({ timeZone: timezone, plainTime: Temporal.PlainTime.from(occurrence.scheduleEndTime) }).toInstant();
     } catch { /* keep the start */ }
   }
-  if (Temporal.Instant.compare(marked, due.add({ minutes: LATE_MARK_THRESHOLD_MINUTES })) < 0) return null;
+  if (Temporal.Instant.compare(marked, due.add({ minutes: lateAfterMinutes })) < 0) return null;
   return range ? { setTime: null, setTimeLabel: null } : { setTime: occurrence.scheduledFor, setTimeLabel: occurrence.scheduledTimeLabel };
 }
 
@@ -136,6 +138,7 @@ export function useOccurrenceMarkDetailParts({ occurrence, justMarked, toneClass
   const pending = current.state === "pending";
 
   if (justMarked.status === "not_completed") {
+    if (!markDetailPromptPicked("not_done_reason", occurrence.id, occurrence.localDate, context.prompts.notDoneReason.share)) return NONE;
     return {
       inline: inline("reasons", <>
         {"Why? "}
@@ -150,8 +153,8 @@ export function useOccurrenceMarkDetailParts({ occurrence, justMarked, toneClass
     };
   }
 
-  const offer = lateMarkOffer(occurrence, justMarked.at, context.timezone);
-  if (!offer) return NONE;
+  const offer = lateMarkOffer(occurrence, justMarked.at, context.timezone, context.prompts.doneAt.lateAfterMinutes);
+  if (!offer || !markDetailPromptPicked("done_at", occurrence.id, occurrence.localDate, context.prompts.doneAt.share)) return NONE;
   const saveAt = (instant: string) => run(() => context.actions.doneAt({ occurrenceId: occurrence.id, doneAt: instant }), `Saved as done at ${timeLabel(instant)}.`);
 
   if (current.state === "other") {

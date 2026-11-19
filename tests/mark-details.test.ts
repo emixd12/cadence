@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { MarkDetailCommit, OccurrenceRecord } from "@cadence/core/data-store";
 import { resolveAccountSync, type AccountSyncEntity } from "@cadence/core/resolvers/account-sync.resolver";
 import {
-  isMarkDetailEvent, LATE_MARK_THRESHOLD_MINUTES, MarkDetailRefusal, notDoneReasonOf,
+  isMarkDetailEvent, LATE_MARK_THRESHOLD_MINUTES, MARK_DETAIL_PROMPTS, MarkDetailRefusal, markDetailPromptPicked, notDoneReasonOf,
   resolveDoneAtDetail, resolveNotDoneReasonDetail,
 } from "@cadence/core/resolvers/status.resolver";
 import { recordOccurrenceDoneAt, recordOccurrenceNotDoneReason } from "@cadence/core/services/occurrence.service";
@@ -107,5 +107,22 @@ describe("mark details (advisor plan 4G)", () => {
     const fromWeb = resolveAccountSync({ accountLinkId: "link", baseline: before, local: before, hosted: after });
     expect(fromWeb.conflicts).toEqual([]);
     expect(fromWeb.localWrites.map(({ kind, id }) => `${kind}:${id}`)).toEqual(["status_event:reason"]);
+  });
+
+  it("shows the lines as often as the tunable settings say", () => {
+    expect(MARK_DETAIL_PROMPTS.doneAt.lateAfterMinutes).toBe(LATE_MARK_THRESHOLD_MINUTES);
+    const ids = Array.from({ length: 400 }, (_, index) => `occ-${index}`);
+    expect(ids.every((id) => markDetailPromptPicked("done_at", id, "2026-11-19", 1))).toBe(true);
+    expect(ids.some((id) => markDetailPromptPicked("not_done_reason", id, "2026-11-19", 0))).toBe(false);
+    const shown = ids.filter((id) => markDetailPromptPicked("not_done_reason", id, "2026-11-19", 0.25)).length;
+    expect(shown).toBeGreaterThan(60);
+    expect(shown).toBeLessThan(140);
+    // The same item and day always gets the same answer.
+    expect(markDetailPromptPicked("done_at", "occ-7", "2026-11-19", 0.5)).toBe(markDetailPromptPicked("done_at", "occ-7", "2026-11-19", 0.5));
+    // A higher late threshold asks less often.
+    const occurrence = { scheduledFor: sevenAm, scheduledTimeLabel: "7:00 AM", scheduleKind: "exact" as const, scheduleEndTime: null, localDate: "2026-11-19" };
+    const threeHoursLate = Temporal.Instant.from(sevenAm).add({ hours: 3 }).toString();
+    expect(lateMarkOffer(occurrence, threeHoursLate, TZ)).not.toBeNull();
+    expect(lateMarkOffer(occurrence, threeHoursLate, TZ, 240)).toBeNull();
   });
 });

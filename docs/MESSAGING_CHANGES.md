@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-071` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-073` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2041,7 +2041,7 @@ cite has not changed.
 - **Related:** P-061, P-063.
 - **Status:** logged.
 
-## P-070: Outside AI clients see why an item was not done (MCP contract 1.4.0)
+## P-072: Outside AI clients see why an item was not done (MCP contract 1.4.0)
 
 - **Change:** implemented November 19, 2026 (advisor Phase 4G). MCP contract 1.4.0 adds
   `not_done_reason` to each `status_history` entry of `get_occurrence`. `effective_at`
