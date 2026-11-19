@@ -172,6 +172,14 @@ describe("visitAdvisorTips", () => {
     expect(outcome.written).toBe(2);
     expect(s.runs[0]!.outcome).toBe("success");
   });
+
+  it("still runs the schedule proposal hook with tips off", async () => {
+    const afterTips = vi.fn().mockResolvedValue(undefined);
+    const s = state({ settings: { tipsOn: false, notesAllowed: false } });
+    const outcome = await run(fakePort(s), { afterTips });
+    expect(outcome.skipped).toBe("tips_off");
+    expect(afterTips).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1", matches: [] }));
+  });
 });
 
 describe("a steady account over 30 days", () => {

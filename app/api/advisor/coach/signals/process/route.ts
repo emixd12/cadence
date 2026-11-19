@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { agentCallerConfigured } from "@/lib/integrations/agent-caller";
+import { agentCallerConfigured, createAgentClient } from "@/lib/integrations/agent-caller";
 import { reportMonitoringError, reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import {
   buildAuthFailureRateLimitKey,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/security/auth-failure-rate-limits";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { agentModelConfigured, agentModelSetting } from "@/lib/services/agent-model";
-import { createHostedTipVisitPort, hostedDueTipAccounts, processCoachTips, visitAdvisorTips } from "@/lib/services/advisor-tips-job.service";
+import { createHostedTipVisitPort, hostedDueTipAccounts, hostedScheduleProposalHook, processCoachTips, visitAdvisorTips } from "@/lib/services/advisor-tips-job.service";
 import {
   coachSignalsEnabled,
   createHostedCoachVisitPort,
@@ -87,7 +87,12 @@ async function processRequest(request: NextRequest) {
       tips = await processCoachTips({
         runBudgetMs: TIPS_BUDGET_MS,
         selectDue: hostedDueTipAccounts(serviceRole),
-        visit: (account) => visitAdvisorTips(createHostedTipVisitPort(account.userId, { setting }), { setting }),
+        visit: (account) => {
+          const client = createAgentClient(account.userId, "coach").client;
+          return visitAdvisorTips(createHostedTipVisitPort(account.userId, { client, setting }), {
+            setting, afterTips: hostedScheduleProposalHook(client, account.userId),
+          });
+        },
       });
       reportMonitoringEvent({ name: "coach_tips_process_completed", context: { ...routeContext(request), ...tips } });
     }

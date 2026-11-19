@@ -28,6 +28,7 @@ import {
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createCoachSignalReads } from "@/lib/db/coach-signals.repo";
 import { createAgentClient } from "@/lib/integrations/agent-caller";
+import { proposeBehaviorChangesForVisit } from "./behavior-change-proposals.service";
 import { agentModelSetting, generateStructured, type AgentModelSetting, type AgentModelUsage } from "./agent-model";
 import { estimateCallMicrodollars, modelPrice, usageMicrodollars } from "./agent-model-pricing";
 import { readAdvisorTipsSettings, type AdvisorTipsSettings } from "./advisor-tips-settings";
@@ -199,6 +200,8 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
   try {
     const settings = await port.settings();
     if (!settings.tipsOn) {
+      // Schedule proposals are not tips: the tips switch does not stop them.
+      if (options.afterTips) await options.afterTips({ runId: run.runId, localDate: run.localDate, signals: [], matches: [] }).catch(() => undefined);
       await port.finishRun(run.runId, { outcome: "success", errorCode: null, errorReason: null, modelCalls: 0, usage: null });
       return { written: 0, modelCalls: 0, skipped: "tips_off", rejected: 0 };
     }
@@ -336,4 +339,28 @@ async function readDayNotes(client: AppSupabaseClient, userId: string, since: st
 
 function addDays(localDate: string, days: number): string {
   return Temporal.PlainDate.from(localDate).add({ days }).toString();
+}
+
+/** Weeks of planned items and moves the schedule proposal rule reads (workstream 4C). */
+const PROPOSAL_LOOKBACK_DAYS = 35;
+
+/**
+ * Workstream 4C's schedule proposals, on the tip run's own coach run. They read the last
+ * five weeks of planned items and moves and store at most one proposal. Card-backed
+ * candidates are not passed: today's Time-of-day gap and Never done signals name no
+ * Behavior and no new time, so only repeated same-weekday moves can propose a change.
+ */
+export function hostedScheduleProposalHook(client: AppSupabaseClient, userId: string): NonNullable<TipVisitOptions["afterTips"]> {
+  const reads = createCoachSignalReads(client, userId);
+  return async ({ runId, localDate }) => {
+    const since = addDays(localDate, -PROPOSAL_LOOKBACK_DAYS);
+    const [occurrences, moves] = await Promise.all([reads.occurrences(since, localDate), reads.moves(since)]);
+    await proposeBehaviorChangesForVisit(client, {
+      userId, runId, today: localDate,
+      occurrences: occurrences.flatMap((row) => row.id && row.startTime && row.scheduleKind
+        ? [{ id: row.id, behaviorId: row.behaviorId, localDate: row.localDate, scheduleKind: row.scheduleKind, startTime: row.startTime }]
+        : []),
+      moves,
+    });
+  };
 }
