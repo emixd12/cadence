@@ -267,9 +267,10 @@ export function buildChangedSchedules(schedules: readonly ProposalSchedule[], ch
 
 /** Same schedules, ignoring ids and the order of schedules, entries and weekdays. */
 export function schedulesEqual(left: readonly ProposalSchedule[], right: readonly ProposalSchedule[]): boolean {
-  const canon = (list: readonly ProposalSchedule[]) => list.map((schedule) => JSON.stringify({
+  // Key order is not kept: a list read back from jsonb has its keys in jsonb's own order.
+  const canon = (list: readonly ProposalSchedule[]) => list.map((schedule) => stableStringify({
     recurrence: canonicalRecurrence(schedule.recurrence),
-    entries: schedule.time_entries.map((entry) => JSON.stringify(withoutId(entry))).sort(),
+    entries: schedule.time_entries.map((entry) => stableStringify(withoutId(entry))).sort(),
   })).sort();
   return JSON.stringify(canon(left)) === JSON.stringify(canon(right));
 }
@@ -564,7 +565,7 @@ function hasCollision(schedules: readonly ProposalSchedule[]): boolean {
     const starts = schedules.flatMap((schedule) => {
       const days = scheduleWeekdays(schedule);
       if (days && !days.includes(day)) return [];
-      return schedule.time_entries.map((entry) => JSON.stringify(withoutId(entry)));
+      return schedule.time_entries.map((entry) => stableStringify(withoutId(entry)));
     });
     // Schedules we cannot place on a weekday are counted on every weekday: conservative.
     if (new Set(starts).size !== starts.length) return true;
@@ -575,6 +576,17 @@ function hasCollision(schedules: readonly ProposalSchedule[]): boolean {
 function canonicalRecurrence(rule: ProposalSchedule["recurrence"]): unknown {
   if (rule.frequency === "weekly") return { ...rule, days_of_week: WEEKDAYS.filter((day) => rule.days_of_week.includes(day)) };
   return rule;
+}
+
+/** JSON with object keys sorted, so equal values give equal text whatever their key order. */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function withoutId<T extends object>(value: T): T {

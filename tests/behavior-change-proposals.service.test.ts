@@ -13,21 +13,26 @@ const mocks = vi.hoisted(() => ({
   getBehavior: vi.fn(),
   timezone: vi.fn(),
   update: vi.fn(),
+  coachState: vi.fn(),
+  coachPropose: vi.fn(),
+  listBehaviors: vi.fn(),
 }));
 
 vi.mock("@/lib/db/behavior-change-proposals.repo", async (original) => ({
   ...(await original<typeof import("@/lib/db/behavior-change-proposals.repo")>()),
   readBehaviorChangeProposal: mocks.read,
   answerBehaviorChangeProposal: mocks.answer,
+  readCoachBehaviorChangeState: mocks.coachState,
+  coachProposeBehaviorChange: mocks.coachPropose,
 }));
 vi.mock("@/lib/db/behaviors.repo", () => ({
   getBehaviorById: mocks.getBehavior,
   getProfileTimezone: mocks.timezone,
-  listUserBehaviors: vi.fn(),
+  listUserBehaviors: mocks.listBehaviors,
 }));
 vi.mock("@/lib/services/behavior.service", () => ({ updateBehaviorForUser: mocks.update }));
 
-const { answerScheduleProposal, readScheduleProposal, proposalSchedules } = await import("@/lib/services/behavior-change-proposals.service");
+const { answerScheduleProposal, readScheduleProposal, proposalSchedules, proposeBehaviorChangesForVisit } = await import("@/lib/services/behavior-change-proposals.service");
 const { buildChangedSchedules } = await import("@cadence/core/services/behavior-change-proposal");
 
 const USER = "00000000-0000-4000-8000-000000000001";
@@ -56,13 +61,21 @@ const built = buildChangedSchedules(before, { weekdays: ["tuesday"], fromTime: "
 if (!built.ok) throw new Error("fixture");
 const after = built.schedules;
 
+/** A value as jsonb gives it back: object keys ordered by length, then bytewise. */
+function jsonbOrder<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(jsonbOrder) as T;
+  if (value === null || typeof value !== "object") return value;
+  const keys = Object.keys(value).sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));
+  return Object.fromEntries(keys.map((key) => [key, jsonbOrder((value as Record<string, unknown>)[key])])) as T;
+}
+
 let row: BehaviorChangeProposalRow;
 let behavior: BehaviorWithCategory;
 
 function proposed(overrides: Partial<BehaviorChangeProposalRow> = {}): BehaviorChangeProposalRow {
   return {
     id: PROPOSAL, behaviorId: GYM, createdLocalDate: "2026-11-19", weekdays: ["tuesday"], fromTime: "07:00", toTime: "18:30",
-    direction: "later", schedulesBefore: before, schedulesAfter: after, firstAffectedDate: "2026-11-24",
+    direction: "later", schedulesBefore: jsonbOrder(before), schedulesAfter: jsonbOrder(after), firstAffectedDate: "2026-11-24",
     reason: "You moved it to about 6:30 PM on 4 of the last 5 Tuesdays.", status: "proposed", closeReason: null,
     acceptedLocalDate: null, checkInDate: null, noticeShownAt: null, replayed: false, ...overrides,
   };
@@ -136,6 +149,46 @@ describe("showing a proposal", () => {
     behavior = gym(["monday", "tuesday", "thursday"], "08:00:00");
     expect(await readScheduleProposal(caller(THURSDAY))).toEqual({ kind: "none" });
     expect(row.status).toBe("expired");
+  });
+});
+
+describe("stored lists and retries", () => {
+  it("the fixture lists really come back in jsonb key order", () => {
+    expect(Object.keys(row.schedulesBefore[0]!.recurrence)).not.toEqual(Object.keys(before[0]!.recurrence));
+  });
+
+  it("an applied Try whose record failed stays open, and a repeat records it without a second edit", async () => {
+    mocks.answer.mockRejectedValueOnce(new Error("network"));
+    await expect(answerScheduleProposal(caller(THURSDAY), { proposalId: PROPOSAL, answer: "try" })).rejects.toBeDefined();
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(row.status).toBe("proposed");
+    expect(await readScheduleProposal(caller(THURSDAY))).toMatchObject({ kind: "proposal", proposalId: PROPOSAL });
+    expect(row.status).toBe("proposed");
+    // Even on a held weekday the repeat only records, so it goes through.
+    const again = await answerScheduleProposal(caller("2026-11-24T15:00:00Z"), { proposalId: PROPOSAL, answer: "try" });
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(again).toMatchObject({ applied: false });
+    expect(row.status).toBe("accepted_trial");
+  });
+});
+
+describe("coach visits", () => {
+  it("does not stop on the state read's open flag; the propose call settles and decides", async () => {
+    mocks.coachState.mockResolvedValue({ hasOpen: true, declined: [] });
+    mocks.listBehaviors.mockResolvedValue([behavior]);
+    mocks.coachPropose.mockResolvedValue({ id: "00000000-0000-4000-8000-0000000000aa" });
+    const tuesdays = ["2026-10-20", "2026-10-27", "2026-11-03", "2026-11-10", "2026-11-17"];
+    const outcome = await proposeBehaviorChangesForVisit({} as never, {
+      userId: USER, runId: "00000000-0000-4000-8000-0000000000bb", today: "2026-11-19",
+      occurrences: tuesdays.map((date, i) => ({ id: `occ-${i}`, behaviorId: GYM, localDate: date, scheduleKind: "exact", startTime: "07:00:00" })),
+      moves: tuesdays.slice(1).map((date, i) => ({
+        occurrenceId: `occ-${i + 1}`, kind: "move" as const, chainPosition: 1, toPlanned: false,
+        toStartAt: Temporal.PlainDateTime.from(`${date}T18:30`).toZonedDateTime("America/New_York").toInstant().toString(),
+        timezone: "America/New_York",
+      })),
+    });
+    expect(mocks.coachPropose).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ proposed: true });
   });
 });
 

@@ -119,8 +119,10 @@ export async function proposeBehaviorChangesForVisit(client: AppSupabaseClient, 
   /** Model-written reasons by Behavior id, when 4B has them; the code writes its own otherwise. */
   reasons?: Readonly<Record<string, string>>;
 }>): Promise<VisitProposalOutcome> {
+  // No early return on state.hasOpen: that read does not settle proposals past their dates,
+  // so a stale one would block every visit. coach_propose_behavior_change settles first and
+  // refuses with open_proposal when one is really open.
   const state = await readCoachBehaviorChangeState(client);
-  if (state.hasOpen) return { proposed: false, reason: "open_proposal" };
 
   const items: PlannedItem[] = input.occurrences.map((row) => ({
     occurrenceId: row.id, behaviorId: row.behaviorId, localDate: row.localDate,
@@ -205,7 +207,8 @@ export async function answerScheduleProposal(caller: ScheduleProposalCaller, inp
     return { applied: false, replayed: recorded.replayed, view: { kind: "none" }, message: answer === "no" ? "No change." : `${await titleOf(caller, row)} stays at ${formatClockTimeLabel(row.toTime)}.` };
   }
   // Every answer below edits the schedule: never on a weekday the change touches (T1).
-  if (isHeldToday(today, row.weekdays)) throw new ScheduleProposalError("held_today");
+  // The one exception is a repeat whose edit already happened, which only records.
+  const held = isHeldToday(today, row.weekdays);
   const behavior = await getBehaviorById(caller.supabase, caller.userId, row.behaviorId);
   const current = behavior && behavior.active ? proposalSchedules(behavior) : null;
   const change: BehaviorChange = { weekdays: row.weekdays, fromTime: row.fromTime, toTime: row.toTime };
@@ -217,6 +220,7 @@ export async function answerScheduleProposal(caller: ScheduleProposalCaller, inp
       throw new ScheduleProposalError("schedule_changed");
     }
     if (!schedulesEqual(current, row.schedulesAfter)) {
+      if (held) throw new ScheduleProposalError("held_today");
       if (!schedulesEqual(current, row.schedulesBefore)) {
         await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer: "schedule_changed", today }));
         throw new ScheduleProposalError("schedule_changed");
@@ -238,6 +242,7 @@ export async function answerScheduleProposal(caller: ScheduleProposalCaller, inp
   }
 
   // Go back: only while the schedule still equals what the trial set (T4).
+  if (held) throw new ScheduleProposalError("held_today");
   if (!current || !schedulesEqual(current, row.schedulesAfter)) {
     if (current && schedulesEqual(current, row.schedulesBefore)) {
       // Already restored (a repeat after a failure): record only.
@@ -284,12 +289,15 @@ async function settleAndView(caller: ScheduleProposalCaller, row: BehaviorChange
   const current = behavior && behavior.active ? proposalSchedules(behavior) : null;
 
   if (row.status === "proposed") {
-    if (!current || !schedulesEqual(current, row.schedulesBefore)) {
+    // Equal to the after-list: an answer applied the change but recording it failed (or is in
+    // flight). Keep the proposal so a repeat of the answer records it.
+    const appliedUnrecorded = current !== null && schedulesEqual(current, row.schedulesAfter);
+    if (!appliedUnrecorded && (!current || !schedulesEqual(current, row.schedulesBefore))) {
       // The person changed the schedule (or archived the Behavior) first: the line is stale.
       await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer: "schedule_changed", today }));
       return { kind: "none" };
     }
-    if (isHeldToday(today, row.weekdays)) return { kind: "hold", proposalId: row.id, reason: "affected_weekday_today" };
+    if (!appliedUnrecorded && isHeldToday(today, row.weekdays)) return { kind: "hold", proposalId: row.id, reason: "affected_weekday_today" };
     const first = firstAffectedDate(today, row.weekdays);
     return {
       kind: "proposal",
