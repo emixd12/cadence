@@ -42,11 +42,11 @@ const CARD = {
 
 // ---------- Timeline fixture: Thursday, November 19, 2026, 3:20 PM in New York ----------
 
-function occurrence(id: string, title: string, scheduledFor: string, localDate: string, label: string,
+function occurrence(id: string, title: string, at: string, localDate: string, label: string,
   status: TimelineOccurrenceInput["status"] = "unresolved"): TimelineOccurrenceInput {
   return {
-    id, behaviorId: `behavior-${id}`, title, scheduledFor, scheduledTimeLabel: label, localDate, status,
-    statusMarkedAt: { unresolved: null, completed: scheduledFor, not_completed: scheduledFor }[status],
+    id, behaviorId: `behavior-${id}`, title, scheduledFor: at, scheduledTimeLabel: label, localDate, status,
+    statusMarkedAt: { unresolved: null, completed: at, not_completed: at }[status],
     description: "", categoryName: "Bench", scheduleSummary: `Every day at ${label}`, note: "",
     timeTracking: { recordedSeconds: 0, runningStartedAt: null }, canStartTimeTracking: false,
   };
