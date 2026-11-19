@@ -107,10 +107,34 @@ describe("move lines", () => {
     await render(client);
     await click(button(line("gym"), "Yes"));
     const alert = line("gym").querySelector("[data-alert-kind='write_refused']")!;
-    expect(alert.textContent).toContain("can’t move to that time now");
+    expect(alert.textContent).toContain("5:30 PM is taken now: you moved Piano practice there after this brief was written.");
     await click(button(alert, "4:00 PM"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "other_time", proposalId: "gym", startAt: "2026-11-18T21:00:00.000Z" }));
     expect(line("gym").textContent).toContain("moved to 4:00 PM");
+  });
+
+  it("re-checks open lines when the brief opens, and shows a stale one already re-planned", async () => {
+    const client = fixtureBriefMoveClient({ stale: ["gym"] });
+    const recheck = vi.spyOn(client, "recheck");
+    await render(client);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(recheck).toHaveBeenCalledWith({ localDate: "2026-11-18", context, proposalIds: ["walk", "gym", "vitamins"] }, expect.any(AbortSignal));
+    expect(line("gym")).toBeNull();
+    expect(line("gym-rechecked").textContent).toContain("12:30 PM → 6:30 PM");
+    expect(line("gym-rechecked").textContent).toContain("5:30 PM is taken now, so 6:30 PM instead.");
+    expect(line("walk").textContent).toContain("9:00 AM → 11:30 AM");
+  });
+
+  it("drops a line the re-check says no longer fits, and keeps the brief when the re-check fails", async () => {
+    const client = fixtureBriefMoveClient();
+    vi.spyOn(client, "recheck").mockResolvedValueOnce({ replaced: [{ proposalId: "walk", line: null }] });
+    await render(client);
+    expect(line("walk")).toBeNull();
+    await act(() => root.unmount());
+    root = createRoot(container);
+    vi.spyOn(client, "recheck").mockRejectedValueOnce(new DailyBriefRequestError("offline"));
+    await render(client);
+    expect(line("walk")).not.toBeNull();
   });
 
   it("Other time lists free times, a time picker and Re-plan", async () => {

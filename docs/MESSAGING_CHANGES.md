@@ -1926,7 +1926,9 @@ cite has not changed.
   today and opens the bottom move note with Undo. The brief no longer expires after five
   minutes and is no longer withdrawn when the Timeline changes; **Close** leaves a
   **Today's brief** link, and **Refresh** replaces the brief. The bubble no longer says
-  "read-only".
+  "read-only". Each time the brief opens, its lines are re-checked against the current
+  Timeline; a line whose time was taken arrives re-planned with the cause in its reason,
+  and a refused answer names what is in the slot now (Emi, November 19).
 - **Affected:** `components/briefing/BriefMoveLines.tsx`, `DailyBriefBubble.tsx`,
   `DailyBriefLauncher.tsx`; `docs/user-guide/timeline.md` ("Daily Brief" and "Answer a
   suggested move", updated in the same change).

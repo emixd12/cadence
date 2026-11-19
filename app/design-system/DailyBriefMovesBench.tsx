@@ -8,7 +8,8 @@ import { BRIEF_MOVE_FIXTURE, BRIEF_MOVE_FIXTURE_BRIEFING, BRIEF_MOVE_FIXTURE_LIN
 
 // Advisor plan Phase 3B. The brief's move lines with synthetic data and no account:
 // every answer applies in memory, except that Gym's Yes is refused so the alert state
-// shows. Yes opens the shared bottom drawer with Undo. No model call is made.
+// shows. Yes opens the shared bottom drawer with Undo. The "rechecked" state opens with
+// Gym's 5:30 taken since the brief was written, so it arrives re-planned. No model call.
 
 const TODAY = BRIEF_MOVE_FIXTURE.localDate;
 const TZ = BRIEF_MOVE_FIXTURE.timezone;
@@ -33,6 +34,7 @@ const ANSWERED: DailyBriefing = {
 export function DailyBriefMovesBench() {
   const client = useMemo(() => fixtureBriefMoveClient({ refuse: ["gym"], delayMs: 150 }), []);
   const answeredClient = useMemo(() => fixtureBriefMoveClient(), []);
+  const recheckedClient = useMemo(() => fixtureBriefMoveClient({ stale: ["gym"] }), []);
   const actions = useMemo<OccurrenceMoveActions>(() => ({
     async suggest() { return []; },
     async move(input) { return { status: "moved", occurrenceId: input.occurrenceId, moveId: "bench", effectiveStartAt: null, revision: "r2" }; },
@@ -46,6 +48,10 @@ export function DailyBriefMovesBench() {
       <div className="grid gap-12 bg-background px-3 pb-16 pt-10 sm:px-6">
         <div data-bench-state="morning">
           <DailyBriefBubble state="ready" briefing={BRIEF_MOVE_FIXTURE_BRIEFING} moves={moves} onDismiss={() => undefined}
+            refresh={{ onRefresh: () => undefined, pending: false, available: true, error: null }} />
+        </div>
+        <div data-bench-state="rechecked">
+          <DailyBriefBubble state="ready" briefing={BRIEF_MOVE_FIXTURE_BRIEFING} moves={{ client: recheckedClient, planningContext: () => ({ calendarBusy: [] }) }} onDismiss={() => undefined}
             refresh={{ onRefresh: () => undefined, pending: false, available: true, error: null }} />
         </div>
         <div data-bench-state="answered">

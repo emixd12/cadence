@@ -93,6 +93,23 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
     }));
   }, []);
 
+  // Re-check on open: lines whose time was taken after the brief was written arrive
+  // already re-planned. Failures change nothing; Yes still checks again on the server.
+  useEffect(() => {
+    if (!client.recheck || !initial.lines.some((line) => OPEN_STATUSES.has(line.status))) return;
+    const controller = new AbortController();
+    const proposalIds = initial.lines.filter((line) => OPEN_STATUSES.has(line.status)).map((line) => line.proposalId);
+    client.recheck({ localDate: initial.localDate, context: planningContext(), proposalIds }, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        for (const entry of response.replaced) replaceLine(entry.proposalId, entry.line);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+    // Once per mount: the bubble remounts this component on every open and reopen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Sends one answer for one line and folds the result back in. */
   const answer = useCallback(async (line: BriefMoveLine, request: BriefMoveAnswerRequest): Promise<BriefMoveAnswerResponse | null> => {
     patchUi(line.proposalId, { pending: true, refusal: null });
@@ -245,7 +262,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
       {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" size="compact" className="mb-2">
         Your calendar couldn’t be read just now, so times that depend on it aren’t offered.
       </AlertNotice> : null}
-      {(moves.acceptAll && open.length >= 2) || moves.undoAllBatchId ? <p className="text-sm leading-6 text-muted-readable" data-brief-accept-all>
+      {(moves.acceptAll && open.length >= 2) || moves.undoAllBatchId ? <p className="text-sm leading-6" data-brief-accept-all>
         {moves.acceptAll && open.length >= 2
           ? <button type="button" className={`font-bold text-foreground ${LINK}`} disabled={batchPending} onClick={() => void acceptAll()}>Accept all</button>
           : null}
@@ -319,20 +336,18 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.length.assumed && line.travel === "not_checked" ? " · " : null}
         {line.travel === "not_checked" ? "travel not checked" : null}
       </p> : null}
-      <p className="text-muted-readable" data-brief-move-actions>
-        {line.status === "proposed" ? <>
-          <ActionLink label="Yes" strong disabled={pending} onClick={onYes} />
-          <Dot /><ActionLink label="No" disabled={pending} onClick={onNo} />
-          <Dot /><ActionLink label="Other time" disabled={pending} onClick={() => onPanel(ui.panel === "other_time" ? null : "other_time")} expanded={ui.panel === "other_time"} />
-          {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
-        </> : null}
+      {line.status === "proposed" ? <p data-brief-move-actions>
+        <ActionLink label="Yes" strong disabled={pending} onClick={onYes} />
+        <Dot /><ActionLink label="No" disabled={pending} onClick={onNo} />
+        <Dot /><ActionLink label="Other time" disabled={pending} onClick={() => onPanel(ui.panel === "other_time" ? null : "other_time")} expanded={ui.panel === "other_time"} />
+        {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
+        {line.offerNeverMove ? <><Dot /><ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
+      </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
         {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
         {line.status === "declined" || line.status === "undone" ? "Not moving this today." : null}
         {line.status === "already_done" ? "Marked Completed." : null}
-        {line.offerNeverMove && (line.status === "proposed" || line.status === "declined") ? <>
-          {line.status === "proposed" ? <Dot /> : " "}<ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} />
-        </> : null}
-      </p>
+        {line.offerNeverMove && line.status === "declined" ? <> <ActionLink label="Don’t suggest moving this" disabled={pending} onClick={onNeverMove} /></> : null}
+      </p>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}
       {ui.refusal ? <AlertNotice kind="write_refused" size="compact" className="mt-1"
@@ -358,19 +373,19 @@ function OtherTimePanel({ line, pending, onPick, onReplan }: Readonly<{
   return (
     <div className="mt-1 grid gap-1 border-l border-line pl-3 text-sm leading-6" data-brief-other-time>
       {line.otherTimes.length ? <p>
-        <span className="text-muted-readable">Free today: </span>
+        <span>Free today: </span>
         {line.otherTimes.map((instant, index) => <span key={instant} className="whitespace-nowrap">
           {index ? " · " : ""}<button type="button" className={LINK} disabled={pending} onClick={() => onPick(instant)}>{moveTimeLabel(instant, line.timezone)}</button>
         </span>)}
-      </p> : <p className="text-muted-readable">No other free time found today.</p>}
+      </p> : <p>No other free time found today.</p>}
       <p className="flex flex-wrap items-center gap-x-2">
-        <label className="text-muted-readable" htmlFor={`brief-time-${line.proposalId}`}>Or pick a time</label>
+        <label htmlFor={`brief-time-${line.proposalId}`}>Or pick a time</label>
         <input id={`brief-time-${line.proposalId}`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)}
           className="min-h-11 border-0 border-b border-line bg-transparent px-0 py-1 text-sm tabular-nums focus:border-foreground focus:outline-none sm:min-h-9" />
         <button type="button" className={LINK} disabled={pending || !picked} onClick={() => picked && onPick(picked)}>Move</button>
       </p>
-      <p><button type="button" className={LINK} disabled={pending} onClick={onReplan}>Re-plan</button>
-        <span className="text-muted-readable"> · finds a new time with what’s on your calendar now</span></p>
+      <p><button type="button" className={LINK} disabled={pending} onClick={onReplan}>Re-plan</button></p>
+      <p className="text-xs leading-5 text-muted-readable">Re-plan finds a new time with what’s on your calendar now.</p>
     </div>
   );
 }
@@ -381,12 +396,12 @@ function LengthPanel({ minutes, pending, onSave, onCancel }: Readonly<{ minutes:
   const valid = Number.isFinite(parsed) && parsed >= 5 && parsed <= 720;
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-2 border-l border-line pl-3 text-sm leading-6" data-brief-length>
-      <label className="text-muted-readable" htmlFor="brief-length">Usually takes</label>
+      <label htmlFor="brief-length">Usually takes</label>
       <input id="brief-length" type="number" inputMode="numeric" min={5} max={720} step={5} value={value} onChange={(event) => setValue(event.target.value)}
         className="min-h-11 w-16 border-0 border-b border-line bg-transparent px-0 py-1 text-sm tabular-nums focus:border-foreground focus:outline-none sm:min-h-9" />
-      <span className="text-muted-readable">min</span>
+      <span>min</span>
       <button type="button" className={LINK} disabled={pending || !valid} onClick={() => onSave(parsed)}>Save</button>
-      <span className="text-muted-readable">·</span>
+      <span aria-hidden="true">·</span>
       <button type="button" className={LINK} disabled={pending} onClick={onCancel}>Cancel</button>
     </p>
   );
@@ -407,7 +422,7 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
       <p>{conflict.conflictingTitle
         ? `Your schedule change put it on top of ${conflict.conflictingTitle}.`
         : "Your schedule change put another item at the same time."}</p>
-      {onKeep || onMove ? <p className="text-muted-readable">
+      {onKeep || onMove ? <p>
         {onKeep ? <ActionLink label="Keep it here" disabled={pending} onClick={() => { setPending(true); void onKeep().finally(() => setPending(false)); }} /> : null}
         {onKeep && onMove ? <Dot /> : null}
         {onMove ? <ActionLink label="Move it" disabled={pending} onClick={onMove} /> : null}

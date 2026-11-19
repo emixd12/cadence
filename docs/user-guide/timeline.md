@@ -81,9 +81,12 @@ items around them. Answer with the text links under the line:
 
 "assumes 30 min · change" means Cadence does not know how long the item takes. Choose
 **change** to set its usual length; the line is planned again with it. "travel not
-checked" means Cadence had no travel time for the new slot. Each answer is checked when
-you tap it; if the time is no longer free, the line says **Not changed** and offers free
-times instead. The first time you use each answer, one short line explains it.
+checked" means Cadence had no travel time for the new slot. Each time the brief opens,
+Cadence checks its lines against your Timeline as it is now. If a suggested time was taken
+after the brief was written, the line arrives with a new time and says why. Each answer
+is checked again when you tap it; if the time is no longer free, the line says **Not
+changed**, names what is there now, and offers free times instead. The first time you
+use each answer, one short line explains it.
 
 Linked, online desktop accounts use hosted information. Unsynchronized and
 local-only records are absent; offline tracking still works without Daily Brief.

@@ -87,7 +87,7 @@ export const BRIEF_MOVE_FIXTURE_BRIEFING: DailyBriefing = {
 };
 
 /** A client that applies every answer at once, refusing Gym's Yes to show the refusal state when asked. */
-export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly string[]; delayMs?: number }> = {}): BriefMoveClient {
+export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly string[]; stale?: readonly string[]; delayMs?: number }> = {}): BriefMoveClient {
   const refuse = new Set(options.refuse ?? []);
   const lines = new Map(BRIEF_MOVE_FIXTURE_LINES.map((entry) => [entry.proposalId, entry]));
   const wait = () => new Promise((resolve) => setTimeout(resolve, options.delayMs ?? 0));
@@ -96,7 +96,7 @@ export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly str
     if (refuse.has(proposalId) && (kind === "yes" || kind === "accept_all")) {
       return {
         proposalId, outcome: "refused", line: current, moveId: null, occurrence: null,
-        refusal: { reason: "slot_taken", message: `${current.title} can’t move to that time now: another item is there.`, alternatives: [at("16:00"), at("18:30")], revision: current.expectedRevision },
+        refusal: { reason: "slot_taken", message: `${formatFixtureTime(current.to.startAt)} is taken now: you moved Piano practice there after this brief was written.`, alternatives: [at("16:00"), at("18:30")], revision: current.expectedRevision },
       };
     }
     const status = kind === "yes" || kind === "accept_all" ? "accepted" : kind === "other_time" ? "other_time"
@@ -144,5 +144,20 @@ export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly str
     async readPreference(behaviorId) {
       return { behaviorId, neverSuggestMove: false, updatedAt: null };
     },
+    async recheck() {
+      await wait();
+      // A stale line arrives re-planned, with the reason naming what took its time.
+      return { replaced: (options.stale ?? []).map((proposalId) => {
+        const current = lines.get(proposalId)!;
+        const next: BriefMoveLine = { ...current, proposalId: `${proposalId}-rechecked`, to: { startAt: at("18:30"), endAt: at("19:00") },
+          reason: `${formatFixtureTime(current.to.startAt)} is taken now, so 6:30 PM instead.` };
+        lines.set(next.proposalId, next);
+        return { proposalId, line: next };
+      }) };
+    },
   };
+}
+
+function formatFixtureTime(instant: string): string {
+  return new Date(instant).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TIMEZONE });
 }

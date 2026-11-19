@@ -966,7 +966,7 @@
     {
       "path": "components/briefing/BriefMoveLines.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 32,
+      "interaction_marker_count": 33,
       "interaction_ids": [
         "INT-BRIEF-006",
         "INT-BRIEF-007"

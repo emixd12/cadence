@@ -3,11 +3,27 @@ import {
   type BehaviorMovePreference,
   type BriefMoveAnswerRequest,
   type BriefMoveAnswerResponse,
+  type BriefMoveLine,
   type BriefMoveLengthRequest,
   type BriefMoveLengthResponse,
   type BriefMoveReplanRequest,
   type BriefMoveReplanResponse,
+  type BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
+
+/**
+ * Re-check on open (Emi, Nov 19): the server tests each open line against the Timeline
+ * as it is now and re-plans the ones whose time was taken after the brief was written.
+ * `line: null` drops a line that no longer fits or was already handled. Planner only.
+ */
+export type BriefMoveRecheckRequest = Readonly<{
+  localDate: string;
+  context: BriefPlanningContext;
+  /** The lines the screen shows; a listed line that closed elsewhere comes back as null. */
+  proposalIds?: readonly string[];
+}>;
+export type BriefMoveRecheckResponse = Readonly<{ replaced: readonly Readonly<{ proposalId: string; line: BriefMoveLine | null }>[] }>;
+export const BRIEF_MOVE_RECHECK_ROUTE = "/api/advisor/brief/recheck";
 
 /**
  * Advisor plan Phase 3: the brief's move answers, one transport for the web (3B) and
@@ -26,6 +42,8 @@ export type BriefMoveClient = Readonly<{
   preference: (input: Readonly<{ behaviorId: string; neverSuggestMove: boolean }>, signal?: AbortSignal) => Promise<BehaviorMovePreference>;
   /** The current switch for Behavior settings (GET). */
   readPreference: (behaviorId: string, signal?: AbortSignal) => Promise<BehaviorMovePreference>;
+  /** Re-checks open lines when the brief opens. Optional so older clients keep working. */
+  recheck?: (request: BriefMoveRecheckRequest, signal?: AbortSignal) => Promise<BriefMoveRecheckResponse>;
 }>;
 
 /** Answers are single database writes; the ceiling only bounds a stalled network. */
@@ -60,5 +78,7 @@ export function createBriefMoveClient(
       request<BehaviorMovePreference>(BRIEF_MOVE_ROUTES.preference, { method: "PUT", body: JSON.stringify(body) }, signal),
     readPreference: (behaviorId, signal) =>
       request<BehaviorMovePreference>(`${BRIEF_MOVE_ROUTES.preference}?behaviorId=${encodeURIComponent(behaviorId)}`, {}, signal),
+    recheck: (body, signal) =>
+      request<BriefMoveRecheckResponse>(BRIEF_MOVE_RECHECK_ROUTE, { method: "POST", body: JSON.stringify(body) }, signal),
   };
 }

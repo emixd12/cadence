@@ -64,13 +64,19 @@ export function DailyBriefBubble({
   return (
     <section
       aria-label="Cadence Daily Brief"
-      className="relative z-10 ml-auto -mt-8 w-[min(30rem,calc(100%-1.5rem))] border border-line bg-background p-3 shadow-none motion-reduce:transition-none sm:-mt-6"
+      className="relative z-10 ml-auto -mt-8 w-full border border-line bg-background p-4 shadow-none motion-reduce:transition-none sm:-mt-6 sm:w-[min(40rem,100%)]"
       data-daily-brief-state={state}
     >
       <span aria-hidden="true" className="absolute -top-2 right-[20%] h-4 w-4 rotate-45 border-l border-t border-line bg-background" />
-      <div className="grid max-h-[min(34rem,70dvh)] grid-cols-[minmax(0,1fr)_2.75rem] gap-3 overflow-y-auto">
+      {/* Close sits on the title row only, so the brief's text uses the full width below it. */}
+      {/* Buttons inherit their size (globals.css), so the row sets it for Close. */}
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <p className="font-bold">Daily Brief</p>
+        <button type="button" onClick={onDismiss} aria-label="Dismiss Daily Brief"
+          className="-my-3 min-h-11 min-w-11 py-3 text-right text-muted-readable underline underline-offset-2 hover:text-foreground">Close</button>
+      </div>
+      <div className="max-h-[min(34rem,70dvh)] overflow-y-auto">
         <div className="min-w-0">
-          <p className="text-sm font-bold">Daily Brief</p>
           {state === "loading" ? <p className="mt-1 text-sm leading-6 text-muted-readable">Preparing today’s brief…</p> : null}
           {ready ? <>
             {briefing.text.trim() || !lanes ? <p role="status" aria-live="polite" className="mt-1 break-words whitespace-pre-wrap text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{named(briefing.text)}</p> : null}
@@ -146,7 +152,6 @@ export function DailyBriefBubble({
             </div> : null}
           </> : null}
         </div>
-        <button type="button" onClick={onDismiss} aria-label="Dismiss Daily Brief" className="product-action product-action-secondary min-h-11 min-w-11 self-start px-2 py-2 text-sm">Close</button>
       </div>
     </section>
   );
