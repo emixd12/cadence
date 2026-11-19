@@ -71,8 +71,8 @@ items around them. Answer with the text links under the line:
 - **Yes** moves the item to that time for today only. The Timeline redraws and a note at
   the bottom of the screen confirms it with **Undo**. Your schedule does not change.
 - **No** leaves the item where it is, and the brief suggests nothing more for it today.
-  The line leaves the brief, unless it offers **Stop suggesting moves for** *item*: then it stays,
-  with its reason, as "Vitamins stays at 8:00 AM".
+  The line leaves the brief, unless it offers **Stop suggesting moves for** *item*: then it
+  stays, with its reason, and says "Staying at 8:00 AM."
 - **Other time** lists other free times, lets you pick a time, or **Re-plan** finds a new
   time with what is on your calendar now.
 - **Already did it** appears on items whose time has passed and marks the item Completed.

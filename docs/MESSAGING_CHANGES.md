@@ -2018,8 +2018,9 @@ cite has not changed.
   Timeline; a line whose time was taken arrives re-planned with the cause in its reason,
   and a refused answer names what is in the slot now (Emi, November 19). Each line is one
   sentence, "Walk 9:00 AM → 11:30 AM: <reason>", and keeps its reason after an answer. After
-  No or Undo the line leaves the brief, unless it offers Don't suggest moving this; then it
-  reads "Vitamins stays at 8:00 AM: <reason>" over the link alone.
+  No or Undo the line leaves the brief, unless it offers the lasting opt-out; then the
+  suggestion stays as written with the outcome "Staying at 8:00 AM." in italics. Every
+  outcome ("Moved to 11:30 AM for today. Undo", "Marked Completed.") uses that italic style.
   "travel not checked" is no longer shown, a refusal is one red sentence ("Not changed. 5:30 PM is taken now: …") with no icon, and answers no
   longer add a first-use explainer that repeats the line (Emi, November 19). The P-068
   link now reads "Stop suggesting moves for [item]" (for example "Stop suggesting moves for

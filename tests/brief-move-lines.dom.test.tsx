@@ -80,7 +80,7 @@ describe("move lines", () => {
     await click(button(line("walk"), "Yes"));
     expect(answer).toHaveBeenCalledWith(expect.objectContaining({ kind: "yes", proposalId: "walk", expectedRevision: BRIEF_MOVE_FIXTURE_LINES[0]!.expectedRevision, context }));
     expect(refresh).toHaveBeenCalled();
-    expect(line("walk").textContent).toContain("moved to 11:30 AM");
+    expect(line("walk").textContent).toContain("Moved to 11:30 AM for today. Undo");
     expect(line("walk").querySelector("[data-brief-explainer]")).toBeNull();
     const drawer = document.querySelector("[data-move-toast]")!;
     expect(drawer.textContent).toContain("Walk moved to 11:30 AM for today.");
@@ -96,11 +96,12 @@ describe("move lines", () => {
     await render(fixtureBriefMoveClient());
     await click(button(line("vitamins"), "No"));
     expect(line("vitamins").className).not.toContain("opacity");
-    expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins stays at 8:00 AM: 8:00 has passed; lunch is the next quiet moment.");
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Stop suggesting moves for Vitamins");
+    expect(line("vitamins").querySelector("p")!.textContent).toBe("Vitamins 8:00 AM → 12:15 PM: 8:00 has passed; lunch is the next quiet moment.");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Staying at 8:00 AM. Stop suggesting moves for Vitamins");
+    expect(line("vitamins").querySelector("[data-brief-outcome]")!.className).toContain("italic");
     expect(line("vitamins").querySelector("[data-brief-explainer]")).toBeNull();
     await click(button(line("vitamins"), "Stop suggesting moves for Vitamins"));
-    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("The brief won’t suggest moving Vitamins again. You can change this in its settings.");
+    expect(line("vitamins").querySelector("[data-brief-move-actions]")!.textContent).toBe("Staying at 8:00 AM. The brief won’t suggest moving Vitamins again; you can change this in its settings.");
   });
 
   it("drops a line answered No from the brief when there is nothing more to choose", async () => {
@@ -121,7 +122,7 @@ describe("move lines", () => {
     expect(alert.textContent).toContain("5:30 PM is taken now: you moved Piano practice there after this brief was written.");
     await click(button(alert, "4:00 PM"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "other_time", proposalId: "gym", startAt: "2026-11-18T21:00:00.000Z" }));
-    expect(line("gym").textContent).toContain("moved to 4:00 PM");
+    expect(line("gym").textContent).toContain("Moved to 4:00 PM for today.");
   });
 
   it("re-checks open lines when the brief opens, and shows a stale one already re-planned", async () => {

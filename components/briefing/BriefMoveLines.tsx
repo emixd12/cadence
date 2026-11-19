@@ -1,7 +1,7 @@
 "use client";
 
 import { Temporal } from "@js-temporal/polyfill";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRefresh } from "@cadence/ui/runtime";
 import type {
   BriefMoveAnswerKind,
@@ -325,16 +325,11 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
   return (
     <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]"
       data-brief-move-line={line.proposalId} data-brief-move-status={line.status}>
-      {/* One sentence: the item, its times, then why. The reason stays after an answer. */}
+      {/* The suggestion as written, unchanged after an answer so its reason still reads true.
+          What the answer did goes on the outcome line below. */}
       <p data-brief-move-head>
         <span className="font-bold">{line.title}</span>{" "}
-        {moved
-          ? <span className="whitespace-nowrap">moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to}</span>
-          : line.status === "already_done"
-            ? <span className="whitespace-nowrap">done</span>
-            : closed
-              ? <span className="whitespace-nowrap tabular-nums">stays at {from}</span>
-              : <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>}
+        <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>
         {line.reason ? <>: {line.reason}</> : null}
       </p>
       {!closed && !moved && line.length.assumed ? <p className="text-xs leading-5 text-muted-readable">
@@ -347,13 +342,14 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         <Dot /><ActionLink label="Other time" disabled={pending} onClick={() => onPanel(ui.panel === "other_time" ? null : "other_time")} expanded={ui.panel === "other_time"} />
         {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
         {line.offerNeverMove ? <><Dot /><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
-      </p> : <p className="text-xs leading-5 text-muted-readable" data-brief-move-actions>
-        {moved ? <>For today only. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
-        {ui.neverMoved ? `The brief won’t suggest moving ${line.title} again. You can change this in its settings.` : null}
+      </p> : <BriefOutcome data-brief-move-actions>
+        {moved ? <>Moved to {ui.movedTo ? moveTimeLabel(ui.movedTo, line.timezone) : to} for today. <ActionLink label="Undo" disabled={pending} onClick={onUndo} /></> : null}
         {line.status === "already_done" ? "Marked Completed." : null}
-        {/* "stays at" on the line already says No worked; only the lasting choice remains. */}
-        {line.offerNeverMove && (line.status === "declined" || line.status === "undone") ? <ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /> : null}
-      </p>}
+        {line.status === "declined" || line.status === "undone" ? <>Staying at {from}.</> : null}
+        {ui.neverMoved ? <> The brief won’t suggest moving {line.title} again; you can change this in its settings.</> : null}
+        {!ui.neverMoved && line.offerNeverMove && (line.status === "declined" || line.status === "undone")
+          ? <> <ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
+      </BriefOutcome>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}
       {ui.refusal ? <AlertNotice kind="write_refused" variant="inline" size="compact" className="mt-1"
@@ -434,6 +430,16 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
       </p> : null}
     </li>
   );
+}
+
+/**
+ * Outcome text: what an answer did ("Moved to 11:30 AM for today. Undo"). Ink italic at
+ * the line's size, one style for every outcome in the brief (Emi, Nov 19). Errors use the
+ * inline Alert notice instead; notes and assumptions use Readable Ash `text-xs`.
+ */
+const OUTCOME_TEXT = "italic";
+function BriefOutcome({ children, ...rest }: Readonly<{ children: ReactNode; "data-brief-move-actions"?: boolean }>) {
+  return <p className={OUTCOME_TEXT} data-brief-outcome {...rest}>{children}</p>;
 }
 
 function ActionLink({ label, onClick, disabled, strong = false, expanded }: Readonly<{ label: string; onClick: () => void; disabled?: boolean; strong?: boolean; expanded?: boolean }>) {
