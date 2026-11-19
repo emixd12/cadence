@@ -1,6 +1,7 @@
 import type { DailyBriefGenerator } from "./daily-brief-consumer";
 import { adviceRejected, DailyBriefError } from "./daily-brief-consumer";
 import { DAILY_BRIEF_SCHEMA, DAILY_BRIEF_SCHEMA_NAME } from "./daily-brief-schema";
+import { BRIEF_OPENING_SCHEMA, BRIEF_OPENING_SCHEMA_NAME } from "./brief-opening";
 import { AGENT_MODEL_SETTINGS, AGENT_REASONING_EFFORTS, AgentModelError, agentModelSetting, generateStructured, type AgentModelSetting, type AgentReasoningEffort } from "./agent-model";
 
 /**
@@ -24,6 +25,14 @@ export function dailyBriefModelSetting(override: DailyBriefGenerationOverride = 
 /** Server-only. Do not log request or response bodies or keep response IDs. */
 export async function generateDailyBriefWithModel(input: Parameters<DailyBriefGenerator>[0], options: AdapterOptions = {}): Promise<unknown> {
   return call(input, options, DAILY_BRIEF_SCHEMA_NAME, DAILY_BRIEF_SCHEMA, dailyBriefModelSetting(options));
+}
+
+/**
+ * Advisor Phase 3: the brief's words (an opening plus one reason per move line), with
+ * the short prompt's strict schema. Same transport, limits and spend wrapper.
+ */
+export async function generateBriefOpeningWithModel(input: Parameters<DailyBriefGenerator>[0], options: AdapterOptions = {}): Promise<unknown> {
+  return call(input, options, BRIEF_OPENING_SCHEMA_NAME, BRIEF_OPENING_SCHEMA, dailyBriefModelSetting(options));
 }
 
 /** Ticket 188 estimate step: same transport and limits, its own strict schema, always the production setting. */
