@@ -128,6 +128,25 @@ export async function finishChatReply(client: AppSupabaseClient, input: Readonly
   if (touchError) fail(touchError);
 }
 
+/** Marks the running reply to a question as stopped. False when it already finished or is unknown. */
+export async function requestChatStop(client: AppSupabaseClient, clientMessageId: string): Promise<boolean> {
+  const { data: question, error } = await client.from("chat_messages").select("id")
+    .eq("client_message_id", clientMessageId).maybeSingle();
+  if (error) fail(error);
+  if (!question) return false;
+  const { data, error: updateError } = await client.from("chat_messages").update({ stop_requested_at: new Date().toISOString() })
+    .eq("reply_to", question.id).eq("state", "streaming").select("id");
+  if (updateError) fail(updateError);
+  return (data ?? []).length > 0;
+}
+
+/** Whether the person pressed Stop on this reply. */
+export async function chatStopRequested(client: AppSupabaseClient, replyId: string): Promise<boolean> {
+  const { data, error } = await client.from("chat_messages").select("stop_requested_at").eq("id", replyId).maybeSingle();
+  if (error) fail(error);
+  return Boolean(data?.stop_requested_at);
+}
+
 export type ChatActionRecord = Readonly<{
   outcome: ChatOutcome; operation: string; undoPlan: unknown | null;
 }>;

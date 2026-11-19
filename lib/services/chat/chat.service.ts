@@ -3,12 +3,12 @@ import { Temporal } from "@js-temporal/polyfill";
 import {
   CHAT_CONVERSATIONS_PAGE_SIZE, CHAT_MESSAGE_MAX_CHARS, CHAT_PROTOCOL_VERSION,
   type ChatAlert, type ChatConfirmResponse, type ChatConversationList, type ChatConversationView, type ChatEvent,
-  type ChatOutcome, type ChatPart, type ChatUndoResponse,
+  type ChatOutcome, type ChatPart, type ChatStopRequest, type ChatStopResponse, type ChatUndoResponse,
 } from "@cadence/core/types/chat";
 import { finishAgentRun, reserveAgentSpend, settleAgentSpend, startAgentRun } from "@/lib/db/agent-runs.repo";
 import {
-  ChatStorageError, claimChatConfirm, claimChatUndo, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
-  readChatConversation, readChatHistory, saveChatActions, saveChatConfirm, startChatQuestion, updateChatMessageParts,
+  ChatStorageError, chatStopRequested, claimChatConfirm, claimChatUndo, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
+  readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
 } from "@/lib/db/chat.repo";
 import { agentCallerConfigured, createAgentContext } from "@/lib/integrations/agent-caller";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
@@ -44,6 +44,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TURN_DEADLINE_MS = 75_000;
 /** A reply still marked streaming after this is treated as abandoned and run again with the same keys. */
 const ABANDONED_AFTER_MS = 100_000;
+/** How often a running turn checks whether the person pressed Stop. */
+const STOP_POLL_MS = 1_000;
 
 type ChatSession = Readonly<{ caller: CalendarCaller; context: IntegrationContext }>;
 
@@ -195,16 +197,22 @@ async function runAndStore(input: Readonly<{
   let toolCalls: readonly string[] = [];
   let modelCalls = 0;
   let parts: readonly ChatPart[] = sentParts;
+  // Stop (CHAT_ROUTES.stop) arrives on another request, so the turn polls its row.
+  const stopController = new AbortController();
+  const stopPoll = setInterval(() => {
+    chatStopRequested(client, input.replyId).then((yes) => { if (yes) stopController.abort(); }, () => undefined);
+  }, STOP_POLL_MS);
   try {
     const result = await runChatTurn({
       setting, instructions, tools, history: earlier, summary: summarizeOlderMessages(earlier, CHAT_LIMITS.historyMessages),
       timelineJson, userMessage: input.message, executor, replyId: input.replyId, signal, onEvent: send,
-      onUsage: (item) => usage.push(item), spend,
+      onUsage: (item) => usage.push(item), spend, stop: stopController.signal,
     });
     parts = result.parts;
     toolCalls = result.toolCalls;
     modelCalls = result.modelCalls;
     if (result.stop === "budget_reached") { outcome = "refused_budget"; errorCode = "budget_reached"; }
+    else if (result.stop === "stopped") errorCode = "stopped";
     else if (result.stop === "model_error") { outcome = "model_error"; errorCode = "model_unavailable"; errorReason = result.errorReason ?? null; }
     await saveChatActions(client, { userId: caller.user.id, conversationId: input.conversationId, messageId: input.replyId,
       actions: result.writes.map((write) => ({ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo })) });
@@ -219,6 +227,8 @@ async function runAndStore(input: Readonly<{
     const alert: ChatAlert = { code: "failed", text: timedOut ? "Chat took too long to answer. Try again." : "Chat could not answer just now. Try again in a moment." };
     send({ type: "alert", alert });
     parts = [...sentParts, { type: "alert", alert }];
+  } finally {
+    clearInterval(stopPoll);
   }
   const total = (pick: (item: AgentModelUsage) => number | null) =>
     usage.reduce<number | null>((sum, item) => { const value = pick(item); return value === null ? sum : (sum ?? 0) + value; }, null);
@@ -316,6 +326,23 @@ export async function answerChatConfirm(session: ChatSession, body: Readonly<{ c
     ...run.refusals.map((refusal) => ({ type: "refusal" as const, refusal })),
   ]);
   return { confirm: { ...row.confirm, state: "accepted" }, outcomes, refusals: run.refusals };
+}
+
+export function parseStopBody(value: unknown): ChatStopRequest {
+  const body = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  if (typeof body.clientMessageId !== "string" || !UUID.test(body.clientMessageId)) {
+    throw new ChatRequestError(400, { code: "invalid_request", text: "Chat could not read that request." });
+  }
+  return { clientMessageId: body.clientMessageId };
+}
+
+/** Asks the running turn for this question to stop. No model call. */
+export async function stopChatTurn(session: ChatSession, body: ChatStopRequest): Promise<ChatStopResponse> {
+  try {
+    return { stopped: await requestChatStop(session.context.supabase, body.clientMessageId) };
+  } catch {
+    throw new ChatRequestError(503, { code: "failed", text: "Chat could not stop just now." });
+  }
 }
 
 export function parseUndoBody(value: unknown): Readonly<{ outcomeId: string }> {

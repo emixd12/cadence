@@ -30,6 +30,13 @@ export const CHAT_ROUTES = Object.freeze({
   confirm: "/api/advisor/chat/confirm",
   /** POST ChatUndoRequest → ChatUndoResponse (JSON). Runs no model call. */
   undo: "/api/advisor/chat/undo",
+  /**
+   * POST ChatStopRequest → ChatStopResponse (JSON). Asks a running turn to stop. The
+   * turn ends at its next safe point and still streams to the end: text and changes
+   * already made stay (with Undo), changes waiting for a Yes are dropped, then a
+   * `notice` of kind "stopped" and `done`. A finished or unknown turn: `stopped: false`.
+   */
+  stop: "/api/advisor/chat/stop",
   /** GET → ChatConversationList (JSON), newest first. `?before=<updatedAt>` pages. */
   conversations: "/api/advisor/chat/conversations",
   /** GET `${conversations}/<id>` → ChatConversationView (JSON). */
@@ -198,7 +205,11 @@ export type ChatRefusal = Readonly<{
 }>;
 
 /** `medical`: show "Cadence does not advise on medical matters." as a small grey note under the reply (D6). */
-export type ChatNotice = Readonly<{ kind: "medical"; text: string }>;
+export type ChatNotice = Readonly<{ kind: "medical" | "stopped"; text: string }>;
+
+export type ChatStopRequest = Readonly<{ clientMessageId: string }>;
+/** `stopped` is true when a running turn was asked to stop. */
+export type ChatStopResponse = Readonly<{ stopped: boolean }>;
 
 export const CHAT_ALERT_CODES = [
   "budget_reached", "model_unavailable", "chat_off", "rate_limited", "tool_limit", "failed", "in_progress", "invalid_request",
@@ -215,3 +226,4 @@ export type ChatAlert = Readonly<{
 
 /** The fixed medical disclaimer (D6). */
 export const CHAT_MEDICAL_NOTICE: ChatNotice = Object.freeze({ kind: "medical", text: "Cadence does not advise on medical matters." });
+export const CHAT_STOPPED_NOTICE: ChatNotice = Object.freeze({ kind: "stopped", text: "Stopped." });
