@@ -176,8 +176,17 @@ function resolveModel(id: string, env: Env, customFetch?: typeof fetch): Languag
     const apiKey = env.AI_GATEWAY_API_KEY;
     return createGateway({ ...(apiKey ? { apiKey } : {}), ...(customFetch ? { fetch: customFetch } : {}) })(id);
   }
-  const [creator, name] = id.split("/", 2);
+  const slash = id.indexOf("/");
+  const creator = slash === -1 ? id : id.slice(0, slash);
+  const name = slash === -1 ? "" : id.slice(slash + 1);
   if (!name) throw new AgentModelError("invalid_model", "model_id_invalid");
+  if (creator === "openrouter") {
+    // Eval-only route to models neither direct provider serves ("openrouter/deepseek/...").
+    if (!env.OPENROUTER_API_KEY) throw new AgentModelError("not_configured", "openrouter_key_missing");
+    if (!name.includes("/")) throw new AgentModelError("invalid_model", "model_id_invalid");
+    return createOpenAI({ apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1", name: "openrouter",
+      ...(customFetch ? { fetch: customFetch } : {}) }).chat(name);
+  }
   if (creator === "openai") {
     if (!env.OPENAI_API_KEY) throw new AgentModelError("not_configured", "openai_key_missing");
     return createOpenAI({ apiKey: env.OPENAI_API_KEY, ...(customFetch ? { fetch: customFetch } : {}) }).responses(name);

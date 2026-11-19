@@ -5,6 +5,8 @@ import { CHAT_SCENARIOS, chatScenario } from "@/lib/services/chat-eval/scenarios
 import { summarizeChatEval, type ChatScenarioResult } from "@/lib/services/chat-eval/harness";
 import { scenarioFacts } from "@/lib/services/chat-eval/grader";
 import { CHAT_EVAL_WORLD_IDS, chatEvalWorld, occurrence } from "@/lib/services/chat-eval/world";
+import { resolveAgentModel } from "@/lib/services/agent-model";
+import { modelPrice } from "@/lib/services/agent-model-pricing";
 
 const TODAY = "2026-11-18";
 
@@ -109,5 +111,15 @@ describe("chat eval scenarios and report", () => {
     expect(summary.conversationsPerMonth).toBe(70);
     expect(summary.conversationsPerMonthWithCoachShare).toBe(90);
     expect(summary.firstVisibleP95Ms).toBe(900);
+  });
+});
+
+describe("chat eval OpenRouter candidates", () => {
+  it("resolves openrouter/<creator>/<model> with the full model id and prices it", () => {
+    const model = resolveAgentModel("openrouter/deepseek/deepseek-v4.1-flash-1017", { OPENROUTER_API_KEY: "test" }) as { modelId: string };
+    expect(model.modelId).toBe("deepseek/deepseek-v4.1-flash-1017");
+    expect(modelPrice("openrouter/z-ai/glm-5.3-flash")?.output).toBe(0.5);
+    expect(modelPrice("openai/gpt-6.1-terra")?.input).toBe(1);
+    expect(() => resolveAgentModel("openrouter/deepseek/deepseek-v4.1-flash-1017", {})).toThrow();
   });
 });
