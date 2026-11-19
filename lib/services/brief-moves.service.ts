@@ -372,6 +372,15 @@ export async function readBriefMoves(supabase: AppSupabaseClient, input: Readonl
   };
 }
 
+/** Today's open schedule-edit conflicts, as the brief shows them (first brief, refresh and reopen alike). */
+export async function readOpenBriefConflicts(supabase: AppSupabaseClient, input: Readonly<{ userId?: string; localDate: string }>): Promise<BriefMoveConflictLine[]> {
+  const userId = input.userId ?? await ownUserId(supabase);
+  const conflicts = await supabase.from("move_conflicts").select("id, occurrence_id, conflicting_occurrence_id")
+    .eq("user_id", userId).eq("local_date", input.localDate).eq("status", "open").order("detected_at");
+  if (conflicts.error) throw conflicts.error;
+  return conflictLines(supabase, userId, input.localDate, conflicts.data ?? []);
+}
+
 async function conflictLines(supabase: AppSupabaseClient, userId: string, localDate: string,
   rows: ReadonlyArray<{ id: string; occurrence_id: string; conflicting_occurrence_id: string | null }>): Promise<BriefMoveConflictLine[]> {
   if (!rows.length) return [];

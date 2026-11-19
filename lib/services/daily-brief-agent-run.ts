@@ -31,6 +31,8 @@ export const DAILY_BRIEF_MAX_OUTPUT_TOKENS = 2_000;
 
 export type DailyBriefAgentRun = Readonly<{
   runId: string;
+  /** The run's `daily_brief` agent client, for the proposal writes that belong to this run (advisor Phase 3). */
+  client: AppSupabaseClient;
   /** Wraps the generator so each call reserves, then settles, spend. */
   wrap: (generate: DailyBriefGenerator) => DailyBriefGenerator;
   /**
@@ -39,7 +41,11 @@ export type DailyBriefAgentRun = Readonly<{
    * caller can bound these writes to its own deadline.
    */
   finish: (
-    result: Readonly<{ ok: true; briefing: unknown; calendarDerived: boolean }> | Readonly<{ ok: false; error: unknown }>,
+    result: Readonly<{
+      ok: true; briefing: unknown; calendarDerived: boolean; linkedProposalIds?: readonly string[];
+      /** Set when the brief was shown with Cadence's stock words because the model call failed; the run records that failure. */
+      wordsError?: unknown;
+    }> | Readonly<{ ok: false; error: unknown }>,
     signal?: AbortSignal,
   ) => Promise<void>;
 }>;
@@ -123,7 +129,8 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
   };
 
   const finish: DailyBriefAgentRun["finish"] = async (result, signal) => {
-    const failure = result.ok ? null : describeFailure(result.error, refused);
+    const failure = !result.ok ? describeFailure(result.error, refused)
+      : result.wordsError !== undefined ? describeFailure(result.wordsError, refused) : null;
     const total = (pick: (item: DailyBriefModelUsage) => number | null) =>
       usage.reduce<number | null>((sum, item) => { const value = pick(item); return value === null ? sum : (sum ?? 0) + value; }, null);
     if (signal?.aborted) return;
@@ -139,6 +146,7 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
       cachedInputTokens: total((item) => item.cachedInputTokens),
       outputTokens: total((item) => item.outputTokens),
       reasoningTokens: total((item) => item.reasoningTokens),
+      ...(result.ok && result.linkedProposalIds?.length ? { linkedProposalIds: result.linkedProposalIds } : {}),
     }, signal).catch(() => undefined);
     if (!result.ok) return;
     try {
@@ -155,7 +163,7 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
     }
   };
 
-  return { runId, wrap, finish };
+  return { runId, client, wrap, finish };
 }
 
 /** Calendar events and travel facts come from a calendar; such text is kept only for its local day. */

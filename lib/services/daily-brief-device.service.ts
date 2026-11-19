@@ -78,7 +78,8 @@ export async function prepareDeviceDailyBrief(caller: CalendarCaller, value: unk
     if (admission.state === "rate_limited") throw new DailyBriefError("rate_limited", admission.retryAfterSeconds);
     if (admission.state === "retry_exhausted") throw new DailyBriefError("retry_exhausted");
     if (admission.state === "pending") return admission.retryAfterSeconds ? { state: "pending", retryAfterSeconds: admission.retryAfterSeconds } : { state: "pending" };
-    if (admission.state !== "acquired") return { state: admission.state };
+    // The device path (paused ChatGPT-plan feature) keeps the three-argument admission, which never returns the Phase 3 states.
+    if (admission.state !== "acquired") return { state: "already_attempted" };
     const leaseToken = admission.leaseToken;
     let handedOff = false;
     try {

@@ -27,9 +27,13 @@ export type DailyBriefPreferenceInput = Pick<DailyBriefPreferences,
   "enabled" | "useConnectedSources" | "excludedSources" | "includeReminderHistory" | "includeNotes">;
 
 export type DailyBriefBeginResult =
-  | { state: "acquired"; leaseToken: string; localDate: string }
+  /** `refresh` is true only when today already has a saved brief that this attempt replaces (advisor Phase 3). */
+  | { state: "acquired"; leaseToken: string; localDate: string; refresh?: boolean; refreshesUsed?: number }
   | { state: "pending" | "rate_limited"; retryAfterSeconds?: number }
-  | { state: "already_attempted" | "retry_exhausted" };
+  | { state: "already_attempted" | "retry_exhausted" }
+  /** Advisor Phase 3: today's brief was already shown; reopen it with no model call. */
+  | { state: "saved"; briefing: JsonRecord; runId: string | null; withMoves: boolean; refreshesUsed: number; localDate: string }
+  | { state: "refresh_limit_reached"; refreshesUsed: number };
 
 type JsonRecord = Record<string, unknown>;
 
@@ -89,15 +93,26 @@ export async function saveDailyBriefPreferences(
 
 export async function beginDailyBrief(
   client: AppSupabaseClient,
-  input: { installationId: string; retry: boolean; expectedRevision: number },
+  /**
+   * Advisor Phase 3: `refresh` asks for a new brief replacing today's saved one; `moves`
+   * says the client shows move lines. Callers that pass neither (the device path) keep
+   * the pre-Phase 3 per-installation admission.
+   */
+  input: { installationId: string; retry: boolean; expectedRevision: number; refresh?: boolean; moves?: boolean },
   signal?: AbortSignal,
 ): Promise<DailyBriefBeginResult> {
   const request = client.rpc(
     "begin_daily_brief",
-    {
+    input.refresh === undefined && input.moves === undefined ? {
       p_installation_id: input.installationId,
       p_retry: input.retry,
       p_expected_revision: input.expectedRevision,
+    } : {
+      p_installation_id: input.installationId,
+      p_retry: input.retry,
+      p_expected_revision: input.expectedRevision,
+      p_refresh: input.refresh ?? false,
+      p_moves: input.moves ?? false,
     },
   );
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
@@ -127,6 +142,34 @@ export async function finishDailyBrief(
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   if (typeof data !== "boolean") throw new Error("Daily Brief completion returned an invalid result.");
+  return data;
+}
+
+/**
+ * Advisor Phase 3: stores the shown brief (without move lines, which live in
+ * move_proposals) and completes the attempt in one transaction. False means the
+ * lease is no longer this attempt's or today's count changed; the brief must not be shown.
+ */
+export async function saveDailyBrief(
+  client: AppSupabaseClient,
+  input: Readonly<{
+    installationId: string; leaseToken: string; expectedRevision: number;
+    runId: string | null; refresh: boolean; withMoves: boolean; briefing: unknown;
+  }>,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const request = client.rpc("save_daily_brief", {
+    p_installation_id: input.installationId,
+    p_lease_token: input.leaseToken,
+    p_expected_revision: input.expectedRevision,
+    p_run_id: input.runId as string,
+    p_refresh: input.refresh,
+    p_with_moves: input.withMoves,
+    p_briefing: JSON.parse(JSON.stringify(input.briefing)),
+  });
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  if (typeof data !== "boolean") throw new Error("Daily Brief save returned an invalid result.");
   return data;
 }
 
@@ -290,10 +333,28 @@ function parseBeginResult(value: unknown): DailyBriefBeginResult {
   const record = asRecord(value, "admission");
   if (record.state === "already_attempted" || record.state === "retry_exhausted") return { state: record.state };
   if (record.state === "acquired") {
-    if (typeof record.lease_token !== "string" || typeof record.local_date !== "string") {
+    if (typeof record.lease_token !== "string" || typeof record.local_date !== "string" ||
+        (record.refresh !== undefined && typeof record.refresh !== "boolean") ||
+        (record.refreshes_used !== undefined && !Number.isInteger(record.refreshes_used))) {
       throw new Error("Daily Brief admission returned an invalid result.");
     }
-    return { state: record.state, leaseToken: record.lease_token, localDate: record.local_date };
+    return { state: record.state, leaseToken: record.lease_token, localDate: record.local_date,
+      ...(record.refresh === undefined ? {} : { refresh: record.refresh as boolean }),
+      ...(record.refreshes_used === undefined ? {} : { refreshesUsed: record.refreshes_used as number }) };
+  }
+  if (record.state === "saved") {
+    const briefing = record.briefing;
+    if (!briefing || typeof briefing !== "object" || Array.isArray(briefing) || typeof record.local_date !== "string" ||
+        typeof record.with_moves !== "boolean" || !Number.isInteger(record.refreshes_used) ||
+        (record.run_id !== null && typeof record.run_id !== "string")) {
+      throw new Error("Daily Brief admission returned an invalid result.");
+    }
+    return { state: "saved", briefing: briefing as JsonRecord, runId: record.run_id as string | null, withMoves: record.with_moves,
+      refreshesUsed: record.refreshes_used as number, localDate: record.local_date };
+  }
+  if (record.state === "refresh_limit_reached") {
+    if (!Number.isInteger(record.refreshes_used)) throw new Error("Daily Brief admission returned an invalid result.");
+    return { state: "refresh_limit_reached", refreshesUsed: record.refreshes_used as number };
   }
   if (record.state === "pending" || record.state === "rate_limited") {
     if (record.retry_after_seconds !== undefined && (!Number.isInteger(record.retry_after_seconds) || (record.retry_after_seconds as number) < 1)) {

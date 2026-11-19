@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-065` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-069` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -122,6 +122,7 @@ Status values:
 | [P-060](#p-060-advisor-content-is-stored-for-30-days-with-no-opt-in) | Advisor content is stored for 30 days, with no opt-in | logged | Advisor plan (D32) | Privacy, Trust, in-app copy, marketing FAQ |
 | [P-061](#p-061-the-advisor-can-change-records-when-the-person-says-yes) | The advisor can change records when the person says yes | logged | Advisor plan (D32) | Privacy, Terms, in-app copy, marketing, user guide, provider submissions |
 | [P-064](#p-064-the-advisor-computes-coach-signals-from-records-overnight) | The advisor computes coach signals from records overnight | logged | Advisor plan Phase 3 (3D) | Privacy, Trust |
+| [P-065](#p-065-the-daily-brief-is-saved-for-the-day-can-be-refreshed-and-sends-less-to-the-model) | The Daily Brief is saved for the day, can be refreshed, and sends less to the model | logged | Advisor plan Phase 3 (3A2) | Privacy, Terms, in-app copy, FAQ, user guide |
 | [P-066](#p-066-the-daily-brief-keeps-calendar-titles-and-answers-for-the-day) | The Daily Brief keeps calendar titles and answers for the day | logged | Advisor Phase 3A1 | Privacy, Trust, in-app copy |
 | [P-067](#p-067-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
 | [P-068](#p-068-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
@@ -1918,6 +1919,36 @@ cite has not changed.
   records overnight, with no model call, keeps them 180 days, and that account deletion
   removes them. Ship with Phase 4's quips, when the signals start to affect what people see.
 - **Related:** P-060, P-061.
+- **Status:** logged.
+
+## P-065: The Daily Brief is saved for the day, can be refreshed, and sends less to the model
+
+- **Change:** implemented November 18, 2026 (advisor Phase 3, 3A2). Cadence saves the shown
+  Daily Brief on its servers for the rest of that local day so it reopens on any device with
+  no new model call, then clears the text when the day ends (the run log keeps its usual 30
+  days). A person can refresh the brief up to two times a day while the month's budget still
+  covers the remaining morning briefs. The hosted brief now sends the model only today's
+  items (title, time, open or done), the proposed moves, and busy calendar times. Calendar
+  event titles are never sent: the model writes a placeholder and Cadence fills in the event's
+  name after the reply comes back. It no longer sends 90 days of completion history or analysis findings. The
+  "Suggestions never change the record" rule and the "Suggestions only. No changes were
+  applied." line are gone, because a Yes now applies a move (P-061).
+- **Affected:** `lib/services/daily-brief.service.ts`, `lib/services/brief-opening.ts`,
+  `supabase/migrations/20261118130000_daily_brief_saved_days.sql`,
+  `packages/core/src/data/briefing-references.json`.
+- **Surfaces:** Privacy ("Optional Daily Brief": what is sent to OpenAI, that the brief is
+  stored for the day, "read-only"), in-app copy (Daily Brief settings panel description,
+  `SettingsRegroupBench`, the bubble's loading line "Preparing today's read-only briefing…"),
+  FAQ and user guide pages about the Daily Brief.
+- **Conflicting current text:** "Cadence sends today's Behavior schedule and completion
+  history, including findings calculated from it, to OpenAI. The briefing cannot change
+  tracking or Calendar records." (`components/settings/LegalContent.tsx`, Privacy);
+  "Daily Brief is an optional, read-only feature" (Terms); "Cadence can prepare one
+  read-only briefing when you first open Timeline each day." (settings panel).
+- **Update needed:** say the brief is stored until the day ends, can be refreshed twice a
+  day, sends today's items and busy times (not history), and changes an item's time only
+  when the person says yes.
+- **Related:** P-061, P-063.
 - **Status:** logged.
 
 ## P-066: The Daily Brief keeps calendar titles and answers for the day

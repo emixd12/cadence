@@ -36,7 +36,26 @@ export type DailyBriefing = Readonly<{
    * opening and travel and see no move lines.
    */
   moves?: BriefMoves;
+  /**
+   * Advisor Phase 3: refreshes left today (one morning brief plus up to two refreshes
+   * per account). `available` is false when none are left or a refresh would leave the
+   * rest of the month's morning briefs unfunded. Absent from older servers.
+   */
+  refresh?: Readonly<{ remaining: number; available: boolean }>;
+  /**
+   * Advisor Phase 3: something is wrong with today's brief. Shown in the shared alert
+   * style, never as advice. Text is Cadence's, never model text.
+   */
+  notices?: readonly DailyBriefNotice[];
 }>;
+
+/**
+ * `calendar_stale`: a calendar did not load, so no time that depends on it is offered.
+ * `budget_reached`: this month's Daily Brief budget is used; moves still work and the
+ * written brief returns at `until`. `words_unavailable`: the writing step failed, so
+ * Cadence's own short wording is shown with the same moves.
+ */
+export type DailyBriefNotice = Readonly<{ kind: "calendar_stale" | "budget_reached" | "words_unavailable"; text: string; until?: string }>;
 
 export type DailyBriefSourceAttention = "changed" | "no_calendars" | "unavailable";
 

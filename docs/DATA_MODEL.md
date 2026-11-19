@@ -3130,7 +3130,7 @@ the functions below, which accept only an agent token and take the agent and
 person from it.
 
 - `agent_runs`: one row per run. Agent, trigger (`on_demand`, `retry`,
-  `scheduled`, `chat_turn`), model, prompt version, local date and timezone,
+  `refresh`, `scheduled`, `chat_turn`), model, prompt version, local date and timezone,
   input hash, model calls, input/cached/output/reasoning tokens, cost (sum of
   the run's settled reservations), tool calls, outcome (`success`,
   `refused_budget`, `invalid_output`, `model_error`, `timeout`, `superseded`,
@@ -3169,6 +3169,42 @@ not user data.
 Repositories: `lib/db/agent-runs.repo.ts`. Local verification:
 `tests/sql/advisor-1a-agent-foundations-smoke.sql` and
 `tests/agent-caller.local-integration.test.ts`.
+
+## Saved Daily Brief (advisor plan Phase 3, workstream 3A2)
+
+Migration `20261118130000_daily_brief_saved_days.sql` keeps the brief that was shown,
+so every later open that day, on any device, gets the same brief with no model call.
+This is the one place Daily Brief output is stored outside `agent_run_contents`.
+
+- `daily_brief_days` (private, owner-only forced RLS, no client table privileges): one
+  row per account and local date. Timezone, the run id of the shown brief, `briefing`
+  (the shown brief as JSON without its move lines, at most 64 KB), `with_moves`
+  (whether the shown brief offered move lines), `refreshes_used` (0–2),
+  `briefs_shown` (1–10) and first and last save times. Move lines are not copied here:
+  they live in `move_proposals` and are read back with their current answers.
+- `begin_daily_brief(installation, retry, expected_revision, refresh, moves)` returns
+  `saved` with the stored brief when one exists for today in the same timezone, unless
+  the request is a refresh or a client that wants move lines found a brief saved
+  without them (that upgrade is a new, uncounted morning brief). A refresh with two
+  already used returns `refresh_limit_reached`; a refresh with nothing saved is the
+  morning brief. The three-argument form stays for callers built before Phase 3.
+- `save_daily_brief(installation, lease, expected_revision, run_id, refresh,
+  with_moves, briefing)` stores the brief and completes the lease in one step. The app
+  shows a brief only after this returns true. A refresh save counts one refresh; a
+  failed attempt counts nothing.
+- `agent_brief_refresh_funded(typical_microdollars)` (the `daily_brief` agent only)
+  says whether one more brief still leaves the rest of the month's morning briefs
+  funded from the Daily Brief share. The service refuses a refresh with
+  `budget_reached` otherwise.
+- Retention: `purge_ended_daily_brief_days()` (service role) clears `briefing` once
+  the row's local day has ended. The daily maintenance run calls it beside
+  `purge_expired_agent_run_contents()` and 3A1's brief move text purge. The count row
+  stays; account deletion cascades.
+- Invalidation: migration `20261119090000_daily_brief_saved_days_preference_reset.sql`
+  adds a trigger on `daily_brief_preferences`. Any write that changes the revision
+  clears the owner's saved `briefing` (and `with_moves`), so the next open builds a new
+  morning brief under the new source choice. `refreshes_used` is kept, so changing a
+  setting never grants extra refreshes.
 
 ## Coach signals in shadow (advisor plan Phase 3, workstream 3D)
 
