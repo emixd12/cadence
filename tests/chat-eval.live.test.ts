@@ -51,7 +51,7 @@ describe.skipIf(process.env.CADENCE_CHAT_EVAL !== "1")("chat eval (live)", () =>
     writeFileSync(file, JSON.stringify(report, null, 2));
     console.log(`chat eval report: ${file}`);
     for (const run of runs) for (const result of run.results) for (const item of result.breaks) console.log(`BREAK ${run.label} ${result.scenario}: ${item.rule} ${item.detail}`);
-    expect(runs.length).toBe(specs.length);
+    expect(runs.length).toBe(specs.length * repeats);
   }, 3_600_000);
 });
 

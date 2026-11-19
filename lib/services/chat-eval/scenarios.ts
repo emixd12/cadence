@@ -149,7 +149,7 @@ export const CHAT_SCENARIOS: readonly ChatScenario[] = [
   // Finalist round (Nov 19): harder cases.
   { id: "calendar_down", world: "calendar_down", description: "The calendar read fails: say so, and do not invent events.",
     steps: [{ say: "What does my afternoon look like? Do I have time for a 45-minute walk before my run?" }],
-    allowedWrites: [], expect: { mentions: ["couldn't|could not|can't|cannot|unable|wasn't able|not able"], never: ["Board review", "Dentist", "Lunch with Sam"], final: [{ kind: "unchanged" }] } },
+    allowedWrites: [], expect: { mentions: ["couldn't|couldn’t|could not|can't|can’t|cannot|unable|wasn't able|not able"], never: ["Board review", "Dentist", "Lunch with Sam"], final: [{ kind: "unchanged" }] } },
 
   { id: "multi_step", world: "everyday", description: "Three asks in one message: a status write, a move, and a question about the rest of the day.",
     steps: [{ say: "I took my meds. Also push my run to 7:30 tonight, and tell me what's still left after that." }, { answer: "yes" }],
