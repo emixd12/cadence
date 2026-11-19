@@ -657,6 +657,203 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_actions: {
+        Row: {
+          confirmed: boolean
+          conversation_id: string
+          created_at: string
+          id: string
+          kind: string
+          message_id: string
+          operation: string
+          outcome: Json
+          undo_plan: Json | null
+          undo_state: string
+          undone_at: string | null
+          user_id: string
+        }
+        Insert: {
+          confirmed: boolean
+          conversation_id: string
+          created_at?: string
+          id: string
+          kind: string
+          message_id: string
+          operation: string
+          outcome: Json
+          undo_plan?: Json | null
+          undo_state: string
+          undone_at?: string | null
+          user_id: string
+        }
+        Update: {
+          confirmed?: boolean
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          message_id?: string
+          operation?: string
+          outcome?: Json
+          undo_plan?: Json | null
+          undo_state?: string
+          undone_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_actions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_confirms: {
+        Row: {
+          answered_at: string | null
+          confirm: Json
+          conversation_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          message_id: string
+          state: string
+          user_id: string
+          writes: Json
+        }
+        Insert: {
+          answered_at?: string | null
+          confirm: Json
+          conversation_id: string
+          created_at?: string
+          expires_at: string
+          id: string
+          message_id: string
+          state?: string
+          user_id: string
+          writes: Json
+        }
+        Update: {
+          answered_at?: string | null
+          confirm?: Json
+          conversation_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message_id?: string
+          state?: string
+          user_id?: string
+          writes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_confirms_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_confirms_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          summary: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+
+        ]
+      }
+      chat_messages: {
+        Row: {
+          agent_run_id: string | null
+          client_message_id: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          parts: Json
+          reply_to: string | null
+          role: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          agent_run_id?: string | null
+          client_message_id?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          parts: Json
+          reply_to?: string | null
+          role: string
+          state?: string
+          user_id: string
+        }
+        Update: {
+          agent_run_id?: string | null
+          client_message_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          parts?: Json
+          reply_to?: string | null
+          role?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: true
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       completion_place_labels: {
         Row: {
           behavior_id: string

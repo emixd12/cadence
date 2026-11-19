@@ -161,9 +161,14 @@ export async function generateStructured(input: StructuredCallInput): Promise<un
   catch { throw new AgentModelError("rejected", "output_not_json"); }
 }
 
-/** The AI SDK model for a model string, over the configured transport. Tool-using agents (chat) call the AI SDK with it directly. */
+/** The AI SDK model for a Gateway model string, on this deployment's transport. Chat (Phase 5) streams with it. */
 export function resolveAgentModel(id: string, env: Env = process.env, customFetch?: typeof fetch): LanguageModel {
   return resolveModel(id, env, customFetch);
+}
+
+/** Maps a provider failure to an AgentModelError, as generateStructured does. */
+export function agentModelFailure(error: unknown, signal: AbortSignal): unknown {
+  return mapProviderError(error, signal);
 }
 
 function resolveModel(id: string, env: Env, customFetch?: typeof fetch): LanguageModel {
