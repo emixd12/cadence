@@ -36,6 +36,9 @@ export const ADVICE_SIGNAL_KINDS_V2 = [
   "done_together",
   "crowded_hour",
   "setup_gaps",
+  "reminder_response",
+  "session_length",
+  "moved_vs_unmoved",
 ] as const;
 
 /**
@@ -107,6 +110,9 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   done_together: ["other_behavior_id", "pattern", "together_days", "either_days"],
   crowded_hour: ["hour", "items_in_hour", "hour_rate", "other_rate", "hour_resolved"],
   setup_gaps: ["missing_length", "missing_place", "without_length", "without_place", "active_behaviors"],
+  reminder_response: ["reminded_marked", "within_30_min", "later", "quick_share", "median_minutes_after"],
+  session_length: ["sessions", "planned_minutes", "median_minutes", "shorter", "longer", "on_target", "pattern"],
+  moved_vs_unmoved: ["moved_rate", "moved_resolved", "unmoved_rate", "unmoved_resolved", "gap", "pattern"],
   account: ADVICE_ACCOUNT_FACT_NAMES,
 });
 
@@ -132,7 +138,8 @@ export const ADVICE_EVIDENCE_KINDS = [
   "meta_analysis",
   "systematic_review",
   "randomized_trial",
-  "cohort_study",
+  "experiment",
+  "observational_study",
   "theory_review",
   "guidance",
   "editorial_guidance",

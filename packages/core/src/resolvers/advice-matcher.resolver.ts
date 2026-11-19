@@ -135,7 +135,7 @@ function excluded(card: AdviceCard, behaviorId: string | null, signals: readonly
 function namesFor(card: AdviceCard, rule: AdviceRule, signal: AdviceSignalInput): string[] {
   const names = new Set(rule.facts.map((condition) => condition.fact));
   for (const seed of card.quip_seeds) {
-    for (const match of seed.matchAll(/\{([a-z_]+)\}/g)) {
+    for (const match of seed.matchAll(/\{([a-z0-9_]+)\}/g)) {
       const name = match[1]!;
       const base = name === "weekday_name" ? "weekday" : name === "hour_label" ? "hour" : name.replace(/_pct$/, "");
       if (base !== "behavior" && signal.facts[base] !== undefined) names.add(base);

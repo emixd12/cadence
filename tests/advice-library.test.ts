@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import document from "@/packages/core/src/data/advice-library.json";
 import { ADVICE_CARDS, ADVICE_SOURCES, adviceSourceFor, fillQuipSeed, parseAdviceLibrary } from "@cadence/core/services/advice-library";
 import { BRIEFING_REFERENCES } from "@cadence/core/services/briefing-references";
-import { ADVICE_SIGNAL_KINDS_V1, ADVICE_SIGNAL_KINDS_V2 } from "@cadence/core/types/advice-cards";
+import { ADVICE_SIGNAL_FACTS, ADVICE_SIGNAL_KINDS_V1, ADVICE_SIGNAL_KINDS_V2 } from "@cadence/core/types/advice-cards";
 
 // Advisor plan Phase 4, workstream 4A: the card schema, its validator and the shipped content.
 
@@ -90,5 +90,33 @@ describe("shipped advice library", () => {
       expect(covered, kind).toContain(kind);
     }
     expect(ADVICE_CARDS.filter((card) => card.audience === "first_two_weeks").length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("shipped quip seeds", () => {
+  // One plausible value per fact name, so every seed of every card can be filled.
+  const SAMPLE: Record<string, unknown> = {
+    weekday: 2, hour: 7, part_of_day: "evening", direction: "later", median_target_time: "18:30", median_mark_time: "21:10",
+    pattern: "clustered", weaker_mode: "range", other_behavior_id: "b-2", recovered: true, last_moved_date: "2026-11-18",
+  };
+  const valueFor = (name: string) => SAMPLE[name] ?? (/(rate|share|gap|drop|change)$/.test(name) ? 0.42 : 3);
+
+  it("fill completely from the facts their rules carry, with no leftover braces", () => {
+    for (const card of ADVICE_CARDS) {
+      const facts = Object.fromEntries(
+        card.applies_when.flatMap((rule) => [...(ADVICE_SIGNAL_FACTS[rule.signal] ?? []), "window_days"]).map((name) => [name, valueFor(name)]),
+      );
+      for (const seed of card.quip_seeds) {
+        const line = fillQuipSeed(seed, { behavior: "Gym", facts });
+        expect(line, `${card.id}: ${seed}`).not.toBeNull();
+        expect(line).not.toMatch(/[{}]/);
+      }
+    }
+  });
+
+  it("keep praise and pep talk out of the seeds", () => {
+    for (const card of ADVICE_CARDS) {
+      for (const seed of card.quip_seeds) expect(seed, card.id).not.toMatch(/\b(great|awesome|amazing|well done|keep it up|proud|crush|you got this)\b|!/i);
+    }
   });
 });
