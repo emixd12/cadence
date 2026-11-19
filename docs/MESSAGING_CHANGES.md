@@ -2042,6 +2042,25 @@ cite has not changed.
 - **Related:** P-061, P-063.
 - **Status:** logged.
 
+## P-070: One AI features question replaces the Daily Brief opt-in
+
+- **Change:** advisor Phase 4, workstream 4F (Emi, November 19, D2). On first open of
+  Timeline every account answers one question, "AI features": Daily Brief, Advisor tips,
+  Chat, and what they use (Behaviors and history, Notes, Reminder history, Connected
+  calendars and Hevy), all on, each with "If you turn it off: …". **Continue** turns
+  everything on; **Keep AI features off** turns every feature off. Settings > Daily Brief
+  becomes Settings > AI features, with a switch per feature and source choices shared by
+  all three. The Daily Brief panel's old disclosure ("The briefing cannot change tracking
+  or Calendar records", "Connected sources, reminder history and Notes are optional") and
+  the per-source "Event titles … are not sent" lines are replaced: Chat reads event
+  titles (D4).
+- **Affected:** `components/onboarding/AiFeaturesApproval.tsx`,
+  `components/briefing/DailyBriefSettingsPanel.tsx`, `lib/ui/ai-features-copy.ts`.
+- **Surfaces:** in-app copy (new). User guide `docs/user-guide/timeline.md#daily-brief`,
+  Privacy, Terms and marketing still describe an opt-in Daily Brief that sends no event
+  titles.
+- **Update needed:** user guide and public pages, at beta launch.
+
 ## P-073: End date must come after today
 
 - **Change:** implemented November 20, 2026. Creating a Behavior, or changing an active

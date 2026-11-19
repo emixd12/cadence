@@ -2676,6 +2676,30 @@ Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
 - `read_daily_brief_preferences` returns the new keys. The repository treats a
   missing key as off and rejects a disclosure without its fence.
 
+Migration `20261120100000_ai_features_approval.sql` (advisor 4F, owner decision D2):
+
+- One AI features approval covers Daily Brief, Advisor tips, Chat and every source.
+  The source choices on `daily_brief_preferences` (Notes, reminder history, the
+  connected-sources choice and its four exclusions) are now shared by all three
+  features. The two checks that required them off while Daily Brief is off
+  (`..._optional_sources_need_enablement`, `..._source_choice_needs_enablement`)
+  are dropped. `save_daily_brief_preferences_v4` still enforces the old rule for
+  older clients.
+- `cadence_advisor_private.ai_feature_settings` (user_id, approved_at, tips_enabled,
+  chat_enabled, revision, updated_at), RLS forced, no table grants. No row means the
+  person has not answered: tips and Chat read as off.
+- `read_ai_settings()` returns the approval, the three switches and the shared
+  source choices. It reads by `auth.uid()`, so the person's session and Cadence's
+  agent tokens (coach, chat) can both call it. App helper:
+  `lib/services/ai-settings.service.ts` (`readAiSettings`, `aiFeatureOn`,
+  `aiSourceAllowed`).
+- `save_ai_settings(daily_brief_enabled, tips_enabled, chat_enabled,
+  use_connected_sources, four exclusions, include_reminder_history, include_notes,
+  expected_revision)` needs the person's own session. It records `approved_at` on
+  first save. It writes the Daily Brief row only when one of its fields changes, so a
+  tips or Chat change keeps today's saved brief. A stale Daily Brief revision raises
+  `55000`.
+
 Migration `20261110150000_daily_brief_connected_sources.sql` (Ticket 306, additive):
 
 - `daily_brief_preferences` adds nullable `use_connected_sources`,

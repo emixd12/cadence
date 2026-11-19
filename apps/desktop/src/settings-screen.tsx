@@ -183,10 +183,10 @@ export function SettingsScreen({
           ) : null}
           {dailyBriefControls ? (
             <SettingsDrawer
-              title="Daily Brief"
+              title="AI features"
               description={SETTINGS_DAILY_BRIEF_PURPOSE}
-              label="Daily Brief settings"
-              setupLabel="Set up Daily Brief"
+              label="AI settings"
+              setupLabel="Choose AI features"
               state={dailyBriefState}
             >
               {dailyBriefControls}
