@@ -145,6 +145,9 @@ export function parseAdviceLibrary(value: unknown, extraSourceIds: readonly stri
       }
       return line;
     });
+    const named = quipSeeds.filter((seed) => seed.includes("{behavior}")).length;
+    if (applies.some((rule) => rule.scope !== "account") && named === 0) fail(`${at}.quip_seeds need a line that starts from {behavior} for Behavior signals`);
+    if (applies.some((rule) => rule.scope !== "behavior") && named === quipSeeds.length) fail(`${at}.quip_seeds need a line without {behavior} for account-wide signals`);
     const reviewedAt = raw.reviewed_at === null ? null : date(raw.reviewed_at, `${at}.reviewed_at`);
     const reviewer = raw.reviewer === null ? null : text(raw.reviewer, `${at}.reviewer`, 80);
     if (status === "active" && (reviewedAt === null || reviewer === null)) fail(`${at} is active without a review`);
@@ -243,6 +246,14 @@ function fillOne(name: string, one: string | undefined, many: string | undefined
   if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
   if (typeof raw === "string" && raw) return raw;
   return null;
+}
+
+/**
+ * The seeds that fit one match: lines naming the Behavior for a Behavior signal, the others
+ * for an account-wide one, so a Behavior's line never reads as a claim about every item.
+ */
+export function quipSeedsFor(card: AdviceCard, behaviorId: string | null): readonly string[] {
+  return card.quip_seeds.filter((seed) => seed.includes("{behavior}") === (behaviorId !== null));
 }
 
 const library = parseAdviceLibrary(rawLibrary);
