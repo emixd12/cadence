@@ -117,6 +117,7 @@ describe("move lines", () => {
     await click(button(line("gym"), "Yes"));
     const alert = line("gym").querySelector("[data-alert-kind='write_refused']")!;
     expect(alert.querySelector("svg")).toBeNull();
+    expect(alert.querySelector("p")!.textContent).toBe("Not changed. 5:30 PM is taken now: you moved Piano practice there after this brief was written.");
     expect(alert.textContent).toContain("5:30 PM is taken now: you moved Piano practice there after this brief was written.");
     await click(button(alert, "4:00 PM"));
     expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "other_time", proposalId: "gym", startAt: "2026-11-18T21:00:00.000Z" }));
@@ -198,7 +199,7 @@ describe("move lines", () => {
     expect(line("vitamins").textContent).toContain("Marked Completed.");
     vi.spyOn(client, "answer").mockRejectedValueOnce(new DailyBriefRequestError("offline"));
     await click(button(line("walk"), "Yes"));
-    expect(line("walk").textContent).toContain("You appear to be offline. Nothing changed.");
+    expect(line("walk").textContent).toContain("Not changed. You appear to be offline.");
   });
 
   it("keeps a schedule-edit collision through the Timeline's own action", async () => {

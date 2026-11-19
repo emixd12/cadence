@@ -45,11 +45,26 @@ export type AlertNoticeProps = Readonly<{
    * action share one size and leading inside a Timeline row.
    */
   size?: "body" | "compact";
+  /**
+   * "inline" writes the label and message as one Rust Signal sentence at the
+   * surrounding text size ("Not changed. 5:30 PM is taken now…"), with the action
+   * in Ink below. The Daily Brief uses it (Emi, Nov 19). Implies no icon.
+   */
+  variant?: "stacked" | "inline";
   className?: string;
 }>;
 
-export function AlertNotice({ kind, children, label, action, icon = true, size = "body", className }: AlertNoticeProps) {
+export function AlertNotice({ kind, children, label, action, icon = true, size = "body", variant = "stacked", className }: AlertNoticeProps) {
   const compact = size === "compact";
+  if (variant === "inline") {
+    return (
+      <div role={ANNOUNCE[kind]} data-alert-kind={kind}
+        className={["grid gap-y-1", compact ? "text-sm leading-6" : "text-base leading-6", className].filter(Boolean).join(" ")}>
+        <p className="text-alert-signal">{label ?? ALERT_NOTICE_LABELS[kind]}. {children}</p>
+        {action ? <div className="text-foreground">{action}</div> : null}
+      </div>
+    );
+  }
   return (
     <div
       role={ANNOUNCE[kind]}

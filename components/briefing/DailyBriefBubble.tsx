@@ -129,9 +129,9 @@ export function DailyBriefBubble({
                 </button>
               </> : null}
             </p>
-            {refresh?.error ? <AlertNotice kind="write_refused" label="Not refreshed" icon={false} size="compact" className="mt-1">{refresh.error}</AlertNotice> : null}
+            {refresh?.error ? <AlertNotice kind="write_refused" label="Not refreshed" variant="inline" size="compact" className="mt-1">{refresh.error}</AlertNotice> : null}
             {briefing.warnings.length ? <p className="mt-1 text-xs leading-5 text-muted-readable">{briefing.warnings.join(" ")}</p> : null}
-            {briefNotices(briefing, Boolean(moves)).map((notice) => <AlertNotice key={notice.kind} kind={NOTICE_KIND[notice.kind]} icon={false} size="compact" className="mt-1"
+            {briefNotices(briefing, Boolean(moves)).map((notice) => <AlertNotice key={notice.kind} kind={NOTICE_KIND[notice.kind]} variant="inline" size="compact" className="mt-1"
               label={notice.kind === "calendar_stale" ? "Calendar not current" : undefined}>{notice.text}</AlertNotice>)}
             {plan?.usage === "plan" ? <p className="mt-2 flex flex-wrap items-center gap-x-3 border-t border-line pt-2 text-xs leading-5" data-brief-plan="plan">
               <span>Using ChatGPT plan</span>

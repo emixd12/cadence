@@ -261,7 +261,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
 
   return (
     <div className="mt-3 border-t border-line pt-2" data-brief-moves>
-      {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" icon={false} size="compact" className="mb-2">
+      {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" variant="inline" size="compact" className="mb-2">
         Your calendar couldn’t be read just now, so times that depend on it aren’t offered.
       </AlertNotice> : null}
       {(moves.acceptAll && open.length >= 2) || moves.undoAllBatchId ? <p className="text-sm leading-6" data-brief-accept-all>
@@ -273,7 +273,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
           ? <button type="button" className={LINK} disabled={batchPending} onClick={() => void undoAll()} data-brief-undo-all>Undo all</button>
           : null}
       </p> : null}
-      {batchNotice ? <AlertNotice kind="write_refused" icon={false} size="compact" className="mb-2">{batchNotice}</AlertNotice> : null}
+      {batchNotice ? <AlertNotice kind="write_refused" variant="inline" size="compact" className="mb-2">{batchNotice}</AlertNotice> : null}
       {batchExplainer ? <p className="text-xs leading-5 text-muted-readable" data-brief-explainer>{batchExplainer}</p> : null}
       <ul className="grid gap-3">
         {shown.map((line) => <MoveLine
@@ -356,7 +356,7 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
       </p>}
       {ui.panel === "other_time" && line.status === "proposed" ? <OtherTimePanel line={line} pending={pending} onPick={onOtherTime} onReplan={onReplan} /> : null}
       {ui.panel === "length" ? <LengthPanel minutes={line.length.minutes} pending={pending} onSave={onLength} onCancel={() => onPanel(null)} /> : null}
-      {ui.refusal ? <AlertNotice kind="write_refused" icon={false} size="compact" className="mt-1"
+      {ui.refusal ? <AlertNotice kind="write_refused" variant="inline" size="compact" className="mt-1"
         action={ui.refusal.alternatives.length ? <span>Free:{" "}{ui.refusal.alternatives.map((instant, index) => <span key={instant} className="whitespace-nowrap">
           {index ? " · " : ""}<button type="button" className={LINK} disabled={pending} onClick={() => onOtherTime(instant)}>{moveTimeLabel(instant, line.timezone)}</button>
         </span>)}</span> : undefined}>
@@ -478,13 +478,13 @@ function firstUseExplainer(kind: BriefMoveAnswerKind): string | null {
 
 function requestRefusal(error: unknown): BriefMoveRefusal {
   const code = error instanceof DailyBriefRequestError ? error.code : "advisor_unavailable";
-  const message = code === "offline" ? "You appear to be offline. Nothing changed."
+  const message = code === "offline" ? "You appear to be offline."
     : code === "proposal_closed" ? "This suggestion was already answered on another device."
       : code === "proposal_not_found" ? "This suggestion is no longer available. Refresh the brief for current ones."
-        : code === "revision_changed" ? "This item changed since the brief was written. Nothing changed; refresh the brief to see it."
+        : code === "revision_changed" ? "This item changed since the brief was written; refresh the brief to see it."
         : code === "rate_limited" ? "Too many changes at once. Try again in a moment."
-          : code === "timeout" ? "That took too long. Nothing changed; try again."
-            : "Cadence couldn’t apply that. Nothing changed.";
+          : code === "timeout" ? "That took too long; try again."
+            : "Cadence couldn’t apply that.";
   return { reason: code, message, alternatives: [], revision: null };
 }
 
