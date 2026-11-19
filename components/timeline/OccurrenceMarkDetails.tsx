@@ -1,7 +1,7 @@
 "use client";
 
 import { Temporal } from "@js-temporal/polyfill";
-import { createContext, useContext, useId, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useId, useState, type ReactNode } from "react";
 import { LATE_MARK_THRESHOLD_MINUTES, NOT_DONE_REASONS, type NotDoneReason } from "@cadence/core/resolvers/status.resolver";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 
@@ -76,23 +76,46 @@ export function lateMarkOffer(occurrence: Pick<TimelineOccurrenceView, "schedule
 const LINK = "-my-2 inline-block py-2 underline underline-offset-2 disabled:opacity-60";
 
 /**
- * The line under the row's summary, outside it so a tap never opens or closes the row.
- * It lines up with the title. `toneClass` is the row's own text color, so it reads on
- * the Completed and Not Completed fills.
+ * Taps joined by " · ". Each tap keeps its trailing dot on its own piece, and the space
+ * between pieces is the only place a narrow row breaks, so a wrapped line never starts
+ * with a dot.
  */
-export function OccurrenceMarkDetailLine({ occurrence, justMarked, toneClass }: Readonly<{
+function choices(items: readonly ReactNode[]): ReactNode {
+  return items.map((item, index) => (
+    <Fragment key={index}>
+      {index ? " " : null}
+      <span className="whitespace-nowrap">{item}{index < items.length - 1 ? " ·" : null}</span>
+    </Fragment>
+  ));
+}
+
+type MarkDetailParts = Readonly<{
+  /** Sits right after the title inside the row's summary; wraps under it only when the row has no room. */
+  inline: ReactNode;
+  /** Only the Other time field, under the summary so typing never opens or closes the row. */
+  below: ReactNode;
+}>;
+
+const NONE: MarkDetailParts = { inline: null, below: null };
+
+/**
+ * The words and taps a just-marked row shows. `inline` goes next to the title: a tap on
+ * it cancels the click's default so the row does not open or close. `toneClass` is the
+ * row's own text color, so it reads on the Completed and Not Completed fills.
+ */
+export function useOccurrenceMarkDetailParts({ occurrence, justMarked, toneClass }: Readonly<{
   occurrence: TimelineOccurrenceView;
   justMarked: JustMarked | null;
   toneClass: string;
-}>) {
+}>): MarkDetailParts {
   const context = useOccurrenceMarkDetails();
   const formId = useId();
   const [phase, setPhase] = useState<Readonly<{ key: string; state: "open" | "other" | "pending" | "dismissed" } | { key: string; state: "saved"; outcome: string } | { key: string; state: "refused"; message: string }>>({ key: "", state: "open" });
   const [otherTime, setOtherTime] = useState("");
-  if (!context || !justMarked || occurrence.status !== justMarked.status) return null;
+  if (!context || !justMarked || occurrence.status !== justMarked.status) return NONE;
   const key = `${occurrence.id}:${justMarked.status}:${justMarked.at}`;
   const current = phase.key === key ? phase : { key, state: "open" as const };
-  if (current.state === "dismissed") return null;
+  if (current.state === "dismissed") return NONE;
 
   const run = async (save: () => Promise<MarkDetailState>, outcome: string) => {
     setPhase({ key, state: "pending" });
@@ -101,68 +124,73 @@ export function OccurrenceMarkDetailLine({ occurrence, justMarked, toneClass }: 
   };
   const timeLabel = (instant: string) => Temporal.Instant.from(instant).toZonedDateTimeISO(context.timezone)
     .toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
-  const lineClass = `timeline-occurrence-mark-detail -mt-2 px-3 pb-2.5 text-xs font-normal leading-5 sm:pl-28 sm:pr-4 ${toneClass}`;
+  const inlineClass = `timeline-occurrence-mark-detail min-w-0 text-xs font-normal leading-5 ${toneClass}`;
+  const inline = (detail: string, children: ReactNode, extra: Readonly<{ italic?: boolean; role?: "status" | "alert" }> = {}) => (
+    <span className={`${inlineClass}${extra.italic ? " italic" : ""}`} data-mark-detail={detail} role={extra.role}
+      // Inside the summary: keep a tap here from opening or closing the row.
+      onClick={(event) => event.preventDefault()}>{children}</span>
+  );
 
-  if (current.state === "saved") {
-    return <p className={`${lineClass} italic`} data-mark-detail="saved" role="status">{current.outcome}</p>;
-  }
-  if (current.state === "refused") {
-    return <p className={lineClass} data-mark-detail="refused" role="alert">Not changed. {current.message}</p>;
-  }
+  if (current.state === "saved") return { inline: inline("saved", current.outcome, { italic: true, role: "status" }), below: null };
+  if (current.state === "refused") return { inline: inline("refused", `Not changed. ${current.message}`, { role: "alert" }), below: null };
   const pending = current.state === "pending";
 
   if (justMarked.status === "not_completed") {
-    return (
-      <p className={lineClass} data-mark-detail="reasons">
-        <span>Why?</span>
-        {NOT_DONE_REASONS.map((reason, index) => (
-          <span key={reason} className="whitespace-nowrap">
-            {index ? " · " : " "}
-            <button type="button" className={LINK} disabled={pending} data-not-done-reason={reason}
-              onClick={() => {
-                void run(() => context.actions.notDoneReason({ occurrenceId: occurrence.id, reason }), `Reason noted: ${NOT_DONE_REASON_LABELS[reason]}.`);
-              }}>{NOT_DONE_REASON_LABELS[reason]}</button>
-          </span>
-        ))}
-      </p>
-    );
+    return {
+      inline: inline("reasons", <>
+        {"Why? "}
+        {choices(NOT_DONE_REASONS.map((reason) => (
+          <button key={reason} type="button" className={LINK} disabled={pending} data-not-done-reason={reason}
+            onClick={() => {
+              void run(() => context.actions.notDoneReason({ occurrenceId: occurrence.id, reason }), `Reason noted: ${NOT_DONE_REASON_LABELS[reason]}.`);
+            }}>{NOT_DONE_REASON_LABELS[reason]}</button>
+        )))}
+      </>),
+      below: null,
+    };
   }
 
   const offer = lateMarkOffer(occurrence, justMarked.at, context.timezone);
-  if (!offer) return null;
+  if (!offer) return NONE;
   const saveAt = (instant: string) => run(() => context.actions.doneAt({ occurrenceId: occurrence.id, doneAt: instant }), `Saved as done at ${timeLabel(instant)}.`);
 
   if (current.state === "other") {
-    return (
-      <form className={`${lineClass} flex flex-wrap items-center gap-x-2`} data-mark-detail="other-time"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const instant = localTimeToInstant(occurrence.localDate, otherTime, context.timezone);
-          if (instant) void saveAt(instant);
-        }}>
-        <label htmlFor={`${formId}-done-at`}>Done at</label>
-        <input id={`${formId}-done-at`} type="time" step={300} value={otherTime} onChange={(event) => setOtherTime(event.target.value)}
-          className="min-h-8 border-0 border-b border-current bg-transparent px-1 py-0 text-xs text-current [color-scheme:light_dark]" />
-        <button type="submit" className={LINK} disabled={!otherTime}>Save</button>
-        <button type="button" className={LINK} onClick={() => setPhase({ key, state: "open" })}>Cancel</button>
-      </form>
-    );
+    return {
+      inline: null,
+      below: (
+        <form className={`timeline-occurrence-mark-detail -mt-2 flex flex-wrap items-center gap-x-2 px-3 pb-2.5 text-xs font-normal leading-5 sm:pl-28 sm:pr-4 ${toneClass}`}
+          data-mark-detail="other-time"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const instant = localTimeToInstant(occurrence.localDate, otherTime, context.timezone);
+            if (instant) void saveAt(instant);
+          }}>
+          <label htmlFor={`${formId}-done-at`}>Done at</label>
+          <input id={`${formId}-done-at`} type="time" step={300} value={otherTime} onChange={(event) => setOtherTime(event.target.value)}
+            className="min-h-8 border-0 border-b border-current bg-transparent px-1 py-0 text-xs text-current [color-scheme:light_dark]" />
+          <button type="submit" className={LINK} disabled={!otherTime}>Save</button>
+          <button type="button" className={LINK} onClick={() => setPhase({ key, state: "open" })}>Cancel</button>
+        </form>
+      ),
+    };
   }
 
-  return (
-    <p className={lineClass} data-mark-detail="done-at">
-      {offer.setTime && offer.setTimeLabel ? <>
-        <button type="button" className={LINK} disabled={pending} data-done-at="set-time"
-          onClick={() => void saveAt(offer.setTime!)}>Done at {offer.setTimeLabel}</button>
-        {" · "}
-      </> : <span>Done earlier? </span>}
-      <button type="button" className={LINK} disabled={pending} data-done-at="just-now"
-        onClick={() => setPhase({ key, state: "dismissed" })}>Just now</button>
-      {" · "}
-      <button type="button" className={LINK} disabled={pending} data-done-at="other-time"
-        onClick={() => setPhase({ key, state: "other" })}>Other time</button>
-    </p>
-  );
+  return {
+    inline: inline("done-at", <>
+      {offer.setTime && offer.setTimeLabel ? null : "Done earlier? "}
+      {choices([
+        ...(offer.setTime && offer.setTimeLabel ? [
+          <button key="set-time" type="button" className={LINK} disabled={pending} data-done-at="set-time"
+            onClick={() => void saveAt(offer.setTime!)}>Done at {offer.setTimeLabel}</button>,
+        ] : []),
+        <button key="just-now" type="button" className={LINK} disabled={pending} data-done-at="just-now"
+          onClick={() => setPhase({ key, state: "dismissed" })}>Just now</button>,
+        <button key="other-time" type="button" className={LINK} disabled={pending} data-done-at="other-time"
+          onClick={() => setPhase({ key, state: "other" })}>Other time</button>,
+      ])}
+    </>),
+    below: null,
+  };
 }
 
 /** A wall time on the item's local day, as a UTC instant; null for an unreadable time. */

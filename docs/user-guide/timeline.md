@@ -201,7 +201,7 @@ assistive technology.
 **Prerequisites:** You just marked a Timeline row, on the web or on the Mac.
 
 1. If you mark an item **Completed** more than two hours after its set time,
-   a line under the row offers **Done at** its set time, **Just now**, and
+   a line next to the item's name offers **Done at** its set time, **Just now**, and
    **Other time**. A time range offers **Done earlier? Just now · Other time**
    once two hours have passed after it ends.
 2. Choose **Done at** to save the set time, or **Other time** to type the time

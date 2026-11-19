@@ -845,7 +845,7 @@
     {
       "path": "components/timeline/OccurrenceMarkDetails.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 15,
+      "interaction_marker_count": 16,
       "interaction_ids": [
         "INT-TIMELINE-018",
         "INT-TIMELINE-019"
@@ -18715,7 +18715,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Done at, Just now or Other time on the line under a just-completed row"
+          "control": "Done at, Just now or Other time next to the name of a just-completed row"
         }
       ],
       "availability": "Timeline on web and Mac, right after marking an item Completed more than two hours after its set time (or after a time range ends).",
@@ -18798,7 +18798,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "No time, Forgot, Low energy, Away or Chose not to on the line under a just-marked Not Completed row"
+          "control": "No time, Forgot, Low energy, Away or Chose not to next to the name of a just-marked Not Completed row"
         }
       ],
       "availability": "Timeline on web and Mac, right after marking an item Not Completed.",

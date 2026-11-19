@@ -892,8 +892,8 @@ bubble's layout is in the web Phase 3 section (3B).
 
 ## Mark details on Timeline rows — advisor Phase 4G
 
-Two optional text lines can appear under a row right after it is marked, on web and Mac
-alike. Neither ever opens a dialog by itself, and ignoring them changes nothing.
+Two optional text lines can appear right after a row is marked, on web and Mac alike. They
+sit to the right of the item's name and wrap under it only when the row has no room. Neither ever opens a dialog by itself, and ignoring them changes nothing.
 
 - **Done at.** A Completed mark made more than two hours after the item's set time shows
   "Done at 7:00 AM · Just now · Other time". "Done at" saves the set time; "Just now"
