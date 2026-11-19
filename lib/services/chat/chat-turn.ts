@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { streamText, type LanguageModel, type ModelMessage } from "ai";
 import {
-  CHAT_MEDICAL_NOTICE, type ChatAlert, type ChatConfirm, type ChatEvent, type ChatMessage, type ChatOutcome, type ChatPart,
+  CHAT_MEDICAL_NOTICE, CHAT_STOPPED_NOTICE, type ChatAlert, type ChatConfirm, type ChatEvent, type ChatMessage, type ChatOutcome, type ChatPart,
   type ChatRefusal, type ChatToolSubject,
 } from "@cadence/core/types/chat";
 import { estimateCallMicrodollars, modelPrice, usageMicrodollars } from "@/lib/services/agent-model-pricing";
@@ -71,6 +71,12 @@ export type ChatTurnInput = Readonly<{
   /** The reply's message id; every idempotency key starts with it. */
   replyId: string;
   signal: AbortSignal;
+  /**
+   * Aborted when the person pressed Stop. The turn ends at the next safe point: a
+   * streaming model call ends where it is, and no further write runs. What was already
+   * written and shown stays (with Undo); pending changes are dropped, not offered.
+   */
+  stop?: AbortSignal;
   onEvent: (event: ChatEvent) => void;
   onUsage?: (usage: AgentModelUsage) => void;
   spend?: ChatSpendGate;
@@ -89,7 +95,7 @@ export type ChatTurnResult = Readonly<{
   modelCalls: number;
   usage: readonly AgentModelUsage[];
   /** Why the turn stopped early, for the run log. */
-  stop: "answered" | "tool_limit" | "ceiling" | "budget_reached" | "model_error";
+  stop: "answered" | "tool_limit" | "ceiling" | "budget_reached" | "model_error" | "stopped";
   errorReason?: string;
 }>;
 
@@ -156,8 +162,10 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
   const price = modelPrice(input.setting.model);
   const messages: ModelMessage[] = buildHistoryMessages(input, limits.historyMessages);
 
+  const stopped = () => input.stop?.aborted === true;
   for (;;) {
     input.signal.throwIfAborted();
+    if (stopped()) { stop = "stopped"; break; }
     if (modelCalls >= limits.maxModelCalls) { stop = "tool_limit"; break; }
     const toolsAllowed = toolCalls.length < limits.maxToolCalls;
     // Spend: reserve before the call; refuse past the question's ceiling.
@@ -200,7 +208,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         reasoning: input.setting.reasoning,
         maxOutputTokens: input.setting.maxOutputTokens,
         maxRetries: 0,
-        abortSignal: AbortSignal.any([input.signal, AbortSignal.timeout(input.setting.timeoutMs)]),
+        abortSignal: AbortSignal.any([input.signal, AbortSignal.timeout(input.setting.timeoutMs), ...(input.stop ? [input.stop] : [])]),
         providerOptions: {
           openai: { store: false, reasoningSummary: null, parallelToolCalls: true },
           ...(modelTransport() === "gateway" ? { gateway: { tags: ["agent:chat"] } } : {}),
@@ -223,6 +231,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       const actual = callUsage && price ? usageMicrodollars(price, callUsage) : null;
       await settle?.(actual ?? estimate).catch(() => undefined);
       if (input.signal.aborted) throw error;
+      if (stopped()) { stop = "stopped"; break; }
       const mapped = agentModelFailure(error, input.signal);
       stop = "model_error";
       errorReason = mapped instanceof AgentModelError ? mapped.reason : "provider_shape";
@@ -256,6 +265,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         continue;
       }
       if (!input.tools.some((tool) => tool.name === call.toolName)) { answer({ error: "unknown_tool" }); continue; }
+      if (stopped()) { answer({ error: "stopped", message: "The person pressed Stop." }); continue; }
       if (toolCalls.length >= limits.maxToolCalls) { answer({ error: "tool_limit", message: "No more lookups in this question. Answer with what you have." }); continue; }
       toolCalls.push(call.toolName);
       const name = call.toolName as ChatToolName;
@@ -280,6 +290,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         answer(WAITING);
         continue;
       }
+      if (stopped()) { answer({ error: "stopped", message: "The person pressed Stop." }); continue; }
       const prepared = withRevision(write, facts);
       const done = await run(prepared.name, prepared.args, true);
       answer(done.ok ? done.result : { error: done.error.code, message: done.error.message });
@@ -302,8 +313,10 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
     if (toolCalls.length >= limits.maxToolCalls) stop = "tool_limit";
   }
 
+  if (stopped()) stop = "stopped";
   let confirm: ChatConfirm | null = null;
-  if (pending.length) {
+  if (stop === "stopped") emit({ type: "notice", notice: CHAT_STOPPED_NOTICE });
+  else if (pending.length) {
     confirm = {
       id: newId(),
       question: pending.length === 1 ? "Make this change?" : `Make these ${pending.length} changes?`,
@@ -396,6 +409,7 @@ export function messageText(message: ChatMessage): string {
       case "confirm": return `[Cadence asked: ${part.confirm.question} ${part.confirm.items.map((item) => item.text).join("; ")}. Answer: ${part.confirm.state}]`;
       case "refusal": return `[Cadence: ${part.refusal.text}]`;
       case "alert": return `[Cadence: ${part.alert.text}]`;
+      case "notice": return part.notice.kind === "stopped" ? "[Cadence: the person stopped this reply]" : "";
       default: return "";
     }
   }).filter(Boolean).join("\n").trim();

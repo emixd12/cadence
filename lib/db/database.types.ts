@@ -803,6 +803,7 @@ export type Database = {
       chat_messages: {
         Row: {
           agent_run_id: string | null
+          stop_requested_at: string | null
           client_message_id: string | null
           conversation_id: string
           created_at: string
@@ -815,6 +816,7 @@ export type Database = {
         }
         Insert: {
           agent_run_id?: string | null
+          stop_requested_at?: string | null
           client_message_id?: string | null
           conversation_id: string
           created_at?: string
@@ -827,6 +829,7 @@ export type Database = {
         }
         Update: {
           agent_run_id?: string | null
+          stop_requested_at?: string | null
           client_message_id?: string | null
           conversation_id?: string
           created_at?: string

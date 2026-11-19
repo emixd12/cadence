@@ -35,8 +35,11 @@ create table public.chat_messages (
   -- Assistant messages are 'streaming' until the turn finishes.
   state text not null default 'complete' check (state in ('streaming', 'complete')),
   agent_run_id uuid,
+  -- Assistant messages: set when the person pressed Stop; the running turn polls it.
+  stop_requested_at timestamptz,
   created_at timestamptz not null default now(),
   check ((role = 'user') = (client_message_id is not null)),
+  check (stop_requested_at is null or role = 'assistant'),
   check ((role = 'assistant') = (reply_to is not null))
 );
 create index chat_messages_conversation_idx on public.chat_messages (conversation_id, created_at, id);

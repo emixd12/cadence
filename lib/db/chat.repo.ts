@@ -6,7 +6,7 @@ import type {
 
 // Advisor plan Phase 5 (5A). Every call runs on the chat agent client
 // (lib/integrations/agent-caller.ts, channel "chat"); the table policies refuse
-// every other token (migration 20261119220000).
+// every other token (migration 20261119230000).
 
 export class ChatStorageError extends Error {
   constructor(public readonly code: "not_found" | "database_error", options?: ErrorOptions) {
@@ -126,6 +126,25 @@ export async function finishChatReply(client: AppSupabaseClient, input: Readonly
   const { error: touchError } = await client.from("chat_conversations")
     .update({ updated_at: now, ...(input.summary !== undefined ? { summary: input.summary } : {}) }).eq("id", input.conversationId);
   if (touchError) fail(touchError);
+}
+
+/** Marks the running reply to a question as stopped. False when it already finished or is unknown. */
+export async function requestChatStop(client: AppSupabaseClient, clientMessageId: string): Promise<boolean> {
+  const { data: question, error } = await client.from("chat_messages").select("id")
+    .eq("client_message_id", clientMessageId).maybeSingle();
+  if (error) fail(error);
+  if (!question) return false;
+  const { data, error: updateError } = await client.from("chat_messages").update({ stop_requested_at: new Date().toISOString() })
+    .eq("reply_to", question.id).eq("state", "streaming").select("id");
+  if (updateError) fail(updateError);
+  return (data ?? []).length > 0;
+}
+
+/** Whether the person pressed Stop on this reply. */
+export async function chatStopRequested(client: AppSupabaseClient, replyId: string): Promise<boolean> {
+  const { data, error } = await client.from("chat_messages").select("stop_requested_at").eq("id", replyId).maybeSingle();
+  if (error) fail(error);
+  return Boolean(data?.stop_requested_at);
 }
 
 export type ChatActionRecord = Readonly<{

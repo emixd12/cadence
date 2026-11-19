@@ -226,6 +226,31 @@ describe("chat turn (5A)", () => {
     expect(result.modelCalls).toBe(3);
   });
 
+  it("stops at the next safe point when the person presses Stop", async () => {
+    const stop = new AbortController();
+    const fake = fakeExecutor();
+    const executor: ChatToolExecutor = async (name, args, options) => {
+      const result = await fake.executor(name, args, options);
+      if (name === "set_occurrence_status") stop.abort();
+      return result;
+    };
+    const { promise } = turn([
+      { calls: [{ name: "set_occurrence_status", input: { occurrence_id: "o1", status: "completed" } },
+        { name: "update_occurrence_note", input: { occurrence_id: "o2", note: "later" } }] },
+      { calls: [{ name: "set_occurrence_status", input: { occurrence_id: "o2", status: "completed" } }] },
+      { text: "Done." },
+    ], { ...fake, executor }, { stop: stop.signal });
+    const result = await promise;
+    expect(result.stop).toBe("stopped");
+    expect(result.modelCalls).toBe(1);
+    // The write that ran stays with its Undo; the waiting one is dropped, not offered.
+    expect(result.writes).toHaveLength(1);
+    expect(result.pending).toBeNull();
+    expect(result.parts.map((part) => part.type)).toEqual(["outcome", "notice"]);
+    expect(result.parts.at(-1)).toEqual({ type: "notice", notice: { kind: "stopped", text: "Stopped." } });
+    expect(fake.calls.filter((call) => call.name === "update_occurrence_note")).toHaveLength(0);
+  });
+
   it("never lets the model choose an idempotency key", async () => {
     const { promise, fake } = turn([{ calls: [{ name: "set_occurrence_status", input: { occurrence_id: "o1", status: "completed", idempotency_key: "model-chosen-key" } }] }, { text: "ok" }]);
     await promise;

@@ -3241,7 +3241,7 @@ Local verification: `tests/coach-signals.local-integration.test.ts`.
 
 ## Chat conversations (advisor plan Phase 5, workstream 5A)
 
-Migration `20261119220000_chat_conversations.sql` adds four tables. All are
+Migration `20261119230000_chat_conversations.sql` adds four tables. All are
 owned by `auth.users` with `on delete cascade`, so deleting the account deletes
 them; nothing else expires them.
 
@@ -3250,7 +3250,9 @@ them; nothing else expires them.
 - `chat_messages`: `role`, `parts` (the stored `ChatPart` list, at most 256 KB),
   `client_message_id` (user messages; unique per user, so a retried question
   replays the stored reply), `reply_to` (assistant messages; unique), `state`
-  (`streaming` or `complete`) and `agent_run_id`.
+  (`streaming` or `complete`), `agent_run_id`, and `stop_requested_at` (set by
+  Stop on a streaming reply; the running turn checks it every second, ends at its
+  next safe point, keeps what it already did and drops changes waiting for a Yes).
 - `chat_actions`: one row per change chat made. `id` is the outcome id the
   client sends to Undo. `undo_plan` holds the exact write that reverses it;
   `undo_state` is `available`, `undoing`, `done` or `unavailable`.
