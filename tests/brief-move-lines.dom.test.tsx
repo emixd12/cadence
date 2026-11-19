@@ -112,6 +112,14 @@ describe("move lines", () => {
     expect(line("gym")).not.toBeNull();
   });
 
+  it("after a reload, names the applied time the server saved, not the suggestion", async () => {
+    const moves = structuredClone(BRIEF_MOVE_FIXTURE);
+    const walk = moves.lines.find((entry) => entry.proposalId === "walk")!;
+    Object.assign(walk, { status: "other_time", moveId: "move-walk", appliedTo: { startAt: "2026-11-18T23:25:00.000Z", endAt: "2026-11-18T23:55:00.000Z" } });
+    await render(fixtureBriefMoveClient(), moves);
+    expect(line("walk").querySelector("[data-brief-outcome]")!.textContent).toContain("Moved to 6:25 PM for today.");
+  });
+
   it("keeps answers when the same brief is shown again after Close or a Timeline remount", async () => {
     const client = fixtureBriefMoveClient();
     const answer = vi.spyOn(client, "answer");
