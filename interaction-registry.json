@@ -1457,6 +1457,12 @@
       "spec": "docs/PRODUCT_SPEC.md#daily-brief-on-the-users-chatgpt-plan-tickets-294300"
     },
     {
+      "id": "advisor-tips",
+      "name": "Advisor tips",
+      "meaning": "The advisor's panel on the Timeline: opening it, its daily tips and the research behind them, and the schedule questions it asks.",
+      "spec": "docs/MESSAGING_CHANGES.md#p-071-overnight-coach-signals-widen-and-the-advisor-writes-daily-tips"
+    },
+    {
       "id": "travel-and-leave-times",
       "name": "Travel and leave times",
       "meaning": "Home, usual travel, travel estimates, leave-time questions and reminders, and the weather credit.",
@@ -19476,6 +19482,7 @@
     {
       "id": "INT-ADVISOR-001",
       "name": "Open the advisor panel",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19566,6 +19573,7 @@
     {
       "id": "INT-ADVISOR-002",
       "name": "React to an advisor tip",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19649,6 +19657,7 @@
     {
       "id": "INT-ADVISOR-003",
       "name": "Show the research behind a tip",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19726,6 +19735,7 @@
     {
       "id": "INT-ADVISOR-004",
       "name": "Answer an advisor schedule question",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
