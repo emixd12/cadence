@@ -132,8 +132,8 @@ describe("integration operation registry", () => {
     ]);
   });
 
-  it("uses contract version 1.4.0 and records when each tool arrived", () => {
-    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.4.0");
+  it("uses contract version 1.5.0 and records when each tool arrived", () => {
+    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.5.0");
     for (const [name, operation] of operations) {
       const since = name === "list_day_notes" || name === "update_day_note" ? "1.1.0"
         : name === "move_occurrence_for_day" || name === "revert_occurrence_move" ? "1.3.0"
@@ -376,7 +376,7 @@ describe("integration errors", () => {
     for (const code of INTEGRATION_ERROR_CODES) {
       const error = createIntegrationError(code, `Example ${code}.`, { retryAfterSeconds: code === "rate_limited" ? 30 : undefined });
       expect(validateAgainstSchema(integrationErrorSchema.schema, error).ok, code).toBe(true);
-      expect(error.contract_version).toBe("1.4.0");
+      expect(error.contract_version).toBe("1.5.0");
     }
   });
 

@@ -9,6 +9,8 @@ import { buildChatToolDefinitions, trimToolResult } from "@/lib/services/chat/ch
 import { buildHistoryMessages, messageText, runChatTurn, summarizeOlderMessages } from "@/lib/services/chat/chat-turn";
 import { runChatConfirm, runChatUndo } from "@/lib/services/chat/chat-confirm";
 import { recordSentPart } from "@/lib/services/chat/chat.service";
+import { chatEnabled, chatSources } from "@/lib/services/chat/chat-settings";
+import { aiSettingsFromStored } from "@/lib/services/ai-settings.service";
 import type { ChatToolExecutor, ChatToolResult } from "@/lib/services/chat/chat-writes";
 
 const ALL_ON = { notes: true, googleCalendar: true, outlookCalendar: true, icloudCalendar: true, hevy: true };
@@ -419,5 +421,23 @@ describe("chat history and tools (5A)", () => {
       expect(tool.inputSchema).not.toHaveProperty("oneOf");
       expect(Object.keys((tool.inputSchema.properties ?? {}) as object)).not.toContain("idempotency_key");
     }
+  });
+});
+
+describe("chat follows the AI features setting (4F)", () => {
+  const none = { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: false };
+  const allOn = { approvedAt: "2026-11-20T09:00:00Z", revision: 1, dailyBriefEnabled: true, tipsEnabled: true, chatEnabled: true,
+    includeNotes: true, includeReminderHistory: true, useConnectedSources: true, excludedSources: none };
+
+  it("is off before the approval and when chat is turned off", () => {
+    expect(chatEnabled(aiSettingsFromStored({ ...allOn, approvedAt: null }))).toBe(false);
+    expect(chatEnabled(aiSettingsFromStored({ ...allOn, chatEnabled: false }))).toBe(false);
+    expect(chatEnabled(aiSettingsFromStored(allOn))).toBe(true);
+  });
+
+  it("reads only the sources left on", () => {
+    expect(chatSources(aiSettingsFromStored({ ...allOn, includeNotes: false, excludedSources: { ...none, hevy: true } })))
+      .toEqual({ notes: false, googleCalendar: true, outlookCalendar: true, icloudCalendar: true, hevy: false });
+    expect(Object.values(chatSources(aiSettingsFromStored({ ...allOn, chatEnabled: false })))).toEqual([false, false, false, false, false]);
   });
 });

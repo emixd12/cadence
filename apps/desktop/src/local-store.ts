@@ -7,7 +7,7 @@ import type {
   OccurrenceTimeSession, Profile, ReminderDelivery,
 } from "../../../lib/types/database";
 import type {
-  OccurrenceRecord, OccurrenceStatusEventRecord, StatusTransitionResult,
+  MarkDetailResult, OccurrenceRecord, OccurrenceStatusEventRecord, StatusTransitionResult,
   StatusTransitionCommit,
 } from "@cadence/core/data-store";
 import type { AccountSyncEntity, AccountSyncWrite } from "@cadence/core/resolvers/account-sync.resolver";
@@ -151,6 +151,10 @@ export type LocalCommandMap = {
   applyStatusTransition: {
     input: Mutation & Omit<StatusTransitionCommit, "event"> & { event: OccurrenceStatusEventRecord | null };
     result: StatusTransitionResult;
+  };
+  applyMarkDetail: {
+    input: Mutation & { occurrenceId: string; expectedLatestEventId: string; completedAt: string | null; event: OccurrenceStatusEventRecord };
+    result: MarkDetailResult;
   };
   updateOccurrenceNote: {
     input: Mutation & { occurrenceId: string; expectedNote: string | null; note: string | null; usedShortcut?: boolean };

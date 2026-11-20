@@ -1759,6 +1759,16 @@
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
     },
     {
+      "id": "INT-TIMELINE-018",
+      "classification": "destructive_serial_only",
+      "reason": "The done-at line appears only right after a late Completed mark and appends status history; it needs a seeded late item and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-019",
+      "classification": "destructive_serial_only",
+      "reason": "The reason line appears only right after a Not Completed mark and appends status history; it needs serial verification."
+    },
+    {
       "id": "INT-ADVISOR-001",
       "classification": "browser_only",
       "reason": "Opening the advisor panel is page state; its reads (today's tip, the schedule question, earlier tips) are single database reads with no model call."
@@ -1799,7 +1809,7 @@
       "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
     },
     {
-      "id": "INT-TIMELINE-018",
+      "id": "INT-TIMELINE-020",
       "classification": "destructive_serial_only",
       "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
     }

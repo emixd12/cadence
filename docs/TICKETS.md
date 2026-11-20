@@ -19422,7 +19422,7 @@ Scope and acceptance:
 - The Mac passes a local `runAction` to `BehaviorList` (End now, Start again, Pause through
   the shared `PauseRangePicker`, Resume now, Cancel pause) and renders
   `BehaviorRunNotices` on its Timeline with the same action.
-- `INT-BEHAVIOR-033` to `INT-BEHAVIOR-036` and `INT-TIMELINE-018` move to implemented for
+- `INT-BEHAVIOR-033` to `INT-BEHAVIOR-036` and `INT-TIMELINE-020` move to implemented for
   desktop.
 
 Platform impact:

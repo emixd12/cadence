@@ -75,7 +75,7 @@ describe("hosted leave reminder port (Wave 4 final check)", () => {
       event("icloud_calendar/call", "2026-11-06T21:00:00Z", "", "Call"),
       event("outlook_calendar/declined", "2026-11-06T22:00:00Z", "Elsewhere", "Declined", { currentUserResponse: "declined" }),
     ];
-    vi.mocked(readTravelCalendarEvents).mockResolvedValue({ google: [], all: events, timezone: null, unavailable: [] } as never);
+    vi.mocked(readTravelCalendarEvents).mockResolvedValue({ google: [], all: events, timezone: null, unavailable: [], complete: true } as never);
     vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValue({ calendarsLeftOut: [], response: { evidence: { legs: [
       { leg: { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "outlook_calendar/dentist", mode: "walking" } },
       { leg: { role: "onward", originCommitmentRef: "outlook_calendar/dentist", destinationCommitmentRef: "icloud_calendar/lunch", mode: "walking" } },
