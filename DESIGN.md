@@ -380,6 +380,23 @@ The one place for short notifications (owner decision, 2026-11-18). `components/
 - **Behavior:** non-modal; it never takes focus. Announced with `role="status"`, or `role="alert"` for something that needs action now. A new notification replaces the open one.
 - **Not for errors** about a specific row or field: those stay next to what failed, in the Alert notice.
 
+### Chat
+
+The Chat page (advisor plan Phase 5B, `/chat`; `components/chat/ChatPage.tsx`, `ChatMessages.tsx`; bench: `/design-system?preview=chat&state=today`). Text-like throughout: no outlined buttons and no bordered bubbles.
+
+- **Layout:** the Timeline horse banner, the "Chat" title, then a quiet row of Readable Ash text links (New conversation · Past conversations). The conversation column is at most 48rem wide; replies keep a 65-75ch measure. The composer is sticky at the bottom with one Ash Line rule above it: a bordered text field that grows to six lines and a bold Send text link. On phones the composer spans the full width, respects the safe area, and the field scrolls into view when the keyboard opens.
+- **Opening:** one Readable Ash `text-sm` line, "Chat can read all of your Cadence data, including notes and connected calendars. Change this in Settings." (the last sentence is a link), then three starter questions as Ink text links, one per line.
+- **Messages:** the person's message sits right-aligned in a Cold Surface block (no border, square, max 85% wide). Cadence's reply is plain Ink Body text on the page.
+- **Tool lines:** what chat looked at ("Looked at your Timeline", "Your calendar is off in Settings") is Readable Ash `text-sm`, one per line, above the text it informs.
+- **Outcomes:** each write that ran is Outcome text: Ink italic with an upright Undo link when Undo is available.
+- **Confirm:** the plain question, the pending changes as an indented list, then Yes · No as text links. After No: an italic "Not changed."; after expiry: an italic "This question expired. Nothing was changed."; after Yes the outcome lines follow the list.
+- **Refusals and alerts:** the inline Alert notice, one Rust Signal sentence starting with its label ("Not changed. …", "Chat paused. …", "Chat unavailable. …", "Not answered. …"). A refused move lists up to three free times in Ink below ("Free: 5:30 PM · 9:00 PM"); choosing one sends it as a message. After a budget stop, outcomes already made stay above the alert.
+- **Medical note:** "Cadence does not advise on medical matters." in Readable Ash `text-sm` under the reply.
+- **Past conversations:** an uppercase Label heading, then titles with Today, Yesterday or a short date right-aligned in Readable Ash, separated by Ash Line dividers; Show older pages.
+- **Side menu drawer:** the Chat menu row carries a small chevron at its right end (closed by default, remembered per browser). Open, it lists up to five recent chat titles and "All conversations" under Chat, in `text-xs` Muted text, one line each, behind a single Ash Line rule that drops from the centre of the Chat icon, so they read as a sub-list and never compete with the main menu items. The open conversation is Ink. Collapsed (icon-only) desktop menus show no drawer.
+- **Run states:** while a reply streams the bold Send link reads Stop (the same control, so focus stays put; Escape also stops). A stopped reply keeps what streamed and ends with "Stopped." in Readable Ash `text-sm`. A message the server never took returns to the field with its inline Alert sentence just above the field. A screen-reader-only status line announces Answering, Waiting for your Yes or No, Answered, Stopped and Not answered without moving focus.
+- **Scrolling:** the page follows a streaming reply only while the newest line is on screen. After the person scrolls up, a Readable Ash "Jump to latest" text link appears right-aligned above the field. No smooth-scroll animation, so reduced motion needs no special case.
+
 ### Chips
 
 - **Style:** Square, compact labels with 1px border.

@@ -26,6 +26,14 @@ import {
 } from "@/lib/navigation";
 import { readCurrentBrowserPushEndpoint } from "@/lib/push/browser";
 import { WebRuntimeProvider } from "@/components/layout/WebRuntimeProvider";
+import {
+  ChatNavRecents,
+  ChatRecentsToggle,
+  useChatRecentsOpen,
+  type ChatRecentsLoader,
+} from "@/components/layout/ChatNavRecents";
+import type { ChatConversationSummary } from "@cadence/core/types/chat";
+import { createChatClient } from "@/lib/ui/chat";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
 import { clearTravelSession } from "@/lib/ui/travel";
 
@@ -81,20 +89,24 @@ function PrimaryNav({
   pendingHref,
   isCollapsed,
   onNavigate,
+  chatRecents,
 }: Readonly<{
   pathname: string;
   pendingHref?: AppNavHref | null;
   isCollapsed: boolean;
   onNavigate?: (href: AppNavHref) => void;
+  chatRecents?: Readonly<{ open: boolean; onToggle: () => void; load: ChatRecentsLoader }>;
 }>) {
   return (
-    <nav aria-label="Primary" className="flex flex-1 flex-col py-3">
+    <nav aria-label="Primary" className="flex flex-1 flex-col overflow-y-auto py-3">
       {getAppNavItems("web").map((item) => {
         const Icon = navIcons[item.href];
         const isActive = pathname === item.href;
         const isPending = pendingHref === item.href && !isActive;
+        // Chat carries a small arrow that opens its recent chats underneath.
+        const withRecents = item.href === "/chat" && chatRecents && !isCollapsed;
 
-        return (
+        const link = (
           <Link
             key={item.href}
             href={item.href}
@@ -103,7 +115,8 @@ function PrimaryNav({
             aria-busy={isPending ? true : undefined}
             onClick={() => onNavigate?.(item.href)}
             className={[
-              "group flex h-10 w-full items-center overflow-hidden text-sm transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              "group flex h-10 items-center overflow-hidden text-sm transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              withRecents ? "min-w-0 flex-1" : "w-full",
               isCollapsed
                 ? isPending
                   ? "bg-surface text-foreground"
@@ -147,9 +160,28 @@ function PrimaryNav({
             </span>
           </Link>
         );
+
+        if (!withRecents) return link;
+        return (
+          <div key={item.href} data-nav-chat>
+            <div className={["flex items-center", isActive ? "bg-timeline-row-hover" : ""].join(" ")}>
+              {link}
+              <ChatRecentsToggle open={chatRecents.open} onToggle={chatRecents.onToggle} />
+            </div>
+            {chatRecents.open ? (
+              <ChatNavRecents load={chatRecents.load} pathname={pathname} onNavigate={() => onNavigate?.("/chat")} />
+            ) : null}
+          </div>
+        );
       })}
     </nav>
   );
+}
+
+function defaultChatRecentsLoader(): Promise<readonly ChatConversationSummary[]> {
+  return createChatClient()
+    .listConversations(null)
+    .then((page) => page.conversations);
 }
 
 const MOBILE_HEADER_BORDER_FADE_DISTANCE = 48;
@@ -320,16 +352,27 @@ export function AppShell({
   children,
   user,
   defaultDesktopSidebarOpen = true,
+  chatRecentsLoader = defaultChatRecentsLoader,
+  defaultChatRecentsOpen,
+  defaultMobileNavOpen = false,
 }: Readonly<{
   children: React.ReactNode;
   user?: AppShellUser;
   defaultDesktopSidebarOpen?: boolean;
+  /** Bench only: fixture conversations for the side menu's recent chats. */
+  chatRecentsLoader?: ChatRecentsLoader;
+  /** Bench only: start with recent chats open or closed instead of the remembered choice. */
+  defaultChatRecentsOpen?: boolean;
+  /** Bench only: start with the phone menu open. */
+  defaultMobileNavOpen?: boolean;
 }>) {
   const pathname = usePathname();
+  const [chatRecentsOpen, toggleChatRecents] = useChatRecentsOpen(defaultChatRecentsOpen);
+  const chatRecents = { open: chatRecentsOpen, onToggle: toggleChatRecents, load: chatRecentsLoader };
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(
     defaultDesktopSidebarOpen,
   );
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(defaultMobileNavOpen);
   const [mobileHeaderBorderOpacity, setMobileHeaderBorderOpacity] = useState(0);
   const [pendingHref, setPendingHref] = useState<AppNavHref | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -692,6 +735,7 @@ export function AppShell({
             pendingHref={pendingHref}
             isCollapsed={false}
             onNavigate={handlePrimaryNavNavigate}
+            chatRecents={chatRecents}
           />
 
           <div className="border-t border-line">
@@ -772,6 +816,7 @@ export function AppShell({
             pendingHref={pendingHref}
             isCollapsed={!isDesktopSidebarOpen}
             onNavigate={handlePrimaryNavNavigate}
+            chatRecents={chatRecents}
           />
 
           <div className="border-t border-line">

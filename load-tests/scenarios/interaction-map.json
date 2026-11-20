@@ -1757,6 +1757,26 @@
       "id": "INT-TIMELINE-017",
       "classification": "destructive_serial_only",
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
+    },
+    {
+      "id": "INT-CHAT-001",
+      "classification": "external_provider",
+      "reason": "A chat turn invokes the model provider and needs separate synthetic provider testing."
+    },
+    {
+      "id": "INT-CHAT-002",
+      "classification": "destructive_serial_only",
+      "reason": "Undo reverses a chat write and needs the stored outcome, the record's revision and idempotency verification on a synthetic account."
+    },
+    {
+      "id": "INT-CHAT-003",
+      "classification": "destructive_serial_only",
+      "reason": "A confirm runs several writes after Yes and needs a stored pending confirm from the same serial run."
+    },
+    {
+      "id": "INT-CHAT-004",
+      "classification": "not_load_bearing",
+      "reason": "Lists and opens stored conversations with one bounded read and no model call."
     }
   ]
 }

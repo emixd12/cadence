@@ -72,6 +72,7 @@ available to every user.
 - [Public site, account information, and Google sign-in](public-and-sign-in.md)
 - [App navigation and first-run setup](navigation-and-setup.md)
 - [Timeline, Needs decision, statuses, and Notes](timeline.md)
+- [Chat: questions, Undo, Yes or No, and past conversations](chat.md)
 - [Behavior setup, review, corrections, archive, and restore](behaviors-and-review.md)
 - [Browser notifications, email reminder intent, and timezone](reminders-and-timezone.md)
 - [Export, Markdown tools, BehaviorLog import, and restore](data-portability.md)
