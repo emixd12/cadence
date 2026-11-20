@@ -8,7 +8,7 @@ import type { ChatClient } from "@/lib/ui/chat";
 import { CHAT_FIXTURE_CONVERSATIONS, MEDS_OUTCOME, fixtureChatClient } from "@/app/design-system/chat-fixtures";
 import { DesktopApp, type DesktopChatNav } from "../apps/desktop/src/desktop-app";
 import { ChatScreen } from "../apps/desktop/src/chat-screen";
-import { createDesktopChatClient, desktopChatFetch, withAccountWrites } from "../apps/desktop/src/chat";
+import { INTERRUPTED_TURN_SYNC_DELAYS_MS, createDesktopChatClient, desktopChatFetch, withAccountWrites } from "../apps/desktop/src/chat";
 
 // Advisor plan Phase 5C: Chat on Cadence for Mac.
 
@@ -138,7 +138,8 @@ describe("the Mac chat client", () => {
   });
 
   it("asks account sync to run after a turn, Yes or Undo that changed records, and only then", async () => {
-    const events: ChatEvent[] = [{ type: "text", delta: "Done." }];
+    const start: ChatEvent = { type: "start", conversationId: "c1", userMessageId: "u1", messageId: "m1", protocol: 1 as never };
+    const events: ChatEvent[] = [start, { type: "text", delta: "Done." }, { type: "done", messageId: "m1" }];
     const base: ChatClient = {
       ...fixtureChatClient({ delayMs: 0 }),
       sendTurn: async (_request, onEvent) => events.forEach(onEvent),
@@ -152,10 +153,10 @@ describe("the Mac chat client", () => {
     await client.sendTurn(request, vi.fn());
     expect(onAccountWrite).not.toHaveBeenCalled();
 
-    events.push({ type: "outcome", outcome: MEDS_OUTCOME }, { type: "outcome", outcome: MEDS_OUTCOME });
+    events.splice(2, 0, { type: "outcome", outcome: MEDS_OUTCOME }, { type: "outcome", outcome: MEDS_OUTCOME });
     const seen = vi.fn();
     await client.sendTurn(request, seen);
-    expect(seen).toHaveBeenCalledTimes(3);
+    expect(seen).toHaveBeenCalledTimes(5);
     expect(onAccountWrite).toHaveBeenCalledTimes(1);
 
     await client.confirm("confirm-1", "no");
@@ -167,6 +168,7 @@ describe("the Mac chat client", () => {
 
   it("still syncs when a turn that already wrote is stopped or drops", async () => {
     const onAccountWrite = vi.fn();
+    const scheduled: number[] = [];
     const client = withAccountWrites(
       {
         ...fixtureChatClient({ delayMs: 0 }),
@@ -176,10 +178,36 @@ describe("the Mac chat client", () => {
         },
       },
       onAccountWrite,
+      (_run, delay) => scheduled.push(delay),
     );
     await expect(
       client.sendTurn({ conversationId: null, message: "hi", clientMessageId: "00000000-0000-4000-8000-000000000002" }, vi.fn()),
     ).rejects.toThrow("connection dropped");
     expect(onAccountWrite).toHaveBeenCalledOnce();
+    // Never started on the server: nothing can land later.
+    expect(scheduled).toEqual([]);
+  });
+
+  it("syncs again later when the Mac stops listening to a turn the server took (it keeps running)", async () => {
+    const onAccountWrite = vi.fn();
+    const scheduled: Array<{ run: () => void; delay: number }> = [];
+    const client = withAccountWrites(
+      {
+        ...fixtureChatClient({ delayMs: 0 }),
+        sendTurn: async (_request, onEvent) => {
+          onEvent({ type: "start", conversationId: "c1", userMessageId: "u1", messageId: "m1", protocol: 1 as never });
+          throw new DOMException("aborted", "AbortError");
+        },
+      },
+      onAccountWrite,
+      (run, delay) => scheduled.push({ run, delay }),
+    );
+    await expect(
+      client.sendTurn({ conversationId: null, message: "mark meds done", clientMessageId: "00000000-0000-4000-8000-000000000003" }, vi.fn()),
+    ).rejects.toThrow("aborted");
+    expect(onAccountWrite).toHaveBeenCalledOnce();
+    expect(scheduled.map((item) => item.delay)).toEqual(INTERRUPTED_TURN_SYNC_DELAYS_MS);
+    scheduled.forEach((item) => item.run());
+    expect(onAccountWrite).toHaveBeenCalledTimes(1 + INTERRUPTED_TURN_SYNC_DELAYS_MS.length);
   });
 });

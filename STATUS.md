@@ -241,7 +241,9 @@ and future mobile not applicable. Messaging impact: none.
   `CHAT_PAGE_LIVE` in `lib/navigation.ts`, now covers production web and Mac release
   builds; development builds always show Chat. Bench `?bench=chat&state=…` in the
   desktop dev server. Tests `tests/desktop-chat.dom.test.tsx`.
-- **Next:** set `CHAT_PAGE_LIVE`, then the installed Mac check (desktop-acceptance) and
+- **Merged Nov 20 (#341).** `CHAT_PAGE_LIVE` set true the same day (owner decision), so
+  Chat is live on production web and in the next Mac build.
+- **Next:** the installed Mac check (desktop-acceptance) and
   the usual Mac release with the owner's written go-ahead.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026

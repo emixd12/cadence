@@ -50,7 +50,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
  * builds of both always show it. The Mac also needs a linked account
  * (Phase 5C): a local-only Mac never shows Chat.
  */
-export const CHAT_PAGE_LIVE = false;
+export const CHAT_PAGE_LIVE = true;
 
 export type AppNavSurface = "web" | "desktop";
 
