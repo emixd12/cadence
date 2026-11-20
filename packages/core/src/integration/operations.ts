@@ -652,6 +652,7 @@ const runActionErrors = ["not_found", "conflict", "idempotency_key_reused", "inv
 
 const endBehavior = writeOperation({
   name: "end_behavior",
+  since: "1.4.0",
   title: "End Behavior now",
   description:
     "Ends a Behavior this minute. It stays active, moves to Not running, and schedules nothing more; its Unresolved Occurrences later today, including a window still open, are removed. Marked, noted, and timed Occurrences stay. To end on a later day, use update_behavior with end_on. resume_behavior starts it again. Ending an ended Behavior changes nothing.",
@@ -674,6 +675,7 @@ const endBehavior = writeOperation({
 
 const pauseBehavior = writeOperation({
   name: "pause_behavior",
+  since: "1.4.0",
   title: "Pause Behavior",
   description:
     "Pauses a Behavior from from_on until back_on, when it runs again by itself from the start of that day. A pause can start today or later; today starts now unless from_time is later. A Behavior has one pause at a time: a new pause replaces the old one. No Occurrences are scheduled while paused, and Unresolved ones inside the pause are removed. Marked, noted, and timed Occurrences stay.",
@@ -699,6 +701,7 @@ const pauseBehavior = writeOperation({
 
 const resumeBehavior = writeOperation({
   name: "resume_behavior",
+  since: "1.4.0",
   title: "Resume Behavior",
   description:
     "Runs a paused or ended Behavior again from now: it clears the pause, and an end that has passed. An end still to come stays. Resuming a running Behavior changes nothing. Use restore_behavior for an archived Behavior.",

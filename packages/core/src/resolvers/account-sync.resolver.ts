@@ -464,7 +464,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     // A baseline saved before contract 7 holds end_date; it reads as the new fields.
     if ("end_date" in value) {
       const { end_date: endDate, ...rest } = value as Record<string, Json>;
-      value = { ...rest, ...legacyEndDateColumns(typeof endDate === "string" ? endDate : null) };
+      try { value = { ...rest, ...legacyEndDateColumns(typeof endDate === "string" ? endDate : null) }; }
+      catch { throw new Error("The account Behavior end or pause is invalid."); }
     }
     // Rows written before Ticket 215 carry only location text, which meant A place.
     if (!("where_kind" in value)) value = { ...value, where_kind: typeof value.location_text === "string" ? "place" : null };

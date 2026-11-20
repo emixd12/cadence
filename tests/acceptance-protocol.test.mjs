@@ -112,6 +112,7 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
       case 'update_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.title = args.title; b.revision += 1; return okResult({ behavior: view(b), changed: true }); }
       case 'archive_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.state = 'archived'; return okResult({ behavior: view(b), changed: true }); }
       case 'restore_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.state = 'active'; return okResult({ behavior: view(b), changed: true }); }
+      case 'end_behavior': case 'pause_behavior': case 'resume_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); return okResult({ behavior: view(b), changed: true }); }
       case 'set_occurrence_status': {
         const o = own(data.occurrences, slot, args.occurrence_id); if (!o) return notFound();
         const previous = o.status; o.status = args.status; o.history.push({ status: args.status });

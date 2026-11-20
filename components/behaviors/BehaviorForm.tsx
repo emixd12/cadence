@@ -377,7 +377,7 @@ export function BehaviorForm({
             <input type="hidden" name="end_time" value={behavior?.endTime?.slice(0, 5) ?? ""} />
             <div id={`${planningId}-end-date-help`}>
               <p className="text-muted-readable">Optional. The last day it runs. After it, the behavior moves to Not running. Nothing is archived.</p>
-              <FieldError message={fieldErrors.end_on ?? fieldErrors.end_time} />
+              <FieldError message={fieldErrors.end_on ?? fieldErrors.end_time ?? fieldErrors.pause} />
             </div>
           </div>
         </div>

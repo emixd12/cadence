@@ -140,7 +140,8 @@ function parseRunFields(formData: FormData): {
   } else if (formData.has("end_date")) {
     const endDate = text("end_date");
     // An invalid date passes through as is so the validator reports it.
-    try { endOn = legacyEndDateColumns(endDate).end_on; } catch { endOn = endDate; }
+    try { endOn = endDate && endDate > "0001-01-01" ? legacyEndDateColumns(endDate).end_on : endDate; }
+    catch { endOn = endDate; }
     endTime = null;
   }
   let pause: BehaviorPause | null | undefined;

@@ -54,6 +54,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
       previousConfiguration: null,
       nextConfiguration: dailyConfiguration({
         whereKind: null,
+        end: null,
+        pause: null,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -80,6 +82,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         "reminder_offset_minutes",
         "active",
         "timezone",
+        "end",
+        "pause",
       ],
       recordedAt: RECORDED_AT,
       effectiveAt: RECORDED_AT,
