@@ -443,6 +443,13 @@
       "reason": "Ticket 132 development-only synthetic comparison bench. No production interaction or provider access."
     },
     {
+      "path": "app/design-system/AdvisorPlacementBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 69,
+      "interaction_ids": [],
+      "reason": "Advisor plan 4D development-only placement bench with synthetic tips. Not a product surface; no account or provider access."
+    },
+    {
       "path": "app/design-system/HorseAvatarTrial.tsx",
       "classification": "excluded",
       "interaction_marker_count": 9,
