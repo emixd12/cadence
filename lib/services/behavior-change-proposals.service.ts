@@ -61,6 +61,7 @@ import {
   type AppSupabaseClient,
   type BehaviorWithCategory,
 } from "@/lib/db/behaviors.repo";
+import { listBehaviorOccurrenceTimesOnLocalDate } from "@/lib/db/occurrences.repo";
 import { updateBehaviorForUser } from "@/lib/services/behavior.service";
 import { integrationBehaviorInput } from "@/lib/services/integration-behavior-input";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
@@ -439,11 +440,9 @@ async function appliedLine(caller: ScheduleProposalCaller, row: BehaviorChangePr
 
 /** Today's Occurrence of the Behavior sits at the new set time, unmarked and not moved by hand. */
 async function todayAtNewTime(caller: ScheduleProposalCaller, behaviorId: string, today: string, toTime: string): Promise<boolean> {
-  const { data, error } = await caller.supabase.from("occurrences")
-    .select("status,schedule_start_time,effective_start_at")
-    .eq("user_id", caller.userId).eq("behavior_id", behaviorId).eq("local_date", today);
-  if (error || !data) return false;
-  return data.some((occurrence) => occurrence.status === "unresolved" && occurrence.effective_start_at === null
+  const occurrences = await listBehaviorOccurrenceTimesOnLocalDate(caller.supabase, caller.userId, behaviorId, today).catch(() => null);
+  if (!occurrences) return false;
+  return occurrences.some((occurrence) => occurrence.status === "unresolved" && occurrence.effective_start_at === null
     && occurrence.schedule_start_time.slice(0, 5) === toTime);
 }
 

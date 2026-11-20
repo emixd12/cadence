@@ -121,8 +121,8 @@ two-week try, then today's tip. A day with nothing shows no line.
   PM every day?** Moves on one weekday ask about that weekday only. A tip about
   how long an item takes may ask to change its length. Choose **Try for two
   weeks**, **Change for good** or **No** in the panel. A Yes starts today when
-  today's item is still ahead and not marked; a day you already moved by hand
-  keeps your move, and the change starts tomorrow. **Undo** right after **Change
+  today's item is still ahead and not marked. If you already marked it or moved
+  it by hand, it stays as it is, and the change starts tomorrow. **Undo** right after **Change
   for good** puts the old schedule back. **No** also answers the tip **Not now**,
   and that tip does not ask about that item again for 30 days. At the end of a try
   the line asks whether to keep it: **Keep** or **Go back**. Only one question per
