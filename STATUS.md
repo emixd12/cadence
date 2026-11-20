@@ -138,6 +138,23 @@ Check the cited entry before acting on a row.
   pass. `npm run test`: only the 4 files that fail the same way on main in this container
   (Node 22, no Preview access).
 
+## Cadence for Mac 0.1.13 release check — November 20, 2026
+
+- **In progress (branch `claude/project-thread-0btsqa`).** Dev-signed 0.1.13-dev.1 (main
+  `6d0f6834`) installed on the owner's Mac (schema 24 → 26, counts unchanged) and the test
+  Mac (schema 25 → 26; 30 `end_date` rows backfilled as `end_on = end_date - 1`; 11 pending
+  writes kept). Migration 26 passes on both.
+- **Finding, fixed on this branch:** the test Mac's sync stopped at "Review 7 sync
+  conflicts". Both sides had archived the same Behaviors and each appended its own
+  configuration event. Applying either choice failed with "references missing
+  configuration_event". `resolveReviewedAccountSync` now copies the rows a reviewed winner
+  newly references from its own side. The bug dates from Tickets 116–122, not Ticket 342.
+- **Next:** 0.1.13-dev.2 from this branch on the test Mac, apply the review, confirm the
+  writes reach hosted, then End, Start again, Pause and Resume with hosted and web readback.
+
+Platform impact: web and desktop share the resolver (desktop runs reviewed sync); marketing
+and future mobile not applicable. Messaging impact: none.
+
 ## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-vwbetq`, stacked on the web PR).**

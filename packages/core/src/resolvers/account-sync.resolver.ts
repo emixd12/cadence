@@ -122,8 +122,8 @@ export function resolveReviewedAccountSync(input: Readonly<{
     throw new Error("The synchronization conflict review is stale. Review the current changes again.");
   }
   const decisions = new Map(input.decisions.map((decision) => [`${decision.kind}:${decision.id}`, decision]));
-  const local = prepare(input.local), hosted = prepare(input.hosted);
-  const protectedOccurrences = protectedOccurrenceIds(prepare(input.baseline), local, hosted);
+  const baseline = prepare(input.baseline), local = prepare(input.local), hosted = prepare(input.hosted);
+  const protectedOccurrences = protectedOccurrenceIds(baseline, local, hosted);
   for (const conflict of initial.conflicts) {
     const key = `${conflict.kind}:${conflict.id}`, decision = decisions.get(key);
     if (!decision) throw new Error("Every synchronization conflict requires a decision.");
@@ -132,8 +132,8 @@ export function resolveReviewedAccountSync(input: Readonly<{
       && ((decision.choice === "local" && conflict.local === null) || (decision.choice === "hosted" && conflict.hosted === null))) {
       throw new Error("An Occurrence with a Note, status history, tracked time, or resolved status cannot be deleted during synchronization.");
     }
-    if (decision.choice === "hosted") replace(local, key, hosted.get(key) ?? null);
-    else if (decision.choice === "local") replace(hosted, key, local.get(key) ?? null);
+    if (decision.choice === "hosted") { replace(local, key, hosted.get(key) ?? null); carryNewParents(local, hosted, baseline, key); }
+    else if (decision.choice === "local") { replace(hosted, key, local.get(key) ?? null); carryNewParents(hosted, local, baseline, key); }
     else {
       if (!canKeepBothAccountSyncConflict(conflict) || !decision.duplicateId) throw new Error("Keep both is unavailable for this synchronization conflict.");
       throw new Error("Keep both is unavailable for this synchronization conflict.");
@@ -262,6 +262,26 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 }
 
 function replace(target: Map<string, AccountSyncEntity>, key: string, value: AccountSyncEntity | null) { if (value) target.set(key, value); else target.delete(key); }
+// A reviewed winner can reference rows that only its own side has created, such as the
+// configuration event a Behavior edit appended. Copy those rows, and their own new parents,
+// to the other side so the winner's graph stays complete. Rows the baseline already had are
+// left alone: a missing one there is a real deletion, and validation reports it.
+function carryNewParents(target: Map<string, AccountSyncEntity>, source: Map<string, AccountSyncEntity>, baseline: Map<string, AccountSyncEntity>, key: string): void {
+  const pending = [key];
+  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+    const entity = target.get(next);
+    if (!entity) continue;
+    for (const [fieldName, parentKind] of dependencies(entity)) {
+      const parentId = field(entity.value, fieldName);
+      const parentKey = parentId ? `${parentKind}:${parentId}` : null;
+      if (!parentKey || target.has(parentKey) || baseline.has(parentKey)) continue;
+      const parent = source.get(parentKey);
+      if (!parent) continue;
+      target.set(parentKey, parent);
+      pending.push(parentKey);
+    }
+  }
+}
 function writesBetween(previous: Map<string, AccountSyncEntity>, next: Map<string, AccountSyncEntity>): AccountSyncWrite[] {
   return [...new Set([...previous.keys(), ...next.keys()])].sort().flatMap((key) => same(previous.get(key) ?? null, next.get(key) ?? null) ? [] : [writeFor(previous.get(key) ?? null, next.get(key) ?? null)])
     .sort((left, right) => writeOrder(left) - writeOrder(right) || compareText(`${left.kind}:${left.id}`, `${right.kind}:${right.id}`));

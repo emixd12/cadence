@@ -669,6 +669,31 @@ describe("resolveAccountSync", () => {
       reviewedFingerprints: review.fingerprints, decisions: [{ kind: "behavior", id: "a", choice: "local" }] })).toThrow("review is stale");
   });
 
+  it("applies a reviewed Behavior winner when each side appended its own configuration event", () => {
+    // Test Mac, November 20, 2026: the Mac archived a Behavior at midnight while the web archived it
+    // by hand. Each side wrote a configuration event and pointed the Behavior at it.
+    const event = (id: string): AccountSyncEntity => ({ kind: "configuration_event", id, value: { id, behavior_id: "a", user_id: "owner" } });
+    const behavior = (title: string, eventId: string): AccountSyncEntity => ({ kind: "behavior", id: "a", value: { id: "a", title, current_configuration_event_id: eventId, user_id: "owner" } });
+    const base = snapshot([event("config-base"), behavior("Running", "config-base")]);
+    const local = snapshot([event("config-base"), event("config-mac"), behavior("Archived on the Mac", "config-mac")]);
+    const hosted = snapshot([event("config-base"), event("config-account"), behavior("Archived on the web", "config-account")]);
+    const review = plan(base, local, hosted);
+    expect(review.conflicts.map(({ kind, id }) => `${kind}:${id}`)).toEqual(["behavior:a"]);
+    const resolve = (choice: "local" | "hosted") => resolveReviewedAccountSync({ accountLinkId: "link", baseline: base, local, hosted,
+      reviewedFingerprints: review.fingerprints, decisions: [{ kind: "behavior", id: "a", choice }] });
+    const writes = (list: readonly { kind: string; id: string }[]) => list.map(({ kind, id }) => `${kind}:${id}`).sort();
+
+    const account = resolve("hosted");
+    expect(account.mergedEntities).toContainEqual(expect.objectContaining({ kind: "behavior", value: expect.objectContaining({ current_configuration_event_id: "config-account" }) }));
+    expect(writes(account.localWrites)).toEqual(["behavior:a", "configuration_event:config-account"]);
+    expect(writes(account.hostedWrites)).toEqual(["configuration_event:config-mac"]);
+
+    const mac = resolve("local");
+    expect(mac.mergedEntities).toContainEqual(expect.objectContaining({ kind: "behavior", value: expect.objectContaining({ current_configuration_event_id: "config-mac" }) }));
+    expect(writes(mac.localWrites)).toEqual(["configuration_event:config-account"]);
+    expect(writes(mac.hostedWrites)).toEqual(["behavior:a", "configuration_event:config-mac"]);
+  });
+
   it("retains processing claims when a reviewed reminder winner has no claim", () => {
     const claim = "2026-09-11T03:00:39.179039Z";
     const delivery = (status: string, processing_started_at: string | null): AccountSyncEntity => ({
