@@ -3269,6 +3269,39 @@ database: `packages/core/src/services/behavior-change-proposal.ts`. Service:
   schedule edit (`updateBehaviorForUser`, with the Behavior's revision), then record the
   answer. Go back is offered only while the schedule still equals what the trial set.
 
+## Mark details and day load (advisor plan Phase 4, workstream 4G)
+
+Migration `20261119220000_mark_details_and_day_load.sql`. Rules that need no database:
+`packages/core/src/resolvers/status.resolver.ts` (mark details) and
+`packages/core/src/resolvers/day-load.resolver.ts` (day load).
+
+- Mark details are status events, not a new table. "Done at" and a not-done reason are
+  each one `occurrence_status_events` row that keeps the status (`previous_status` =
+  `status`), with `explicit_user_correction` provenance and `revises_event_id` = the
+  latest event. `reason_code` is `done_at` or `not_done:<no_time|forgot|low_energy|away|chose_not_to>`.
+  History stays append-only, so account sync and export carry them with no new rules.
+  Counters of marks must skip these events.
+- Done at: the event's `effective_at` is the done time and the Occurrence's
+  `completed_at` becomes that time. `status_marked_at` keeps the tap time. The done time
+  must fall on the item's local day and not after the tap. A reason keeps
+  `effective_at` at the tap and does not change the Occurrence.
+- `apply_occurrence_mark_detail(occurrence, expected_latest_event_id, completed_at,
+  recorded_at, effective_at, reason_code)`: `authenticated`, security invoker (the
+  person's own RLS). Checks the expected latest event and the current status, then
+  writes the event and, for done at, `completed_at`, in one transaction.
+- `cadence_advisor_private.day_loads`: one row per account per local day, server only,
+  never synced or exported. Calendar minutes and event count (both null when no
+  calendar was read in full: source off, none connected, a read failed or returned part
+  of the day), Cadence item minutes from real lengths only (a set length or a logged
+  average), items counted, items left out for having no length, `load_version`,
+  `run_id`. No titles. RLS on, no policies, no grants to any API role.
+- `coach_record_day_load(run_id, local_date, load_version, load)`: coach token only, for
+  an unfinished coach run of the caller. The day must be the run's day or up to 180
+  days before it. Replaces that day's row. Rows older than 400 days are removed when
+  the account is visited again. `coach_day_loads(from, to)`: coach token only, at most
+  400 days.
+- Account deletion cascades. Deleting the run leaves the row with a null `run_id`.
+
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 
 Ticket 307 retires this grant. Daily Brief reads Google Calendar timing through the

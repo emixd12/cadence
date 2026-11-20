@@ -5,7 +5,7 @@ import { resolveBehaviorDurationEstimate, DURATION_ESTIMATE_LOOKBACK_DAYS } from
 import type { BehaviorDurationEstimate, BehaviorDurationHistoryOccurrence, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { Json } from "@/lib/db/database.types";
 import { listUserBehaviors, type AppSupabaseClient } from "@/lib/db/behaviors.repo";
-import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { readAllPostgrestRows } from "@/lib/db/paginated-read";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import type { CalendarReadCaller } from "@/lib/services/google-calendar.service";
 import { readTravelCalendarConnections, readTravelCalendarEvents, travelCalendarSourcesTakingPart } from "@/lib/services/travel-calendar-sources";
@@ -77,7 +77,13 @@ export function createHostedDayLoadReads(caller: CalendarReadCaller): DayLoadRea
   const userId = caller.user.id;
   return {
     behaviors: () => listUserBehaviors(caller.client, userId),
-    occurrences: (start, end) => listOccurrencesBetweenLocalDates(caller.client, userId, start, end),
+    // Paged: 90 days of history can pass the API's 1,000-row cap.
+    occurrences: (start, end) => readAllPostgrestRows({
+      label: "day load occurrences",
+      createQuery: () => caller.client.from("occurrences").select("id,behavior_id,local_date,status")
+        .eq("user_id", userId).gte("local_date", start).lte("local_date", end).order("id"),
+      getRowKey: (row) => row.id,
+    }),
     sessions: (start, end, through) => listTimeSessionHistory(caller.client, {
       userId, startLocalDate: start, endLocalDate: end, includeArchived: true, throughStartedAt: through,
     }),
@@ -86,8 +92,8 @@ export function createHostedDayLoadReads(caller: CalendarReadCaller): DayLoadRea
       const takingPart = travelCalendarSourcesTakingPart(connections).length;
       if (takingPart === 0) return null;
       const events = await readTravelCalendarEvents(caller, connections, { scope: "day", startLocalDate: localDate, endLocalDate: localDate });
-      // Calendar numbers only when every connected calendar was read.
-      return events.unavailable.length === 0 ? events.all : null;
+      // Calendar numbers only when every connected calendar was read in full.
+      return events.unavailable.length === 0 && events.complete ? events.all : null;
     },
   };
 }
