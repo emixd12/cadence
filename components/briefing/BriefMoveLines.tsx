@@ -13,7 +13,9 @@ import type {
   BriefMoves,
   BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
+import { noticeText } from "@cadence/core/notices";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
+import { Notice } from "@/components/feedback/Notice";
 import { moveTimeLabel, useOccurrenceMoves, wallTime } from "@/components/timeline/OccurrenceMoves";
 import type { BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { DailyBriefRequestError } from "@/lib/ui/daily-brief";
@@ -38,7 +40,7 @@ export type BriefMoveLinesProps = Readonly<{
 export const BRIEF_ANSWER_EXPLAINERS: Readonly<Partial<Record<BriefMoveAnswerKind, string>>> = Object.freeze({
   // Yes, No, Other time, Already did it, Undo and Stop suggesting moves need none:
   // the line's own note already says what happened.
-  accept_all: "Accept all: moves every item above for today. Undo all puts them back.",
+  accept_all: noticeText("brief-moves.accept-all-explainer"),
 });
 
 const EXPLAINED_KEY = "cadence.daily-brief.answers-explained.v1";
@@ -199,7 +201,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
           return next;
         });
       } else {
-        patchUi(line.proposalId, { refusal: { reason: "no_time", message: "No other time fits today.", alternatives: [], revision: null } });
+        patchUi(line.proposalId, { refusal: { reason: "no_time", message: noticeText("brief-moves.no-time-fits"), alternatives: [], revision: null } });
       }
     } catch (error) {
       patchUi(line.proposalId, { refusal: requestRefusal(error) });
@@ -244,7 +246,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
       }
       setMoves((current) => ({ ...current, undoAllBatchId: response.batchId }));
       const refused = response.results.filter((result) => result.outcome === "refused").length;
-      if (refused) setBatchNotice(refused === 1 ? "One item could not be moved; see its line." : `${refused} items could not be moved; see their lines.`);
+      if (refused) setBatchNotice(noticeText("brief-moves.batch-refused", { count: refused }));
       setBatchExplainer(firstUseExplainer("accept_all"));
       if (response.results.some((result) => result.outcome === "applied")) refresh();
     } catch (error) {
@@ -280,9 +282,7 @@ export function BriefMoveLines({ moves: initial, client, planningContext }: Brie
 
   return (
     <div className="mt-3 border-t border-line pt-2" data-brief-moves>
-      {moves.calendar === "stale" ? <AlertNotice kind="data_stale" label="Calendar not current" variant="inline" size="compact" className="mb-2">
-        Your calendar couldn’t be read just now, so times that depend on it aren’t offered.
-      </AlertNotice> : null}
+      {moves.calendar === "stale" ? <Notice id="brief-moves.calendar-stale" className="mb-2" /> : null}
       {(moves.acceptAll && open.length >= 2) || moves.undoAllBatchId ? <p className="text-sm leading-6" data-brief-accept-all>
         {moves.acceptAll && open.length >= 2
           ? <button type="button" className={`font-bold text-foreground ${LINK}`} disabled={batchPending} onClick={() => void acceptAll()}>Accept all</button>
@@ -352,7 +352,7 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.reason ? <>: {line.reason}</> : null}
       </p>
       {!closed && !moved && line.length.assumed ? <p className="text-xs leading-5 text-muted-readable">
-        {line.length.minutes} min is a guess ·{" "}
+        {noticeText("brief-moves.length-guess", { minutes: line.length.minutes })} ·{" "}
         <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button>
       </p> : null}
       {line.status === "proposed" ? <p data-brief-move-actions>
@@ -362,10 +362,10 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         {line.late ? <><Dot /><ActionLink label="Already did it" disabled={pending} onClick={onAlreadyDone} /></> : null}
         {line.offerNeverMove ? <><Dot /><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></> : null}
       </p> : <BriefOutcome data-brief-move-actions>
-        {moved ? <>Moved to {movedToLabel(line, ui.movedTo, to)} for today. <span className="not-italic"><ActionLink label="Undo" disabled={pending} onClick={onUndo} /></span></> : null}
-        {line.status === "already_done" ? "Marked Completed." : null}
-        {line.status === "declined" || line.status === "undone" ? <>Staying at {from}.</> : null}
-        {ui.neverMoved ? <> The brief won’t suggest moving {line.title} again; you can change this in its settings.</> : null}
+        {moved ? <>{noticeText("brief-moves.moved", { time: movedToLabel(line, ui.movedTo, to) })} <span className="not-italic"><ActionLink label="Undo" disabled={pending} onClick={onUndo} /></span></> : null}
+        {line.status === "already_done" ? noticeText("brief-moves.already-done") : null}
+        {line.status === "declined" || line.status === "undone" ? noticeText("brief-moves.staying", { time: from }) : null}
+        {ui.neverMoved ? <> {noticeText("brief-moves.never-move", { title: line.title })}</> : null}
         {!ui.neverMoved && line.offerNeverMove && (line.status === "declined" || line.status === "undone")
           ? <> <span className="not-italic"><ActionLink label={`Stop suggesting moves for ${line.title}`} disabled={pending} onClick={onNeverMove} /></span></> : null}
       </BriefOutcome>}
@@ -398,7 +398,7 @@ function OtherTimePanel({ line, pending, onPick, onReplan }: Readonly<{
         {line.otherTimes.map((instant, index) => <span key={instant} className="whitespace-nowrap">
           {index ? " · " : ""}<button type="button" className={LINK} disabled={pending} onClick={() => onPick(instant)}>{moveTimeLabel(instant, line.timezone)}</button>
         </span>)}
-      </p> : <p>No other free time found today.</p>}
+      </p> : <Notice id="brief-moves.no-other-free-time" />}
       <p className="flex flex-wrap items-center gap-x-2">
         <label htmlFor={`brief-time-${line.proposalId}`}>Or pick a time</label>
         <input id={`brief-time-${line.proposalId}`} type="time" step={300} value={time} onChange={(event) => setTime(event.target.value)}
@@ -406,7 +406,7 @@ function OtherTimePanel({ line, pending, onPick, onReplan }: Readonly<{
         <button type="button" className={LINK} disabled={pending || !picked} onClick={() => picked && onPick(picked)}>Move</button>
       </p>
       <p><button type="button" className={LINK} disabled={pending} onClick={onReplan}>Re-plan</button></p>
-      <p className="text-xs leading-5 text-muted-readable">Re-plan finds a new time with what’s on your calendar now.</p>
+      <Notice id="brief-moves.replan-explainer" className="text-xs leading-5" />
     </div>
   );
 }
@@ -439,9 +439,8 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
   const at = moveTimeLabel(conflict.at.startAt, timezone);
   return (
     <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]" data-brief-conflict={conflict.conflictId}>
-      <p><span className="font-bold">{conflict.title}</span> <span className="whitespace-nowrap tabular-nums">at {at}</span>: {conflict.conflictingTitle
-        ? `Your schedule change put it on top of ${conflict.conflictingTitle}.`
-        : "Your schedule change put another item at the same time."}</p>
+      <p><span className="font-bold">{conflict.title}</span> <span className="whitespace-nowrap tabular-nums">at {at}</span>: {noticeText("brief-moves.conflict",
+        { hasOther: conflict.conflictingTitle ? "yes" : "no", other: conflict.conflictingTitle ?? "" })}</p>
       {onKeep || onMove ? <p>
         {onKeep ? <ActionLink label="Keep it here" disabled={pending} onClick={() => { setPending(true); void onKeep().finally(() => setPending(false)); }} /> : null}
         {onKeep && onMove ? <Dot /> : null}
@@ -515,13 +514,13 @@ function firstUseExplainer(kind: BriefMoveAnswerKind): string | null {
 
 function requestRefusal(error: unknown): BriefMoveRefusal {
   const code = error instanceof DailyBriefRequestError ? error.code : "advisor_unavailable";
-  const message = code === "offline" ? "You appear to be offline."
-    : code === "proposal_closed" ? "This suggestion was already answered on another device."
-      : code === "proposal_not_found" ? "This suggestion is no longer available. Refresh the brief for current ones."
-        : code === "revision_changed" ? "This item changed since the brief was written; refresh the brief to see it."
-        : code === "rate_limited" ? "Too many changes at once. Try again in a moment."
-          : code === "timeout" ? "That took too long; try again."
-            : "Cadence couldn’t apply that.";
+  const message = noticeText(code === "offline" ? "brief-moves.request.offline"
+    : code === "proposal_closed" ? "brief-moves.request.proposal-closed"
+      : code === "proposal_not_found" ? "brief-moves.request.proposal-not-found"
+        : code === "revision_changed" ? "brief-moves.request.revision-changed"
+        : code === "rate_limited" ? "brief-moves.request.rate-limited"
+          : code === "timeout" ? "brief-moves.request.timeout"
+            : "brief-moves.request.failed");
   return { reason: code, message, alternatives: [], revision: null };
 }
 

@@ -1,0 +1,320 @@
+{
+  "feature": "daily-brief-moves",
+  "notices": {
+    "brief-moves.moved": {
+      "meaning": "Says on a brief's move line that the person's Yes or Other time moved the item, with Undo beside it.",
+      "text": "Moved to {time} for today.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.already-done": {
+      "meaning": "Says on a brief's move line that Already did it marked the item Completed.",
+      "text": "Marked Completed.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.staying": {
+      "meaning": "Says on a brief's move line that No (or Undo) keeps the item at its time.",
+      "text": "Staying at {time}.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.never-move": {
+      "meaning": "Confirms that the brief will stop suggesting moves for this Behavior, and where to change that.",
+      "text": "The brief won’t suggest moving {title} again; you can change this in its settings.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.accept-all-explainer": {
+      "meaning": "Explains once, after the first Accept all, what Accept all and Undo all do.",
+      "text": "Accept all: moves every item above for today. Undo all puts them back.",
+      "style": "note",
+      "interactions": [
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.batch-refused": {
+      "meaning": "Says how many items Accept all could not move; each refused line names its own reason.",
+      "text": "{count, plural, one {One item could not be moved; see its line.} other {# items could not be moved; see their lines.}}",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.calendar-stale": {
+      "meaning": "Says the calendar could not be read, so the brief offers no times that depend on it.",
+      "text": "Your calendar couldn’t be read just now, so times that depend on it aren’t offered.",
+      "style": "error",
+      "alert": "data_stale",
+      "label": "Calendar not current",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.no-time-fits": {
+      "meaning": "Says Re-plan found no other time that fits today.",
+      "text": "No other time fits today.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.no-other-free-time": {
+      "meaning": "Says in Other time that the planner found no other free start today, so the person picks one below.",
+      "text": "No other free time found today.",
+      "style": "question",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.replan-explainer": {
+      "meaning": "Explains under Re-plan that it plans again with the calendar as it is now.",
+      "text": "Re-plan finds a new time with what’s on your calendar now.",
+      "style": "note",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.length-guess": {
+      "meaning": "Says the move line's length is Cadence's guess and offers to set it.",
+      "text": "{minutes} min is a guess",
+      "style": "note",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.conflict": {
+      "meaning": "Says in the brief that a schedule edit put a moved item on top of another item, with Keep it here and Move it.",
+      "text": "Your schedule change put {hasOther, select, no {another item at the same time} other {it on top of {other}}}.",
+      "style": "question",
+      "interactions": [
+        "INT-TIMELINE-017",
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.request.offline": {
+      "meaning": "Says a move-line answer could not be sent because the device appears to be offline.",
+      "text": "You appear to be offline.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.request.proposal-closed": {
+      "meaning": "Says another device already answered this move line.",
+      "text": "This suggestion was already answered on another device.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.request.proposal-not-found": {
+      "meaning": "Says the move line no longer exists, and that a Refresh shows the current ones.",
+      "text": "This suggestion is no longer available. Refresh the brief for current ones.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.request.revision-changed": {
+      "meaning": "Says the item changed after the brief was written, and that a Refresh shows it as it is.",
+      "text": "This item changed since the brief was written; refresh the brief to see it.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.request.rate-limited": {
+      "meaning": "Says too many answers arrived at once and asks the person to wait a moment.",
+      "text": "Too many changes at once. Try again in a moment.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.request.timeout": {
+      "meaning": "Says a move-line answer took too long and asks the person to try again.",
+      "text": "That took too long; try again.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.request.failed": {
+      "meaning": "Says Cadence could not apply a move-line answer for a reason it cannot name.",
+      "text": "Cadence couldn’t apply that.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.closed": {
+      "meaning": "Server refusal: this move line was already answered.",
+      "text": "This suggestion was already answered.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.refused.already-marked": {
+      "meaning": "Server refusal: the line's item was marked after the brief was written.",
+      "text": "{title} is already marked.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.refused.item-changed": {
+      "meaning": "Server refusal: the line's item changed after the brief was written.",
+      "text": "{title} changed after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
+    },
+    "brief-moves.refused.calendar-too-close": {
+      "meaning": "Server refusal: a calendar event added after the brief now sits too close to the line's time.",
+      "text": "{time} is too close to a calendar event now: {hasEvent, select, no {one was added} other {{event} was added}} after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.calendar-taken": {
+      "meaning": "Server refusal: a calendar event added after the brief now holds the line's time.",
+      "text": "{time} is taken now: {hasEvent, select, no {a calendar event was added there} other {{event} was added to your calendar}} after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.batch-too-close": {
+      "meaning": "Server refusal: the same Accept all just moved another item too close to this line's time.",
+      "text": "{time} is too close to {title}, which Accept all just moved.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.batch-taken": {
+      "meaning": "Server refusal: the same Accept all just moved another item into this line's time.",
+      "text": "{time} is taken: Accept all just moved {title} there.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.too-close-moved": {
+      "meaning": "Server refusal: the person moved another item too close to this line's time after the brief.",
+      "text": "{time} is too close to {title} now: you moved it after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.too-close-changed": {
+      "meaning": "Server refusal: another item changed after the brief and now sits too close to this line's time.",
+      "text": "{time} is too close to {title} now: it changed after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.too-close": {
+      "meaning": "Server refusal: another item sits closer to this line's time than the 10 minutes Cadence keeps.",
+      "text": "{time} is too close to {title}. Cadence keeps 10 minutes between items.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.taken-moved": {
+      "meaning": "Server refusal: the person moved another item into this line's time after the brief.",
+      "text": "{time} is taken now: you moved {title} there after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.taken-changed": {
+      "meaning": "Server refusal: another item changed after the brief and now holds this line's time.",
+      "text": "{time} is taken now: {title} changed after this brief was written.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    },
+    "brief-moves.refused.taken": {
+      "meaning": "Server refusal: another item holds this line's time.",
+      "text": "{time} is taken: {title} is there.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-BRIEF-006",
+        "INT-BRIEF-007"
+      ]
+    }
+  }
+}

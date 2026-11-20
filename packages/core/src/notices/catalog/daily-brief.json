@@ -1,0 +1,212 @@
+{
+  "feature": "daily-brief",
+  "notices": {
+    "brief.preparing": {
+      "meaning": "Shows in the brief while Cadence prepares today's brief.",
+      "text": "Preparing today’s brief…",
+      "style": "note",
+      "interactions": ["INT-BRIEF-001"]
+    },
+    "brief.unavailable": {
+      "meaning": "Says today's brief could not be shown, when no more specific reason is known.",
+      "text": "Today’s Daily Brief is unavailable.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.already-started": {
+      "meaning": "Says today's brief was started in another tab or earlier load and was not shown here, with Try again.",
+      "text": "Today’s Daily Brief was already started but not shown here.",
+      "style": "note",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"]
+    },
+    "brief.did-not-finish": {
+      "meaning": "Says today's brief stopped loading before it arrived, with Try again.",
+      "text": "Today’s Daily Brief did not finish loading.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.still-preparing": {
+      "meaning": "Says the server is still preparing today's brief and when to try again.",
+      "text": "Daily Brief is still being prepared. {wait, select, none {Try again shortly.} other {Try again in about {wait}.}}",
+      "style": "note",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"]
+    },
+    "brief.request-limit": {
+      "meaning": "Says the brief hit its request limit and when to try again.",
+      "text": "Daily Brief reached its request limit. {wait, select, none {Try again shortly.} other {Try again in about {wait}.}}",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.timeout": {
+      "meaning": "Says the brief took too long to load and tracking still works.",
+      "text": "Daily Brief took too long to load. Tracking is unaffected.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.offline": {
+      "meaning": "Says the brief could not load because the device appears to be offline.",
+      "text": "You appear to be offline. Try again when you are connected.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.sign-in-again": {
+      "meaning": "Says the session ended and the person must sign in again to load the brief.",
+      "text": "Sign in again to load today’s Daily Brief.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.context-changed": {
+      "meaning": "Says the Timeline or settings changed while the brief was prepared, with Get a current brief.",
+      "text": "Your Timeline or settings changed while the brief was prepared.",
+      "style": "note",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"]
+    },
+    "brief.retry-exhausted": {
+      "meaning": "Says today's retries are used up and tracking still works.",
+      "text": "Today’s Daily Brief retry limit has been reached. Tracking is unaffected.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.month-limit": {
+      "meaning": "Says the account's monthly advisor budget refused today's brief and tracking still works.",
+      "text": "Daily Brief reached this month’s limit. Tracking is unaffected.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.turned-off": {
+      "meaning": "Says the brief is turned off or not offered, and points to Settings.",
+      "text": "Daily Brief is turned off or unavailable. Check Settings.",
+      "style": "note",
+      "interactions": ["INT-BRIEF-001"]
+    },
+    "brief.could-not-prepare": {
+      "meaning": "Says Cadence could not prepare today's brief, when the server names no recovery.",
+      "text": "Cadence could not prepare today’s Daily Brief.",
+      "style": "error",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.chatgpt-usage-limit": {
+      "meaning": "Mac: says the ChatGPT plan's usage limit stopped today's brief, with Manage usage.",
+      "text": "ChatGPT usage limit reached. Review your plan or Cadence’s limit in ChatGPT settings.",
+      "style": "error",
+      "feature": "daily-brief-chatgpt-plan",
+      "platforms": ["mac"],
+      "interactions": ["INT-BRIEF-001", "INT-SETTINGS-020"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.chatgpt-not-eligible": {
+      "meaning": "Mac: says the person's ChatGPT plan cannot run the brief and how to use Cadence instead.",
+      "text": "Your ChatGPT plan can’t run the Daily Brief. To use Cadence instead, disconnect ChatGPT in Settings.",
+      "style": "error",
+      "feature": "daily-brief-chatgpt-plan",
+      "platforms": ["mac"],
+      "interactions": ["INT-BRIEF-001", "INT-SETTINGS-021"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.chatgpt-reconnect": {
+      "meaning": "Mac: says ChatGPT must be reconnected to load the brief on the person's plan.",
+      "text": "Reconnect ChatGPT to load today’s Daily Brief on your plan.",
+      "style": "error",
+      "feature": "daily-brief-chatgpt-plan",
+      "platforms": ["mac"],
+      "interactions": ["INT-BRIEF-001", "INT-SETTINGS-019"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.chatgpt-retry-later": {
+      "meaning": "Mac: says ChatGPT could not run today's brief this time, with Try again.",
+      "text": "ChatGPT could not run today’s Daily Brief. Try again later.",
+      "style": "error",
+      "feature": "daily-brief-chatgpt-plan",
+      "platforms": ["mac"],
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "brief.plan-off": {
+      "meaning": "Mac: says under the brief that ChatGPT plan usage is off, so this brief did not use the plan.",
+      "text": "ChatGPT plan usage is off, so this brief did not use your plan.",
+      "style": "note",
+      "feature": "daily-brief-chatgpt-plan",
+      "platforms": ["mac"],
+      "interactions": ["INT-SETTINGS-020"]
+    },
+    "brief.refresh.not-ready": {
+      "meaning": "Says Refresh asked for a new brief that is not ready yet; the current brief stays.",
+      "text": "The new brief isn’t ready yet. Try again shortly.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.refresh.limit-reached": {
+      "meaning": "Says today's refreshes are used up; the current brief and its lines still work.",
+      "text": "You’ve used today’s refreshes. This brief stays, and every line still works.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.refresh.budget": {
+      "meaning": "Says Refresh is paused to keep the month's morning briefs; the current brief still works.",
+      "text": "Refresh is paused to keep this month’s morning briefs. This brief stays, and every line still works.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.refresh.offline": {
+      "meaning": "Says Refresh could not run offline; the current brief stays.",
+      "text": "You appear to be offline. This brief stays; try again when you’re connected.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.refresh.rate-limited": {
+      "meaning": "Says Refresh was asked too often and to wait a minute.",
+      "text": "Too many requests. Try again in a minute.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.refresh.failed": {
+      "meaning": "Says Refresh failed for a reason Cadence cannot name; the current brief stays.",
+      "text": "Cadence couldn’t refresh the brief. This one stays; try again later.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not refreshed",
+      "interactions": ["INT-BRIEF-008"]
+    },
+    "brief.calendar-stale": {
+      "meaning": "Server: says in the brief that the calendar did not load, so no new times that depend on it are offered.",
+      "text": "Your calendar did not load, so no new times that depend on it are offered.",
+      "style": "error",
+      "alert": "data_stale",
+      "label": "Calendar not current",
+      "interactions": ["INT-BRIEF-001"]
+    },
+    "brief.budget-reached": {
+      "meaning": "Server: says the month's advisor budget is used, so this is Cadence's short brief, and when the full one returns.",
+      "text": "Daily Brief reached this month's limit, so this is Cadence's short version.{lines, select, yes { The suggested moves, Yes and Undo still work.} other {}}{until, select, none {} other { The full brief returns {until}.}}",
+      "style": "error",
+      "alert": "budget_reached",
+      "interactions": ["INT-BRIEF-001"]
+    },
+    "brief.words-unavailable": {
+      "meaning": "Server: says the written part of the brief did not arrive, so this is Cadence's short version.",
+      "text": "The written part of today's brief did not come through, so this is Cadence's short version.{lines, select, yes { The suggested moves still work.} other {}}",
+      "style": "error",
+      "alert": "model_failed",
+      "interactions": ["INT-BRIEF-001"]
+    }
+  }
+}

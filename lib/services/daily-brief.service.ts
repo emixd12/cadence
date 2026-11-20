@@ -1,3 +1,4 @@
+import { noticeText } from "@cadence/core/notices";
 import { Temporal } from "@js-temporal/polyfill";
 import { DAILY_BRIEF_CONNECTED_SOURCES, DAILY_BRIEF_POLICY_VERSION, type DailyBriefConnectedSource, type DailyBriefing, type DailyBriefNotice, type DailyBriefResponse, type DailyBriefSettings, type DailyBriefSourceStatus } from "@cadence/core/types/daily-brief";
 import { BRIEF_MOVE_LINES_FEATURE, BRIEF_MOVES_VERSION, type BriefMoveConflictLine, type BriefMoveLine, type BriefMoves, type BriefPlanningContext } from "@cadence/core/types/brief-moves";
@@ -445,15 +446,15 @@ export type DailyBriefWords = BriefOpeningText & Readonly<{
 /** Cadence's own wording for what went wrong; shown in the alert style. */
 export function dailyBriefNotices(input: Readonly<{ calendar: "current" | "stale" | "none"; words: DailyBriefWords; timezone: string; lines: number }>): DailyBriefNotice[] {
   const notices: DailyBriefNotice[] = [];
-  if (input.calendar === "stale") notices.push({ kind: "calendar_stale", text: "Your calendar did not load, so no new times that depend on it are offered." });
+  if (input.calendar === "stale") notices.push({ kind: "calendar_stale", text: noticeText("brief.calendar-stale") });
   if (input.words.failure?.kind === "budget_reached") {
     const until = input.words.failure.retryAfterSeconds
       ? Temporal.Now.instant().add({ seconds: input.words.failure.retryAfterSeconds }).toZonedDateTimeISO(input.timezone) : null;
     const when = until ? until.toPlainDate().toLocaleString("en-US", { month: "long", day: "numeric" }) : null;
-    notices.push({ kind: "budget_reached", text: `Daily Brief reached this month's limit, so this is Cadence's short version.${input.lines ? " The suggested moves, Yes and Undo still work." : ""}${when ? ` The full brief returns ${when}.` : ""}`,
+    notices.push({ kind: "budget_reached", text: noticeText("brief.budget-reached", { lines: input.lines ? "yes" : "no", until: when ?? "none" }),
       ...(until ? { until: until.toInstant().toString() } : {}) });
   } else if (input.words.failure?.kind === "words_unavailable") {
-    notices.push({ kind: "words_unavailable", text: `The written part of today's brief did not come through, so this is Cadence's short version.${input.lines ? " The suggested moves still work." : ""}` });
+    notices.push({ kind: "words_unavailable", text: noticeText("brief.words-unavailable", { lines: input.lines ? "yes" : "no" }) });
   }
   return notices;
 }

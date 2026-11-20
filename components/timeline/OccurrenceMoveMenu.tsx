@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { noticeText } from "@cadence/core/notices";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 import {
@@ -73,8 +74,8 @@ export function OccurrenceMoveMenu({ occurrence }: Readonly<{ occurrence: Timeli
       {open ? (
         <div id={menuId} className="grid gap-2 text-sm leading-6">
           <p className="text-muted-readable">
-            {suggested.status === "ready" && suggested.starts.length === 0 ? "No free time found today. Pick a time." : "Free today:"}
-            {suggested.status !== "ready" ? " finding times…" : null}
+            {suggested.status !== "ready" ? noticeText("move.finding-times")
+              : suggested.starts.length === 0 ? noticeText("move.no-free-time") : "Free today:"}
             {suggested.status === "ready" ? suggested.starts.map((start, index) => (
               <span key={start}>
                 {index === 0 ? " " : " · "}
@@ -118,7 +119,7 @@ export function OccurrenceMovedLine({ occurrence, toneClass }: Readonly<{ occurr
   const canUndo = Boolean(moves?.canMove(occurrence));
   return (
     <p className={`timeline-occurrence-moved col-start-2 min-w-0 text-xs font-normal leading-5 ${toneClass}`} data-moved-from>
-      <span className="whitespace-nowrap">Moved from {occurrence.movedFromLabel}</span>
+      <span className="whitespace-nowrap">{noticeText("move.moved-from", { time: occurrence.movedFromLabel })}</span>
       {canUndo && moves ? <span className="whitespace-nowrap">
         {" · "}
         <button type="button" className={`font-bold ${LINK}`} disabled={moves.pendingId === occurrence.id} data-move-undo
@@ -151,7 +152,7 @@ export function OccurrenceMoveNotice({ occurrence }: Readonly<{ occurrence: Time
       ))}</span>
       : <button type="button" className={LINK} onClick={() => moves.clearNotice(occurrence.id)}>Dismiss</button>;
   return (
-    <AlertNotice kind="write_refused" action={action} icon={false} size="compact" className="px-3 pb-3 sm:px-4">
+    <AlertNotice kind="write_refused" variant="inline" action={action} size="compact" className="px-3 pb-3 sm:px-4">
       {notice.message}
     </AlertNotice>
   );

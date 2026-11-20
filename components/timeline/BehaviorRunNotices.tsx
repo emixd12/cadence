@@ -6,6 +6,7 @@ import { useRefresh } from "@cadence/ui/runtime";
 
 import type { BehaviorRunNotice } from "@cadence/core/types/timeline";
 import type { BehaviorActionState, BehaviorFormAction } from "@/lib/types/behavior";
+import { noticeText } from "@cadence/core/notices";
 import { formatRunDay } from "@/lib/ui/behavior-run";
 
 /**
@@ -56,11 +57,11 @@ function writeClosed(keys: ReadonlySet<string>) {
 }
 
 export function behaviorRunNoticeText(notice: BehaviorRunNotice, todayLocalDate: string): string {
-  if (notice.kind === "ended") return `${notice.title} ended.`;
+  if (notice.kind === "ended") return noticeText("run.ended", { title: notice.title });
   if (notice.kind === "paused") {
-    return notice.backOn ? `${notice.title} is paused, back ${formatRunDay(notice.backOn, todayLocalDate)}.` : `${notice.title} is paused.`;
+    return noticeText("run.paused", { title: notice.title, back: notice.backOn ? formatRunDay(notice.backOn, todayLocalDate) : "none" });
   }
-  return `${notice.title} is back today.`;
+  return noticeText("run.back-today", { title: notice.title });
 }
 
 export function BehaviorRunNotices({

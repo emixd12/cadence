@@ -94,6 +94,29 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Product map, features and journeys — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the
+  product map and notices library plan (owner decisions of November 20, 2026).
+  `scripts/build-product-map.mjs` joins the registries into one deterministic graph:
+  journeys, 35 features, interactions, components, families, tokens, ontology terms,
+  database tables, MCP tools, services and API routes (`docs/PRODUCT_MAP_GUIDE.md`).
+  `npm run map:check` runs in CI and Dagger; `npm run map -- <id>` shows one item.
+- Interaction registry 1.4.0 adds `features` and a required `feature` on every
+  interaction. Journeys: J03 is now Sign-in; J23 to J28 added (calendars, Hevy, Daily
+  Brief, travel, completion places, AI apps); J14 keeps only its 3 timezone actions.
+- 18 component descriptions and the canonical token descriptions filled in; token
+  values unchanged.
+- Build step 2, the notices library: 99 notices in `packages/core/src/notices/catalog/`
+  (moves, Daily Brief, brief move lines, Timeline reload, Mac reminder lines, Ended and
+  Paused form errors and its 3 Timeline notices from PR #328).
+  `<Notice>` (`components/feedback/Notice.tsx`) draws the four styles; web, Mac and the
+  server read the words from the catalog. Restyled to the November 19 text styles: move
+  confirmations italic, Timeline row refusals and brief load errors as one Rust Signal
+  line, the reload line by result. `docs/NOTICES.md` (committed, checked) lists every
+  notice and the 39 changes. A new `advisor-tips` feature holds the Timeline advisor
+  interactions from #321, and `chat` holds the Chat page from #325, whose journey is J29 (35 features).
+
 ## Tips with one-tap changes — November 20, 2026
 
 - **In progress (branch `claude/project-thread-wg2oqh`, draft PR).** A tip can carry a
@@ -213,7 +236,7 @@ Check the cited entry before acting on a row.
 - **Chat page (second change):** `components/chat/ChatPage.tsx` and `ChatMessages.tsx` on
   5A's `@cadence/core/types/chat` events (`lib/ui/chat.ts` folds the stream), past
   conversations, composer fixed to the bottom on phones, bench
-  `/design-system?preview=chat&state=…`. Registry INT-CHAT-001..004, journey J23,
+  `/design-system?preview=chat&state=…`. Registry INT-CHAT-001..004, journey J29,
   `docs/user-guide/chat.md`, DESIGN.md "Chat". Second pass against an AI chat UI
   checklist: Stop (5A's `CHAT_ROUTES.stop`), scroll that follows only when the newest
   line is on screen plus Jump to latest, failed sends back in the field with the same

@@ -589,6 +589,7 @@ Before considering a ticket complete, and before every push, run these checks:
 ```bash
 npm run agents:check
 npm run interactions:check
+npm run map:check
 npm run resolvers:check
 npm run lint
 npm run typecheck
@@ -602,7 +603,7 @@ Run them with one command from the repository root:
 dagger check --cadence --progress=report
 ```
 
-`--cadence` limits the run to the Cadence module's ten checks. Dagger never blocks
+`--cadence` limits the run to the Cadence module's eleven checks. Dagger never blocks
 work: when it is unavailable, or a check fails for a reason outside your change, run
 the npm commands, note the fault in the pull request and continue.
 
@@ -653,7 +654,19 @@ Keep `DESIGN.md` current. Update it from actual code rather than intentions.
 interaction intents. Update it in the same change whenever a user-facing
 interaction is added, removed, renamed, moved, gated differently, or given a
 materially different side effect. Run `npm run interactions:check`; the command
-is also enforced by `npm run agents:check`.
+is also enforced by `npm run agents:check`. Every interaction names its feature.
+
+`npm run map -- <id or text>` shows how a feature, journey, interaction,
+component, token, service, table or MCP tool links to the rest of the product. The
+map is built from the registries above, never edited by hand
+(`docs/PRODUCT_MAP_GUIDE.md`).
+
+Notices (what just happened, what state something is in) live in the notices
+library, `packages/core/src/notices/catalog/*.json`. Show one with `<Notice id>`
+from `components/feedback/Notice.tsx` or `noticeText(id)` from
+`@cadence/core/notices`; never write a notice's words at the call site. When you
+change a notice's words or style, add a `previous` record and run
+`npm run map:build` to update the committed `docs/NOTICES.md`.
 
 ## Completion criteria for any coding task
 

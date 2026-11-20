@@ -95,6 +95,7 @@ import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
 import { AiFeaturesPreview } from "@/app/design-system/AiFeaturesBench";
 import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
 import { AlertNoticeBench } from "@/app/design-system/AlertNoticeBench";
+import { NoticeBench } from "@/app/design-system/NoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
 import { MarkDetailsBench } from "@/app/design-system/MarkDetailsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
@@ -2228,6 +2229,7 @@ const previewFactories: Record<
   "module.settings-drawer": () => <ProductPreview><SettingsDrawerBench /></ProductPreview>,
   "module.settings-saving": () => <ProductPreview><SettingsSavingBench /></ProductPreview>,
   "module.alert-notice": () => <ProductPreview><AlertNoticeBench /></ProductPreview>,
+  "module.notice": () => <ProductPreview maxHeight="72rem"><NoticeBench /></ProductPreview>,
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
   "module.occurrence-mark-details": () => <ProductPreview maxHeight="32rem"><MarkDetailsBench /></ProductPreview>,
   "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,

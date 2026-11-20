@@ -358,8 +358,8 @@ assert(
   `${registryPath} must reference ./interaction-registry.schema.json.`,
 );
 assert(
-  registry.schema_version === "1.3.0" && schema.properties.schema_version.const === "1.3.0",
-  `${registryPath} and schema schema_version must be 1.3.0.`,
+  registry.schema_version === "1.4.0" && schema.properties.schema_version.const === "1.4.0",
+  `${registryPath} and schema schema_version must be 1.4.0.`,
 );
 assert(
   registry.registry_id === "cadence.user-interactions",
@@ -445,8 +445,42 @@ for (const surface of surfaces) {
   );
 }
 
+const features = Array.isArray(registry.features) ? registry.features : [];
+const featureIds = new Set();
+assert(features.length > 0, `${registryPath} features must be a non-empty array.`);
+for (const feature of features) {
+  const featureLabel = `Feature ${String(feature.id)}`;
+  assert(
+    /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(feature.id ?? ""),
+    `${featureLabel} id must be lowercase words joined by hyphens.`,
+  );
+  assert(!featureIds.has(feature.id), `Duplicate feature id: ${feature.id}.`);
+  featureIds.add(feature.id);
+  const featureKeys = Object.keys(feature).sort().join(",");
+  assert(featureKeys === "id,meaning,name,spec", `${featureLabel} must have exactly id, name, meaning and spec.`);
+  assert(isNonEmptyString(feature.name), `${featureLabel} needs a name.`);
+  assert(isNonEmptyString(feature.meaning), `${featureLabel} needs a meaning.`);
+  const { file: specFile, symbol: specAnchor } = splitReference(feature.spec ?? "");
+  assert(
+    isNonEmptyString(specFile) && /\.md$/.test(specFile) && exists(specFile),
+    `${featureLabel} spec must reference an existing Markdown file: ${String(feature.spec)}.`,
+  );
+  if (isNonEmptyString(specAnchor) && exists(specFile ?? "")) {
+    assert(
+      markdownHeadingAnchors(specFile).has(specAnchor),
+      `${featureLabel} spec anchor does not resolve: ${feature.spec}.`,
+    );
+  }
+}
+const coveredFeatureIds = new Set();
+
 for (const interaction of interactions) {
   const label = interaction.id ?? "<missing id>";
+  assert(
+    featureIds.has(interaction.feature),
+    `${label} must name a feature listed in ${registryPath} features: ${String(interaction.feature)}.`,
+  );
+  coveredFeatureIds.add(interaction.feature);
   assert(
     /^INT-[A-Z]+-\d{3}$/.test(label),
     `Interaction id ${String(label)} must match INT-<DOMAIN>-NNN.`,
@@ -692,6 +726,9 @@ for (const scannedSource of scannedSources) {
     sourcePaths.has(scannedSource),
     `Interactive source is missing from source_inventory: ${scannedSource}.`,
   );
+}
+for (const featureId of featureIds) {
+  assert(coveredFeatureIds.has(featureId), `Feature ${featureId} has no interaction in ${registryPath}.`);
 }
 for (const sourcePath of sourcePaths) {
   assert(

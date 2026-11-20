@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { localDayBounds } from "./time.resolver";
+import { noticeText } from "../notices";
 
 /**
  * Per-day moves (advisor plan, Phase 2A): durations, the tap-time free-slot check,
@@ -33,20 +34,20 @@ export const MOVE_REFUSAL_REASONS = [
 ] as const;
 export type MoveRefusalReason = (typeof MOVE_REFUSAL_REASONS)[number];
 
-/** Plain-language refusal text for every caller (web, brief, chat, MCP). */
+/** Plain-language refusal text for every caller (web, brief, chat, MCP), from the notices library. */
 export const MOVE_REFUSAL_MESSAGES: Readonly<Record<MoveRefusalReason, string>> = Object.freeze({
-  occurrence_not_found: "This Occurrence does not exist in your account.",
-  occurrence_resolved: "This is already marked, so it stays where it is.",
-  not_today: "Only today's items can be moved.",
-  revision_changed: "This changed on another device. Look at its current time before moving it again.",
-  range_behavior: "Items scheduled as a time range are not moved.",
-  start_not_on_day: "A move keeps the item on today. Pick a start time today.",
-  time_passed: "That time has already passed. Pick a later time.",
-  no_change: "It is already at that time.",
-  nothing_to_undo: "There is no move to undo.",
-  not_latest_move: "Only the latest move can be undone.",
-  slot_taken: "Something else is already at that time.",
-  calendar_busy: "Your calendar is busy at that time.",
+  occurrence_not_found: noticeText("move.refused.occurrence-not-found"),
+  occurrence_resolved: noticeText("move.refused.occurrence-resolved"),
+  not_today: noticeText("move.refused.not-today"),
+  revision_changed: noticeText("move.refused.revision-changed"),
+  range_behavior: noticeText("move.refused.range-behavior"),
+  start_not_on_day: noticeText("move.refused.start-not-on-day"),
+  time_passed: noticeText("move.refused.time-passed"),
+  no_change: noticeText("move.refused.no-change"),
+  nothing_to_undo: noticeText("move.refused.nothing-to-undo"),
+  not_latest_move: noticeText("move.refused.not-latest-move"),
+  slot_taken: noticeText("move.refused.slot-taken"),
+  calendar_busy: noticeText("move.refused.calendar-busy"),
 });
 
 export const MOVE_PERSON_REASONS = ["running_late", "conflict", "low_energy", "other"] as const;
