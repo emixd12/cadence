@@ -61,6 +61,14 @@ cargo +1.97.1 check --locked --target aarch64-apple-darwin --manifest-path apps/
 cargo +1.97.1 test --locked --lib --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 
+The job restores `node_modules` through `.github/actions/setup` and restores
+compiled Rust dependencies from the Actions cache. The Rust cache key covers the
+runner, the toolchain, the deployment target and `Cargo.lock`. Pull requests only
+read that cache; a push to `main` or a manual run saves it once per key. Cargo
+still compiles the application crate on every run. Before November 20, 2026 the
+job ran `npm ci` and compiled every dependency twice on each run (374 s at the
+median of 24 runs).
+
 The library tests use synthetic data and temporary SQLite databases. The job
 requires no signing keys or account credentials and publishes no artifacts.
 Treat this as native compilation and unit-test evidence for the checked commit.
