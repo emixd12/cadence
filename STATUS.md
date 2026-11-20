@@ -94,6 +94,27 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Tips with one-tap changes — November 20, 2026
+
+- **In progress (branch `claude/project-thread-wg2oqh`, draft PR).** A tip can carry a
+  schedule or length question that Cadence writes ("Set Gym to 6:30 PM every day?"). The
+  offer uses the tip's bar: 3 same-direction moves in 28 days, targets within 60 minutes,
+  a shift of at least 30 minutes; moves on one weekday change that weekday, on 2 or more
+  every day at that set time. Length changes round to 5 minutes. A Yes applies today when
+  today's Occurrence is ahead and unmarked; a day moved by hand keeps its move. Undo
+  follows Change for good. No answers the tip Not now and rests the card 30 days for that
+  Behavior. One open proposal per Behavior. Offer cards at revision 3, seeds without
+  questions. Tip links open the Behaviors editor at a field (web `/behaviors?edit=&field=`,
+  the Mac in app) or Needs decision. New interaction `INT-ADVISOR-005`.
+- **Migration:** `20261120160000_tips_one_tap_changes.sql` (owner approved as reviewed).
+- **Verification:** unit tests for the core proposal rules, the proposals service, the tips
+  writer and job, the advice library and the advisor DOM; `tests/sql/tips-one-tap-changes-smoke.sql`
+  and `tests/tips-one-tap.local-integration.test.ts` on an isolated local Supabase (a Yes
+  moves today's item and Undo puts it back; a day moved by hand keeps its move, no second
+  copy). Lint, typecheck (web and Mac), `interactions:check`, `resolvers:check` and build
+  pass. `npm run test`: only the 4 files that fail the same way on main in this container
+  (Node 22, no Preview access).
+
 ## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-vwbetq`, stacked on the web PR).**

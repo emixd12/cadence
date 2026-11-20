@@ -2,13 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRefresh } from "@cadence/ui/runtime";
-import type { AdvisorTip, AdvisorTipReaction, AdvisorTipsNextResponse } from "@cadence/core/types/advisor-tips";
+import type { AdvisorTip, AdvisorTipLink, AdvisorTipReaction, AdvisorTipsNextResponse } from "@cadence/core/types/advisor-tips";
 import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
 
 import {
   advisorErrorText,
   advisorHasNew,
   advisorLineItem,
+  followAdvisorLinkOnWeb,
   readBriefSeen,
   writeBriefSeen,
   type AdvisorBriefSummary,
@@ -33,6 +34,8 @@ export type AdvisorProposalState = Readonly<{
   outcome: string | null;
   pending: ScheduleProposalAnswer | null;
   error: string | null;
+  /** After Change for good: the outcome line offers Undo until it is used or the screen reloads. */
+  undoable: boolean;
 }>;
 
 export type AdvisorTipState = Readonly<{
@@ -56,6 +59,8 @@ type AdvisorContextValue = Readonly<{
   react: (reaction: AdvisorTipReaction) => void;
   proposal: AdvisorProposalState | null;
   answer: (answer: ScheduleProposalAnswer) => void;
+  /** Follows a tip's link (an editor field, the Behaviors list or Needs decision); closes the panel first. */
+  openLink: (link: AdvisorTipLink) => void;
   /** Tips shown on earlier days; null until the panel first opens or when the read failed. */
   recent: readonly AdvisorTip[] | null;
   /** The panel's last section links here when the Chat page exists (5B/5C pass it). */
@@ -90,13 +95,22 @@ const NONE: AdvisorBriefSummary = { kind: "none" };
 export function AdvisorProvider({
   client,
   chatHref = null,
+  onOpenLink,
   children,
-}: Readonly<{ client: AdvisorClient | null | undefined; chatHref?: string | null; children: ReactNode }>) {
+}: Readonly<{
+  client: AdvisorClient | null | undefined;
+  chatHref?: string | null;
+  /** How a tip's link opens on this platform; the web default loads the Behaviors page. */
+  onOpenLink?: (link: AdvisorTipLink) => void;
+  children: ReactNode;
+}>) {
   if (!client) return <>{children}</>;
-  return <AdvisorState client={client} chatHref={chatHref}>{children}</AdvisorState>;
+  return <AdvisorState client={client} chatHref={chatHref} onOpenLink={onOpenLink ?? followAdvisorLinkOnWeb}>{children}</AdvisorState>;
 }
 
-function AdvisorState({ client, chatHref, children }: Readonly<{ client: AdvisorClient; chatHref: string | null; children: ReactNode }>) {
+function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
+  client: AdvisorClient; chatHref: string | null; onOpenLink: (link: AdvisorTipLink) => void; children: ReactNode;
+}>) {
   const refresh = useRefresh();
   const [panelOpen, setPanelOpen] = useState(false);
   const [brief, setBrief] = useState<AdvisorBriefSummary>(NONE);
@@ -125,7 +139,7 @@ function AdvisorState({ client, chatHref, children }: Readonly<{ client: Advisor
   const applyProposal = useCallback((view: ScheduleProposalView | null) => {
     // An answer given on this screen keeps its outcome until the next open.
     if (!view || proposalRef.current?.outcome) return;
-    setProposal(view.kind === "none" || view.kind === "hold" ? null : { view, outcome: null, pending: null, error: null });
+    setProposal(view.kind === "none" || view.kind === "hold" ? null : { view, outcome: null, pending: null, error: null, undoable: false });
   }, []);
 
   useEffect(() => {
@@ -184,18 +198,25 @@ function AdvisorState({ client, chatHref, children }: Readonly<{ client: Advisor
 
   const answer = useCallback((choice: ScheduleProposalAnswer) => {
     const current = proposalRef.current;
-    if (!current || pending.current || current.outcome) return;
+    if (!current || pending.current) return;
+    // Once answered, the only answer left is Undo after Change for good.
+    if (current.outcome && !(choice === "undo" && current.undoable)) return;
     const view = current.view;
     if (view.kind !== "proposal" && view.kind !== "check_in") return;
     pending.current = { action: choice };
     setProposal({ ...current, pending: choice, error: null });
     void client.answerProposal(view.proposalId, choice).then((result) => {
-      setProposal({ view, outcome: result.message, pending: null, error: null });
+      setProposal({ view, outcome: result.message, pending: null, error: null, undoable: choice !== "undo" && result.undoable === true });
       if (result.applied) refresh();
     }, (error: unknown) => {
       setProposal({ ...current, pending: null, error: advisorErrorText(errorCode(error)) });
     }).finally(() => { pending.current = null; });
   }, [client, refresh]);
+
+  const openLink = useCallback((link: AdvisorTipLink) => {
+    setPanelOpen(false);
+    onOpenLink(link);
+  }, [onOpenLink]);
 
   const item = advisorLineItem({ brief, briefSeen, proposal: proposal?.view ?? null, tip: tip?.tip ?? null, tipAnsweredHere: tip?.answeredHere ?? false });
   const answeredHere = item?.kind === "tip" ? !!tip?.answeredHere
@@ -205,8 +226,8 @@ function AdvisorState({ client, chatHref, children }: Readonly<{ client: Advisor
   const value = useMemo<AdvisorContextValue>(() => ({
     item, hasNew, panelOpen, openPanel, closePanel, brief, tip,
     researchOpen, toggleResearch: () => setResearchOpen((open) => !open),
-    react, proposal, answer, recent, chatHref,
-  }), [item, hasNew, panelOpen, openPanel, closePanel, brief, tip, researchOpen, react, proposal, answer, recent, chatHref]);
+    react, proposal, answer, openLink, recent, chatHref,
+  }), [item, hasNew, panelOpen, openPanel, closePanel, brief, tip, researchOpen, react, proposal, answer, openLink, recent, chatHref]);
   const slot = useMemo<BriefSlot>(() => ({ publish: setBrief, target: panelOpen ? briefTarget : null }), [panelOpen, briefTarget]);
 
   return (

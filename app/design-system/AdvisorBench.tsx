@@ -17,7 +17,10 @@ import { BRIEF_MOVE_FIXTURE_BRIEFING, fixtureBriefMoveClient } from "./brief-mov
 import {
   ADVISOR_FIXTURE_CHECK_IN,
   ADVISOR_FIXTURE_PROPOSAL,
+  ADVISOR_FIXTURE_LINK_TIP,
+  ADVISOR_FIXTURE_QUESTION_TIP,
   ADVISOR_FIXTURE_TIP,
+  ADVISOR_FIXTURE_TIP_QUESTION,
   ADVISOR_FIXTURE_TRIAL,
   fixtureAdvisorClient,
   type AdvisorFixtureOptions,
@@ -25,10 +28,10 @@ import {
 
 /**
  * Advisor plan Phase 4 (4E): the built advisor (placement K) on the real Timeline, with
- * synthetic data. /design-system?preview=advisor&state=tip|brief|proposal|checkin|trial|refused|none
+ * synthetic data. /design-system?preview=advisor&state=tip|brief|proposal|tipquestion|tiplink|checkin|trial|refused|none
  * The horse opens the panel; nothing is saved.
  */
-export type AdvisorBenchState = "tip" | "brief" | "proposal" | "checkin" | "trial" | "refused" | "none";
+export type AdvisorBenchState = "tip" | "brief" | "proposal" | "tipquestion" | "tiplink" | "checkin" | "trial" | "refused" | "none";
 
 const TIMEZONE = "America/New_York";
 
@@ -67,9 +70,11 @@ const OPTIONS: Readonly<Record<AdvisorBenchState, AdvisorFixtureOptions>> = {
   tip: { tip: ADVISOR_FIXTURE_TIP },
   brief: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_TRIAL },
   proposal: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_PROPOSAL },
+  tipquestion: { tip: ADVISOR_FIXTURE_QUESTION_TIP, proposal: ADVISOR_FIXTURE_TIP_QUESTION },
+  tiplink: { tip: ADVISOR_FIXTURE_LINK_TIP },
   checkin: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_CHECK_IN },
   trial: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_TRIAL },
-  refused: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_PROPOSAL, refuseWith: "held_today" },
+  refused: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_PROPOSAL, refuseWith: "schedule_changed" },
   none: { tip: null, recent: [] },
 };
 
@@ -93,7 +98,7 @@ export function AdvisorBench({ state, statusAction, timeAction }: Readonly<{
   return (
     <WebRuntimeProvider>
       <AppShell user={{ name: "Emi" }}>
-        <AdvisorTimelineFrame client={client.advisor} banner={<><h1 className="sr-only">Timeline</h1><CadencePageBanner /></>}>
+        <AdvisorTimelineFrame client={client.advisor} onOpenLink={() => undefined} banner={<><h1 className="sr-only">Timeline</h1><CadencePageBanner /></>}>
           <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
             <OccurrenceMovesProvider actions={NO_MOVES} timezone={TIMEZONE} todayLocalDate="2026-11-19" hasMovedBefore>
               <DailyBriefLauncher client={client} sessionKey="bench" />

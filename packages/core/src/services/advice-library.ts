@@ -4,6 +4,7 @@ import { BRIEFING_REFERENCES } from "./briefing-references";
 import {
   ADVICE_AUDIENCES,
   ADVICE_COMMON_FACTS,
+  ADVICE_OFFER_LINK_TARGETS,
   ADVICE_EVIDENCE_KINDS,
   ADVICE_EVIDENCE_STRENGTHS,
   ADVICE_SIGNAL_FACTS,
@@ -12,6 +13,7 @@ import {
   type AdviceEvidence,
   type AdviceFactCondition,
   type AdviceLibrary,
+  type AdviceOffer,
   type AdviceRule,
   type AdviceSignalKind,
   type AdviceSource,
@@ -108,7 +110,7 @@ export function parseAdviceLibrary(value: unknown, extraSourceIds: readonly stri
   const cardIds = new Set<string>();
   const cards = library.cards.map((item, index): AdviceCard => {
     const where = `cards[${index}]`;
-    const raw = record(item, ["id", "revision", "status", "advice", "applies_when", "does_not_apply_when", "action", "evidence", "limitation", "quip_seeds", "audience", "reviewed_at", "reviewer"], where);
+    const raw = record(item, ["id", "revision", "status", "advice", "applies_when", "does_not_apply_when", "action", "evidence", "limitation", "quip_seeds", "audience", "offer", "reviewed_at", "reviewer"], where);
     const cardId = id(raw.id, `${where}.id`);
     if (cardIds.has(cardId)) fail(`${where}.id ${cardId} is not unique`);
     cardIds.add(cardId);
@@ -152,6 +154,7 @@ export function parseAdviceLibrary(value: unknown, extraSourceIds: readonly stri
     const named = quipSeeds.filter((seed) => seed.includes("{behavior}")).length;
     if (applies.some((rule) => rule.scope !== "account") && named === 0) fail(`${at}.quip_seeds need a line that starts from {behavior} for Behavior signals`);
     if (applies.some((rule) => rule.scope !== "behavior") && named === quipSeeds.length) fail(`${at}.quip_seeds need a line without {behavior} for account-wide signals`);
+    const offer = parseOffer(raw.offer, applies, quipSeeds, `${at}.offer`);
     const reviewedAt = raw.reviewed_at === null ? null : date(raw.reviewed_at, `${at}.reviewed_at`);
     const reviewer = raw.reviewer === null ? null : text(raw.reviewer, `${at}.reviewer`, 80);
     if (status === "active" && (reviewedAt === null || reviewer === null)) fail(`${at} is active without a review`);
@@ -160,11 +163,33 @@ export function parseAdviceLibrary(value: unknown, extraSourceIds: readonly stri
       advice: sentence(raw.advice, `${at}.advice`), applies_when: applies, does_not_apply_when: excludes,
       action: sentence(raw.action, `${at}.action`), evidence, limitation: sentence(raw.limitation, `${at}.limitation`, 400),
       quip_seeds: quipSeeds, audience: oneOf(raw.audience, ADVICE_AUDIENCES, `${at}.audience`),
-      reviewed_at: reviewedAt, reviewer,
+      offer, reviewed_at: reviewedAt, reviewer,
     };
   });
 
   return { version, sources, cards };
+
+  /**
+   * A one-tap offer needs a Behavior-scoped rule of the one signal that carries its value
+   * (the moves, or the session length), and seeds with no question: code adds the question
+   * with the exact value a Yes applies.
+   */
+  function parseOffer(value: unknown, applies: readonly AdviceRule[], seeds: readonly string[], where: string): AdviceOffer | null {
+    if (value === null) return null;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return fail(`${where} must be null or an object`);
+    const kind = oneOf((value as { kind?: unknown }).kind, ["set_time", "set_length", "open"] as const, `${where}.kind`);
+    if (kind === "open") {
+      const item = record(value, ["kind", "target"], where);
+      return { kind, target: oneOf(item.target, ADVICE_OFFER_LINK_TARGETS, `${where}.target`) };
+    }
+    record(value, ["kind"], where);
+    const signal = kind === "set_time" ? "repeated_move" : "session_length";
+    if (!applies.length || !applies.every((rule) => rule.signal === signal && rule.scope === "behavior")) {
+      fail(`${where} ${kind} needs Behavior-scoped ${signal} rules only`);
+    }
+    if (seeds.some((seed) => seed.includes("?"))) fail(`${where} ${kind}: seeds must not ask; Cadence adds the question`);
+    return { kind };
+  }
 }
 
 function allowedFacts(kind: AdviceSignalKind): readonly string[] {

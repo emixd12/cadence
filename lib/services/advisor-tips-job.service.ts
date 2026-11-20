@@ -4,7 +4,7 @@ import { matchAdviceCards } from "@cadence/core/resolvers/advice-matcher.resolve
 import { resolveCoachAccountFacts } from "@cadence/core/resolvers/coach-signals-v2.resolver";
 import type { CoachSignalBehavior, CoachSignalOccurrence } from "@cadence/core/resolvers/coach-signals.resolver";
 import { ADVICE_CARDS } from "@cadence/core/services/advice-library";
-import type { AdviceCard, AdviceCardStatus, AdviceMatch, AdviceSignalInput } from "@cadence/core/types/advice-cards";
+import type { AdviceCard, AdviceCardStatus, AdviceMatch, AdviceOfferLinkTarget, AdviceSignalInput } from "@cadence/core/types/advice-cards";
 
 import {
   finishAgentRun,
@@ -28,12 +28,12 @@ import {
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createCoachSignalReads } from "@/lib/db/coach-signals.repo";
 import { createAgentClient } from "@/lib/integrations/agent-caller";
-import { proposeBehaviorChangesForVisit } from "./behavior-change-proposals.service";
+import { proposeBehaviorChangesForVisit, proposeTipOffers, type CoachVisitOccurrence, type TipOffer, type TipOfferOutcome } from "./behavior-change-proposals.service";
 import { agentModelSetting, generateStructured, type AgentModelSetting, type AgentModelUsage } from "./agent-model";
 import { estimateCallMicrodollars, modelPrice, usageMicrodollars } from "./agent-model-pricing";
 import { readAdvisorTipsSettings, type AdvisorTipsSettings } from "./advisor-tips-settings";
 import {
-  CARD_REST_DAYS,
+  TIP_HISTORY_DAYS,
   TIP_INSTRUCTIONS,
   TIP_PROMPT_VERSION,
   TIP_SCHEMA,
@@ -153,6 +153,12 @@ export type TipVisitPort = Readonly<{
   reserve(runId: string, estimatedMicrodollars: number): Promise<SpendDecision>;
   settle(reservationId: string, actualMicrodollars: number): Promise<void>;
   generate(input: Readonly<{ instructions: string; prompt: string; timeoutMs: number; onUsage(usage: AgentModelUsage): void }>): Promise<unknown>;
+  /**
+   * The questions for the day's tips that carry an offer (one-tap changes). Stores at most
+   * one open question per Behavior; a refused offer comes back with no proposal id.
+   * Absent in ports that never store proposals.
+   */
+  offers?(runId: string, localDate: string, offers: readonly TipOffer[]): Promise<TipOfferOutcome[]>;
   write(runId: string, tips: readonly TipToWrite[]): Promise<number>;
   storeContent(runId: string, input: Readonly<{ prompt: string; output: unknown }>): Promise<void>;
   finishRun(runId: string, result: Readonly<{
@@ -217,7 +223,7 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
     const [allSignals, setup, history] = await Promise.all([
       port.signals(today),
       port.setup(today),
-      port.history(addDays(today, -CARD_REST_DAYS)),
+      port.history(addDays(today, -TIP_HISTORY_DAYS)),
     ]);
     // Reminder history reaches the model only when the AI features settings allow it.
     const signals = settings.reminderHistoryAllowed ? allSignals : allSignals.filter((signal) => signal.kind !== "reminder_response");
@@ -245,7 +251,8 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
       outcome = called.outcome;
       if (called.refused) skipped = "budget";
       failure = called.failure;
-      const written = await port.write(run.runId, outcome.tips);
+      const tips = await withOffers(port, { runId: run.runId, localDate: today, tips: outcome.tips, matches: chosen, setup, cards: options.cards ?? ADVICE_CARDS });
+      const written = await port.write(run.runId, tips);
       if (modelCalls > 0 && !failure) await port.storeContent(run.runId, { prompt, output: outcome.tips.map((tip) => tip.text) }).catch(() => undefined);
       if (options.afterTips) await options.afterTips({ runId: run.runId, localDate: today, signals, matches }).catch(() => undefined);
       // Once the day's tips are written, the day is done: a failed model call that fell back to
@@ -294,6 +301,63 @@ async function callModel(port: TipVisitPort, runId: string, setting: AgentModelS
 }
 
 // ---------------------------------------------------------------------------
+// Offers: a tip's question or its link (one-tap changes, Nov 20).
+
+/**
+ * Gives each tip what its card offers. A set-time or set-length card stores its question
+ * first (code computes the change and writes the question); when the question cannot be
+ * stored (below the bar, declined, another question open for that Behavior), the tip
+ * links to the editor field instead. Other cards link where their offer says. A tip
+ * about the whole account links to the first Behavior missing that field, or the list.
+ */
+export async function withOffers(port: Pick<TipVisitPort, "offers">, input: Readonly<{
+  runId: string;
+  localDate: string;
+  tips: readonly TipToWrite[];
+  matches: readonly AdviceMatch[];
+  setup: TipSetup;
+  cards: readonly AdviceCard[];
+}>): Promise<TipToWrite[]> {
+  const cardOf = new Map(input.cards.map((card) => [card.id, card]));
+  const matchOf = new Map(input.matches.map((match) => [`${match.card.id}:${match.behaviorId ?? ""}`, match]));
+  const offers: TipOffer[] = [];
+  input.tips.forEach((tip, index) => {
+    const offer = cardOf.get(tip.cardId)?.offer;
+    if (!tip.behaviorId || (offer?.kind !== "set_time" && offer?.kind !== "set_length")) return;
+    const match = matchOf.get(`${tip.cardId}:${tip.behaviorId}`);
+    const signalId = Number(match?.signal.id);
+    offers.push({
+      key: String(index), kind: offer.kind, behaviorId: tip.behaviorId, cardId: tip.cardId, tipText: tip.text,
+      signalIds: Number.isInteger(signalId) && signalId > 0 ? [signalId] : [], facts: match?.signal.facts ?? {},
+    });
+  });
+  const outcomes = new Map<string, TipOfferOutcome>();
+  if (offers.length > 0 && port.offers) {
+    try {
+      for (const outcome of await port.offers(input.runId, input.localDate, offers)) outcomes.set(outcome.key, outcome);
+    } catch {
+      // A failed proposal step never stops the day's tips: they get their links instead.
+    }
+  }
+  return input.tips.map((tip, index) => {
+    const offer = cardOf.get(tip.cardId)?.offer ?? null;
+    if (!offer) return tip;
+    const proposalId = outcomes.get(String(index))?.proposalId ?? null;
+    if (proposalId) return { ...tip, proposalId, linkTarget: null, linkBehaviorId: null };
+    const target: AdviceOfferLinkTarget = offer.kind === "set_time" ? "time" : offer.kind === "set_length" ? "length" : offer.target;
+    return { ...tip, proposalId: null, linkTarget: target, linkBehaviorId: tip.behaviorId ?? linkBehaviorFor(target, input.setup) };
+  });
+}
+
+/** For a tip about the whole account: the first active Behavior missing the field the link opens. */
+function linkBehaviorFor(target: AdviceOfferLinkTarget, setup: TipSetup): string | null {
+  const active = setup.behaviors.filter((behavior) => behavior.active);
+  if (target === "length") return active.find((behavior) => behavior.hasLength === false)?.id ?? null;
+  if (target === "where") return active.find((behavior) => behavior.hasPlace === false)?.id ?? null;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Hosted port: the coach agent's client, as the person.
 
 export function createHostedTipVisitPort(userId: string, options: Readonly<{ client?: AppSupabaseClient; setting?: AgentModelSetting }> = {}): TipVisitPort {
@@ -328,6 +392,10 @@ export function createHostedTipVisitPort(userId: string, options: Readonly<{ cli
       agent: "coach", setting, instructions: input.instructions, prompt: input.prompt,
       schemaName: TIP_SCHEMA_NAME, schema: TIP_SCHEMA, signal: AbortSignal.timeout(input.timeoutMs), onUsage: input.onUsage,
     }),
+    async offers(runId, localDate, offers) {
+      const { occurrences, moves } = await readProposalInputs(reads, localDate);
+      return proposeTipOffers(client, { userId, runId, today: localDate, occurrences, moves, offers });
+    },
     write: (runId, tips) => writeTips(client, runId, tips),
     async storeContent(runId, input) {
       await storeAgentRunContent(client, { runId, kind: "input", calendarDerived: false, body: { facts: input.prompt } });
@@ -375,14 +443,16 @@ const PROPOSAL_LOOKBACK_DAYS = 35;
 export function hostedScheduleProposalHook(client: AppSupabaseClient, userId: string): NonNullable<TipVisitOptions["afterTips"]> {
   const reads = createCoachSignalReads(client, userId);
   return async ({ runId, localDate }) => {
-    const since = addDays(localDate, -PROPOSAL_LOOKBACK_DAYS);
-    const [occurrences, moves] = await Promise.all([reads.occurrences(since, localDate), reads.moves(since)]);
-    await proposeBehaviorChangesForVisit(client, {
-      userId, runId, today: localDate,
-      occurrences: occurrences.flatMap((row) => row.id && row.startTime && row.scheduleKind
-        ? [{ id: row.id, behaviorId: row.behaviorId, localDate: row.localDate, scheduleKind: row.scheduleKind, startTime: row.startTime }]
-        : []),
-      moves,
-    });
+    const { occurrences, moves } = await readProposalInputs(reads, localDate);
+    await proposeBehaviorChangesForVisit(client, { userId, runId, today: localDate, occurrences, moves });
   };
+}
+
+async function readProposalInputs(reads: ReturnType<typeof createCoachSignalReads>, localDate: string) {
+  const since = addDays(localDate, -PROPOSAL_LOOKBACK_DAYS);
+  const [rows, moves] = await Promise.all([reads.occurrences(since, localDate), reads.moves(since)]);
+  const occurrences: CoachVisitOccurrence[] = rows.flatMap((row) => row.id && row.startTime && row.scheduleKind
+    ? [{ id: row.id, behaviorId: row.behaviorId, localDate: row.localDate, scheduleKind: row.scheduleKind, startTime: row.startTime }]
+    : []);
+  return { occurrences, moves };
 }

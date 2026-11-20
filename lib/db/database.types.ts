@@ -3417,7 +3417,7 @@ export type Database = {
       read_daily_brief_tip_history: { Args: never; Returns: Json }
       read_day_note_shortcut_context: { Args: never; Returns: Json }
       read_behavior_change_proposal: {
-        Args: { p_today: string }
+        Args: { p_proposal_id?: string; p_today: string }
         Returns: Json
       }
       read_note_shortcut_context: {

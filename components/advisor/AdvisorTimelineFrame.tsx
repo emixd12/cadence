@@ -3,6 +3,7 @@
 import { useMemo, type ReactNode } from "react";
 
 import { defaultWebDailyBriefClient } from "@/lib/ui/daily-brief";
+import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
 import type { AdvisorClient } from "@/lib/ui/advisor";
 import { AdvisorProvider, useAdvisor } from "./AdvisorProvider";
 import { AdvisorPanel, AdvisorWindow, AdvisorWindowSpacer } from "./AdvisorParts";
@@ -18,9 +19,12 @@ export function AdvisorTimelineFrame({
   banner,
   fallbackBanner,
   chatHref = null,
+  onOpenLink,
   children,
 }: Readonly<{
   client: AdvisorClient | null | undefined;
+  /** How a tip's link opens (the Mac goes to its Behaviors screen); the web loads the Behaviors page. */
+  onOpenLink?: (link: AdvisorTipLink) => void;
   /** The banner's wave line with no horse; the horse lives at the top centre now. */
   banner: ReactNode;
   /** The old banner with its horse, for a page with no advisor. */
@@ -29,7 +33,7 @@ export function AdvisorTimelineFrame({
   children: ReactNode;
 }>) {
   return (
-    <AdvisorProvider client={client} chatHref={chatHref}>
+    <AdvisorProvider client={client} chatHref={chatHref} onOpenLink={onOpenLink}>
       <AdvisorColumn banner={client ? banner : fallbackBanner ?? banner}>{children}</AdvisorColumn>
       <AdvisorPanel />
     </AdvisorProvider>

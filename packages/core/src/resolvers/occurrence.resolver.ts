@@ -295,8 +295,18 @@ function planOccurrenceGenerationForWindow(
       occurrence,
     ]),
   );
-  const keptByMove = desiredKeysKeptByMoves(
-    input.existingOccurrences,
+  // An unresolved row this plan removes: inside the generation range, no note or timed session, no
+  // longer planned, and still ahead and not moved, or stopped by an end or a pause (T4).
+  const removedByPlan = (occurrence: ExistingOccurrenceForGeneration) =>
+    occurrence.status === "unresolved" &&
+    isWithinGenerationWindow(normalizeInstant(occurrence.scheduledFor), generationWindow) &&
+    !hasNonEmptyNote(occurrence.note) &&
+    !occurrence.hasTimeSessions &&
+    !desiredOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
+    (stoppedByRun(occurrence) ||
+      (isAfter(normalizeInstant(occurrence.scheduledFor), input.now) && !occurrence.moved));
+  const keptByMove = desiredKeysKeptByExisting(
+    input.existingOccurrences.filter((occurrence) => !removedByPlan(occurrence) && !stoppedByRun(occurrence)),
     desiredOccurrences,
     existingOccurrenceKeys,
     desiredOccurrenceKeys,
@@ -374,20 +384,7 @@ function planOccurrenceGenerationForWindow(
         ];
       }),
     deleteUnresolved: input.existingOccurrences
-      .filter(
-        (occurrence) =>
-          occurrence.status === "unresolved" &&
-          isWithinGenerationWindow(
-            normalizeInstant(occurrence.scheduledFor),
-            generationWindow,
-          ) &&
-          !hasNonEmptyNote(occurrence.note) &&
-          !occurrence.hasTimeSessions &&
-          !desiredOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
-          // An end or a pause removes its rows even when they are past or moved (T4).
-          (stoppedByRun(occurrence) ||
-            (isAfter(normalizeInstant(occurrence.scheduledFor), input.now) && !occurrence.moved)),
-      )
+      .filter(removedByPlan)
       .map((occurrence) => ({
         id: occurrence.id,
         scheduledFor: normalizeInstantString(occurrence.scheduledFor),
@@ -572,21 +569,21 @@ function dedupeDesiredOccurrences<T extends {
 }
 
 /**
- * Desired items a moved Occurrence stands in for. When a schedule edit gives a moved
- * Occurrence's day a new identity (a new planned time), the moved Occurrence keeps its
- * row and its moved time, and the new plan's item for that day is not created. Each
- * moved Occurrence keeps the desired item of its own schedule slot, otherwise the one
- * nearest its planned time. Rules: docs/DATETIME_STRATEGY.md, "Moves".
+ * Desired items a kept Occurrence stands in for. When a schedule edit gives a day a new
+ * identity (a new planned time), an Occurrence the edit keeps (moved, marked, already
+ * started, or holding a note or timed session) keeps its row, and the new plan's item for
+ * that day is not created, so the day never shows a second copy. Each kept Occurrence
+ * takes the desired item of its own schedule slot, otherwise the one nearest its planned
+ * time. Rules: docs/DATETIME_STRATEGY.md, "Moves" and "Base schedule proposals".
  */
-function desiredKeysKeptByMoves(
+function desiredKeysKeptByExisting(
   existing: readonly ExistingOccurrenceForGeneration[],
   desired: readonly ReturnType<typeof resolveDesiredOccurrences>[number][],
   existingKeys: ReadonlySet<string>,
   desiredKeys: ReadonlySet<string>,
 ): Set<string> {
   const kept = new Set<string>();
-  const orphans = existing.filter((occurrence) =>
-    occurrence.moved && occurrence.status === "unresolved" && !desiredKeys.has(occurrenceIdentityKey(occurrence)));
+  const orphans = existing.filter((occurrence) => !desiredKeys.has(occurrenceIdentityKey(occurrence)));
   for (const occurrence of orphans) {
     const planned = normalizeInstant(occurrence.scheduledFor);
     const candidates = desired.filter((item) => {

@@ -1,6 +1,7 @@
 import {
   ADVISOR_TIP_ROUTES,
   type AdvisorTip,
+  type AdvisorTipLink,
   type AdvisorTipReaction,
   type AdvisorTipReactionResponse,
   type AdvisorTipsNextResponse,
@@ -161,6 +162,8 @@ export function audienceLabel(audience: string): string {
 
 /** One short line for a schedule question on the line under the date; the full choice is in the panel. */
 export function proposalShortLine(view: Extract<ScheduleProposalView, { kind: "proposal" }>): string {
+  // A question that came from a tip already is one short line: "Set Gym to 6:30 PM every day?"
+  if (view.tip?.question) return view.tip.question;
   // "Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday, Nov 24 (now 7:00 AM)."
   // becomes "Try Gym at 6:30 PM every Tuesday?"
   const match = /^Change your schedule:\s*(.+?)\s+from\s+[^()]+\(now [^)]*\)\.?$/i.exec(view.line);
@@ -190,4 +193,54 @@ export function readBriefSeen(storage: Pick<Storage, "getItem"> | null, key: str
 
 export function writeBriefSeen(storage: Pick<Storage, "setItem"> | null, key: string) {
   try { storage?.setItem(BRIEF_SEEN_KEY, key); } catch { /* storage unavailable: lasts for this page only */ }
+}
+
+// ---------------------------------------------------------------- tip links (one-tap changes)
+
+/** The editor field a tip's link opens on the Behaviors page. */
+export type BehaviorEditField = "time" | "length" | "where" | "description";
+export const BEHAVIOR_EDIT_FIELDS: readonly BehaviorEditField[] = ["time", "length", "where", "description"];
+
+/** Open this Behavior's Details and Settings, with the field focused when one is named. */
+export type BehaviorEditTarget = Readonly<{ behaviorId: string; field: BehaviorEditField | null }>;
+
+export type AdvisorLinkAction =
+  | Readonly<{ kind: "behavior"; target: BehaviorEditTarget }>
+  | Readonly<{ kind: "behaviors" }>
+  | Readonly<{ kind: "needs_decision" }>;
+
+/** Needs decision opens on this window event (the Timeline's dialog listens for it). */
+export const OPEN_NEEDS_DECISION_EVENT = "cadence:open-needs-decision";
+
+export function advisorLinkAction(link: AdvisorTipLink): AdvisorLinkAction {
+  if (link.target === "unmarked") return { kind: "needs_decision" };
+  if (link.target === "behaviors" || !link.behaviorId) return { kind: "behaviors" };
+  const field = link.target === "behavior" ? null : link.target;
+  return { kind: "behavior", target: { behaviorId: link.behaviorId, field } };
+}
+
+/** The web address for a link to the Behaviors page: "/behaviors?edit=<id>&field=length". */
+export function behaviorEditHref(target: BehaviorEditTarget | null): string {
+  if (!target) return "/behaviors";
+  const query = new URLSearchParams({ edit: target.behaviorId });
+  if (target.field) query.set("field", target.field);
+  return `/behaviors?${query.toString()}`;
+}
+
+const EDIT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Reads `?edit=<id>&field=<field>`; anything else is no target. */
+export function parseBehaviorEditTarget(edit: string | undefined, field: string | undefined): BehaviorEditTarget | null {
+  if (!edit || !EDIT_ID.test(edit)) return null;
+  return { behaviorId: edit, field: BEHAVIOR_EDIT_FIELDS.includes(field as BehaviorEditField) ? field as BehaviorEditField : null };
+}
+
+/** The web's way to follow a link: Needs decision opens in place, the rest go to Behaviors. */
+export function followAdvisorLinkOnWeb(link: AdvisorTipLink) {
+  const action = advisorLinkAction(link);
+  if (action.kind === "needs_decision") {
+    window.dispatchEvent(new CustomEvent(OPEN_NEEDS_DECISION_EVENT));
+    return;
+  }
+  window.location.assign(behaviorEditHref(action.kind === "behavior" ? action.target : null));
 }

@@ -16,7 +16,7 @@ export const maxDuration = 30;
 /**
  * Advisor Phase 4C: the advisor's schedule proposal ("Try for two weeks").
  * GET returns what to show now (ScheduleProposalView). POST records one answer:
- * { proposalId, answer: "try" | "for_good" | "no" | "keep" | "go_back" }.
+ * { proposalId, answer: "try" | "for_good" | "no" | "keep" | "go_back" | "undo" }.
  * Web sends its session cookie and the Mac its Bearer token, as for the brief.
  * Errors come back as { error: ScheduleProposalErrorCode }.
  */
@@ -33,7 +33,7 @@ export function POST(request: Request) {
 
 export const OPTIONS = calendarPreflight;
 
-const ANSWERS: readonly ScheduleProposalAnswer[] = ["try", "for_good", "no", "keep", "go_back"];
+const ANSWERS: readonly ScheduleProposalAnswer[] = ["try", "for_good", "no", "keep", "go_back", "undo"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parseAnswer(value: unknown): { proposalId: string; answer: ScheduleProposalAnswer } {
