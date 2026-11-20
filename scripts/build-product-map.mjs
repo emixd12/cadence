@@ -460,7 +460,7 @@ function packageExport(pkg, directory, subpath) {
     if (key === `./${subpath}`) return posix.join(directory, value);
     if (key.endsWith("/*") && `./${subpath}`.startsWith(key.slice(0, -1))) {
       const rest = `./${subpath}`.slice(key.length - 1);
-      return posix.join(directory, value.replace("*", rest));
+      return posix.join(directory, value.replaceAll("*", rest));
     }
   }
   return null;
