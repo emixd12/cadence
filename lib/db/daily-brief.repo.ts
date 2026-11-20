@@ -299,9 +299,9 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
   const choice = record.use_connected_sources === undefined && record.excluded_sources === undefined
     ? dailyBriefChoiceFromAllowed(enabled, dailyBriefSourceFlags((source) => record[ALLOWED_SOURCE_KEYS[source]] === true))
     : parseSourceChoice(record);
-  if (!enabled && (choice.useConnectedSources || DAILY_BRIEF_CONNECTED_SOURCES.some((source) => choice.excludedSources[source]))) {
-    throw new Error("Daily Brief preferences returned an invalid result.");
-  }
+  // Advisor 4F (migration 20261120100000): source choices are shared by every AI
+  // feature, so they may stay on while Daily Brief is off. The brief still reads a
+  // source only while it is on (`dailyBriefSourceAllowed`).
   return {
     enabled,
     ...choice,

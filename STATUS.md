@@ -99,7 +99,7 @@ Check the cited entry before acting on a row.
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the
   product map and notices library plan (owner decisions of November 20, 2026).
   `scripts/build-product-map.mjs` joins the registries into one deterministic graph:
-  journeys, 32 features, interactions, components, families, tokens, ontology terms,
+  journeys, 33 features, interactions, components, families, tokens, ontology terms,
   database tables, MCP tools, services and API routes (`docs/PRODUCT_MAP_GUIDE.md`).
   `npm run map:check` runs in CI and Dagger; `npm run map -- <id>` shows one item.
 - Interaction registry 1.4.0 adds `features` and a required `feature` on every

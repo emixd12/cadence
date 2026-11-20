@@ -1,4 +1,6 @@
 import type {
+  CoachSignalReminder,
+  CoachSignalSession,
   CoachBriefAnswerKind,
   CoachSignal,
   CoachSignalAnswer,
@@ -56,6 +58,10 @@ export type CoachSignalReads = Readonly<{
   decisions(since: string, before: string): Promise<CoachSignalDecision[]>;
   moves(since: string): Promise<CoachSignalMove[]>;
   answers(since: string): Promise<Readonly<{ source: CoachAnswersSource; rows: CoachSignalAnswer[] }>>;
+  /** Sent reminders for Occurrences dated in [since, before). */
+  reminders(since: string, before: string): Promise<CoachSignalReminder[]>;
+  /** Stopped timed sessions for Occurrences dated in [since, before). */
+  sessions(since: string, before: string): Promise<CoachSignalSession[]>;
 }>;
 
 const PROPOSAL_STATUS_ANSWERS: Readonly<Record<string, CoachBriefAnswerKind>> = {
@@ -82,18 +88,24 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
   return {
     async behaviors() {
       const { data, error } = await client.from("behaviors")
-        .select("id,created_at,timezone,active,archived_at").eq("user_id", userId);
+        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind").eq("user_id", userId);
       if (error) throw new CoachSignalsError("read_behaviors_failed");
       return (data ?? []).map((row) => ({
         id: row.id, createdAt: row.created_at, timezone: row.timezone, active: row.active && row.archived_at === null,
+        hasLength: row.default_duration_minutes !== null, lengthMinutes: row.default_duration_minutes,
+        hasPlace: row.where_kind !== null,
       }));
     },
     async occurrences(since, before) {
       const rows = await pages("read_occurrences_failed", (from, to) => client.from("occurrences")
-        .select("id,behavior_id,local_date,status").eq("user_id", userId)
+        .select("id,behavior_id,local_date,status,schedule_kind,schedule_start_time,scheduled_for").eq("user_id", userId)
         .gte("local_date", since).lt("local_date", before).order("id").range(from, to));
       return rows.flatMap((row) => isStatus(row.status)
-        ? [{ behaviorId: row.behavior_id, localDate: row.local_date, status: row.status }] : []);
+        ? [{
+          id: row.id, behaviorId: row.behavior_id, localDate: row.local_date, status: row.status,
+          scheduleKind: row.schedule_kind === "range" ? "range" as const : "exact" as const,
+          startTime: row.schedule_start_time, plannedStartAt: row.scheduled_for,
+        }] : []);
     },
     async decisions(since, before) {
       // First explicit decisions only: a mark from Unresolved, made by the person.
@@ -118,6 +130,22 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
           toPlanned: row.to_planned,
           source: row.source,
         }] : []);
+    },
+    async reminders(since, before) {
+      // Joined to the Occurrence for its local date; a reminder belongs to its item's day.
+      const rows = await pages("read_reminders_failed", (from, to) => client.from("reminder_deliveries")
+        .select("id,occurrence_id,sent_at,occurrences!inner(local_date)").eq("user_id", userId).eq("status", "sent")
+        .not("sent_at", "is", null).gte("occurrences.local_date", since).lt("occurrences.local_date", before)
+        .order("id").range(from, to));
+      return rows.flatMap((row) => row.sent_at ? [{ occurrenceId: row.occurrence_id, sentAt: row.sent_at }] : []);
+    },
+    async sessions(since, before) {
+      const rows = await pages("read_sessions_failed", (from, to) => client.from("occurrence_time_sessions")
+        .select("id,occurrence_id,behavior_id,started_at,stopped_at,occurrences!inner(local_date)").eq("user_id", userId)
+        .not("stopped_at", "is", null).gte("occurrences.local_date", since).lt("occurrences.local_date", before)
+        .order("id").range(from, to));
+      return rows.flatMap((row) => row.stopped_at
+        ? [{ occurrenceId: row.occurrence_id, behaviorId: row.behavior_id, startedAt: row.started_at, stoppedAt: row.stopped_at }] : []);
     },
     async answers(since) {
       // Workstream 3A1 records every answer in move_proposal_answers. Until that table
