@@ -1777,6 +1777,26 @@
       "id": "INT-CHAT-004",
       "classification": "not_load_bearing",
       "reason": "Lists and opens stored conversations with one bounded read and no model call."
+    },
+    {
+      "id": "INT-ADVISOR-001",
+      "classification": "browser_only",
+      "reason": "Opening the advisor panel is page state; its reads (today's tip, the schedule question, earlier tips) are single database reads with no model call."
+    },
+    {
+      "id": "INT-ADVISOR-002",
+      "classification": "destructive_serial_only",
+      "reason": "A tip reaction needs a stored tip for the account's local today, written by the nightly coach run; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-ADVISOR-003",
+      "classification": "browser_only",
+      "reason": "The research card comes with the tip; opening it makes no request."
+    },
+    {
+      "id": "INT-ADVISOR-004",
+      "classification": "destructive_serial_only",
+      "reason": "Schedule answers edit a Behavior's schedule and need an open stored proposal; run serially on a synthetic account."
     }
   ]
 }

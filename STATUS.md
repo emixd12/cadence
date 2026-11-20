@@ -94,6 +94,29 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ended and Paused Behaviors, server and core — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-p37rj8`).** Behaviors no longer
+  archive by themselves. `end_date` becomes `end_on` (last day it runs) plus optional
+  `end_time`; a single pause (`pause_from_on`, optional `pause_from_time`,
+  `pause_back_on`) stops scheduling until the back-on day. Run state is derived by
+  `packages/core/src/resolvers/behavior-run.resolver.ts`. Run actions End now, Start
+  again, Pause and Resume now write one configuration revision each. The archive job,
+  its RPCs and the automatic-archive notices are removed. MCP 1.4.0 adds `run_state`,
+  `end_on`, `end_time`, `pause`, the `running` and `not_running` filters, and
+  `end_behavior`, `pause_behavior`, `resume_behavior`; `end_date` stays as a deprecated
+  alias. Account sync contract 7. Docs: `docs/RECURRENCE_RULES.md`, "Behavior end and
+  pause"; `docs/DATA_MODEL.md`, same title; `docs/MESSAGING_CHANGES.md` P-074 to P-076.
+- **Verification:** migration replayed on a fresh local Postgres; backfill checked
+  (end_date 2026-12-01 became end_on 2026-11-30, `updated_at` unchanged);
+  `tests/sql/behavior-end-and-pause-smoke.sql` passes. `npm run test`: 6,304 pass; the 16
+  failures are the 4 files that need Node 24 and fail the same way on main here.
+- **Production:** migration `20261120120000_behavior_end_and_pause.sql` not applied. It
+  needs the owner's OK, and should be applied right before the merge.
+- **Next:** web UI (Not running list, End now, Pause, Resume, notices) and Mac
+  workstreams. The Mac Rust store still uses `end_date` and must move before the next
+  Mac release. The trial-shift rule (T6) belongs to the AI helpers workstream.
+
 ## Advisor plan Phase 5 (5A): chat server — November 19, 2026
 
 - **Merged November 20 (PR #318).** `POST /api/advisor/chat`

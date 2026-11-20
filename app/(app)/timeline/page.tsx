@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { HorseBanner } from "@/components/layout/HorseBanner";
-import { ScreenContentLoading } from "@/components/layout/ScreenFrame";
+import { CadencePageBanner, ScreenContentLoading } from "@/components/layout/ScreenFrame";
+import { WebAdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
+import { AiFeaturesApproval } from "@/components/onboarding/AiFeaturesApproval";
 import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getCurrentUserClaims } from "@/lib/auth/current-user";
@@ -47,7 +48,6 @@ const MOVE_ACTIONS: OccurrenceMoveActions = {
   keep: keepMovedOccurrenceAction,
 };
 
-
 type TimelinePageProps = Readonly<{
   searchParams?: Promise<{
     days?: string | string[];
@@ -61,20 +61,21 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   // Ticket 278: a leave reminder's link names its trip by digest only.
   const leaveReminderDigest = parseLeaveReminderDigest(params?.[LEAVE_REMINDER_LINK_PARAM]);
 
+  // Advisor Phase 4 (4E, placement K): the advisor (the horse) sits at the top centre and the
+  // banner keeps only its wave line. The brief, tips and schedule questions open from the horse.
   return (
-    <div className="flex w-full flex-col">
+    <WebAdvisorTimelineFrame banner={<>
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
         <h1 className="sr-only">Timeline</h1>
       </div>
-
-      <HorseBanner />
-
+      <CadencePageBanner />
+    </>}>
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
         <Suspense fallback={<ScreenContentLoading label="Loading timeline" />}>
           <TimelineContent futureDays={futureDays} leaveReminderDigest={leaveReminderDigest} />
         </Suspense>
       </div>
-    </div>
+    </WebAdvisorTimelineFrame>
   );
 }
 
@@ -112,7 +113,10 @@ async function TimelineContent({
       hasMovedBefore={moveState.hasMovedBefore}
     >
       <DailyBriefLauncher travelAccountId={userId} />
-      <FirstRunOnboardingPanel onboarding={onboarding} />
+      {/* Advisor 4F: the one AI features question comes before the setup pop-up, in its place. */}
+      <AiFeaturesApproval>
+        <FirstRunOnboardingPanel onboarding={onboarding} />
+      </AiFeaturesApproval>
       <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
       <Timeline
         key={userId}
@@ -150,7 +154,6 @@ async function loadMoveState(userId: string | null, todayLocalDate: string)
     return { hasMovedBefore: true, conflicts: [] };
   }
 }
-
 
 function parseFutureDays(value: string | string[] | undefined): number | undefined {
   const rawValue = Array.isArray(value) ? value[0] : value;

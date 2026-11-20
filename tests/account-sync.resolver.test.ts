@@ -641,7 +641,8 @@ describe("resolveAccountSync", () => {
   it("preserves domain revision fields while removing ownership", () => {
     const revised: AccountSyncEntity = { kind: "behavior", id: "a", value: { id: "a", revision: 3, user_id: "local", metadata: { user_id: "provenance-owner" } } };
     expect(plan(empty, snapshot([revised]), empty).hostedWrites[0].value).toEqual({
-      archive_notes: [], default_duration_minutes: null, end_date: null, auto_archived_at: null, location_text: null,
+      archive_notes: [], default_duration_minutes: null, end_on: null, end_time: null,
+      pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, location_text: null,
       where_kind: null, id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
     });
   });
@@ -775,16 +776,31 @@ describe("Behavior persistence fields in account synchronization", () => {
     }), behavior({}));
     expect(result.hostedWrites[0].value).toMatchObject({
       default_duration_minutes: 30,
-      end_date: "2026-10-01",
+      end_on: "2026-09-30",
+      end_time: null,
+      pause_from_on: null,
       auto_archived_at: null,
     });
+    expect(result.hostedWrites[0].value).not.toHaveProperty("end_date");
+  });
+
+  it("carries end and pause fields into writes", () => {
+    const run = { end_on: "2026-12-01", end_time: "18:30:00", pause_from_on: "2026-11-21", pause_from_time: null, pause_back_on: "2026-11-24" };
+    const result = plan(snapshot([row("b", "Walk")]), behavior(run), behavior({}));
+    expect(result.hostedWrites[0].value).toMatchObject(run);
   });
 
   it.each([
     { default_duration_minutes: 0 },
     { default_duration_minutes: 1.5 },
     { end_date: "2026-02-30" },
-    { end_date: "0000-01-01" },
+    { end_on: "2026-02-30" },
+    { end_on: "0001-01-01" },
+    { end_on: "2026-12-01", end_time: "18:30" },
+    { end_time: "18:30:00" },
+    { pause_from_on: "2026-11-21" },
+    { pause_from_on: "2026-11-21", pause_back_on: "2026-11-21" },
+    { pause_from_time: "08:00:00", pause_back_on: "2026-11-21" },
     { auto_archived_at: "not-an-instant" },
     { auto_archived_at: "2026-09-18T00:00:00Z", active: true, archived_at: null },
   ])("rejects invalid persistence values %#", (invalid) => {

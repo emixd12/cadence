@@ -1,3 +1,4 @@
+import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import {
@@ -104,7 +105,7 @@ function serializeOccurrences(account: Account, occurrences: Occurrence[]) {
 
 async function behaviorResult(context: IntegrationContext, behavior: BehaviorWithCategory) {
   const refs = await listExternalReferences(context.supabase, { entityType: "behavior", entityIds: [behavior.id] });
-  return serializeIntegrationBehavior(behavior, refs.get(behavior.id) ?? null);
+  return serializeIntegrationBehavior(behavior, refs.get(behavior.id) ?? null, Temporal.Instant.from(context.now.toISOString()));
 }
 
 async function occurrenceDetail(context: IntegrationContext, account: Account, id: string): Promise<OccurrenceDetailOutput> {
@@ -148,13 +149,20 @@ export async function getIntegrationAccountContext(context: IntegrationContext):
 
 export async function listIntegrationBehaviors(context: IntegrationContext, input: IntegrationOperationInput<"list_behaviors">): Promise<IntegrationOperationOutput<"list_behaviors">> {
   const account = await readAccount(context);
-  const rows = account.behaviors.filter((row) =>
-    (!input.state || input.state === "all" || row.active === (input.state === "active")) &&
+  const runState = (row: BehaviorWithCategory) => behaviorRunState(runFieldsFromStored(row), account.now).state;
+  const inState = (row: BehaviorWithCategory) => {
+    const state = input.state ?? "all";
+    if (state === "all") return true;
+    if (state === "active" || state === "archived") return row.active === (state === "active");
+    if (!row.active) return false;
+    return state === "running" ? runState(row) === "running" : runState(row) !== "running";
+  };
+  const rows = account.behaviors.filter((row) => inState(row) &&
     (!input.category_id || row.category_id === input.category_id) && changedSince(row.updated_at, input.updated_since),
   );
   const selected = page(context, rows, input, ["behaviors", input.state ?? "all", input.category_id, input.updated_since], (row) => row.id);
   const refs = await listExternalReferences(context.supabase, { entityType: "behavior", entityIds: selected.rows.map((row) => row.id) });
-  return { behaviors: selected.rows.map((row) => serializeIntegrationBehavior(row, refs.get(row.id) ?? null)), next_cursor: selected.next_cursor };
+  return { behaviors: selected.rows.map((row) => serializeIntegrationBehavior(row, refs.get(row.id) ?? null, account.now)), next_cursor: selected.next_cursor };
 }
 
 export async function getIntegrationBehavior(context: IntegrationContext, input: IntegrationOperationInput<"get_behavior">): Promise<IntegrationOperationOutput<"get_behavior">> {

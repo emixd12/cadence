@@ -10,6 +10,7 @@ import { parseChatBenchState } from "./chat-fixtures";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
+import { AdvisorBench, type AdvisorBenchState } from "./AdvisorBench";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -91,6 +92,7 @@ import {
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
 import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
+import { AiFeaturesPreview } from "@/app/design-system/AiFeaturesBench";
 import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
 import { AlertNoticeBench } from "@/app/design-system/AlertNoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
@@ -433,6 +435,15 @@ export default async function DesignSystemPage({
     );
   }
 
+  if (selectedPreviewId === "advisor") {
+    // Advisor plan 4E: the built advisor (placement K) on the real Timeline with synthetic data.
+    // ?state=tip|brief|proposal|checkin|trial|refused|none
+    const stateParam = firstSearchParam(params?.state);
+    const states: readonly AdvisorBenchState[] = ["tip", "brief", "proposal", "checkin", "trial", "refused", "none"];
+    const state: AdvisorBenchState = states.find((item) => item === stateParam) ?? "tip";
+    return <AdvisorBench key={state} state={state} statusAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction} />;
+  }
+
   if (selectedPreviewId === "advisor-placement") {
     // Advisor plan 4D, rounds 1 and 1b: places for the advisor's tips.
     // ?option=a|a2|b|c|d|e|f|g|h|j|k|k2&view=closed|open|why|answered|scrolled|scrolled-open|panel|brief|checkin|none&shot=1
@@ -473,6 +484,11 @@ export default async function DesignSystemPage({
         </main>
       </WebRuntimeProvider>
     );
+  }
+  if (selectedPreviewId === "ai-features") {
+    // Advisor 4F: the AI features question (state=approval) and Settings > AI features
+    // (state=settings, or settings-unanswered) on a fixture account.
+    return <AiFeaturesPreview state={selectedFixtureState ?? "approval"} />;
   }
   if (selectedPreviewId === "settings-regroup") {
     // Usability evaluation, 2026-11-09: the Settings regroup proposal on synthetic data.
@@ -563,6 +579,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
       <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
       <BenchAnchor href="?preview=settings-regroup">Settings regroup proposal</BenchAnchor>
+      <BenchAnchor href="?preview=ai-features">AI features question and Settings (advisor 4F)</BenchAnchor>
     </nav>
   );
 }
@@ -2100,7 +2117,7 @@ const previewFactories: Record<
       <ProductPreview maxHeight="50rem">
         <BehaviorList
           activeBehaviors={[activeBehavior]}
-          archivedBehaviors={[{ ...archivedBehavior, endDate: "2026-06-10", autoArchivedAt: "2026-06-10T04:00:00Z" }]}
+          archivedBehaviors={[{ ...archivedBehavior, endOn: "2026-06-09", autoArchivedAt: "2026-06-10T04:00:00Z" }]}
           categories={categoryOptions}
           analytics={analyticsFixture}
           updateAction={behaviorAction}
@@ -2582,7 +2599,6 @@ const futureSection: TimelineDaySection = {
 };
 
 const timelineFixture: TimelineView = {
-  archiveNotifications: [{ behaviorId: "archived-fixture", title: "Course practice", endDate: "2026-06-08" }],
   durationEstimates: {
     "behavior-water": { kind: "known", seconds: 1800, durationLabel: "30m", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
   },

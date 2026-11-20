@@ -17,7 +17,6 @@ import { resolveExportPageSummary, exportReadEndLocalDate, resolveExportDateRang
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { assertLaunchCircuitBreakerClosed } from "@/lib/security/launch-circuit-breakers";
 import { ensureUserOccurrencesFresh } from "@/lib/services/occurrence.service";
-import { reconcileMyDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import { createStoredZip } from "@/lib/services/zip";
 import { createClient } from "@/lib/supabase/server";
 import { readCachedProfileTimezone, readCachedUserBehaviors } from "@/lib/cache/stable-user-data.cache";
@@ -103,7 +102,6 @@ export async function getUserExportBundle(
   }
 
   const now = options.now ?? Temporal.Now.instant();
-  await reconcileMyDueBehaviorArchives(supabase, userId);
   const [
     profileTimezone,
     cachedBehaviors,

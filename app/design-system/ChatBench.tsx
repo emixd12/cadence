@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ChatPage } from "@/components/chat/ChatPage";
 import { AppShell } from "@/components/layout/AppShell";
-import { HorseBanner } from "@/components/layout/HorseBanner";
+import { CadencePageBanner } from "@/components/layout/ScreenFrame";
 import { EMPTY_CHAT_THREAD, type ChatThreadState } from "@/lib/ui/chat";
 import {
   CHAT_BENCH_STATES,
@@ -51,7 +51,7 @@ export function ChatBenchPage({
       defaultMobileNavOpen={menuOpen}
     >
       <div className="flex w-full flex-col">
-        <HorseBanner />
+        <CadencePageBanner />
         <div className="mx-auto flex w-full max-w-3xl flex-col px-4 sm:px-6 lg:px-10">
           <h1 className="pt-4 text-3xl font-bold leading-tight sm:text-4xl">Chat</h1>
           <nav aria-label="Bench states" className="flex flex-wrap gap-x-3 pt-2 text-sm leading-5 text-muted-readable" data-bench-only>

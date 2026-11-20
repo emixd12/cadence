@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ChatPage } from "@/components/chat/ChatPage";
-import { HorseBanner } from "@/components/layout/HorseBanner";
+import { CadencePageBanner } from "@/components/layout/ScreenFrame";
 import { isChatPageAvailable } from "@/lib/navigation";
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export default async function ChatRoute({ searchParams }: ChatRouteProps) {
 
   return (
     <div className="flex w-full flex-col">
-      <HorseBanner />
+      <CadencePageBanner />
       <div className="mx-auto flex w-full max-w-3xl flex-col px-4 sm:px-6 lg:px-10">
         <h1 className="pt-4 text-3xl font-bold leading-tight sm:text-4xl">Chat</h1>
         <div className="pt-4">

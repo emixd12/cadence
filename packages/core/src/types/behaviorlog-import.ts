@@ -135,7 +135,7 @@ export type BehaviorLogExistingBehavior = {
   archivedAt?: string | null;
   archiveNotes?: ArchiveNote[];
   defaultDurationMinutes?: number | null;
-  endDate?: string | null;
+  run?: BehaviorLogImportBehaviorRun;
   autoArchivedAt?: string | null;
   sourceOriginalId?: string | null;
   schedules?: BehaviorLogExistingSchedule[];
@@ -279,7 +279,8 @@ export type BehaviorLogImportBehaviorPlan = {
   archivedAtUtc: string | null;
   cadenceArchiveNotes?: ArchiveNote[];
   expectedDurationMinutes?: number | null;
-  cadenceEndDate?: string | null;
+  /** End and pause from `extensions.app.cadence`. Absent when the bundle carries none. */
+  cadenceRun?: BehaviorLogImportBehaviorRun;
   cadenceAutoArchivedAt?: string | null;
   active?: boolean;
   cadenceActive: boolean | null;
@@ -623,4 +624,13 @@ export type BehaviorLogImportRecordMappingInput = {
   recordType: BehaviorLogImportRecordType;
   externalId: string;
   localId: string;
+};
+
+/** A Behavior's end and pause in stored form (docs/RECURRENCE_RULES.md, "Behavior end and pause"). */
+export type BehaviorLogImportBehaviorRun = {
+  endOn: string | null;
+  endTime: string | null;
+  pauseFromOn: string | null;
+  pauseFromTime: string | null;
+  pauseBackOn: string | null;
 };

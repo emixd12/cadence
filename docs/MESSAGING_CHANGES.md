@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-074` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
+1. Give a new entry the next ID (`P-077` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -127,6 +127,9 @@ Status values:
 | [P-067](#p-067-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
 | [P-068](#p-068-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
 | [P-073](#p-073-end-date-must-come-after-today) | End date must come after today | logged | — | in-app copy, user guide |
+| [P-074](#p-074-an-end-or-pause-start-must-be-later-than-now) | An end or pause start must be later than now | logged | Ended and Paused plan | in-app copy, MCP |
+| [P-075](#p-075-pause-back-on-day-rule) | Pause back-on day rule | logged | Ended and Paused plan | in-app copy, MCP |
+| [P-076](#p-076-behaviors-no-longer-archive-by-themselves) | Behaviors no longer archive by themselves | logged | Ended and Paused plan | in-app copy, user guide, MCP |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -2042,6 +2045,49 @@ cite has not changed.
 - **Related:** P-061, P-063.
 - **Status:** logged.
 
+## P-070: One AI features question replaces the Daily Brief opt-in
+
+- **Change:** advisor Phase 4, workstream 4F (Emi, November 19, D2). On first open of
+  Timeline every account answers one question, "AI features": Daily Brief, Advisor tips,
+  Chat, and what they use (Behaviors and history, Notes, Reminder history, Connected
+  calendars and Hevy), all on, each with "If you turn it off: …". **Continue** turns
+  everything on; **Keep AI features off** turns every feature off. Settings > Daily Brief
+  becomes Settings > AI features, with a switch per feature and source choices shared by
+  all three. The Daily Brief panel's old disclosure ("The briefing cannot change tracking
+  or Calendar records", "Connected sources, reminder history and Notes are optional") and
+  the per-source "Event titles … are not sent" lines are replaced: Chat reads event
+  titles (D4).
+- **Affected:** `components/onboarding/AiFeaturesApproval.tsx`,
+  `components/briefing/DailyBriefSettingsPanel.tsx`, `lib/ui/ai-features-copy.ts`.
+- **Surfaces:** in-app copy (new). User guide `docs/user-guide/timeline.md#daily-brief`,
+  Privacy, Terms and marketing still describe an opt-in Daily Brief that sends no event
+  titles.
+- **Update needed:** user guide and public pages, at beta launch.
+
+## P-071: Overnight coach signals widen, and the advisor writes daily tips
+
+- **Change:** implemented November 19, 2026 (advisor plan Phase 4, workstream 4B). The
+  overnight coach signals (P-064) widen from five patterns to twenty-one, still counts only,
+  no model call, no titles or notes: weekly numbers, weekday gap, time-of-day gap, set time
+  or range, steady item, never done, dip and recovery, day shape, unmarked items, marking
+  time, done together, crowded hour, setup gaps, reminder response, time spent against the
+  set length, and moved against unmoved items. They now also read sent reminders and timed
+  sessions. Each morning the advisor turns up to three of them into short tips. A tip pairs
+  one counted fact with one action from a reviewed research card. The model sees the counts,
+  the Behavior titles the tips name, and, only when the person's AI choices allow notes, up
+  to seven recent day notes. A new account's first tips are filled from the cards' own
+  wording with no model call. Tips are stored with the card and the facts they state, and
+  kept until the person deletes their data. "Don't suggest this again" turns a card off for
+  that account.
+- **Affected:** `packages/core/src/resolvers/coach-signals-v2.resolver.ts`,
+  `lib/services/advisor-tips-*.ts`, `app/api/advisor/tips/*`,
+  `supabase/migrations/20261119221000_advisor_tips.sql`.
+- **Surfaces:** none in-app until workstream 4E shows tips. Privacy and Terms describe
+  five overnight patterns and no tips (P-064, P-065).
+- **Update needed:** when P-064 is written up, list the pattern families in general terms
+  and describe tips (what reaches the model, how long tips are kept).
+- **Related:** P-064, P-065.
+
 ## P-073: End date must come after today
 
 - **Change:** implemented November 20, 2026. Creating a Behavior, or changing an active
@@ -2056,3 +2102,55 @@ cite has not changed.
 - **Conflicting current text:** none found.
 - **Update needed:** none.
 - **Status:** logged.
+
+## P-074: An end or pause start must be later than now
+
+- **Change:** implemented November 20, 2026 (Ended and Paused, server and core). Setting an
+  end, or a pause start, that is already in the past is refused with "Pick a time later than
+  now. To stop it right away, use End now." (`RUN_STOP_IN_PAST_MESSAGE`). It replaces P-073's
+  "Choose a date after today. The Behavior’s last day is the day before its end date.",
+  because the field is now the last day it runs ("Ends after"), and today is allowed when the
+  end time is later.
+- **Affected:** `packages/core/src/services/behavior-values.ts`; web and Mac Behavior forms;
+  MCP `create_behavior`, `update_behavior` and `pause_behavior` (`invalid_input`).
+- **Surfaces:** in-app copy (changed error message), MCP error text.
+- **Conflicting current text:** none after this change.
+- **Update needed:** none.
+- **Related:** P-073 (superseded), P-076.
+- **Status:** logged.
+
+## P-075: Pause back-on day rule
+
+- **Change:** implemented November 20, 2026. A pause whose back-on day is not after the first
+  paused day, or not after today, is refused with "Pick a back-on day after the first paused
+  day and after today." (`PAUSE_BACK_ON_MESSAGE`).
+- **Affected:** `packages/core/src/services/behavior-values.ts`; MCP `pause_behavior`; the web
+  and Mac Pause controls when they ship (later workstreams).
+- **Surfaces:** in-app copy (new), MCP error text (new).
+- **Conflicting current text:** none.
+- **Update needed:** none.
+- **Status:** logged.
+
+## P-076: Behaviors no longer archive by themselves
+
+- **Change:** implemented November 20, 2026. The End date field becomes "Ends after", the last
+  day a Behavior runs. When the end passes, the Behavior stays active and moves to Not running;
+  nothing is archived. Removed: the Timeline notice "“…” was automatically archived for its …
+  end date. History is preserved." with its "Review archived behaviors" link (web and Mac), and
+  the form help "Optional. Archives at the start of this date in the Behavior’s timezone.
+  Cadence shows an in-app notification." New form help: "Optional. The last day it runs. After
+  it, the behavior moves to Not running. Nothing is archived." Existing end dates moved to the
+  day before, so every Behavior keeps the same last day.
+- **Affected:** `components/behaviors/BehaviorForm.tsx`, `components/timeline/Timeline.tsx`,
+  `apps/desktop/src/screens/timeline-screen.tsx`, `components/behaviors/BehaviorList.tsx`; MCP
+  1.4.0 (`end_on`, `end_time`, `pause`, `run_state`; `end_date` kept as a deprecated alias;
+  new `end_behavior`, `pause_behavior`, `resume_behavior`).
+- **Surfaces:** in-app copy (changed), user guide (`docs/user-guide/behaviors-and-review.md`,
+  "Default duration and end date", updated in this change), MCP developer reference
+  (regenerated).
+- **Conflicting current text:** none found after this change.
+- **Update needed:** the web and Mac workstreams add the Not running list, End now, Pause and
+  Resume controls, and their Timeline notices; log their copy then.
+- **Related:** P-073, P-074.
+- **Status:** logged.
+

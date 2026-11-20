@@ -250,6 +250,26 @@ function parseConfigurationSnapshot(
     ),
     active: requireBoolean(snapshot.active, "configuration active"),
     timezone: requireString(snapshot.timezone, "configuration timezone"),
+    ...(snapshot.end === undefined ? {} : { end: parseConfigurationEnd(snapshot.end) }),
+    ...(snapshot.pause === undefined ? {} : { pause: parseConfigurationPause(snapshot.pause) }),
+  };
+}
+
+function parseConfigurationEnd(value: Json | undefined): ExportBehaviorConfigurationSnapshot["end"] {
+  if (value === null || value === undefined) return null;
+  const end = requireJsonObject(value, "configuration end");
+  const time = requireNullableString(end.time ?? null, "configuration end time");
+  return { on: requireString(end.on, "configuration end on"), time: time === null ? null : normalizeExportTime(time) };
+}
+
+function parseConfigurationPause(value: Json | undefined): ExportBehaviorConfigurationSnapshot["pause"] {
+  if (value === null || value === undefined) return null;
+  const pause = requireJsonObject(value, "configuration pause");
+  const time = requireNullableString(pause.from_time ?? null, "configuration pause from_time");
+  return {
+    fromOn: requireString(pause.from_on, "configuration pause from_on"),
+    fromTime: time === null ? null : normalizeExportTime(time),
+    backOn: requireString(pause.back_on, "configuration pause back_on"),
   };
 }
 
@@ -450,7 +470,7 @@ function toExportBehaviorInput(
     archivedAt: behavior.archived_at,
     archiveNotes: parseArchiveNotes(behavior.archive_notes),
     defaultDurationMinutes: behavior.default_duration_minutes ?? null,
-    endDate: behavior.end_date ?? null,
+    ...exportRunFields(behavior),
     autoArchivedAt: behavior.auto_archived_at ?? null,
     createdAt: behavior.created_at,
     updatedAt: behavior.updated_at,
@@ -788,4 +808,14 @@ export function assertConfigurationHistoryStable(input: {
       );
     }
   }
+}
+
+function exportRunFields(behavior: BehaviorGraphRecord) {
+  return {
+    endOn: behavior.end_on ?? null,
+    endTime: behavior.end_time ?? null,
+    pauseFromOn: behavior.pause_from_on ?? null,
+    pauseFromTime: behavior.pause_from_time ?? null,
+    pauseBackOn: behavior.pause_back_on ?? null,
+  };
 }

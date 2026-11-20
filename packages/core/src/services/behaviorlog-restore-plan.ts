@@ -1,3 +1,4 @@
+import { storedRunColumns } from "./behavior-run-fields";
 import type { Json } from "../types/json";
 import { sha256 } from "../hash";
 import { normalizeBehaviorDefinition, planBehaviorDefinitionChangeEvent, planInitialBehaviorDefinitionEvent } from "../resolvers/behavior-definition.resolver";
@@ -411,9 +412,9 @@ export function buildRestorePayload(input: {
             ...(behavior.expectedDurationMinutes === undefined
               ? {}
               : { default_duration_minutes: behavior.expectedDurationMinutes }),
-            ...(behavior.cadenceEndDate === undefined
+            ...(behavior.cadenceRun === undefined
               ? {}
-              : { end_date: behavior.cadenceEndDate }),
+              : storedRunColumns(behavior.cadenceRun)),
             ...(behavior.cadenceAutoArchivedAt === undefined
               ? {}
               : { auto_archived_at: behavior.cadenceAutoArchivedAt }),

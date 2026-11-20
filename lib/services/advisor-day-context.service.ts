@@ -253,12 +253,12 @@ async function assembleDayContexts(
   });
   // A fresh sync fences current Behavior configurations. Preserved occurrences may
   // legitimately retain older or null lineage (past times, notes, or time sessions).
-  if (!coverage.covered || cadenceSnapshot.dueArchiveCount > 0) {
+  if (!coverage.covered) {
     throw new AdvisorDayContextServiceError(
       "context_incomplete",
       true,
       null,
-      `${cadenceSnapshot.dueArchiveCount > 0 ? "Open Timeline to reconcile due archives. Then open" : "Open"} Settings, confirm your current timezone, and choose Save timezone to retry schedule synchronization. Then return and try again.`,
+      "Open Settings, confirm your current timezone, and choose Save timezone to retry schedule synchronization. Then return and try again.",
     );
   }
 

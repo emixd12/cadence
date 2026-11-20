@@ -2,6 +2,7 @@ import { sha256 } from "../hash";
 import { parseArchiveNotes } from "./archive-note.resolver";
 import { NOTE_SHORTCUT_LIMITS, validateNoteShortcutState } from "./note-suggestion.resolver";
 import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/travel-habits";
+import { legacyEndDateColumns } from "../services/behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
@@ -12,8 +13,10 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * `cadence_private.account_sync_contract_additions` or `account_sync_contract_rows`
  * entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
  * Contract 5 adds the read-only connector completion kinds (Ticket 320).
+ * Contract 7 replaces the Behavior `end_date` with end and pause fields (Ended and
+ * Paused). It is breaking, so the server's minimum writer contract is 7 as well.
  */
-export const ACCOUNT_SYNC_CONTRACT = 6;
+export const ACCOUNT_SYNC_CONTRACT = 7;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -449,11 +452,21 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     value = {
       archive_notes: [],
       default_duration_minutes: null,
-      end_date: null,
+      end_on: null,
+      end_time: null,
+      pause_from_on: null,
+      pause_from_time: null,
+      pause_back_on: null,
       auto_archived_at: null,
       location_text: null,
       ...value,
     };
+    // A baseline saved before contract 7 holds end_date; it reads as the new fields.
+    if ("end_date" in value) {
+      const { end_date: endDate, ...rest } = value as Record<string, Json>;
+      try { value = { ...rest, ...legacyEndDateColumns(typeof endDate === "string" ? endDate : null) }; }
+      catch { throw new Error("The account Behavior end or pause is invalid."); }
+    }
     // Rows written before Ticket 215 carry only location text, which meant A place.
     if (!("where_kind" in value)) value = { ...value, where_kind: typeof value.location_text === "string" ? "place" : null };
     parseArchiveNotes(value.archive_notes);
@@ -664,13 +677,27 @@ function validateBehaviorPersistenceFields(value: Record<string, Json | undefine
     && (typeof duration !== "number" || !Number.isInteger(duration) || duration < 1 || duration > 1_440)) {
     throw new Error("The account Behavior default duration is invalid.");
   }
-  const endDate = value.end_date;
-  if (endDate !== null) {
-    if (typeof endDate !== "string") throw new Error("The account Behavior end date is invalid.");
+  for (const field of ["end_on", "pause_from_on", "pause_back_on"] as const) {
+    const day = value[field];
+    if (day === null) continue;
+    if (typeof day !== "string") throw new Error("The account Behavior end or pause is invalid.");
     try {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < "0001-01-01"
-        || Temporal.PlainDate.from(endDate).toString() !== endDate) throw new Error();
-    } catch { throw new Error("The account Behavior end date is invalid."); }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < "0001-01-02"
+        || Temporal.PlainDate.from(day).toString() !== day) throw new Error();
+    } catch { throw new Error("The account Behavior end or pause is invalid."); }
+  }
+  for (const field of ["end_time", "pause_from_time"] as const) {
+    const time = value[field];
+    if (time !== null && (typeof time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d:00$/.test(time))) {
+      throw new Error("The account Behavior end or pause is invalid.");
+    }
+  }
+  if ((value.end_time !== null && value.end_on === null)
+    || ((value.pause_from_on === null) !== (value.pause_back_on === null))
+    || (value.pause_from_time !== null && value.pause_from_on === null)
+    || (typeof value.pause_from_on === "string" && typeof value.pause_back_on === "string"
+      && value.pause_back_on <= value.pause_from_on)) {
+    throw new Error("The account Behavior end or pause is invalid.");
   }
   const autoArchivedAt = value.auto_archived_at;
   if (autoArchivedAt !== null) {

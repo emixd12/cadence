@@ -40,6 +40,7 @@ export const OPERATION_ACCESS = Object.freeze({
   move_occurrence_for_day: 'write', revert_occurrence_move: 'write', update_day_note: 'write',
   create_behavior: 'write',
   update_behavior: 'write', archive_behavior: 'write', restore_behavior: 'write',
+  end_behavior: 'write', pause_behavior: 'write', resume_behavior: 'write',
 });
 
 export const KINDS = Object.freeze([

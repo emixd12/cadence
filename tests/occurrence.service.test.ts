@@ -41,7 +41,6 @@ import {
   syncReminderDeliveriesForBehaviors,
 } from "@/lib/services/reminder.service";
 import { createClient } from "@/lib/supabase/server";
-import { processDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import type {
   Behavior,
   BehaviorScheduleSlot,
@@ -99,9 +98,6 @@ vi.mock("@/lib/services/reminder.service", () => ({
   syncReminderDeliveriesForBehaviors: vi.fn(),
 }));
 
-vi.mock("@/lib/services/behavior-lifecycle.service", () => ({
-  processDueBehaviorArchives: vi.fn(),
-}));
 
 vi.mock("@/lib/monitoring/privacy-safe-events", () => ({
   reportMonitoringError: vi.fn(),
@@ -138,7 +134,6 @@ const FORM_OCCURRENCE_ID = "11111111-1111-4111-8111-111111111111";
 
 beforeEach(() => {
   vi.mocked(listOccurrenceIdsWithTimeSessions).mockResolvedValue([]);
-  vi.mocked(processDueBehaviorArchives).mockResolvedValue([]);
 });
 
 describe("syncUserOccurrences", () => {

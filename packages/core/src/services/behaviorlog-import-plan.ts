@@ -1,3 +1,4 @@
+import { storedRunColumns } from "./behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorLogImportMergePreviewResult, BehaviorLogImportSchedulePlan } from "../types/behaviorlog-import";
 import type { LocalImportWritePlan, PortabilityGraph } from "../types/portability-rows";
@@ -52,7 +53,7 @@ export function planBehaviorLogImportWrite(context: PortabilityPlanContext & {
       active: row.archivedAtUtc ? false : row.cadenceActive ?? true, archived_at: row.archivedAtUtc,
       archive_notes: serializeArchiveNotes(row.cadenceArchiveNotes ?? []), current_configuration_event_id: null,
       default_duration_minutes: row.expectedDurationMinutes ?? null,
-      end_date: row.cadenceEndDate ?? null,
+      ...(row.cadenceRun ? storedRunColumns(row.cadenceRun) : {}),
       auto_archived_at: row.cadenceAutoArchivedAt ?? null,
       created_at: row.createdAtUtc ?? now, updated_at: row.createdAtUtc ?? now }, schedules: [], slots: [] };
     const parentGroups = new Map<string, BehaviorLogImportSchedulePlan[]>();

@@ -46,11 +46,13 @@ function walk(relativePath) {
 const resolverRegistry = [
   { domain: "time helper and effective time", resolver: "packages/core/src/resolvers/time.resolver.ts", test: "tests/time.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "per-day moves", resolver: "packages/core/src/resolvers/move.resolver.ts", test: "tests/move.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
+  { domain: "Behavior end and pause", resolver: "packages/core/src/resolvers/behavior-run.resolver.ts", test: "tests/behavior-run.resolver.test.ts", source: "docs/RECURRENCE_RULES.md" },
   { domain: "brief moves free-slot rule", resolver: "packages/core/src/resolvers/brief-move.resolver.ts", test: "tests/brief-move.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "historical completion timing", resolver: "packages/core/src/resolvers/completion-timing.resolver.ts", test: "tests/completion-timing.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "briefing planner", resolver: "packages/core/src/resolvers/briefing-plan.resolver.ts", test: "tests/briefing-plan.resolver.test.ts", source: "docs/TICKETS.md" },
   { domain: "briefing analysis lanes", resolver: "packages/core/src/resolvers/briefing-analysis.resolver.ts", test: "tests/briefing-analysis.resolver.test.ts", source: "docs/TICKETS.md" },
   { domain: "coach signals", resolver: "packages/core/src/resolvers/coach-signals.resolver.ts", test: "tests/coach-signals.resolver.test.ts", source: "docs/DATA_MODEL.md" },
+  { domain: "coach signals version 2", resolver: "packages/core/src/resolvers/coach-signals-v2.resolver.ts", test: "tests/coach-signals-v2.resolver.test.ts", source: "docs/DATA_MODEL.md" },
   { domain: "advice matcher", resolver: "packages/core/src/resolvers/advice-matcher.resolver.ts", test: "tests/advice-matcher.resolver.test.ts", source: "packages/core/src/types/advice-cards.ts" },
   { domain: "chat starters", resolver: "packages/core/src/resolvers/chat-starters.resolver.ts", test: "tests/chat-starters.resolver.test.ts", source: "packages/core/src/data/chat-starters.json" },
   {

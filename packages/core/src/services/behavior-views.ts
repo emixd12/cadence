@@ -7,11 +7,15 @@ import { formatScheduledTimeLabel, normalizeRecurrenceRule, normalizeScheduledTi
   recurrenceDefaultsFromRule, summarizeRecurrenceRule, summarizeReminders } from "./behavior-values";
 import { compareScheduleSlots, formatScheduleSlotsSummary, toScheduleSlotView } from "./schedule";
 import { storedBehaviorWhere } from "./behavior-where";
+import type { Temporal } from "@js-temporal/polyfill";
+import { behaviorRunState, runFieldsFromStored } from "../resolvers/behavior-run.resolver";
 
 export function assembleBehaviorPageData(input: {
   behaviors: BehaviorGraphRecord[]; categories: CategoryOption[]; profileTimezone: string | null;
+  /** Needed for each view's run state (running, ended, paused). */
+  now?: Temporal.Instant;
 }): BehaviorPageData {
-  const behaviorViews = input.behaviors.map(toBehaviorView);
+  const behaviorViews = input.behaviors.map((behavior) => toBehaviorView(behavior, input.now));
   return {
     categories: input.categories.map(toCategoryOption),
     activeBehaviors: behaviorViews.filter((behavior) => behavior.active),
@@ -20,7 +24,7 @@ export function assembleBehaviorPageData(input: {
   };
 }
 
-export function toBehaviorView(behavior: BehaviorGraphRecord): BehaviorView {
+export function toBehaviorView(behavior: BehaviorGraphRecord, now?: Temporal.Instant): BehaviorView {
   const recurrenceRule = normalizeRecurrenceRule(behavior.recurrence_rule);
   const scheduledTime = normalizeScheduledTime(behavior.scheduled_time);
   const scheduledTimeLabel = formatScheduledTimeLabel(scheduledTime);
@@ -30,7 +34,7 @@ export function toBehaviorView(behavior: BehaviorGraphRecord): BehaviorView {
   return {
     id: behavior.id,
     defaultDurationMinutes: behavior.default_duration_minutes ?? null,
-    endDate: behavior.end_date ?? null,
+    ...behaviorRunView(behavior, now),
     autoArchivedAt: behavior.auto_archived_at ?? null,
     title: behavior.title,
     description: behavior.description ?? "",
@@ -65,6 +69,18 @@ export function toBehaviorView(behavior: BehaviorGraphRecord): BehaviorView {
     archiveNotes: parseArchiveNotes(behavior.archive_notes),
     createdAt: behavior.created_at,
     updatedAt: behavior.updated_at,
+  };
+}
+
+function behaviorRunView(behavior: BehaviorGraphRecord, now?: Temporal.Instant) {
+  const fields = runFieldsFromStored(behavior);
+  return {
+    endOn: fields.endOn,
+    endTime: fields.endTime,
+    pause: fields.pauseFromOn && fields.pauseBackOn
+      ? { fromOn: fields.pauseFromOn, fromTime: fields.pauseFromTime, backOn: fields.pauseBackOn }
+      : null,
+    ...(now ? { runState: behaviorRunState(fields, now).state } : {}),
   };
 }
 

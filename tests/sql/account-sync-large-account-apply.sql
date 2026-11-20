@@ -12,6 +12,12 @@
 -- Synthetic local fixtures only; all changes roll back.
 begin;
 
+-- The account sync writer floor is 7 since Ended and Paused (contracts 1-6 wrote
+-- end_date). This file checks how older contracts behave, so it lowers the floor
+-- inside its rolled-back transaction.
+create or replace function cadence_private.account_sync_min_writer_contract()
+returns integer language sql immutable set search_path = '' as $floor$ select 1 $floor$;
+
 do $$
 begin
   if not exists (

@@ -454,6 +454,8 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 - **State language:** Use direct labels such as Start here, Done, Not enabled, Blocked, Unavailable, Confirmed, Review, Started, and Optional. Import is optional and must not block setup completion.
 - **Permission behavior:** The setup pop-up reads browser support and permission state, but it never requests notification permission on page load. Denied or blocked notification permission is a completed onboarding decision, not a reason to keep the setup pop-up open after the other required setup items are done.
 
+- **AI features question (advisor 4F):** Before the setup pop-up, in its place and with its frame, Timeline shows "AI features" once per account until it is answered. Quiet header and one intro sentence; divider-separated rows for Daily Brief, Advisor tips and Chat, then a bold "What they use" heading and rows for Behaviors and history ("Always"), Notes, Reminder history, and Connected calendars and Hevy. Each row has its name, a muted "On" at the right, and one muted sentence: what it does, then "If you turn it off: …". A muted line names the AI model use. The answer row sticks to the bottom of the pop-up while the list scrolls: **Continue** (primary text action) and **Keep AI features off** (secondary), with "You can turn them on later in Settings." There is no close control. Implementation: `components/onboarding/AiFeaturesApproval.tsx`; words in `lib/ui/ai-features-copy.ts`.
+
 ### Timeline Rows
 
 - **Timeline structure:** The current day is the first forward feed section and uses the strongest date treatment. Do not show a visible Timeline page title above the feed. The transparent Cadence horse-line-and-dot image may sit directly above the feed as a full app-content-width banner with no extra top or bottom margin; the first Timeline day section remains the current day. Day transitions use the date header plus a thin divider, not boxed day sections. Needs decision is reached from a fixed lower-right button on desktop and a full-width lower safe-area button on mobile; it opens a modal rather than appearing as an inline Timeline section.
@@ -498,6 +500,7 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 - **Source rows:** Each connected source is one closed native disclosure row (`SettingsRow`). The summary shows the disclosure indicator, the provider's own 20px icon (decorative, `alt=""`), the source name as a level-4 `text-lg` heading, its kind in muted text, and one state line: muted when off, Ink Black when connected, bold Ink Black when it needs action. Opening the row shows the existing source panel, which drops its own heading. Rows sit between inner Ash Line dividers under the Connected sources description.
 - **Drawers:** Travel, Daily Brief and Categories are drawers (`SettingsDrawer`): the level-3 `text-xl` title and the state line share a baseline row, a muted one-line purpose sits below, and one disclosure text action opens the controls ("Set up Travel" while off, "Travel settings" while on; the neutral label shows while checking). A closed drawer ends at its label, not at the 44px target's lower edge.
 - **Section state:** Every row and drawer shows "Checking…" while its panel loads and "Status unavailable" on a failed read. States come from pure functions in `lib/ui/settings-sections.ts`. A row or drawer whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, a failed read) opens by itself once; the person can close it again. A link to an anchor inside a row or drawer opens it and holds it in place while panels above finish loading, until the reader scrolls, types or taps.
+- **AI features (advisor 4F):** The Planning drawer formerly titled Daily Brief is **AI features** on web and Mac. Native checkboxes for **Daily Brief**, **Advisor tips** and **Chat**, each with an indented muted line: what it does while on, "Off. <what is lost>" while off. Then a bold level-4 **What they use**: Behaviors and history (no checkbox, always used), **Notes**, **Reminder history** and **Connected calendars and Hevy**, the same on and off lines, then the closed **Choose sources** disclosure for per-source exclusions. Source choices stay usable while Daily Brief is off. While the account has not answered the AI features question, one line says so above the switches with **Turn everything on** and **Keep AI features off** text actions. The drawer state is "Not answered yet", "On", "On · 2 of 3 features" or "Off". The bullet below describes the Ticket 306 layout this replaced.
 - **Daily Brief:** Settings uses native checkboxes: **Daily Brief**, then **Plan around my connected sources** (Ticket 306), one default-off choice with an indented line naming the connected sources it covers. A closed native `details` disclosure, **Advanced: choose sources**, uses the secondary-action summary style and lists each connected source as a checkbox with an indented, `aria-describedby` statement of exactly what is sent and "Daily Brief uses it." while it is used, then the reminder-history and Notes checkboxes. There is no per-source **Allow again** button: a covered source follows its current connection. The disclosure stays factual, links to provider retention terms, and states that the model cannot change Cadence or Calendar records.
 - **Profile:** Quiet label/value rows only.
 - **Timezone:** One native select of IANA timezones whose selected value is the saved timezone. Each option reads as a place ("New York", "Knox, Indiana") under a region group ("Americas"), while its value stays the IANA name (`lib/ui/timezone-labels.ts`, Ticket 309); the select is the single source for "current timezone", with no separate current or browser-detected value rows and no visible label repeating the section heading. When the browser-detected timezone differs from the saved one, show one quiet muted line, "Your device is set to {place}.", with an inline secondary Use device timezone text action that updates the select; when they match or detection is unavailable, show nothing. Saving stays an explicit primary Save timezone action, with helper copy explaining the schedule impact. If the browser cannot enumerate timezones, fall back to a plain IANA text field.
@@ -910,10 +913,13 @@ bubble's layout is in the web Phase 3 section (3B).
 ## Advisor placement — advisor Phase 4D (option K)
 
 On November 19, 2026 the owner chose option K for where the advisor (the horse) lives.
-Today it exists only on the development bench
-(`/design-system?preview=advisor-placement&option=k&view=open|why|answered|brief|checkin|none|panel`,
-`app/design-system/AdvisorPlacementBench.tsx`). The product build is 4E. In the interface it
-is called "Advisor"; "coach" stays internal.
+Built in 4E on the web Timeline and Cadence for Mac (shared components in `components/advisor/`:
+`AdvisorTimelineFrame`, `AdvisorProvider`, `AdvisorParts`; transport `lib/ui/advisor.ts`).
+Bench with synthetic data: `/design-system?preview=advisor&state=tip|brief|proposal|checkin|trial|refused|none`
+(`app/design-system/AdvisorBench.tsx`). The design-round bench stays at
+`/design-system?preview=advisor-placement&option=k`. In the interface it is called
+"Advisor"; "coach" stays internal. A Mac with no account keeps the banner horse and shows
+no advisor.
 
 - **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
   round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
@@ -932,6 +938,9 @@ is called "Advisor"; "coach" stays internal.
   - a schedule question: a short form, with the full choice in the panel
   - a trial check-in: "Keep Gym at 6:30 PM on Tuesdays? Keep · Go back", answered on the line
   - a tip: one short sentence, then "Why this? · Helpful · Not now" on one line
+  - The brief is not drawn on the Timeline any more: it renders inside the panel's "Today’s
+    brief" section with no frame or Close. Opening the panel counts it as read for that day
+    on that device, and the line moves on. The line steps aside while the panel is open.
 - **Line rules.**
   - "Don't suggest this again" is only in the panel.
   - After an answer, the italic outcome ("Saved as helpful.") replaces the links.
