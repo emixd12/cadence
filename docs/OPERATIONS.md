@@ -113,6 +113,9 @@ the checked commit/tree and PR head/base. It runs on a fresh `ubuntu-24.04` VM
 with Node 24, read-only repository permission and no hosted secrets or deployment
 environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
 runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
+The job installs Node.js and dependencies through `.github/actions/setup`, so it
+restores `node_modules` from the Actions cache like the `CI` jobs. Before
+November 20, 2026 it ran `npm ci` on every run (68 s at the median of 44 runs).
 
 The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
 project-scoped Docker proxy. It pulls the seven existing pinned images from
