@@ -87,10 +87,10 @@ async function processRequest(request: NextRequest) {
       tips = await processCoachTips({
         runBudgetMs: TIPS_BUDGET_MS,
         selectDue: hostedDueTipAccounts(serviceRole),
-        visit: (account) => {
+        visit: (account, { deadlineAt }) => {
           const client = createAgentClient(account.userId, "coach").client;
           return visitAdvisorTips(createHostedTipVisitPort(account.userId, { client, setting }), {
-            setting, afterTips: hostedScheduleProposalHook(client, account.userId),
+            setting, deadlineAt, afterTips: hostedScheduleProposalHook(client, account.userId),
           });
         },
       });

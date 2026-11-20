@@ -100,7 +100,7 @@ describe("visitAdvisorTips", () => {
     const s = state();
     const port = fakePort(s);
     const outcome = await run(port);
-    expect(outcome).toEqual({ written: 2, modelCalls: 1, skipped: null, rejected: 0 });
+    expect(outcome).toEqual({ written: 2, modelCalls: 1, skipped: null, modelFailed: false, rejected: 0 });
     expect(port.calls.write[0]!.map((tip) => tip.source)).toEqual(["model", "model"]);
     expect(s.runs[0]).toMatchObject({ outcome: "success", modelCalls: 1 });
     expect(port.calls.notes).toBe(0);
@@ -142,8 +142,31 @@ describe("visitAdvisorTips", () => {
     const outcome = await run(port);
     expect(outcome).toMatchObject({ written: 2, modelCalls: 1 });
     expect(port.calls.write[0]!.every((tip) => tip.source === "seed")).toBe(true);
-    expect(s.runs[0]).toMatchObject({ outcome: "model_error", errorCode: "model_error" });
+    // The day's tips are written, so the day counts as done and no later hour calls again.
+    expect(s.runs[0]).toMatchObject({ outcome: "success", errorCode: null });
+    expect(outcome.modelFailed).toBe(true);
     expect(s.signals).toEqual([DROP, STEADY]);
+  });
+
+  it("when the model call fails and nothing could be written, the run records the failure for a retry", async () => {
+    const s = state({ generate: async () => { throw Object.assign(new Error("boom"), { reason: "timeout" }); } });
+    const port = { ...fakePort(s), write: async () => 0 };
+    await run(port);
+    expect(s.runs[0]).toMatchObject({ outcome: "model_error", errorCode: "model_error" });
+  });
+
+  it("bounds the model call by the job's deadline, and skips it when too little time is left", async () => {
+    const timeouts: number[] = [];
+    const s = state({ generate: async () => ({ tips: [] }) });
+    const base = fakePort(s);
+    const port = { ...base, generate: async (input: { timeoutMs: number }) => { timeouts.push(input.timeoutMs); return { tips: [] }; } };
+    await run(port, { deadlineAt: 1_000_000 + 12_000, now: () => 1_000_000 });
+    expect(timeouts).toEqual([12_000]);
+    const s2 = state();
+    const port2 = fakePort(s2);
+    const outcome = await run(port2, { deadlineAt: 1_000_000 + 2_000, now: () => 1_000_000 });
+    expect(port2.calls.generate).toBe(0);
+    expect(outcome).toMatchObject({ skipped: "no_time", modelCalls: 0, written: 2 });
   });
 
   it("replaces a refused model line with its seed", async () => {

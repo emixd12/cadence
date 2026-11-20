@@ -69,11 +69,14 @@ export type TipVisitOutcome = Readonly<{
   written: number;
   modelCalls: number;
   /** Why no model call was made, when none was. */
-  skipped: "tips_off" | "no_match" | "budget" | null;
+  skipped: "tips_off" | "no_match" | "budget" | "no_time" | null;
   rejected: number;
+  /** The model call failed and the cards' own wording was used. */
+  modelFailed?: boolean;
 }>;
 
 export type CoachTipsJobResult = {
+  modelFailures: number;
   pages: number;
   selected: number;
   visited: number;
@@ -89,9 +92,10 @@ export async function processCoachTips(options: Readonly<{
   runBudgetMs: number;
   pageSize?: number;
   selectDue(input: Readonly<{ after: string | null; limit: number }>): Promise<DueTipAccount[]>;
-  visit(account: DueTipAccount): Promise<TipVisitOutcome>;
+  /** `deadlineAt` (epoch ms) is when the job's time runs out; the visit bounds its model call by it. */
+  visit(account: DueTipAccount, context: Readonly<{ deadlineAt: number }>): Promise<TipVisitOutcome>;
 }>): Promise<CoachTipsJobResult> {
-  const total: CoachTipsJobResult = { pages: 0, selected: 0, visited: 0, leftOver: 0, failed: 0, written: 0, modelCalls: 0 };
+  const total: CoachTipsJobResult = { pages: 0, selected: 0, visited: 0, leftOver: 0, failed: 0, written: 0, modelCalls: 0, modelFailures: 0 };
   const clock = options.now ?? Date.now;
   const budgetEndsAt = clock() + options.runBudgetMs;
   const pageSize = Math.min(Math.max(1, Math.trunc(options.pageSize ?? COACH_TIPS_PAGE_SIZE)), 500);
@@ -106,8 +110,9 @@ export async function processCoachTips(options: Readonly<{
         const account = page[index++]!;
         if (clock() >= budgetEndsAt) { total.leftOver += 1; continue; }
         try {
-          const outcome = await options.visit(account);
+          const outcome = await options.visit(account, { deadlineAt: budgetEndsAt });
           total.visited += 1;
+          if (outcome.modelFailed) total.modelFailures += 1;
           total.written += outcome.written;
           total.modelCalls += outcome.modelCalls;
         } catch {
@@ -147,7 +152,7 @@ export type TipVisitPort = Readonly<{
   notes(since: string, before: string): Promise<DayNote[]>;
   reserve(runId: string, estimatedMicrodollars: number): Promise<SpendDecision>;
   settle(reservationId: string, actualMicrodollars: number): Promise<void>;
-  generate(input: Readonly<{ instructions: string; prompt: string; onUsage(usage: AgentModelUsage): void }>): Promise<unknown>;
+  generate(input: Readonly<{ instructions: string; prompt: string; timeoutMs: number; onUsage(usage: AgentModelUsage): void }>): Promise<unknown>;
   write(runId: string, tips: readonly TipToWrite[]): Promise<number>;
   storeContent(runId: string, input: Readonly<{ prompt: string; output: unknown }>): Promise<void>;
   finishRun(runId: string, result: Readonly<{
@@ -161,6 +166,9 @@ export type TipVisitOptions = Readonly<{
   statuses?: readonly AdviceCardStatus[];
   maxPerDay?: number;
   trigger?: AgentRunTrigger;
+  /** Epoch ms when the job's time runs out. The model call never runs past it. */
+  deadlineAt?: number;
+  now?: () => number;
   /** Run after tips are written, on the same run (workstream 4C's schedule proposals). Its failure never fails the visit. */
   afterTips?: (context: Readonly<{ runId: string; localDate: string; signals: readonly AdviceSignalInput[]; matches: readonly AdviceMatch[] }>) => Promise<void>;
 }>;
@@ -223,20 +231,29 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
       const items = tipItems(chosen, setup.titles);
       const notes = settings.notesAllowed ? await port.notes(addDays(today, -7), today) : null;
       const prompt = buildTipPrompt({ items, notes });
-      const called = await callModel(port, run.runId, options.setting, prompt, items);
+      // The model call never runs past the job's time; with too little left, the cards' own wording is used.
+      const remainingMs = options.deadlineAt === undefined ? options.setting.timeoutMs : options.deadlineAt - (options.now ?? Date.now)();
+      const timeoutMs = Math.min(options.setting.timeoutMs, remainingMs);
+      const called = timeoutMs >= MIN_MODEL_CALL_MS
+        ? await callModel(port, run.runId, options.setting, prompt, items, timeoutMs)
+        : { outcome: seedTips(items), modelCalls: 0, usage: null, refused: false, failure: null };
+      if (timeoutMs < MIN_MODEL_CALL_MS) skipped = "no_time";
       modelCalls = called.modelCalls;
       usage = called.usage;
       outcome = called.outcome;
       if (called.refused) skipped = "budget";
       failure = called.failure;
       const written = await port.write(run.runId, outcome.tips);
-      if (modelCalls > 0) await port.storeContent(run.runId, { prompt, output: outcome.tips.map((tip) => tip.text) }).catch(() => undefined);
+      if (modelCalls > 0 && !failure) await port.storeContent(run.runId, { prompt, output: outcome.tips.map((tip) => tip.text) }).catch(() => undefined);
       if (options.afterTips) await options.afterTips({ runId: run.runId, localDate: today, signals, matches }).catch(() => undefined);
-      await port.finishRun(run.runId, {
-        // The day's tips were written either way; a model failure is recorded, not repeated.
-        outcome: failure?.outcome ?? "success", errorCode: failure?.code ?? null, errorReason: failure?.reason ?? null, modelCalls, usage,
-      });
-      return { written, modelCalls, skipped, rejected: outcome.rejected.length };
+      // Once the day's tips are written, the day is done: a failed model call that fell back to
+      // the cards' wording counts as delivered, so the hourly job does not call again and replace
+      // them. With nothing written, the failure is recorded and a later hour tries again.
+      const delivered = written > 0 || outcome.tips.length === 0 && failure === null;
+      await port.finishRun(run.runId, delivered
+        ? { outcome: "success", errorCode: null, errorReason: null, modelCalls, usage }
+        : { outcome: failure?.outcome ?? "error", errorCode: failure?.code ?? "nothing_written", errorReason: failure?.reason ?? null, modelCalls, usage });
+      return { written, modelCalls, skipped, rejected: outcome.rejected.length, modelFailed: failure !== null };
     }
     if (options.afterTips) await options.afterTips({ runId: run.runId, localDate: today, signals, matches }).catch(() => undefined);
     await port.finishRun(run.runId, { outcome: "success", errorCode: null, errorReason: null, modelCalls: 0, usage: null });
@@ -248,7 +265,7 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
   }
 }
 
-async function callModel(port: TipVisitPort, runId: string, setting: AgentModelSetting, prompt: string, items: readonly TipItem[]): Promise<Readonly<{
+async function callModel(port: TipVisitPort, runId: string, setting: AgentModelSetting, prompt: string, items: readonly TipItem[], timeoutMs: number): Promise<Readonly<{
   outcome: TipOutcome; modelCalls: number; usage: AgentModelUsage | null; refused: boolean;
   failure: Readonly<{ outcome: AgentRunOutcome; code: string; reason: string }> | null;
 }>> {
@@ -260,7 +277,7 @@ async function callModel(port: TipVisitPort, runId: string, setting: AgentModelS
   if (!decision.allowed) return { outcome: seedTips(items), modelCalls: 0, usage: null, refused: true, failure: null };
   let usage: AgentModelUsage | null = null;
   try {
-    const output = await port.generate({ instructions: TIP_INSTRUCTIONS, prompt, onUsage: (item) => { usage = item; } });
+    const output = await port.generate({ instructions: TIP_INSTRUCTIONS, prompt, timeoutMs, onUsage: (item) => { usage = item; } });
     return { outcome: resolveTipOutput(output, items), modelCalls: 1, usage, refused: false, failure: null };
   } catch (error) {
     const reason = error && typeof error === "object" && "reason" in error ? String((error as { reason: unknown }).reason) : "model_error";
@@ -307,7 +324,7 @@ export function createHostedTipVisitPort(userId: string, options: Readonly<{ cli
     },
     generate: (input) => generateStructured({
       agent: "coach", setting, instructions: input.instructions, prompt: input.prompt,
-      schemaName: TIP_SCHEMA_NAME, schema: TIP_SCHEMA, signal: AbortSignal.timeout(setting.timeoutMs), onUsage: input.onUsage,
+      schemaName: TIP_SCHEMA_NAME, schema: TIP_SCHEMA, signal: AbortSignal.timeout(input.timeoutMs), onUsage: input.onUsage,
     }),
     write: (runId, tips) => writeTips(client, runId, tips),
     async storeContent(runId, input) {
@@ -340,6 +357,9 @@ async function readDayNotes(client: AppSupabaseClient, userId: string, since: st
 function addDays(localDate: string, days: number): string {
   return Temporal.PlainDate.from(localDate).add({ days }).toString();
 }
+
+/** Below this, a model call is not started; the cards' own wording is used instead. */
+const MIN_MODEL_CALL_MS = 5_000;
 
 /** Weeks of planned items and moves the schedule proposal rule reads (workstream 4C). */
 const PROPOSAL_LOOKBACK_DAYS = 35;
