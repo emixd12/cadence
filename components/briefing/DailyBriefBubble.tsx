@@ -10,7 +10,9 @@ import { departureBriefFooterPhrase, departurePhraseContext } from "@cadence/cor
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 import type { DailyBriefPlanUsage } from "@/lib/ui/daily-brief";
 import { ContinueWithChatGptButton } from "./ChatGptPlanCard";
+import type { NoticeId, NoticeParams } from "@cadence/core/notices";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
+import { Notice } from "@/components/feedback/Notice";
 import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
 import type { BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { BriefMoveLines } from "./BriefMoveLines";
@@ -19,6 +21,8 @@ type DailyBriefBubbleProps = Readonly<{
   state: "loading" | "ready" | "error";
   briefing?: DailyBriefing;
   message?: string;
+  /** The message's notice, so it shows in its style. Without it, `message` shows as plain text. */
+  messageNotice?: Readonly<{ id: NoticeId; params?: NoticeParams }>;
   onDismiss: () => void;
   onRetry?: () => void;
   retryLabel?: string;
@@ -33,7 +37,7 @@ type DailyBriefBubbleProps = Readonly<{
   /** Advisor Phase 3: answers for the brief's move lines. Without it, lines are not shown. */
   moves?: Readonly<{ client: BriefMoveClient; planningContext: () => BriefPlanningContext }> | null;
   /** Advisor Phase 3: Refresh replaces today's brief (up to two a day; the server decides). */
-  refresh?: Readonly<{ onRefresh: () => void; pending: boolean; available: boolean; error: string | null }> | null;
+  refresh?: Readonly<{ onRefresh: () => void; pending: boolean; available: boolean; error: Extract<NoticeId, `brief.refresh.${string}`> | null }> | null;
   /**
    * Advisor Phase 4 (4E, placement K): the brief sits in the advisor's panel under its
    * "Today’s brief" heading. No frame, pointer, title or Close; the panel has its own.
@@ -45,6 +49,7 @@ export function DailyBriefBubble({
   state,
   briefing,
   message,
+  messageNotice,
   onDismiss,
   onRetry,
   retryLabel = "Try again",
@@ -86,7 +91,7 @@ export function DailyBriefBubble({
       </>}
       <div className={embedded ? "" : "max-h-[min(34rem,70dvh)] overflow-y-auto"}>
         <div className="min-w-0">
-          {state === "loading" ? <p className="mt-1 text-sm leading-6 text-muted-readable">Preparing today’s brief…</p> : null}
+          {state === "loading" ? <Notice id="brief.preparing" className="mt-1 text-sm leading-6" /> : null}
           {ready ? <>
             {briefing.text.trim() || !lanes ? <p role="status" aria-live="polite" className="mt-1 break-words whitespace-pre-wrap text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{named(briefing.text)}</p> : null}
             {moveLines ? <BriefMoveLines key={`${moveLines.runId ?? ""}:${briefing.generatedAt}`} moves={moveLines} client={moves!.client} planningContext={moves!.planningContext} /> : null}
@@ -138,7 +143,7 @@ export function DailyBriefBubble({
                 </button>
               </> : null}
             </p>
-            {refresh?.error ? <AlertNotice kind="write_refused" label="Not refreshed" variant="inline" size="compact" className="mt-1">{refresh.error}</AlertNotice> : null}
+            {refresh?.error ? <Notice id={refresh.error} className="mt-1" /> : null}
             {briefing.warnings.length ? <p className="mt-1 text-xs leading-5 text-muted-readable">{briefing.warnings.join(" ")}</p> : null}
             {briefNotices(briefing, Boolean(moves)).map((notice) => <AlertNotice key={notice.kind} kind={NOTICE_KIND[notice.kind]} variant="inline" size="compact" className="mt-1"
               label={notice.kind === "calendar_stale" ? "Calendar not current" : undefined}>{notice.text}</AlertNotice>)}
@@ -147,12 +152,14 @@ export function DailyBriefBubble({
               <button type="button" onClick={plan.onManageUsage} className="min-h-11 underline">Manage usage</button>
             </p> : null}
             {plan?.usage === "plan_off" ? <div className="mt-2 border-t border-line pt-2" data-brief-plan="plan_off">
-              <p className="text-xs leading-5 text-muted-readable">ChatGPT plan usage is off, so this brief did not use your plan.</p>
+              <Notice id="brief.plan-off" className="text-xs leading-5" />
               <ContinueWithChatGptButton onClick={plan.onConnect} className="mt-2" />
             </div> : null}
           </> : null}
           {state === "error" ? <>
-            <p role="status" aria-live="polite" className="mt-1 text-sm leading-6 text-muted-readable">{message ?? "Today’s Daily Brief is unavailable."}</p>
+            {messageNotice ? <Notice id={messageNotice.id} params={messageNotice.params} announce="status" className="mt-1 text-sm leading-6" />
+              : message ? <p role="status" aria-live="polite" className="mt-1 text-sm leading-6 text-muted-readable">{message}</p>
+                : <Notice id="brief.unavailable" announce="status" className="mt-1 text-sm leading-6" />}
             {action || onRetry ? <div className="mt-3 flex flex-wrap gap-3">
               {action ? action.chatGpt
                 ? <ContinueWithChatGptButton onClick={action.onClick} />

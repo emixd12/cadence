@@ -1,9 +1,9 @@
 {
   "$schema": "./interaction-registry.schema.json",
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-13",
+  "updated": "2026-11-20",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -1384,10 +1384,223 @@
       "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes \u00b7 No and Undo answer in memory. Excluded from product interaction counts."
     }
   ],
+  "features": [
+    {
+      "id": "marketing-site",
+      "name": "Marketing site",
+      "meaning": "The public cadence-me.com site: what Cadence is, the BehaviorLog standard, the Mac download and the way into sign-in.",
+      "spec": "docs/PRODUCT_SPEC.md#public-website-scope"
+    },
+    {
+      "id": "developer-docs",
+      "name": "Developer docs",
+      "meaning": "Public, machine-readable developer documentation and copyable code examples on the marketing site.",
+      "spec": "docs/PRODUCT_SPEC.md#public-website-scope"
+    },
+    {
+      "id": "privacy-and-trust-pages",
+      "name": "Privacy and Trust pages",
+      "meaning": "The Terms, Privacy and Trust pages, reachable before sign-in and from Settings.",
+      "spec": "docs/PRODUCT_SPEC.md#product-surfaces"
+    },
+    {
+      "id": "sign-in",
+      "name": "Sign-in",
+      "meaning": "Getting into the app with Google, email or Apple, the internal test user, and signing out.",
+      "spec": "docs/PRODUCT_SPEC.md#product-surfaces"
+    },
+    {
+      "id": "sign-in-methods",
+      "name": "Sign-in methods",
+      "meaning": "Adding, changing or removing the ways an account signs in, from Settings.",
+      "spec": "docs/PRODUCT_SPEC.md#product-surfaces"
+    },
+    {
+      "id": "app-navigation",
+      "name": "App navigation",
+      "meaning": "Moving between Timeline, Behaviors, Export and Settings on desktop and mobile, and within Settings.",
+      "spec": "docs/PRODUCT_SPEC.md#core-screens"
+    },
+    {
+      "id": "first-run-setup",
+      "name": "First-run setup",
+      "meaning": "The setup pop-up a new account sees on its first Timeline, with links to each setup task.",
+      "spec": "docs/PRODUCT_SPEC.md#core-screens"
+    },
+    {
+      "id": "behavior-editor",
+      "name": "Behavior editor",
+      "meaning": "Creating and editing a Behavior: its title, recurrence, schedules, times and default length.",
+      "spec": "docs/PRODUCT_SPEC.md#behavior-creation"
+    },
+    {
+      "id": "reminders",
+      "name": "Reminders",
+      "meaning": "Browser and email reminders for a Behavior, and notification permission on each device.",
+      "spec": "docs/NOTIFICATION_SPEC.md"
+    },
+    {
+      "id": "ending-pausing-archiving",
+      "name": "Ending, pausing and archiving",
+      "meaning": "How a Behavior stops running: its end date, Ended and Paused states, and manual Archive and Restore with archive notes.",
+      "spec": "docs/RECURRENCE_RULES.md"
+    },
+    {
+      "id": "categories-and-filters",
+      "name": "Categories and list filters",
+      "meaning": "Categories for Behaviors, and filtering and sorting the Behaviors list.",
+      "spec": "docs/PRODUCT_SPEC.md#category-management-and-list-organization"
+    },
+    {
+      "id": "note-shortcuts",
+      "name": "Note shortcuts",
+      "meaning": "Reusable note text for occurrence notes and day notes.",
+      "spec": "docs/PRODUCT_SPEC.md#recurring-note-shortcuts-contract-tickets-126128"
+    },
+    {
+      "id": "timeline",
+      "name": "Timeline",
+      "meaning": "The day view: today and future days, marking occurrences Completed or Not Completed, notes, time tracking and refresh.",
+      "spec": "docs/PRODUCT_SPEC.md#day-progress-timeline-and-gated-calendar-context-tickets-132137"
+    },
+    {
+      "id": "needs-decision",
+      "name": "Needs decision",
+      "meaning": "Earlier days' unresolved occurrences, brought forward for an answer without punitive language.",
+      "spec": "docs/PRODUCT_SPEC.md#status"
+    },
+    {
+      "id": "move-for-today",
+      "name": "Move for today",
+      "meaning": "Moving one occurrence to another time for today only, with Undo, reasons and overlap answers.",
+      "spec": "DESIGN.md#move-for-today"
+    },
+    {
+      "id": "review-and-adherence",
+      "name": "Review and adherence",
+      "meaning": "Looking back at a Behavior over a range, opening a day, and correcting past answers.",
+      "spec": "docs/PRODUCT_SPEC.md#behavior-review-and-adherence"
+    },
+    {
+      "id": "export",
+      "name": "Export",
+      "meaning": "Downloading tracking data in every format, plus the Markdown AI summary and analysis prompts.",
+      "spec": "docs/EXPORT_FORMATS.md"
+    },
+    {
+      "id": "behaviorlog-import",
+      "name": "BehaviorLog import",
+      "meaning": "Previewing and applying a BehaviorLog bundle import.",
+      "spec": "docs/EXPORT_FORMATS.md"
+    },
+    {
+      "id": "restore-from-backup",
+      "name": "Restore from backup",
+      "meaning": "Previewing, confirming and applying a full backup restore.",
+      "spec": "docs/EXPORT_FORMATS.md"
+    },
+    {
+      "id": "account-deletion",
+      "name": "Account deletion",
+      "meaning": "Deleting the signed-in account after an export reminder and typed confirmation.",
+      "spec": "docs/PRODUCT_SPEC.md#product-surfaces"
+    },
+    {
+      "id": "timezone",
+      "name": "Timezone",
+      "meaning": "Choosing and saving the account timezone that schedules are read in.",
+      "spec": "docs/DATETIME_STRATEGY.md"
+    },
+    {
+      "id": "calendar-connectors",
+      "name": "Calendar connectors",
+      "meaning": "Google, Outlook and iCloud Calendar: connecting, choosing calendars, refreshing, and their events on the Timeline.",
+      "spec": "docs/PRODUCT_SPEC.md#connector-expansion-tickets-233241"
+    },
+    {
+      "id": "hevy-connector",
+      "name": "Hevy connector",
+      "meaning": "Connecting Hevy, linking Behaviors to workouts, and counting workouts toward completion.",
+      "spec": "docs/PRODUCT_SPEC.md#connector-completion-tickets-310324"
+    },
+    {
+      "id": "daily-brief",
+      "name": "Daily Brief",
+      "meaning": "The advisor's morning brief on the Timeline: preparing, showing, refreshing and reopening it, and the data it may use.",
+      "spec": "docs/PRODUCT_SPEC.md#in-app-daily-briefing-tickets-145148"
+    },
+    {
+      "id": "daily-brief-moves",
+      "name": "Daily Brief moves",
+      "meaning": "Answering the brief's proposed moves for today: Yes, No, Other time, Accept all and Undo.",
+      "spec": "DESIGN.md#5-components"
+    },
+    {
+      "id": "ai-features",
+      "name": "AI features approval",
+      "meaning": "The one question that turns Cadence's AI features (Daily Brief, Advisor tips and Chat) and their data sources on or off, and Settings > AI features to change each one later.",
+      "spec": "docs/MESSAGING_CHANGES.md#p-070-one-ai-features-question-replaces-the-daily-brief-opt-in"
+    },
+    {
+      "id": "daily-brief-chatgpt-plan",
+      "name": "Daily Brief on your ChatGPT plan",
+      "meaning": "Running the Daily Brief on the person's own ChatGPT plan on the Mac: connect, manage usage, disconnect.",
+      "spec": "docs/PRODUCT_SPEC.md#daily-brief-on-the-users-chatgpt-plan-tickets-294300"
+    },
+    {
+      "id": "advisor-tips",
+      "name": "Advisor tips",
+      "meaning": "The advisor's panel on the Timeline: opening it, its daily tips and the research behind them, and the schedule questions it asks.",
+      "spec": "docs/MESSAGING_CHANGES.md#p-071-overnight-coach-signals-widen-and-the-advisor-writes-daily-tips"
+    },
+    {
+      "id": "chat",
+      "name": "Chat",
+      "meaning": "The Chat page: talking with Cadence about the schedule, the changes Chat makes with confirms and Undo, and past conversations.",
+      "spec": "docs/DATA_MODEL.md#chat-conversations-advisor-plan-phase-5-workstream-5a"
+    },
+    {
+      "id": "travel-and-leave-times",
+      "name": "Travel and leave times",
+      "meaning": "Home, usual travel, travel estimates, leave-time questions and reminders, and the weather credit.",
+      "spec": "docs/PRODUCT_SPEC.md#travel-advisory-revamp-tickets-263285"
+    },
+    {
+      "id": "completion-places",
+      "name": "Completion places",
+      "meaning": "Recording where a Behavior was done: place markers, label retention and Where suggestions.",
+      "spec": "docs/PRODUCT_SPEC.md#travel-context-tickets-160-162165"
+    },
+    {
+      "id": "connected-ai-apps",
+      "name": "Connected AI apps",
+      "meaning": "Approving, limiting, reviewing and disconnecting AI clients that reach Cadence through MCP.",
+      "spec": "docs/MCP_INTEGRATION.md"
+    },
+    {
+      "id": "mac-data-and-recovery",
+      "name": "Mac data and recovery",
+      "meaning": "The Mac's local database: revealing, backing up, restoring and retrying when it cannot open.",
+      "spec": "docs/DESKTOP_DATA_MODEL.md"
+    },
+    {
+      "id": "mac-account-sync",
+      "name": "Mac account sync",
+      "meaning": "Linking a Mac to a Cadence account, synchronizing, resolving conflicts and disconnecting.",
+      "spec": "docs/DESKTOP_DATA_MODEL.md"
+    },
+    {
+      "id": "mac-updates",
+      "name": "Mac updates",
+      "meaning": "Reviewing, downloading, installing and restarting into a Cadence for Mac update.",
+      "spec": "docs/DESKTOP_RELEASE.md"
+    }
+  ],
   "interactions": [
     {
       "id": "INT-DATABASE-004",
       "name": "Delete the verified storage recovery backup",
+      "feature": "mac-data-and-recovery",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -1468,6 +1681,7 @@
     {
       "id": "INT-DESKTOP-002",
       "name": "Review, download, install, or restart a desktop update",
+      "feature": "mac-updates",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -1589,6 +1803,7 @@
     {
       "id": "INT-DESKTOP-001",
       "name": "Retry opening local tracking data",
+      "feature": "mac-data-and-recovery",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -1676,6 +1891,7 @@
     {
       "id": "INT-AUTH-001",
       "name": "Start Google sign-in",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -1757,6 +1973,7 @@
     {
       "id": "INT-AUTH-002",
       "name": "Continue as a temporary test user",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "internal_qa",
         "references": [
@@ -1835,6 +2052,7 @@
     {
       "id": "INT-AUTH-003",
       "name": "Open public information before sign-in",
+      "feature": "privacy-and-trust-pages",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -1934,6 +2152,7 @@
     {
       "id": "INT-LEGAL-001",
       "name": "Switch public account-information page",
+      "feature": "privacy-and-trust-pages",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2026,6 +2245,7 @@
     {
       "id": "INT-LEGAL-002",
       "name": "Leave or open supporting policy from a public account-information page",
+      "feature": "privacy-and-trust-pages",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2130,6 +2350,7 @@
     {
       "id": "INT-LEGAL-003",
       "name": "Open immutable Trust evidence",
+      "feature": "privacy-and-trust-pages",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2204,6 +2425,7 @@
     {
       "id": "INT-MKT-001",
       "name": "Skip marketing navigation",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2278,6 +2500,7 @@
     {
       "id": "INT-MKT-002",
       "name": "Open marketing home from the brand",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2351,6 +2574,7 @@
     {
       "id": "INT-MKT-004",
       "name": "Open Cadence sign-in from marketing",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2421,6 +2645,7 @@
     {
       "id": "INT-MKT-005",
       "name": "Use marketing footer navigation",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2547,6 +2772,7 @@
     {
       "id": "INT-MKT-006",
       "name": "Begin a record",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2621,6 +2847,7 @@
     {
       "id": "INT-MKT-007",
       "name": "Open BehaviorLog information",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2696,6 +2923,7 @@
     {
       "id": "INT-MKT-008",
       "name": "Open a project repository",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2783,6 +3011,7 @@
     {
       "id": "INT-MKT-009",
       "name": "Download the example BehaviorLog bundle",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2863,6 +3092,7 @@
     {
       "id": "INT-MKT-010",
       "name": "Open a machine-readable marketing resource",
+      "feature": "developer-docs",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -2946,6 +3176,7 @@
     {
       "id": "INT-MKT-011",
       "name": "Follow an in-page or related marketing link",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3026,6 +3257,7 @@
     {
       "id": "INT-MKT-012",
       "name": "Download Cadence for Mac",
+      "feature": "marketing-site",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3104,6 +3336,7 @@
     {
       "id": "INT-SHELL-001",
       "name": "Navigate between primary app screens",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3235,6 +3468,7 @@
     {
       "id": "INT-SHELL-002",
       "name": "Open Timeline from the app brand",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3322,6 +3556,7 @@
     {
       "id": "INT-SHELL-003",
       "name": "Open account settings",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3402,6 +3637,7 @@
     {
       "id": "INT-SHELL-004",
       "name": "Toggle the desktop navigation rail",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3500,6 +3736,7 @@
     {
       "id": "INT-SHELL-005",
       "name": "Open mobile navigation",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3587,6 +3824,7 @@
     {
       "id": "INT-SHELL-006",
       "name": "Close mobile navigation",
+      "feature": "app-navigation",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3686,6 +3924,7 @@
     {
       "id": "INT-SHELL-007",
       "name": "Preview the login screen while authenticated",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "internal_qa",
         "references": [
@@ -3764,6 +4003,7 @@
     {
       "id": "INT-SHELL-008",
       "name": "Sign out",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3854,6 +4094,7 @@
     {
       "id": "INT-ONBOARD-001",
       "name": "Show or dismiss first-run setup",
+      "feature": "first-run-setup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3952,6 +4193,7 @@
     {
       "id": "INT-ONBOARD-002",
       "name": "Open a first-run setup task",
+      "feature": "first-run-setup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -3977,7 +4219,6 @@
         "J04",
         "J05",
         "J12",
-        "J14",
         "J16"
       ],
       "intent": "Continue from setup to the existing product control that owns the selected task.",
@@ -4085,6 +4326,7 @@
     {
       "id": "INT-TIMELINE-001",
       "name": "Show more future days",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4168,6 +4410,7 @@
     {
       "id": "INT-TIMELINE-002",
       "name": "Open Needs decision",
+      "feature": "needs-decision",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4249,6 +4492,7 @@
     {
       "id": "INT-TIMELINE-003",
       "name": "Close Needs decision",
+      "feature": "needs-decision",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4338,6 +4582,7 @@
     {
       "id": "INT-TIMELINE-004",
       "name": "Toggle occurrence details",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4426,6 +4671,7 @@
     {
       "id": "INT-TIMELINE-005",
       "name": "Set an occurrence to Completed",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4530,6 +4776,7 @@
     {
       "id": "INT-TIMELINE-006",
       "name": "Set an occurrence to Not Completed",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4625,6 +4872,7 @@
     {
       "id": "INT-TIMELINE-007",
       "name": "Clear a submitted occurrence decision",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4724,6 +4972,7 @@
     {
       "id": "INT-TIMELINE-008",
       "name": "Save an occurrence note",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4865,6 +5114,7 @@
     {
       "id": "INT-TIMELINE-009",
       "name": "Track occurrence time",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -4980,6 +5230,7 @@
     {
       "id": "INT-TIMELINE-010",
       "name": "Refresh Timeline and connectors",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5082,6 +5333,7 @@
     {
       "id": "INT-BEHAVIOR-001",
       "name": "Change the behavior review range",
+      "feature": "review-and-adherence",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5182,6 +5434,7 @@
     {
       "id": "INT-BEHAVIOR-002",
       "name": "Open a behavior day review",
+      "feature": "review-and-adherence",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5270,6 +5523,7 @@
     {
       "id": "INT-BEHAVIOR-003",
       "name": "Toggle occurrence correction controls in behavior review",
+      "feature": "review-and-adherence",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5353,6 +5607,7 @@
     {
       "id": "INT-BEHAVIOR-004",
       "name": "Toggle the create behavior form",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5437,6 +5692,7 @@
     {
       "id": "INT-BEHAVIOR-005",
       "name": "Toggle behavior Details and Settings",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5520,6 +5776,7 @@
     {
       "id": "INT-BEHAVIOR-006",
       "name": "Toggle archived behaviors",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5603,6 +5860,7 @@
     {
       "id": "INT-BEHAVIOR-007",
       "name": "Edit behavior identity fields",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5692,6 +5950,7 @@
     {
       "id": "INT-BEHAVIOR-008",
       "name": "Choose a recurrence pattern",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5796,6 +6055,7 @@
     {
       "id": "INT-BEHAVIOR-009",
       "name": "Configure recurrence details",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5883,6 +6143,7 @@
     {
       "id": "INT-BEHAVIOR-010",
       "name": "Add a behavior schedule",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -5965,6 +6226,7 @@
     {
       "id": "INT-BEHAVIOR-011",
       "name": "Remove a behavior schedule",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6047,6 +6309,7 @@
     {
       "id": "INT-BEHAVIOR-012",
       "name": "Choose a schedule time mode",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6141,6 +6404,7 @@
     {
       "id": "INT-BEHAVIOR-013",
       "name": "Edit a schedule time",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6245,6 +6509,7 @@
     {
       "id": "INT-BEHAVIOR-014",
       "name": "Add a time to a behavior schedule",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6327,6 +6592,7 @@
     {
       "id": "INT-BEHAVIOR-015",
       "name": "Remove a schedule time",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6409,6 +6675,7 @@
     {
       "id": "INT-BEHAVIOR-016",
       "name": "Set behavior browser-reminder intent",
+      "feature": "reminders",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6493,6 +6760,7 @@
     {
       "id": "INT-BEHAVIOR-017",
       "name": "Set behavior email-reminder intent",
+      "feature": "reminders",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6567,6 +6835,7 @@
     {
       "id": "INT-BEHAVIOR-018",
       "name": "Choose the behavior reminder offset",
+      "feature": "reminders",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6679,6 +6948,7 @@
     {
       "id": "INT-BEHAVIOR-019",
       "name": "Create a behavior",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6772,6 +7042,7 @@
     {
       "id": "INT-BEHAVIOR-020",
       "name": "Update a behavior",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6864,6 +7135,7 @@
     {
       "id": "INT-BEHAVIOR-021",
       "name": "Reset unsaved behavior changes",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -6945,6 +7217,7 @@
     {
       "id": "INT-BEHAVIOR-022",
       "name": "Archive a behavior",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7041,6 +7314,7 @@
     {
       "id": "INT-BEHAVIOR-023",
       "name": "Restore an archived behavior",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7133,6 +7407,7 @@
     {
       "id": "INT-EXPORT-001",
       "name": "Choose an export range",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7217,6 +7492,7 @@
     {
       "id": "INT-EXPORT-002",
       "name": "Include or exclude archived behaviors from exports",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7300,6 +7576,7 @@
     {
       "id": "INT-EXPORT-003",
       "name": "Include or exclude occurrence notes from exports",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7384,6 +7661,7 @@
     {
       "id": "INT-EXPORT-019",
       "name": "Include or exclude time tracking from exports",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7476,6 +7754,7 @@
     {
       "id": "INT-EXPORT-004",
       "name": "Apply export options",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7564,6 +7843,7 @@
     {
       "id": "INT-EXPORT-005",
       "name": "Download a structured export",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7692,6 +7972,7 @@
     {
       "id": "INT-EXPORT-006",
       "name": "Copy the Markdown AI summary",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7777,6 +8058,7 @@
     {
       "id": "INT-EXPORT-007",
       "name": "Download the Markdown AI summary",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7862,6 +8144,7 @@
     {
       "id": "INT-EXPORT-008",
       "name": "Toggle an analysis prompt",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -7946,6 +8229,7 @@
     {
       "id": "INT-EXPORT-009",
       "name": "Copy an analysis prompt",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8033,6 +8317,7 @@
     {
       "id": "INT-EXPORT-010",
       "name": "Preview a BehaviorLog import",
+      "feature": "behaviorlog-import",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8137,6 +8422,7 @@
     {
       "id": "INT-EXPORT-011",
       "name": "Acknowledge the exact accepted import preview",
+      "feature": "behaviorlog-import",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8222,6 +8508,7 @@
     {
       "id": "INT-EXPORT-012",
       "name": "Acknowledge sensitive imported notes",
+      "feature": "behaviorlog-import",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8308,6 +8595,7 @@
     {
       "id": "INT-EXPORT-013",
       "name": "Apply a BehaviorLog import",
+      "feature": "behaviorlog-import",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8418,6 +8706,7 @@
     {
       "id": "INT-EXPORT-014",
       "name": "Preview a BehaviorLog restore",
+      "feature": "restore-from-backup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8517,6 +8806,7 @@
     {
       "id": "INT-EXPORT-015",
       "name": "Acknowledge a fresh backup before restore",
+      "feature": "restore-from-backup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8602,6 +8892,7 @@
     {
       "id": "INT-EXPORT-016",
       "name": "Acknowledge sensitive restored notes",
+      "feature": "restore-from-backup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8688,6 +8979,7 @@
     {
       "id": "INT-EXPORT-017",
       "name": "Type restore confirmation",
+      "feature": "restore-from-backup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8773,6 +9065,7 @@
     {
       "id": "INT-EXPORT-018",
       "name": "Apply a BehaviorLog restore",
+      "feature": "restore-from-backup",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8868,6 +9161,7 @@
     {
       "id": "INT-SETTINGS-001",
       "name": "Choose a timezone",
+      "feature": "timezone",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -8961,6 +9255,7 @@
     {
       "id": "INT-SETTINGS-002",
       "name": "Use the browser-detected timezone",
+      "feature": "timezone",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9044,6 +9339,7 @@
     {
       "id": "INT-SETTINGS-003",
       "name": "Save the account timezone",
+      "feature": "timezone",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9140,6 +9436,7 @@
     {
       "id": "INT-SETTINGS-004",
       "name": "Enable or refresh notifications on this device",
+      "feature": "reminders",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9246,6 +9543,7 @@
     {
       "id": "INT-SETTINGS-005",
       "name": "Open public trust or legal information from Settings",
+      "feature": "privacy-and-trust-pages",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9351,6 +9649,7 @@
     {
       "id": "INT-SETTINGS-006",
       "name": "Open Export before account deletion",
+      "feature": "account-deletion",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9426,6 +9725,7 @@
     {
       "id": "INT-SETTINGS-007",
       "name": "Acknowledge the account-deletion export decision",
+      "feature": "account-deletion",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9499,6 +9799,7 @@
     {
       "id": "INT-SETTINGS-008",
       "name": "Type account-deletion confirmation",
+      "feature": "account-deletion",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9575,6 +9876,7 @@
     {
       "id": "INT-SETTINGS-009",
       "name": "Delete the signed-in account",
+      "feature": "account-deletion",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9658,6 +9960,7 @@
     {
       "id": "INT-NOTIFICATION-001",
       "name": "Open Cadence from a delivered notification",
+      "feature": "reminders",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9781,6 +10084,7 @@
     {
       "id": "INT-DATABASE-001",
       "name": "Reveal the local database in Finder",
+      "feature": "mac-data-and-recovery",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9858,6 +10162,7 @@
     {
       "id": "INT-DATABASE-002",
       "name": "Back up the local database",
+      "feature": "mac-data-and-recovery",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -9938,6 +10243,7 @@
     {
       "id": "INT-DATABASE-003",
       "name": "Restore the local database",
+      "feature": "mac-data-and-recovery",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10021,6 +10327,7 @@
     {
       "id": "INT-AUTH-004",
       "name": "Sign in to a desktop account",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10130,6 +10437,7 @@
     {
       "id": "INT-AUTH-005",
       "name": "Cancel desktop Google sign in",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10204,6 +10512,7 @@
     {
       "id": "INT-AUTH-006",
       "name": "Import local data during first account link",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10284,6 +10593,7 @@
     {
       "id": "INT-AUTH-007",
       "name": "Ignore local data during first account link",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10359,6 +10669,7 @@
     {
       "id": "INT-AUTH-008",
       "name": "Cancel first desktop account link",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10435,6 +10746,7 @@
     {
       "id": "INT-AUTH-009",
       "name": "Synchronize linked desktop account now",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10518,6 +10830,7 @@
     {
       "id": "INT-AUTH-010",
       "name": "Open desktop synchronization conflict review",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10596,6 +10909,7 @@
     {
       "id": "INT-AUTH-011",
       "name": "Resolve desktop synchronization conflicts",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10673,6 +10987,7 @@
     {
       "id": "INT-AUTH-012",
       "name": "Disconnect desktop account and keep local copy",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10753,6 +11068,7 @@
     {
       "id": "INT-AUTH-013",
       "name": "Disconnect desktop account and remove local account data",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10835,6 +11151,7 @@
     {
       "id": "INT-AUTH-014",
       "name": "Reconnect or cancel revoked desktop account recovery",
+      "feature": "mac-account-sync",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -10918,6 +11235,7 @@
     {
       "id": "INT-AUTH-015",
       "name": "Sign in or create an account with email",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11022,6 +11340,7 @@
     {
       "id": "INT-AUTH-016",
       "name": "Sign in or create an account with Apple",
+      "feature": "sign-in",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11104,6 +11423,7 @@
     {
       "id": "INT-EXPORT-020",
       "name": "Generate the Markdown AI summary",
+      "feature": "export",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11187,6 +11507,7 @@
     {
       "id": "INT-SETTINGS-010",
       "name": "Edit category drafts",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11268,6 +11589,7 @@
     {
       "id": "INT-SETTINGS-011",
       "name": "Save categories",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11354,6 +11676,7 @@
     {
       "id": "INT-SETTINGS-012",
       "name": "Reorder categories",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11445,6 +11768,7 @@
     {
       "id": "INT-SETTINGS-013",
       "name": "Delete a category",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11531,6 +11855,7 @@
     {
       "id": "INT-BEHAVIOR-024",
       "name": "Filter Behaviors by category",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11612,6 +11937,7 @@
     {
       "id": "INT-BEHAVIOR-025",
       "name": "Sort Behaviors",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11693,6 +12019,7 @@
     {
       "id": "INT-BEHAVIOR-026",
       "name": "Clear Behavior filters",
+      "feature": "categories-and-filters",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11774,6 +12101,7 @@
     {
       "id": "INT-BEHAVIOR-027",
       "name": "Edit an archive note",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11866,6 +12194,7 @@
     {
       "id": "INT-BEHAVIOR-028",
       "name": "Remove archive note text",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -11958,6 +12287,7 @@
     {
       "id": "INT-TIMELINE-011",
       "name": "Fill an occurrence Note with an accepted shortcut",
+      "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12051,6 +12381,7 @@
     {
       "id": "INT-TIMELINE-012",
       "name": "Save a day note",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12175,6 +12506,7 @@
     {
       "id": "INT-TIMELINE-013",
       "name": "Count an unlinked Hevy workout by hand",
+      "feature": "hevy-connector",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12189,7 +12521,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J09"
+        "J09",
+        "J24"
       ],
       "intent": "Mark today's Occurrence Completed from a Hevy workout that no link accepted, and keep the workout's time (Ticket 324).",
       "triggers": [
@@ -12252,6 +12585,7 @@
     {
       "id": "INT-BEHAVIOR-029",
       "name": "Manage Behavior Note shortcuts",
+      "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12339,6 +12673,7 @@
     },
     {
       "id": "INT-SETTINGS-015",
+      "feature": "app-navigation",
       "status": "implemented",
       "surfaces": [
         "settings"
@@ -12442,6 +12777,7 @@
     },
     {
       "id": "INT-SETTINGS-016",
+      "feature": "app-navigation",
       "status": "implemented",
       "surfaces": [
         "settings"
@@ -12576,6 +12912,7 @@
     },
     {
       "id": "INT-SETTINGS-017",
+      "feature": "export",
       "status": "implemented",
       "surfaces": [
         "settings",
@@ -12661,6 +12998,7 @@
     {
       "id": "INT-SETTINGS-018",
       "name": "Manage day note shortcuts",
+      "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12675,7 +13013,7 @@
         "/settings#settings-general"
       ],
       "journeys": [
-        "J14"
+        "J07"
       ],
       "intent": "Review suggested shortcuts from repeated day notes: accept, edit, dismiss, or remove them. The pool is on by default (Ticket 305), learns only from day notes after each save, and its shortcuts appear only in the day-note editor.",
       "triggers": [
@@ -12754,6 +13092,7 @@
     {
       "id": "INT-SETTINGS-019",
       "name": "Connect ChatGPT to use your ChatGPT plan",
+      "feature": "daily-brief-chatgpt-plan",
       "user_guidance": {
         "audience": "internal_qa",
         "references": [
@@ -12770,7 +13109,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Let the Mac run the Daily Brief on the user's own ChatGPT plan (D27).",
       "triggers": [
@@ -12851,6 +13191,7 @@
     {
       "id": "INT-SETTINGS-020",
       "name": "Manage ChatGPT usage",
+      "feature": "daily-brief-chatgpt-plan",
       "user_guidance": {
         "audience": "internal_qa",
         "references": [
@@ -12867,7 +13208,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Review or change ChatGPT plan usage and limits for Cadence.",
       "triggers": [
@@ -12933,6 +13275,7 @@
     {
       "id": "INT-SETTINGS-021",
       "name": "Disconnect ChatGPT",
+      "feature": "daily-brief-chatgpt-plan",
       "user_guidance": {
         "audience": "internal_qa",
         "references": [
@@ -12947,7 +13290,8 @@
         "/settings#chatgpt-plan"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Stop using the ChatGPT plan on this Mac.",
       "triggers": [
@@ -13015,6 +13359,7 @@
     {
       "id": "INT-SETTINGS-022",
       "name": "Add a Google or Apple sign-in method",
+      "feature": "sign-in-methods",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13031,7 +13376,8 @@
         "/auth/callback"
       ],
       "journeys": [
-        "J19"
+        "J19",
+        "J03"
       ],
       "intent": "Add another Google or Apple account as a way to sign in to the same Cadence account (Ticket 334, D31.3).",
       "triggers": [
@@ -13103,6 +13449,7 @@
     {
       "id": "INT-SETTINGS-023",
       "name": "Add email or change the sign-in address",
+      "feature": "sign-in-methods",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13119,7 +13466,8 @@
         "/auth/callback"
       ],
       "journeys": [
-        "J19"
+        "J19",
+        "J03"
       ],
       "intent": "Make email codes reach this account at an address the person chooses, with no password (Ticket 334, D31.2, D31.3).",
       "triggers": [
@@ -13200,6 +13548,7 @@
     {
       "id": "INT-SETTINGS-024",
       "name": "Remove a sign-in method",
+      "feature": "sign-in-methods",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13216,7 +13565,8 @@
         "/auth/callback"
       ],
       "journeys": [
-        "J19"
+        "J19",
+        "J03"
       ],
       "intent": "Stop a Google or Apple account from signing in to this Cadence account while another way in remains (Ticket 334, D31.3).",
       "triggers": [
@@ -13294,6 +13644,7 @@
     {
       "id": "INT-CALENDAR-001",
       "name": "Connect or reconnect Google Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13309,7 +13660,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Bind a separate read-only grant to the same Google identity.",
       "triggers": [
@@ -13389,6 +13740,7 @@
     {
       "id": "INT-CALENDAR-002",
       "name": "Select calendars and Calendar visibility",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13404,7 +13756,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Expand the compact calendar field, search readable calendars, select calendars, and control timed/all-day visibility. Selected names appear as tags. Each change saves as it happens (Ticket 303); there is no Save button.",
       "triggers": [
@@ -13495,6 +13847,7 @@
     {
       "id": "INT-CALENDAR-003",
       "name": "Refresh Calendar context",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13510,7 +13863,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Reload available calendars and read a complete bounded event snapshot for saved selections without changing drafts.",
       "triggers": [
@@ -13587,6 +13940,7 @@
     {
       "id": "INT-CALENDAR-004",
       "name": "Disconnect Google Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13602,7 +13956,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Remove the selected Calendar grant across devices for this account.",
       "triggers": [
@@ -13689,6 +14043,7 @@
     {
       "id": "INT-CALENDAR-005",
       "name": "Preview Calendar context and view details",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13703,7 +14058,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J08"
+        "J08",
+        "J23"
       ],
       "intent": "Inspect external context without changing Cadence status.",
       "triggers": [
@@ -13772,6 +14128,7 @@
     {
       "id": "INT-CALENDAR-006",
       "name": "Dismiss or restore all-day context",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13786,7 +14143,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J08"
+        "J08",
+        "J23"
       ],
       "intent": "Change local presentation of all-day events.",
       "triggers": [
@@ -13853,6 +14211,7 @@
     {
       "id": "INT-CALENDAR-007",
       "name": "Open an external event or linked detail",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13868,7 +14227,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J08"
+        "J08",
+        "J23"
       ],
       "intent": "Open a validated external URL without automatic download.",
       "triggers": [
@@ -13943,6 +14303,7 @@
     {
       "id": "INT-CALENDAR-008",
       "name": "Connect or reconnect Outlook Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -13957,7 +14318,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Bind a read-only Microsoft calendar grant to this Cadence account.",
       "triggers": [
@@ -14032,6 +14393,7 @@
     {
       "id": "INT-CALENDAR-009",
       "name": "Select Outlook calendars and visibility",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14046,7 +14408,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Choose which Outlook calendars Cadence may show and how.",
       "triggers": [
@@ -14128,6 +14490,7 @@
     {
       "id": "INT-CALENDAR-010",
       "name": "Refresh Outlook Calendar context",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14142,7 +14505,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Read the displayed Outlook range now.",
       "triggers": [
@@ -14213,6 +14576,7 @@
     {
       "id": "INT-CALENDAR-011",
       "name": "Disconnect Outlook Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14227,7 +14591,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Stop Outlook reads and delete Cadence's saved Microsoft access.",
       "triggers": [
@@ -14307,6 +14671,7 @@
     {
       "id": "INT-CONNECTOR-001",
       "name": "Connect or reconnect Hevy",
+      "feature": "hevy-connector",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14321,7 +14686,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J24"
       ],
       "intent": "Enter a Hevy API key once so Cadence can read workout timing.",
       "triggers": [
@@ -14394,6 +14759,7 @@
     {
       "id": "INT-CONNECTOR-002",
       "name": "Refresh Hevy recorded activity",
+      "feature": "hevy-connector",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14408,7 +14774,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J24"
       ],
       "intent": "Read today's recorded workout timing now.",
       "triggers": [
@@ -14479,6 +14845,7 @@
     {
       "id": "INT-CONNECTOR-003",
       "name": "Disconnect Hevy",
+      "feature": "hevy-connector",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14493,7 +14860,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J24"
       ],
       "intent": "Stop Hevy reads and delete Cadence's saved API key.",
       "triggers": [
@@ -14571,6 +14938,7 @@
     {
       "id": "INT-BEHAVIOR-030",
       "name": "Set default Behavior duration",
+      "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14652,6 +15020,7 @@
     {
       "id": "INT-BEHAVIOR-031",
       "name": "Set Behavior end date",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14733,6 +15102,7 @@
     {
       "id": "INT-BRIEF-001",
       "name": "Start the Daily Brief on Timeline opening",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14747,7 +15117,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Request one read-only Daily Brief after the Timeline data is ready on the first opening of the local day.",
       "triggers": [
@@ -14821,6 +15192,7 @@
     {
       "id": "INT-BRIEF-002",
       "name": "Dismiss the Daily Brief",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14835,7 +15207,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Hide the current Daily Brief for this account and local day.",
       "triggers": [
@@ -14902,6 +15275,7 @@
     {
       "id": "INT-BRIEF-003",
       "name": "Retry or refresh the Daily Brief",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14916,7 +15290,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Deliberately retry a failed, interrupted, undelivered, expired or outdated Daily Brief without polling.",
       "triggers": [
@@ -15003,6 +15378,7 @@
     {
       "id": "INT-BRIEF-004",
       "name": "Answer and change the AI features choices",
+      "feature": "ai-features",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15018,7 +15394,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J14"
+        "J04",
+        "J25"
       ],
       "intent": "Answer the one AI features question once (advisor 4F, owner decision D2): Continue turns Daily Brief, Advisor tips, Chat and every data source on; Keep AI features off turns every feature off. Later, in Settings > AI features, turn each feature on or off and choose the sources all features share: Notes, reminder history, and one choice that covers every connected calendar and Hevy, with per-source exclusions under Choose sources.",
       "triggers": [
@@ -15116,6 +15493,7 @@
     {
       "id": "INT-BRIEF-005",
       "name": "Inspect a Daily Brief source",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15130,7 +15508,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Open trusted catalog provenance for a read-only suggestion.",
       "triggers": [
@@ -15195,6 +15574,7 @@
     {
       "id": "INT-TRAVEL-001",
       "name": "Save Home and usual travel",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15210,7 +15590,7 @@
         "/settings#travel"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Set the optional Home and the usual travel mode (walking, cycling, transit or driving). Usual travel comes first, above Travel estimates, which needs it. Each saves on its own; the travel toggle keeps its state (Ticket 303).",
       "triggers": [
@@ -15291,6 +15671,7 @@
     {
       "id": "INT-TRAVEL-002",
       "name": "Turn travel estimates on or off",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15305,7 +15686,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Turning the travel toggle on records routing consent beside the Google Maps disclosure and requests one foreground device position in the same click. Turning it off withdraws consent. Permission status refreshes read the OS grant without requesting another position.",
       "triggers": [
@@ -15378,6 +15759,7 @@
     {
       "id": "INT-TRAVEL-003",
       "name": "Correct travel for an event instance",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15392,7 +15774,7 @@
         "/timeline"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Use an explicit destination correction for one event revision, and remember the corrected place for that event's location text.",
       "triggers": [
@@ -15479,6 +15861,7 @@
     {
       "id": "INT-TRAVEL-004",
       "name": "Refresh travel estimates",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15493,7 +15876,7 @@
         "/timeline"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Request new travel estimates for today from the Timeline status line, or from a travel line that needs a new estimate (Ticket 261).",
       "triggers": [
@@ -15574,6 +15957,7 @@
     {
       "id": "INT-TRAVEL-005",
       "name": "Choose a Behavior's Where",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15589,7 +15973,8 @@
       ],
       "journeys": [
         "J05",
-        "J06"
+        "J06",
+        "J26"
       ],
       "intent": "Choose Not set, Anywhere, Home or A place for a Behavior. A place takes typed text. Saving the Behavior stores Where and records it in configuration history.",
       "triggers": [
@@ -15661,6 +16046,7 @@
     {
       "id": "INT-WEATHER-001",
       "name": "Open the weather data credit",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15675,7 +16061,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J26"
       ],
       "intent": "Open Open-Meteo or the CC BY 4.0 licence from the credit beside weather-margin lines in travel timing and the Daily Brief travel block.",
       "triggers": [
@@ -15747,6 +16134,7 @@
     {
       "id": "INT-TRAVEL-008",
       "name": "Answer the leave-time question",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15761,7 +16149,7 @@
         "/timeline"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0–30 minutes (travel-habit-defaults@1).",
       "triggers": [
@@ -15851,6 +16239,7 @@
     {
       "id": "INT-TRAVEL-009",
       "name": "Choose travel for a place",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15865,7 +16254,7 @@
         "/timeline"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Choose walking, cycling, transit or driving for the journey to a located Calendar event or Behavior. Cadence remembers the choice for that place; Usual travel forgets it.",
       "triggers": [
@@ -15943,6 +16332,7 @@
     {
       "id": "INT-TRAVEL-010",
       "name": "Edit learned travel habits",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -15957,7 +16347,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Edit the learned get-ready time, arrival buffer and travel mode per place, shown as plain sentences in Travel Settings. Choosing a default follows it; Use usual travel forgets a place.",
       "triggers": [
@@ -16044,6 +16434,7 @@
     {
       "id": "INT-TRAVEL-006",
       "name": "Check device location again",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16058,7 +16449,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "After allowing location in the browser or System Settings, ask for one foreground device position again without changing travel settings.",
       "triggers": [
@@ -16126,6 +16517,7 @@
     {
       "id": "INT-TRAVEL-007",
       "name": "Open macOS Location Services",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16140,7 +16532,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Open System Settings at Privacy & Security, Location Services so the user can turn on Cadence by hand when macOS does not ask.",
       "triggers": [
@@ -16203,6 +16595,7 @@
     {
       "id": "INT-TRAVEL-011",
       "name": "Open the next step for a missing estimate",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16219,7 +16612,7 @@
         "/behaviors"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "When a trip has no leave time, or the trip home has no time, because Home or the device position is missing, or because a Behavior's place could not be found, follow the sentence's own first words to where it is fixed.",
       "triggers": [
@@ -16297,6 +16690,7 @@
     {
       "id": "INT-TRAVEL-012",
       "name": "Offer Travel estimates while they are off",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16312,7 +16706,7 @@
         "/settings#travel"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "With Travel estimates off and a located Calendar event or Behavior still ahead today, one line names it and opens Travel settings. Not now hides the line on this device.",
       "triggers": [
@@ -16387,6 +16781,7 @@
     {
       "id": "INT-TRAVEL-013",
       "name": "Turn leave reminders on or off",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16401,7 +16796,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Turn the account's leave reminders on or off with one sentence in How you travel, and see what they still need on this device: notifications, Home, and where the estimate starts (decision D3).",
       "triggers": [
@@ -16489,6 +16884,7 @@
     {
       "id": "INT-TRAVEL-014",
       "name": "Set Home from the current location",
+      "feature": "travel-and-leave-times",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -16504,7 +16900,7 @@
         "/settings#travel"
       ],
       "journeys": [
-        "J14"
+        "J26"
       ],
       "intent": "Fill the Home field with a street address from this device's position, then check or edit it; Home saves on blur or Enter as usual (Tickets 308 and 303).",
       "triggers": [
@@ -16583,6 +16979,7 @@
     {
       "id": "INT-OAUTH-001",
       "name": "Approve AI client access",
+      "feature": "connected-ai-apps",
       "status": "implemented",
       "surfaces": [
         "oauth_consent"
@@ -16591,7 +16988,7 @@
         "/oauth/consent"
       ],
       "journeys": [
-        "J14"
+        "J28"
       ],
       "intent": "Approve AI client access.",
       "triggers": [
@@ -16661,6 +17058,7 @@
     {
       "id": "INT-OAUTH-002",
       "name": "Deny AI client access",
+      "feature": "connected-ai-apps",
       "status": "implemented",
       "surfaces": [
         "oauth_consent"
@@ -16669,7 +17067,7 @@
         "/oauth/consent"
       ],
       "journeys": [
-        "J14"
+        "J28"
       ],
       "intent": "Deny AI client access.",
       "triggers": [
@@ -16739,6 +17137,7 @@
     {
       "id": "INT-OAUTH-003",
       "name": "Narrow AI client permissions",
+      "feature": "connected-ai-apps",
       "status": "implemented",
       "surfaces": [
         "oauth_consent"
@@ -16747,7 +17146,7 @@
         "/oauth/consent"
       ],
       "journeys": [
-        "J14"
+        "J28"
       ],
       "intent": "Narrow AI client permissions.",
       "triggers": [
@@ -16813,6 +17212,7 @@
     {
       "id": "INT-OAUTH-004",
       "name": "Disconnect an AI client",
+      "feature": "connected-ai-apps",
       "status": "implemented",
       "surfaces": [
         "settings"
@@ -16821,7 +17221,7 @@
         "/settings#connected-apps"
       ],
       "journeys": [
-        "J14"
+        "J28"
       ],
       "intent": "Disconnect an AI client.",
       "triggers": [
@@ -16893,6 +17293,7 @@
     {
       "id": "INT-OAUTH-005",
       "name": "View recent AI client activity",
+      "feature": "connected-ai-apps",
       "status": "implemented",
       "surfaces": [
         "settings"
@@ -16901,7 +17302,7 @@
         "/settings#connected-apps"
       ],
       "journeys": [
-        "J14"
+        "J28"
       ],
       "intent": "View recent AI client activity.",
       "triggers": [
@@ -16967,6 +17368,7 @@
     {
       "id": "INT-MKT-013",
       "name": "Read developer documentation",
+      "feature": "developer-docs",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17048,6 +17450,7 @@
     {
       "id": "INT-MKT-014",
       "name": "Copy developer code example",
+      "feature": "developer-docs",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17121,6 +17524,7 @@
     {
       "id": "INT-CALENDAR-012",
       "name": "Connect or reconnect iCloud Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17135,7 +17539,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Send Apple Account email and an app-specific password once to the hosted broker; bind a read-only CalDAV connection to this Cadence account.",
       "triggers": [
@@ -17208,6 +17612,7 @@
     {
       "id": "INT-CALENDAR-013",
       "name": "Select iCloud calendars and visibility",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17222,7 +17627,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Choose which iCloud calendars Cadence may show and how.",
       "triggers": [
@@ -17304,6 +17709,7 @@
     {
       "id": "INT-CALENDAR-014",
       "name": "Refresh iCloud Calendar context",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17318,7 +17724,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Read the displayed iCloud range now.",
       "triggers": [
@@ -17389,6 +17795,7 @@
     {
       "id": "INT-CALENDAR-015",
       "name": "Disconnect iCloud Calendar",
+      "feature": "calendar-connectors",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17403,7 +17810,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J23"
       ],
       "intent": "Stop iCloud reads and delete Cadence's saved Apple login values.",
       "triggers": [
@@ -17483,6 +17890,7 @@
     {
       "id": "INT-PLACE-001",
       "name": "Turn on completion places",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17497,7 +17905,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J27"
       ],
       "intent": "Opt in to saving where Behaviors are completed, choosing how long labels are kept.",
       "triggers": [
@@ -17584,6 +17992,7 @@
     {
       "id": "INT-PLACE-002",
       "name": "Change label retention",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17598,7 +18007,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J27"
       ],
       "intent": "Keep labels for 90 days, 1 year or until deleted.",
       "triggers": [
@@ -17682,6 +18091,7 @@
     {
       "id": "INT-PLACE-003",
       "name": "Delete completion place labels",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17696,7 +18106,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J27"
       ],
       "intent": "Delete every saved completion place label.",
       "triggers": [
@@ -17776,6 +18186,7 @@
     {
       "id": "INT-PLACE-004",
       "name": "Delete place markers",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17790,7 +18201,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J27"
       ],
       "intent": "Delete every recorded place marker.",
       "triggers": [
@@ -17870,6 +18281,7 @@
     {
       "id": "INT-PLACE-005",
       "name": "Turn off completion places",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17884,7 +18296,7 @@
         "/settings"
       ],
       "journeys": [
-        "J14"
+        "J27"
       ],
       "intent": "Stop saving completion places and delete everything location-derived.",
       "triggers": [
@@ -17968,6 +18380,7 @@
     {
       "id": "INT-PLACE-006",
       "name": "Record a place marker",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -17985,7 +18398,7 @@
       ],
       "journeys": [
         "J06",
-        "J14"
+        "J27"
       ],
       "intent": "Record the device's current position as the marker for Home or a saved place.",
       "triggers": [
@@ -18070,6 +18483,7 @@
     {
       "id": "INT-PLACE-007",
       "name": "Remove a place marker",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18087,7 +18501,7 @@
       ],
       "journeys": [
         "J06",
-        "J14"
+        "J27"
       ],
       "intent": "Remove the marker for one place.",
       "triggers": [
@@ -18164,6 +18578,7 @@
     {
       "id": "INT-PLACE-008",
       "name": "Review a Where suggestion",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18178,7 +18593,8 @@
         "/behaviors"
       ],
       "journeys": [
-        "J06"
+        "J06",
+        "J27"
       ],
       "intent": "Open the Behavior's settings with the suggested Where filled in.",
       "triggers": [
@@ -18256,6 +18672,7 @@
     {
       "id": "INT-PLACE-009",
       "name": "Dismiss a Where suggestion",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18270,7 +18687,8 @@
         "/behaviors"
       ],
       "journeys": [
-        "J06"
+        "J06",
+        "J27"
       ],
       "intent": "Hide a Where suggestion for a Behavior.",
       "triggers": [
@@ -18345,6 +18763,7 @@
     {
       "id": "INT-PLACE-010",
       "name": "Turn off marker prompts",
+      "feature": "completion-places",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18359,7 +18778,8 @@
         "/behaviors"
       ],
       "journeys": [
-        "J06"
+        "J06",
+        "J27"
       ],
       "intent": "Stop the one-line prompts that ask for missing place markers.",
       "triggers": [
@@ -18434,6 +18854,7 @@
     {
       "id": "INT-BEHAVIOR-032",
       "name": "Link a Behavior to Hevy for connector completion",
+      "feature": "hevy-connector",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18448,7 +18869,7 @@
         "/behaviors"
       ],
       "journeys": [
-        "J14"
+        "J24"
       ],
       "intent": "Let workouts recorded in Hevy mark this Behavior Completed on their day (D28).",
       "triggers": [
@@ -18525,6 +18946,7 @@
     {
       "id": "INT-TIMELINE-014",
       "name": "Move an occurrence for today",
+      "feature": "move-for-today",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18602,6 +19024,7 @@
     {
       "id": "INT-TIMELINE-015",
       "name": "Undo a move for today",
+      "feature": "move-for-today",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18677,6 +19100,7 @@
     {
       "id": "INT-TIMELINE-016",
       "name": "Record why an occurrence was moved",
+      "feature": "move-for-today",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18753,6 +19177,7 @@
     {
       "id": "INT-TIMELINE-017",
       "name": "Answer a moved-item overlap after a schedule change",
+      "feature": "move-for-today",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18828,6 +19253,7 @@
     {
       "id": "INT-TIMELINE-018",
       "name": "Say when a late item was done",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18911,6 +19337,7 @@
     {
       "id": "INT-TIMELINE-019",
       "name": "Give a reason an item was not done",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -18994,6 +19421,7 @@
     {
       "id": "INT-BRIEF-006",
       "name": "Answer a Daily Brief move line",
+      "feature": "daily-brief-moves",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19008,7 +19436,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Answer one of the brief's proposed moves for today: Yes, No, Other time, Already did it, Undo, or Stop suggesting moves for <item> (advisor plan, Phase 3B).",
       "triggers": [
@@ -19087,6 +19516,7 @@
     {
       "id": "INT-BRIEF-007",
       "name": "Accept all or undo all Daily Brief moves",
+      "feature": "daily-brief-moves",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19101,7 +19531,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Answer Yes to every undecided move line at once, and reverse that batch (advisor plan, Phase 3B).",
       "triggers": [
@@ -19164,6 +19595,7 @@
     {
       "id": "INT-BRIEF-008",
       "name": "Refresh the Daily Brief",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19178,7 +19610,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Replace today's brief with a new one that reflects the day as it is now (advisor plan, Phase 3).",
       "triggers": [
@@ -19238,6 +19671,7 @@
     {
       "id": "INT-BRIEF-009",
       "name": "Reopen today's Daily Brief",
+      "feature": "daily-brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19252,7 +19686,8 @@
         "/timeline"
       ],
       "journeys": [
-        "J07"
+        "J07",
+        "J25"
       ],
       "intent": "Show today's brief again after Close, with its undecided lines (advisor plan, Phase 3).",
       "triggers": [
@@ -19312,6 +19747,7 @@
     {
       "id": "INT-ADVISOR-001",
       "name": "Open the advisor panel",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19402,6 +19838,7 @@
     {
       "id": "INT-ADVISOR-002",
       "name": "React to an advisor tip",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19485,6 +19922,7 @@
     {
       "id": "INT-ADVISOR-003",
       "name": "Show the research behind a tip",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19562,6 +20000,7 @@
     {
       "id": "INT-ADVISOR-004",
       "name": "Answer an advisor schedule question",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19653,6 +20092,7 @@
     {
       "id": "INT-ADVISOR-005",
       "name": "Follow a tip's link to the setting it names",
+      "feature": "advisor-tips",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19736,6 +20176,7 @@
     {
       "id": "INT-BEHAVIOR-033",
       "name": "End a behavior now or start it again",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19831,6 +20272,7 @@
     {
       "id": "INT-BEHAVIOR-034",
       "name": "Pause a behavior with the range picker, resume it or cancel a pause",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19940,6 +20382,7 @@
     {
       "id": "INT-BEHAVIOR-035",
       "name": "Toggle the Not running group",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20022,6 +20465,7 @@
     {
       "id": "INT-BEHAVIOR-036",
       "name": "Set or clear an end time",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20111,6 +20555,7 @@
     {
       "id": "INT-TIMELINE-020",
       "name": "Act on or close an ended, paused or back-today notice",
+      "feature": "ending-pausing-archiving",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20206,6 +20651,7 @@
     {
       "id": "INT-CHAT-001",
       "name": "Send a chat message",
+      "feature": "chat",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20220,7 +20666,7 @@
         "/chat"
       ],
       "journeys": [
-        "J23"
+        "J29"
       ],
       "intent": "Ask Cadence about or for a change to the person's own records in plain words (advisor plan Phase 5B).",
       "triggers": [
@@ -20308,6 +20754,7 @@
     {
       "id": "INT-CHAT-002",
       "name": "Undo a change Chat made",
+      "feature": "chat",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20322,7 +20769,7 @@
         "/chat"
       ],
       "journeys": [
-        "J23"
+        "J29"
       ],
       "intent": "Reverse a single change Chat made in reply to a question.",
       "triggers": [
@@ -20383,6 +20830,7 @@
     {
       "id": "INT-CHAT-003",
       "name": "Answer a chat confirm",
+      "feature": "chat",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20397,7 +20845,7 @@
         "/chat"
       ],
       "journeys": [
-        "J23"
+        "J29"
       ],
       "intent": "Approve or decline every pending change of one question at once (Behavior changes and any second write).",
       "triggers": [
@@ -20462,6 +20910,7 @@
     {
       "id": "INT-CHAT-004",
       "name": "Open past or new conversations",
+      "feature": "chat",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -20476,7 +20925,7 @@
         "/chat"
       ],
       "journeys": [
-        "J23"
+        "J29"
       ],
       "intent": "See past conversations newest first, open one to continue it, or start a new one.",
       "triggers": [

@@ -143,6 +143,45 @@ Implemented surface work:
 
 - Astro marketing site under `apps/marketing`.
 
+## Product map follow-ups
+
+The product map (`docs/PRODUCT_MAP_GUIDE.md`) and its features and journeys landed on
+November 20, 2026. The owner asked for two later passes:
+
+- A full UI copy audit: read every piece of in-app text, notice or not, against
+  `PRODUCT.md` voice and the text styles in `DESIGN.md`, and propose wording fixes for
+  owner review. The notices library covers notices first; this pass covers the rest.
+- A comprehensive journey pass: rewrite `docs/UX_JOURNEY_INVENTORY.md` journeys from
+  how people use Cadence today (advisor, Chat, Mac, connectors), not only the
+  interaction re-filing done on November 20, 2026. J06 and J07 still hold many
+  interactions each.
+
+Other open items:
+
+- Desktop-only screens link to the map at component-family level only, because the
+  design-system manifest lists web components. A Mac component inventory would let
+  the map name Mac components.
+- `design-system.usage.json` misses 15 component uses the map's scan finds;
+  `npm run map:check` reports them as warnings. Regenerate it on the owner's Mac with
+  the design-system-bench verifier, which this container does not have.
+- MCP tools link to the services their handlers call, but not yet to features or tables:
+  they reach data through database functions and helper calls, so the link needs a
+  function-level call graph rather than the map's file-level import scan.
+- 21 tokens in `app/globals.css` and the marketing stylesheet have no description
+  comment; the map warns about them.
+- Notices in the remaining areas: Settings, Behaviors, connectors (Calendar, Hevy,
+  travel), export and restore, sign-in, onboarding, Chat and the advisor's tips,
+  plus reminder and email words (`channel` reminder and email, from
+  `docs/NOTIFICATION_SPEC.md` and the Sequenzy templates). The owner asked for these
+  after the advisor work merges (product map answer 8). Each area moves its notices
+  into `packages/core/src/notices/catalog/`, lowers its counts in
+  `tests/fixtures/notice-role-allowlist.json`, and adds `previous` records for any
+  wording or style change.
+- Ended and Paused web (PR #328) added raw status and alert lines in
+  `BehaviorList.tsx`, `BehaviorRunControls.tsx` and the action results in
+  `BehaviorRunNotices.tsx`; #319 added one in `OccurrenceMarkDetails.tsx`; #325 added three in `components/chat/`. Move them into
+  the catalog with the remaining areas.
+
 ## Agent readability roadmap
 
 The Ticket 031 marketing site includes static HTML, Markdown mirrors,

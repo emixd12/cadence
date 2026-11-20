@@ -1,0 +1,382 @@
+{
+  "feature": "move-for-today",
+  "notices": {
+    "move.moved": {
+      "meaning": "Confirms that the person moved one of today's items to a new time, in the move drawer with Undo beside it.",
+      "text": "{title} moved to {time} for today.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-BRIEF-006"
+      ],
+      "previous": [
+        {
+          "look": "Ink, upright",
+          "until": "2026-11-20",
+          "change": "Outcome style: italic Ink, Undo stays upright (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.undone": {
+      "meaning": "Confirms that Undo put a moved item back at its earlier time.",
+      "text": "{title} is back at {time}.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "Ink, upright",
+          "until": "2026-11-20",
+          "change": "Outcome style: italic Ink (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.undone-usual-time": {
+      "meaning": "Confirms that Undo put a moved item back when Cadence could not name the earlier time.",
+      "text": "{title} is back at its usual time.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "Ink, upright",
+          "until": "2026-11-20",
+          "change": "Outcome style: italic Ink (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.first-move": {
+      "meaning": "Says once, after the person's first move ever, that a move changes only today and the usual schedule stays.",
+      "text": "This changes today only. Your schedule stays.",
+      "style": "note",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-BRIEF-006"
+      ]
+    },
+    "move.reason-noted": {
+      "meaning": "Confirms the one-tap reason the person gave for a move.",
+      "text": "Reason noted: {reason}",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-016"
+      ],
+      "previous": [
+        {
+          "look": "Readable Ash, upright, small",
+          "until": "2026-11-20",
+          "change": "Outcome style: italic Ink at the same small size (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.moved-from": {
+      "meaning": "Marks a moved row with the time it was scheduled at before today's move.",
+      "text": "Moved from {time}",
+      "style": "note",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015"
+      ]
+    },
+    "move.no-free-time": {
+      "meaning": "Says the move menu found no free time left today, so the person picks one.",
+      "text": "No free time found today. Pick a time.",
+      "style": "note",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ]
+    },
+    "move.finding-times": {
+      "meaning": "Shows while the move menu looks for today's free times.",
+      "text": "Free today: finding times…",
+      "style": "note",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ]
+    },
+    "move.moved-on-another-device": {
+      "meaning": "Refuses a move or Undo because another device moved the item first, and says where it is now.",
+      "text": "{title} was just moved to {time} on another device.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.conflict": {
+      "meaning": "Asks whether to keep today's moved time after a schedule edit made it overlap another item.",
+      "text": "Your schedule changed, and {title} at {time} today now overlaps {hasOther, select, no {another item} other {{other} at {otherTime}}}. Keep {title} at {time}?",
+      "style": "question",
+      "interactions": [
+        "INT-TIMELINE-017"
+      ]
+    },
+    "move.conflict-not-saved": {
+      "meaning": "Says the person's answer to a moved-item overlap did not save.",
+      "text": "That answer was not saved. Try again.",
+      "style": "error",
+      "interactions": [
+        "INT-TIMELINE-017"
+      ],
+      "previous": [
+        {
+          "look": "Readable Ash, small",
+          "until": "2026-11-20",
+          "change": "Error style: one Rust Signal line (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.occurrence-not-found": {
+      "meaning": "Refuses a move because the item is not in the person's account.",
+      "text": "This Occurrence does not exist in your account.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.occurrence-resolved": {
+      "meaning": "Refuses a move because the item is already marked Completed or Not Completed.",
+      "text": "This is already marked, so it stays where it is.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.not-today": {
+      "meaning": "Refuses a move for an item that is not today's.",
+      "text": "Only today's items can be moved.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.revision-changed": {
+      "meaning": "Refuses a move or Undo because the item changed on another device after the screen loaded.",
+      "text": "This changed on another device. Look at its current time before moving it again.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014",
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.range-behavior": {
+      "meaning": "Refuses a move for an item scheduled as a time range.",
+      "text": "Items scheduled as a time range are not moved.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.start-not-on-day": {
+      "meaning": "Refuses a move whose new start is not on today.",
+      "text": "A move keeps the item on today. Pick a start time today.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.time-passed": {
+      "meaning": "Refuses a move to a time that has already passed.",
+      "text": "That time has already passed. Pick a later time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.no-change": {
+      "meaning": "Refuses a move to the time the item already has.",
+      "text": "It is already at that time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.nothing-to-undo": {
+      "meaning": "Refuses Undo when the item has no move to undo.",
+      "text": "There is no move to undo.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.not-latest-move": {
+      "meaning": "Refuses Undo of a move that a later move replaced.",
+      "text": "Only the latest move can be undone.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-015"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.slot-taken": {
+      "meaning": "Refuses a move to a time another item already holds.",
+      "text": "Something else is already at that time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.calendar-busy": {
+      "meaning": "Refuses a move to a time a calendar event holds.",
+      "text": "Your calendar is busy at that time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.too-close": {
+      "meaning": "Refuses a move that leaves less than the 10 minutes Cadence keeps between items.",
+      "text": "That is too close to something else. Cadence keeps 10 minutes between items.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    },
+    "move.refused.travel-busy": {
+      "meaning": "Refuses a move into time the person needs for travel.",
+      "text": "That time is needed for travel.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "interactions": [
+        "INT-TIMELINE-014"
+      ],
+      "previous": [
+        {
+          "look": "On Timeline rows: Alert notice, stacked: uppercase Rust Signal \"NOT CHANGED\" label above Ink text",
+          "until": "2026-11-20",
+          "change": "One Rust Signal line on Timeline rows, as in the brief: \"Not changed.\" then the reason (Emi, product map answer 1)."
+        }
+      ]
+    }
+  }
+}

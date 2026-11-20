@@ -67,4 +67,7 @@ supabase/signing_keys*.json
 .env.*
 !.env.example
 .agentic/runtime/
+# Product map output: built on demand by npm run map:build, never committed.
+/product-map.json
+/docs/PRODUCT_MAP.md
 .claude/fable-codex/

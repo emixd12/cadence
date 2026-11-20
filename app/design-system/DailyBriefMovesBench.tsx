@@ -56,7 +56,7 @@ export function DailyBriefMovesBench() {
         </div>
         <div data-bench-state="answered">
           <DailyBriefBubble state="ready" briefing={ANSWERED} moves={{ client: answeredClient, planningContext: () => ({ calendarBusy: [] }) }} onDismiss={() => undefined}
-            refresh={{ onRefresh: () => undefined, pending: false, available: true, error: "You’ve used today’s refreshes. This brief stays, and every line still works." }} />
+            refresh={{ onRefresh: () => undefined, pending: false, available: true, error: "brief.refresh.limit-reached" }} />
         </div>
       </div>
     </OccurrenceMovesProvider>

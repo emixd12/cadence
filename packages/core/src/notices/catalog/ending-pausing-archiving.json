@@ -1,0 +1,45 @@
+{
+  "feature": "ending-pausing-archiving",
+  "notices": {
+    "run.ended": {
+      "meaning": "Says on the Timeline, on the day it happens, that a Behavior reached its end, with Start again and Close.",
+      "text": "{title} ended.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-020"
+      ]
+    },
+    "run.paused": {
+      "meaning": "Says on the Timeline, on the first paused day, that a Behavior is paused and when it comes back, with Resume now and Close.",
+      "text": "{back, select, none {{title} is paused.} other {{title} is paused, back {back}.}}",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-020"
+      ]
+    },
+    "run.back-today": {
+      "meaning": "Says on the Timeline, on its back-on day, that a paused Behavior runs again, with Close.",
+      "text": "{title} is back today.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TIMELINE-020"
+      ]
+    },
+    "run.end-time-passed": {
+      "meaning": "Refuses an end or a pause start set to a moment that has passed, in the Behavior form, Chat and MCP.",
+      "text": "Pick a time later than now. To stop it right away, use End now.",
+      "style": "error",
+      "interactions": [
+        "INT-BEHAVIOR-031"
+      ]
+    },
+    "run.pause-back-on": {
+      "meaning": "Refuses a pause whose back-on day is not after its first paused day and after today.",
+      "text": "Pick a back-on day after the first paused day and after today.",
+      "style": "error",
+      "interactions": [
+        "INT-BEHAVIOR-031"
+      ]
+    }
+  }
+}

@@ -167,6 +167,7 @@ const requiredScripts = [
   "build",
   "agents:check",
   "interactions:check",
+  "map:check",
   "resolvers:check",
   "core:check",
   "load:install",
@@ -374,6 +375,7 @@ const docsMustMentionChecks = [
   ["docs/ROUTE_MAP.md", "/timeline"],
   ["docs/OPERATIONS.md", "npm run agents:check"],
   ["docs/OPERATIONS.md", "npm run interactions:check"],
+  ["docs/OPERATIONS.md", "npm run map:check"],
 ];
 for (const [file, snippet] of docsMustMentionChecks) {
   assert(read(file).toLowerCase().includes(snippet.toLowerCase()), `${file} must mention ${snippet}.`);

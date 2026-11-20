@@ -30,6 +30,7 @@ import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { briefCalendarBusy } from "@/lib/ui/brief-calendar";
 import { DAILY_BRIEF_MOVE_FEATURES } from "@/lib/ui/daily-brief-moves";
 import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
+import { noticeText, type NoticeId, type NoticeParams } from "@cadence/core/notices";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 import { useAdvisorBriefSlot } from "@/components/advisor/AdvisorProvider";
 
@@ -46,7 +47,7 @@ type View =
   | Readonly<{ kind: "closed" }>
   | Readonly<{ kind: "loading" }>
   | Readonly<{ kind: "ready"; briefing: DailyBriefing; attempt: DailyBriefAttempt }>
-  | Readonly<{ kind: "notice"; message: string; retryLabel?: string; retryAt?: number; action?: PlanAction }>;
+  | Readonly<{ kind: "notice"; message: string; notice?: NoticeRef; retryLabel?: string; retryAt?: number; action?: PlanAction }>;
 
 /** Ticket 299: a ChatGPT plan notice's primary action. Only the Mac's plan path produces these codes. */
 type PlanAction = "manage_usage" | "connect";
@@ -60,7 +61,7 @@ const CLOSED: View = { kind: "closed" };
  */
 const shownBriefings = new WeakMap<DailyBriefClient, Readonly<{ fence: string; briefing: DailyBriefing }>>();
 
-type RefreshState = Readonly<{ pending: boolean; error: string | null }>;
+type RefreshState = Readonly<{ pending: boolean; error: RefreshNoticeId | null }>;
 const REFRESH_IDLE: RefreshState = { pending: false, error: null };
 const TRY_AGAIN = "Try again";
 
@@ -124,7 +125,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         return;
       }
       if (outcome.kind === "already_attempted") {
-        show(marker.delivered ? CLOSED : { kind: "notice", message: "Today’s Daily Brief was already started but not shown here.", retryLabel: TRY_AGAIN });
+        show(marker.delivered ? CLOSED : { kind: "notice", ...briefNotice("brief.already-started"), retryLabel: TRY_AGAIN });
         return;
       }
       const notice = failureNotice(outcome);
@@ -186,7 +187,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         later(() => evaluate(settings, false), marker.pendingUntil + 1);
         return;
       }
-      show({ kind: "notice", message: "Today’s Daily Brief did not finish loading.", retryLabel: TRY_AGAIN });
+      show({ kind: "notice", ...briefNotice("brief.did-not-finish"), retryLabel: TRY_AGAIN });
     };
 
     const withdraw = () => {
@@ -225,7 +226,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         if (!previous) evaluate(settings, allowStart);
       }).catch(() => {
         if (!mounted.current || loadEpoch !== epoch.current) return;
-        if (retry) { show({ kind: "notice", message: "Today’s Daily Brief did not finish loading.", retryLabel: TRY_AGAIN }); return; }
+        if (retry) { show({ kind: "notice", ...briefNotice("brief.did-not-finish"), retryLabel: TRY_AGAIN }); return; }
         // Enablement is unknown, so stay out of the way; focus or reconnection checks again.
         if (settingsRef.current) withdraw();
         else setView(HIDDEN);
@@ -278,7 +279,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
               ...moveRequestFields(briefClient, travelAccountId, settings.localDate),
             });
             if (!live() || refreshEpoch !== generation) return;
-            if (response.state !== "ready") { setRefreshState({ pending: false, error: "The new brief isn’t ready yet. Try again shortly." }); return; }
+            if (response.state !== "ready") { setRefreshState({ pending: false, error: "brief.refresh.not-ready" }); return; }
             shownBriefings.set(briefClient, { fence: dailyBriefFence(settings), briefing: response.briefing });
             setRefreshState(REFRESH_IDLE);
             show({ kind: "ready", briefing: response.briefing, attempt: rememberSettledDailyBriefAttempt(briefClient, settings, response.briefing) });
@@ -387,6 +388,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       embedded={embedded}
       state="error"
       message={shown.message}
+      messageNotice={shown.notice}
       action={action}
       onDismiss={onDismiss}
       onRetry={shown.retryLabel ? () => actions.current.retry() : undefined}
@@ -441,58 +443,68 @@ function refreshAvailability(briefing: DailyBriefing): boolean {
   return refresh?.available !== false;
 }
 
-function refreshFailure(error: unknown): string {
+function refreshFailure(error: unknown): RefreshNoticeId {
   const code = error instanceof DailyBriefRequestError ? error.code : "brief_unavailable";
   switch (code) {
-    case "refresh_limit_reached": return "You’ve used today’s refreshes. This brief stays, and every line still works.";
-    case "budget_reached": return "Refresh is paused to keep this month’s morning briefs. This brief stays, and every line still works.";
-    case "offline": return "You appear to be offline. This brief stays; try again when you’re connected.";
-    case "rate_limited": return "Too many requests. Try again in a minute.";
-    default: return "Cadence couldn’t refresh the brief. This one stays; try again later.";
+    case "refresh_limit_reached": return "brief.refresh.limit-reached";
+    case "budget_reached": return "brief.refresh.budget";
+    case "offline": return "brief.refresh.offline";
+    case "rate_limited": return "brief.refresh.rate-limited";
+    default: return "brief.refresh.failed";
   }
+}
+
+/** A Refresh failure, named by its notice. The brief shows it under "Not refreshed". */
+export type RefreshNoticeId = Extract<NoticeId, `brief.refresh.${string}`>;
+
+type NoticeRef = Readonly<{ id: NoticeId; params?: NoticeParams }>;
+
+/** The launcher's message for a notice: its words, plus the id so the brief shows it in the notice's style. */
+function briefNotice(id: NoticeId, params?: NoticeParams): Readonly<{ message: string; notice: NoticeRef }> {
+  return { message: noticeText(id, params), notice: { id, ...(params ? { params } : {}) } };
 }
 
 function failureNotice(outcome: Extract<DailyBriefOutcome, { kind: "failed" }>): Extract<View, { kind: "notice" }> {
   const retryAt = outcome.retryAfterSeconds ? outcome.settledAt + outcome.retryAfterSeconds * 1000 : undefined;
-  const wait = outcome.retryAfterSeconds ? ` Try again in about ${formatWait(outcome.retryAfterSeconds)}.` : " Try again shortly.";
+  const wait = { wait: outcome.retryAfterSeconds ? formatWait(outcome.retryAfterSeconds) : "none" };
   switch (outcome.code) {
     case "pending":
-      return { kind: "notice", message: `Daily Brief is still being prepared.${wait}`, retryLabel: TRY_AGAIN, retryAt };
+      return { kind: "notice", ...briefNotice("brief.still-preparing", wait), retryLabel: TRY_AGAIN, retryAt };
     case "rate_limited":
-      return { kind: "notice", message: `Daily Brief reached its request limit.${wait}`, retryLabel: TRY_AGAIN, retryAt };
+      return { kind: "notice", ...briefNotice("brief.request-limit", wait), retryLabel: TRY_AGAIN, retryAt };
     case "timeout":
-      return { kind: "notice", message: "Daily Brief took too long to load. Tracking is unaffected.", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...briefNotice("brief.timeout"), retryLabel: TRY_AGAIN };
     case "offline":
-      return { kind: "notice", message: "You appear to be offline. Try again when you are connected.", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...briefNotice("brief.offline"), retryLabel: TRY_AGAIN };
     case "unauthenticated":
-      return { kind: "notice", message: "Sign in again to load today’s Daily Brief." };
+      return { kind: "notice", ...briefNotice("brief.sign-in-again") };
     case "context_changed":
     case "context_expired":
-      return { kind: "notice", message: "Your Timeline or settings changed while the brief was prepared.", retryLabel: "Get a current brief" };
+      return { kind: "notice", ...briefNotice("brief.context-changed"), retryLabel: "Get a current brief" };
     case "retry_exhausted":
-      return { kind: "notice", message: "Today’s Daily Brief retry limit has been reached. Tracking is unaffected." };
+      return { kind: "notice", ...briefNotice("brief.retry-exhausted") };
     // Advisor plan Phase 1A: the account's monthly advisor budget refused the model call.
     case "budget_reached":
-      return { kind: "notice", message: "Daily Brief reached this month’s limit. Tracking is unaffected." };
+      return { kind: "notice", ...briefNotice("brief.month-limit") };
     case "access_denied":
     case "not_configured":
-      return { kind: "notice", message: "Daily Brief is turned off or unavailable. Check Settings." };
+      return { kind: "notice", ...briefNotice("brief.turned-off") };
     case "brief_unavailable":
-      return { kind: "notice", message: "Today’s Daily Brief is unavailable.", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...briefNotice("brief.unavailable"), retryLabel: TRY_AGAIN };
     // Ticket 299 (D27): the Mac's ChatGPT plan could not run the brief. Cadence does not run it another way.
     case "chatgpt_usage_limit":
-      return { kind: "notice", message: "ChatGPT usage limit reached. Review your plan or Cadence’s limit in ChatGPT settings.", action: "manage_usage", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...briefNotice("brief.chatgpt-usage-limit"), action: "manage_usage", retryLabel: TRY_AGAIN };
     case "chatgpt_not_eligible":
-      return { kind: "notice", message: "Your ChatGPT plan can’t run the Daily Brief. To use Cadence instead, disconnect ChatGPT in Settings." };
+      return { kind: "notice", ...briefNotice("brief.chatgpt-not-eligible") };
     case "chatgpt_reconnect":
-      return { kind: "notice", message: "Reconnect ChatGPT to load today’s Daily Brief on your plan.", action: "connect" };
+      return { kind: "notice", ...briefNotice("brief.chatgpt-reconnect"), action: "connect" };
     case "chatgpt_retry_later":
     case "chatgpt_timeout":
     case "chatgpt_advisor_unavailable":
     case "chatgpt_unavailable":
-      return { kind: "notice", message: "ChatGPT could not run today’s Daily Brief. Try again later.", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...briefNotice("brief.chatgpt-retry-later"), retryLabel: TRY_AGAIN };
     default:
-      return { kind: "notice", message: outcome.recovery ?? "Cadence could not prepare today’s Daily Brief.", retryLabel: TRY_AGAIN };
+      return { kind: "notice", ...(outcome.recovery ? { message: outcome.recovery } : briefNotice("brief.could-not-prepare")), retryLabel: TRY_AGAIN };
   }
 }
 

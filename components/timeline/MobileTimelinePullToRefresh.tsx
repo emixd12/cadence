@@ -1,5 +1,7 @@
 "use client";
 
+import { noticeText } from "@cadence/core/notices";
+import { TimelineReloadLine, type ReloadNoticeId } from "@/components/timeline/TimelineReloadLine";
 import {
   useCallback,
   useEffect,
@@ -41,7 +43,7 @@ export function MobileTimelinePullToRefresh({
   const [pullState, setPullState] =
     useState<PullToRefreshState>(IDLE_PULL_TO_REFRESH_STATE);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [resultMessage, setResultMessage] = useState("");
+  const [resultMessage, setResultMessage] = useState<ReloadNoticeId | "">("");
   const [isPending, startTransition] = useTransition();
   const pullStateRef = useRef<PullToRefreshState>(IDLE_PULL_TO_REFRESH_STATE);
   const refreshInFlightRef = useRef(false);
@@ -64,9 +66,7 @@ export function MobileTimelinePullToRefresh({
 
     refreshInFlightRef.current = false;
     setIsRefreshing(false);
-    setResultMessage(connectorSuccessRef.current
-      ? "Cadence and connectors reloaded."
-      : "Reload incomplete. Cadence or connector data may be stale.");
+    setResultMessage(connectorSuccessRef.current ? "timeline.reloaded" : "timeline.reload-incomplete");
     connectorSuccessRef.current = null;
     sawPendingRef.current = false;
     if (resultTimerRef.current !== null) window.clearTimeout(resultTimerRef.current);
@@ -92,7 +92,7 @@ export function MobileTimelinePullToRefresh({
     }
 
     if (!navigator.onLine) {
-      setResultMessage("Reload failed while offline. Displayed data may be stale.");
+      setResultMessage("timeline.reload-offline");
       if (resultTimerRef.current !== null) window.clearTimeout(resultTimerRef.current);
       resultTimerRef.current = window.setTimeout(() => setResultMessage(""), RESULT_DURATION_MS);
       return;
@@ -196,7 +196,7 @@ export function MobileTimelinePullToRefresh({
   const isReadyToRefresh =
     isPulling && pullState.distance >= PULL_TO_REFRESH_THRESHOLD;
   const feedback = isRefreshing
-    ? "Reloading Cadence and connectors"
+    ? noticeText("timeline.reloading")
     : isReadyToRefresh
       ? "Release to refresh"
       : "Pull to refresh";
@@ -212,13 +212,7 @@ export function MobileTimelinePullToRefresh({
       onTouchCancel={resetPull}
     >
       {isPulling || isRefreshing || resultMessage ? (
-        <p
-          aria-live="polite"
-          className="pointer-events-none fixed left-1/2 top-[calc(4rem+max(0.5rem,env(safe-area-inset-top)))] z-30 -translate-x-1/2 border border-line bg-background px-3 py-1.5 text-xs text-muted-readable motion-safe:transition-opacity motion-reduce:transition-none"
-          role="status"
-        >
-          {resultMessage || feedback}
-        </p>
+        <TimelineReloadLine result={resultMessage || null} feedback={feedback} />
       ) : null}
       {children}
     </div>
