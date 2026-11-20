@@ -129,7 +129,25 @@ fn snapshot(graph: &GraphRows) -> Value {
             schedule.to_string(),
         )
     });
-    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone})
+    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior)})
+}
+
+/// Ended and Paused: the snapshot's `end`, as core's toBehaviorConfigurationSnapshot writes it.
+fn run_end(behavior: &Behavior) -> Value {
+    match &behavior.end_on {
+        Some(on) => json!({"on":on,"time":behavior.end_time}),
+        None => Value::Null,
+    }
+}
+
+/// Ended and Paused: the snapshot's `pause`, as core's toBehaviorConfigurationSnapshot writes it.
+fn run_pause(behavior: &Behavior) -> Value {
+    match (&behavior.pause_from_on, &behavior.pause_back_on) {
+        (Some(from_on), Some(back_on)) => {
+            json!({"fromOn":from_on,"fromTime":behavior.pause_from_time,"backOn":back_on})
+        }
+        _ => Value::Null,
+    }
 }
 
 fn normalize_configuration_snapshot(value: &Value) -> Value {
@@ -145,6 +163,9 @@ fn normalize_configuration_snapshot(value: &Value) -> Value {
             Value::Null
         };
         object.entry("whereKind".to_string()).or_insert(derived);
+        // Snapshots written before Ended and Paused carry no end or pause.
+        object.entry("end".to_string()).or_insert(Value::Null);
+        object.entry("pause".to_string()).or_insert(Value::Null);
     }
     normalized
 }
@@ -219,6 +240,8 @@ fn validate_history(
             "where_kind",
             "active",
             "timezone",
+            "end",
+            "pause",
         ];
         if event.changed_fields.is_empty()
             || event
@@ -578,7 +601,25 @@ pub fn update_timezone(db: &Connection, request: &super::Request) -> Result<Valu
         expected.behavior.timezone = timezone.clone();
         expected.behavior.current_configuration_event_id = Some(event.id.clone());
         expected.behavior.updated_at = now.clone();
-        if &expected != next || event.changed_fields != ["timezone"] {
+        // Rule T1: an end or a pause start that already happened is re-expressed in the
+        // new timezone so its moment stays. Core plans the new local values; the back-on
+        // day and every other field stay as they were.
+        expected.behavior.end_on = next.behavior.end_on.clone();
+        expected.behavior.end_time = next.behavior.end_time.clone();
+        expected.behavior.pause_from_on = next.behavior.pause_from_on.clone();
+        expected.behavior.pause_from_time = next.behavior.pause_from_time.clone();
+        let run_changes = [
+            ("end", run_end(&before.behavior) != run_end(&next.behavior)),
+            ("pause", run_pause(&before.behavior) != run_pause(&next.behavior)),
+        ];
+        let expected_fields = std::iter::once("timezone")
+            .chain(run_changes.iter().filter(|(_, changed)| *changed).map(|(field, _)| *field))
+            .collect::<Vec<_>>();
+        if &expected != next
+            || event.changed_fields != expected_fields
+            || before.behavior.end_on.is_some() != next.behavior.end_on.is_some()
+            || before.behavior.pause_from_on.is_some() != next.behavior.pause_from_on.is_some()
+        {
             return Err(
                 "A timezone operation cannot change other Behavior fields or schedules.".into(),
             );

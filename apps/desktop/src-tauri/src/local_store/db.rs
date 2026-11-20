@@ -142,6 +142,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "occurrence_moves",
         include_str!("../../migrations/0025_occurrence_moves.sql"),
     ),
+    (
+        26,
+        "behavior_end_and_pause",
+        include_str!("../../migrations/0026_behavior_end_and_pause.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {
@@ -801,11 +806,7 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
         {
             return Err("A Behavior default duration must be 1 through 1,440 minutes.".into());
         }
-        if let Some(end_date) = value["end_date"].as_str() {
-            valid_date(end_date)?;
-        } else if !value["end_date"].is_null() {
-            return Err("A Behavior end date is invalid.".into());
-        }
+        validate_run_fields(&value)?;
         if !value["auto_archived_at"].is_null()
             && (value["active"] != false || value["archived_at"].is_null())
         {
@@ -829,6 +830,52 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
         }
     } else if T::TABLE == "note_shortcut_states" {
         validate_note_shortcut_state(&value)?;
+    }
+    Ok(())
+}
+
+/// Ended and Paused Behaviors: the five local run fields, with the hosted checks
+/// (`behaviors_end_valid`, `behaviors_pause_valid`). Times are whole minutes.
+fn validate_run_fields(value: &Value) -> Result<()> {
+    let date = |field: &str| -> Result<Option<String>> {
+        match &value[field] {
+            Value::Null => Ok(None),
+            Value::String(text) => {
+                valid_date(text)?;
+                Ok(Some(text.clone()))
+            }
+            _ => Err("A Behavior end or pause date is invalid.".into()),
+        }
+    };
+    let time = |field: &str| -> Result<Option<String>> {
+        match &value[field] {
+            Value::Null => Ok(None),
+            Value::String(text) if text.len() == 8 && text.ends_with(":00") => {
+                valid_time(text)?;
+                Ok(Some(text.clone()))
+            }
+            _ => Err("A Behavior end or pause time must be a whole minute.".into()),
+        }
+    };
+    let end_on = date("end_on")?;
+    let end_time = time("end_time")?;
+    let pause_from_on = date("pause_from_on")?;
+    let pause_from_time = time("pause_from_time")?;
+    let pause_back_on = date("pause_back_on")?;
+    if end_on.as_deref().is_some_and(|day| day > "9999-12-30") {
+        return Err("A Behavior end date is invalid.".into());
+    }
+    if end_time.is_some() && end_on.is_none() {
+        return Err("A Behavior end time needs its end date.".into());
+    }
+    if pause_from_on.is_some() != pause_back_on.is_some()
+        || pause_from_time.is_some() && pause_from_on.is_none()
+        || pause_from_on
+            .as_deref()
+            .zip(pause_back_on.as_deref())
+            .is_some_and(|(from, back)| back <= from)
+    {
+        return Err("A Behavior pause needs a first paused day before its back-on day.".into());
     }
     Ok(())
 }

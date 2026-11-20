@@ -386,7 +386,11 @@ fn validate_write(
                     .ok_or("An account sync upsert requires a value.")?;
                 if [
                     "default_duration_minutes",
-                    "end_date",
+                    "end_on",
+                    "end_time",
+                    "pause_from_on",
+                    "pause_from_time",
+                    "pause_back_on",
                     "auto_archived_at",
                     "location_text",
                     "where_kind",
@@ -931,7 +935,10 @@ mod tests {
         let graph = complete_graph(&profile, category, '8');
         let mut value = normalized(&graph.behavior).unwrap();
         value["default_duration_minutes"] = json!(45);
-        value["end_date"] = json!("2026-10-01");
+        value["end_on"] = json!("2026-09-30");
+        value["end_time"] = json!("14:00:00");
+        value["pause_from_on"] = json!("2026-09-10");
+        value["pause_back_on"] = json!("2026-09-14");
         let check = |db: &mut Connection, value: Value| {
             let request = serde_json::from_value::<Request>(json!({
                 "operation": "validateAccountSyncSnapshot",
@@ -941,6 +948,10 @@ mod tests {
         };
         let changes = connection.total_changes();
         assert_eq!(check(&mut connection, value.clone()).unwrap(), Value::Null);
+        // A contract 6 field no longer matches the local model.
+        let mut legacy = value.clone();
+        legacy["end_date"] = json!("2026-10-01");
+        assert_eq!(check(&mut connection, legacy).unwrap_err(), "Update Cadence before synchronizing account data.");
         value["future_behavior_field"] = Value::Null;
         assert_eq!(check(&mut connection, value.clone()).unwrap_err(), "Update Cadence before synchronizing account data.");
         value.as_object_mut().unwrap().remove("future_behavior_field");
@@ -1066,7 +1077,11 @@ mod tests {
             archived_at: None,
             auto_archived_at: None,
             default_duration_minutes: None,
-            end_date: None,
+            end_on: None,
+            end_time: None,
+            pause_from_on: None,
+            pause_from_time: None,
+            pause_back_on: None,
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: "09:00:00".into(),
             timezone: "America/New_York".into(),
@@ -2132,7 +2147,11 @@ mod tests {
             archived_at: Some(stamp.clone()),
             auto_archived_at: Some(stamp.clone()),
             default_duration_minutes: Some(45),
-            end_date: Some("2026-09-01".into()),
+            end_on: Some("2026-08-31".into()),
+            end_time: Some("14:30:00".into()),
+            pause_from_on: Some("2026-08-20".into()),
+            pause_from_time: None,
+            pause_back_on: Some("2026-08-24".into()),
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: "09:00:00".into(),
             timezone: "America/New_York".into(),
@@ -2241,7 +2260,10 @@ mod tests {
         let stored_behavior = db::by_id::<Behavior>(&connection, &profile, &behavior.id).unwrap();
         assert_eq!(stored_behavior.archive_notes, behavior.archive_notes);
         assert_eq!(stored_behavior.default_duration_minutes, Some(45));
-        assert_eq!(stored_behavior.end_date.as_deref(), Some("2026-09-01"));
+        assert_eq!(stored_behavior.end_on.as_deref(), Some("2026-08-31"));
+        assert_eq!(stored_behavior.end_time.as_deref(), Some("14:30:00"));
+        assert_eq!(stored_behavior.pause_from_on.as_deref(), Some("2026-08-20"));
+        assert_eq!(stored_behavior.pause_back_on.as_deref(), Some("2026-08-24"));
         assert_eq!(
             stored_behavior.auto_archived_at.as_deref(),
             Some("2026-09-01T00:00:00.000000Z")
@@ -2251,7 +2273,7 @@ mod tests {
         let mut legacy_behavior = expected_behavior.clone();
         let legacy_object = legacy_behavior.as_object_mut().unwrap();
         legacy_object.remove("default_duration_minutes");
-        legacy_object.remove("end_date");
+        legacy_object.remove("end_on");
         legacy_object.remove("auto_archived_at");
         let failure = execute(
             &mut connection,
