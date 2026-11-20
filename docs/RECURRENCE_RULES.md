@@ -129,6 +129,10 @@ A Behavior may have a nullable `end_date` in its own timezone. The end date is
 the first archived local date. Occurrence generation includes dates before the
 end date and excludes the end date itself.
 
+Creating a Behavior, or changing an active Behavior's end date, refuses an end date
+on or before the current local date in the Behavior's timezone: such a Behavior would
+be archived at once and never run. An unchanged end date is not checked again.
+
 At or after local midnight on the end date, lifecycle reconciliation archives
 an active Behavior. A delayed reconciliation records the actual processing
 instant while its configuration event keeps the end-date midnight as the

@@ -249,9 +249,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export const END_DATE_NOT_AFTER_TODAY_MESSAGE = "Choose a date after today. The Behavior’s last day is the day before its end date.";
+
+/**
+ * Checks Default duration and End date. With `today` (the Behavior's local date), an End date
+ * must come after today: the End date is the first day the Behavior no longer runs
+ * (docs/RECURRENCE_RULES.md, "Behavior end date"), so today or earlier would archive it at once.
+ */
 export function validateBehaviorPlanningFields(input: {
   defaultDurationMinutes?: number | null; endDate?: string | null;
-}): void {
+}, options: { today?: string } = {}): void {
   const errors: Partial<Record<BehaviorFormField, string>> = {};
   if (input.defaultDurationMinutes != null && (!Number.isInteger(input.defaultDurationMinutes) ||
       input.defaultDurationMinutes < 1 || input.defaultDurationMinutes > 1440)) {
@@ -262,6 +269,9 @@ export function validateBehaviorPlanningFields(input: {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(input.endDate) || input.endDate < "0001-01-01" ||
           Temporal.PlainDate.from(input.endDate).toString() !== input.endDate) throw new Error("Invalid date");
     } catch { errors.end_date = "Enter a valid end date, or leave blank."; }
+    if (!errors.end_date && options.today && input.endDate <= options.today) {
+      errors.end_date = END_DATE_NOT_AFTER_TODAY_MESSAGE;
+    }
   }
   if (Object.keys(errors).length) throw new BehaviorValidationError("Check the highlighted fields.", errors);
 }

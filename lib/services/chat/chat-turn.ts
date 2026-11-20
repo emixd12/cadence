@@ -54,6 +54,8 @@ export type ChatSpendGate = (estimateMicrodollars: number) => Promise<
   | Readonly<{ ok: false; retryAt: string | null }>
 >;
 
+export type ChatTurnWrite = Readonly<{ outcome: ChatOutcome; call: ChatWriteCall; undo: ChatUndoPlan | null; facts: ChatWriteFacts }>;
+
 export type ChatTurnInput = Readonly<{
   setting: AgentModelSetting;
   /** Tests and evals may pass a model; otherwise the setting's model on this deployment's transport. */
@@ -78,6 +80,8 @@ export type ChatTurnInput = Readonly<{
    */
   stop?: AbortSignal;
   onEvent: (event: ChatEvent) => void;
+  /** Called once per write that ran, before the turn goes on, so it is stored even if the turn later fails. */
+  onWrite?: (write: ChatTurnWrite) => Promise<void>;
   onUsage?: (usage: AgentModelUsage) => void;
   spend?: ChatSpendGate;
   limits?: Partial<ChatLimits>;
@@ -88,7 +92,7 @@ export type ChatTurnInput = Readonly<{
 export type ChatTurnResult = Readonly<{
   parts: readonly ChatPart[];
   /** Writes that ran, with how to undo each, in order. */
-  writes: readonly Readonly<{ outcome: ChatOutcome; call: ChatWriteCall; undo: ChatUndoPlan | null; facts: ChatWriteFacts }>[];
+  writes: readonly ChatTurnWrite[];
   /** Set when writes wait for a Yes. The caller stores it with the confirm. */
   pending: Readonly<{ confirm: ChatConfirm; writes: readonly ChatPendingWrite[] }> | null;
   toolCalls: readonly string[];
@@ -282,7 +286,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       const factsRead = factsReadFor(write);
       const facts = factsFrom(write, factsRead ? await run(factsRead.name, factsRead.args, false) : null);
       if (!runNow) {
-        pending.push({ call: write, item: { text: describePendingWrite(write, facts), kind: outcomeKind(write.name) }, guard: guardFrom(facts) });
+        pending.push({ call: write, item: { text: describePendingWrite(write, facts), kind: outcomeKind(write.name) }, guard: guardFrom(facts, write) });
         answer(WAITING);
         continue;
       }
@@ -300,8 +304,10 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         id: newId(), kind: outcomeKind(prepared.name), text: describeOutcome(prepared, done.result, facts), confirmed: false,
         undo: undo ? "available" : "unavailable", ...outcomeTargets(prepared, done.result),
       };
-      writes.push({ outcome, call: prepared, undo, facts });
+      const written = { outcome, call: prepared, undo, facts };
+      writes.push(written);
       emit({ type: "outcome", outcome });
+      await input.onWrite?.(written);
     }
     messages.push({ role: "tool", content: results.map((result) => ({
       type: "tool-result" as const, toolCallId: result.toolCallId, toolName: result.toolName, output: { type: "text" as const, value: result.value },

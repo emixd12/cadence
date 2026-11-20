@@ -26,18 +26,15 @@ export type ChatToolExecutor = (
 export type ChatWriteCall = Readonly<{ name: ChatWriteName; args: Readonly<Record<string, unknown>> }>;
 
 /** How to undo a write that ran. `check` is the record state right after it, so Undo refuses once it changed. */
-export type ChatUndoPlan = Readonly<{
-  call: ChatWriteCall;
-  /** For moves, re-read the item's revision at Undo time instead of trusting the stored one. */
-  refreshRevision?: Readonly<{ occurrenceId: string }>;
-}>;
+export type ChatUndoPlan = Readonly<{ call: ChatWriteCall }>;
 
 /** One write waiting for a Yes, with the record state it was described from. */
 export type ChatPendingWrite = Readonly<{
   call: ChatWriteCall;
   item: ChatConfirmItem;
   /** The record and revision the confirm was shown against; a change expires the confirm (T13). */
-  guard: Readonly<{ kind: "occurrence"; id: string; revision: string }> | Readonly<{ kind: "behavior"; id: string; revision: string }> | null;
+  /** `day_note` uses the local date as id and "none" as the revision of a day with no note. */
+  guard: Readonly<{ kind: "occurrence" | "behavior" | "day_note"; id: string; revision: string }> | null;
 }>;
 
 type Json = Record<string, unknown>;
@@ -79,6 +76,8 @@ export type ChatWriteFacts = Readonly<{
   occurrence?: Json | null;
   behavior?: Json | null;
   dayNote?: string | null;
+  /** The day note's revision when the day has a note. */
+  dayNoteRevision?: string | null;
 }>;
 
 export function outcomeKind(name: ChatWriteName): ChatOutcomeKind { return CHAT_OUTCOME_KIND[name]; }
@@ -179,16 +178,21 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
         local_date: call.args.local_date, note: facts.dayNote ?? "", ...(str(dayNote.revision) ? { expected_revision: dayNote.revision } : {}),
       } } };
     }
-    case "move_occurrence_for_day":
-      if (!occurrenceId || out.outcome !== "moved") return null;
-      return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId } }, refreshRevision: { occurrenceId } };
+    // Move Undo carries the revision right after this move, so it refuses once anyone
+    // moves or changes the item again; revert would otherwise undo that newer move.
+    case "move_occurrence_for_day": {
+      const revision = str(occurrence.revision);
+      if (!occurrenceId || out.outcome !== "moved" || !revision) return null;
+      return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId, expected_revision: revision } } };
+    }
     case "revert_occurrence_move": {
       const before = str(obj(facts.occurrence).effective_start_at);
       const timezone = str(occurrence.timezone);
-      if (!occurrenceId || out.outcome !== "undone" || !before || !timezone) return null;
+      const revision = str(occurrence.revision);
+      if (!occurrenceId || out.outcome !== "undone" || !before || !timezone || !revision) return null;
       const local = Temporal.Instant.from(before).toZonedDateTimeISO(timezone);
       const startTime = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
-      return { call: { name: "move_occurrence_for_day", args: { occurrence_id: occurrenceId, start_time: startTime } }, refreshRevision: { occurrenceId } };
+      return { call: { name: "move_occurrence_for_day", args: { occurrence_id: occurrenceId, start_time: startTime, expected_revision: revision } } };
     }
     case "create_behavior": {
       const id = str(obj(out.behavior).id);
@@ -234,7 +238,7 @@ export function factsFrom(call: ChatWriteCall, read: ChatToolResult | null): Cha
   if (call.name === "update_day_note") {
     const notes = Array.isArray(out.day_notes) ? out.day_notes.map(obj) : [];
     const match = notes.find((note) => note.local_date === call.args.local_date);
-    return { dayNote: match ? str(match.note) : null };
+    return { dayNote: match ? str(match.note) : null, dayNoteRevision: match ? str(match.revision) : null };
   }
   if (out.occurrence) return { occurrence: obj(out.occurrence) };
   if (out.behavior) return { behavior: obj(out.behavior) };
@@ -242,7 +246,10 @@ export function factsFrom(call: ChatWriteCall, read: ChatToolResult | null): Cha
 }
 
 /** The record a confirm item depends on, for expiry when it changes (T13). */
-export function guardFrom(facts: ChatWriteFacts): ChatPendingWrite["guard"] {
+export function guardFrom(facts: ChatWriteFacts, call?: ChatWriteCall): ChatPendingWrite["guard"] {
+  if (call?.name === "update_day_note" && facts.dayNote !== undefined && str(call.args.local_date)) {
+    return { kind: "day_note", id: call.args.local_date as string, revision: facts.dayNoteRevision ?? "none" };
+  }
   const occurrence = facts.occurrence ? obj(facts.occurrence) : null;
   if (occurrence && str(occurrence.id) && str(occurrence.revision)) return { kind: "occurrence", id: occurrence.id as string, revision: occurrence.revision as string };
   const behavior = facts.behavior ? obj(facts.behavior) : null;
@@ -256,6 +263,9 @@ export function withRevision(call: ChatWriteCall, facts: ChatWriteFacts): ChatWr
   const revision = occurrence ? str(occurrence.revision) : null;
   if (revision && (call.name === "move_occurrence_for_day" || call.name === "revert_occurrence_move") && !str(call.args.expected_revision)) {
     return { ...call, args: { ...call.args, expected_revision: revision } };
+  }
+  if (call.name === "update_day_note" && facts.dayNoteRevision && !str(call.args.expected_revision)) {
+    return { ...call, args: { ...call.args, expected_revision: facts.dayNoteRevision } };
   }
   return call;
 }
