@@ -1739,6 +1739,26 @@
       "reason": "The Hevy link form reads routine titles from Hevy and saving binds the link to the connected Hevy account; load tests need separate synthetic provider authorization."
     },
     {
+      "id": "INT-BEHAVIOR-033",
+      "classification": "destructive_serial_only",
+      "reason": "End now and Start again change a Behavior's run state and remove or restore today's rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-034",
+      "classification": "destructive_serial_only",
+      "reason": "Pause, Resume now and Cancel pause change a Behavior's run state and remove or restore rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-035",
+      "classification": "browser_only",
+      "reason": "Not running disclosure state is client-side."
+    },
+    {
+      "id": "INT-BEHAVIOR-036",
+      "classification": "browser_only",
+      "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
+    },
+    {
       "id": "INT-TIMELINE-014",
       "classification": "destructive_serial_only",
       "reason": "Per-day moves need today's clock in the account's timezone, the Occurrence's current revision and idempotency verification; run serially on a synthetic account."
@@ -1757,6 +1777,11 @@
       "id": "INT-TIMELINE-017",
       "classification": "destructive_serial_only",
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-018",
+      "classification": "destructive_serial_only",
+      "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
     }
   ]
 }
