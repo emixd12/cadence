@@ -37,6 +37,7 @@ import { travelWeatherStateText } from "./TravelWeather";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { RecordedActivityList } from "./RecordedActivityList";
+import { AdvisorDayLine } from "@/components/advisor/AdvisorParts";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
@@ -786,6 +787,8 @@ function DayProgressDay({
               {visibleAllDay.length && visibleAllDay.length < allDay.length ? <button type="button" className="min-h-11 text-xs underline" onClick={onRestoreAllDay}>Restore ({allDay.length - visibleAllDay.length})</button> : null}
             </aside> : null}
           </div>
+          {/* Advisor Phase 4 (4E, placement K): one line under today's date. Nothing outside an advisor. */}
+          {section.kind === "today" ? <AdvisorDayLine /> : null}
           {dayNoteAction ? <DayNoteControl
             localDate={section.localDate}
             dayLabel={section.label}

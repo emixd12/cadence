@@ -28,17 +28,27 @@ describe("coach eval accounts", () => {
 });
 
 describe("coach eval with the cards' own wording", () => {
-  it("breaks no layer-1 rule on any account over a week", async () => {
-    const results = await runCoachEval({ run: seedsOnly, fixtures: coachEvalFixtures(), days: 7 });
+  // One test per account. As a single test the 19 accounts took 2.7 to 4.4 s on GitHub's
+  // runners and passed the 5 s limit on 3 of 11 runs on November 20, 2026.
+  const tipsByFixture = new Map<string, number>();
+
+  it.each(COACH_EVAL_FIXTURE_IDS)("breaks no layer-1 rule on %s over a week", async (id) => {
+    const results = await runCoachEval({ run: seedsOnly, fixtures: [coachEvalFixture(id)], days: 7 });
     const violations = results.flatMap((result) => result.days.flatMap((day) => day.violations.map((v) => ({ fixture: result.fixture, ...v }))));
     expect(violations).toEqual([]);
     const summary = summarizeCoachEval(results);
-    expect(summary.tips).toBeGreaterThan(19);
     expect(summary.modelTips).toBe(0);
+    tipsByFixture.set(id, summary.tips);
+  });
+
+  it("gives tips across the accounts", () => {
+    // Fails unless every account's test above ran first, so it cannot pass on a partial run.
+    expect([...tipsByFixture.keys()].sort()).toEqual([...COACH_EVAL_FIXTURE_IDS].sort());
+    const tips = [...tipsByFixture.values()].reduce((sum, count) => sum + count, 0);
+    expect(tips).toBeGreaterThan(19);
     // Nothing from notes reaches a prompt when notes are off; the one notes-on account gets them.
-    const byFixture = Object.fromEntries(results.map((result) => [result.fixture, result.days.reduce((sum, day) => sum + day.tips.length, 0)]));
-    expect(byFixture.brand_new).toBeGreaterThan(0);
-    expect(byFixture.steady).toBeGreaterThan(0);
+    expect(tipsByFixture.get("brand_new")).toBeGreaterThan(0);
+    expect(tipsByFixture.get("steady")).toBeGreaterThan(0);
   });
 
   it("flags a model line that quotes a note or follows a title's instruction, and ships the seed instead", async () => {
