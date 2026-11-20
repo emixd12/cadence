@@ -2987,6 +2987,7 @@
       ],
       "routes": [
         "/timeline",
+        "/chat",
         "/behaviors",
         "/export",
         "/settings"
@@ -2998,7 +2999,7 @@
         "J18",
         "J21"
       ],
-      "intent": "Open one of the four primary authenticated product screens.",
+      "intent": "Open one of the primary authenticated product screens.",
       "triggers": [
         {
           "kind": "activate",
@@ -3010,6 +3011,11 @@
           "id": "timeline",
           "label": "Timeline",
           "result": "Navigate to /timeline."
+        },
+        {
+          "id": "chat",
+          "label": "Chat",
+          "result": "Navigate to /chat. Web only, and not in production web until the chat server ships; Cadence for Mac hides it until Phase 5C."
         },
         {
           "id": "behaviors",
@@ -3050,9 +3056,10 @@
         "references": [
           "tests/sign-out-shell.test.tsx",
           "tests/desktop-navigation.test.ts",
-          "tests/desktop-render-recovery.dom.test.tsx"
+          "tests/desktop-render-recovery.dom.test.tsx",
+          "tests/navigation.test.ts"
         ],
-        "notes": "The app-shell test renders all four primary navigation destinations in the owning shell. The desktop render-recovery test opens Behaviors from the Timeline's automatic-archive notice."
+        "notes": "The app-shell test renders all primary navigation destinations in the owning shell. The desktop render-recovery test opens Behaviors from the Timeline's automatic-archive notice."
       },
       "platforms": {
         "web": {

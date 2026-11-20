@@ -116,6 +116,15 @@ Check the cited entry before acting on a row.
 - **Next:** switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
   add `search_advice` once 4A's matcher merges.
 
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
+  mobile layout and a `/design-system` bench with fixture conversations.
+
 ## Cadence for Mac 0.1.12 published — November 19, 2026
 
 - **Published 23:34Z** on the owner's instruction of November 19, 21:20Z. Version bump PR #311
