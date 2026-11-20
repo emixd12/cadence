@@ -5,6 +5,7 @@ import {
   type IntegrationError, type IntegrationOperationOutput,
 } from "@cadence/core/integration";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
+import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
 import { recordIntegrationActivity } from "@/lib/db/integration.repo";
 import { getProfileSettings } from "@/lib/db/profiles.repo";
 import { invalidateBehaviorData } from "@/lib/cache/stable-user-data.cache";
@@ -28,6 +29,8 @@ export type MoveOperationResult<N extends MoveOperationName> =
 export async function executeOccurrenceMoveWrite<N extends MoveOperationName>(
   name: N, context: IntegrationContext, raw: unknown,
   scopeError = checkOperationScope(name, context.actor.grantedScopes),
+  /** First-party callers only (chat): today's calendar busy times for the slot check. */
+  calendarBusy?: readonly MoveCalendarBusy[],
 ): Promise<MoveOperationResult<N>> {
   let recorded = false;
   try {
@@ -42,7 +45,7 @@ export async function executeOccurrenceMoveWrite<N extends MoveOperationName>(
     const result: OccurrenceMoveResult = name === "move_occurrence_for_day"
       ? await moveOccurrenceForDay(caller, {
         occurrenceId: input.occurrence_id, expectedRevision: input.expected_revision, startTime: input.start_time,
-        idempotencyKey: input.idempotency_key ?? null, requestHash,
+        idempotencyKey: input.idempotency_key ?? null, requestHash, ...(calendarBusy?.length ? { calendarBusy } : {}),
       })
       : await revertOccurrenceMove(caller, {
         occurrenceId: input.occurrence_id, expectedRevision: input.expected_revision,
