@@ -150,6 +150,13 @@ export async function reactToTip(client: AppSupabaseClient, tipId: string, react
   return tip;
 }
 
+/** The person: tips shown on the last `days` local days before today, newest first (4E "Earlier"). */
+export async function recentTips(client: AppSupabaseClient, days: number, limit: number): Promise<TipRow[]> {
+  const { data, error } = await client.rpc("advisor_recent_tips", { p_days: days, p_limit: limit });
+  if (error || !Array.isArray(data)) throw new AdvisorTipsError("recent_failed");
+  return data.map(parseTipRow).filter((row): row is TipRow => row !== null);
+}
+
 function parseTipRow(value: unknown): TipRow | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as Record<string, unknown>;

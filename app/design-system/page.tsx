@@ -8,6 +8,7 @@ import { DailyBriefMovesBench } from "./DailyBriefMovesBench";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
+import { AdvisorBench, type AdvisorBenchState } from "./AdvisorBench";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -417,6 +418,15 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
 
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
+
+  if (selectedPreviewId === "advisor") {
+    // Advisor plan 4E: the built advisor (placement K) on the real Timeline with synthetic data.
+    // ?state=tip|brief|proposal|checkin|trial|refused|none
+    const stateParam = firstSearchParam(params?.state);
+    const states: readonly AdvisorBenchState[] = ["tip", "brief", "proposal", "checkin", "trial", "refused", "none"];
+    const state: AdvisorBenchState = states.find((item) => item === stateParam) ?? "tip";
+    return <AdvisorBench key={state} state={state} statusAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction} />;
+  }
 
   if (selectedPreviewId === "advisor-placement") {
     // Advisor plan 4D, rounds 1 and 1b: places for the advisor's tips.
