@@ -543,9 +543,13 @@ export type Database = {
           default_duration_minutes: number | null
           description: string | null
           email_reminder_enabled: boolean
-          end_date: string | null
+          end_on: string | null
+          end_time: string | null
           id: string
           location_text: string | null
+          pause_back_on: string | null
+          pause_from_on: string | null
+          pause_from_time: string | null
           recurrence_rule: Json
           reminder_offset_minutes: number
           scheduled_time: string
@@ -567,9 +571,13 @@ export type Database = {
           default_duration_minutes?: number | null
           description?: string | null
           email_reminder_enabled?: boolean
-          end_date?: string | null
+          end_on?: string | null
+          end_time?: string | null
           id?: string
           location_text?: string | null
+          pause_back_on?: string | null
+          pause_from_on?: string | null
+          pause_from_time?: string | null
           recurrence_rule: Json
           reminder_offset_minutes?: number
           scheduled_time: string
@@ -591,9 +599,13 @@ export type Database = {
           default_duration_minutes?: number | null
           description?: string | null
           email_reminder_enabled?: boolean
-          end_date?: string | null
+          end_on?: string | null
+          end_time?: string | null
           id?: string
           location_text?: string | null
+          pause_back_on?: string | null
+          pause_from_on?: string | null
+          pause_from_time?: string | null
           recurrence_rule?: Json
           reminder_offset_minutes?: number
           scheduled_time?: string
@@ -2754,20 +2766,6 @@ export type Database = {
           target_occurrence_id: string
         }
         Returns: Json
-      }
-      archive_due_behaviors: {
-        Args: { batch_limit?: number; processed_at: string }
-        Returns: {
-          behavior_id: string
-          user_id: string
-        }[]
-      }
-      archive_my_due_behaviors: {
-        Args: { batch_limit?: number }
-        Returns: {
-          behavior_id: string
-          user_id: string
-        }[]
       }
       attach_source_activity: {
         Args: {

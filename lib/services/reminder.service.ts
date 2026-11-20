@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
-import { resolveDueBehaviorArchives } from "@/lib/resolvers/occurrence.resolver";
+import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 
 import type {
   AppSupabaseClient,
@@ -483,11 +483,10 @@ export async function processDueBrowserPushReminders(
   return result;
 }
 
+/** An ended or paused Behavior sends no reminder; its Occurrence is not running. */
 function behaviorHasEnded(behavior: Behavior, processedAt: string): boolean {
-  return resolveDueBehaviorArchives({
-    now: Temporal.Instant.from(processedAt),
-    behaviors: [{ id: behavior.id, active: behavior.active, endDate: behavior.end_date, timezone: behavior.timezone }],
-  }).length > 0;
+  const state = behaviorRunState(runFieldsFromStored(behavior), Temporal.Instant.from(processedAt)).state;
+  return state === "ended" || state === "paused";
 }
 
 async function processClaimedEmailReminder(input: {

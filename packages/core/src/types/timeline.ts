@@ -143,8 +143,18 @@ export type TimelineNeedsDecisionGroup = {
   daySections: TimelineDaySection[];
 };
 
+export type BehaviorRunNotice = {
+  behaviorId: string;
+  title: string;
+  /** ended: "Run ended. Start again". paused: "Run is paused, back Dec 8". back: "Run is back today". */
+  kind: "ended" | "paused" | "back";
+  /** The back-on day of a pause. */
+  backOn: string | null;
+};
+
 export type TimelineView = {
-  archiveNotifications?: Array<{ behaviorId: string; title: string; endDate: string | null }>;
+  /** Ended, paused and back-today notices for today (T7). Derived from fields; nothing is stored. */
+  runNotices?: BehaviorRunNotice[];
   durationEstimates?: Record<string, BehaviorDurationEstimate>;
   timezone: string;
   todayLocalDate: string;

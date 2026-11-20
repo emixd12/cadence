@@ -321,6 +321,8 @@ describe("BehaviorLog import write service", () => {
           "reminder_offset_minutes",
           "active",
           "timezone",
+          "end",
+          "pause",
         ],
         recorded_at: COMPLETED_AT,
         effective_at: COMPLETED_AT,

@@ -126,14 +126,18 @@ describe("integration operation registry", () => {
       "update_behavior",
       "archive_behavior",
       "restore_behavior",
+      "end_behavior",
+      "pause_behavior",
+      "resume_behavior",
     ]);
   });
 
-  it("uses contract version 1.4.0 and records when each tool arrived", () => {
-    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.4.0");
+  it("uses contract version 1.5.0 and records when each tool arrived", () => {
+    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.5.0");
     for (const [name, operation] of operations) {
       const since = name === "list_day_notes" || name === "update_day_note" ? "1.1.0"
-        : name === "move_occurrence_for_day" || name === "revert_occurrence_move" ? "1.3.0" : "1.0.0";
+        : name === "move_occurrence_for_day" || name === "revert_occurrence_move" ? "1.3.0"
+          : name === "end_behavior" || name === "pause_behavior" || name === "resume_behavior" ? "1.4.0" : "1.0.0";
       expect(operation.since, name).toBe(since);
     }
   });
@@ -144,7 +148,9 @@ describe("integration operation registry", () => {
     expect(byScope(INTEGRATION_SCOPES.occurrencesWrite)).toEqual([
       "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
     ]);
-    expect(byScope(INTEGRATION_SCOPES.behaviorsWrite)).toEqual(["create_behavior", "update_behavior", "archive_behavior", "restore_behavior"]);
+    expect(byScope(INTEGRATION_SCOPES.behaviorsWrite)).toEqual([
+      "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "end_behavior", "pause_behavior", "resume_behavior",
+    ]);
     for (const [, operation] of operations) {
       expect(operation.access === "read").toBe(operation.scope === INTEGRATION_SCOPES.read);
     }
@@ -175,6 +181,7 @@ describe("integration operation registry", () => {
     expect(destructive).toEqual([
       "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move",
       "update_day_note", "update_behavior", "archive_behavior", "restore_behavior",
+      "end_behavior", "pause_behavior", "resume_behavior",
     ]);
     expect(INTEGRATION_OPERATIONS.create_behavior.annotations.idempotentHint).toBe(false);
     expect(INTEGRATION_OPERATIONS.move_occurrence_for_day.annotations.idempotentHint).toBe(false);
@@ -369,7 +376,7 @@ describe("integration errors", () => {
     for (const code of INTEGRATION_ERROR_CODES) {
       const error = createIntegrationError(code, `Example ${code}.`, { retryAfterSeconds: code === "rate_limited" ? 30 : undefined });
       expect(validateAgainstSchema(integrationErrorSchema.schema, error).ok, code).toBe(true);
-      expect(error.contract_version).toBe("1.4.0");
+      expect(error.contract_version).toBe("1.5.0");
     }
   });
 

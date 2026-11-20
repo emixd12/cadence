@@ -368,15 +368,16 @@ export function BehaviorForm({
             </div>
           </div>
           <div className="grid min-w-0 gap-1 text-sm">
-            <label htmlFor={`${planningId}-end-date`}>End date</label>
-            <input id={`${planningId}-end-date`} name="end_date" type="date"
-              min="0001-01-01" max="9999-12-31" defaultValue={behavior?.endDate ?? ""}
-              aria-invalid={Boolean(fieldErrors.end_date)}
+            <label htmlFor={`${planningId}-end-date`}>Ends after</label>
+            <input id={`${planningId}-end-date`} name="end_on" type="date"
+              min="0001-01-01" max="9999-12-30" defaultValue={behavior?.endOn ?? ""}
+              aria-invalid={Boolean(fieldErrors.end_on)}
               aria-describedby={`${planningId}-end-date-help`}
               className="min-h-11 min-w-0 w-full border-0 border-b border-line bg-background px-0 text-base" />
+            <input type="hidden" name="end_time" value={behavior?.endTime?.slice(0, 5) ?? ""} />
             <div id={`${planningId}-end-date-help`}>
-              <p className="text-muted-readable">Optional. Archives at the start of this date in the Behavior’s timezone. Cadence shows an in-app notification.</p>
-              <FieldError message={fieldErrors.end_date} />
+              <p className="text-muted-readable">Optional. The last day it runs. After it, the behavior moves to Not running. Nothing is archived.</p>
+              <FieldError message={fieldErrors.end_on ?? fieldErrors.end_time ?? fieldErrors.pause} />
             </div>
           </div>
         </div>

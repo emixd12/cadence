@@ -15,6 +15,8 @@ import type { BehaviorConfigurationEvent } from "@/lib/types/database";
 export type TimezoneBehaviorConfigurationChange = {
   behaviorId: string;
   expectedUpdatedAt: string;
+  /** The stored end and pause start after the change (re-expressed when already past). */
+  run?: { end_on: string | null; end_time: string | null; pause_from_on: string | null; pause_from_time: string | null };
   configurationEventPlan: BehaviorConfigurationEventPlan | null;
 };
 
@@ -181,6 +183,7 @@ export async function updateProfileAndActiveBehaviorTimezonesWithConfigurationEv
       behavior_changes: input.behaviorChanges.map((change) => ({
         behavior_id: change.behaviorId,
         expected_updated_at: change.expectedUpdatedAt,
+        ...(change.run ? { run: change.run } : {}),
         configuration_event_plan: change.configurationEventPlan
           ? toBehaviorConfigurationEventPlanPayload(
               change.configurationEventPlan,

@@ -1,5 +1,6 @@
+import { earliestStoppedLocalDate, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { Temporal } from "@js-temporal/polyfill";
-import { toExistingOccurrenceForGeneration } from "@cadence/core/services/occurrence-generation";
+import { generationRunFields, toExistingOccurrenceForGeneration } from "@cadence/core/services/occurrence-generation";
 import type { OccurrenceDataStore } from "@cadence/core/data-store";
 import { syncMoveConflicts } from "@/lib/services/occurrence-move.service";
 
@@ -65,7 +66,6 @@ import { matchRepeatedNotesAfterNoteSave } from "@/lib/services/note-shortcut.se
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { processDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import type {
   Behavior,
   Occurrence,
@@ -176,7 +176,7 @@ export async function syncUserOccurrences(
         generationWindow: resolveGenerationWindow({
           now,
           timezone: behavior.timezone,
-          behaviorEndDate: behavior.end_date,
+          earliestStoppedLocalDate: earliestStoppedLocalDate(runFieldsFromStored(behavior)),
           horizonDays: options.horizonDays,
         }),
       }));
@@ -240,7 +240,7 @@ export async function syncUserOccurrences(
                   ),
                   timezone: behavior.timezone,
                   active: behavior.active,
-                  endDate: behavior.end_date,
+                  ...generationRunFields(behavior),
                   createdAt: behavior.created_at,
                 },
                 existingOccurrences: behaviorOccurrences.map(
@@ -547,11 +547,6 @@ export async function processOccurrenceSyncHorizons(
   const supabase = options.supabase ?? createServiceRoleClient();
   const now = options.now ?? Temporal.Now.instant();
   const horizonDays = options.horizonDays ?? DEFAULT_OCCURRENCE_HORIZON_DAYS;
-  await processDueBehaviorArchives({
-    supabase,
-    now,
-    limit: options.limit,
-  });
   const targets = await listProfileOccurrenceSyncTargets(supabase, {
     limit: normalizeOccurrenceSyncProcessLimit(options.limit),
   });

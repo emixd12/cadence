@@ -33,7 +33,6 @@ import {
   readFirstRunTravelSetup,
 } from "@/lib/services/onboarding.service";
 import { ensureUserOccurrencesFresh } from "@/lib/services/occurrence.service";
-import { reconcileMyDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import { readOccurrenceSyncState } from "@/lib/services/occurrence-sync-state.service";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
@@ -73,7 +72,6 @@ export async function getTimelinePageBundleForUser(
   options: GetTimelinePageDataOptions = {},
 ): Promise<TimelinePageBundle> {
   const now = options.now ?? Temporal.Now.instant();
-  await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, importRuns, syncState, travel] = await Promise.all([
     readCachedProfileTimezone(supabase, userId),
     readCachedUserBehaviors(supabase, userId),
@@ -116,7 +114,6 @@ export async function getTimelinePageDataForUser(
   options: GetTimelinePageDataOptions = {},
 ): Promise<TimelineView> {
   const now = options.now ?? Temporal.Now.instant();
-  await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, syncState] = await Promise.all([
     readCachedProfileTimezone(supabase, userId),
     readCachedUserBehaviors(supabase, userId),

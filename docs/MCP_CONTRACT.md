@@ -92,7 +92,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.4.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.5.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -118,6 +118,9 @@ Contract version: `1.4.0`. Generated from `packages/core/src/integration/`.
 | `update_behavior` | Update Behavior | `cadence.behaviors.write` | no | yes | yes |
 | `archive_behavior` | Archive Behavior | `cadence.behaviors.write` | no | yes | yes |
 | `restore_behavior` | Restore Behavior | `cadence.behaviors.write` | no | yes | yes |
+| `end_behavior` | End Behavior now | `cadence.behaviors.write` | no | yes | yes |
+| `pause_behavior` | Pause Behavior | `cadence.behaviors.write` | no | yes | yes |
+| `resume_behavior` | Resume Behavior | `cadence.behaviors.write` | no | yes | yes |
 
 Every tool sets `openWorldHint: false`.
 
@@ -127,7 +130,7 @@ Every tool sets `openWorldHint: false`.
 |---|---|---|---|
 | `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
 | `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note` |
-| `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior` |
+| `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior`, `end_behavior`, `pause_behavior`, `resume_behavior` |
 
 ## Error catalog
 
@@ -247,12 +250,12 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.4.0"` |
+| `contract_version` | yes | `"1.5.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
 
-**List Behaviors.** Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.
+**List Behaviors.** Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -264,7 +267,7 @@ Input:
 
 | Field | Required | Type |
 |---|---|---|
-| `state` | no | `active`, `archived`, `all` |
+| `state` | no | `active`, `archived`, `running`, `not_running`, `all` |
 | `category_id` | no | string (uuid) |
 | `updated_since` | no | string (date-time) |
 | `page_size` | no | integer |
@@ -279,7 +282,7 @@ Output:
 
 ### `get_behavior`
 
-**Get Behavior.** Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, end date, archive notes, and revision. Use it before editing a Behavior.
+**Get Behavior.** Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, and revision. Use it before editing a Behavior.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -663,6 +666,8 @@ Input:
 | `schedules` | yes | array of object |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer |
+| `end_on` | no | string (date) |
+| `end_time` | no | string |
 | `end_date` | no | string (date) |
 | `external_ref` | no | string |
 | `idempotency_key` | no | string |
@@ -675,7 +680,7 @@ Output:
 
 ### `update_behavior`
 
-**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end date. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
+**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
@@ -696,10 +701,12 @@ Input:
 | `schedules` | no | array of object |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer or null |
+| `end_on` | no | string (date) or null |
+| `end_time` | no | string or null |
 | `end_date` | no | string (date) or null |
 | `idempotency_key` | no | string |
 
-At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_date` is required.
+At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date` is required.
 
 Output:
 
@@ -743,6 +750,84 @@ Output:
 - Annotation rationale: Modifies an existing Behavior's state and resumes scheduling, which Claude's review criteria treat as a data modification, so destructiveHint is true. Under OpenAI's guidance the change is easy to reverse, so the value is conservative there. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.
 - Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`
 - Since: 1.0.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior_id` | yes | string (uuid) |
+| `expected_revision` | no | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior` | yes | object |
+| `changed` | yes | boolean |
+
+### `end_behavior`
+
+**End Behavior now.** Ends a Behavior this minute. It stays active, moves to Not running, and schedules nothing more; its Unresolved Occurrences later today, including a window still open, are removed. Marked, noted, and timed Occurrences stay. To end on a later day, use update_behavior with end_on. resume_behavior starts it again. Ending an ended Behavior changes nothing.
+
+- Scope: `cadence.behaviors.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Stops scheduling and removes the rest of today's Unresolved Occurrences, so destructiveHint is true under both Claude's and OpenAI's guidance. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
+- Since: 1.4.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior_id` | yes | string (uuid) |
+| `expected_revision` | no | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior` | yes | object |
+| `changed` | yes | boolean |
+
+### `pause_behavior`
+
+**Pause Behavior.** Pauses a Behavior from from_on until back_on, when it runs again by itself from the start of that day. A pause can start today or later; today starts now unless from_time is later. A Behavior has one pause at a time: a new pause replaces the old one. No Occurrences are scheduled while paused, and Unresolved ones inside the pause are removed. Marked, noted, and timed Occurrences stay.
+
+- Scope: `cadence.behaviors.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Replaces any earlier pause and removes Unresolved Occurrences inside the pause, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments leave the same pause, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
+- Since: 1.4.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior_id` | yes | string (uuid) |
+| `from_on` | yes | string (date) |
+| `from_time` | no | string or null |
+| `back_on` | yes | string (date) |
+| `expected_revision` | no | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior` | yes | object |
+| `changed` | yes | boolean |
+
+### `resume_behavior`
+
+**Resume Behavior.** Runs a paused or ended Behavior again from now: it clears the pause, and an end that has passed. An end still to come stays. Resuming a running Behavior changes nothing. Use restore_behavior for an archived Behavior.
+
+- Scope: `cadence.behaviors.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Modifies the Behavior's end or pause and resumes scheduling, which Claude's review criteria treat as a data modification, so destructiveHint is true. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
+- Since: 1.4.0
 
 Input:
 

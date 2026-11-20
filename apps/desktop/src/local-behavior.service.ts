@@ -1,3 +1,4 @@
+import { BEHAVIOR_RUN_COLUMNS } from "@cadence/core/services/behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorDataStore, BehaviorScheduleGraphMutation } from "@cadence/core/behavior-store";
 import { normalizeBehaviorDefinition } from "@cadence/core/resolvers/behavior-definition.resolver";
@@ -39,7 +40,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
       const configurationEvent = configurationRow(input.configurationEventPlan, profileId, behaviorId, timestamp);
       const behavior: Behavior = { ...input.behavior, archive_notes: input.behavior.archive_notes ?? [], id: behaviorId,
         default_duration_minutes: input.behavior.default_duration_minutes ?? null,
-        end_date: input.behavior.end_date ?? null, auto_archived_at: input.behavior.auto_archived_at ?? null,
+        ...runColumns(input.behavior, null), auto_archived_at: input.behavior.auto_archived_at ?? null,
         where_kind: input.behavior.where_kind ?? null, location_text: input.behavior.location_text ?? null,
         current_configuration_event_id: configurationEvent.id,
         scheduled_time: canonicalTime(input.behavior.scheduled_time),
@@ -65,7 +66,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
       const behavior: Behavior = { ...previous.behavior, ...input.behavior,
         default_duration_minutes: input.behavior.default_duration_minutes === undefined
           ? previous.behavior.default_duration_minutes ?? null : input.behavior.default_duration_minutes,
-        end_date: input.behavior.end_date === undefined ? previous.behavior.end_date ?? null : input.behavior.end_date,
+        ...runColumns(input.behavior, previous.behavior),
         auto_archived_at: input.behavior.auto_archived_at === undefined
           ? previous.behavior.auto_archived_at ?? null : input.behavior.auto_archived_at,
         where_kind: input.behavior.where_kind === undefined ? previous.behavior.where_kind ?? null : input.behavior.where_kind,
@@ -141,4 +142,10 @@ function jsonEqual(left: unknown, right: unknown) {
     : value !== null && typeof value === "object"
       ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => [key, stable(nested)])) : value;
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+}
+
+/** End and pause columns: each keeps the previous value when the write leaves it out. */
+function runColumns(next: Partial<Record<(typeof BEHAVIOR_RUN_COLUMNS)[number], string | null>>, previous: Behavior | null) {
+  return Object.fromEntries(BEHAVIOR_RUN_COLUMNS.map((column) =>
+    [column, next[column] === undefined ? previous?.[column] ?? null : next[column]])) as Record<(typeof BEHAVIOR_RUN_COLUMNS)[number], string | null>;
 }

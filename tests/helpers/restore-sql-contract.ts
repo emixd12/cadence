@@ -180,21 +180,17 @@ export async function exerciseRestoreSqlContract(client: AppSupabaseClient, user
   expect(snapshotHash(afterMixed.statusEvents)).toBe(snapshotHash(beforeMixed.statusEvents));
   expect(snapshotHash(afterMixed.timeSessions)).toBe(snapshotHash(beforeMixed.timeSessions));
 
-  // A pre-feature bundle can reactivate an automatically archived Behavior. The End date must
-  // come after the write's local date (2026-08-30); the database's real clock is past it, so
-  // the archive RPC treats it as due.
+  // A bundle written before Ended and Paused carries no end or pause. Restoring it keeps
+  // the stored end: Restore never clears an end, so the Behavior comes back as Ended.
   await updateBehavior(createBehaviorStore(client, userId), { behaviorId: current.behavior.id,
     expectedUpdatedAt: afterMixed.graphs[0].behavior.updated_at,
-    values: { ...addedValues, endDate: "2026-08-31" }, recordedAt: now.add({ seconds: 114 }).toString() });
-  const archived = await client.rpc("archive_my_due_behaviors", {});
-  expect(archived.error).toBeNull();
-  expect(archived.data).toHaveLength(1);
+    values: { ...addedValues, endOn: "2026-08-31" }, recordedAt: now.add({ seconds: 114 }).toString() });
   const legacyFiles = twoFiles.map((file) => ({ ...file }));
   const legacyBehaviors = legacyFiles.find((file) => file.path === "data/behaviors.jsonl")!;
   legacyBehaviors.content = legacyBehaviors.content.trim().split("\n").map((line) => {
     const row = JSON.parse(line);
     delete row.expected_duration_minutes;
-    delete row.extensions["app.cadence"].end_date;
+    for (const key of ["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"]) delete row.extensions["app.cadence"][key];
     delete row.extensions["app.cadence"].auto_archived_at;
     return JSON.stringify(row);
   }).join("\n") + "\n";
@@ -213,7 +209,7 @@ export async function exerciseRestoreSqlContract(client: AppSupabaseClient, user
   expect(legacyResult.status).toBe("applied");
   const legacyRestored = await readPortabilitySqlSnapshot(client, base);
   expect(legacyRestored.graphs[0].behavior).toMatchObject({
-    active: true, default_duration_minutes: 45, end_date: null, auto_archived_at: null,
+    active: true, default_duration_minutes: 45, end_on: "2026-08-31", auto_archived_at: null,
   });
 }
 
