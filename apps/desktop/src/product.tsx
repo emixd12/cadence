@@ -662,7 +662,7 @@ export function Product() {
         notificationTarget={notificationTarget}
         dailyBriefClient={dailyBriefClient}
         dailyBriefSessionKey={accountUserId ?? "local"}
-        onNavigate={navigate}
+        onNavigate={navigate} runAction={behaviorActions.runAction}
         onOpenAdvisorLink={openAdvisorLink}
         onRefresh={refresh} onReload={reloadTimeline} onShowMore={(days) => { parameters.current.days = days; void refreshScreen(); }} /> : null}
       {activeScreen === "behaviors" ? <BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}

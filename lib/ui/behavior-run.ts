@@ -1,3 +1,4 @@
+import type { BehaviorRunAction } from "@cadence/core/services/behavior.service";
 import type { BehaviorView } from "@/lib/types/behavior";
 
 /**
@@ -134,4 +135,15 @@ export function pauseRangeSummary(range: Readonly<{ fromOn: string; backOn: stri
   if (!range.backOn) return `Paused from ${from}. Pick the day it comes back.`;
   const days = daysBetween(range.fromOn, range.backOn);
   return `Paused from ${from}, back ${formatRunDay(range.backOn, todayLocalDate)} (${days} ${days === 1 ? "day" : "days"} off).`;
+}
+
+/** The italic outcome line after a run action (P-077). Shared by the web server action and the Mac local action. */
+export function behaviorRunOutcomeMessage(title: string, action: BehaviorRunAction, todayLocalDate: string): string {
+  if (action.kind === "end_now") return `${title} ended. Start again brings it back.`;
+  if (action.kind === "start_again") return `${title} is running again.`;
+  if (action.kind === "resume") return `${title} has no pause and runs as scheduled.`;
+  const back = formatRunDay(action.pause.backOn, todayLocalDate);
+  return action.pause.fromOn <= todayLocalDate
+    ? `${title} is paused, back ${back}.`
+    : `${title} pauses from ${formatRunDay(action.pause.fromOn, todayLocalDate)}, back ${back}.`;
 }

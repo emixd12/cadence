@@ -115,6 +115,19 @@ Check the cited entry before acting on a row.
   pass. `npm run test`: only the 4 files that fail the same way on main in this container
   (Node 22, no Preview access).
 
+## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-vwbetq`, stacked on the web PR).**
+  SQLite migration 0026 replaces `end_date` with the five run columns (backfill
+  `end_on = end_date - 1`). Row checks, contract 7 sync fields, the configuration snapshot
+  (`end`, `pause`), the generation guard and the timezone re-expression (T1) match the
+  server. The Mac wires the shared Not running group, run controls and Timeline notices to
+  a local `runAction`.
+- **Verification:** 167 Rust store tests; `tests/desktop-run-actions.test.ts`,
+  `tests/desktop-run-ui.dom.test.tsx`; desktop and web typecheck.
+- **Next:** Cadence for Mac 0.1.13 after the server PR merges; publishing needs the
+  owner's written OK.
+
 ## Ended and Paused Behaviors, web — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-8l6iw2`, stacked on the server and

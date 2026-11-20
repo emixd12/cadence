@@ -157,6 +157,8 @@ const HABIT_NOW: &str = "2026-08-30T12:00:00.000000Z";
 fn id(value: u32) -> String {
     format!("00000000-0000-4000-a000-{value:012}")
 }
+const RUN_COLUMNS: [&str; 5] = ["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"];
+
 struct Fixture {
     directory: std::path::PathBuf,
     db: Connection,
@@ -194,7 +196,25 @@ impl Fixture {
         request["profileId"] = json!(self.profile);
         request["mutationId"] = json!(id(mutation));
         request["now"] = json!(NOW);
-        execute(&mut self.db, serde_json::from_value(request).unwrap())
+        // A schema before 0026 has no run columns; the current Behavior row needs them
+        // while the request runs. They leave again so the full migrate adds them itself.
+        // Schemas 15 to 25 also carry end_date, which the current row no longer has.
+        let before_run_columns = self.db.prepare("SELECT end_on FROM behaviors").is_err();
+        let has_end_date = self.db.prepare("SELECT end_date FROM behaviors").is_ok();
+        if before_run_columns {
+            self.db.execute_batch(&RUN_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors ADD COLUMN {column} TEXT;")).collect::<String>()).unwrap();
+            if has_end_date {
+                self.db.execute_batch("ALTER TABLE behaviors DROP COLUMN end_date;").unwrap();
+            }
+        }
+        let result = execute(&mut self.db, serde_json::from_value(request).unwrap());
+        if before_run_columns {
+            self.db.execute_batch(&RUN_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors DROP COLUMN {column};")).collect::<String>()).unwrap();
+            if has_end_date {
+                self.db.execute_batch("ALTER TABLE behaviors ADD COLUMN end_date TEXT;").unwrap();
+            }
+        }
+        result
     }
     fn count(&self, table: &str) -> i64 {
         self.db
@@ -224,7 +244,7 @@ fn configuration() -> Value {
 }
 fn create_request(profile: &str) -> Value {
     json!({"operation":"createBehaviorGraph","graph":{
-        "behavior":{"id":id(1),"user_id":profile,"title":"Walk","description":null,"category_id":null,"recurrence_rule":{"frequency":"daily","interval":1},"scheduled_time":"09:00:00","timezone":"America/New_York","browser_reminder_enabled":true,"email_reminder_enabled":false,"reminder_offset_minutes":0,"default_duration_minutes":null,"end_date":null,"auto_archived_at":null,"active":true,"current_configuration_event_id":id(5),"created_at":NOW,"updated_at":NOW,"archived_at":null},
+        "behavior":{"id":id(1),"user_id":profile,"title":"Walk","description":null,"category_id":null,"recurrence_rule":{"frequency":"daily","interval":1},"scheduled_time":"09:00:00","timezone":"America/New_York","browser_reminder_enabled":true,"email_reminder_enabled":false,"reminder_offset_minutes":0,"default_duration_minutes":null,"end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,"auto_archived_at":null,"active":true,"current_configuration_event_id":id(5),"created_at":NOW,"updated_at":NOW,"archived_at":null},
         "schedules":[{"id":id(2),"user_id":profile,"behavior_id":id(1),"recurrence_rule":{"frequency":"daily","interval":1},"sort_order":0,"created_at":NOW,"updated_at":NOW}],
         "slots":[{"id":id(3),"user_id":profile,"behavior_id":id(1),"behavior_schedule_id":id(2),"kind":"exact","preset":null,"start_time":"09:00:00","end_time":null,"sort_order":0,"created_at":NOW,"updated_at":NOW}]},
         "definitionEvent":{"id":id(4),"user_id":profile,"behavior_id":id(1),"previous_title":null,"previous_description":null,"next_title":"Walk","next_description":null,"changed_fields":["title"],"recorded_at":NOW,"source":"manual","reason":null,"created_at":NOW,"updated_at":NOW},
@@ -371,26 +391,83 @@ fn archive_history_validates_and_roundtrips_each_cycle() {
 }
 
 #[test]
-fn behavior_duration_and_archive_boundary_validate_and_roundtrip() {
+fn behavior_duration_end_and_pause_validate_and_roundtrip() {
     let mut fixture = Fixture::new();
     fixture.create();
     let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
     behavior.default_duration_minutes = Some(45);
-    behavior.end_date = Some("2026-10-01".into());
+    behavior.end_on = Some("2026-09-30".into());
+    behavior.end_time = Some("14:00:00".into());
+    behavior.pause_from_on = Some("2026-09-10".into());
+    behavior.pause_from_time = Some("18:30:00".into());
+    behavior.pause_back_on = Some("2026-09-14".into());
     db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
     let stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &behavior.id).unwrap();
-    assert_eq!(stored.default_duration_minutes, Some(45));
-    assert_eq!(stored.end_date.as_deref(), Some("2026-10-01"));
+    assert_eq!(stored, behavior);
 
-    let mut invalid = stored.clone();
-    invalid.default_duration_minutes = Some(0);
-    assert!(db::validate_row(&fixture.profile, &invalid).is_err());
-    invalid = stored.clone();
-    invalid.end_date = Some("2026-02-30".into());
-    assert!(db::validate_row(&fixture.profile, &invalid).is_err());
-    invalid = stored;
-    invalid.auto_archived_at = Some("2026-10-01T04:00:00Z".into());
-    assert!(db::validate_row(&fixture.profile, &invalid).is_err());
+    let invalid = |change: &dyn Fn(&mut Behavior)| {
+        let mut row = stored.clone();
+        change(&mut row);
+        assert!(db::validate_row(&fixture.profile, &row).is_err());
+    };
+    invalid(&|row| row.default_duration_minutes = Some(0));
+    invalid(&|row| row.end_on = Some("2026-02-30".into()));
+    invalid(&|row| row.end_on = Some("9999-12-31".into()));
+    invalid(&|row| row.end_time = Some("14:00:30".into()));
+    invalid(&|row| row.end_time = Some("2:00 PM".into()));
+    invalid(&|row| row.end_on = None);
+    invalid(&|row| row.pause_back_on = None);
+    invalid(&|row| {
+        row.pause_from_on = None;
+        row.pause_from_time = None;
+    });
+    invalid(&|row| row.pause_back_on = Some("2026-09-10".into()));
+    invalid(&|row| row.pause_from_time = Some("18:30:15".into()));
+    invalid(&|row| row.auto_archived_at = Some("2026-10-01T04:00:00Z".into()));
+    for sql in [
+        "UPDATE behaviors SET end_on=NULL",
+        "UPDATE behaviors SET end_time='14:00:30'",
+        "UPDATE behaviors SET pause_back_on=NULL",
+        "UPDATE behaviors SET pause_back_on='2026-09-09'",
+        "UPDATE behaviors SET pause_from_on=NULL, pause_from_time=NULL",
+    ] {
+        // SQLite refuses the same rows when validation is skipped.
+        assert!(fixture.db.execute(sql, []).is_err(), "{sql}");
+    }
+}
+
+#[test]
+fn migration_backfills_end_on_as_the_day_before_end_date() {
+    let connection = rusqlite::Connection::open_in_memory().unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE behaviors (id TEXT PRIMARY KEY, active INTEGER NOT NULL, archived_at TEXT, end_date TEXT, auto_archived_at TEXT);
+             INSERT INTO behaviors VALUES ('a', 1, NULL, '2026-12-01', NULL), ('b', 1, NULL, NULL, NULL),
+               ('c', 0, '2026-03-01T05:00:00Z', '2026-03-01', '2026-03-01T05:00:00Z'), ('d', 1, NULL, '2027-01-01', NULL);",
+        )
+        .unwrap();
+    connection
+        .execute_batch(include_str!("../../migrations/0026_behavior_end_and_pause.sql"))
+        .unwrap();
+    type BackfillRow = (String, Option<String>, Option<String>, Option<String>);
+    let rows: Vec<BackfillRow> = connection
+        .prepare("SELECT id, end_on, end_time, auto_archived_at FROM behaviors ORDER BY id")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+        .unwrap()
+        .collect::<std::result::Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("a".into(), Some("2026-11-30".into()), None, None),
+            ("b".into(), None, None, None),
+            // An item the retired job archived stays archived, with its marker.
+            ("c".into(), Some("2026-02-28".into()), None, Some("2026-03-01T05:00:00Z".into())),
+            ("d".into(), Some("2026-12-31".into()), None, None),
+        ]
+    );
+    assert!(connection.prepare("SELECT end_date FROM behaviors").is_err());
 }
 
 #[test]
@@ -416,40 +493,116 @@ fn occurrence_identity_keeps_exact_and_different_ranges_and_rejects_stale_batch(
 }
 
 #[test]
-fn end_date_only_edit_rejects_a_stale_generation_insert() {
-    let mut fixture = Fixture::new();
-    fixture.create();
-    let planned = occurrence_row(&fixture.profile, 10, "exact", None);
-    let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
-    let configuration_id = behavior.current_configuration_event_id.clone();
-    behavior.end_date = Some(planned.local_date.clone());
-    db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
-    let result = fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":configuration_id,"create":[planned],"update":[],"delete":[]}),101);
-    assert_eq!(
-        result.unwrap_err(),
-        "Behavior end date changed after occurrence planning."
-    );
-    assert_eq!(fixture.count("occurrences"), 0);
+fn end_or_pause_edit_rejects_a_stale_generation_insert() {
+    for (end_on, pause) in [
+        // The day before the planned row is the last day it runs.
+        (Some("2026-08-30"), None),
+        // The planned row falls inside the pause.
+        (None, Some(("2026-08-29", None, "2026-09-02"))),
+        // The pause starts at the beginning of the planned day.
+        (None, Some(("2026-08-31", None, "2026-09-01"))),
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.create();
+        let planned = occurrence_row(&fixture.profile, 10, "exact", None);
+        assert_eq!(planned.local_date, "2026-08-31");
+        let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+        let configuration_id = behavior.current_configuration_event_id.clone();
+        behavior.end_on = end_on.map(Into::into);
+        if let Some((from, time, back)) = pause {
+            behavior.pause_from_on = Some(from.into());
+            behavior.pause_from_time = time;
+            behavior.pause_back_on = Some(back.into());
+        }
+        db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
+        let result = fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":configuration_id,"create":[planned],"update":[],"delete":[]}),101);
+        assert_eq!(
+            result.unwrap_err(),
+            "Behavior end or pause changed after occurrence planning."
+        );
+        assert_eq!(fixture.count("occurrences"), 0);
+    }
 }
 
 #[test]
-fn end_date_cleanup_can_delete_elapsed_bare_rows_but_preserves_notes() {
-    let mut fixture = Fixture::new();
-    fixture.create();
-    let mut row = fixture.occurrence();
-    row.local_date = "2026-08-29".into();
-    row.scheduled_for = "2026-08-29T13:00:00Z".into();
-    row.note = Some("Keep this note".into());
-    db::update(&fixture.db, &fixture.profile, &row.id, &row).unwrap();
-    let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
-    behavior.end_date = Some("2026-08-28".into());
-    db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
-    let request = |row: &Occurrence| json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),"create":[],"update":[],"delete":[row]});
-    assert!(fixture.run(request(&row), 102).is_err());
-    row.note = None;
-    db::update(&fixture.db, &fixture.profile, &row.id, &row).unwrap();
-    fixture.run(request(&row), 103).unwrap();
-    assert_eq!(fixture.count("occurrences"), 0);
+fn rows_on_the_last_day_or_a_timed_pause_start_day_are_left_to_the_planner() {
+    for (end_on, pause) in [
+        (Some("2026-08-31"), None),
+        (None, Some(("2026-08-31", Some("18:00:00".to_string()), "2026-09-02"))),
+        (None, Some(("2026-08-25", None, "2026-08-31"))),
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.create();
+        let planned = occurrence_row(&fixture.profile, 10, "exact", None);
+        let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+        behavior.end_on = end_on.map(Into::into);
+        if let Some((from, time, back)) = pause {
+            behavior.pause_from_on = Some(from.into());
+            behavior.pause_from_time = time;
+            behavior.pause_back_on = Some(back.into());
+        }
+        db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
+        fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),"create":[planned],"update":[],"delete":[]}),101).unwrap();
+        assert_eq!(fixture.count("occurrences"), 1);
+    }
+}
+
+#[test]
+fn end_or_pause_cleanup_can_delete_elapsed_bare_rows_but_preserves_notes() {
+    for (end_on, pause) in [
+        (Some("2026-08-28"), None),
+        // An overnight range planned the day before the last day may still be open.
+        (Some("2026-08-30"), None),
+        (None, Some(("2026-08-29", "2026-09-01"))),
+        (None, Some(("2026-08-30", "2026-09-01"))),
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.create();
+        let mut row = fixture.occurrence();
+        row.local_date = "2026-08-29".into();
+        row.scheduled_for = "2026-08-29T13:00:00Z".into();
+        row.note = Some("Keep this note".into());
+        db::update(&fixture.db, &fixture.profile, &row.id, &row).unwrap();
+        let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+        behavior.end_on = end_on.map(Into::into);
+        if let Some((from, back)) = pause {
+            behavior.pause_from_on = Some(from.into());
+            behavior.pause_back_on = Some(back.into());
+        }
+        db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
+        let request = |row: &Occurrence| json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),"create":[],"update":[],"delete":[row]});
+        assert!(fixture.run(request(&row), 102).is_err());
+        row.note = None;
+        db::update(&fixture.db, &fixture.profile, &row.id, &row).unwrap();
+        fixture.run(request(&row), 103).unwrap();
+        assert_eq!(fixture.count("occurrences"), 0);
+    }
+}
+
+#[test]
+fn elapsed_rows_outside_the_end_and_pause_stay_protected() {
+    for (end_on, pause) in [
+        (Some("2026-08-31"), None),
+        (None, Some(("2026-08-31", "2026-09-02"))),
+        (None, Some(("2026-08-20", "2026-08-29"))),
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.create();
+        let mut row = fixture.occurrence();
+        row.local_date = "2026-08-29".into();
+        row.scheduled_for = "2026-08-29T13:00:00Z".into();
+        db::update(&fixture.db, &fixture.profile, &row.id, &row).unwrap();
+        let mut behavior: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+        behavior.end_on = end_on.map(Into::into);
+        if let Some((from, back)) = pause {
+            behavior.pause_from_on = Some(from.into());
+            behavior.pause_back_on = Some(back.into());
+        }
+        db::update(&fixture.db, &fixture.profile, &behavior.id, &behavior).unwrap();
+        let request = json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),"create":[],"update":[],"delete":[row]});
+        assert!(fixture.run(request, 102).is_err());
+        assert_eq!(fixture.count("occurrences"), 1);
+    }
 }
 
 #[test]
@@ -1091,6 +1244,100 @@ fn graph_edits_swap_times_and_relocate_retained_slots_without_losing_occurrence_
     assert_eq!(fixture.count("tombstones"), 1);
 }
 
+/// A configuration revision from the shared core service: an end or a pause change.
+fn run_revision(
+    fixture: &mut Fixture,
+    change: impl Fn(&mut Value),
+    previous_run: (Value, Value),
+    next_run: (Value, Value),
+    changed_fields: Value,
+    mutation: u32,
+) -> Result<Value> {
+    let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+    let revision = graph["revision"].clone();
+    graph.as_object_mut().unwrap().remove("revision");
+    change(&mut graph["behavior"]);
+    graph["behavior"]["current_configuration_event_id"] = json!(id(mutation));
+    let mut event = create_request(&fixture.profile)["configurationEvent"].clone();
+    event["id"] = json!(id(mutation));
+    event["event_kind"] = json!("revision");
+    event["previous_configuration"] = event["next_configuration"].clone();
+    event["previous_configuration"]["end"] = previous_run.0;
+    event["previous_configuration"]["pause"] = previous_run.1;
+    event["next_configuration"]["end"] = next_run.0;
+    event["next_configuration"]["pause"] = next_run.1;
+    event["changed_fields"] = changed_fields;
+    event["reason_code"] = json!("behavior_paused");
+    fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":event}), mutation)
+}
+
+#[test]
+fn end_and_pause_join_the_configuration_snapshot() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let pause = json!({"fromOn":"2026-09-10","fromTime":null,"backOn":"2026-09-14"});
+    let set_pause = |behavior: &mut Value| {
+        behavior["pause_from_on"] = json!("2026-09-10");
+        behavior["pause_back_on"] = json!("2026-09-14");
+    };
+    // The snapshot must carry the pause, and "pause" is an allowed changed field.
+    assert!(run_revision(&mut fixture, set_pause, (Value::Null, Value::Null), (Value::Null, Value::Null), json!(["pause"]), 6).is_err());
+    assert!(run_revision(&mut fixture, set_pause, (Value::Null, Value::Null), (Value::Null, pause.clone()), json!(["end_date"]), 6).is_err());
+    let paused = run_revision(&mut fixture, set_pause, (Value::Null, Value::Null), (Value::Null, pause.clone()), json!(["pause"]), 6).unwrap();
+    assert_eq!(paused["behavior"]["pause_back_on"], "2026-09-14");
+    // A pre-0026 snapshot (no end or pause keys) reads as no end and no pause.
+    let stored: BehaviorConfigurationEvent = db::by_id(&fixture.db, &fixture.profile, &id(5)).unwrap();
+    assert!(stored.next_configuration.get("end").is_none());
+    let end = json!({"on":"2026-09-30","time":"14:00:00"});
+    let ended = run_revision(&mut fixture, |behavior| {
+        behavior["end_on"] = json!("2026-09-30");
+        behavior["end_time"] = json!("14:00:00");
+    }, (Value::Null, pause.clone()), (end, pause), json!(["end"]), 7).unwrap();
+    assert_eq!(ended["behavior"]["end_time"], "14:00:00");
+    assert_eq!(fixture.count("behavior_configuration_events"), 3);
+}
+
+#[test]
+fn timezone_change_may_reexpress_a_past_end_but_nothing_else() {
+    let attempt = |end_on: &str, end_time: Option<&str>, back_on: &str, changed: Value| {
+        let mut fixture = Fixture::new();
+        fixture.create();
+        let mut stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+        stored.end_on = Some("2026-08-29".into());
+        stored.pause_from_on = Some("2026-09-10".into());
+        stored.pause_back_on = Some("2026-09-14".into());
+        db::update(&fixture.db, &fixture.profile, &stored.id, &stored).unwrap();
+        let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+        graph.as_object_mut().unwrap().remove("revision");
+        graph["behavior"]["timezone"] = json!("Europe/London");
+        graph["behavior"]["current_configuration_event_id"] = json!(id(6));
+        graph["behavior"]["end_on"] = json!(end_on);
+        graph["behavior"]["end_time"] = json!(end_time);
+        graph["behavior"]["pause_back_on"] = json!(back_on);
+        let mut configuration = create_request(&fixture.profile)["configurationEvent"].clone();
+        configuration["id"] = json!(id(6));
+        configuration["event_kind"] = json!("revision");
+        configuration["previous_configuration"] = configuration["next_configuration"].clone();
+        configuration["previous_configuration"]["end"] = json!({"on":"2026-08-29","time":null});
+        let pause = json!({"fromOn":"2026-09-10","fromTime":null,"backOn":"2026-09-14"});
+        configuration["previous_configuration"]["pause"] = pause;
+        configuration["next_configuration"]["timezone"] = json!("Europe/London");
+        configuration["next_configuration"]["end"] = json!({"on":end_on,"time":end_time});
+        configuration["next_configuration"]["pause"] = json!({"fromOn":"2026-09-10","fromTime":null,"backOn":back_on});
+        configuration["timezone"] = json!("Europe/London");
+        configuration["changed_fields"] = changed;
+        configuration["reason_code"] = json!("timezone_changed");
+        fixture.run(json!({"operation":"updateProfileTimezone","expectedTimezone":"America/New_York","expectedSyncVersion":1,"timezone":"Europe/London","updates":[{"graph":graph,"expectedRevision":1,"configurationEvent":configuration}]}), 102)
+    };
+    // Midnight in New York is 5:00 AM in London: the moment stays.
+    attempt("2026-08-30", Some("05:00:00"), "2026-09-14", json!(["timezone", "end"])).unwrap();
+    attempt("2026-08-29", None, "2026-09-14", json!(["timezone"])).unwrap();
+    // The changed fields must name the re-expressed end.
+    assert!(attempt("2026-08-30", Some("05:00:00"), "2026-09-14", json!(["timezone"])).is_err());
+    // The back-on day never moves with a timezone change.
+    assert!(attempt("2026-08-29", None, "2026-09-15", json!(["timezone", "pause"])).is_err());
+}
+
 #[test]
 fn sync_freshness_cas_rejects_a_graph_mutation_during_generation() {
     let mut fixture = Fixture::new();
@@ -1624,6 +1871,7 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
     fixture.db.execute_batch(db::MIGRATIONS[17].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[18].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[19].2).unwrap();
+    fixture.db.execute_batch(db::MIGRATIONS[25].2).unwrap();
     let mut plan = import_plan(&fixture.profile);
     let intervention = imported_intervention(&fixture.profile, 200, "browser_push", "sent");
     plan["importedInterventionWrites"] = json!([{"expected":null,"next":intervention}]);
@@ -1678,7 +1926,11 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
         .db
         .execute_batch(
             "ALTER TABLE behaviors DROP COLUMN auto_archived_at;
-             ALTER TABLE behaviors DROP COLUMN end_date;
+             ALTER TABLE behaviors DROP COLUMN end_time;
+             ALTER TABLE behaviors DROP COLUMN pause_from_time;
+             ALTER TABLE behaviors DROP COLUMN pause_back_on;
+             ALTER TABLE behaviors DROP COLUMN pause_from_on;
+             ALTER TABLE behaviors DROP COLUMN end_on;
              ALTER TABLE behaviors DROP COLUMN default_duration_minutes;
              ALTER TABLE behaviors DROP COLUMN archive_notes;
              DROP TRIGGER profiles_create_default_travel_settings;
