@@ -5,6 +5,8 @@ import { LeaveReminderSettingBench, TravelDevelopmentTextBench, TravelHabitsBenc
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefMovesBench } from "./DailyBriefMovesBench";
+import { ChatBench, ChatBenchPage } from "./ChatBench";
+import { parseChatBenchState } from "./chat-fixtures";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
@@ -399,6 +401,8 @@ type DesignSystemPageProps = Readonly<{
     preview?: string | string[];
     state?: string | string[];
     layout?: string | string[];
+    recents?: string | string[];
+    menu?: string | string[];
     option?: string | string[];
     view?: string | string[];
     shot?: string | string[];
@@ -419,6 +423,18 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
 
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
+
+  // Advisor plan Phase 5B: the Chat page in the app shell, one fixture state per page.
+  if (selectedPreviewId === "chat") {
+    const recents = firstSearchParam(params?.recents);
+    return (
+      <ChatBenchPage
+        state={parseChatBenchState(selectedFixtureState)}
+        recentsOpen={recents === "open" ? true : recents === "closed" ? false : undefined}
+        menuOpen={firstSearchParam(params?.menu) === "open"}
+      />
+    );
+  }
 
   if (selectedPreviewId === "advisor") {
     // Advisor plan 4E: the built advisor (placement K) on the real Timeline with synthetic data.
@@ -2215,6 +2231,7 @@ const previewFactories: Record<
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
   "module.occurrence-mark-details": () => <ProductPreview maxHeight="32rem"><MarkDetailsBench /></ProductPreview>,
   "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,
+  "module.chat-page": () => <ProductPreview maxHeight="48rem"><ChatBench state="today" /></ProductPreview>,
   "module.trust-and-legal-panel": () => (
       <ProductPreview>
         <TrustAndLegalPanel />

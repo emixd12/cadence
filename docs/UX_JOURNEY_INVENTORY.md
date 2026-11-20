@@ -595,6 +595,28 @@ Likely failure points:
 - Machine-readable links can drift from generated outputs if marketing checks
   are not run after route changes.
 
+### J23 Chat With Cadence
+
+Primary persona: any signed-in person (advisor plan Phase 5).
+
+Steps:
+
+1. Open **Chat** from the navigation.
+2. Ask about today or the week, or ask for a change.
+3. Undo a single change, or answer **Yes** · **No** for a Behavior change.
+4. Reopen a past conversation.
+
+Success criteria:
+
+- Answers name the person's own items and calendar events.
+- Every change Chat makes shows an outcome line; single changes offer Undo.
+- Refusals and failures are one red sentence with what to do next.
+
+Likely failure points:
+
+- A dropped connection mid-reply; Send again must never run a turn twice.
+- The phone keyboard hiding the last line or the field.
+
 ## Cross-Journey Acceptance Themes
 
 Use these as global pass/fail criteria across the inventory:

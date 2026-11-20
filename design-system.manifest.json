@@ -678,6 +678,21 @@
       "notes": "Advisor plan Phase 3B. The brief's move lines inside the Daily Brief bubble: Behavior, current \u2192 new time, a plain reason, then Yes \u00b7 No \u00b7 Other time as underlined text links, plus Already did it on late items, assumes N min \u00b7 change, travel not checked and Don\u2019t suggest moving this. Accept all above two or more lines, Undo all after it. Other time lists free times, a time picker and Re-plan. Yes opens the shared bottom move drawer with Undo. No fades the line. Refusals use the alert style. Text only: no boxes or filled buttons."
     },
     {
+      "id": "module.chat-page",
+      "name": "ChatPage",
+      "kind": "module",
+      "source": "components/chat/ChatPage.tsx",
+      "exportName": "ChatPage",
+      "usageNames": [
+        "ChatPage",
+        "ChatMessages"
+      ],
+      "benchAnchor": "design-system#ds-module-chat-page",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Advisor plan Phase 5B. The Chat page: opening line and three starter prompts, the person's messages in a Cold Surface block, Cadence's reply as plain Ink text, small Readable Ash tool lines, Ink italic outcomes with an upright Undo, a Yes \u00b7 No confirm listing every pending write, refusals and alerts as one Rust Signal sentence, a grey medical note, past conversations and a composer fixed to the bottom. Full-page states: /design-system?preview=chat&state=opening|today|confirm|refusal|medical|budget|past."
+    },
+    {
       "id": "module.daily-brief-settings-panel",
       "name": "DailyBriefSettingsPanel",
       "kind": "module",

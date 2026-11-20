@@ -1,0 +1,45 @@
+{
+  "version": "chat-starters-2",
+  "notes": "Advisor plan Phase 5B. Starter questions for an empty Chat conversation. Each lane names the account fact that makes a question worth asking (packages/core/src/resolvers/chat-starters.resolver.ts). {behavior} is filled with one of the person's own Behavior titles, so templates keep the person as the subject and work for verb-phrase titles too. min_behaviors hides a question until the account has that many active Behaviors. advice_card names the advice card a question draws on, when there is one. Copy rules (Emi's review, Nov 20): Behavior for the recurring habit, items for one day's instances, Needs decision for older items without a mark; no scorekeeping, guilt or cheerleading; every question answerable from the person's own record. Revision 2 applies that review.",
+  "starters": [
+    { "id": "today-whats-on", "lane": "general", "text": "What is on today?" },
+    { "id": "week-how-going", "lane": "general", "text": "How is my week going?" },
+    { "id": "today-plan-rest", "lane": "general", "text": "Help me plan the rest of today." },
+    { "id": "week-not-done", "lane": "general", "text": "What did not get done this week?" },
+    { "id": "month-how-been", "lane": "general", "text": "How has my month been?" },
+    { "id": "behaviors-need-attention", "lane": "general", "text": "Which Behaviors need attention lately?" },
+
+    { "id": "today-what-next", "lane": "today_open", "text": "What should I do next?" },
+    { "id": "today-fit-the-rest", "lane": "today_open", "text": "Can I still fit everything in today?" },
+    { "id": "today-rearrange", "lane": "today_open", "text": "Help me rearrange the rest of today." },
+    { "id": "today-tomorrow", "lane": "today_done", "text": "How does tomorrow look?" },
+    { "id": "today-week-review", "lane": "today_done", "text": "How did my week go?" },
+    { "id": "today-moved", "lane": "moved_today", "text": "Have I been moving {behavior} a lot lately?", "advice_card": "set-it-where-you-keep-moving-it" },
+
+    { "id": "decision-which", "lane": "unmarked", "text": "What still needs a decision?", "advice_card": "unmarked-is-not-missed" },
+    { "id": "decision-mark", "lane": "unmarked", "text": "Help me mark what still needs a decision.", "advice_card": "marking-is-the-core" },
+
+    { "id": "low-obstacle", "lane": "low_behavior", "text": "What gets in the way of {behavior}?", "advice_card": "name-the-obstacle" },
+    { "id": "low-smaller", "lane": "low_behavior", "text": "How could I make {behavior} easier to start?", "advice_card": "make-it-smaller" },
+    { "id": "low-other-time", "lane": "low_behavior", "text": "Would {behavior} work better at another time?", "advice_card": "plan-when-and-where-after-a-drop" },
+
+    { "id": "steady-why", "lane": "steady_behavior", "text": "What makes {behavior} so steady?", "advice_card": "leave-steady-items-alone" },
+    { "id": "steady-pair", "lane": "steady_behavior", "text": "What could I pair with {behavior}?", "advice_card": "stack-after-a-routine" },
+
+    { "id": "week-what-changed", "lane": "week_down", "text": "What changed this week?", "advice_card": "plan-for-the-dip" },
+    { "id": "week-focus", "lane": "week_down", "text": "What should I focus on for the rest of the week?", "advice_card": "one-miss-is-fine" },
+    { "id": "week-working", "lane": "week_up", "text": "What is working better this week?", "advice_card": "look-at-the-week" },
+    { "id": "month-improved", "lane": "week_up", "text": "What has improved this month?", "advice_card": "look-at-the-week" },
+
+    { "id": "early-too-soon", "lane": "early", "text": "Is it too early to judge my new Behaviors?", "advice_card": "weeks-not-days" },
+    { "id": "early-times-places", "lane": "early", "text": "Do my new Behaviors have good times and places?", "advice_card": "start-with-when-and-where" },
+    { "id": "early-fit", "lane": "early", "text": "Where in my day do my new Behaviors fit best?", "advice_card": "anchor-to-an-existing-routine" },
+    { "id": "early-too-many", "lane": "early", "text": "Am I starting too many Behaviors at once?", "advice_card": "start-with-fewer", "min_behaviors": 4 },
+
+    { "id": "weekday-hardest", "lane": "weekday_gap", "text": "Which day of the week is hardest for me?", "advice_card": "same-cue-every-day" },
+    { "id": "time-of-day", "lane": "time_of_day_gap", "text": "When in the day do I do best?" },
+    { "id": "crowded-hour", "lane": "crowded_hour", "text": "Are too many Behaviors crowded into one hour?", "advice_card": "one-slot-one-item" },
+    { "id": "done-together", "lane": "done_together", "text": "Which Behaviors do I tend to do together?", "advice_card": "stack-after-a-routine" },
+    { "id": "setup-gaps", "lane": "setup_gaps", "text": "Which Behaviors are missing a duration or a place?", "advice_card": "give-it-a-length" }
+  ]
+}
