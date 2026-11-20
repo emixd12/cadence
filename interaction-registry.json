@@ -370,7 +370,8 @@
         "INT-ADVISOR-001",
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
-        "INT-ADVISOR-004"
+        "INT-ADVISOR-004",
+        "INT-ADVISOR-005"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -1284,12 +1285,13 @@
     {
       "path": "components/advisor/AdvisorParts.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 19,
+      "interaction_marker_count": 25,
       "interaction_ids": [
         "INT-ADVISOR-001",
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
-        "INT-ADVISOR-004"
+        "INT-ADVISOR-004",
+        "INT-ADVISOR-005"
       ]
     }
   ],
@@ -19321,20 +19323,24 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Answer a suggested schedule change (Try for two weeks, Change for good, No) or the check-in at the end of a try (Keep, Go back).",
+      "intent": "Answer a suggested schedule change (Try for two weeks, Change for good, No), the check-in at the end of a try (Keep, Go back), or Undo right after Change for good. A tip can carry the question (Set Gym to 6:30 PM every day?); Cadence writes the question, and a No answers the tip Not now.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Try for two weeks, Change for good or No in the panel"
+          "control": "Try for two weeks, Change for good or No in the panel, under the question or under the tip that carries it"
         },
         {
           "kind": "activate",
           "control": "Keep or Go back on the line under today's date or in the panel"
+        },
+        {
+          "kind": "activate",
+          "control": "Undo after the outcome of Change for good"
         }
       ],
       "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
-      "success_result": "The italic outcome replaces the answers. An answer that changes the schedule redraws the Timeline (the Mac pulls it through account sync).",
-      "failure_result": "A question that waits for tomorrow, closed or changed elsewhere shows one red line starting Not changed.; the schedule is unchanged.",
+      "success_result": "The italic outcome replaces the answers and says when the change starts (today when today's item is still ahead and unmarked, otherwise tomorrow). Undo puts the old schedule back, today's item included. An answer that changes the schedule redraws the Timeline (the Mac pulls it through account sync).",
+      "failure_result": "A question that waits for tomorrow, closed or changed elsewhere, or an Undo after a later edit, shows one red line starting Not changed.; the schedule is unchanged.",
       "effects": [
         "database_write",
         "network_request"
@@ -19343,14 +19349,18 @@
       "confirmation": "none",
       "implementation": [
         "components/advisor/AdvisorParts.tsx#AdvisorDayLine",
-        "lib/ui/advisor.ts"
+        "components/advisor/AdvisorParts.tsx#TipQuestion",
+        "lib/ui/advisor.ts",
+        "lib/services/behavior-change-proposals.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/advisor-ui.dom.test.tsx"
+          "tests/advisor-ui.dom.test.tsx",
+          "tests/behavior-change-proposals.service.test.ts",
+          "tests/tips-one-tap.local-integration.test.ts"
         ],
-        "notes": "DOM checks cover Go back on the line with its refresh, and a refused Try for two weeks in the panel."
+        "notes": "DOM checks cover Go back on the line with its refresh, a refused Try for two weeks in the panel, and a tip's question answered Change for good then Undo. Service and local Supabase checks cover a Yes moving today's item, a day already moved by hand keeping its move, and Undo."
       },
       "platforms": {
         "web": {
@@ -19367,6 +19377,89 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-ADVISOR-005",
+      "name": "Follow a tip's link to the setting it names",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#advisor"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Open the place a tip points at: Change the set time or Set a length opens that Behavior's editor at the field; Open Needs decision opens the Needs decision list.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "The link label first in a tip's reactions line, on the line under today's date or in the panel"
+        }
+      ],
+      "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
+      "success_result": "The panel closes and Behaviors opens with that Behavior's editor open and the field focused, or the Needs decision list opens on the Timeline.",
+      "failure_result": "A Behavior that no longer exists opens Behaviors with no editor open.",
+      "effects": [
+        "navigation",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/advisor/AdvisorParts.tsx#TipLinkButton",
+        "lib/ui/advisor.ts",
+        "components/behaviors/BehaviorList.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/advisor-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover the link label and the editor address it opens."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/advisor/AdvisorParts.tsx#TipLinkButton",
+            "app/(app)/behaviors/page.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
             "apps/desktop/src/timeline-screen.tsx"
           ],
           "evidence": [

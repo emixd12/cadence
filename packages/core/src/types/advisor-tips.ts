@@ -66,6 +66,39 @@ export type AdvisorTipResearch = Readonly<{
   limitation: string;
 }>;
 
+/**
+ * What a tip's link opens ("Tips with one-tap changes"): a Behavior's editor on one field
+ * (time, length, where, description, or the whole editor), Needs decision (unmarked), or
+ * the Behaviors list.
+ */
+export const ADVISOR_TIP_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors"] as const;
+export type AdvisorTipLinkTarget = (typeof ADVISOR_TIP_LINK_TARGETS)[number];
+
+export type AdvisorTipLink = Readonly<{
+  target: AdvisorTipLinkTarget;
+  /** The Behavior whose editor opens; null for Needs decision and the list. */
+  behaviorId: string | null;
+  /** The link's words, built by Cadence: "Set a length", "Open Needs decision". */
+  label: string;
+}>;
+
+const LINK_LABELS: Readonly<Record<AdvisorTipLinkTarget, string>> = {
+  time: "Change the set time",
+  length: "Set a length",
+  where: "Add when and where",
+  description: "Write it in the description",
+  behavior: "Edit the Behavior",
+  unmarked: "Open Needs decision",
+  behaviors: "Open Behaviors",
+};
+
+export function advisorTipLink(target: AdvisorTipLinkTarget, behaviorId: string | null): AdvisorTipLink {
+  // A Behavior editor link with no Behavior opens the list instead.
+  const needsBehavior = target !== "unmarked" && target !== "behaviors";
+  if (needsBehavior && !behaviorId) return { target: "behaviors", behaviorId: null, label: LINK_LABELS.behaviors };
+  return { target, behaviorId: needsBehavior ? behaviorId : null, label: LINK_LABELS[target] };
+}
+
 export type AdvisorTip = Readonly<{
   id: string;
   /** The account's local date the tip belongs to. */
@@ -78,6 +111,13 @@ export type AdvisorTip = Readonly<{
   shownAt: string;
   reaction: AdvisorTipReaction | null;
   research: AdvisorTipResearch;
+  /**
+   * The schedule question this tip carries ("Set Gym to 6:30 PM every day?"), shown with
+   * its answers in place of the tip while it is open. Absent from servers before Nov 20.
+   */
+  proposalId?: string | null;
+  /** Where the tip's link goes, when it has one and no question. */
+  link?: AdvisorTipLink | null;
 }>;
 
 export type AdvisorTipsNoneReason =

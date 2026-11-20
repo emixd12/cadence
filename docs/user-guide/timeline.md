@@ -112,12 +112,21 @@ two-week try, then today's tip. A day with nothing shows no line.
   the kind of source and how strong the evidence is. **Helpful** saves it as
   helpful. **Not now** hides it for today. In the panel, **Don't suggest this
   again** stops that advice on every device. Cadence shows at most one new tip each
-  time you open the app, at least two hours apart.
-- **Schedule questions.** When you keep moving an item to the same time, the
-  advisor may suggest changing its schedule. Choose **Try for two weeks**,
-  **Change for good** or **No** in the panel. At the end of a try the line asks
-  whether to keep it: **Keep** or **Go back**. A change that would move one of
-  today's items waits until tomorrow.
+  time you open the app, at least two hours apart. Some tips name a setting, such
+  as **Set a length** or **Change the set time**: it opens that item's editor on
+  **Behaviors** at that field. A tip about items with no mark opens **Needs
+  decision**.
+- **Schedule questions.** When you move an item to about the same time on 3 days
+  in 4 weeks, a tip may ask whether to set it there, for example **Set Gym to 6:30
+  PM every day?** Moves on one weekday ask about that weekday only. A tip about
+  how long an item takes may ask to change its length. Choose **Try for two
+  weeks**, **Change for good** or **No** in the panel. A Yes starts today when
+  today's item is still ahead and not marked; a day you already moved by hand
+  keeps your move, and the change starts tomorrow. **Undo** right after **Change
+  for good** puts the old schedule back. **No** also answers the tip **Not now**,
+  and that tip does not ask about that item again for 30 days. At the end of a try
+  the line asks whether to keep it: **Keep** or **Go back**. Only one question per
+  item is open at a time.
 
 Select the horse to open the panel: today's brief, questions that need your answer,
 today's tip, a two-week try in progress, and tips from earlier days. On a wide

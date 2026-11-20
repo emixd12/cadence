@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { ADVICE_CARDS, adviceSourceFor } from "@cadence/core/services/advice-library";
+import { ADVICE_CARDS } from "@cadence/core/services/advice-library";
 import type { AdviceCard } from "@cadence/core/types/advice-cards";
 import {
   ADVISOR_TIP_MINIMUM_SPACING_MINUTES,
@@ -9,7 +9,6 @@ import {
   type AdvisorTip,
   type AdvisorTipReaction,
   type AdvisorTipReactionResponse,
-  type AdvisorTipResearch,
   type AdvisorTipsErrorCode,
   type AdvisorTipsNextResponse,
   type AdvisorTipsRecentResponse,
@@ -19,7 +18,8 @@ import { AdvisorTipsError, nextTip, reactToTip, recentTips, type TipRow } from "
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { agentCallerConfigured } from "@/lib/integrations/agent-caller";
 import { readAdvisorTipsSettings, type AdvisorTipsSettings } from "./advisor-tips-settings";
-import { chooseTipMatches, createHostedTipVisitPort, type TipVisitPort } from "./advisor-tips-job.service";
+import { researchFor } from "./advisor-tip-research";
+import { chooseTipMatches, createHostedTipVisitPort, withOffers, type TipVisitPort } from "./advisor-tips-job.service";
 import { seedTips, tipItems, tipsPerDay } from "./advisor-tips-writer";
 import { authenticateCalendarRequest, calendarPreflight, calendarResponse, readCalendarRequestBody } from "./google-calendar-request";
 import { CalendarConnectionError } from "./google-calendar-oauth";
@@ -102,23 +102,12 @@ export async function handleRecentTips(request: Request, deps: TipRequestDeps = 
 }
 
 export function toAdvisorTip(row: TipRow, cards: readonly AdviceCard[]): AdvisorTip | null {
-  const card = cards.find((entry) => entry.id === row.cardId);
-  if (!card) return null;
-  const source = adviceSourceFor(card);
-  const research: AdvisorTipResearch = {
-    cardId: card.id,
-    cardRevision: card.revision,
-    advice: card.advice,
-    action: card.action,
-    claim: card.evidence.claim,
-    source: { citation: source?.citation ?? "", url: source?.url ?? "", kind: card.evidence.kind },
-    strength: card.evidence.strength,
-    audience: card.audience,
-    limitation: card.limitation,
-  };
+  const research = researchFor(row.cardId, cards);
+  if (!research) return null;
   return {
     id: row.id, localDate: row.localDate, text: row.text, behaviorId: row.behaviorId,
     shownAt: row.shownAt, reaction: row.reaction, research,
+    proposalId: row.proposalId, link: row.link,
   };
 }
 
@@ -153,7 +142,8 @@ export async function writeFirstDayTips(port: TipVisitPort, cards: readonly Advi
       statuses: ["active"], maxPerDay: tipsPerDay(),
     });
     const outcome = seedTips(tipItems(chosen, setup.titles));
-    const written = outcome.tips.length ? await port.write(run.runId, outcome.tips) : 0;
+    const tips = await withOffers(port, { runId: run.runId, localDate: run.localDate, tips: outcome.tips, matches: chosen, setup, cards });
+    const written = tips.length ? await port.write(run.runId, tips) : 0;
     await port.finishRun(run.runId, { outcome: "success", errorCode: null, errorReason: null, modelCalls: 0, usage: null });
     return written;
   } catch (error) {

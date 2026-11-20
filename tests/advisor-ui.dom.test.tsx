@@ -7,11 +7,15 @@ import { RefreshProvider } from "@cadence/ui/runtime";
 import { AdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
 import { AdvisorDayLine } from "@/components/advisor/AdvisorParts";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
-import { advisorLineItem, proposalShortLine, type AdvisorClient } from "@/lib/ui/advisor";
+import { advisorLineItem, behaviorEditHref, parseBehaviorEditTarget, proposalShortLine, type AdvisorClient } from "@/lib/ui/advisor";
+import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import {
   ADVISOR_FIXTURE_CHECK_IN,
+  ADVISOR_FIXTURE_LINK_TIP,
   ADVISOR_FIXTURE_PROPOSAL,
+  ADVISOR_FIXTURE_QUESTION_TIP,
+  ADVISOR_FIXTURE_TIP_QUESTION,
   ADVISOR_FIXTURE_TIP,
   ADVISOR_FIXTURE_TRIAL,
   fixtureAdvisorClient,
@@ -33,11 +37,11 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(() => root.unmount()); container.remove(); document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
-async function render(advisor: AdvisorClient | null, brief?: DailyBriefClient) {
+async function render(advisor: AdvisorClient | null, brief?: DailyBriefClient, onOpenLink?: (link: AdvisorTipLink) => void) {
   await act(async () => {
     root.render(
       <RefreshProvider onRefresh={refresh}>
-        <AdvisorTimelineFrame client={advisor} banner={<p>wave banner</p>} fallbackBanner={<p>horse banner</p>}>
+        <AdvisorTimelineFrame client={advisor} onOpenLink={onOpenLink} banner={<p>wave banner</p>} fallbackBanner={<p>horse banner</p>}>
           {brief ? <DailyBriefLauncher client={brief} sessionKey="test" /> : null}
           <section data-today><h2>Thursday</h2><AdvisorDayLine /></section>
         </AdvisorTimelineFrame>
@@ -168,5 +172,48 @@ describe("advisor placement K", () => {
     await click("Close", panel()!);
     // Opened once, the line moves on to the tip.
     expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
+  });
+});
+
+describe("tips with one-tap changes", () => {
+  it("shows the tip's question on the line, answers Change for good in the panel, then Undo", async () => {
+    const client = fixtureAdvisorClient({ tip: ADVISOR_FIXTURE_QUESTION_TIP, proposal: ADVISOR_FIXTURE_TIP_QUESTION });
+    const answer = vi.spyOn(client, "answerProposal");
+    await render(client);
+    expect(line()?.textContent).toContain("Set Gym to 6:30 PM every day?");
+    await click("Answer", line()!);
+    const question = panel()!.querySelector("[data-advisor-tip-question]");
+    expect(question?.textContent).toContain(ADVISOR_FIXTURE_TIP_QUESTION.tip!.text);
+    // The tip is shown once, inside its question, not again as today's tip.
+    expect(panel()!.textContent).not.toContain("Today’s tip");
+    await click("Change for good", panel()!);
+    expect(answer).toHaveBeenLastCalledWith(ADVISOR_FIXTURE_TIP_QUESTION.proposalId, "for_good");
+    expect(panel()!.querySelector("p.italic")?.textContent).toBe("Gym is at 6:30 PM every Tuesday from now on.");
+    await click("Undo", panel()!);
+    expect(answer).toHaveBeenLastCalledWith(ADVISOR_FIXTURE_TIP_QUESTION.proposalId, "undo");
+    expect(panel()!.querySelector("p.italic")?.textContent).toBe("Gym is back at 7:00 AM.");
+    expect(Array.from(panel()!.querySelectorAll("button")).some((button) => button.textContent === "Undo")).toBe(false);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("puts a tip's link first and follows it, closing the panel", async () => {
+    const opened = vi.fn<(link: AdvisorTipLink) => void>();
+    await render(fixtureAdvisorClient({ tip: ADVISOR_FIXTURE_LINK_TIP }), undefined, opened);
+    const first = line()!.querySelector("button");
+    expect(first?.textContent).toBe("Set a length");
+    await click("Set a length", line()!);
+    expect(opened).toHaveBeenCalledWith(ADVISOR_FIXTURE_LINK_TIP.link);
+    await click(horseLabel()!.trim());
+    await click("Set a length", panel()!);
+    expect(opened).toHaveBeenCalledTimes(2);
+    expect(panel()).toBeNull();
+  });
+
+  it("builds and reads the Behaviors editor address", () => {
+    const id = "0d000000-0000-4000-8000-000000000010";
+    expect(behaviorEditHref({ behaviorId: id, field: "length" })).toBe(`/behaviors?edit=${id}&field=length`);
+    expect(parseBehaviorEditTarget(id, "length")).toEqual({ behaviorId: id, field: "length" });
+    expect(parseBehaviorEditTarget(id, "nonsense")).toEqual({ behaviorId: id, field: null });
+    expect(parseBehaviorEditTarget("not-an-id", "time")).toBeNull();
   });
 });

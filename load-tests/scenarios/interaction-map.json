@@ -1777,6 +1777,11 @@
       "id": "INT-ADVISOR-004",
       "classification": "destructive_serial_only",
       "reason": "Schedule answers edit a Behavior's schedule and need an open stored proposal; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-ADVISOR-005",
+      "classification": "browser_only",
+      "reason": "Following a tip's link is navigation; the Behaviors editor reads what the page already loads."
     }
   ]
 }

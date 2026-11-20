@@ -10,6 +10,8 @@ import {
 } from "react";
 import { X } from "lucide-react";
 
+import { OPEN_NEEDS_DECISION_EVENT } from "@/lib/ui/advisor";
+
 const FOCUSABLE_SELECTOR =
   'summary, a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -32,6 +34,13 @@ export function NeedsDecisionDialog({
   const dialogId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const hasDecisions = occurrenceCount > 0;
+
+  // A tip's "Open Needs decision" link opens this dialog from the advisor.
+  useEffect(() => {
+    const open = () => setIsOpen(true);
+    window.addEventListener(OPEN_NEEDS_DECISION_EVENT, open);
+    return () => window.removeEventListener(OPEN_NEEDS_DECISION_EVENT, open);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {

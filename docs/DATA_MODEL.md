@@ -3408,7 +3408,7 @@ database: `packages/core/src/services/behavior-change-proposal.ts`. Service:
   `status` (`proposed`, `accepted_trial`, `accepted`, `declined`, `kept`, `reverted`,
   `expired`), `close_reason`, trial dates and the one-time notice. RLS on, no policies,
   no grants to any API role. One open proposal (`proposed` or `accepted_trial`) per
-  account, enforced by a partial unique index. Deleting the account or the Behavior
+  account, enforced by a partial unique index (per Behavior since Nov 20, below). Deleting the account or the Behavior
   deletes its proposals.
 - `coach_propose_behavior_change(run_id, proposal)`: coach token only, for an unfinished
   coach run of the caller. Refuses (as data, not an error) when a proposal is open, when
@@ -3421,6 +3421,41 @@ database: `packages/core/src/services/behavior-change-proposal.ts`. Service:
 - The coach never edits a Behavior. Try, Change for good and Go back run the person's own
   schedule edit (`updateBehaviorForUser`, with the Behavior's revision), then record the
   answer. Go back is offered only while the schedule still equals what the trial set.
+
+### Tips with one-tap changes (Nov 20)
+
+Migration `20261120160000_tips_one_tap_changes.sql`. A tip whose card offers a change
+carries its question; other tips link to the editor field their card names.
+
+- `behavior_change_proposals` gains `change_kind` (`time` or `length`) and
+  `from_minutes`/`to_minutes`. A time row needs weekdays (1 to 7), both times and both
+  schedule lists; a length row needs only the two lengths and tip evidence
+  (`behavior_change_proposals_kind_fields`). `direction` adds `longer` and `shorter`;
+  evidence `source` adds `tip` (card id and the tip's sentence); `first_affected_date`
+  may be today (a Yes applies today); `close_reason` adds `undone`.
+- One open proposal per Behavior, not per account (partial unique index
+  `behavior_change_proposals_one_open_per_behavior`). The panel still shows one at a
+  time. `coach_propose_behavior_change` refuses a second one for the same Behavior with
+  `open_id` and, for a tip's question, `open_card_id`, so a re-run links to it.
+- `read_behavior_change_proposal(today, proposal_id)` with an id returns that proposal
+  whatever its status (the answer route reads the one it answers).
+  `answer_behavior_change_proposal` adds `undo` (accepted to reverted, `undone`), and a
+  No also answers the tip that carries the question "not now".
+- `coach_tips` gains `proposal_id` (the question the tip carries, set null when the
+  proposal is deleted), `link_target` (`time`, `length`, `where`, `description`,
+  `behavior`, `unmarked`, `behaviors`) and `link_behavior_id`. `coach_write_tips` takes
+  them and drops a proposal of another Behavior; `tip_json` returns them;
+  `coach_tip_history` adds `proposal_declined`, so the tip run rests that card for that
+  Behavior 30 days.
+- The tip run (prompt version `coach-tips-2`) stores each question before writing the
+  tips. The change comes from code: moves grouped by the set time they came from (3
+  same-direction moves in 28 days, targets within 60 minutes, at least 30 minutes away,
+  rounded to 15 minutes; two or more weekdays change every day with that time), or the
+  usual session length rounded to 5 minutes.
+
+Local verification: `tests/sql/tips-one-tap-changes-smoke.sql` and
+`tests/tips-one-tap.local-integration.test.ts` (a Yes moves today's unmarked Occurrence;
+a day already moved by hand keeps its move).
 
 ## Agent Calendar grant (Ticket 187, retired by Ticket 307)
 

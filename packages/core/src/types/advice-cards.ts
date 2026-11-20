@@ -183,6 +183,24 @@ export type AdviceAudience = (typeof ADVICE_AUDIENCES)[number];
 
 export type AdviceCardStatus = "draft" | "active" | "withdrawn";
 
+/** Where an `open` offer's link goes (see `ADVISOR_TIP_LINK_TARGETS` in ./advisor-tips). */
+export const ADVICE_OFFER_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors"] as const;
+export type AdviceOfferLinkTarget = (typeof ADVICE_OFFER_LINK_TARGETS)[number];
+
+/**
+ * What a tip from this card lets the person do ("Tips with one-tap changes", Nov 20):
+ * - set_time: a one-tap new set time, computed by code from the Behavior's moves
+ *   (repeated_move cards only);
+ * - set_length: a one-tap new length, the usual session time (session_length cards only);
+ * - open: a link to the right editor or list;
+ * - null: no action (the advice is to keep things as they are, or to keep marking).
+ * The question and the link's words are written by code, never by the card or the model.
+ */
+export type AdviceOffer =
+  | Readonly<{ kind: "set_time" }>
+  | Readonly<{ kind: "set_length" }>
+  | Readonly<{ kind: "open"; target: AdviceOfferLinkTarget }>;
+
 export type AdviceCard = Readonly<{
   id: string;
   revision: number;
@@ -205,6 +223,8 @@ export type AdviceCard = Readonly<{
    */
   quip_seeds: readonly string[];
   audience: AdviceAudience;
+  /** The tip's one action, or null. */
+  offer: AdviceOffer | null;
   reviewed_at: string | null;
   reviewer: string | null;
 }>;

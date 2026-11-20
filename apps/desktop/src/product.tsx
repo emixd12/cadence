@@ -33,6 +33,8 @@ import { ChatGptPlanSettings } from "./chatgpt/chatgpt-plan-settings";
 import { CHATGPT_USAGE_URL } from "@/lib/ui/daily-brief";
 import { activateDailyBriefClient, discardDailyBriefAttempt } from "@/lib/ui/daily-brief-session";
 import { TimelineScreen } from "./timeline-screen";
+import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
+import { advisorLinkAction, OPEN_NEEDS_DECISION_EVENT, type BehaviorEditTarget } from "@/lib/ui/advisor";
 import { DesktopErrorBoundary } from "./desktop-error-boundary";
 import { BehaviorsScreen } from "./behaviors-screen";
 import { desktopSourceLinkCoordinator } from "./calendar/source-links";
@@ -127,6 +129,8 @@ export function Product() {
   const refreshTravelStops = useRef<() => void>(() => undefined);
   const refreshLeaveStops = useCallback(() => refreshTravelStops.current(), []);
   const [navigationRequest, setNavigationRequest] = useState<{ anchor?: string } | null>(null);
+  // A tip's link: the Behavior and field the Behaviors screen opens (one-tap changes).
+  const [behaviorEditTarget, setBehaviorEditTarget] = useState<BehaviorEditTarget | null>(null);
   const activation = useRef<{ occurrenceId: string; requestKey: number } | null>(null);
   const activationSequence = useRef(0);
   const reminderRevision = useRef(0);
@@ -574,6 +578,17 @@ export function Product() {
     setNotificationTarget(null);
     setActiveScreen(screen);
     setNavigationRequest({ anchor });
+    setBehaviorEditTarget(null);
+  };
+  const openAdvisorLink = (link: AdvisorTipLink) => {
+    const action = advisorLinkAction(link);
+    if (action.kind === "needs_decision") {
+      window.dispatchEvent(new CustomEvent(OPEN_NEEDS_DECISION_EVENT));
+      return;
+    }
+    navigate("behaviors");
+    // Set after navigate, which clears it; React applies both in one render.
+    setBehaviorEditTarget(action.kind === "behavior" ? action.target : null);
   };
   const accountControls = <><AccountPanel state={account} configured={readDesktopAuthConfig() !== null} connected={syncReady} busy={accountBusy}
     methods={signInMethods}
@@ -648,11 +663,13 @@ export function Product() {
         dailyBriefClient={dailyBriefClient}
         dailyBriefSessionKey={accountUserId ?? "local"}
         onNavigate={navigate}
+        onOpenAdvisorLink={openAdvisorLink}
         onRefresh={refresh} onReload={reloadTimeline} onShowMore={(days) => { parameters.current.days = days; void refreshScreen(); }} /> : null}
       {activeScreen === "behaviors" ? <BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
         sourceLinkCoordinator={sourceLinkCoordinator}
+        editTarget={behaviorEditTarget}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
         shellCue={(conflictReview?.conflicts.length ?? 0) > 0}

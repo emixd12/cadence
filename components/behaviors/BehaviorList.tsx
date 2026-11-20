@@ -2,6 +2,7 @@
 
 import { SourceLinkSettings } from "@/components/behaviors/SourceLinkSettings";
 import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/source-links";
+import type { BehaviorEditField, BehaviorEditTarget } from "@/lib/ui/advisor";
 import { RuntimeLink as Link } from "@cadence/ui/runtime";
 import type { CSSProperties, ReactNode } from "react";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
@@ -66,7 +67,17 @@ type BehaviorListProps = Readonly<{
   reminderRuntime?: "web" | "desktop";
   /** Ticket 330: Complete from Hevy on a linked Mac; the web uses its own route by default. */
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
+  /** A tip's link: open this Behavior's Details and Settings and focus the named field. */
+  editTarget?: BehaviorEditTarget | null;
 }>;
+
+/** The first control of each field a tip's link can open. */
+const EDIT_FIELD_SELECTOR: Readonly<Record<BehaviorEditField, string>> = {
+  time: '[name*="_exact_time_"], [name*="_range_start_"], [name*="_range_preset_"]',
+  length: '[name="default_duration_minutes"]',
+  where: '[name="where_kind"]',
+  description: '[name="description"]',
+};
 
 const EMPTY_ACTION_STATE: BehaviorActionState = {
   status: "idle",
@@ -127,6 +138,7 @@ export function BehaviorList({
   noteShortcutAction,
   reminderRuntime = "web",
   sourceLinkCoordinator,
+  editTarget = null,
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -282,6 +294,7 @@ export function BehaviorList({
                 noteShortcutView={noteShortcutViews[behavior.id]}
                 noteShortcutAction={noteShortcutAction}
                 sourceLinkCoordinator={linkCoordinator}
+                editRequest={editTarget?.behaviorId === behavior.id ? editTarget : null}
               />
               </div>
             ))}
@@ -447,6 +460,7 @@ function BehaviorRecord({
   noteShortcutView,
   noteShortcutAction,
   sourceLinkCoordinator = null,
+  editRequest = null,
 }: Readonly<{
   behavior: BehaviorView;
   categories: CategoryOption[];
@@ -463,6 +477,7 @@ function BehaviorRecord({
   noteShortcutView?: NoteShortcutView;
   noteShortcutAction?: NoteShortcutAction;
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
+  editRequest?: BehaviorEditTarget | null;
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -471,6 +486,18 @@ function BehaviorRecord({
   const [reviewedWhere, setReviewedWhere] = useState<{ draft: WhereDraft; revision: string } | null>(null);
   const whereDraft = reviewedWhere?.revision === behavior.updatedAt ? reviewedWhere.draft : null;
   const settingsRef = useRef<HTMLDetailsElement>(null);
+  // A tip's link opens Details and Settings once per request, then focuses its field after the form renders.
+  const handledEdit = useRef<BehaviorEditTarget | null>(null);
+  useEffect(() => {
+    if (!editRequest || handledEdit.current === editRequest) return;
+    handledEdit.current = editRequest;
+    const details = settingsRef.current;
+    if (!details) return;
+    details.open = true;
+    const field = editRequest.field ? details.querySelector<HTMLElement>(EDIT_FIELD_SELECTOR[editRequest.field]) : null;
+    (field ?? details).scrollIntoView({ block: "center" });
+    field?.focus({ preventScroll: true });
+  }, [editRequest]);
   const reviewWhere = useCallback((draft: WhereDraft) => {
     // A suggestion only fills the form; the Behavior changes when the user saves.
     setReviewedWhere({ draft, revision: behavior.updatedAt });
@@ -557,7 +584,7 @@ function BehaviorRecord({
         <div className="grid gap-5 pb-5 pl-3 pt-0">
           <BehaviorMetadata behavior={behavior} />
 
-          {hasOpenedEdit ? (
+          {hasOpenedEdit || editRequest ? (
             <>
               {behavior.active ? (
                 <div className="relative grid gap-4">

@@ -15,7 +15,7 @@ const CARD = {
   does_not_apply_when: [],
   evidence: { source_id: "src-a", kind: "meta_analysis", strength: "moderate", claim: "It helped.", quote: "It helped a lot.", locator: "Abstract" },
   quip_seeds: ["{behavior} went from {baseline_rate_pct} to {recent_rate_pct}.", "Another line."],
-  audience: "any_account", reviewed_at: null, reviewer: null,
+  audience: "any_account", offer: null, reviewed_at: null, reviewer: null,
 };
 const lib = (cards: unknown[], sources: unknown[] = [SOURCE]) => ({ version: "t", sources, cards });
 
@@ -194,6 +194,30 @@ describe("shipped quip seeds", () => {
   it("keep praise and pep talk out of the seeds", () => {
     for (const card of ADVICE_CARDS) {
       for (const seed of card.quip_seeds) expect(seed, card.id).not.toMatch(/\b(great|awesome|amazing|well done|keep it up|proud|crush|you got this)\b|!/i);
+    }
+  });
+});
+
+describe("card offers (one-tap changes)", () => {
+  const moved = { ...CARD, applies_when: [{ signal: "repeated_move", scope: "behavior", facts: [] }], quip_seeds: ["{behavior} moved.", "Moved again."] };
+
+  it("accepts a set-time offer only on Behavior-scoped repeated-move cards, with seeds that do not ask", () => {
+    expect(parseAdviceLibrary(lib([{ ...moved, offer: { kind: "set_time" } }])).cards[0]!.offer).toEqual({ kind: "set_time" });
+    expect(() => parseAdviceLibrary(lib([{ ...CARD, offer: { kind: "set_time" } }]))).toThrow("repeated_move");
+    expect(() => parseAdviceLibrary(lib([{ ...moved, offer: { kind: "set_length" } }]))).toThrow("session_length");
+    expect(() => parseAdviceLibrary(lib([{ ...moved, quip_seeds: ["{behavior} moved. Move it?", "Moved again."], offer: { kind: "set_time" } }]))).toThrow("must not ask");
+  });
+
+  it("accepts an open link to a known target only", () => {
+    expect(parseAdviceLibrary(lib([{ ...CARD, offer: { kind: "open", target: "length" } }])).cards[0]!.offer).toEqual({ kind: "open", target: "length" });
+    expect(() => parseAdviceLibrary(lib([{ ...CARD, offer: { kind: "open", target: "settings" } }]))).toThrow();
+    expect(() => parseAdviceLibrary(lib([{ ...CARD, offer: undefined }]))).toThrow();
+  });
+
+  it("the shipped offer cards carry no question in their seeds", () => {
+    for (const card of ADVICE_CARDS.filter((entry) => entry.offer?.kind === "set_time" || entry.offer?.kind === "set_length")) {
+      expect(card.quip_seeds.some((seed) => seed.includes("?")), card.id).toBe(false);
+      expect(card.revision, card.id).toBeGreaterThanOrEqual(3);
     }
   });
 });
