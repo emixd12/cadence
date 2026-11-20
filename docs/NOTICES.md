@@ -92,11 +92,11 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
-| `run.back-today` Says on the Timeline, on its back-on day, that a paused Behavior runs again, with Close. | outcome | {title} is back today. | web, Mac; planned | none |
+| `run.back-today` Says on the Timeline, on its back-on day, that a paused Behavior runs again, with Close. | outcome | {title} is back today. | web, Mac | INT-TIMELINE-020, `components/timeline/BehaviorRunNotices.tsx` |
 | `run.end-time-passed` Refuses an end or a pause start set to a moment that has passed, in the Behavior form, Chat and MCP. | error | Pick a time later than now. To stop it right away, use End now. | web, Mac | INT-BEHAVIOR-031, `packages/core/src/services/behavior-values.ts` |
-| `run.ended` Says on the Timeline, on the day it happens, that a Behavior reached its end, with Start again and Close. | outcome | {title} ended. | web, Mac; planned | none |
+| `run.ended` Says on the Timeline, on the day it happens, that a Behavior reached its end, with Start again and Close. | outcome | {title} ended. | web, Mac | INT-TIMELINE-020, `components/timeline/BehaviorRunNotices.tsx` |
 | `run.pause-back-on` Refuses a pause whose back-on day is not after its first paused day and after today. | error | Pick a back-on day after the first paused day and after today. | web, Mac | INT-BEHAVIOR-031, `packages/core/src/services/behavior-values.ts` |
-| `run.paused` Says on the Timeline, on the first paused day, that a Behavior is paused and when it comes back, with Resume now and Close. | outcome | {back, select, none {{title} is paused.} other {{title} is paused, back {back}.}} | web, Mac; planned | none |
+| `run.paused` Says on the Timeline, on the first paused day, that a Behavior is paused and when it comes back, with Resume now and Close. | outcome | {back, select, none {{title} is paused.} other {{title} is paused, back {back}.}} | web, Mac | INT-TIMELINE-020, `components/timeline/BehaviorRunNotices.tsx` |
 
 ## Move for today
 

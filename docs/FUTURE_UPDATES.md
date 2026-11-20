@@ -177,9 +177,10 @@ Other open items:
   into `packages/core/src/notices/catalog/`, lowers its counts in
   `tests/fixtures/notice-role-allowlist.json`, and adds `previous` records for any
   wording or style change.
-- When Ended and Paused (PR #328) merges, switch `components/timeline/BehaviorRunNotices.tsx`
-  to `run.ended`, `run.paused` and `run.back-today`, mark them active and link
-  their interactions.
+- Ended and Paused web (PR #328) added raw status and alert lines in
+  `BehaviorList.tsx`, `BehaviorRunControls.tsx` and the action results in
+  `BehaviorRunNotices.tsx`; #319 added one in `OccurrenceMarkDetails.tsx`. Move them into
+  the catalog with the remaining areas.
 
 ## Agent readability roadmap
 
