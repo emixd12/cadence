@@ -60,13 +60,13 @@ describe("Daily Brief repository", () => {
     await expect(read({ ...preferences, google_calendar_source: "agent" })).rejects.toThrow("invalid result");
   });
 
-  it("rejects a malformed or disabled choice", async () => {
+  it("rejects a malformed choice, and since advisor 4F keeps source choices while Daily Brief is off", async () => {
     const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
     await expect(read({ ...preferences, use_connected_sources: "true" })).rejects.toThrow("invalid result");
     await expect(read({ ...preferences, excluded_sources: { ...excluded, hevy: null } })).rejects.toThrow("invalid result");
     await expect(read({ ...preferences, excluded_sources: { ...excluded, strava: false } })).rejects.toThrow("invalid result");
     await expect(read({ ...preferences, excluded_sources: undefined })).rejects.toThrow("invalid result");
-    await expect(read({ ...preferences, enabled: false })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, enabled: false })).resolves.toMatchObject({ enabled: false, useConnectedSources: true });
     await expect(read({ ...preferences, include_hevy: "true" })).rejects.toThrow("invalid result");
   });
 

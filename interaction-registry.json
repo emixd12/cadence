@@ -1004,10 +1004,25 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 14,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
+    },
+    {
+      "path": "components/onboarding/AiFeaturesApproval.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-BRIEF-004"
+      ]
+    },
+    {
+      "path": "app/design-system/AiFeaturesBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only bench for the advisor 4F AI features question and Settings section on a fixture account. Changes stay on the page; no account or provider access."
     },
     {
       "path": "app/design-system/BriefingWorkbenchGuide.tsx",
@@ -14880,7 +14895,7 @@
     },
     {
       "id": "INT-BRIEF-004",
-      "name": "Configure Daily Brief data use",
+      "name": "Answer and change the AI features choices",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -14892,40 +14907,45 @@
         "settings"
       ],
       "routes": [
-        "/settings"
+        "/settings",
+        "/timeline"
       ],
       "journeys": [
         "J14"
       ],
-      "intent": "Turn the Daily Brief on or off, make one choice that covers every connected source (including one connected later), and under Advanced exclude a connected Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy workout-timing source, or choose reminder delivery history and Notes on Not Completed occurrences.",
+      "intent": "Answer the one AI features question once (advisor 4F, owner decision D2): Continue turns Daily Brief, Advisor tips, Chat and every data source on; Keep AI features off turns every feature off. Later, in Settings > AI features, turn each feature on or off and choose the sources all features share: Notes, reminder history, and one choice that covers every connected calendar and Hevy, with per-source exclusions under Choose sources.",
       "triggers": [
         {
-          "kind": "change",
-          "control": "Daily Brief"
-        },
-        {
-          "kind": "change",
-          "control": "Plan around my connected sources"
+          "kind": "activate",
+          "control": "Continue or Keep AI features off in the AI features question"
         },
         {
           "kind": "activate",
-          "control": "Advanced: choose sources"
+          "control": "Turn everything on or Keep AI features off in Settings while unanswered"
         },
         {
           "kind": "change",
-          "control": "Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy under Advanced"
+          "control": "Daily Brief, Advisor tips or Chat"
         },
         {
           "kind": "change",
-          "control": "Include reminder delivery history"
+          "control": "Notes or Reminder history"
         },
         {
           "kind": "change",
-          "control": "Include Notes on Not Completed Occurrences"
+          "control": "Connected calendars and Hevy"
+        },
+        {
+          "kind": "activate",
+          "control": "Choose sources"
+        },
+        {
+          "kind": "change",
+          "control": "Google Calendar, Outlook Calendar, iCloud Calendar, or Hevy under Choose sources"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. Plan around my connected sources needs Daily Brief on and cannot be turned on while nothing is connected. Advanced lists only connected sources; a source row is disabled while the one choice is off. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Google Calendar is the Timeline connection and its selected calendars (Ticket 307).",
-      "success_result": "Saves the declared preference fields (Ticket 306: enabled, the one connected-sources choice, four per-source exclusions, reminder history and Notes) and withdraws any current Daily Brief presentation. Turning Daily Brief off withdraws every choice and deletes tip repetition metadata. A source connected after the choice is covered and its Advanced row says Daily Brief uses it; reconnecting or reselecting a covered source asks nothing. The server never reads an excluded source. Older per-source clients' saves map to the one choice and exclude every source they leave off. Each run fences the sources it reads on the connection and selection read at its start.",
+      "availability": "The question shows on web Timeline, in the first-run setup pop-up's place, until the account answers it once; existing accounts see it on their next open. Settings shows it while unanswered, on web and on a linked online Mac. Source choices stand on their own: they stay usable while Daily Brief is off. The connected-sources choice cannot be turned on while nothing is connected. Against a server before 4F the panel shows only Daily Brief and the earlier rule that turning it off withdraws every source.",
+      "success_result": "Saves every AI choice at once and records the approval on the account (save_ai_settings). Continue turns every feature and source on; the Daily Brief launcher hears the change and starts today's brief. Changing only tips or Chat keeps today's saved brief; a Daily Brief or source change starts a new one, as before. A feature that is off makes no model call; a source that is off is never sent to a model or returned by a Chat tool (lib/services/ai-settings.service.ts).",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -14937,11 +14957,14 @@
       "confirmation": "none",
       "implementation": [
         "components/briefing/DailyBriefSettingsPanel.tsx#DailyBriefSettingsPanel",
+        "components/onboarding/AiFeaturesApproval.tsx#AiFeaturesApproval",
         "apps/desktop/src/product.tsx#Product"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/ai-features.dom.test.tsx",
+          "tests/ai-settings.test.ts",
           "tests/daily-brief-ui.dom.test.tsx",
           "tests/daily-brief.service.test.ts",
           "tests/daily-brief-sources.test.ts",

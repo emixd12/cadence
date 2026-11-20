@@ -197,20 +197,21 @@ describe("Daily Brief UI", () => {
     expect(container.querySelector('[role="status"]')?.className).toContain("[overflow-wrap:anywhere]");
   });
 
-  it("saves only the declared Daily Brief settings and discloses the external model", async () => {
-    const adapter = client({ preferences: vi.fn(async () => connectedSettings({ hevy: "ready" })) });
+  it("saves only the declared Daily Brief settings to a server before 4F and discloses the external model", async () => {
+    const adapter = client({ preferences: vi.fn(async () => connectedSettings({ hevy: "ready" }, { optionalSources: { reminders: false, notes: false } })) });
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Plan around my connected sources"));
+    await vi.waitFor(() => expect(container.textContent).toContain("Connected calendars and Hevy"));
     const controls = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    expect([...controls].map((control) => control.closest("label")?.textContent)).toEqual(["Daily Brief", "Plan around my connected sources", "Hevy"]);
-    expect(container.textContent).not.toContain("Include Notes");
+    expect([...controls].map((control) => control.closest("label")?.textContent)).toEqual(["Daily Brief", "Connected calendars and Hevy", "Hevy"]);
+    expect(container.textContent).not.toContain("Advisor tips");
     expect(controls[1]!.checked).toBe(false);
     await act(() => controls[1]!.click());
     await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, useConnectedSources: true, excludedSources: none,
       includeReminderHistory: false, includeNotes: false }));
     expect(container.querySelector('a[href="https://developers.openai.com/api/docs/guides/your-data"]')).not.toBeNull();
-    expect(container.textContent).toContain("cannot change tracking or Calendar records");
-    expect(container.textContent).toContain("nothing from them is sent unless a choice here covers it");
+    // Advisor 4F replaced the stale Phase 3 sentence (T18).
+    expect(container.textContent).not.toContain("cannot change tracking or Calendar records");
+    expect(container.textContent).toContain("Cadence sends what a feature needs to an AI model");
   });
 });
 
@@ -227,20 +228,19 @@ describe("one choice for every connected source (Ticket 306)", () => {
   it("names the covered sources and lists each connected source under Advanced with its statement of what is sent", async () => {
     const on = connectedSettings(allConnected, { useConnectedSources: true, excludedSources: { ...none, outlookCalendar: true } });
     await act(() => root.render(<DailyBriefSettingsPanel client={client({ preferences: vi.fn(async () => on) })} />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Advanced: choose sources"));
+    await vi.waitFor(() => expect(container.textContent).toContain("Choose sources"));
     expect(checkbox("daily-brief-sources-coverage").checked).toBe(true);
-    expect(container.querySelector("#daily-brief-sources-coverage")?.textContent).toBe("Covers Google Calendar, iCloud Calendar and Hevy, and any source you connect later. Only timing is sent, never event titles, descriptions, locations, attendees or workout details.");
+    expect(container.querySelector("#daily-brief-sources-coverage")?.textContent).toBe("Event times from your calendars, and event titles for Chat. Workout times from Hevy. Covers Google Calendar, iCloud Calendar and Hevy, and any source you connect later.");
     expect(container.querySelector("details")?.open).toBe(false);
     const google = container.querySelector("#daily-brief-google-disclosure")?.textContent ?? "";
-    expect(google).toContain("Sends today’s event times, timezone, availability and your response for the calendars you selected for Timeline.");
-    expect(google).toContain("Event titles, descriptions, locations and attendees are not sent.");
-    expect(google).toContain("Daily Brief uses it.");
-    expect(container.querySelector("#daily-brief-outlook-disclosure")?.textContent).toBe("Sends today’s event times, availability and your response for the selected Outlook calendars. Event titles and details are not sent.");
-    expect(container.querySelector("#daily-brief-icloud-disclosure")?.textContent).toContain("No iCloud Calendar calendars are selected, so the brief cannot use it.");
+    expect(google).toContain("Event times, availability and your response for the calendars you selected for Timeline.");
+    expect(google).toContain("Chat also reads event titles and locations.");
+    expect(google).toContain("AI features use it.");
+    expect(container.querySelector("#daily-brief-outlook-disclosure")?.textContent).toBe("Event times, availability and your response for the selected Outlook calendars. Chat also reads event titles and locations.");
+    expect(container.querySelector("#daily-brief-icloud-disclosure")?.textContent).toContain("No iCloud Calendar calendars are selected, so AI features cannot use it.");
     const hevy = container.querySelector("#daily-brief-hevy-disclosure")?.textContent ?? "";
-    expect(hevy).toContain("Exercises, sets, weights, notes and titles are not sent");
-    expect(hevy).toContain("never completes a Behavior");
-    expect(hevy).toContain("Daily Brief uses it.");
+    expect(hevy).toContain("Exercises, sets and weights are not used.");
+    expect(hevy).toContain("AI features use it.");
     expect(checkbox("daily-brief-google-disclosure").checked).toBe(true);
     expect(checkbox("daily-brief-outlook-disclosure").checked).toBe(false);
   });
@@ -261,15 +261,15 @@ describe("one choice for every connected source (Ticket 306)", () => {
   it("says when every connected source is excluded or nothing is connected yet, and offers no choice to turn on with nothing connected", async () => {
     const excluded = connectedSettings({ hevy: "ready" }, { useConnectedSources: true, excludedSources: { ...none, hevy: true } });
     await act(() => root.render(<DailyBriefSettingsPanel client={client({ preferences: vi.fn(async () => excluded) })} />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Every connected source is excluded under Advanced. A source you connect later is covered."));
-    expect(container.querySelector("#daily-brief-hevy-disclosure")?.textContent).not.toContain("Daily Brief uses it.");
+    await vi.waitFor(() => expect(container.textContent).toContain("Every connected source is excluded under Choose sources. A source you connect later is covered."));
+    expect(container.querySelector("#daily-brief-hevy-disclosure")?.textContent).not.toContain("AI features use it.");
 
     await act(() => root.unmount());
     root = createRoot(container);
     await act(() => root.render(<DailyBriefSettingsPanel client={client({ preferences: vi.fn(async () => connectedSettings({})) })} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Nothing is connected yet."));
     expect(checkbox("daily-brief-sources-coverage").disabled).toBe(true);
-    expect(container.textContent).not.toContain("Advanced: choose sources");
+    expect(container.textContent).not.toContain("Choose sources");
 
     // A choice made earlier stays visible so it can be turned off after every source disconnects.
     await act(() => root.unmount());
@@ -285,7 +285,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
     await act(() => root.render(<DailyBriefSettingsPanel client={client({ preferences: vi.fn(async () => later) })} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Covers iCloud Calendar"));
     expect(checkbox("daily-brief-icloud-disclosure").checked).toBe(true);
-    expect(container.querySelector("#daily-brief-icloud-disclosure")?.textContent).toContain("Daily Brief uses it.");
+    expect(container.querySelector("#daily-brief-icloud-disclosure")?.textContent).toContain("AI features use it.");
   });
 
   it("disables source rows while the one choice is off", async () => {
@@ -293,19 +293,17 @@ describe("one choice for every connected source (Ticket 306)", () => {
     await vi.waitFor(() => expect(checkbox("daily-brief-hevy-disclosure")).not.toBeNull());
     expect(checkbox("daily-brief-hevy-disclosure").disabled).toBe(true);
     expect(checkbox("daily-brief-hevy-disclosure").checked).toBe(false);
-    expect(container.querySelector("#daily-brief-hevy-disclosure")?.textContent).not.toContain("Daily Brief uses it.");
+    expect(container.querySelector("#daily-brief-hevy-disclosure")?.textContent).not.toContain("AI features use it.");
   });
 
-  it("offers reminder history and Notes under Advanced and withdraws every choice when Daily Brief is turned off", async () => {
+  it("offers reminder history and Notes, and on a server before 4F withdraws every choice when Daily Brief is turned off", async () => {
     const offered = connectedSettings({ outlookCalendar: "ready" }, { useConnectedSources: true, excludedSources: { ...none, hevy: true },
       includeNotes: true, includeReminderHistory: true, optionalSources: { reminders: true, notes: true } });
     const adapter = client({ preferences: vi.fn(async () => offered), updatePreferences: vi.fn(async (input) => ({ ...offered, ...input })) });
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Include Notes on Not Completed Occurrences"));
-    expect(container.querySelector("details")?.textContent).toContain("Include reminder delivery history");
-    expect(container.textContent).toContain("up to 12 Notes, the first 280 characters of each");
-    expect(container.textContent).toContain("never reminder content");
-    expect(checkbox("daily-brief-notes-disclosure").checked).toBe(true);
+    await vi.waitFor(() => expect(container.textContent).toContain("Notes you wrote on items and days."));
+    expect(container.textContent).toContain("When reminders were sent, as counts. Never their text.");
+    expect(checkbox("ai-source-notes").checked).toBe(true);
     await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!.click());
     await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: false, useConnectedSources: false, excludedSources: none,
       includeReminderHistory: false, includeNotes: false }));
@@ -317,7 +315,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
     await vi.waitFor(() => expect(checkbox("daily-brief-sources-coverage")).not.toBeNull());
     await act(() => checkbox("daily-brief-sources-coverage").click());
-    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toBe("Daily Brief settings could not save. Try again."));
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toBe("AI settings could not save. Your change was undone. Try again."));
   });
 });
 

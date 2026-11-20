@@ -31,7 +31,7 @@ export type DailyBriefClient = Readonly<{
   plan?: DailyBriefPlanControls;
   preferences: (signal?: AbortSignal) => Promise<DailyBriefSettings>;
   updatePreferences: (
-    input: DailyBriefPreferenceInput,
+    input: DailyBriefSettingsUpdate,
     signal?: AbortSignal,
   ) => Promise<DailyBriefSettings>;
   requestBrief: (
@@ -66,6 +66,14 @@ export type DailyBriefPreferenceInput = Readonly<{
   includeReminderHistory: boolean;
   includeNotes: boolean;
 }>;
+
+/** Advisor 4F: every AI choice at once; source choices are shared by every AI feature. */
+export type AiSettingsInput = DailyBriefPreferenceInput & Readonly<{ tipsEnabled: boolean; chatEnabled: boolean }>;
+
+/** Advisor 4F: the answer to the one AI features question. */
+export type AiApprovalInput = Readonly<{ approval: "all_on" | "all_off" }>;
+
+export type DailyBriefSettingsUpdate = DailyBriefPreferenceInput | AiSettingsInput | AiApprovalInput;
 
 export class DailyBriefRequestError extends Error {
   constructor(
