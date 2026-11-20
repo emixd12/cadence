@@ -90,6 +90,7 @@ import {
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
 import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { SettingsRegroupBench } from "@/app/design-system/SettingsRegroupBench";
+import { AiFeaturesPreview } from "@/app/design-system/AiFeaturesBench";
 import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
 import { AlertNoticeBench } from "@/app/design-system/AlertNoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
@@ -468,6 +469,11 @@ export default async function DesignSystemPage({
       </WebRuntimeProvider>
     );
   }
+  if (selectedPreviewId === "ai-features") {
+    // Advisor 4F: the AI features question (state=approval) and Settings > AI features
+    // (state=settings, or settings-unanswered) on a fixture account.
+    return <AiFeaturesPreview state={selectedFixtureState ?? "approval"} />;
+  }
   if (selectedPreviewId === "settings-regroup") {
     // Usability evaluation, 2026-11-09: the Settings regroup proposal on synthetic data.
     return <SettingsRegroupBench query={{ layout: firstSearchParam(params?.layout), state: selectedFixtureState }} />;
@@ -557,6 +563,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
       <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
       <BenchAnchor href="?preview=settings-regroup">Settings regroup proposal</BenchAnchor>
+      <BenchAnchor href="?preview=ai-features">AI features question and Settings (advisor 4F)</BenchAnchor>
     </nav>
   );
 }

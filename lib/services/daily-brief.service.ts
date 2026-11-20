@@ -4,6 +4,7 @@ import { BRIEF_MOVE_LINES_FEATURE, BRIEF_MOVES_VERSION, type BriefMoveConflictLi
 import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
 import { dailyBriefChoiceFromAllowed, dailyBriefReadsGoogleCalendar, dailyBriefSourceFlags, dailyBriefSourcesUsed } from "@cadence/core/services/daily-brief-sources";
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
+import { readStoredAiSettings, saveStoredAiSettings, type AiSettingsWrite, type StoredAiSettings } from "@/lib/db/ai-settings.repo";
 import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, saveDailyBrief, saveDailyBriefPreferences, type DailyBriefBeginResult, type DailyBriefPreferenceInput, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { agentBriefRefreshFunded } from "@/lib/db/agent-runs.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -39,6 +40,10 @@ const LEGACY_SETTINGS_KEY_SETS = [
   "enabled,includeCalendar,includeHevy,includeIcloudCalendar,includeNotes,includeOutlookCalendar,includeReminderHistory",
 ];
 const SETTINGS_KEYS = "enabled,excludedSources,includeNotes,includeReminderHistory,useConnectedSources";
+/** Advisor 4F: every AI choice at once. Source choices no longer depend on Daily Brief being on. */
+const AI_SETTINGS_KEYS = "chatEnabled,enabled,excludedSources,includeNotes,includeReminderHistory,tipsEnabled,useConnectedSources";
+/** Advisor 4F: the answer to the one AI features question. */
+const AI_APPROVAL_KEYS = "approval";
 const EXCLUDED_SOURCE_KEYS = [...DAILY_BRIEF_CONNECTED_SOURCES].sort().join();
 
 /** Phase diagnostics record span, duration and error code only; never prompts, facts or output. */
@@ -54,9 +59,11 @@ export function dailyBriefUsageCounts(usage: readonly DailyBriefCallUsage[]): Pe
 
 export async function getDailyBriefSettings(caller: CalendarCaller): Promise<DailyBriefSettings> {
   const preferences = await readDailyBriefPreferences(caller.client);
-  const [timezone, sourceStatus] = await Promise.all([
+  const [timezone, sourceStatus, ai] = await Promise.all([
     readAdvisorProfileTimezone(caller.client, caller.user.id),
     readDailyBriefSourceStatus(caller, preferences),
+    // A server whose database lacks the 4F migration reports no AI features question.
+    readStoredAiSettings(caller.client).catch(() => null),
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
   return { accountRef: briefingAccountRef(caller.user.id), available: agentModelConfigured(),
@@ -69,7 +76,8 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     includeCalendar: used.googleCalendar, includeOutlookCalendar: used.outlookCalendar, includeIcloudCalendar: used.icloudCalendar, includeHevy: used.hevy,
     connectorSources: { outlookCalendar: sourceStatus.outlookCalendar === "ready", icloudCalendar: sourceStatus.icloudCalendar === "ready", hevy: sourceStatus.hevy === "ready" },
     connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: null },
-    timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString() };
+    timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString(),
+    ...(ai ? { ai: { approved: ai.approvedAt !== null, tipsEnabled: ai.tipsEnabled, chatEnabled: ai.chatEnabled } } : {}) };
 }
 
 /**
@@ -80,6 +88,9 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
  * Turning Daily Brief off requires every other choice off.
  */
 export async function updateDailyBriefSettings(caller: CalendarCaller, value: unknown): Promise<DailyBriefSettings> {
+  if (record(value) && (Object.keys(value).sort().join() === AI_SETTINGS_KEYS || Object.keys(value).join() === AI_APPROVAL_KEYS)) {
+    return updateAiSettings(caller, value);
+  }
   const input = parseDailyBriefSettingsInput(value);
   if (!input) throw new DailyBriefError("invalid_request");
   // Ticket 298: a server that offers only the device model still lets a linked Mac turn the brief on.
@@ -87,6 +98,47 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
+}
+
+/**
+ * Advisor 4F. Saves every AI choice and records the approval. `{ approval: "all_on" }`
+ * turns every feature and source on; `{ approval: "all_off" }` turns every feature off
+ * and keeps the source choices as stored. Daily Brief turns on only where this server
+ * can run it.
+ */
+async function updateAiSettings(caller: CalendarCaller, value: Record<string, unknown>): Promise<DailyBriefSettings> {
+  const briefCanRun = agentModelConfigured() || dailyBriefDeviceModelAvailable(process.env);
+  const [current, preferences] = await Promise.all([readStoredAiSettings(caller.client), readDailyBriefPreferences(caller.client)]);
+  const input = parseAiSettingsInput(value, current, briefCanRun);
+  if (!input) throw new DailyBriefError("invalid_request");
+  if (input.dailyBriefEnabled && !briefCanRun) throw new DailyBriefError("not_configured");
+  await saveStoredAiSettings(caller.client, input, preferences.revision);
+  return getDailyBriefSettings(caller);
+}
+
+export function parseAiSettingsInput(value: Record<string, unknown>, current: StoredAiSettings, briefCanRun: boolean): AiSettingsWrite | null {
+  if (Object.keys(value).join() === AI_APPROVAL_KEYS) {
+    if (value.approval === "all_on") {
+      return { dailyBriefEnabled: briefCanRun, tipsEnabled: true, chatEnabled: true, includeNotes: true, includeReminderHistory: true,
+        useConnectedSources: true, excludedSources: dailyBriefSourceFlags(() => false) };
+    }
+    if (value.approval === "all_off") {
+      return { dailyBriefEnabled: false, tipsEnabled: false, chatEnabled: false, includeNotes: current.includeNotes,
+        includeReminderHistory: current.includeReminderHistory, useConnectedSources: current.useConnectedSources, excludedSources: current.excludedSources };
+    }
+    return null;
+  }
+  const excluded = value.excludedSources;
+  if (!record(excluded) || Object.keys(excluded).sort().join() !== EXCLUDED_SOURCE_KEYS ||
+      Object.values(excluded).some((item) => typeof item !== "boolean") ||
+      [value.enabled, value.tipsEnabled, value.chatEnabled, value.useConnectedSources, value.includeReminderHistory, value.includeNotes]
+        .some((item) => typeof item !== "boolean")) return null;
+  return {
+    dailyBriefEnabled: value.enabled as boolean, tipsEnabled: value.tipsEnabled as boolean, chatEnabled: value.chatEnabled as boolean,
+    useConnectedSources: value.useConnectedSources as boolean,
+    excludedSources: dailyBriefSourceFlags((source) => excluded[source] === true),
+    includeReminderHistory: value.includeReminderHistory as boolean, includeNotes: value.includeNotes as boolean,
+  };
 }
 
 function parseDailyBriefSettingsInput(value: unknown): DailyBriefPreferenceInput | null {
