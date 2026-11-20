@@ -784,6 +784,31 @@ describe("Behavior persistence fields in account synchronization", () => {
     expect(result.hostedWrites[0].value).not.toHaveProperty("end_date");
   });
 
+  // Mac 0.1.12 to 0.1.13: the saved baseline still holds end_date, while the local rows
+  // (migration 0026) and the hosted rows (contract 7 migration) both hold end_on. Edits
+  // made on 0.1.12 before the upgrade must still reach the account, with no conflict.
+  it("flushes edits made under contract 6 after the Mac upgrade", () => {
+    const run = { end_on: "2026-11-30", end_time: null, pause_from_on: null, pause_from_time: null, pause_back_on: null };
+    const baseline = snapshot([
+      { kind: "behavior", id: "b", value: { id: "b", title: "Walk", archive_notes: [], end_date: "2026-12-01" } },
+      { kind: "behavior", id: "c", value: { id: "c", title: "Read", archive_notes: [], end_date: null } },
+    ] as AccountSyncEntity[]);
+    const local = snapshot([
+      { kind: "behavior", id: "b", value: { id: "b", title: "Walk daily", archive_notes: [], ...run } },
+      { kind: "behavior", id: "c", value: { id: "c", title: "Read", archive_notes: [], ...run, end_on: null } },
+    ] as AccountSyncEntity[]);
+    const hosted = snapshot([
+      { kind: "behavior", id: "b", value: { id: "b", title: "Walk", archive_notes: [], ...run } },
+      { kind: "behavior", id: "c", value: { id: "c", title: "Read", archive_notes: [], ...run, end_on: null } },
+    ] as AccountSyncEntity[]);
+    const result = plan(baseline, local, hosted);
+    expect(result.conflicts).toEqual([]);
+    expect(result.localWrites).toEqual([]);
+    expect(result.hostedWrites).toHaveLength(1);
+    expect(result.hostedWrites[0]).toMatchObject({ kind: "behavior", id: "b", value: { title: "Walk daily", ...run } });
+    expect(result.hostedWrites[0].value).not.toHaveProperty("end_date");
+  });
+
   it("carries end and pause fields into writes", () => {
     const run = { end_on: "2026-12-01", end_time: "18:30:00", pause_from_on: "2026-11-21", pause_from_time: null, pause_back_on: "2026-11-24" };
     const result = plan(snapshot([row("b", "Walk")]), behavior(run), behavior({}));

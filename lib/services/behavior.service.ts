@@ -1,3 +1,4 @@
+import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
@@ -5,6 +6,7 @@ import {
   type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
+import { behaviorRunOutcomeMessage, localDateIn } from "@/lib/ui/behavior-run";
 import {
   getProfileTimezone,
   listUserBehaviors,
@@ -27,6 +29,7 @@ import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import {
   behaviorErrorToActionState,
   parseBehaviorFormData,
+  parseBehaviorRunActionFormData,
 } from "@/lib/services/behavior-form";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 export { behaviorErrorToActionState };
@@ -47,7 +50,8 @@ export async function getBehaviorPageData(): Promise<BehaviorPageData> {
     readCachedProfileTimezone(supabase, userId),
   ]);
 
-  return assembleBehaviorPageData({ categories, behaviors, profileTimezone });
+  // `now` gives each view its run state, so the list can group Not running items.
+  return assembleBehaviorPageData({ categories, behaviors, profileTimezone, now: Temporal.Now.instant() });
 }
 
 export async function createBehaviorFromFormData(formData: FormData): Promise<BehaviorView> {
@@ -155,6 +159,8 @@ type BehaviorGraphOperation = "create" | "update" | "archive" | "restore" | "run
  * and pause"). The action writes one configuration revision; the post-write sync then
  * removes the rows the end or pause stops, or brings rows back.
  */
+export { behaviorRunOutcomeMessage };
+
 export async function applyBehaviorRunActionForUser(
   supabase: AppSupabaseClient, userId: string,
   input: { behaviorId: string; action: BehaviorRunAction; expectedUpdatedAt: string },
@@ -166,31 +172,21 @@ export async function applyBehaviorRunActionForUser(
   return updated;
 }
 
-/** Form fields: behavior_id, expected_updated_at, run_action, and for a pause pause_from_on, pause_from_time, pause_back_on. */
-export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<void> {
+/**
+ * Form fields: behavior_id, expected_updated_at, run_action, and for a pause
+ * pause_from_on, pause_from_time, pause_back_on. Returns the outcome line the list and
+ * the Timeline notices show (docs/MESSAGING_CHANGES.md, P-077).
+ */
+export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<{ message: string }> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await applyBehaviorRunActionForUser(supabase, userId, {
+  const action = parseBehaviorRunActionFormData(formData);
+  const updated = await applyBehaviorRunActionForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData),
-    action: getRunActionFromFormData(formData),
+    action,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
   });
-}
-
-function getRunActionFromFormData(formData: FormData): BehaviorRunAction {
-  const kind = formData.get("run_action");
-  const text = (name: string) => {
-    const value = formData.get(name);
-    return typeof value === "string" && value.trim() ? value.trim() : null;
-  };
-  if (kind === "end_now" || kind === "start_again" || kind === "resume") return { kind };
-  if (kind === "pause") {
-    const fromOn = text("pause_from_on");
-    const backOn = text("pause_back_on");
-    if (!fromOn || !backOn) throw new Error("Choose the first paused day and the back-on day.");
-    return { kind, pause: { fromOn, fromTime: text("pause_from_time"), backOn } };
-  }
-  throw new Error("Choose what to do with this behavior.");
+  return { message: behaviorRunOutcomeMessage(updated.title, action, localDateIn(updated.timezone)) };
 }
 
 export async function syncBehaviorGraphForUser(

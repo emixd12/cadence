@@ -257,6 +257,15 @@ is deleted at the source exports as an Unresolved event with the same values.
 Match timing facts (`occurrence_source_matches`) are not exported. Routine
 identifiers, workout titles and credentials never export.
 
+Mark details (advisor Phase 4G) export the same way, as same-status events with
+`status_semantics = explicit_user_correction`, `source_capture_method = manual_tap`
+and `revises_event_id` set to the mark they add to. A late Completed mark with a stated
+time has `reason_code = done_at`: `effective_at` is when the person says they did it,
+and `recorded_at` is the tap. The Occurrence's `completed_at` takes the stated time and
+`status_marked_at` keeps the original tap. A Not Completed reason has
+`reason_code = not_done:<reason>`, one of `no_time`, `forgot`, `low_energy`, `away` or
+`chose_not_to`.
+
 The additive `status_events` root preserves compatibility for existing readers
 of the unchanged category, behavior, and occurrence snapshot arrays. BehaviorLog
 remains the interoperable and restore-oriented export format; its

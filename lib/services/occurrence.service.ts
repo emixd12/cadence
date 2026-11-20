@@ -1,6 +1,7 @@
 import { earliestStoppedLocalDate, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import { generationRunFields, toExistingOccurrenceForGeneration } from "@cadence/core/services/occurrence-generation";
+import type { OccurrenceDataStore } from "@cadence/core/data-store";
 import { syncMoveConflicts } from "@/lib/services/occurrence-move.service";
 
 import {
@@ -17,6 +18,7 @@ import {
   updateOccurrenceNoteIfExpected,
 } from "@/lib/db/occurrences.repo";
 import {
+  applyOccurrenceMarkDetailRpc,
   applyOccurrenceStatusTransitionRpc,
   getLatestOccurrenceStatusEventForOccurrence,
   type ApplyOccurrenceStatusTransitionRpcResult,
@@ -34,6 +36,8 @@ import { listProfileOccurrenceSyncTargets } from "@/lib/db/profiles.repo";
 import { listOccurrenceIdsWithTimeSessions } from "@/lib/db/timeSessions.repo";
 import {
   applyOccurrenceStatusTransition as applySharedStatusTransition,
+  recordOccurrenceDoneAt as recordSharedDoneAt,
+  recordOccurrenceNotDoneReason as recordSharedNotDoneReason,
   updateOccurrenceNote as updateSharedOccurrenceNote,
   normalizeOccurrenceStatus, parseOccurrenceId, parseOccurrenceStatus, parseOccurrenceNote,
 } from "@cadence/core/services/occurrence.service";
@@ -649,6 +653,43 @@ export async function applyOccurrenceStatusTransition(
   }
 
   return result;
+}
+
+/**
+ * Advisor plan 4G: the web's store for the two mark details. Reads the Occurrence and
+ * its latest status event, then commits through `apply_occurrence_mark_detail`.
+ */
+function markDetailStore(supabase: AppSupabaseClient, userId: string): Pick<OccurrenceDataStore, "readStatusContext" | "applyMarkDetail"> {
+  return {
+    async readStatusContext(occurrenceId: string) {
+      const [occurrence, latestStatusEvent] = await Promise.all([
+        getOccurrenceWithBehaviorTimezoneById(supabase, userId, occurrenceId),
+        getLatestOccurrenceStatusEventForOccurrence(supabase, userId, occurrenceId),
+      ]);
+      return occurrence ? {
+        occurrence,
+        latestStatusEventId: latestStatusEvent?.id ?? null,
+        timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE,
+      } : null;
+    },
+    applyMarkDetail: (plan) => applyOccurrenceMarkDetailRpc(supabase, plan),
+  };
+}
+
+export async function recordOccurrenceDoneAt(
+  supabase: AppSupabaseClient,
+  userId: string,
+  input: { occurrenceId: string; doneAt: Temporal.Instant; now: Temporal.Instant },
+) {
+  return recordSharedDoneAt(markDetailStore(supabase, userId), input);
+}
+
+export async function recordOccurrenceNotDoneReason(
+  supabase: AppSupabaseClient,
+  userId: string,
+  input: { occurrenceId: string; reason: unknown; now: Temporal.Instant },
+) {
+  return recordSharedNotDoneReason(markDetailStore(supabase, userId), input);
 }
 
 export async function repairClearedDecisionReminderCoverage(

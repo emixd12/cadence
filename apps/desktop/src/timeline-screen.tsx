@@ -1,5 +1,5 @@
 import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
@@ -8,8 +8,11 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { DayProgressTimeline, type DayProgressContext } from "@/components/timeline/DayProgressTimeline";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
+import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { useTimelineWheelReload } from "@/lib/ui/timeline-wheel-reload";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
+import type { BehaviorFormAction } from "@/lib/types/behavior";
+import { BehaviorRunNotices } from "@/components/timeline/BehaviorRunNotices";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { AdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
 import type { NotificationTarget } from "./notification-activation";
@@ -36,8 +39,12 @@ export type TimelineScreenProps = Readonly<{
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
   dailyBriefClient?: DailyBriefClient | null;
   dailyBriefSessionKey?: string;
-  // Shared links on the Timeline (the archive notice) switch desktop screens instead of loading a URL.
+  // Shared links on the Timeline switch desktop screens instead of loading a URL.
   onNavigate?: (screen: DesktopScreen, anchor?: string) => void;
+  /** Ended and Paused: Start again and Resume now on the Timeline notices (local action). */
+  runAction?: BehaviorFormAction;
+  /** Advisor plan 4G: the "Done at" and "Why?" lines after a mark. */
+  markDetailActions?: OccurrenceMarkDetailActions;
 }>;
 
 type NavigateScreen = (screen: DesktopScreen, anchor?: string) => void;
@@ -78,10 +85,12 @@ export function TimelineScreen({
   onReload,
   onShowMore,
   notificationTarget,
+  runAction,
   shortcutsByBehavior = {},
   dailyBriefClient,
   dailyBriefSessionKey,
   onNavigate,
+  markDetailActions,
   ...actions
 }: TimelineScreenProps) {
   const nextFutureDays = timeline.nextFutureDays;
@@ -145,6 +154,7 @@ export function TimelineScreen({
     <ScreenNavigation.Provider value={onNavigate}>
     <LinkProvider component={DesktopScreenLink}>
     <RefreshProvider onRefresh={onRefresh}>
+    <MarkDetails actions={markDetailActions} timezone={timeline.timezone}>
       <div ref={rootRef} className="flex w-full flex-col">
         <h1 className="sr-only">Timeline</h1>
         {reloadMessage ? (
@@ -186,6 +196,7 @@ export function TimelineScreen({
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
           <div className="grid gap-8 pb-32 sm:pb-24">
+            <BehaviorRunNotices notices={timeline.runNotices} todayLocalDate={timeline.todayLocalDate} runAction={runAction} />
             {notificationTarget ? (
               <section className="grid gap-3 border-b border-line py-4" aria-label="Opened reminder">
                 <p data-notification-result tabIndex={-1} role={notificationTarget.status === "error" ? "alert" : "status"}
@@ -243,8 +254,13 @@ export function TimelineScreen({
         </div>
         </AdvisorTimelineFrame>
       </div>
+    </MarkDetails>
     </RefreshProvider>
     </LinkProvider>
     </ScreenNavigation.Provider>
   );
+}
+
+function MarkDetails({ actions, timezone, children }: Readonly<{ actions?: OccurrenceMarkDetailActions; timezone: string; children: ReactNode }>) {
+  return actions ? <OccurrenceMarkDetailsProvider actions={actions} timezone={timezone}>{children}</OccurrenceMarkDetailsProvider> : <>{children}</>;
 }

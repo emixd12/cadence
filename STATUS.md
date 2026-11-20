@@ -94,6 +94,35 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-vwbetq`, stacked on the web PR).**
+  SQLite migration 0026 replaces `end_date` with the five run columns (backfill
+  `end_on = end_date - 1`). Row checks, contract 7 sync fields, the configuration snapshot
+  (`end`, `pause`), the generation guard and the timezone re-expression (T1) match the
+  server. The Mac wires the shared Not running group, run controls and Timeline notices to
+  a local `runAction`.
+- **Verification:** 167 Rust store tests; `tests/desktop-run-actions.test.ts`,
+  `tests/desktop-run-ui.dom.test.tsx`; desktop and web typecheck.
+- **Next:** Cadence for Mac 0.1.13 after the server PR merges; publishing needs the
+  owner's written OK.
+
+## Ended and Paused Behaviors, web — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-8l6iw2`, stacked on the server and
+  core PR).** Behaviors list: a Not running group (open by default, hidden when empty) with
+  "Ended Nov 30" or "Paused, back Dec 8" and Start again or Resume now plus Archive; grey
+  notes on running rows for an upcoming end or pause; End now, Pause and Cancel pause under
+  "When it runs" in Details and Settings. `PauseRangePicker` (first paused day, then back-on
+  day). Form: "Ends after" with "Set a time" and "End of day instead". Timeline: three
+  closable notices (`BehaviorRunNotices`), Close remembered per device per day. Shared
+  components take an injected `runAction`, so the Mac (Ticket 342) wires local actions.
+  Interactions INT-BEHAVIOR-033 to 036 and INT-TIMELINE-020; messaging P-077.
+- **Verification:** `tests/behavior-run-ui.dom.test.tsx` (9 tests); typecheck; lint of
+  changed files; `interactions:check` passes. Full `npm run test`: 6,324 pass; the 16
+  failures are the Node 24 files that fail the same way on main here.
+- **Left for AI helpers:** the trial warnings before End and Pause (R3, `in_trial`).
+
 ## Ended and Paused Behaviors, server and core — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-p37rj8`).** Behaviors no longer

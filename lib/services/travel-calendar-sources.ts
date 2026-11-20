@@ -1,4 +1,5 @@
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
+import type { ExternalEventSnapshotV1_1 } from "@cadence/core/types/external-event";
 import type { CalendarConnectionView } from "@/lib/types/google-calendar";
 import { ConnectorError, type ConnectorConnectionView } from "@/lib/types/connectors";
 import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
@@ -33,6 +34,8 @@ export type TravelCalendarEvents = Readonly<{
   timezone: string | null;
   /** Connected Outlook or iCloud Calendars whose read failed and were left out. */
   unavailable: readonly TravelConnectorName[];
+  /** False when a Calendar that was read returned only part of the range (such as quarantined events). */
+  complete: boolean;
 }>;
 
 export async function readTravelCalendarConnections(caller: CalendarReadCaller): Promise<TravelCalendarConnections> {
@@ -56,10 +59,11 @@ function connectorReadable(connection: ConnectorConnectionView): boolean {
  */
 export async function readTravelCalendarEvents(caller: CalendarReadCaller, connections: TravelCalendarConnections,
   request: Pick<TravelRouteRefreshRequest, "scope" | "startLocalDate" | "endLocalDate">, previous?: TravelCalendarEvents): Promise<TravelCalendarEvents> {
-  const connector = async (name: TravelConnectorName, read: Parameters<typeof readTravelCalendarRange>[1]) => {
+  const connector = async (name: TravelConnectorName, read: (start: string, end: string) => Promise<ExternalEventSnapshotV1_1>) => {
     if (!connectorReadable(connections[name]) || previous?.unavailable.includes(name)) return { name, events: null };
     try {
-      return { name, events: (await readTravelCalendarRange(request, read)).events };
+      const snapshot = await readTravelCalendarRange(request, read);
+      return { name, events: snapshot.events, complete: snapshot.completeness === "complete" };
     } catch (error) {
       if (previous || !(error instanceof ConnectorError) || error.code === "invalid_request") throw error;
       return { name, events: null, failed: true };
@@ -77,6 +81,7 @@ export async function readTravelCalendarEvents(caller: CalendarReadCaller, conne
     all: [...googleEvents, ...(outlook.events ?? []), ...(icloud.events ?? [])],
     timezone: google?.requestedRange.timezone ?? null,
     unavailable: [...(previous?.unavailable ?? []), ...[outlook, icloud].flatMap((entry) => "failed" in entry ? [entry.name] : [])],
+    complete: (google === null || google.completeness === "complete") && [outlook, icloud].every((entry) => !("complete" in entry) || entry.complete),
   };
 }
 

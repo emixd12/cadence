@@ -20,6 +20,7 @@ import {
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
 } from "./actions";
+import { behaviorRunAction } from "../behaviors/actions";
 import {
   keepMovedOccurrenceAction,
   moveOccurrenceAction,
@@ -28,6 +29,8 @@ import {
   suggestMoveTimesAction,
 } from "./move-actions";
 import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
+import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
+import { recordDoneAtAction, recordNotDoneReasonAction } from "./mark-detail-actions";
 import { MoveConflictNotices, type MoveConflictNotice } from "@/components/timeline/MoveConflictNotices";
 import { hasPersonMovedBefore, listOpenMoveConflicts } from "@/lib/services/occurrence-move.service";
 import { systemClock } from "@/lib/services/clock";
@@ -40,6 +43,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 // Advisor plan, Phase 2C: the person's own per-day moves from the Timeline row.
+const MARK_DETAIL_ACTIONS: OccurrenceMarkDetailActions = {
+  doneAt: recordDoneAtAction,
+  notDoneReason: recordNotDoneReasonAction,
+};
+
 const MOVE_ACTIONS: OccurrenceMoveActions = {
   move: moveOccurrenceAction,
   revert: revertOccurrenceMoveAction,
@@ -112,6 +120,7 @@ async function TimelineContent({
       todayLocalDate={timeline.todayLocalDate}
       hasMovedBefore={moveState.hasMovedBefore}
     >
+      <OccurrenceMarkDetailsProvider actions={MARK_DETAIL_ACTIONS} timezone={timeline.timezone}>
       <DailyBriefLauncher travelAccountId={userId} />
       {/* Advisor 4F: the one AI features question comes before the setup pop-up, in its place. */}
       <AiFeaturesApproval>
@@ -131,7 +140,9 @@ async function TimelineContent({
         dayNoteAction={saveDayNoteAction}
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
+        runAction={behaviorRunAction}
       />
+      </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>
   );
 }

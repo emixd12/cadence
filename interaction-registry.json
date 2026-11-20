@@ -284,7 +284,11 @@
         "INT-PLACE-008",
         "INT-PLACE-009",
         "INT-PLACE-010",
-        "INT-BEHAVIOR-032"
+        "INT-BEHAVIOR-032",
+        "INT-BEHAVIOR-033",
+        "INT-BEHAVIOR-034",
+        "INT-BEHAVIOR-035",
+        "INT-BEHAVIOR-036"
       ]
     },
     {
@@ -367,6 +371,9 @@
         "INT-BRIEF-005",
         "INT-WEATHER-001",
         "INT-TIMELINE-012",
+        "INT-TIMELINE-018",
+        "INT-TIMELINE-019",
+        "INT-TIMELINE-020",
         "INT-ADVISOR-001",
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
@@ -557,7 +564,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 46,
+      "interaction_marker_count": 52,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -574,13 +581,14 @@
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
         "INT-TRAVEL-005",
-        "INT-PLACE-006"
+        "INT-PLACE-006",
+        "INT-BEHAVIOR-036"
       ]
     },
     {
       "path": "components/behaviors/BehaviorList.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 27,
+      "interaction_marker_count": 28,
       "interaction_ids": [
         "INT-BEHAVIOR-001",
         "INT-BEHAVIOR-002",
@@ -601,7 +609,10 @@
         "INT-PLACE-006",
         "INT-PLACE-008",
         "INT-PLACE-009",
-        "INT-PLACE-010"
+        "INT-PLACE-010",
+        "INT-BEHAVIOR-033",
+        "INT-BEHAVIOR-034",
+        "INT-BEHAVIOR-035"
       ]
     },
     {
@@ -852,6 +863,15 @@
       ]
     },
     {
+      "path": "components/timeline/OccurrenceMarkDetails.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 16,
+      "interaction_ids": [
+        "INT-TIMELINE-018",
+        "INT-TIMELINE-019"
+      ]
+    },
+    {
       "path": "components/timeline/OccurrenceMoves.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 4,
@@ -883,8 +903,9 @@
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
+        "INT-SHELL-001",
         "INT-TIMELINE-001",
-        "INT-SHELL-001"
+        "INT-TIMELINE-020"
       ]
     },
     {
@@ -965,14 +986,14 @@
       "classification": "excluded",
       "interaction_marker_count": 104,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Ticket 219 adds travel_day and travel_unknown synthetic selections whose travel facts come from invented places and routes, never Maps content. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case. Ticket 290 adds a per-configuration Generation group (Model, Reasoning effort, Prompt) filled from the server's allowed values, and shows each run's generation, token usage and failure reason."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175–177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182–183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Ticket 219 adds travel_day and travel_unknown synthetic selections whose travel facts come from invented places and routes, never Maps content. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case. Ticket 290 adds a per-configuration Generation group (Model, Reasoning effort, Prompt) filled from the server's allowed values, and shows each run's generation, token usage and failure reason."
     },
     {
       "path": "app/design-system/BriefingReview.tsx",
       "classification": "excluded",
       "interaction_marker_count": 43,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief review components for Tickets 175\u2013177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
+      "reason": "Development-only Daily Brief review components for Tickets 175–177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
     },
     {
       "path": "components/briefing/BriefMoveLines.tsx",
@@ -1149,7 +1170,7 @@
       "classification": "excluded",
       "interaction_marker_count": 40,
       "interaction_ids": [],
-      "reason": "Development-only historical exploration and chronological review under Tickets 182\u2013183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
+      "reason": "Development-only historical exploration and chronological review under Tickets 182–183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
     },
     {
       "path": "components/settings/OutlookCalendarPanel.tsx",
@@ -1290,6 +1311,31 @@
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
         "INT-ADVISOR-004"
+      ]
+    },
+    {
+      "path": "components/behaviors/BehaviorRunControls.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 16,
+      "interaction_ids": [
+        "INT-BEHAVIOR-033",
+        "INT-BEHAVIOR-034"
+      ]
+    },
+    {
+      "path": "components/behaviors/PauseRangePicker.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-BEHAVIOR-034"
+      ]
+    },
+    {
+      "path": "components/timeline/BehaviorRunNotices.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-TIMELINE-020"
       ]
     }
   ],
@@ -12407,7 +12453,7 @@
         }
       ],
       "availability": "Always available. Rows and drawers start closed; one whose state needs action (needs reconnection, no calendars chosen, a Daily Brief source that needs a choice, Status unavailable after a failed read, or on the Mac a sync conflict, a first-link choice or a revoked session) opens by itself once.",
-      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking\u2026, Not connected, Connected \u00b7 N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
+      "success_result": "The row or drawer opens or closes and shows the existing panel unchanged; the closed summary keeps its state line (Checking…, Not connected, Connected · N calendars, Needs reconnection, Off, On; on a local Mac, Link a Cadence account).",
       "failure_result": "A failed status read shows Status unavailable and opens the panel, which shows its own error.",
       "effects": [
         "ui_state"
@@ -12434,7 +12480,7 @@
           "tests/desktop-account-section-state.test.ts",
           "tests/desktop-navigation.test.ts"
         ],
-        "notes": "Unit tests cover every state function; DOM tests cover Checking\u2026, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
+        "notes": "Unit tests cover every state function; DOM tests cover Checking…, self-opening on attention and failed reads, drawer labels, one heading per section, and anchor links. Desktop DOM tests cover the Mac groups, local-mode row state, the self-opening account drawer and in-app anchor navigation."
       },
       "platforms": {
         "web": {
@@ -13335,7 +13381,7 @@
         }
       ],
       "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "A failed save puts the controls back to their saved values and says so. Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
@@ -13977,7 +14023,7 @@
         }
       ],
       "availability": "Available while Outlook Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
@@ -15137,7 +15183,7 @@
         }
       ],
       "availability": "Existing Settings. Usual travel saves when it changes; Home saves on blur or Enter when its text changed. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
-      "success_result": "Saves the one changed value on the latest saved revision, shows Saving\u2026 then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
+      "success_result": "Saves the one changed value on the latest saved revision, shows Saving… then Saved in Travel's one result line, and announces the change so travel estimates refresh.",
       "failure_result": "Puts the control back to its saved value and says what to do in the same line: try again, or reload Settings if another device changed it. Tracking data is unchanged.",
       "effects": [
         "ui_state",
@@ -15224,7 +15270,7 @@
         }
       ],
       "availability": "Existing Settings after usual travel is chosen; usual travel sits above the toggle. Route estimates remain deployment-gated.",
-      "success_result": "Saves the toggle with consent at once and shows Saving\u2026, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
+      "success_result": "Saves the toggle with consent at once and shows Saving…, then Saved with the device location outcome in Travel's one result line. The position from this request is not saved or sent.",
       "failure_result": "Puts the toggle back to its saved state and says what to do. Tracking data is unchanged.",
       "effects": [
         "ui_state",
@@ -15672,7 +15718,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0\u201330 minutes (travel-habit-defaults@1).",
+      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0–30 minutes (travel-habit-defaults@1).",
       "triggers": [
         {
           "kind": "activate",
@@ -15884,7 +15930,7 @@
         }
       ],
       "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision, one save at a time; there are no separate buffer fields.",
-      "success_result": "Saves the habit, shows Saving\u2026 then Saved in How you travel's one result line, and refreshes estimates once.",
+      "success_result": "Saves the habit, shows Saving… then Saved in How you travel's one result line, and refreshes estimates once.",
       "failure_result": "Puts the choice back to its stored value, says so, and asks the user to reload Settings when another device changed them.",
       "effects": [
         "ui_state",
@@ -16324,7 +16370,7 @@
         }
       ],
       "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section. Ticket 283: Outlook and iCloud events get reminders like Google Calendar events, so the readiness list no longer limits sources.",
-      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving\u2026, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
+      "success_result": "Saves the switch on the hosted server at once; How you travel's one result line shows Saving…, then Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
       "failure_result": "Puts the switch back to its stored value and says the reminder setting could not save and the change was undone. A failed load leaves the checkbox unavailable and says so.",
       "effects": [
         "ui_state",
@@ -16739,8 +16785,8 @@
           "control": "Disconnect"
         }
       ],
-      "availability": "Signed in, under Settings \u2192 Connected apps.",
-      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting\u2026, then the result (Ticket 303).",
+      "availability": "Signed in, under Settings → Connected apps.",
+      "success_result": "Revoke the owned grant and every token immediately. One result line shows Disconnecting…, then the result (Ticket 303).",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_revocation"
@@ -16819,7 +16865,7 @@
           "control": "Recent activity"
         }
       ],
-      "availability": "Signed in, under Settings \u2192 Connected apps.",
+      "availability": "Signed in, under Settings → Connected apps.",
       "success_result": "Expand or collapse operation, time, and outcome records without payloads.",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
@@ -17153,7 +17199,7 @@
         }
       ],
       "availability": "Available while iCloud Calendar is connected. Each display and selection change saves as it changes (Ticket 303); there is no Save button.",
-      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving\u2026, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context. The section's one result line shows Saving…, then Saved after the calendar list reloads. Changes made during a save collapse into one save of the newest choice.",
       "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged. The controls go back to their saved values and the line says the change was undone.",
       "effects": [
         "database_write",
@@ -18735,6 +18781,172 @@
       }
     },
     {
+      "id": "INT-TIMELINE-018",
+      "name": "Say when a late item was done",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-when-or-why-to-a-mark"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Record the time an item was really done when it is marked Completed well after its set time.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Done at, Just now or Other time next to the name of a just-completed row"
+        }
+      ],
+      "availability": "Timeline on web and Mac, right after marking an item Completed more than two hours after its set time (or after a time range ends).",
+      "success_result": "Done at saves the set time and Other time saves a chosen time as when it was done; the tap time is kept. Just now closes the line and changes nothing.",
+      "failure_result": "A time after the tap or before the item's day, or a change on another device, is refused under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMarkDetails.tsx",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/(app)/timeline/mark-detail-actions.ts",
+        "lib/services/occurrence.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mark-details.test.ts"
+        ],
+        "notes": "Covers the stored done-at and tap time, refusals, the late-mark rule, reasons, and sync of a reason web to Mac and back."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMarkDetails.tsx"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-occurrence.service.ts"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ],
+          "reason": "The Mac uses the same row component and line through the shared provider; the local store writes the same history event (Rust test mark_details_append_same_status_events_and_keep_the_tap_time)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-019",
+      "name": "Give a reason an item was not done",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-when-or-why-to-a-mark"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Note why an item was not done, in one optional tap.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "No time, Forgot, Low energy, Away or Chose not to next to the name of a just-marked Not Completed row"
+        }
+      ],
+      "availability": "Timeline on web and Mac, right after marking an item Not Completed.",
+      "success_result": "Cadence notes the reason on the item's history. The status does not change.",
+      "failure_result": "A change on another device or a changed status is refused under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMarkDetails.tsx",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/(app)/timeline/mark-detail-actions.ts",
+        "lib/services/occurrence.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mark-details.test.ts"
+        ],
+        "notes": "Covers the stored done-at and tap time, refusals, the late-mark rule, reasons, and sync of a reason web to Mac and back."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMarkDetails.tsx"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-occurrence.service.ts"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ],
+          "reason": "The Mac uses the same row component and line through the shared provider; the local store writes the same history event (Rust test mark_details_append_same_status_events_and_keep_the_tap_time)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
       "id": "INT-BRIEF-006",
       "name": "Answer a Daily Brief move line",
       "user_guidance": {
@@ -19372,6 +19584,476 @@
           "evidence": [
             "tests/advisor-ui.dom.test.tsx"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-033",
+      "name": "End a behavior now or start it again",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior this minute without archiving it, or bring an ended one back.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "End now (When it runs)"
+        },
+        {
+          "kind": "submit",
+          "control": "Start again (Not running row)"
+        }
+      ],
+      "availability": "End now on a running Behavior's Details and Settings; Start again on an ended row in Not running.",
+      "success_result": "End now writes one configuration revision; unmarked rows later today leave the Timeline and the row moves to Not running as Ended. Start again clears the end; the Behavior runs from now with history kept. An italic outcome line shows at the top of the list.",
+      "failure_result": "A stale revision or server error shows in the error style under the row; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "occurrence_mutation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorRunControls.tsx",
+        "app/(app)/behaviors/actions.ts",
+        "lib/services/behavior.service.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Start again posts run_action with the Behavior's revision; the Not running group renders ended rows."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx",
+            "components/behaviors/BehaviorRunControls.tsx",
+            "app/(app)/behaviors/actions.ts",
+            "lib/services/behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-run-ui.dom.test.tsx",
+            "tests/desktop-run-actions.test.ts"
+          ],
+          "reason": "Ticket 342: the shared run controls post to the Mac local run action; the SQLite store keeps the five run columns."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-034",
+      "name": "Pause a behavior with the range picker, resume it or cancel a pause",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior for a range of days; it comes back by itself on the back-on day.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Pause"
+        },
+        {
+          "kind": "activate",
+          "control": "Pause range picker day"
+        },
+        {
+          "kind": "submit",
+          "control": "Save pause"
+        },
+        {
+          "kind": "submit",
+          "control": "Resume now"
+        },
+        {
+          "kind": "submit",
+          "control": "Cancel pause"
+        }
+      ],
+      "availability": "Pause on a running Behavior's Details and Settings; Resume now on a paused row; Cancel pause when a pause is set for later.",
+      "success_result": "Save pause writes one configuration revision with the first paused day and back-on day (one pause at a time). A pause from today moves the row to Not running as Paused, back X; a later pause shows a grey note. Resume now and Cancel pause clear the pause.",
+      "failure_result": "A refused range shows P-075 or P-074 in the error style next to the picker; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "occurrence_mutation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorRunControls.tsx",
+        "components/behaviors/PauseRangePicker.tsx",
+        "app/(app)/behaviors/actions.ts",
+        "lib/services/behavior.service.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Picker refuses past days, picks first paused day then back-on day, posts pause_from_on and pause_back_on; refused pause shows the field error."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx",
+            "components/behaviors/BehaviorRunControls.tsx",
+            "components/behaviors/PauseRangePicker.tsx",
+            "app/(app)/behaviors/actions.ts",
+            "lib/services/behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-run-ui.dom.test.tsx",
+            "tests/desktop-run-actions.test.ts"
+          ],
+          "reason": "Ticket 342: the shared Pause range picker posts to the Mac local run action."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-035",
+      "name": "Toggle the Not running group",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Show or hide ended and paused Behaviors.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Not running disclosure"
+        }
+      ],
+      "availability": "Shown between active and archived Behaviors when at least one Behavior is ended or paused; open by default.",
+      "success_result": "Toggles the native disclosure without changing behavior state.",
+      "failure_result": "No stored product data changes.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-behaviors-read.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "The group renders open with its count and is absent when empty."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-behaviors-read.service.ts"
+          ],
+          "evidence": [
+            "tests/desktop-run-ui.dom.test.tsx",
+            "tests/desktop-run-actions.test.ts"
+          ],
+          "reason": "Ticket 342: Mac Behavior views carry runState, so the shared list groups Not running items."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-036",
+      "name": "Set or clear an end time",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior at a time of day on its last day instead of the end of the day.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Set a time"
+        },
+        {
+          "kind": "input",
+          "control": "Ends after time"
+        },
+        {
+          "kind": "activate",
+          "control": "End of day instead"
+        }
+      ],
+      "availability": "In the create and edit forms once an Ends after day is chosen.",
+      "success_result": "The time is saved with the form as end_time; End of day instead posts an empty time.",
+      "failure_result": "A time already past is refused with P-074 on save; the draft stays.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src-tauri/src/local_store/db.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Covered through the shared form render; the save rule is covered by core tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src-tauri/src/local_store/db.rs"
+          ],
+          "evidence": [
+            "tests/desktop-run-actions.test.ts"
+          ],
+          "reason": "Ticket 342: the shared form saves end_time through the local store; SQLite checks whole minutes."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-020",
+      "name": "Act on or close an ended, paused or back-today notice",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J08"
+      ],
+      "intent": "See at the top of the Timeline that a Behavior ended, paused or came back today, and undo it in one tap.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Start again (notice)"
+        },
+        {
+          "kind": "submit",
+          "control": "Resume now (notice)"
+        },
+        {
+          "kind": "activate",
+          "control": "Close notice"
+        }
+      ],
+      "availability": "On the day a Behavior ends, the day a pause starts, and the back-on day; derived from the Behavior's fields.",
+      "success_result": "Start again or Resume now writes one revision and the Timeline refreshes. Close hides that line on this device for the rest of the day.",
+      "failure_result": "An action error shows in the error style under the line; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/BehaviorRunNotices.tsx",
+        "components/timeline/Timeline.tsx",
+        "app/(app)/timeline/page.tsx",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Three notice lines, Close persisted per day, Resume now posts the notice revision."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/BehaviorRunNotices.tsx",
+            "components/timeline/Timeline.tsx",
+            "app/(app)/timeline/page.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/desktop-run-ui.dom.test.tsx",
+            "tests/desktop-run-actions.test.ts"
+          ],
+          "reason": "Ticket 342: the Mac Timeline renders the shared notices from local run fields with the local run action."
         },
         "marketing": {
           "applicability": "not_applicable",

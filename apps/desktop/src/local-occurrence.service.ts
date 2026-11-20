@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { OccurrenceDataStore, OccurrenceStatusEventRecord } from "@cadence/core/data-store";
 import {
-  applyOccurrenceStatusTransition, updateOccurrenceNote,
+  applyOccurrenceStatusTransition, recordOccurrenceDoneAt, recordOccurrenceNotDoneReason, updateOccurrenceNote,
 } from "@cadence/core/services/occurrence.service";
 import {
   startOccurrenceTimeTracking, stopOccurrenceTimeTracking, resetOccurrenceTimeTracking,
@@ -43,6 +43,25 @@ export function createLocalOccurrenceStore(profileId: string, now: Temporal.Inst
         created_at: now.toString(), updated_at: now.toString(),
       } : null;
       return localCommand("applyStatusTransition", { ...localMutation(profileId, now.toString()), ...plan, event });
+    },
+    async applyMarkDetail(plan) {
+      if (!context || context.occurrence.id !== plan.occurrenceId) throw new Error("Read the occurrence before changing it.");
+      const event: OccurrenceStatusEventRecord = {
+        id: crypto.randomUUID(), user_id: profileId,
+        occurrence_id: plan.occurrenceId, behavior_id: context.occurrence.behavior_id,
+        local_date: context.occurrence.local_date, timezone: context.timezone,
+        previous_status: plan.event.previousStatus, status: plan.event.status,
+        status_semantics: plan.event.statusSemantics, recorded_at: plan.event.recordedAt,
+        effective_at: plan.event.effectiveAt, reason_code: plan.event.reasonCode,
+        revises_event_id: plan.expectedLatestEventId,
+        source_capture_method: plan.event.sourceCaptureMethod,
+        source_confidence: plan.event.sourceConfidence,
+        created_at: now.toString(), updated_at: now.toString(),
+      };
+      return localCommand("applyMarkDetail", {
+        ...localMutation(profileId, now.toString()),
+        occurrenceId: plan.occurrenceId, expectedLatestEventId: plan.expectedLatestEventId, completedAt: plan.completedAt, event,
+      });
     },
     updateOccurrenceNote: ({ usedShortcut, ...plan }) => localCommand("updateOccurrenceNote", {
       ...localMutation(profileId, now.toString()), ...plan, ...(usedShortcut ? { usedShortcut: true } : {}),
@@ -87,6 +106,18 @@ export async function markLocalOccurrence(profileId: string, input: {
   occurrenceId: string; expectedStatus: OccurrenceStatus; nextStatus: OccurrenceStatus;
 }, now = Temporal.Now.instant()) {
   return (await applyOccurrenceStatusTransition(createLocalOccurrenceStore(profileId, now), { ...input, now })).result;
+}
+
+/** Advisor plan 4G: "Done at" after a late Completed mark on the Mac. */
+export async function recordLocalDoneAt(profileId: string, input: { occurrenceId: string; doneAt: string }, now = Temporal.Now.instant()) {
+  return recordOccurrenceDoneAt(createLocalOccurrenceStore(profileId, now), {
+    occurrenceId: input.occurrenceId, doneAt: Temporal.Instant.from(input.doneAt), now,
+  });
+}
+
+/** Advisor plan 4G: an optional reason on Not Completed on the Mac. */
+export async function recordLocalNotDoneReason(profileId: string, input: { occurrenceId: string; reason: string }, now = Temporal.Now.instant()) {
+  return recordOccurrenceNotDoneReason(createLocalOccurrenceStore(profileId, now), { ...input, now });
 }
 
 export async function saveLocalOccurrenceNote(profileId: string, input: {
