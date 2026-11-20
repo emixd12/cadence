@@ -57,6 +57,7 @@
               "capture_method": "manual_tap",
               "recorded_at": "2026-10-18T11:35:00Z",
               "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             },
@@ -68,6 +69,7 @@
               "capture_method": "manual_text",
               "recorded_at": "2026-10-18T11:41:00Z",
               "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             }
@@ -120,6 +122,7 @@
               "capture_method": "manual_tap",
               "recorded_at": "2026-10-18T11:35:00Z",
               "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             },
@@ -131,6 +134,7 @@
               "capture_method": "manual_text",
               "recorded_at": "2026-10-18T11:41:00Z",
               "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             }
@@ -226,6 +230,7 @@
               "capture_method": "manual_tap",
               "recorded_at": "2026-10-18T11:35:00Z",
               "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             },
@@ -237,6 +242,7 @@
               "capture_method": "manual_text",
               "recorded_at": "2026-10-18T11:41:00Z",
               "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
               "local_date": "2026-10-18",
               "timezone": "America/New_York"
             }

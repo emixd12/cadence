@@ -14,7 +14,7 @@
     { "id": "today-moved", "lane": "moved_today", "text": "Should {behavior} move for good?", "advice_card": "set-it-where-you-keep-moving-it" },
 
     { "id": "unmarked-which", "lane": "unmarked", "text": "Which items are still unmarked?", "advice_card": "unmarked-is-not-missed" },
-    { "id": "unmarked-catch-up", "lane": "unmarked", "text": "Help me catch up on unmarked items.", "advice_card": "write-it-down" },
+    { "id": "unmarked-catch-up", "lane": "unmarked", "text": "Help me catch up on unmarked items.", "advice_card": "marking-is-the-core" },
 
     { "id": "low-why", "lane": "low_behavior", "text": "Why does {behavior} keep slipping?", "advice_card": "name-the-obstacle" },
     { "id": "low-smaller", "lane": "low_behavior", "text": "How could I make {behavior} easier to start?", "advice_card": "make-it-smaller" },
@@ -27,12 +27,12 @@
     { "id": "week-back-on-track", "lane": "week_down", "text": "How do I get back on track after a slow week?", "advice_card": "one-miss-is-fine" },
     { "id": "week-up", "lane": "week_up", "text": "This week is going better. What is working?", "advice_card": "look-at-the-week" },
 
-    { "id": "early-how-long", "lane": "early", "text": "How long does a new routine take to stick?", "advice_card": "expect-about-ten-weeks" },
+    { "id": "early-how-long", "lane": "early", "text": "How long does a new routine take to stick?", "advice_card": "weeks-not-days" },
     { "id": "early-anchor", "lane": "early", "text": "What could I tie my new Behaviors to?", "advice_card": "anchor-to-an-existing-routine" },
     { "id": "early-too-many", "lane": "early", "text": "Am I trying too many things at once?", "advice_card": "start-with-fewer" },
 
     { "id": "weekday-hardest", "lane": "weekday_gap", "text": "Which day of the week is hardest for me?", "advice_card": "same-cue-every-day" },
-    { "id": "time-of-day", "lane": "time_of_day_gap", "text": "Do I do better in the morning or the evening?", "advice_card": "time-of-day-matters" },
+    { "id": "time-of-day", "lane": "time_of_day_gap", "text": "Do I do better in the morning or the evening?" },
     { "id": "crowded-hour", "lane": "crowded_hour", "text": "Have I put too much in one hour?", "advice_card": "one-slot-one-item" },
     { "id": "done-together", "lane": "done_together", "text": "Which Behaviors do I tend to do together?", "advice_card": "stack-after-a-routine" },
     { "id": "setup-lengths", "lane": "setup_gaps", "text": "Which Behaviors still need a length or a place?", "advice_card": "give-it-a-length" }

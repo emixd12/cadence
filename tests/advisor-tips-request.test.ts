@@ -29,7 +29,7 @@ const CARD: AdviceCard = {
 const ROW = { id: "11111111-1111-4111-8111-111111111111", localDate: "2026-11-19", text: "Gym: 2 of 8.", cardId: "drop", cardRevision: 2, behaviorId: "b-gym", shownAt: "2026-11-19T09:00:00Z", reaction: null };
 
 function deps(overrides: Partial<TipRequestDeps> = {}): TipRequestDeps {
-  return { settings: async () => ({ tipsOn: true, notesAllowed: false }), firstDay: vi.fn(async () => 0), cards: [CARD], ...overrides };
+  return { settings: async () => ({ tipsOn: true, notesAllowed: false, reminderHistoryAllowed: true }), firstDay: vi.fn(async () => 0), cards: [CARD], ...overrides };
 }
 
 const get = () => new Request("https://cadence.test/api/advisor/tips/next", { headers: { authorization: "Bearer t" } });
@@ -54,7 +54,7 @@ describe("GET next tip", () => {
   });
 
   it("with tips off: nothing, and no tip is marked shown", async () => {
-    const response = await handleNextTip(get(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false }) }));
+    const response = await handleNextTip(get(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }) }));
     expect(await response.json()).toEqual({ state: "none", reason: "tips_off", nextAt: null });
     expect(repo.nextTip).not.toHaveBeenCalled();
   });
@@ -131,7 +131,7 @@ describe("first-day tips (T7)", () => {
     const p = {
       calls,
       startRun: async () => { calls.startRun += 1; return { runId: "r", localDate: today }; },
-      settings: async () => ({ tipsOn: true, notesAllowed: false }),
+      settings: async () => ({ tipsOn: true, notesAllowed: false, reminderHistoryAllowed: true }),
       signals: async () => [], history: async () => ({ tips: [], suppressedCardIds: [] }), notes: async () => [],
       setup: async () => ({ behaviors: [{ id: "b", createdAt, timezone: "UTC", active: true, hasLength: false }], occurrences: [], titles: new Map([["b", "Gym"]]) }),
       reserve: async () => ({ allowed: false as const }), settle: async () => undefined,
@@ -173,7 +173,7 @@ describe("GET recent tips", () => {
   });
 
   it("with tips off: an empty list and no read", async () => {
-    const body = await (await handleRecentTips(recent(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false }) }))).json();
+    const body = await (await handleRecentTips(recent(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }) }))).json();
     expect(body).toEqual({ tips: [] });
     expect(repo.recentTips).not.toHaveBeenCalled();
   });

@@ -523,6 +523,21 @@
       "notes": "Advisor plan Phase 2C. The web Timeline's own Move for today: free times as text links then Other time, Moved from 9:00 AM \u00b7 Undo, a short Undo message, optional one-tap reasons, refusals in the alert style, and the schedule-edit overlap line with Yes / No / Other time. Text only: no boxes or filled buttons."
     },
     {
+      "id": "module.occurrence-mark-details",
+      "name": "OccurrenceMarkDetailLine",
+      "kind": "module",
+      "source": "components/timeline/OccurrenceMarkDetails.tsx",
+      "exportName": "OccurrenceMarkDetailLine",
+      "usageNames": [
+        "OccurrenceMarkDetailLine",
+        "OccurrenceMarkDetailsProvider"
+      ],
+      "benchAnchor": "design-system#ds-module-occurrence-mark-details",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Advisor plan Phase 4G. Right after a mark, one optional text line under the row: a late Completed mark offers Done at 9:00 AM \u00b7 Just now \u00b7 Other time; Not Completed offers Why? No time \u00b7 Forgot \u00b7 Low energy \u00b7 Away \u00b7 Chose not to. Outcome in italic; refusals start with Not changed."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",

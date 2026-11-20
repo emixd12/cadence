@@ -1759,24 +1759,14 @@
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
     },
     {
-      "id": "INT-CHAT-001",
-      "classification": "external_provider",
-      "reason": "A chat turn invokes the model provider and needs separate synthetic provider testing."
-    },
-    {
-      "id": "INT-CHAT-002",
+      "id": "INT-TIMELINE-018",
       "classification": "destructive_serial_only",
-      "reason": "Undo reverses a chat write and needs the stored outcome, the record's revision and idempotency verification on a synthetic account."
+      "reason": "The done-at line appears only right after a late Completed mark and appends status history; it needs a seeded late item and serial verification."
     },
     {
-      "id": "INT-CHAT-003",
+      "id": "INT-TIMELINE-019",
       "classification": "destructive_serial_only",
-      "reason": "A confirm runs several writes after Yes and needs a stored pending confirm from the same serial run."
-    },
-    {
-      "id": "INT-CHAT-004",
-      "classification": "not_load_bearing",
-      "reason": "Lists and opens stored conversations with one bounded read and no model call."
+      "reason": "The reason line appears only right after a Not Completed mark and appends status history; it needs serial verification."
     },
     {
       "id": "INT-ADVISOR-001",
@@ -1797,6 +1787,26 @@
       "id": "INT-ADVISOR-004",
       "classification": "destructive_serial_only",
       "reason": "Schedule answers edit a Behavior's schedule and need an open stored proposal; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-CHAT-001",
+      "classification": "external_provider",
+      "reason": "A chat turn invokes the model provider and needs separate synthetic provider testing."
+    },
+    {
+      "id": "INT-CHAT-002",
+      "classification": "destructive_serial_only",
+      "reason": "Undo reverses a chat write and needs the stored outcome, the record's revision and idempotency verification on a synthetic account."
+    },
+    {
+      "id": "INT-CHAT-003",
+      "classification": "destructive_serial_only",
+      "reason": "A confirm runs several writes after Yes and needs a stored pending confirm from the same serial run."
+    },
+    {
+      "id": "INT-CHAT-004",
+      "classification": "not_load_bearing",
+      "reason": "Lists and opens stored conversations with one bounded read and no model call."
     }
   ]
 }

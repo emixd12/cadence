@@ -221,3 +221,148 @@ export function isConnectorStatusEvent(event: Readonly<{
     && typeof event.reasonCode === "string"
     && event.reasonCode.startsWith("connector:");
 }
+
+/**
+ * Advisor plan Phase 4, workstream 4G (Emi, D8): two optional details a person adds
+ * after a mark, each appended as its own status event that keeps the status. History
+ * stays append-only, so the details sync like any mark, web and Mac.
+ *
+ * - "Done at": the mark was tapped well after the set time; the person says when it
+ *   was really done. The event's `effective_at` and the Occurrence's `completed_at`
+ *   become that time. `status_marked_at` keeps the tap time.
+ * - "Why not done": an optional one-tap reason on Not Completed, stored as the
+ *   event's `reason_code` ("not_done:<reason>"). The Occurrence does not change.
+ */
+export const DONE_AT_REASON_CODE = "done_at";
+export const NOT_DONE_REASON_PREFIX = "not_done:";
+export const NOT_DONE_REASONS = ["no_time", "forgot", "low_energy", "away", "chose_not_to"] as const;
+export type NotDoneReason = (typeof NOT_DONE_REASONS)[number];
+/**
+ * How often the two mark-detail lines appear (Emi, Nov 19: keep it tunable). Change the
+ * numbers here; web and Mac both read them.
+ *
+ * - `lateAfterMinutes`: a Completed mark this long after the set time (or after a time
+ *   range ends) offers "Done at". Raise it to ask less often.
+ * - `share`: the part of eligible marks that show the line, from 0 (never) to 1 (every
+ *   time). The pick is fixed per item and day, so the same mark never flickers between
+ *   showing and not.
+ */
+export type MarkDetailPromptSettings = Readonly<{
+  doneAt: Readonly<{ lateAfterMinutes: number; share: number }>;
+  notDoneReason: Readonly<{ share: number }>;
+}>;
+
+export const MARK_DETAIL_PROMPTS: MarkDetailPromptSettings = Object.freeze({
+  doneAt: Object.freeze({ lateAfterMinutes: 120, share: 1 }),
+  notDoneReason: Object.freeze({ share: 1 }),
+});
+
+/** Kept for callers that read the late threshold directly. */
+export const LATE_MARK_THRESHOLD_MINUTES = MARK_DETAIL_PROMPTS.doneAt.lateAfterMinutes;
+
+/**
+ * Whether this item's line is in the shown share: a stable number in [0, 1) from the
+ * line kind, Occurrence id and local date, compared with `share`.
+ */
+export function markDetailPromptPicked(kind: "done_at" | "not_done_reason", occurrenceId: string, localDate: string, share: number): boolean {
+  if (share >= 1) return true;
+  if (share <= 0) return false;
+  let hash = 2166136261;
+  for (const char of `${kind}:${occurrenceId}:${localDate}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967296 < share;
+}
+
+export type MarkDetailEventPlan = Readonly<{
+  previousStatus: "completed" | "not_completed";
+  status: "completed" | "not_completed";
+  statusSemantics: "explicit_user_correction";
+  recordedAt: string;
+  effectiveAt: string | null;
+  sourceCaptureMethod: "manual_tap";
+  sourceConfidence: "high";
+  reasonCode: string;
+}>;
+
+export type MarkDetailPlan = Readonly<{
+  /** The Occurrence's new `completed_at`; equal to the current value for a reason. */
+  completedAt: string | null;
+  event: MarkDetailEventPlan;
+}>;
+
+export class MarkDetailRefusal extends Error {
+  constructor(readonly code: "not_completed" | "not_not_completed" | "done_at_after_mark" | "done_at_before_day" | "invalid_reason") {
+    super(MARK_DETAIL_MESSAGES[code]);
+    this.name = "MarkDetailRefusal";
+  }
+}
+
+const MARK_DETAIL_MESSAGES: Readonly<Record<MarkDetailRefusal["code"], string>> = {
+  not_completed: "This item is no longer Completed.",
+  not_not_completed: "This item is no longer Not Completed.",
+  done_at_after_mark: "That time is after you marked it.",
+  done_at_before_day: "That time is before the item's day.",
+  invalid_reason: "Choose one of the listed reasons.",
+};
+
+export function isNotDoneReason(value: unknown): value is NotDoneReason {
+  return typeof value === "string" && (NOT_DONE_REASONS as readonly string[]).includes(value);
+}
+
+/** The reason stored on a status event, or null. */
+export function notDoneReasonOf(reasonCode: string | null | undefined): NotDoneReason | null {
+  if (!reasonCode?.startsWith(NOT_DONE_REASON_PREFIX)) return null;
+  const reason = reasonCode.slice(NOT_DONE_REASON_PREFIX.length);
+  return isNotDoneReason(reason) ? reason : null;
+}
+
+/**
+ * Plans a "Done at" detail. `doneAt` must fall from the start of the Occurrence's local
+ * day up to the tap time (`status_marked_at`).
+ */
+export function resolveDoneAtDetail(input: Readonly<{
+  occurrence: Readonly<{ status: string; statusMarkedAt: string | null; localDate: string }>;
+  timezone: string;
+  doneAt: Temporal.Instant;
+  now: Temporal.Instant;
+}>): MarkDetailPlan {
+  if (input.occurrence.status !== "completed" || !input.occurrence.statusMarkedAt) throw new MarkDetailRefusal("not_completed");
+  const doneAt = input.doneAt.round({ smallestUnit: "second", roundingMode: "floor" });
+  if (Temporal.Instant.compare(doneAt, Temporal.Instant.from(input.occurrence.statusMarkedAt)) > 0) throw new MarkDetailRefusal("done_at_after_mark");
+  const dayStart = Temporal.PlainDate.from(input.occurrence.localDate).toZonedDateTime({ timeZone: input.timezone }).toInstant();
+  if (Temporal.Instant.compare(doneAt, dayStart) < 0) throw new MarkDetailRefusal("done_at_before_day");
+  return {
+    completedAt: doneAt.toString(),
+    event: {
+      previousStatus: "completed", status: "completed", statusSemantics: "explicit_user_correction",
+      recordedAt: input.now.toString(), effectiveAt: doneAt.toString(),
+      sourceCaptureMethod: "manual_tap", sourceConfidence: "high", reasonCode: DONE_AT_REASON_CODE,
+    },
+  };
+}
+
+/** Plans a "Why not done" detail. The latest event's effective time is kept. */
+export function resolveNotDoneReasonDetail(input: Readonly<{
+  occurrence: Readonly<{ status: string; statusMarkedAt: string | null }>;
+  reason: unknown;
+  now: Temporal.Instant;
+}>): MarkDetailPlan {
+  if (input.occurrence.status !== "not_completed" || !input.occurrence.statusMarkedAt) throw new MarkDetailRefusal("not_not_completed");
+  if (!isNotDoneReason(input.reason)) throw new MarkDetailRefusal("invalid_reason");
+  return {
+    completedAt: null,
+    event: {
+      previousStatus: "not_completed", status: "not_completed", statusSemantics: "explicit_user_correction",
+      recordedAt: input.now.toString(), effectiveAt: input.occurrence.statusMarkedAt,
+      sourceCaptureMethod: "manual_tap", sourceConfidence: "high", reasonCode: `${NOT_DONE_REASON_PREFIX}${input.reason}`,
+    },
+  };
+}
+
+/** True when a status event is a mark detail (a same-status event from 4G). */
+export function isMarkDetailEvent(event: Readonly<{ previousStatus?: string | null; status?: string | null; reasonCode?: string | null }>): boolean {
+  return event.previousStatus === event.status
+    && (event.reasonCode === DONE_AT_REASON_CODE || notDoneReasonOf(event.reasonCode) !== null);
+}
