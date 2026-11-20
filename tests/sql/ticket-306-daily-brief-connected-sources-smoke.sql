@@ -156,7 +156,10 @@ begin
     where user_id = '30600000-0000-4000-8000-000000000003' and use_connected_sources is not null) then
     raise exception 'The migration stored a choice for an existing row.';
   end if;
-  perform pg_temp.expect_error($q$update cadence_advisor_private.daily_brief_preferences set enabled = false, include_notes = false where user_id = '30600000-0000-4000-8000-000000000002'$q$, '23514');
+  -- Advisor 4F (20261120100000): source choices are shared by every AI feature, so they
+  -- may stay on while Daily Brief is off. The v4 save still refuses that for old clients.
+  update cadence_advisor_private.daily_brief_preferences set enabled = false, include_notes = false
+  where user_id = '30600000-0000-4000-8000-000000000002';
   perform pg_temp.expect_error($q$update cadence_advisor_private.daily_brief_preferences set exclude_hevy = null where user_id = '30600000-0000-4000-8000-000000000002'$q$, '23514');
   if has_function_privilege('anon', 'public.save_daily_brief_preferences_v4(boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, bigint)', 'EXECUTE')
     or has_function_privilege('service_role', 'cadence_advisor_private.save_daily_brief_preferences_v4(boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, bigint)', 'EXECUTE')

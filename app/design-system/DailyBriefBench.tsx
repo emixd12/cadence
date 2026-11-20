@@ -60,7 +60,8 @@ async function fetchAccount(signal: AbortSignal): Promise<Account> {
   return body;
 }
 
-import type { DailyBriefClient, DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
+import type { DailyBriefClient } from "@/lib/ui/daily-brief";
+import { createAiFeaturesBenchClient } from "./AiFeaturesBench";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { ChatGptPlanCard } from "@/components/briefing/ChatGptPlanCard";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
@@ -72,20 +73,8 @@ import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchGeneration, BenchProposal } from "@/lib/services/briefing-bench-store";
 import type { DailyBriefCallUsage } from "@/lib/services/daily-brief-consumer";
 
-function benchDailyBriefSettings(input: DailyBriefPreferenceInput, revision: number): DailyBriefSettings {
-  return { accountRef: "bench-account", available: true, revision, localDate: "2026-09-20", timezone: "America/New_York", ...input,
-    sourceStatus: { googleCalendar: "ready", outlookCalendar: "no_calendars", icloudCalendar: "not_connected", hevy: "ready" },
-    includeCalendar: input.useConnectedSources && !input.excludedSources.googleCalendar, includeOutlookCalendar: false, includeIcloudCalendar: false,
-    includeHevy: input.useConnectedSources && !input.excludedSources.hevy };
-}
-
-const client: DailyBriefClient = {
-  // Ticket 306 states: the one choice on, Hevy excluded, Outlook with no selected calendar, iCloud not connected.
-  preferences: async () => benchDailyBriefSettings({ enabled: true, useConnectedSources: true,
-    excludedSources: { googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: true }, includeReminderHistory: false, includeNotes: false }, 1),
-  updatePreferences: async (input) => benchDailyBriefSettings(input, 2),
-  requestBrief: async () => ({ state: "already_attempted" }),
-};
+// Advisor 4F states: every AI feature on, Hevy excluded, Outlook with no selected calendar, iCloud not connected.
+const client: DailyBriefClient = createAiFeaturesBenchClient({ approved: true });
 
 // Ticket 218 synthetic guidance: a thunderstorm margin with its credit, and no device location.
 const briefTravel = (weather: "applied" | "no_position"): BriefTravelGuidance => ({

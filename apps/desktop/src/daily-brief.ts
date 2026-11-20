@@ -4,7 +4,7 @@ import type {
   DailyBriefResponse,
   DailyBriefSettings,
 } from "@cadence/core/types/daily-brief";
-import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefPreferenceInput, DailyBriefRequestInput } from "@/lib/ui/daily-brief";
+import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefRequestInput, DailyBriefSettingsUpdate } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch, withDailyBriefDeadline } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { ChatGPTPlanError, chooseChatGPTPlanModel, generateChatGPTPlanDailyBrief } from "@/lib/services/daily-brief-chatgpt-plan";
@@ -80,7 +80,7 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     return this.settingsRequest({}, signal);
   }
 
-  updatePreferences(input: DailyBriefPreferenceInput, signal?: AbortSignal) {
+  updatePreferences(input: DailyBriefSettingsUpdate, signal?: AbortSignal) {
     return this.settingsRequest({ method: "PUT", body: JSON.stringify(input) }, signal);
   }
 

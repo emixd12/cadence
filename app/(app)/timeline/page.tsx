@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { ScreenContentLoading } from "@/components/layout/ScreenFrame";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
+import { AiFeaturesApproval } from "@/components/onboarding/AiFeaturesApproval";
 import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getCurrentUserClaims } from "@/lib/auth/current-user";
@@ -132,7 +133,10 @@ async function TimelineContent({
     >
       <OccurrenceMarkDetailsProvider actions={MARK_DETAIL_ACTIONS} timezone={timeline.timezone}>
       <DailyBriefLauncher travelAccountId={userId} />
-      <FirstRunOnboardingPanel onboarding={onboarding} />
+      {/* Advisor 4F: the one AI features question comes before the setup pop-up, in its place. */}
+      <AiFeaturesApproval>
+        <FirstRunOnboardingPanel onboarding={onboarding} />
+      </AiFeaturesApproval>
       <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
       <Timeline
         key={userId}

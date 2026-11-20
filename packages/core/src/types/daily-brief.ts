@@ -117,6 +117,18 @@ export type DailyBriefSettings = Readonly<{
   configurationRevision?: string;
   localDate: string;
   timezone: string;
+  /**
+   * Advisor 4F: the one AI features approval and the other features' switches. The
+   * source choices above are shared by every AI feature. Absent from older servers.
+   */
+  ai?: AiFeatureSettings;
+}>;
+
+export type AiFeatureSettings = Readonly<{
+  /** False until the person answers the AI features question. */
+  approved: boolean;
+  tipsEnabled: boolean;
+  chatEnabled: boolean;
 }>;
 
 export type DailyBriefResponse =
