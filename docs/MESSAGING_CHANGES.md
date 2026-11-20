@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-077` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
+1. Give a new entry the next ID (`P-078` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -130,6 +130,7 @@ Status values:
 | [P-074](#p-074-an-end-or-pause-start-must-be-later-than-now) | An end or pause start must be later than now | logged | Ended and Paused plan | in-app copy, MCP |
 | [P-075](#p-075-pause-back-on-day-rule) | Pause back-on day rule | logged | Ended and Paused plan | in-app copy, MCP |
 | [P-076](#p-076-behaviors-no-longer-archive-by-themselves) | Behaviors no longer archive by themselves | logged | Ended and Paused plan | in-app copy, user guide, MCP |
+| [P-077](#p-077-ended-and-paused-on-the-web) | Ended and Paused on the web | logged | Ended and Paused plan | in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -2082,7 +2083,8 @@ cite has not changed.
   paused day, or not after today, is refused with "Pick a back-on day after the first paused
   day and after today." (`PAUSE_BACK_ON_MESSAGE`).
 - **Affected:** `packages/core/src/services/behavior-values.ts`; MCP `pause_behavior`; the web
-  and Mac Pause controls when they ship (later workstreams).
+  Pause control (`components/behaviors/BehaviorRunControls.tsx`, P-077) and the Mac, which
+  reuses it.
 - **Surfaces:** in-app copy (new), MCP error text (new).
 - **Conflicting current text:** none.
 - **Update needed:** none.
@@ -2111,3 +2113,31 @@ cite has not changed.
 - **Related:** P-073, P-074.
 - **Status:** logged.
 
+## P-077: Ended and Paused on the web
+
+- **Change:** implemented November 20, 2026 (Ended and Paused, web workstream). New in-app
+  copy:
+  - Behaviors list: group heading "Not running (n)"; row lines "Ended Nov 30" (with a time,
+    "Ended Nov 30, 2:00 PM") and "Paused, back Dec 8"; grey notes on running rows "Ends after
+    Dec 31" and "Paused from Dec 20, back Jan 3"; the "When it runs" heading; actions "End now",
+    "Pause", "Cancel pause", "Start again", "Resume now", "Archive", "Save pause", "Cancel";
+    count line "… n of n not running;".
+  - Pause picker: "Paused from today. Pick the day it comes back." and "Paused from today, back
+    Dec 8 (18 days off)."; "This replaces the pause already set."
+  - Form: "end of day · Set a time", "at", "End of day instead", and the note "Paused from Dec
+    20, back Jan 3.".
+  - Outcome lines (italic) after a run action: "Run ended. Start again brings it back.", "Run is
+    running again.", "Run is paused, back Dec 8.", "Run pauses from Dec 20, back Jan 3.", "Run
+    has no pause and runs as scheduled."
+  - Timeline notices (plan answer 5A): "Run ended. Start again", "Guitar practice is paused,
+    back Dec 8. Resume now", "Stretch is back today.", each with "Close".
+- **Affected:** `components/behaviors/BehaviorList.tsx`, `BehaviorRunControls.tsx`,
+  `PauseRangePicker.tsx`, `BehaviorForm.tsx`, `components/timeline/BehaviorRunNotices.tsx`,
+  `lib/ui/behavior-run.ts`, `lib/services/behavior.service.ts` (`behaviorRunOutcomeMessage`).
+  The Mac renders the same shared components when its workstream wires its local actions.
+- **Surfaces:** in-app copy (new), user guide (`docs/user-guide/behaviors-and-review.md`,
+  "End, pause, or start a Behavior again").
+- **Conflicting current text:** none.
+- **Update needed:** none. The trial warnings (plan R3) come with the AI helpers workstream.
+- **Related:** P-074, P-075, P-076.
+- **Status:** logged.

@@ -14,6 +14,7 @@ import { useFormStatus } from "react-dom";
 import { ReminderEditor } from "@/components/behaviors/ReminderEditor";
 import { PlaceMarkerControl, type WhereDraft } from "@/components/travel/PlaceLabels";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
+import { formatRunDay, localDateIn } from "@/lib/ui/behavior-run";
 import type {
   BehaviorActionState,
   BehaviorFormAction,
@@ -116,6 +117,13 @@ export function BehaviorForm({
   const initialPlaceText = whereDraft ? whereDraft.locationText : behavior?.whereKind === "place" ? behavior.locationText ?? "" : "";
   const [whereKind, setWhereKind] = useState<BehaviorWhereKind | "">(whereDraft?.whereKind ?? behavior?.whereKind ?? "");
   const [placeText, setPlaceText] = useState(initialPlaceText);
+  const [endDay, setEndDay] = useState(behavior?.endOn ?? "");
+  const [showEndTime, setShowEndTime] = useState(Boolean(behavior?.endTime));
+  const pauseToday = behavior ? localDateIn(behavior.timezone) : "";
+  // The pause is set from the Pause picker, not this form; the form only shows it.
+  const pauseNote = behavior?.pause && behavior.pause.backOn > pauseToday
+    ? `Paused from ${formatRunDay(behavior.pause.fromOn, pauseToday)}, back ${formatRunDay(behavior.pause.backOn, pauseToday)}.`
+    : null;
   const [state, formAction] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
   const [scheduleRows, setScheduleRows] = useState<ScheduleFormRow[]>(() =>
@@ -370,13 +378,38 @@ export function BehaviorForm({
           <div className="grid min-w-0 gap-1 text-sm">
             <label htmlFor={`${planningId}-end-date`}>Ends after</label>
             <input id={`${planningId}-end-date`} name="end_on" type="date"
-              min="0001-01-01" max="9999-12-30" defaultValue={behavior?.endOn ?? ""}
+              min="0001-01-01" max="9999-12-30" value={endDay}
+              onChange={(event) => setEndDay(event.target.value)}
               aria-invalid={Boolean(fieldErrors.end_on)}
               aria-describedby={`${planningId}-end-date-help`}
               className="min-h-11 min-w-0 w-full border-0 border-b border-line bg-background px-0 text-base" />
-            <input type="hidden" name="end_time" value={behavior?.endTime?.slice(0, 5) ?? ""} />
+            {endDay && showEndTime ? (
+              <span className="flex flex-wrap items-center gap-x-2">
+                <label htmlFor={`${planningId}-end-time`} className="sr-only">Ends at</label>
+                <span aria-hidden="true">at</span>
+                <input id={`${planningId}-end-time`} name="end_time" type="time"
+                  defaultValue={behavior?.endTime?.slice(0, 5) ?? ""}
+                  aria-invalid={Boolean(fieldErrors.end_time)}
+                  className="min-h-11 min-w-0 border-0 border-b border-line bg-background px-0 text-base" />
+                <button type="button" className="product-action product-action-secondary min-h-11"
+                  onClick={() => setShowEndTime(false)}>End of day instead</button>
+              </span>
+            ) : (
+              <>
+                <input type="hidden" name="end_time" value="" />
+                {endDay ? (
+                  <span className="flex flex-wrap items-center gap-x-1 text-muted-readable">
+                    <span>end of day</span>
+                    <span aria-hidden="true">·</span>
+                    <button type="button" className="product-action product-action-primary min-h-11"
+                      onClick={() => setShowEndTime(true)}>Set a time</button>
+                  </span>
+                ) : null}
+              </>
+            )}
             <div id={`${planningId}-end-date-help`}>
               <p className="text-muted-readable">Optional. The last day it runs. After it, the behavior moves to Not running. Nothing is archived.</p>
+              {pauseNote ? <p className="text-muted-readable">{pauseNote}</p> : null}
               <FieldError message={fieldErrors.end_on ?? fieldErrors.end_time ?? fieldErrors.pause} />
             </div>
           </div>

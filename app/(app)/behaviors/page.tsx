@@ -14,6 +14,7 @@ import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.
 import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import {
   archiveBehaviorAction,
+  behaviorRunAction,
   createBehaviorAction,
   markBehaviorReviewOccurrenceStatusAction,
   resetBehaviorReviewOccurrenceTimeTrackingAction,
@@ -119,6 +120,7 @@ async function BehaviorsContent({
         archiveAction={archiveBehaviorAction}
         restoreAction={restoreBehaviorAction}
         archiveNoteAction={updateBehaviorArchiveNoteAction}
+        runAction={behaviorRunAction}
         statusAction={markBehaviorReviewOccurrenceStatusAction}
         noteAction={updateBehaviorReviewOccurrenceNoteAction}
         stopTimeTrackingAction={stopBehaviorReviewOccurrenceTimeTrackingAction}

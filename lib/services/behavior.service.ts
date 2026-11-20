@@ -1,3 +1,4 @@
+import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
@@ -5,6 +6,7 @@ import {
   type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
+import { formatRunDay, localDateIn } from "@/lib/ui/behavior-run";
 import {
   getProfileTimezone,
   listUserBehaviors,
@@ -47,7 +49,8 @@ export async function getBehaviorPageData(): Promise<BehaviorPageData> {
     readCachedProfileTimezone(supabase, userId),
   ]);
 
-  return assembleBehaviorPageData({ categories, behaviors, profileTimezone });
+  // `now` gives each view its run state, so the list can group Not running items.
+  return assembleBehaviorPageData({ categories, behaviors, profileTimezone, now: Temporal.Now.instant() });
 }
 
 export async function createBehaviorFromFormData(formData: FormData): Promise<BehaviorView> {
@@ -166,15 +169,32 @@ export async function applyBehaviorRunActionForUser(
   return updated;
 }
 
-/** Form fields: behavior_id, expected_updated_at, run_action, and for a pause pause_from_on, pause_from_time, pause_back_on. */
-export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<void> {
+/**
+ * Form fields: behavior_id, expected_updated_at, run_action, and for a pause
+ * pause_from_on, pause_from_time, pause_back_on. Returns the outcome line the list and
+ * the Timeline notices show (docs/MESSAGING_CHANGES.md, P-077).
+ */
+export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<{ message: string }> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await applyBehaviorRunActionForUser(supabase, userId, {
+  const action = getRunActionFromFormData(formData);
+  const updated = await applyBehaviorRunActionForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData),
-    action: getRunActionFromFormData(formData),
+    action,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
   });
+  return { message: behaviorRunOutcomeMessage(updated.title, action, localDateIn(updated.timezone)) };
+}
+
+/** The italic outcome line after a run action (P-077). */
+export function behaviorRunOutcomeMessage(title: string, action: BehaviorRunAction, todayLocalDate: string): string {
+  if (action.kind === "end_now") return `${title} ended. Start again brings it back.`;
+  if (action.kind === "start_again") return `${title} is running again.`;
+  if (action.kind === "resume") return `${title} has no pause and runs as scheduled.`;
+  const back = formatRunDay(action.pause.backOn, todayLocalDate);
+  return action.pause.fromOn <= todayLocalDate
+    ? `${title} is paused, back ${back}.`
+    : `${title} pauses from ${formatRunDay(action.pause.fromOn, todayLocalDate)}, back ${back}.`;
 }
 
 function getRunActionFromFormData(formData: FormData): BehaviorRunAction {
