@@ -101,6 +101,11 @@ describe("fillQuipSeed", () => {
     expect(fillQuipSeed("{after_minutes_duration}", { facts: { after_minutes: 0.2 } })).toBe("under a minute");
   });
 
+  it("names the paired Behavior only when the caller passes its title", () => {
+    expect(fillQuipSeed("{behavior} and {other_behavior}.", { behavior: "Gym", otherBehavior: "Reading", facts: {} })).toBe("Gym and Reading.");
+    expect(fillQuipSeed("{behavior} and {other_behavior}.", { behavior: "Gym", facts: {} })).toBeNull();
+  });
+
   it("returns null instead of a half-filled line", () => {
     expect(fillQuipSeed("{behavior} {x}.", { facts: { x: 1 } })).toBeNull();
     expect(fillQuipSeed("{x}.", { behavior: "Gym", facts: {} })).toBeNull();
@@ -119,14 +124,26 @@ describe("shipped advice library", () => {
     for (const card of ADVICE_CARDS) expect(adviceSourceFor(card)).not.toBeNull();
   });
 
-  it("covers every v2 signal and serves new accounts once content is in", () => {
+  // Signals with no card on purpose (Emi's card review, Nov 20): the research found did not fit
+  // the pattern the signal measures, so tips about them use the person's own numbers only.
+  const NO_CARD_YET = ["brief_answers", "late_marking", "marking_time", "time_of_day_gap", "timing_mode_gap", "day_shape", "reminder_response"];
+
+  it("covers every other signal and serves new accounts once content is in", () => {
     if (ADVICE_CARDS.length === 0) return;
     const covered = new Set(ADVICE_CARDS.filter((card) => card.status !== "withdrawn").flatMap((card) => card.applies_when.map((rule) => rule.signal)));
     for (const kind of [...ADVICE_SIGNAL_KINDS_V1, ...ADVICE_SIGNAL_KINDS_V2]) {
-      if (kind === "brief_answers") continue;
-      expect(covered, kind).toContain(kind);
+      if (NO_CARD_YET.includes(kind)) expect(covered, kind).not.toContain(kind);
+      else expect(covered, kind).toContain(kind);
     }
-    expect(ADVICE_CARDS.filter((card) => card.audience === "first_two_weeks").length).toBeGreaterThanOrEqual(5);
+    expect(ADVICE_CARDS.filter((card) => card.applies_when.some((rule) => rule.signal === "account")).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("uses Cadence's domain terms in every line a person reads", () => {
+    for (const card of ADVICE_CARDS) {
+      for (const text of [card.advice, card.action, ...card.quip_seeds]) {
+        expect(text.replace(/\{[a-z0-9_]+/g, "{"), card.id).not.toMatch(/\bitems?\b|\bmiss(es|ed)?\b|\bunmarked\b/i);
+      }
+    }
   });
 });
 
@@ -144,9 +161,19 @@ describe("shipped quip seeds", () => {
         card.applies_when.flatMap((rule) => [...(ADVICE_SIGNAL_FACTS[rule.signal] ?? []), "window_days"]).map((name) => [name, valueFor(name)]),
       );
       for (const seed of card.quip_seeds) {
-        const line = fillQuipSeed(seed, { behavior: "Gym", facts });
+        const line = fillQuipSeed(seed, { behavior: "Gym", otherBehavior: "Reading", facts });
         expect(line, `${card.id}: ${seed}`).not.toBeNull();
         expect(line).not.toMatch(/[{}]/);
+      }
+    }
+  });
+
+  it("leave every rule at least one line it can fill on its own", () => {
+    for (const card of ADVICE_CARDS) {
+      for (const rule of card.applies_when) {
+        const facts = Object.fromEntries([...(ADVICE_SIGNAL_FACTS[rule.signal] ?? []), "window_days"].map((name) => [name, valueFor(name)]));
+        const lines = card.quip_seeds.map((seed) => fillQuipSeed(seed, { behavior: "Gym", facts })).filter((line) => line !== null);
+        expect(lines.length, `${card.id} / ${rule.signal}`).toBeGreaterThan(0);
       }
     }
   });
@@ -158,8 +185,8 @@ describe("shipped quip seeds", () => {
           .map((name) => [name, typeof SAMPLE[name] === "string" || /(rate|share|gap|drop|change)$/.test(name) ? valueFor(name) : 1]),
       );
       for (const seed of card.quip_seeds) {
-        const line = fillQuipSeed(seed, { behavior: "Gym", facts });
-        expect(line, `${card.id}: ${seed}`).not.toMatch(/\b1 (items|days|weeks|marks|minutes|sessions|routines|new routines)\b|\b1 of your 1 items\b/);
+        const line = fillQuipSeed(seed, { behavior: "Gym", otherBehavior: "Reading", facts });
+        expect(line, `${card.id}: ${seed}`).not.toMatch(/\b1 (items|Behaviors|new Behaviors|past Occurrences|days|weeks|marks|minutes|sessions|routines|new routines)\b|\b1 of your 1 items\b/);
       }
     }
   });

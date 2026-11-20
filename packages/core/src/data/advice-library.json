@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-19.5",
+  "version": "2026-11-20.1",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -16,15 +16,6 @@
       "url": "https://doi.org/10.3389/fpsyg.2021.565202",
       "doi": "10.3389/fpsyg.2021.565202",
       "year": 2021,
-      "kind": "meta_analysis",
-      "checked_at": "2026-11-19"
-    },
-    {
-      "id": "harkin-2016",
-      "citation": "Harkin B, Webb TL, Chang BPI, et al. (2016). Does monitoring goal progress promote goal attainment? A meta-analysis of the experimental evidence. Psychological Bulletin 142(2), 198-229.",
-      "url": "https://doi.org/10.1037/bul0000025",
-      "doi": "10.1037/bul0000025",
-      "year": 2016,
       "kind": "meta_analysis",
       "checked_at": "2026-11-19"
     },
@@ -74,15 +65,6 @@
       "checked_at": "2026-11-19"
     },
     {
-      "id": "fournier-2017",
-      "citation": "Fournier M, d'Arripe-Longueville F, Rovere C, et al. (2017). Effects of circadian cortisol on the development of a health habit. Health Psychology 36(11), 1059-1064.",
-      "url": "https://doi.org/10.1037/hea0000510",
-      "doi": "10.1037/hea0000510",
-      "year": 2017,
-      "kind": "randomized_trial",
-      "checked_at": "2026-11-19"
-    },
-    {
       "id": "judah-2013",
       "citation": "Judah G, Gardner B, Aunger R (2013). Forming a flossing habit: an exploratory study of the psychological determinants of habit formation. British Journal of Health Psychology 18(2), 338-353.",
       "url": "https://doi.org/10.1111/j.2044-8287.2012.02086.x",
@@ -113,9 +95,9 @@
   "cards": [
     {
       "id": "plan-when-and-where-after-a-drop",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "When something starts slipping, a specific when-and-where plan helps more than trying harder.",
+      "advice": "When a routine starts slipping, a specific when-and-where plan helps more than trying harder, and a fresh one can help when the current one stopped working.",
       "applies_when": [
         {
           "signal": "completion_drop",
@@ -124,7 +106,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Give the item a fixed time and place, and think of it as: when this happens, I do it.",
+      "action": "If it has no set time and Where, give it both; if it has them, try a different specific time or place for two weeks.",
       "evidence": {
         "source_id": "gollwitzer-sheeran-2006",
         "kind": "meta_analysis",
@@ -133,10 +115,10 @@
         "quote": "Findings from 94 independent tests showed that implementation intentions had a positive effect of medium‐to‐large magnitude ( d = .65) on goal attainment.",
         "locator": "Abstract"
       },
-      "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
+      "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller. The review did not test changing an existing plan.",
       "quip_seeds": [
-        "{behavior}: {recent_completed} of {recent_resolved} done in the last {recent_days|day|days}, down from {baseline_rate_pct}.",
-        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A fixed time and place for it may help."
+        "{behavior} dropped to {recent_completed} of {recent_resolved} in the last {recent_days|day|days}, from {baseline_rate_pct}. Try a new specific time or place?",
+        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A specific when-and-where plan, or a fresh one, may help."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -144,7 +126,7 @@
     },
     {
       "id": "name-the-obstacle",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "Name the obstacle that keeps getting in the way, and decide now what you will do when it shows up.",
       "applies_when": [
@@ -161,7 +143,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Write the usual obstacle and your fallback in today's note.",
+      "action": "Write the usual obstacle and your fallback in the Behavior's description, where you will see it next time.",
       "evidence": {
         "source_id": "wang-wang-gai-2021",
         "kind": "meta_analysis",
@@ -173,7 +155,7 @@
       "limitation": "The effect is small to moderate and, because of publication bias, may be smaller than reported.",
       "quip_seeds": [
         "{behavior} dropped from {baseline_rate_pct} to {recent_rate_pct} over {recent_days|day|days}. What usually gets in the way?",
-        "{behavior}: {recent_completed} of {recent_resolved} lately. Plan for the usual obstacle."
+        "{behavior}: {recent_completed} of {recent_resolved} lately. What gets in the way, and what will you do when it does?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -181,7 +163,7 @@
     },
     {
       "id": "set-it-where-you-keep-moving-it",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "A routine sticks when it is repeated at the same cue, so set the time where you actually do it.",
       "applies_when": [
@@ -192,7 +174,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Change the item's set time to where you keep moving it.",
+      "action": "Change the Behavior's set time to where you keep moving it.",
       "evidence": {
         "source_id": "keller-2021",
         "kind": "randomized_trial",
@@ -203,7 +185,7 @@
       },
       "limitation": "The trial studied one everyday eating habit over 84 days; schedules with a fixed external constraint may not move.",
       "quip_seeds": [
-        "You moved {behavior} {direction} on {same_direction_days|day|days} in the last {window_days|day|days}.",
+        "You moved {behavior} to near {median_target_time_clock} on {same_direction_days|day|days} of the last {window_days}. Set it there?",
         "{behavior} keeps landing near {median_target_time_clock}. Setting it there may stick better."
       ],
       "audience": "any_account",
@@ -211,47 +193,21 @@
       "reviewer": null
     },
     {
-      "id": "check-in-more-often",
-      "revision": 1,
-      "status": "draft",
-      "advice": "Checking on your progress more often goes with reaching goals more often.",
-      "applies_when": [
-        {
-          "signal": "late_marking",
-          "scope": "either",
-          "facts": []
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Mark items the same day, right after you do them.",
-      "evidence": {
-        "source_id": "harkin-2016",
-        "kind": "meta_analysis",
-        "strength": "strong",
-        "claim": "Across 138 randomized studies, prompting people to monitor their progress more often helped them reach goals, and the extra monitoring explained the effect.",
-        "quote": "Furthermore, changes in the frequency of progress monitoring mediated the effect of the interventions on goal attainment.",
-        "locator": "Abstract"
-      },
-      "limitation": "The studies tested monitoring more often, not marking sooner; marking on the same day is our reading of it.",
-      "quip_seeds": [
-        "{later_day} of your last {decisions|mark|marks} came a day or more late.",
-        "When a mark comes late, it usually lands {median_lag_days|day|days} after the item.",
-        "{behavior}: {later_day} of the last {decisions|mark|marks} came a day or more late."
-      ],
-      "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
       "id": "weeks-not-days",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "New routines take weeks to months to feel automatic, and the time varies a lot from person to person.",
+      "advice": "New routines take weeks to months to feel automatic, and the time varies a lot, so the first two weeks are too early to judge one.",
       "applies_when": [
         {
           "signal": "new_behavior_settled",
           "scope": "behavior",
-          "facts": []
+          "facts": [
+            {
+              "fact": "completion_rate",
+              "op": "gte",
+              "value": 0.5
+            }
+          ]
         }
       ],
       "does_not_apply_when": [],
@@ -264,10 +220,10 @@
         "quote": "The time it took participants to reach 95% of their asymptote of automaticity ranged from 18 to 254 days; indicating considerable variation in how long it takes people to reach their limit of automaticity and highlighting that it can take a very long time.",
         "locator": "Abstract"
       },
-      "limitation": "One study of simple daily eating, drinking and activity habits; less frequent items may take longer.",
+      "limitation": "One study of simple daily eating, drinking and activity habits; less frequent Behaviors may take longer.",
       "quip_seeds": [
-        "First two weeks of {behavior}: {completed} done, {not_completed} not done.",
-        "{behavior} is {age_days|day|days} old. Most routines need weeks more to feel automatic."
+        "{behavior}: {completed} done, {not_completed} not done in its first two weeks. Still early to feel automatic, so keep the slot steady.",
+        "{behavior} is {age_days|day|days} old. Routines often need weeks more to feel automatic, so it is early to judge it."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -275,18 +231,24 @@
     },
     {
       "id": "look-at-the-week",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "Comparing what you did against what you planned, and adjusting, works better than tracking alone.",
       "applies_when": [
         {
           "signal": "weekly_numbers",
           "scope": "either",
-          "facts": []
+          "facts": [
+            {
+              "fact": "change",
+              "op": "lte",
+              "value": -0.1
+            }
+          ]
         }
       ],
       "does_not_apply_when": [],
-      "action": "Look at this week on the Behaviors page and adjust one item.",
+      "action": "Look at this week on the Behaviors page and adjust one tight spot.",
       "evidence": {
         "source_id": "michie-2009",
         "kind": "meta_analysis",
@@ -297,9 +259,8 @@
       },
       "limitation": "The programs targeted eating and physical activity; other kinds of routines were not studied.",
       "quip_seeds": [
-        "This week: {week_completed} done, {week_not_completed} not done ({week_rate_pct}). Your usual is {prior_rate_pct}.",
-        "{week_rate_pct} this week against {prior_rate_pct} over the {prior_weeks|week|weeks} before.",
-        "{behavior} this week: {week_rate_pct}, against {prior_rate_pct} usually."
+        "This week: {week_completed} done, {week_not_completed} not done ({week_rate_pct}), against your usual {prior_rate_pct}. Adjust one tight spot?",
+        "{behavior} this week: {week_rate_pct}, against {prior_rate_pct} usually. Worth a look at what got in the way?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -307,9 +268,9 @@
     },
     {
       "id": "same-cue-every-day",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Habits form best at a time and place that comes up the same way every day.",
+      "advice": "Habits tend to form more reliably at a time and place that stay the same each time the routine comes up.",
       "applies_when": [
         {
           "signal": "weekday_gap",
@@ -318,7 +279,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Check what is different on that weekday, then move the item or drop it from that day.",
+      "action": "Check what is different on that weekday, then move the Behavior that day or drop it from that day.",
       "evidence": {
         "source_id": "gardner-lally-wardle-2012",
         "kind": "theory_review",
@@ -327,73 +288,10 @@
         "quote": "Be consistent: choose a time and place that you encounter every day of the week.",
         "locator": "Box 1, step 3"
       },
-      "limitation": "This is expert advice drawn from habit research, not a trial of weekday schedules.",
+      "limitation": "Expert advice drawn from habit research and written for daily habits; not a trial of weekday schedules.",
       "quip_seeds": [
-        "{weekday_name}s are the weak day: {weekday_rate_pct} done against {other_rate_pct} on other days.",
-        "{behavior} on {weekday_name}s: {weekday_rate_pct}. Other days: {other_rate_pct}."
-      ],
-      "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "time-of-day-matters",
-      "revision": 1,
-      "status": "draft",
-      "advice": "The time of day can change how quickly a routine becomes automatic.",
-      "applies_when": [
-        {
-          "signal": "time_of_day_gap",
-          "scope": "either",
-          "facts": []
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Try moving one item from the weaker part of the day to the stronger one.",
-      "evidence": {
-        "source_id": "fournier-2017",
-        "kind": "randomized_trial",
-        "strength": "limited",
-        "claim": "In a trial of 48 students, a stretch done on waking became automatic sooner than the same stretch done at bedtime.",
-        "quote": "Extrapolation of the curves indicated that the morning group achieved automaticity at an earlier time point (105.95 days) than did the evening group (154.01 days).",
-        "locator": "Abstract, results"
-      },
-      "limitation": "One small trial of a single stretching exercise in students; your own numbers matter more than this finding.",
-      "quip_seeds": [
-        "Items set for the {part_of_day}: {part_rate_pct} done, against {other_rate_pct} the rest of the day.",
-        "{behavior} in the {part_of_day} gets done {part_rate_pct} of the time."
-      ],
-      "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "routine-or-clock",
-      "revision": 1,
-      "status": "draft",
-      "advice": "Tying an item to a routine or to a clock time worked equally well, so use whichever you actually keep.",
-      "applies_when": [
-        {
-          "signal": "timing_mode_gap",
-          "scope": "either",
-          "facts": []
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Switch one weaker item to the other kind of timing for two weeks.",
-      "evidence": {
-        "source_id": "keller-2021",
-        "kind": "randomized_trial",
-        "strength": "moderate",
-        "claim": "In a randomized trial, linking a daily habit to a routine or to a set time led to similar habit formation.",
-        "quote": "Linking one's nutrition behaviour to a daily routine or a specific time was similarly effective for habit formation.",
-        "locator": "Abstract, conclusions"
-      },
-      "limitation": "The trial studied one eating habit; it shows no difference on average, and individuals may differ.",
-      "quip_seeds": [
-        "Window items get done {window_rate_pct} of the time, set-time items {set_time_rate_pct}.",
-        "Window items: {window_rate_pct}. Set-time items: {set_time_rate_pct}. One of the two suits you better.",
-        "{behavior} with a time range: {window_rate_pct} done. With a set time: {set_time_rate_pct}."
+        "{behavior} on {weekday_name}s: {weekday_rate_pct}, against {other_rate_pct} on other days. What is different then?",
+        "{weekday_name}s get done {weekday_rate_pct} of the time, against {other_rate_pct} on other days. What is different about {weekday_name}s?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -401,9 +299,9 @@
     },
     {
       "id": "leave-steady-items-alone",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "A steady routine runs on its cue, so keep its time and place as they are.",
+      "advice": "A steady routine often runs on its cue, so keeping its time and place protects it.",
       "applies_when": [
         {
           "signal": "steady_behavior",
@@ -424,7 +322,7 @@
           ]
         }
       ],
-      "action": "Leave this item's time and place unchanged when you reshuffle your day.",
+      "action": "Leave this Behavior's time and place unchanged when you rearrange your day.",
       "evidence": {
         "source_id": "wood-neal-2007",
         "kind": "theory_review",
@@ -433,41 +331,10 @@
         "quote": "Once a habit is formed, perception of contexts triggers the associated response without a mediating goal.",
         "locator": "Abstract"
       },
-      "limitation": "A theory review; it explains why changing the cue can disrupt a habit but does not measure how often it does.",
+      "limitation": "A theory review; it explains why changing the cue can disrupt a habit but does not measure how often it does. Four steady weeks do not always mean a habit has formed.",
       "quip_seeds": [
-        "{behavior}: {completed} of {resolved} over {weeks|week|weeks}.",
-        "{behavior} has held at {rate_pct} for {weeks|week|weeks}."
-      ],
-      "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "make-it-smaller",
-      "revision": 1,
-      "status": "draft",
-      "advice": "When an item rarely gets done, a smaller version is easier to start and repeat.",
-      "applies_when": [
-        {
-          "signal": "never_done",
-          "scope": "behavior",
-          "facts": []
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Shorten it, move it to a better time, or pause it for now.",
-      "evidence": {
-        "source_id": "gardner-lally-wardle-2012",
-        "kind": "theory_review",
-        "strength": "limited",
-        "claim": "Habit researchers advise small, manageable changes, because failure is discouraging and simpler actions become habits faster.",
-        "quote": "Patients should be encouraged to aim for small and manageable behaviour changes, because failure can be discouraging.",
-        "locator": "Making healthy habits"
-      },
-      "limitation": "Expert advice drawn from habit research, written for clinicians; not a trial of shrinking a routine.",
-      "quip_seeds": [
-        "{behavior}: {completed} of {resolved} in {weeks|week|weeks}.",
-        "{behavior} is at {rate_pct} for {weeks|week|weeks}. A smaller version, a new time, or a pause?"
+        "{behavior}: {completed} of {resolved} over {weeks|week|weeks}. Keep its time and place steady when you rearrange your day.",
+        "{behavior} has held at {rate_pct} for {weeks|week|weeks}. Worth leaving its time and place as they are."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -475,24 +342,24 @@
     },
     {
       "id": "one-miss-is-fine",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Missing a day does not undo a routine; what matters is picking it up the next time.",
+      "advice": "A Not Completed day now and then does not undo a routine; what matters is picking it up the next time.",
       "applies_when": [
         {
-          "signal": "day_shape",
-          "scope": "either",
+          "signal": "steady_behavior",
+          "scope": "behavior",
           "facts": [
             {
-              "fact": "pattern",
-              "op": "eq",
-              "value": "clustered"
+              "fact": "rate",
+              "op": "lt",
+              "value": 1
             }
           ]
         }
       ],
       "does_not_apply_when": [],
-      "action": "After a bad day, keep the next day's plan as it is.",
+      "action": "After a Not Completed day, keep the next day's plan as it is.",
       "evidence": {
         "source_id": "lally-2010",
         "kind": "observational_study",
@@ -503,9 +370,39 @@
       },
       "limitation": "The study looked at single missed days, not long breaks.",
       "quip_seeds": [
-        "Most misses land on just {bad_days|day|days}.",
-        "{miss_share_on_bad_days_pct} of the misses fell on {bad_days|day|days}.",
-        "Misses of {behavior} bunch up on {bad_days|day|days}."
+        "{behavior}: {completed} of {resolved} over {weeks|week|weeks}. A Not Completed day now and then does not undo it; keep the next day's plan.",
+        "{behavior} is at {rate_pct} for {weeks|week|weeks}, with a few Not Completed days. Those do not undo a routine."
+      ],
+      "audience": "any_account",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "id": "make-it-smaller",
+      "revision": 2,
+      "status": "draft",
+      "advice": "When a Behavior rarely gets done, a smaller version can be easier to start and repeat.",
+      "applies_when": [
+        {
+          "signal": "never_done",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Shorten it, move it to a better time, or archive it for now.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers advise small, manageable changes, because failure can be discouraging.",
+        "quote": "Patients should be encouraged to aim for small and manageable behaviour changes, because failure can be discouraging.",
+        "locator": "Making healthy habits"
+      },
+      "limitation": "Expert advice drawn from habit research, written for clinicians; not a trial of shrinking a routine.",
+      "quip_seeds": [
+        "{behavior}: {completed} of {resolved} in {weeks|week|weeks}. A smaller version may be easier to start. Shorten it?",
+        "{behavior} is at {rate_pct} for {weeks|week|weeks}. A smaller version, a new time, or archive it for now?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -513,18 +410,24 @@
     },
     {
       "id": "plan-for-the-dip",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "Plan ahead for the weeks that go badly, so getting back is a step you already know.",
       "applies_when": [
         {
           "signal": "dip_recovery",
           "scope": "behavior",
-          "facts": []
+          "facts": [
+            {
+              "fact": "recovered",
+              "op": "eq",
+              "value": true
+            }
+          ]
         }
       ],
       "does_not_apply_when": [],
-      "action": "Write down what helped you get back on track, for the next dip.",
+      "action": "Note in the Behavior's description what helped you get back on track, for the next dip.",
       "evidence": {
         "source_id": "nice-ph49-planning",
         "kind": "guidance",
@@ -535,8 +438,8 @@
       },
       "limitation": "National guidance for health behaviour programs; it recommends the technique rather than testing it in an app.",
       "quip_seeds": [
-        "{behavior} dipped to {dip_rate_pct} for {dip_weeks|week|weeks}, against {usual_rate_pct} usually.",
-        "{behavior} is back to {recent_rate_pct} after a dip."
+        "{behavior} dipped to {dip_rate_pct} for {dip_weeks|week|weeks} and came back. Note what helped in its description, for next time.",
+        "{behavior} is back to {recent_rate_pct} after a dip to {dip_rate_pct}. What helped? Note it in its description."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -544,9 +447,9 @@
     },
     {
       "id": "unmarked-is-not-missed",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "An unmarked item is not a failure; it just has no decision yet.",
+      "advice": "An Unresolved Occurrence is not a failure; it just has no decision yet.",
       "applies_when": [
         {
           "signal": "unmarked_items",
@@ -555,52 +458,19 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Mark what you remember and leave the rest unmarked.",
+      "action": "Mark what you remember and leave the rest Unresolved.",
       "evidence": {
         "source_id": "cadence-manual-truth",
         "kind": "editorial_guidance",
         "strength": "product_rule",
-        "claim": "Cadence treats an unmarked item as missing a decision, never as a miss.",
+        "claim": "Cadence treats an Unresolved Occurrence as missing a decision, never as Not Completed.",
         "quote": "Unresolved remains missing decision data.",
         "locator": "docs/PRODUCT_SPEC.md, analysis lanes"
       },
       "limitation": "A Cadence product rule, not research evidence.",
       "quip_seeds": [
-        "{unmarked|item waits|items wait} unmarked; the oldest is {oldest_days|day|days} old.",
-        "{unmarked|item has|items have} no mark yet.",
-        "{behavior} has {unmarked|item|items} waiting for a mark."
-      ],
-      "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "write-it-down",
-      "revision": 1,
-      "status": "draft",
-      "advice": "Recording progress, not just keeping it in mind, goes with better results.",
-      "applies_when": [
-        {
-          "signal": "marking_time",
-          "scope": "either",
-          "facts": []
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Mark items when you finish them, or pick one daily check-in time.",
-      "evidence": {
-        "source_id": "harkin-2016",
-        "kind": "meta_analysis",
-        "strength": "strong",
-        "claim": "Monitoring progress helped more when the information was physically recorded or shared.",
-        "quote": "Moderation tests revealed that progress monitoring had larger effects on goal attainment when the outcomes were reported or made public, and when the information was physically recorded.",
-        "locator": "Abstract"
-      },
-      "limitation": "The studies compared recording with not recording; they did not test how soon to record.",
-      "quip_seeds": [
-        "You usually mark items around {median_mark_time_clock}, {median_lag_hours_duration} after they are set. Try marking as you finish.",
-        "{same_day_share_pct} of your marks are made the same day. Marking as you finish keeps the record exact.",
-        "{behavior} usually gets marked around {median_mark_time_clock}, {median_lag_hours_duration} after it is set."
+        "{unmarked|past Occurrence has|past Occurrences have} no mark yet. Mark what you remember; leaving the rest Unresolved is fine.",
+        "{behavior} has {unmarked|past Occurrence|past Occurrences} with no mark. Mark the ones you remember; the rest can stay Unresolved."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -608,9 +478,9 @@
     },
     {
       "id": "stack-after-a-routine",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Doing a newer routine right after an established one can help it stick.",
+      "advice": "Doing a newer routine right after an established one, rather than before it, can help it stick.",
       "applies_when": [
         {
           "signal": "done_together",
@@ -625,7 +495,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Set the newer item to start right after the one it goes with.",
+      "action": "Keep the newer of the two set right after the other, not before it.",
       "evidence": {
         "source_id": "judah-2013",
         "kind": "experiment",
@@ -634,10 +504,10 @@
         "quote": "Those who flossed after brushing (rather than before) tended to form stronger flossing habits and, at 8-month follow-up, had stronger habits and flossed more frequently.",
         "locator": "Abstract, results"
       },
-      "limitation": "An exploratory study of 50 people and one habit.",
+      "limitation": "An exploratory study of 50 people and one habit; it compared after with before, not pairing with not pairing.",
       "quip_seeds": [
-        "{behavior} goes with another item on {together_days} of {either_days|day|days}.",
-        "{behavior} and another item get done together on {together_days|day|days}."
+        "{behavior} and {other_behavior} get done together on {together_days} of {either_days|day|days}. Keep the newer one right after the other.",
+        "{behavior} pairs with another Behavior on {together_days} of {either_days|day|days}. Keep the newer of the two right after the other."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -645,9 +515,9 @@
     },
     {
       "id": "one-slot-one-item",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Detailed plans help one goal at a time, but piling many into the same slot works against them.",
+      "advice": "People tend to underestimate how long tasks take, so several Behaviors set for one hour can crowd each other out.",
       "applies_when": [
         {
           "signal": "crowded_hour",
@@ -656,20 +526,19 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Spread items set for the same hour across the day.",
+      "action": "Move one Behavior to a quieter hour, or check that their lengths fit in the hour.",
       "evidence": {
-        "source_id": "dalton-spiller-2012",
+        "source_id": "buehler-1994",
         "kind": "experiment",
-        "strength": "moderate",
-        "claim": "Making detailed plans helped with one goal but not with several, because planning made the combined load feel hard.",
-        "quote": "An investigation into this question suggests that the benefits of implemental planning for attaining a single goal do not typically extend to multiple goals.",
+        "strength": "limited",
+        "claim": "People's estimates of how long their own tasks would take were too optimistic for many kinds of tasks.",
+        "quote": "Ss' predictions of their completion times were too optimistic for a variety of academic and nonacademic tasks.",
         "locator": "Abstract"
       },
-      "limitation": "Lab and field experiments with short tasks; a full day of routines may behave differently.",
+      "limitation": "The study measured time estimates for student tasks; linking it to a crowded hour is our reading. Your own numbers for that hour matter more.",
       "quip_seeds": [
-        "{items_in_hour|item is|items are} set for {hour_label}, done {hour_rate_pct} of the time.",
-        "Items at {hour_label}: {hour_rate_pct} done. Other hours: {other_rate_pct}.",
-        "{behavior} shares {hour_label} with other items and gets done {hour_rate_pct} of the time there."
+        "{items_in_hour|Behavior is|Behaviors are} set for {hour_label}, done {hour_rate_pct} of the time against {other_rate_pct} at other hours. Move one?",
+        "{behavior} shares {hour_label} with other Behaviors and gets done {hour_rate_pct} of the time there. Move it to a quieter hour?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -677,10 +546,26 @@
     },
     {
       "id": "give-it-a-length",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "People underestimate how long their own tasks take, unless they think back to how long it took before.",
       "applies_when": [
+        {
+          "signal": "account",
+          "scope": "account",
+          "facts": [
+            {
+              "fact": "behaviors_without_length",
+              "op": "gte",
+              "value": 1
+            },
+            {
+              "fact": "account_age_days",
+              "op": "lt",
+              "value": 14
+            }
+          ]
+        },
         {
           "signal": "setup_gaps",
           "scope": "account",
@@ -694,7 +579,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Add a length to items, based on how long they took last time.",
+      "action": "Give each Behavior a length based on how long it took last time, so the day does not overfill.",
       "evidence": {
         "source_id": "buehler-1994",
         "kind": "experiment",
@@ -705,83 +590,8 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "Items with no length set: {without_length} of {active_behaviors}.",
-        "{without_length|item has|items have} no length yet. How long does each one take?"
-      ],
-      "audience": "history_needed",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "give-it-a-place",
-      "revision": 1,
-      "status": "draft",
-      "advice": "A plan that names where, as well as when, is easier to act on.",
-      "applies_when": [
-        {
-          "signal": "setup_gaps",
-          "scope": "account",
-          "facts": [
-            {
-              "fact": "without_place",
-              "op": "gte",
-              "value": 1
-            }
-          ]
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Add a place to the items that have none.",
-      "evidence": {
-        "source_id": "gollwitzer-sheeran-2006",
-        "kind": "meta_analysis",
-        "strength": "strong",
-        "claim": "Plans that spell out when, where and how to act helped people reach their goals.",
-        "quote": "This review analyzes whether realization of goal intentions is facilitated by forming an implementation intention that spells out the when, where, and how of goal striving in advance (“If situation Y is encountered, then I will initiate goal‐directed behavior X!”).",
-        "locator": "Abstract"
-      },
-      "limitation": "The review tested complete when-where-how plans; a place alone is part of such a plan.",
-      "quip_seeds": [
-        "Items with no place set: {without_place} of {active_behaviors}.",
-        "{without_place|item has|items have} no place yet. Where does each one happen?"
-      ],
-      "audience": "history_needed",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "act-when-the-reminder-fires",
-      "revision": 1,
-      "status": "draft",
-      "advice": "A reminder works best as the cue to start right then, so set it for a moment when you can act.",
-      "applies_when": [
-        {
-          "signal": "reminder_response",
-          "scope": "either",
-          "facts": [
-            {
-              "fact": "quick_share",
-              "op": "lt",
-              "value": 0.5
-            }
-          ]
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Move the reminder to the time you usually end up doing the item.",
-      "evidence": {
-        "source_id": "gollwitzer-sheeran-2006",
-        "kind": "meta_analysis",
-        "strength": "strong",
-        "claim": "Plans that tie an action to a specific situation (if this happens, then I do that) helped people reach their goals.",
-        "quote": "This review analyzes whether realization of goal intentions is facilitated by forming an implementation intention that spells out the when, where, and how of goal striving in advance (“If situation Y is encountered, then I will initiate goal‐directed behavior X!”).",
-        "locator": "Abstract"
-      },
-      "limitation": "The review tested if-then plans that people made themselves, not phone reminders.",
-      "quip_seeds": [
-        "Items get done within 30 minutes of the reminder {quick_share_pct} of the time.",
-        "Marked items are usually done {median_minutes_after_duration} after the reminder.",
-        "{behavior} gets done within 30 minutes of its reminder {quick_share_pct} of the time."
+        "{behaviors_without_length|Behavior has|Behaviors have} no length yet. Basing each on how long it took last time keeps the day from overfilling.",
+        "{without_length|Behavior has|Behaviors have} no length set. How long did each take last time? That keeps the day from overfilling."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -789,7 +599,7 @@
     },
     {
       "id": "set-the-length-it-takes",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "If sessions keep running longer than planned, plan for the time they actually take.",
       "applies_when": [
@@ -806,7 +616,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Change the item's length to the time it usually takes.",
+      "action": "Change the Behavior's length to the time it usually takes.",
       "evidence": {
         "source_id": "buehler-1994",
         "kind": "experiment",
@@ -817,8 +627,8 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "{behavior} is planned for {planned_minutes|minute|minutes} and usually takes {median_minutes|minute|minutes}.",
-        "Sessions of {behavior} that ran past the planned length: {longer} of {sessions}."
+        "{behavior} is planned for {planned_minutes|minute|minutes} and usually takes {median_minutes|minute|minutes}. Change its length to match?",
+        "{longer} of the last {sessions|session|sessions} of {behavior} ran past the planned {planned_minutes|minute|minutes}. Plan for the time it takes?"
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -826,9 +636,9 @@
     },
     {
       "id": "moving-it-costs-something",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Doing an item at its usual time helps it become routine, so moving it often can work against that.",
+      "advice": "Repeating a routine at its usual cue helps it become automatic, so keep a Behavior at its usual time when the day allows.",
       "applies_when": [
         {
           "signal": "moved_vs_unmoved",
@@ -843,7 +653,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Before moving an item, check whether a smaller version fits at its usual time.",
+      "action": "When the day allows, leave it at its usual time; if you keep moving it the same way, give it a new usual time.",
       "evidence": {
         "source_id": "keller-2021",
         "kind": "randomized_trial",
@@ -852,11 +662,10 @@
         "quote": "Repeated plan enactment was a key predictor for automaticity.",
         "locator": "Abstract, results"
       },
-      "limitation": "The trial studied one everyday eating habit over 84 days; some moves are unavoidable and still worth making.",
+      "limitation": "Moved days are often already disrupted, so a lower rate on moved days does not show that moving caused it. The trial studied one eating habit.",
       "quip_seeds": [
-        "Moved items got done {moved_rate_pct} of the time; items left in place, {unmoved_rate_pct}.",
-        "Items left at their usual time: {unmoved_rate_pct} done. Moved: {moved_rate_pct}.",
-        "{behavior}: {unmoved_rate_pct} done at its usual time, {moved_rate_pct} when moved."
+        "{behavior}: {unmoved_rate_pct} done at its usual time, {moved_rate_pct} on moved days. When the day allows, keep it at its usual time.",
+        "Left at their usual time, Behaviors got done {unmoved_rate_pct} of the time; moved, {moved_rate_pct}. Keep the usual time when the day allows."
       ],
       "audience": "any_account",
       "reviewed_at": null,
@@ -864,7 +673,7 @@
     },
     {
       "id": "start-with-when-and-where",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
       "advice": "A new routine starts more reliably with a plan for when and where it happens.",
       "applies_when": [
@@ -881,7 +690,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Add a place to each new item, next to its time.",
+      "action": "Set a Where for each new Behavior next to its time; Anywhere is fine for ones that move around.",
       "evidence": {
         "source_id": "gollwitzer-sheeran-2006",
         "kind": "meta_analysis",
@@ -890,47 +699,10 @@
         "quote": "Findings from 94 independent tests showed that implementation intentions had a positive effect of medium‐to‐large magnitude ( d = .65) on goal attainment.",
         "locator": "Abstract"
       },
-      "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller.",
+      "limitation": "The studies tested full when, where and how plans, not a Where field alone; most were short and many were lab tasks.",
       "quip_seeds": [
-        "Items with no place yet: {behaviors_without_place} of {active_behaviors}.",
-        "{behaviors_without_place|item has|items have} a time but no place. Where does each one happen?"
-      ],
-      "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "start-with-a-length",
-      "revision": 1,
-      "status": "draft",
-      "advice": "Set a realistic length for each new item; people tend to underestimate their own tasks.",
-      "applies_when": [
-        {
-          "signal": "account",
-          "scope": "account",
-          "facts": [
-            {
-              "fact": "behaviors_without_length",
-              "op": "gte",
-              "value": 1
-            }
-          ]
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Add a length to each item, thinking of how long it took the last time.",
-      "evidence": {
-        "source_id": "buehler-1994",
-        "kind": "experiment",
-        "strength": "moderate",
-        "claim": "People's estimates of how long their own tasks would take were too optimistic for many kinds of tasks.",
-        "quote": "Ss' predictions of their completion times were too optimistic for a variety of academic and nonacademic tasks.",
-        "locator": "Abstract"
-      },
-      "limitation": "Studied with student projects and tasks, not daily routines.",
-      "quip_seeds": [
-        "Items with no length yet: {behaviors_without_length} of {active_behaviors}.",
-        "{behaviors_without_length|item has|items have} no length set. A realistic one helps plan the day."
+        "{behaviors_without_place|Behavior has|Behaviors have} a time but no Where yet. Naming where each happens makes it easier to start.",
+        "To make new routines easier to start, add a Where to the {behaviors_without_place|Behavior|Behaviors} without one. Anywhere counts too."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -938,9 +710,9 @@
     },
     {
       "id": "start-with-fewer",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Starting many new routines at once makes each one harder to keep; a few at a time works better.",
+      "advice": "Planning many new routines at once can make the load feel harder to keep; starting with a few is easier to hold.",
       "applies_when": [
         {
           "signal": "account",
@@ -960,7 +732,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Pick the items that matter most this month and pause the rest.",
+      "action": "Keep the two or three Behaviors that matter most this month, and archive the rest for later.",
       "evidence": {
         "source_id": "dalton-spiller-2012",
         "kind": "experiment",
@@ -969,47 +741,10 @@
         "quote": "An investigation into this question suggests that the benefits of implemental planning for attaining a single goal do not typically extend to multiple goals.",
         "locator": "Abstract"
       },
-      "limitation": "Lab and field experiments with short tasks; the right number of routines differs from person to person.",
+      "limitation": "Lab and field experiments with short tasks studied detailed planning across goals; the right number of routines differs from person to person.",
       "quip_seeds": [
-        "You are starting with {active_behaviors|item|items}.",
-        "{behaviors_created_last_14_days|new item|new items} in two weeks is a lot to plan in detail."
-      ],
-      "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
-    },
-    {
-      "id": "expect-about-ten-weeks",
-      "revision": 1,
-      "status": "draft",
-      "advice": "Expect a new daily routine to take around ten weeks to feel automatic, not three.",
-      "applies_when": [
-        {
-          "signal": "account",
-          "scope": "account",
-          "facts": [
-            {
-              "fact": "active_behaviors",
-              "op": "gte",
-              "value": 1
-            }
-          ]
-        }
-      ],
-      "does_not_apply_when": [],
-      "action": "Keep each new item at the same time and place while it settles.",
-      "evidence": {
-        "source_id": "gardner-lally-wardle-2012",
-        "kind": "theory_review",
-        "strength": "limited",
-        "claim": "Habit researchers suggest telling people to expect a daily habit to take around 10 weeks to form, based on a study that found an average near 66 days.",
-        "quote": "Therefore, it may be helpful to tell patients to expect habit formation (based on daily repetition) to take around 10 weeks.",
-        "locator": "Making healthy habits"
-      },
-      "limitation": "An average from one study of daily habits; individuals ranged from under three weeks to over eight months.",
-      "quip_seeds": [
-        "{active_behaviors|item|items} set up. New routines usually take weeks to feel automatic.",
-        "Day {account_age_days} of {active_behaviors|new routine|new routines}. Around ten weeks is typical."
+        "{behaviors_created_last_14_days|new Behavior|new Behaviors} in two weeks is a heavy load to plan at once. Keep the two or three that matter most?",
+        "You are starting with {active_behaviors|Behavior|Behaviors}. A few at a time are easier to keep. Archive some for later?"
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -1017,9 +752,9 @@
     },
     {
       "id": "anchor-to-an-existing-routine",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Tie each new item to something you already do every day.",
+      "advice": "Setting a new Behavior right after something you already do every day gives it a steady starting point.",
       "applies_when": [
         {
           "signal": "account",
@@ -1034,7 +769,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Set each new item right after a daily routine, such as breakfast or arriving at work.",
+      "action": "Set each new Behavior's time just after a daily routine, such as breakfast or arriving at work.",
       "evidence": {
         "source_id": "gardner-lally-wardle-2012",
         "kind": "theory_review",
@@ -1043,10 +778,10 @@
         "quote": "A cue located within an existing daily routine (for example, ‘when I go on my lunch break’) provides a convenient and stable starting point.",
         "locator": "Making healthy habits"
       },
-      "limitation": "Expert advice drawn from habit research, written for clinicians.",
+      "limitation": "Expert advice drawn from habit research, written for clinicians. A trial found routine cues and clock times worked about equally well, so a clock time alone is fine too.",
       "quip_seeds": [
-        "{active_behaviors|item|items} set up. Tie each one to something you already do daily.",
-        "{behaviors_with_set_time|item has|items have} a clock time. A daily routine next to each makes a stronger cue."
+        "For your {active_behaviors|new Behavior|new Behaviors}: setting each just after something you already do daily, like breakfast, gives a steady start.",
+        "Is there a daily routine just before each of your {active_behaviors|Behavior|Behaviors}? Setting the time right after it gives a steady start."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
@@ -1054,9 +789,9 @@
     },
     {
       "id": "marking-is-the-core",
-      "revision": 1,
+      "revision": 2,
       "status": "draft",
-      "advice": "Keeping a record of what you did was the strongest single ingredient in eating and activity programs.",
+      "advice": "Recording what you actually did, Completed or Not Completed, is one of the ingredients most linked to changing a routine.",
       "applies_when": [
         {
           "signal": "account",
@@ -1071,7 +806,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Mark each item as Completed or Not Completed when it is done or skipped.",
+      "action": "Mark each Behavior Completed or Not Completed once it is done or skipped.",
       "evidence": {
         "source_id": "michie-2009",
         "kind": "meta_analysis",
@@ -1082,8 +817,8 @@
       },
       "limitation": "The programs targeted eating and physical activity; the finding is about programs, not individual people.",
       "quip_seeds": [
-        "{active_behaviors|item|items} to track. Marking each one is the core of it.",
-        "Marking your {active_behaviors|item|items} as you go is the part that helps most."
+        "{active_behaviors|Behavior|Behaviors} to track. Marking each one Completed or Not Completed is the part research links most to change.",
+        "Mark your {active_behaviors|Behavior|Behaviors} Completed or Not Completed; an honest record is the part that helps most."
       ],
       "audience": "first_two_weeks",
       "reviewed_at": null,
