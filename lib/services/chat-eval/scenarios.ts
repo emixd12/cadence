@@ -135,8 +135,8 @@ export const CHAT_SCENARIOS: readonly ChatScenario[] = [
     allowedWrites: [], expect: { never: ["Standup", "Board review", "Dentist", "Lunch with Sam"], mentions: ["Settings|turned off|off"], final: [{ kind: "unchanged" }] } },
 
   { id: "workouts", world: "everyday", description: "Hevy data: count this week's workouts.",
-    steps: [{ say: "How many gym workouts did I log this week, and which ones?" }],
-    allowedWrites: [], expect: { mentions: ["Leg", "Pull"], final: [{ kind: "unchanged" }] } },
+    steps: [{ say: "How many gym workouts did I log this week, and how long was each?" }],
+    allowedWrites: [], expect: { final: [{ kind: "unchanged" }] } },
 
   { id: "expensive_question", world: "long_history", description: "The costliest kind of question: long ranges, many records, several sources. Must stay under the per-question ceiling.",
     steps: [{ say: "Go through the last three months: every item I skipped, every note I wrote, my workouts, and my calendar for the next two weeks. Then tell me what pattern you see." }],

@@ -483,8 +483,9 @@ function workouts(world: ChatWorld, args: unknown): ChatToolResult {
   if (world.sourcesOff.has("workouts")) return ok({ workouts: [], sources: [{ source: "hevy", state: "off" }], note: "Hevy is off in Settings." });
   if (world.id === "new_user") return ok({ workouts: [], sources: [], note: "Hevy is not connected." });
   return ok({ workouts: world.workouts.filter((item) => item.localDate >= range.start && item.localDate <= range.end)
-    .map((item) => ({ title: item.title, start: toInstant(world, item.localDate, item.start),
-      end: toInstant(world, item.localDate, timeOf(minutesOf(item.start) + item.minutes)), duration_minutes: item.minutes, exercise_count: item.exercises })),
+    // Same shape as 5A's live read: Hevy titles and exercise counts are not passed to chat.
+    .map((item) => ({ start: toInstant(world, item.localDate, item.start),
+      end: toInstant(world, item.localDate, timeOf(minutesOf(item.start) + item.minutes)), minutes: item.minutes, date: item.localDate })),
     sources: [{ source: "hevy", state: "read" }], note: null });
 }
 

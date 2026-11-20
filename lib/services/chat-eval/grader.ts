@@ -63,7 +63,7 @@ export function scenarioFacts(scenario: ChatScenario): string {
     world.id === "calendar_down" ? "Calendar: connected, but every read FAILED in this conversation (Google could not be reached). Chat cannot know any event and should say the calendar could not be read." :
     world.sourcesOff.has("calendar") ? "Settings: Google, Outlook and iCloud calendar reading are all turned OFF for chat (chat is told this); chat must not know or mention any event." :
       `Calendar events (calendar name, location): ${world.events.map((item) => `${item.localDate} ${clockLabel(item.start)}-${clockLabel(item.end)} ${JSON.stringify(item.title)} (${item.calendar}${item.location ? `, ${item.location}` : ""})`).join("; ") || "none connected"}.`,
-    `Hevy workouts: ${world.id === "new_user" ? "Hevy not connected" : world.workouts.map((item) => `${item.localDate} ${JSON.stringify(item.title)} at ${clockLabel(item.start)}, ${item.minutes} min, ${item.exercises} exercises`).join("; ") || "none"}.`,
+    `Hevy workouts: ${world.id === "new_user" ? "Hevy not connected" : world.workouts.map((item) => `${item.localDate} at ${clockLabel(item.start)}, ${item.minutes} min`).join("; ") || "none"} (chat sees only times and lengths, not workout names or exercises).`,
     "Research: chat has no advice library yet, so it has no research cards. The right answer to a research question says it has no research to cite and may still help from the person's own records. Stating research findings would be unsupported.",
     `Scenario: ${scenario.description}`,
   ];
