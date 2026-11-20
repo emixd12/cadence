@@ -35,20 +35,43 @@ export function desktopChatFetch(origin: string, accessToken: AccessToken, fetch
   };
 }
 
-/** Calls `onAccountWrite` once after any call that changed hosted records. */
-export function withAccountWrites(client: ChatClient, onAccountWrite: () => void): ChatClient {
+/**
+ * The server keeps running a turn after the Mac stops listening (the person left the
+ * Chat screen, pressed Stop, or the connection dropped), up to the route's 90 s limit.
+ * A write can then land after the stream ended, so an interrupted turn asks for sync
+ * now and again at these delays.
+ */
+export const INTERRUPTED_TURN_SYNC_DELAYS_MS: readonly number[] = [15_000, 95_000];
+
+type Schedule = (run: () => void, delayMs: number) => void;
+
+/** Calls `onAccountWrite` after any call that changed, or may still change, hosted records. */
+export function withAccountWrites(
+  client: ChatClient,
+  onAccountWrite: () => void,
+  schedule: Schedule = (run, delayMs) => { setTimeout(run, delayMs); },
+): ChatClient {
   return {
     ...client,
     async sendTurn(request, onEvent, signal) {
       let wrote = false;
+      let started = false;
+      let finished = false;
       try {
         await client.sendTurn(request, (event) => {
+          if (event.type === "start") started = true;
           if (event.type === "outcome") wrote = true;
+          if (event.type === "done") finished = true;
           onEvent(event);
         }, signal);
       } finally {
         // A stopped or dropped turn may still have written before it ended.
         if (wrote) onAccountWrite();
+        // The server took the turn but this Mac stopped listening: it may write later.
+        if (started && !finished) {
+          if (!wrote) onAccountWrite();
+          for (const delay of INTERRUPTED_TURN_SYNC_DELAYS_MS) schedule(onAccountWrite, delay);
+        }
       }
     },
     async confirm(confirmId, answer) {
