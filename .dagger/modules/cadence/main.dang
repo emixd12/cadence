@@ -122,8 +122,8 @@ type Cadence {
   mounts the Git data of fixtureCommit instead, fetched once from GitHub and
   cached. So HEAD in this container is fixtureCommit, not the local commit.
 
-  tests/acceptance-web-client.test.mjs needs installed Google Chrome, which
-  the image lacks, so the check excludes it.
+  The tests in tests/acceptance-web-client/ need installed Google Chrome,
+  which the image lacks, so the check excludes them.
   """
   pub test: Void @check {
     app
@@ -131,7 +131,7 @@ type Cadence {
       .withExec([
         "npm", "run", "test", "--",
         "--reporter=agent", "--silent=passed-only",
-        "--exclude", "tests/acceptance-web-client.test.mjs",
+        "--exclude", "tests/acceptance-web-client/**",
       ])
       .sync
     null
