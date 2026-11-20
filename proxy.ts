@@ -19,6 +19,7 @@ export const config = {
     "/",
     "/login",
     "/timeline/:path*",
+    "/chat/:path*",
     "/behaviors/:path*",
     "/analytics/:path*",
     "/export/:path*",
