@@ -214,11 +214,13 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
       return { written: 0, modelCalls: 0, skipped: "tips_off", rejected: 0 };
     }
     const today = run.localDate;
-    const [signals, setup, history] = await Promise.all([
+    const [allSignals, setup, history] = await Promise.all([
       port.signals(today),
       port.setup(today),
       port.history(addDays(today, -CARD_REST_DAYS)),
     ]);
+    // Reminder history reaches the model only when the AI features settings allow it.
+    const signals = settings.reminderHistoryAllowed ? allSignals : allSignals.filter((signal) => signal.kind !== "reminder_response");
     const { matches, chosen } = chooseTipMatches({
       localDate: today, signals, setup, history,
       cards: options.cards ?? ADVICE_CARDS, statuses: options.statuses ?? ["active"],
