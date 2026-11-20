@@ -140,6 +140,10 @@ export function parseAdviceLibrary(value: unknown, extraSourceIds: readonly stri
           if (!applies.some((rule) => rule.scope !== "account")) fail(`${at}.quip_seeds[${s}] uses {behavior} but no rule is Behavior-scoped`);
           continue;
         }
+        if (name === "other_behavior") {
+          if (!applies.some((rule) => rule.signal === "done_together" && rule.scope !== "account")) fail(`${at}.quip_seeds[${s}] uses {other_behavior}, which only Behavior-scoped done_together rules carry`);
+          continue;
+        }
         if (!seedFacts.has(baseFact(name))) fail(`${at}.quip_seeds[${s}] uses {${name}}, which no applies_when signal carries`);
         if (name.endsWith("_duration") && !/(hours|minutes)/.test(baseFact(name))) fail(`${at}.quip_seeds[${s}] uses {${name}}, but only _hours and _minutes facts have a duration`);
       }
@@ -170,7 +174,7 @@ function allowedFacts(kind: AdviceSignalKind): readonly string[] {
 /**
  * Seed placeholders: `{fact}`, a formatted `{fact_pct}`, `{fact_clock}` ("21:46" → "9:46 PM"),
  * `{fact_duration}` (a `_hours` or `_minutes` fact → "about 50 minutes"), `{weekday_name}`,
- * `{hour_label}`, and a counted noun `{fact|item has|items have}` → "1 item has" / "3 items have".
+ * `{hour_label}`, `{other_behavior}` (the paired Behavior's title, done_together only), and a counted noun `{fact|item has|items have}` → "1 item has" / "3 items have".
  */
 const PLACEHOLDER = /\{([a-z0-9_]+)(?:\|([^|{}]+)\|([^|{}]+))?\}/g;
 const FORMATTED_SUFFIX = /_(pct|clock|duration)$/;
@@ -213,7 +217,14 @@ function durationLabel(base: string, value: unknown): string | null {
  * Fills a quip seed with a Behavior title and the matched signal's facts. Returns null when
  * any placeholder has no value, so a caller never shows a half-filled line.
  */
-export function fillQuipSeed(seed: string, values: Readonly<{ behavior?: string | null; facts: Readonly<Record<string, unknown>> }>): string | null {
+export type QuipSeedValues = Readonly<{
+  behavior?: string | null;
+  /** Title of the paired Behavior (`done_together`'s `other_behavior_id`), for `{other_behavior}`. */
+  otherBehavior?: string | null;
+  facts: Readonly<Record<string, unknown>>;
+}>;
+
+export function fillQuipSeed(seed: string, values: QuipSeedValues): string | null {
   let missing = false;
   const filled = seed.replace(PLACEHOLDER, (_, name: string, one?: string, many?: string) => {
     const value = fillOne(name, one, many, values);
@@ -223,8 +234,9 @@ export function fillQuipSeed(seed: string, values: Readonly<{ behavior?: string 
   return missing ? null : filled;
 }
 
-function fillOne(name: string, one: string | undefined, many: string | undefined, values: Readonly<{ behavior?: string | null; facts: Readonly<Record<string, unknown>> }>): string | null {
+function fillOne(name: string, one: string | undefined, many: string | undefined, values: QuipSeedValues): string | null {
   if (name === "behavior") return values.behavior || null;
+  if (name === "other_behavior") return values.otherBehavior || null;
   const base = baseFact(name);
   const raw = values.facts[base];
   if (one !== undefined && many !== undefined) {
