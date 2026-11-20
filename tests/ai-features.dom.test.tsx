@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DailyBriefSettings } from "@cadence/core/types/daily-brief";
 
 import { AiFeaturesApproval } from "@/components/onboarding/AiFeaturesApproval";
+import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { dailyBriefSectionState } from "@/lib/ui/settings-sections";
@@ -66,6 +67,21 @@ describe("the AI features question", () => {
     window.removeEventListener("cadence:daily-brief-settings", heard);
   });
 
+  it("starts today's Daily Brief right after Continue", async () => {
+    let answered = false;
+    const requestBrief = vi.fn(async () => ({ state: "already_attempted" as const }));
+    const shared: DailyBriefClient = {
+      preferences: vi.fn(async () => (answered ? approved : base)),
+      updatePreferences: vi.fn(async () => { answered = true; return approved; }),
+      requestBrief,
+    };
+    await act(() => root.render(<><DailyBriefLauncher client={shared} /><AiFeaturesApproval client={shared} /></>));
+    await vi.waitFor(() => expect(button("Continue")).toBeDefined());
+    expect(requestBrief).not.toHaveBeenCalled();
+    await act(() => button("Continue").click());
+    await vi.waitFor(() => expect(requestBrief).toHaveBeenCalled());
+  });
+
   it("keeps every feature off on request", async () => {
     const update = vi.fn(async () => ({ ...base, ai: { approved: true, tipsEnabled: false, chatEnabled: false } }));
     await act(() => root.render(<AiFeaturesApproval client={client(base, update)} />));
@@ -117,6 +133,13 @@ describe("Settings > AI features", () => {
     expect(checkbox("daily-brief-sources-coverage").disabled).toBe(false);
     await act(() => checkbox("ai-source-notes").click());
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, includeNotes: true, useConnectedSources: true }));
+  });
+
+  it("shows Notes and Reminder history even when the Daily Brief does not use them", async () => {
+    const noLanes = { ...approved, optionalSources: { reminders: false, notes: false } };
+    await act(() => root.render(<DailyBriefSettingsPanel client={client(noLanes)} />));
+    await vi.waitFor(() => expect(checkbox("ai-source-notes")).not.toBeNull());
+    expect(checkbox("ai-source-reminderHistory")).not.toBeNull();
   });
 
   it("asks an account that has not answered and turns everything on from Settings", async () => {

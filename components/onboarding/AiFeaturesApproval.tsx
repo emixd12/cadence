@@ -42,8 +42,8 @@ export function AiFeaturesApproval({ client, children }: Readonly<{ client?: Dai
   const answer = (approval: "all_on" | "all_off") => {
     setSaving(true); setError("");
     void resolvedClient.updatePreferences({ approval }).then((updated) => {
-      // The Daily Brief launcher reads this and starts today's brief when it is on.
-      window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: updated }));
+      // startNow asks the Daily Brief launcher to read the settings again and start today's brief when it is on.
+      window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: { ...updated, startNow: true } }));
       setPhase("answered");
     }).catch(() => {
       setError("Your answer could not be saved. Try again.");

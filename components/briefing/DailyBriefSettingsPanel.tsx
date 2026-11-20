@@ -180,8 +180,9 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
           <p className="min-h-11 py-2.5 pl-7">{AI_SOURCE_COPY.history.title}</p>
           <p className="max-w-2xl pl-7 text-muted-readable">{AI_SOURCE_COPY.history.does}</p>
         </div>
-        {settings.optionalSources?.notes !== false ? source("notes", settings.includeNotes === true, { includeNotes: settings.includeNotes !== true }) : null}
-        {settings.optionalSources?.reminders !== false ? source("reminderHistory", settings.includeReminderHistory === true, { includeReminderHistory: settings.includeReminderHistory !== true }) : null}
+        {/* Notes and reminder history are shared by every AI feature, so they always show once the AI settings exist. */}
+        {settings.ai || settings.optionalSources?.notes !== false ? source("notes", settings.includeNotes === true, { includeNotes: settings.includeNotes !== true }) : null}
+        {settings.ai || settings.optionalSources?.reminders !== false ? source("reminderHistory", settings.includeReminderHistory === true, { includeReminderHistory: settings.includeReminderHistory !== true }) : null}
         <div>
           <label className="flex min-h-11 items-center gap-3">
             {/* With nothing connected the choice can still be turned off, never on. */}
