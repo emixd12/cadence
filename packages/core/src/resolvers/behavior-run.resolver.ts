@@ -111,7 +111,7 @@ export type RunStopCandidate = Readonly<{ startsAt: Temporal.Instant; endsAt: Te
  * True when an end or a pause removes an Occurrence (rule T4). Pass the effective
  * (moved) time. An exact time is removed when it starts at or after the end, or
  * inside the pause. A time range is removed when it is still open at the end (so
- * End now removes an Evening window at 8 PM) or overlaps the pause. The caller
+ * End now removes an Evening range at 8 PM) or overlaps the pause. The caller
  * keeps marked, noted and timed rows whatever this returns.
  */
 export function isStoppedByRunFields(fields: BehaviorRunFields, candidate: RunStopCandidate): boolean {
@@ -132,7 +132,7 @@ export function isStoppedByRunFields(fields: BehaviorRunFields, candidate: RunSt
 }
 
 /**
- * The window end of a time range planned on a local day. A range whose end is at or
+ * The end of a time range planned on a local day. A range whose end is at or
  * before its start ends on the next day.
  */
 export function plannedRangeEnd(localDate: string, startTime: string, endTime: string, timezone: string): Temporal.Instant {

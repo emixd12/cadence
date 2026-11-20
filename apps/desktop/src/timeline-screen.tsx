@@ -1,4 +1,4 @@
-import { LinkProvider, RuntimeLink, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
+import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";

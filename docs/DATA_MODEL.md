@@ -2240,6 +2240,55 @@ for inserts, updates, and elapsed-row cleanup, independent of configuration line
 Migration:
 `20260918010100_add_behavior_duration_and_scheduled_archive.sql`.
 
+Superseded by Behavior end and pause below: `end_date` and the archive job are
+gone. `auto_archived_at` stays for history and BehaviorLog; nothing sets it now.
+
+## Behavior end and pause (Ended and Paused plan, November 2026)
+
+Behaviors never archive by themselves. Five nullable local columns replace
+`behaviors.end_date`:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `end_on` | `date` | Last local day the Behavior runs. |
+| `end_time` | `time` | Local time on `end_on` when it stops. Null means the end of that day. Requires `end_on`. |
+| `pause_from_on` | `date` | First paused local day. |
+| `pause_from_time` | `time` | Local time on `pause_from_on` when the pause starts. Null means the start of that day. Requires `pause_from_on`. |
+| `pause_back_on` | `date` | Local day it runs again, from the start of the day. Later than `pause_from_on`. |
+
+`behaviors_end_valid` and `behaviors_pause_valid` enforce whole minutes and the
+pairing rules. The pause columns are all set or all null, apart from the
+optional time. Values are local to the Behavior's timezone, never instants.
+
+The backfill sets `end_on = end_date - 1` for every real end date, without
+touching `updated_at`. The migration drops `end_date`, its check,
+`archive_due_behaviors`, `archive_my_due_behaviors`,
+`cadence_private.archive_due_behaviors_for_owner` and
+`behavior_end_date_boundary`.
+
+The configuration snapshot gains `end` (`{on, time}` or null) and `pause`
+(`{from_on, from_time, back_on}` or null). `changed_fields` accepts `end` and
+`pause`, and baselines list both. The `updated_at` trigger watches the five
+columns.
+
+Private helpers `behavior_local_instant`, `behavior_end_instant`,
+`behavior_planned_range_end` and `behavior_stops_occurrence` turn local values
+into instants with the "compatible" rule. `apply_occurrence_generation_plan`
+refuses an insert or update of a stopped row ("Behavior end or pause changed
+after occurrence planning.") and allows deleting a stopped Unresolved row even
+when it is past or moved. The rules are in docs/RECURRENCE_RULES.md, "Behavior
+end and pause".
+
+Account synchronization moves to contract 7, and the minimum writer contract is
+7. Contract 7 adds the five columns with null defaults. A baseline saved under an
+older contract reads `end_date` as `end_on = end_date - 1`. The Settings
+timezone RPC accepts a per-Behavior `run` object so past stops keep their
+moment. The advisor snapshot carries the five fields and drops
+`dueArchiveCount`. Export, BehaviorLog import and restore carry the five fields;
+BehaviorLog reads a legacy `end_date` the same way.
+
+Migration: `20261120120000_behavior_end_and_pause.sql`.
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
