@@ -19406,7 +19406,7 @@ the code before the fix, Ticket 339's refresh test in both modes, unit tests, `d
 
 ## Ticket 342: Ended and Paused Behaviors in Cadence for Mac
 
-Status: open. Filed November 20, 2026 by the Ended and Paused web workstream. Design: the
+Status: in review (Mac workstream draft PR, November 20, 2026); ships with Mac 0.1.13. Filed November 20, 2026 by the Ended and Paused web workstream. Design: the
 Ended and Paused plan (`docs/RECURRENCE_RULES.md`, "Behavior end and pause"). Dependencies:
 the server and core workstream (`end_on`, `end_time`, pause columns, account sync contract
 7). Ships with Cadence for Mac 0.1.13; publishing needs the owner's written OK.

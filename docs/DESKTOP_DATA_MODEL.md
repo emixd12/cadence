@@ -584,12 +584,22 @@ instants, and marker-to-archive consistency. Full graph, import, restore,
 export, and account-sync rows carry the fields. Direct synchronization rejects
 older Behavior rows missing the new keys; normalized legacy baselines use null.
 
-Pending (Ended and Paused, workstream 3): hosted account sync is now contract 7,
-which replaces `end_date` with `end_on`, `end_time`, `pause_from_on`,
-`pause_from_time` and `pause_back_on` (docs/DATA_MODEL.md, "Behavior end and
-pause"). The TypeScript desktop services already read and write these fields.
-The Rust SQLite store still has `end_date` and must move to the five columns
-before the next Mac release. The local archive job is removed.
+## Behavior end and pause (Ticket 342)
+
+SQLite schema 26 replaces `behaviors.end_date` with `end_on`, `end_time`,
+`pause_from_on`, `pause_from_time` and `pause_back_on`, the hosted account sync
+contract 7 fields (docs/DATA_MODEL.md, "Behavior end and pause"). The migration
+backfills `end_on = end_date - 1` with no time; `auto_archived_at` stays for items
+the retired job archived. SQLite checks and native row validation match the hosted
+`behaviors_end_valid` and `behaviors_pause_valid` constraints: real dates, whole-minute
+times, a time only with its day, and a back-on day after the first paused day.
+The configuration snapshot carries `end` and `pause` like core's
+`toBehaviorConfigurationSnapshot`; older snapshots read both as null. A timezone
+operation may re-express an end or pause start that already happened (rule T1),
+naming `end` or `pause` in its changed fields; the back-on day never moves.
+Generation refuses a stale plan that creates a row on a day the end or pause stops
+entirely, and lets an end or pause delete elapsed bare rows from the day before the
+stop onward; marked, noted and timed rows stay. The local archive job is removed.
 
 ## Note shortcut state (Tickets 126–128)
 
