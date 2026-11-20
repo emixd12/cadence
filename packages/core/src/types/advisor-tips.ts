@@ -9,6 +9,7 @@
  * Routes (web and Mac, signed-in person; the Mac sends its hosted bearer token):
  *   GET  /api/advisor/tips/next      -> AdvisorTipsNextResponse
  *   POST /api/advisor/tips/reaction  AdvisorTipReactionRequest -> AdvisorTipReactionResponse
+ *   GET  /api/advisor/tips/recent    -> AdvisorTipsRecentResponse (4E: the panel's "Earlier")
  *
  * Showing rules (server-side, so every client gets them):
  * - At most one new tip per app open, and at least `minimumSpacingMinutes` (120) after the
@@ -25,7 +26,11 @@
 export const ADVISOR_TIP_ROUTES = Object.freeze({
   next: "/api/advisor/tips/next",
   reaction: "/api/advisor/tips/reaction",
+  recent: "/api/advisor/tips/recent",
 });
+
+/** 4E: how far back the advisor panel's "Earlier" list reaches, and how many tips it holds. */
+export const ADVISOR_RECENT_TIPS = Object.freeze({ days: 7, limit: 10 });
 
 export const ADVISOR_TIP_MINIMUM_SPACING_MINUTES = 120;
 
@@ -105,7 +110,10 @@ export type AdvisorTipReactionResponse = Readonly<{
   tip: AdvisorTip;
 }>;
 
-/** Error body from both routes: `{ error: AdvisorTipsErrorCode }`, as the brief move routes. */
+/** Tips shown before today (newest first), for the panel's "Earlier" list. Empty when tips are off. */
+export type AdvisorTipsRecentResponse = Readonly<{ tips: readonly AdvisorTip[] }>;
+
+/** Error body from the tip routes: `{ error: AdvisorTipsErrorCode }`, as the brief move routes. */
 export type AdvisorTipsErrorCode =
   | "unauthenticated" // 401
   | "invalid_request" // 400

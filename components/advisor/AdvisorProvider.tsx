@@ -1,0 +1,229 @@
+"use client";
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRefresh } from "@cadence/ui/runtime";
+import type { AdvisorTip, AdvisorTipReaction, AdvisorTipsNextResponse } from "@cadence/core/types/advisor-tips";
+import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
+
+import {
+  advisorErrorText,
+  advisorHasNew,
+  advisorLineItem,
+  readBriefSeen,
+  writeBriefSeen,
+  type AdvisorBriefSummary,
+  type AdvisorClient,
+  type AdvisorLineItem,
+} from "@/lib/ui/advisor";
+import { DailyBriefRequestError } from "@/lib/ui/daily-brief";
+
+/**
+ * Advisor plan Phase 4, workstream 4E (placement K, DESIGN.md "Advisor placement").
+ * One provider per Timeline holds what the advisor shows: the brief (published by the
+ * Daily Brief launcher), the schedule question or trial from 4C, and today's tip from 4B.
+ * The horse at the top, the line under today's date and the panel all read it.
+ * Opening the app never calls a model: every read here is a stored row.
+ */
+
+type Pending = Readonly<{ action: string }> | null;
+
+export type AdvisorProposalState = Readonly<{
+  view: ScheduleProposalView;
+  /** The italic outcome after an answer on this screen. */
+  outcome: string | null;
+  pending: ScheduleProposalAnswer | null;
+  error: string | null;
+}>;
+
+export type AdvisorTipState = Readonly<{
+  tip: AdvisorTip;
+  answeredHere: boolean;
+  pending: AdvisorTipReaction | null;
+  error: string | null;
+}>;
+
+type AdvisorContextValue = Readonly<{
+  item: AdvisorLineItem | null;
+  hasNew: boolean;
+  panelOpen: boolean;
+  openPanel: () => void;
+  closePanel: () => void;
+  brief: AdvisorBriefSummary;
+  tip: AdvisorTipState | null;
+  /** The tip's "Why this?" card is open; one switch shared by the line and the panel. */
+  researchOpen: boolean;
+  toggleResearch: () => void;
+  react: (reaction: AdvisorTipReaction) => void;
+  proposal: AdvisorProposalState | null;
+  answer: (answer: ScheduleProposalAnswer) => void;
+  /** Tips shown on earlier days; null until the panel first opens or when the read failed. */
+  recent: readonly AdvisorTip[] | null;
+  /** The panel's last section links here when the Chat page exists (5B/5C pass it). */
+  chatHref: string | null;
+}>;
+
+type BriefSlot = Readonly<{
+  publish: (summary: AdvisorBriefSummary) => void;
+  /** Where the brief renders: the panel's "Today's brief" section while the panel is open. */
+  target: HTMLElement | null;
+}>;
+
+const AdvisorContext = createContext<AdvisorContextValue | null>(null);
+const AdvisorBriefSlotContext = createContext<BriefSlot | null>(null);
+const AdvisorBriefTargetSetter = createContext<((element: HTMLElement | null) => void) | null>(null);
+
+export function useAdvisor() {
+  return useContext(AdvisorContext);
+}
+
+/** The Daily Brief launcher's way into the advisor. Null outside an advisor (old layout). */
+export function useAdvisorBriefSlot() {
+  return useContext(AdvisorBriefSlotContext);
+}
+
+export function useAdvisorBriefTarget() {
+  return useContext(AdvisorBriefTargetSetter);
+}
+
+const NONE: AdvisorBriefSummary = { kind: "none" };
+
+export function AdvisorProvider({
+  client,
+  chatHref = null,
+  children,
+}: Readonly<{ client: AdvisorClient | null | undefined; chatHref?: string | null; children: ReactNode }>) {
+  if (!client) return <>{children}</>;
+  return <AdvisorState client={client} chatHref={chatHref}>{children}</AdvisorState>;
+}
+
+function AdvisorState({ client, chatHref, children }: Readonly<{ client: AdvisorClient; chatHref: string | null; children: ReactNode }>) {
+  const refresh = useRefresh();
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [brief, setBrief] = useState<AdvisorBriefSummary>(NONE);
+  const [briefSeenKey, setBriefSeenKey] = useState<string | null>(null);
+  const [briefTarget, setBriefTarget] = useState<HTMLElement | null>(null);
+  const [tip, setTip] = useState<AdvisorTipState | null>(null);
+  const [researchOpen, setResearchOpen] = useState(false);
+  const [proposal, setProposal] = useState<AdvisorProposalState | null>(null);
+  const [recent, setRecent] = useState<readonly AdvisorTip[] | null>(null);
+  const pending = useRef<Pending>(null);
+  const tipRef = useRef(tip);
+  const proposalRef = useRef(proposal);
+  useEffect(() => { tipRef.current = tip; proposalRef.current = proposal; });
+
+  const applyTip = useCallback((response: AdvisorTipsNextResponse | null) => {
+    if (!response) return;
+    if (response.state === "tip") {
+      setTip((current) => current?.tip.id === response.tip.id && current.answeredHere ? current
+        : { tip: response.tip, answeredHere: false, pending: null, error: null });
+      setResearchOpen((open) => open && tipRef.current?.tip.id === response.tip.id);
+    } else if (!tipRef.current?.answeredHere) {
+      setTip(null);
+    }
+  }, []);
+
+  const applyProposal = useCallback((view: ScheduleProposalView | null) => {
+    // An answer given on this screen keeps its outcome until the next open.
+    if (!view || proposalRef.current?.outcome) return;
+    setProposal(view.kind === "none" || view.kind === "hold" ? null : { view, outcome: null, pending: null, error: null });
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const live = <T,>(value: T) => controller.signal.aborted ? null : value;
+    const loadTip = () => client.nextTip(controller.signal).then(live, () => null).then(applyTip);
+    const loadProposal = () => client.scheduleProposal(controller.signal).then(live, () => null).then(applyProposal);
+    void loadTip();
+    void loadProposal();
+    // Returning to the app is an open: the server decides whether a new tip is due (two hours apart).
+    // Asked even when today's tip is unanswered, so a Timeline left open moves on to the next tip.
+    const onFocus = () => {
+      if (!pending.current) void loadTip();
+      if (!proposalRef.current) void loadProposal();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => { controller.abort(); window.removeEventListener("focus", onFocus); };
+  }, [client, applyTip, applyProposal]);
+
+  const briefKey = brief.kind === "ready" || brief.kind === "closed" ? brief.key : null;
+  // Read in render: the brief summary only arrives after mount, so server and client agree.
+  const briefSeen = briefKey !== null && (briefSeenKey === briefKey || readBriefSeen(safeStorage(), briefKey));
+
+  const markBriefSeen = useCallback(() => {
+    if (!briefKey) return;
+    writeBriefSeen(safeStorage(), briefKey);
+    setBriefSeenKey(briefKey);
+  }, [briefKey]);
+
+  // Opening the panel shows the brief, so it counts as read; a brief delivered earlier reopens there
+  // (today's saved brief, no model call).
+  const openPanel = useCallback(() => {
+    setPanelOpen(true);
+    markBriefSeen();
+    if (brief.kind === "closed") brief.reopen();
+    if (recent === null) void client.recentTips().then(setRecent, () => setRecent([]));
+  }, [client, recent, brief, markBriefSeen]);
+  const closePanel = useCallback(() => {
+    setPanelOpen(false);
+    // A brief that arrived while the panel was open was seen there.
+    markBriefSeen();
+  }, [markBriefSeen]);
+
+  const react = useCallback((reaction: AdvisorTipReaction) => {
+    const current = tipRef.current;
+    if (!current || pending.current) return;
+    pending.current = { action: reaction };
+    setTip({ ...current, pending: reaction, error: null });
+    void client.react(current.tip.id, reaction).then((next) => {
+      setTip({ tip: next, answeredHere: true, pending: null, error: null });
+      if (reaction !== "helpful") setResearchOpen(false);
+    }, (error: unknown) => {
+      setTip({ ...current, pending: null, error: advisorErrorText(errorCode(error)) });
+    }).finally(() => { pending.current = null; });
+  }, [client]);
+
+  const answer = useCallback((choice: ScheduleProposalAnswer) => {
+    const current = proposalRef.current;
+    if (!current || pending.current || current.outcome) return;
+    const view = current.view;
+    if (view.kind !== "proposal" && view.kind !== "check_in") return;
+    pending.current = { action: choice };
+    setProposal({ ...current, pending: choice, error: null });
+    void client.answerProposal(view.proposalId, choice).then((result) => {
+      setProposal({ view, outcome: result.message, pending: null, error: null });
+      if (result.applied) refresh();
+    }, (error: unknown) => {
+      setProposal({ ...current, pending: null, error: advisorErrorText(errorCode(error)) });
+    }).finally(() => { pending.current = null; });
+  }, [client, refresh]);
+
+  const item = advisorLineItem({ brief, briefSeen, proposal: proposal?.view ?? null, tip: tip?.tip ?? null, tipAnsweredHere: tip?.answeredHere ?? false });
+  const answeredHere = item?.kind === "tip" ? !!tip?.answeredHere
+    : item?.kind === "proposal" || item?.kind === "check_in" ? !!proposal?.outcome : false;
+  const hasNew = advisorHasNew(item, answeredHere);
+
+  const value = useMemo<AdvisorContextValue>(() => ({
+    item, hasNew, panelOpen, openPanel, closePanel, brief, tip,
+    researchOpen, toggleResearch: () => setResearchOpen((open) => !open),
+    react, proposal, answer, recent, chatHref,
+  }), [item, hasNew, panelOpen, openPanel, closePanel, brief, tip, researchOpen, react, proposal, answer, recent, chatHref]);
+  const slot = useMemo<BriefSlot>(() => ({ publish: setBrief, target: panelOpen ? briefTarget : null }), [panelOpen, briefTarget]);
+
+  return (
+    <AdvisorContext.Provider value={value}>
+      <AdvisorBriefSlotContext.Provider value={slot}>
+        <AdvisorBriefTargetSetter.Provider value={setBriefTarget}>
+          {children}
+        </AdvisorBriefTargetSetter.Provider>
+      </AdvisorBriefSlotContext.Provider>
+    </AdvisorContext.Provider>
+  );
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof DailyBriefRequestError ? error.code : undefined;
+}
+
+function safeStorage(): Storage | null {
+  try { return window.localStorage; } catch { return null; }
+}

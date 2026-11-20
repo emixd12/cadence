@@ -13,9 +13,10 @@ findings calculated from it, to OpenAI.
 Calendar descriptions and credentials are excluded. Notes require the separate
 control described below. Provider retention may apply.
 
-On the first Timeline opening each day, the horse presents the generated briefing.
-Ignore it to keep tracking, or choose **Close** to dismiss it for this account,
-day and installation. Tab to **Close** and press Enter or Space. A failed request
+The brief lives with the advisor (see [Advisor](#advisor)). When today's brief is
+ready, the line under today's date says so, for example "2 moves suggested for
+today. **Open**". **Open**, or the horse at the top of the Timeline, shows the brief
+in the advisor's panel. Ignore it to keep tracking. A failed request
 can show **Try again**; retries happen only when you choose that action.
 Leaving Timeline while the brief loads does not lose it; it appears when you return.
 If loading was interrupted, the bubble says so and offers **Try again**. When
@@ -54,9 +55,9 @@ waiting for your decision; it never allows one again for you. Turning Daily Brie
 off turns all of these off, and an older Cadence app that saves Daily Brief settings
 also turns them off.
 
-The brief stays until you close it or the day ends. Marking an item or another
-Timeline change does not take it away. After **Close**, a small **Today's brief**
-link on the Timeline shows it again. **Refresh**, next to the time the brief was
+The brief stays until the day ends. Marking an item or another
+Timeline change does not take it away. Opening the advisor again shows it again,
+with no new model call. **Refresh**, next to the time the brief was
 made, replaces it with a new one; Cadence allows two refreshes a day while the
 month's budget covers them, and says so when it cannot. Nothing regenerates
 automatically. Disable Daily Brief in Settings to stop generation.
@@ -95,6 +96,35 @@ local-only records are absent; offline tracking still works without Daily Brief.
 A suggestion changes nothing until you answer it.
 A source link opens trusted catalog provenance. Editorial guidance is labeled separately
 from research. A citation is not a guarantee that advice applies to you.
+
+## Advisor
+
+The advisor is the horse at the top centre of the Timeline. It stays in view when
+you scroll. Under it, **Advisor** reads **Advisor · 1 new** when something waits for
+you.
+
+One line under today's date shows the most pressing item, one at a time, in this
+order: today's brief until you open it, a schedule question, a check-in on a
+two-week try, then today's tip. A day with nothing shows no line.
+
+- **Tips.** A tip states one fact from your own records and one step to try.
+  **Why this?** shows the research behind it: what the source found, a link to it,
+  the kind of source and how strong the evidence is. **Helpful** saves it as
+  helpful. **Not now** hides it for today. In the panel, **Don't suggest this
+  again** stops that advice on every device. Cadence shows at most one new tip each
+  time you open the app, at least two hours apart.
+- **Schedule questions.** When you keep moving an item to the same time, the
+  advisor may suggest changing its schedule. Choose **Try for two weeks**,
+  **Change for good** or **No** in the panel. At the end of a try the line asks
+  whether to keep it: **Keep** or **Go back**. A change that would move one of
+  today's items waits until tomorrow.
+
+Select the horse to open the panel: today's brief, questions that need your answer,
+today's tip, a two-week try in progress, and tips from earlier days. On a wide
+window the panel sits to the right of the Timeline; on a phone or a narrower window
+it fills the screen. **Close** or Escape returns to the Timeline. If an answer
+cannot be saved, one red line starting **Not changed.** says why. Advisor tips can
+be turned off in **Settings > AI features**.
 
 ## Refresh Timeline
 

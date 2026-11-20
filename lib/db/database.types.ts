@@ -2658,6 +2658,10 @@ export type Database = {
         Args: { p_reaction: string; p_tip_id: string }
         Returns: Json
       }
+      advisor_recent_tips: {
+        Args: { p_days?: number; p_limit?: number }
+        Returns: Json
+      }
       agent_run_start: {
         Args: { p_model: string; p_prompt_version: string; p_trigger: string }
         Returns: {
