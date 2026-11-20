@@ -546,6 +546,7 @@ The Timeline screen is the main screen.
 
 Primary screens:
 - Timeline: `/timeline`
+- Chat: `/chat` (advisor plan Phase 5; web first, Mac in Phase 5C)
 - Behaviors: `/behaviors`
 - Export: `/export`
 - Settings: `/settings`

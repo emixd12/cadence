@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { getAccountInitials } from "@/lib/ui/account";
 import type { DesktopAccountState } from "./account/auth";
-import { APP_NAV_ITEMS } from "@/lib/navigation";
+import { getAppNavItems } from "@/lib/navigation";
 import { getFocusableElements } from "@/components/timeline/NeedsDecisionDialog";
 
 export type DesktopScreen = "timeline" | "behaviors" | "export" | "settings";
@@ -266,7 +266,7 @@ function PrimaryNav({
 }>) {
   return (
     <nav aria-label="Primary" className="flex flex-1 flex-col py-3">
-      {APP_NAV_ITEMS.map((item) => {
+      {getAppNavItems("desktop").map((item) => {
         const screen = item.href.slice(1) as DesktopScreen;
         const Icon = ICONS[screen];
         const active = activeScreen === screen;
