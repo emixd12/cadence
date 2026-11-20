@@ -292,4 +292,4 @@ labels and support keyboard input; controls wrap on narrow screens.
 
 Default duration (minutes) is optional. Enter a whole number from 1 to 1,440. Timeline uses this value for planning while your tracked time and measured averages stay separate. Clear it to return to the measured estimate.
 
-End date is optional. Cadence archives the Behavior at the start of that date in its timezone. No Occurrences are scheduled on that date or later. Your history stays available under Archived behaviors. Cadence shows an in-app archive notification, including when you return after being offline. Desktop catches up when it opens or resumes. Restoring clears an expired end date.
+End date is optional. Cadence archives the Behavior at the start of that date in its timezone. No Occurrences are scheduled on that date or later. The end date must come after today, so the Behavior's last day is the day before it. Your history stays available under Archived behaviors. Cadence shows an in-app archive notification, including when you return after being offline. Desktop catches up when it opens or resumes. Restoring clears an expired end date.

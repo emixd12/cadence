@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-069` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-074` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -126,6 +126,7 @@ Status values:
 | [P-066](#p-066-the-daily-brief-keeps-calendar-titles-and-answers-for-the-day) | The Daily Brief keeps calendar titles and answers for the day | logged | Advisor Phase 3A1 | Privacy, Trust, in-app copy |
 | [P-067](#p-067-the-advisor-estimates-how-long-an-item-takes) | The advisor estimates how long an item takes | logged | Advisor Phase 3A1 | Privacy, in-app copy, user guide |
 | [P-068](#p-068-dont-suggest-moving-this-per-behavior) | "Don't suggest moving this" per Behavior | logged | Advisor Phase 3A1 | in-app copy, user guide |
+| [P-073](#p-073-end-date-must-come-after-today) | End date must come after today | logged | — | in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -2064,4 +2065,18 @@ cite has not changed.
 - **Update needed:** when P-064 is written up, list the pattern families in general terms
   and describe tips (what reaches the model, how long tips are kept).
 - **Related:** P-064, P-065.
+
+## P-073: End date must come after today
+
+- **Change:** implemented November 20, 2026. Creating a Behavior, or changing an active
+  Behavior's End date, now refuses a date of today or earlier with "Choose a date after today.
+  The Behavior’s last day is the day before its end date." The End date stays the first day the
+  Behavior no longer runs (`docs/RECURRENCE_RULES.md`, "Behavior end date"). Before, such a
+  Behavior was archived at once and never ran (Mac 0.1.12 release check, November 19).
+- **Affected:** `packages/core/src/services/behavior-values.ts`, `behavior.service.ts`; web and
+  Mac Behavior forms and MCP Behavior writes (`invalid_input` with the same field message).
+- **Surfaces:** in-app copy (new error message); user guide (one sentence added in
+  `docs/user-guide/behaviors-and-review.md`, "Default duration and end date").
+- **Conflicting current text:** none found.
+- **Update needed:** none.
 - **Status:** logged.

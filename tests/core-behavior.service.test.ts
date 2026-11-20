@@ -182,3 +182,38 @@ it("clears an expired date when the edit form restores a Behavior", async () => 
     values: { ...values, active: true, endDate: "2026-08-29" } });
   expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ active: true, end_date: null, auto_archived_at: null });
 });
+
+describe("End date must come after today", () => {
+  // recordedAt in the fixture; the Behavior's timezone decides "today".
+  const today = (timezone: string) => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date(recordedAt));
+  const addDays = (date: string, days: number) => {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(Date.UTC(year!, month! - 1, day! + days)).toISOString().slice(0, 10);
+  };
+
+  it("refuses creating a Behavior whose End date is today or earlier", async () => {
+    for (const endDate of [today("America/New_York"), addDays(today("America/New_York"), -1)]) {
+      const adapter = store();
+      await expect(createBehavior(adapter, { values: { ...values, endDate }, userId: "owner", timezone: "America/New_York", recordedAt }))
+        .rejects.toMatchObject({ fieldErrors: { end_date: "Choose a date after today. The Behavior’s last day is the day before its end date." } });
+      expect(adapter.createBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
+    }
+  });
+
+  it("accepts tomorrow as the End date", async () => {
+    const adapter = store();
+    await createBehavior(adapter, { values: { ...values, endDate: addDays(today("America/New_York"), 1) }, userId: "owner", timezone: "America/New_York", recordedAt });
+    expect(adapter.createBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
+  });
+
+  it("refuses changing an active Behavior's End date to today, and leaves an unchanged date alone", async () => {
+    const existing = { ...stored, end_date: addDays(today(stored.timezone), 5) };
+    const adapter = store(existing);
+    await expect(updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
+      values: { ...values, endDate: today(stored.timezone) } })).rejects.toMatchObject({ fieldErrors: { end_date: expect.any(String) } });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
+    await updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
+      values: { ...values, endDate: existing.end_date } });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
+  });
+});
