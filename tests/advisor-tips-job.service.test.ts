@@ -82,7 +82,7 @@ function fakePort(state: FakeState): TipVisitPort & { calls: { generate: number;
 
 function state(overrides: Partial<FakeState> = {}): FakeState {
   return {
-    today: "2026-11-19", settings: { tipsOn: true, notesAllowed: false }, signals: [DROP, STEADY], tips: [], suppressed: [],
+    today: "2026-11-19", settings: { tipsOn: true, notesAllowed: false, reminderHistoryAllowed: true }, signals: [DROP, STEADY], tips: [], suppressed: [],
     reserveAllowed: true, runs: [], storedSignals: 2,
     generate: async () => ({ tips: [
       { ref: "t1", text: "Gym: 2 of 8 done lately. Pick one fixed time." },
@@ -107,19 +107,29 @@ describe("visitAdvisorTips", () => {
   });
 
   it("reads day notes only when the notes choice allows it", async () => {
-    const port = fakePort(state({ settings: { tipsOn: true, notesAllowed: true } }));
+    const port = fakePort(state({ settings: { tipsOn: true, notesAllowed: true, reminderHistoryAllowed: true } }));
     await run(port);
     expect(port.calls.notes).toBe(1);
   });
 
   it("with tips off: zero model calls, nothing written, stored tips stay", async () => {
     const old: StoredTip = { localDate: "2026-11-18", position: 1, cardId: "drop", behaviorId: "b-gym", factIds: [], factValues: {}, source: "seed", shownAt: "2026-11-18T09:00:00Z", reaction: null };
-    const s = state({ settings: { tipsOn: false, notesAllowed: false }, tips: [old] });
+    const s = state({ settings: { tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }, tips: [old] });
     const port = fakePort(s);
     expect(await run(port)).toEqual({ written: 0, modelCalls: 0, skipped: "tips_off", rejected: 0 });
     expect(port.calls.generate).toBe(0);
     expect(port.calls.write).toEqual([]);
     expect(s.tips).toEqual([old]);
+  });
+
+  it("leaves reminder history out when the AI features settings turn it off", async () => {
+    const reminderCard = card("reminder", "reminder_response", ["{behavior}: {quick} of {marked} marked soon after a reminder."]);
+    const reminder: AdviceSignalInput = { id: "3", kind: "reminder_response", behaviorId: "b-gym", facts: { quick: 6, marked: 8 } };
+    const off = fakePort(state({ signals: [reminder], settings: { tipsOn: true, notesAllowed: false, reminderHistoryAllowed: false } }));
+    expect(await run(off, { cards: [reminderCard] })).toMatchObject({ written: 0, modelCalls: 0, skipped: "no_match" });
+    expect(off.calls.generate).toBe(0);
+    const on = fakePort(state({ signals: [reminder], generate: async () => ({ tips: [{ ref: "t1", text: "Gym: 6 of 8 marked soon after a reminder." }] }) }));
+    expect(await run(on, { cards: [reminderCard] })).toMatchObject({ written: 1 });
   });
 
   it("with no matching card: no call and no tips (no filler)", async () => {
@@ -198,7 +208,7 @@ describe("visitAdvisorTips", () => {
 
   it("still runs the schedule proposal hook with tips off", async () => {
     const afterTips = vi.fn().mockResolvedValue(undefined);
-    const s = state({ settings: { tipsOn: false, notesAllowed: false } });
+    const s = state({ settings: { tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true } });
     const outcome = await run(fakePort(s), { afterTips });
     expect(outcome.skipped).toBe("tips_off");
     expect(afterTips).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1", matches: [] }));

@@ -896,10 +896,13 @@ bubble's layout is in the web Phase 3 section (3B).
 ## Advisor placement — advisor Phase 4D (option K)
 
 On November 19, 2026 the owner chose option K for where the advisor (the horse) lives.
-Today it exists only on the development bench
-(`/design-system?preview=advisor-placement&option=k&view=open|why|answered|brief|checkin|none|panel`,
-`app/design-system/AdvisorPlacementBench.tsx`). The product build is 4E. In the interface it
-is called "Advisor"; "coach" stays internal.
+Built in 4E on the web Timeline and Cadence for Mac (shared components in `components/advisor/`:
+`AdvisorTimelineFrame`, `AdvisorProvider`, `AdvisorParts`; transport `lib/ui/advisor.ts`).
+Bench with synthetic data: `/design-system?preview=advisor&state=tip|brief|proposal|checkin|trial|refused|none`
+(`app/design-system/AdvisorBench.tsx`). The design-round bench stays at
+`/design-system?preview=advisor-placement&option=k`. In the interface it is called
+"Advisor"; "coach" stays internal. A Mac with no account keeps the banner horse and shows
+no advisor.
 
 - **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
   round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
@@ -918,6 +921,9 @@ is called "Advisor"; "coach" stays internal.
   - a schedule question: a short form, with the full choice in the panel
   - a trial check-in: "Keep Gym at 6:30 PM on Tuesdays? Keep · Go back", answered on the line
   - a tip: one short sentence, then "Why this? · Helpful · Not now" on one line
+  - The brief is not drawn on the Timeline any more: it renders inside the panel's "Today’s
+    brief" section with no frame or Close. Opening the panel counts it as read for that day
+    on that device, and the line moves on. The line steps aside while the panel is open.
 - **Line rules.**
   - "Don't suggest this again" is only in the panel.
   - After an answer, the italic outcome ("Saved as helpful.") replaces the links.

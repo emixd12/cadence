@@ -366,7 +366,11 @@
         "INT-BRIEF-003",
         "INT-BRIEF-005",
         "INT-WEATHER-001",
-        "INT-TIMELINE-012"
+        "INT-TIMELINE-012",
+        "INT-ADVISOR-001",
+        "INT-ADVISOR-002",
+        "INT-ADVISOR-003",
+        "INT-ADVISOR-004"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -982,9 +986,10 @@
     {
       "path": "components/briefing/DailyBriefLauncher.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 4,
       "interaction_ids": [
-        "INT-BRIEF-009"
+        "INT-BRIEF-009",
+        "INT-ADVISOR-001"
       ]
     },
     {
@@ -1275,6 +1280,17 @@
       "interaction_marker_count": 1,
       "interaction_ids": [],
       "reason": "Development-only synthetic Complete from Hevy bench (Tickets 317 and 329); no provider or account access."
+    },
+    {
+      "path": "components/advisor/AdvisorParts.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 19,
+      "interaction_ids": [
+        "INT-ADVISOR-001",
+        "INT-ADVISOR-002",
+        "INT-ADVISOR-003",
+        "INT-ADVISOR-004"
+      ]
     }
   ],
   "interactions": [
@@ -19023,6 +19039,339 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-ADVISOR-001",
+      "name": "Open the advisor panel",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#advisor"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Open the advisor (the horse at the top of the Timeline) to see today's brief, questions that need an answer, today's tip, a two-week try and earlier tips.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "The horse at the top centre of the Timeline (Advisor or Advisor \u00b7 1 new)"
+        },
+        {
+          "kind": "activate",
+          "control": "Open or Answer on the line under today's date"
+        },
+        {
+          "kind": "activate",
+          "control": "Close or Escape in the panel"
+        }
+      ],
+      "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
+      "success_result": "The panel opens beside the Timeline from 1280px wide and fills the window below that. Opening it counts today's brief as read, so the line under the date moves on. Close returns to the Timeline.",
+      "failure_result": "If earlier tips cannot be read, that section is left out; the rest of the panel still shows.",
+      "effects": [
+        "network_request",
+        "local_preference",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/advisor/AdvisorParts.tsx#AdvisorPanel",
+        "components/advisor/AdvisorProvider.tsx",
+        "components/advisor/AdvisorTimelineFrame.tsx",
+        "components/briefing/DailyBriefLauncher.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/advisor-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover opening and closing the panel, its sections, the brief rendering inside it and the line moving on after the brief was opened."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/advisor/AdvisorParts.tsx#AdvisorPanel"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-ADVISOR-002",
+      "name": "React to an advisor tip",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#advisor"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Mark today's tip Helpful, Not now or Don't suggest this again.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Helpful or Not now on the line under today's date"
+        },
+        {
+          "kind": "activate",
+          "control": "Helpful, Not now or Don't suggest this again in the panel"
+        }
+      ],
+      "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
+      "success_result": "The italic outcome replaces the links (Saved as helpful., Hidden for today., This tip won't come back.). Don't suggest this again turns that advice off on every device.",
+      "failure_result": "A failed request shows one red line starting Not changed.; nothing is saved.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/advisor/AdvisorParts.tsx#AdvisorDayLine",
+        "lib/ui/advisor.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/advisor-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover Helpful with its request and outcome, and the label dropping 1 new."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/advisor/AdvisorParts.tsx#AdvisorDayLine"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-ADVISOR-003",
+      "name": "Show the research behind a tip",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#advisor"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Open the Why this? card under a tip: what the source found, the source link, its kind and evidence strength, and in the panel who it applies to and its limitation.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Why this? or Hide research under a tip"
+        }
+      ],
+      "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
+      "success_result": "The research card opens under the tip with a thin left rule; Hide research closes it.",
+      "failure_result": "None: the card comes with the tip.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/advisor/AdvisorParts.tsx#ResearchCard"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/advisor-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks open the card on the line and read its claim."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/advisor/AdvisorParts.tsx#ResearchCard"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-ADVISOR-004",
+      "name": "Answer an advisor schedule question",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#advisor"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Answer a suggested schedule change (Try for two weeks, Change for good, No) or the check-in at the end of a try (Keep, Go back).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Try for two weeks, Change for good or No in the panel"
+        },
+        {
+          "kind": "activate",
+          "control": "Keep or Go back on the line under today's date or in the panel"
+        }
+      ],
+      "availability": "Web Timeline and Cadence for Mac signed in to an account (advisor plan Phase 4, 4E, placement K). A Mac with no account shows no advisor.",
+      "success_result": "The italic outcome replaces the answers. An answer that changes the schedule redraws the Timeline (the Mac pulls it through account sync).",
+      "failure_result": "A question that waits for tomorrow, closed or changed elsewhere shows one red line starting Not changed.; the schedule is unchanged.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/advisor/AdvisorParts.tsx#AdvisorDayLine",
+        "lib/ui/advisor.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/advisor-ui.dom.test.tsx"
+        ],
+        "notes": "DOM checks cover Go back on the line with its refresh, and a refused Try for two weeks in the panel."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/advisor/AdvisorParts.tsx#AdvisorDayLine"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/advisor-ui.dom.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",

@@ -34,6 +34,11 @@ type DailyBriefBubbleProps = Readonly<{
   moves?: Readonly<{ client: BriefMoveClient; planningContext: () => BriefPlanningContext }> | null;
   /** Advisor Phase 3: Refresh replaces today's brief (up to two a day; the server decides). */
   refresh?: Readonly<{ onRefresh: () => void; pending: boolean; available: boolean; error: string | null }> | null;
+  /**
+   * Advisor Phase 4 (4E, placement K): the brief sits in the advisor's panel under its
+   * "Today’s brief" heading. No frame, pointer, title or Close; the panel has its own.
+   */
+  embedded?: boolean;
 }>;
 
 export function DailyBriefBubble({
@@ -49,6 +54,7 @@ export function DailyBriefBubble({
   plan = null,
   moves = null,
   refresh = null,
+  embedded = false,
 }: DailyBriefBubbleProps) {
   const developmentBuild = useDevelopmentBuild();
   const ready = state === "ready" && briefing;
@@ -64,18 +70,21 @@ export function DailyBriefBubble({
   return (
     <section
       aria-label="Cadence Daily Brief"
-      className="relative z-10 ml-auto -mt-8 w-full border border-line bg-background p-4 shadow-none motion-reduce:transition-none sm:-mt-6 sm:w-[min(40rem,100%)]"
+      className={embedded ? "relative w-full" : "relative z-10 ml-auto -mt-8 w-full border border-line bg-background p-4 shadow-none motion-reduce:transition-none sm:-mt-6 sm:w-[min(40rem,100%)]"}
       data-daily-brief-state={state}
+      data-daily-brief-embedded={embedded ? "" : undefined}
     >
-      <span aria-hidden="true" className="absolute -top-2 right-[20%] h-4 w-4 rotate-45 border-l border-t border-line bg-background" />
-      {/* Close sits on the title row only, so the brief's text uses the full width below it. */}
-      {/* Buttons inherit their size (globals.css), so the row sets it for Close. */}
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="font-bold">Daily Brief</p>
-        <button type="button" onClick={onDismiss} aria-label="Dismiss Daily Brief"
-          className="-my-3 min-h-11 min-w-11 py-3 text-right text-muted-readable underline underline-offset-2 hover:text-foreground">Close</button>
-      </div>
-      <div className="max-h-[min(34rem,70dvh)] overflow-y-auto">
+      {embedded ? null : <>
+        <span aria-hidden="true" className="absolute -top-2 right-[20%] h-4 w-4 rotate-45 border-l border-t border-line bg-background" />
+        {/* Close sits on the title row only, so the brief's text uses the full width below it. */}
+        {/* Buttons inherit their size (globals.css), so the row sets it for Close. */}
+        <div className="flex items-baseline justify-between gap-3 text-sm">
+          <p className="font-bold">Daily Brief</p>
+          <button type="button" onClick={onDismiss} aria-label="Dismiss Daily Brief"
+            className="-my-3 min-h-11 min-w-11 py-3 text-right text-muted-readable underline underline-offset-2 hover:text-foreground">Close</button>
+        </div>
+      </>}
+      <div className={embedded ? "" : "max-h-[min(34rem,70dvh)] overflow-y-auto"}>
         <div className="min-w-0">
           {state === "loading" ? <p className="mt-1 text-sm leading-6 text-muted-readable">Preparing today’s brief…</p> : null}
           {ready ? <>

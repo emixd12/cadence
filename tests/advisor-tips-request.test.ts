@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdviceCard } from "@cadence/core/types/advice-cards";
 
 const auth = vi.hoisted(() => ({ authenticateCalendarRequest: vi.fn() }));
-const repo = vi.hoisted(() => ({ nextTip: vi.fn(), reactToTip: vi.fn() }));
+const repo = vi.hoisted(() => ({ nextTip: vi.fn(), reactToTip: vi.fn(), recentTips: vi.fn() }));
 
 vi.mock("@/lib/services/google-calendar-request", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/services/google-calendar-request")>()),
@@ -11,11 +11,11 @@ vi.mock("@/lib/services/google-calendar-request", async (importOriginal) => ({
 }));
 vi.mock("@/lib/db/advisor-tips.repo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db/advisor-tips.repo")>()),
-  nextTip: repo.nextTip, reactToTip: repo.reactToTip,
+  nextTip: repo.nextTip, reactToTip: repo.reactToTip, recentTips: repo.recentTips,
 }));
 
 import { CalendarConnectionError } from "@/lib/services/google-calendar-oauth";
-import { handleNextTip, handleTipReaction, parseReaction, type TipRequestDeps } from "@/lib/services/advisor-tips-request";
+import { handleNextTip, handleRecentTips, handleTipReaction, parseReaction, type TipRequestDeps } from "@/lib/services/advisor-tips-request";
 
 // Advisor plan Phase 4, workstream 4B step 5: the tip routes.
 
@@ -29,7 +29,7 @@ const CARD: AdviceCard = {
 const ROW = { id: "11111111-1111-4111-8111-111111111111", localDate: "2026-11-19", text: "Gym: 2 of 8.", cardId: "drop", cardRevision: 2, behaviorId: "b-gym", shownAt: "2026-11-19T09:00:00Z", reaction: null };
 
 function deps(overrides: Partial<TipRequestDeps> = {}): TipRequestDeps {
-  return { settings: async () => ({ tipsOn: true, notesAllowed: false }), firstDay: vi.fn(async () => 0), cards: [CARD], ...overrides };
+  return { settings: async () => ({ tipsOn: true, notesAllowed: false, reminderHistoryAllowed: true }), firstDay: vi.fn(async () => 0), cards: [CARD], ...overrides };
 }
 
 const get = () => new Request("https://cadence.test/api/advisor/tips/next", { headers: { authorization: "Bearer t" } });
@@ -54,7 +54,7 @@ describe("GET next tip", () => {
   });
 
   it("with tips off: nothing, and no tip is marked shown", async () => {
-    const response = await handleNextTip(get(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false }) }));
+    const response = await handleNextTip(get(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }) }));
     expect(await response.json()).toEqual({ state: "none", reason: "tips_off", nextAt: null });
     expect(repo.nextTip).not.toHaveBeenCalled();
   });
@@ -131,7 +131,7 @@ describe("first-day tips (T7)", () => {
     const p = {
       calls,
       startRun: async () => { calls.startRun += 1; return { runId: "r", localDate: today }; },
-      settings: async () => ({ tipsOn: true, notesAllowed: false }),
+      settings: async () => ({ tipsOn: true, notesAllowed: false, reminderHistoryAllowed: true }),
       signals: async () => [], history: async () => ({ tips: [], suppressedCardIds: [] }), notes: async () => [],
       setup: async () => ({ behaviors: [{ id: "b", createdAt, timezone: "UTC", active: true, hasLength: false }], occurrences: [], titles: new Map([["b", "Gym"]]) }),
       reserve: async () => ({ allowed: false as const }), settle: async () => undefined,
@@ -157,5 +157,29 @@ describe("first-day tips (T7)", () => {
     const p = port("2026-01-01T00:00:00Z");
     expect(await writeFirstDayTips(p, [starter])).toBe(0);
     expect(p.calls.startRun).toBe(0);
+  });
+});
+
+// Advisor 4E: the panel's "Earlier" list.
+describe("GET recent tips", () => {
+  const recent = () => new Request("https://cadence.test/api/advisor/tips/recent", { headers: { authorization: "Bearer t" } });
+
+  it("returns shown tips from earlier days with their research cards, skipping cards that left the library", async () => {
+    repo.recentTips.mockResolvedValue([{ ...ROW, localDate: "2026-11-18", reaction: "helpful" }, { ...ROW, id: "gone", cardId: "removed" }]);
+    const body = await (await handleRecentTips(recent(), deps())).json();
+    expect(repo.recentTips).toHaveBeenCalledWith({}, 7, 10);
+    expect(body.tips).toHaveLength(1);
+    expect(body.tips[0]).toMatchObject({ localDate: "2026-11-18", reaction: "helpful", research: { cardId: "drop" } });
+  });
+
+  it("with tips off: an empty list and no read", async () => {
+    const body = await (await handleRecentTips(recent(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }) }))).json();
+    expect(body).toEqual({ tips: [] });
+    expect(repo.recentTips).not.toHaveBeenCalled();
+  });
+
+  it("answers 401 without a session", async () => {
+    auth.authenticateCalendarRequest.mockRejectedValue(new CalendarConnectionError("unauthenticated"));
+    expect((await handleRecentTips(recent(), deps())).status).toBe(401);
   });
 });
