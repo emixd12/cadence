@@ -584,6 +584,13 @@ instants, and marker-to-archive consistency. Full graph, import, restore,
 export, and account-sync rows carry the fields. Direct synchronization rejects
 older Behavior rows missing the new keys; normalized legacy baselines use null.
 
+Pending (Ended and Paused, workstream 3): hosted account sync is now contract 7,
+which replaces `end_date` with `end_on`, `end_time`, `pause_from_on`,
+`pause_from_time` and `pause_back_on` (docs/DATA_MODEL.md, "Behavior end and
+pause"). The TypeScript desktop services already read and write these fields.
+The Rust SQLite store still has `end_date` and must move to the five columns
+before the next Mac release. The local archive job is removed.
+
 ## Note shortcut state (Tickets 126–128)
 
 Schema 13 mirrors the owned `note_shortcut_states` contract in DATA_MODEL with

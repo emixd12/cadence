@@ -543,9 +543,13 @@ export type Database = {
           default_duration_minutes: number | null
           description: string | null
           email_reminder_enabled: boolean
-          end_date: string | null
+          end_on: string | null
+          end_time: string | null
           id: string
           location_text: string | null
+          pause_back_on: string | null
+          pause_from_on: string | null
+          pause_from_time: string | null
           recurrence_rule: Json
           reminder_offset_minutes: number
           scheduled_time: string
@@ -567,9 +571,13 @@ export type Database = {
           default_duration_minutes?: number | null
           description?: string | null
           email_reminder_enabled?: boolean
-          end_date?: string | null
+          end_on?: string | null
+          end_time?: string | null
           id?: string
           location_text?: string | null
+          pause_back_on?: string | null
+          pause_from_on?: string | null
+          pause_from_time?: string | null
           recurrence_rule: Json
           reminder_offset_minutes?: number
           scheduled_time: string
@@ -591,9 +599,13 @@ export type Database = {
           default_duration_minutes?: number | null
           description?: string | null
           email_reminder_enabled?: boolean
-          end_date?: string | null
+          end_on?: string | null
+          end_time?: string | null
           id?: string
           location_text?: string | null
+          pause_back_on?: string | null
+          pause_from_on?: string | null
+          pause_from_time?: string | null
           recurrence_rule?: Json
           reminder_offset_minutes?: number
           scheduled_time?: string
@@ -656,6 +668,206 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      chat_actions: {
+        Row: {
+          confirmed: boolean
+          conversation_id: string
+          created_at: string
+          id: string
+          kind: string
+          message_id: string
+          operation: string
+          outcome: Json
+          undo_plan: Json | null
+          undo_state: string
+          undone_at: string | null
+          user_id: string
+        }
+        Insert: {
+          confirmed: boolean
+          conversation_id: string
+          created_at?: string
+          id: string
+          kind: string
+          message_id: string
+          operation: string
+          outcome: Json
+          undo_plan?: Json | null
+          undo_state: string
+          undone_at?: string | null
+          user_id: string
+        }
+        Update: {
+          confirmed?: boolean
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          message_id?: string
+          operation?: string
+          outcome?: Json
+          undo_plan?: Json | null
+          undo_state?: string
+          undone_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_actions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_confirms: {
+        Row: {
+          answered_at: string | null
+          confirm: Json
+          conversation_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          message_id: string
+          state: string
+          user_id: string
+          writes: Json
+        }
+        Insert: {
+          answered_at?: string | null
+          confirm: Json
+          conversation_id: string
+          created_at?: string
+          expires_at: string
+          id: string
+          message_id: string
+          state?: string
+          user_id: string
+          writes: Json
+        }
+        Update: {
+          answered_at?: string | null
+          confirm?: Json
+          conversation_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message_id?: string
+          state?: string
+          user_id?: string
+          writes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_confirms_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_confirms_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          summary: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+
+        ]
+      }
+      chat_messages: {
+        Row: {
+          agent_run_id: string | null
+          stop_requested_at: string | null
+          client_message_id: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          parts: Json
+          reply_to: string | null
+          role: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          agent_run_id?: string | null
+          stop_requested_at?: string | null
+          client_message_id?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          parts: Json
+          reply_to?: string | null
+          role: string
+          state?: string
+          user_id: string
+        }
+        Update: {
+          agent_run_id?: string | null
+          stop_requested_at?: string | null
+          client_message_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          parts?: Json
+          reply_to?: string | null
+          role?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: true
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       completion_place_labels: {
         Row: {
@@ -2566,20 +2778,6 @@ export type Database = {
           target_occurrence_id: string
         }
         Returns: Json
-      }
-      archive_due_behaviors: {
-        Args: { batch_limit?: number; processed_at: string }
-        Returns: {
-          behavior_id: string
-          user_id: string
-        }[]
-      }
-      archive_my_due_behaviors: {
-        Args: { batch_limit?: number }
-        Returns: {
-          behavior_id: string
-          user_id: string
-        }[]
       }
       attach_source_activity: {
         Args: {

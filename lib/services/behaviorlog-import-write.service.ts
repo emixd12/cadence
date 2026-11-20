@@ -1,3 +1,4 @@
+import { storedRunColumns } from "@cadence/core/services/behavior-run-fields";
 import { createHash } from "node:crypto";
 
 import { Temporal } from "@js-temporal/polyfill";
@@ -539,7 +540,7 @@ export async function applyCreateMissingBehaviorLogImportPlan(
           archived_at: behavior.archivedAtUtc,
           archive_notes: serializeArchiveNotes(behavior.cadenceArchiveNotes ?? []),
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
-          end_date: behavior.cadenceEndDate ?? null,
+          ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,
@@ -1050,7 +1051,7 @@ export async function applyApprovedBehaviorLogMergePlan(
           archived_at: behavior.archivedAtUtc,
           archive_notes: serializeArchiveNotes(behavior.cadenceArchiveNotes ?? []),
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
-          end_date: behavior.cadenceEndDate ?? null,
+          ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,

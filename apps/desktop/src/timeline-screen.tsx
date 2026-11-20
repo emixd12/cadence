@@ -1,4 +1,4 @@
-import { LinkProvider, RuntimeLink, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
+import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
@@ -186,14 +186,6 @@ export function TimelineScreen({
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
           <div className="grid gap-8 pb-32 sm:pb-24">
-            {timeline.archiveNotifications?.length ? (
-              <div role="status" className="grid gap-2 border-b border-line py-4 text-sm">
-                {timeline.archiveNotifications.map((notice) => (
-                  <p key={notice.behaviorId}>“{notice.title}” was automatically archived{notice.endDate ? ` for its ${notice.endDate} end date` : ""}. History is preserved.</p>
-                ))}
-                <RuntimeLink href="/behaviors" className="product-action product-action-primary justify-self-start">Review archived behaviors</RuntimeLink>
-              </div>
-            ) : null}
             {notificationTarget ? (
               <section className="grid gap-3 border-b border-line py-4" aria-label="Opened reminder">
                 <p data-notification-result tabIndex={-1} role={notificationTarget.status === "error" ? "alert" : "status"}

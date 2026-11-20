@@ -34,7 +34,7 @@ vi.mock("@/lib/monitoring/privacy-safe-events", () => ({ reportMonitoringEvent: 
 
 const URL_PATH = "http://localhost:3000/api/advisor/coach/signals/process";
 const RESULT = { enabled: true, pages: 1, selected: 2, visited: 2, skipped: 0, failed: 0, signals: 5 };
-const TIPS = { pages: 1, selected: 1, visited: 1, leftOver: 0, failed: 0, written: 3, modelCalls: 1 };
+const TIPS = { pages: 1, selected: 1, visited: 1, leftOver: 0, failed: 0, written: 3, modelCalls: 1, modelFailures: 0 };
 
 async function loadRoute() {
   vi.resetModules();

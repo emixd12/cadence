@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Download,
+  MessageSquare,
   ListChecks,
   LogIn,
   LogOut,
@@ -19,8 +20,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  APP_NAV_ITEMS,
   DEFAULT_APP_ROUTE,
+  getAppNavItems,
   type AppNavHref,
 } from "@/lib/navigation";
 import { readCurrentBrowserPushEndpoint } from "@/lib/push/browser";
@@ -30,6 +31,7 @@ import { clearTravelSession } from "@/lib/ui/travel";
 
 const navIcons: Record<AppNavHref, LucideIcon> = {
   "/timeline": CalendarDays,
+  "/chat": MessageSquare,
   "/behaviors": ListChecks,
   "/export": Download,
   "/settings": Settings,
@@ -89,7 +91,7 @@ function PrimaryNav({
 }>) {
   return (
     <nav aria-label="Primary" className="flex flex-1 flex-col py-3">
-      {APP_NAV_ITEMS.map((item) => {
+      {getAppNavItems("web").map((item) => {
         const Icon = navIcons[item.href];
         const isActive = pathname === item.href;
         const isPending = pendingHref === item.href && !isActive;

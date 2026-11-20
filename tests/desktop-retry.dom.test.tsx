@@ -10,7 +10,7 @@ import { Product } from "../apps/desktop/src/product";
 import { LocalExportScreen } from "../apps/desktop/src/export-screen";
 
 const mocks = vi.hoisted(() => ({ timeline: vi.fn(), behaviors: vi.fn(), command: vi.fn(), exportData: vi.fn(), imports: vi.fn(), restores: vi.fn(),
-  listen: vi.fn(), events: vi.fn(), reminders: vi.fn(), reconcileEndDates: vi.fn(), retainDeliveries: vi.fn(), shortcutContext: vi.fn(), shortcutStates: vi.fn(), shortcutCommit: vi.fn(), linked: false, sync: vi.fn() }));
+  listen: vi.fn(), events: vi.fn(), reminders: vi.fn(), retainDeliveries: vi.fn(), shortcutContext: vi.fn(), shortcutStates: vi.fn(), shortcutCommit: vi.fn(), linked: false, sync: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true, invoke: vi.fn(async (command: string) => {
   if (command === "read_update_configuration") return { configured: false, version: "0.1.0" };
   throw new Error(`Unexpected native command: ${command}`);
@@ -32,7 +32,6 @@ vi.mock("../apps/desktop/src/account/account-sync", () => ({
 vi.mock("../apps/desktop/src/native-spike", () => ({ readNativeEvents: mocks.events }));
 vi.mock("../apps/desktop/src/local-timeline.service", () => ({ loadLocalTimeline: mocks.timeline }));
 vi.mock("../apps/desktop/src/local-behaviors-read.service", () => ({ getLocalBehaviorsPageData: mocks.behaviors }));
-vi.mock("../apps/desktop/src/local-behavior-lifecycle.service", () => ({ reconcileLocalBehaviorEndDates: mocks.reconcileEndDates }));
 vi.mock("../apps/desktop/src/local-store", () => ({ localCommand: mocks.command }));
 vi.mock("../apps/desktop/src/local-note-shortcut.service", () => ({
   createLocalNoteShortcutStore: () => ({
@@ -70,7 +69,6 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   localStorage.setItem("cadence-first-run-dismissed", "true");
   mocks.listen.mockResolvedValue(() => {}); mocks.events.mockResolvedValue([]);
-  mocks.reconcileEndDates.mockResolvedValue(0);
   mocks.reminders.mockRejectedValue(new Error("OS readback unavailable in this test"));
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   mocks.command.mockImplementation(async (operation: string) => {
@@ -149,23 +147,6 @@ describe("desktop lifecycle refresh", () => {
     expect(mocks.timeline).toHaveBeenCalledTimes(2);
     expect(mocks.timeline.mock.calls[1][1].epochMilliseconds).toBe(Date.parse("2026-08-30T12:01:00Z"));
     expect(mocks.reminders).toHaveBeenCalledTimes(9);
-    expect(mocks.behaviors).toHaveBeenCalledTimes(1);
-  });
-
-  it("awaits the newest archive reconciliation before a coalesced read", async () => {
-    const loaded = await mocks.timeline();
-    mocks.timeline.mockClear();
-    let finishRead!: (value: unknown) => void;
-    mocks.timeline.mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }));
-    await mountAt("2026-08-30T12:00:00Z");
-    let finishArchive!: (value: number) => void;
-    mocks.reconcileEndDates.mockImplementationOnce(() => new Promise((resolve) => { finishArchive = resolve; }));
-    mocks.events.mockResolvedValueOnce([{ kind: "resume", at: "2026-08-30T12:00:00Z" }]);
-    await act(async () => { mocks.listen.mock.calls[0][1]({ payload: null }); });
-    await act(async () => { finishRead(loaded); });
-    expect(mocks.timeline).toHaveBeenCalledTimes(1);
-    await act(async () => { finishArchive(1); });
-    expect(mocks.timeline).toHaveBeenCalledTimes(2);
     expect(mocks.behaviors).toHaveBeenCalledTimes(1);
   });
 

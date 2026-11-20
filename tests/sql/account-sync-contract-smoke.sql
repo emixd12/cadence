@@ -343,7 +343,8 @@ begin
   -- Contract 4 adds no column or kind; it adds the day-note Note shortcut row (Ticket 292).
   -- Contract 5 adds the read-only connector completion kinds (Ticket 320).
   -- Contract 6 adds the read-only occurrence_move kind (advisor Phase 2A).
-  if cadence_private.account_sync_current_contract() <> 6 then
+  -- Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
+  if cadence_private.account_sync_current_contract() <> 7 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -372,6 +373,13 @@ begin
       jsonb_build_object('kind', 'note_shortcut_state', 'id', 'day_notes', 'value', '{}'::jsonb)
     )), 4) -> 'entities') <> 1 then
     raise exception 'Contract 4 projection hides the day-note shortcut row.';
+  end if;
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'behavior', 'id', 'b', 'value', jsonb_build_object('id', 'b', 'end_on', '2026-12-01',
+        'end_time', null, 'pause_from_on', null, 'pause_from_time', null, 'pause_back_on', null))
+    )), 6) -> 'entities' -> 0 -> 'value' <> '{"id": "b"}'::jsonb then
+    raise exception 'Contract 6 projection no longer hides the contract 7 end and pause fields.';
   end if;
 end;
 $$;

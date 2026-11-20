@@ -123,24 +123,81 @@ preserved. A prior missing occurrence is inserted as Unresolved with no
 fabricated completion timestamp or status event; it enters Needs decision only
 through the normal prior-local-date rule.
 
-## Behavior end date
+## Behavior end and pause
 
-A Behavior may have a nullable `end_date` in its own timezone. The end date is
-the first archived local date. Occurrence generation includes dates before the
-end date and excludes the end date itself.
+Behaviors never archive by themselves. An end or a pause stops scheduling while
+the Behavior stays active; Behaviors lists it under Not running. Only a person
+archives a Behavior. `packages/core/src/resolvers/behavior-run.resolver.ts` owns
+these rules.
 
-At or after local midnight on the end date, lifecycle reconciliation archives
-an active Behavior. A delayed reconciliation records the actual processing
-instant while its configuration event keeps the end-date midnight as the
-effective instant. Web reconciliation runs before authenticated product reads
-and in protected background processing. Desktop reconciliation runs on launch,
-resume, local day change, and foreground refresh.
+### Fields
 
-Automatic archival removes unresolved generated rows on or after the end date,
-including rows whose scheduled instant passed before delayed reconciliation.
-Completed, Not Completed, noted, or time-tracked rows remain historical data.
-Restoring an automatically archived Behavior clears an expired end date so the
-next lifecycle reconciliation does not archive it again immediately.
+All values are local to the Behavior's timezone. None is stored as an instant.
+
+- `end_on`: the last local day the Behavior runs. Null means no end.
+- `end_time`: optional local time on `end_on` when it stops. Null means it stops
+  at the end of `end_on`.
+- `pause_from_on`: the first paused local day. `pause_from_time` is an optional
+  local time on that day; null means the start of the day.
+- `pause_back_on`: the local day it runs again by itself, from the start of the
+  day. It is later than `pause_from_on`.
+
+A Behavior has one pause at a time. A new pause replaces the old one. Times are
+whole minutes. Local times follow the "compatible" rule: a time skipped by a
+spring-forward change moves to the next valid time, and a repeated time takes the
+earlier instant.
+
+### Run state
+
+`behaviorRunState(fields, now)` returns one of `running`, `ended`, `paused` or
+`archived`. Archive wins. An end that has passed wins over a pause. Nothing is
+written when an end or a pause arrives; the state is read from the fields.
+
+### Which Occurrences stop
+
+The stop rule compares an Occurrence's effective time: the moved time when the
+row was moved for the day, otherwise the planned time.
+
+- An exact time stops when it starts at or after the end, or inside the pause.
+- A time range stops when its window is still open at the end, or overlaps the
+  pause. End now at 8 PM removes that evening's Evening window.
+
+Generation creates no stopped rows. Post-write sync removes stopped Unresolved
+rows, including past and moved ones; this is the one exception to the rule that
+keeps past and moved rows. Completed, Not Completed, noted and timed rows always
+stay. Once a stop starts today or earlier, generation does not recreate a row
+that already started, so a removed moved row does not return at its planned time.
+Generation reads from the earliest stopped local day, so rows left by an end set
+offline are removed on the next sync.
+
+### Actions
+
+- Ends after: set `end_on` and optional `end_time` on create or edit.
+- End now: sets the end to the current minute, rounded up. Ending an ended
+  Behavior changes nothing.
+- Pause: sets the pause. It can start today or later; today starts now unless
+  `pause_from_time` is later.
+- Resume now: clears the pause, and an end that has passed. An end still to come
+  stays.
+- Start again: clears the end.
+- Restore keeps the end, so an archived Behavior with a passed end comes back as
+  ended.
+
+Entry points refuse a new end or pause start that is already in the past. A
+stored value is not checked again on later saves. Each action writes one
+configuration revision whose changed fields include `end` or `pause`.
+
+### Timezone change
+
+A Settings timezone change re-expresses stops that already happened, so their
+moment stays the same. A stop still to come keeps its wall-clock time and moves
+with the new timezone.
+
+### Timeline notices
+
+Timeline notices are derived from the fields, with no stored record: "ended" on
+the day the end arrives, "paused" on the day a pause starts, and "back" on the
+back-on day. Archived Behaviors show none.
 
 ## Idempotence
 
@@ -221,7 +278,9 @@ The resolver must be pure:
 - Monthly day 31 falls back to last day of short months.
 - Timezone remains America/New_York.
 - Local midnight boundary behaves correctly.
-- End date is the first excluded local date and automatic archive boundary.
+- End day is the last local day that runs; an end time stops it at that minute.
+- A pause stops rows from its start until the start of the back-on day.
+- End now removes a time range that is still open, and keeps marked, noted and timed rows.
 - Multiple schedules with different recurrences can generate occurrences.
 - Exact-time and time-range entries generate occurrence snapshots.
 - Duplicate generated occurrences merge before analytics/reminders see them.

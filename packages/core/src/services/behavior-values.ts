@@ -4,6 +4,7 @@ import type { BehaviorFormField, BehaviorRecurrenceFormDefaults } from "../types
 import type { RecurrenceRule, Weekday } from "../types/recurrence";
 import { WEEKDAYS } from "../types/recurrence";
 import { formatClockTimeLabel, formatScheduleSlotLabel, normalizeTime } from "./schedule";
+import { behaviorEndInstant, type BehaviorPause } from "../resolvers/behavior-run.resolver";
 
 export class BehaviorValidationError extends Error {
   readonly fieldErrors: Partial<Record<BehaviorFormField, string>>;
@@ -249,19 +250,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** P-074: an end or a pause start entered as a moment that has passed. */
+export const RUN_STOP_IN_PAST_MESSAGE = "Pick a time later than now. To stop it right away, use End now.";
+/** P-075: a pause whose back-on day does not come after its first paused day and after today. */
+export const PAUSE_BACK_ON_MESSAGE = "Pick a back-on day after the first paused day and after today.";
+
+/**
+ * Checks Default duration, Ends after and Pause. With `now`, a changed end or pause
+ * must lie ahead (rule T5): only the form, Chat and MCP pass it. Sync, import and
+ * restore accept past values, so an offline Mac edit arrives as Ended.
+ * Rules: docs/RECURRENCE_RULES.md, "Behavior end and pause".
+ */
 export function validateBehaviorPlanningFields(input: {
-  defaultDurationMinutes?: number | null; endDate?: string | null;
-}): void {
+  defaultDurationMinutes?: number | null;
+  endOn?: string | null;
+  endTime?: string | null;
+  pause?: BehaviorPause | null;
+}, options: { now?: Temporal.Instant; timezone?: string; checkEnd?: boolean; checkPause?: boolean } = {}): void {
   const errors: Partial<Record<BehaviorFormField, string>> = {};
   if (input.defaultDurationMinutes != null && (!Number.isInteger(input.defaultDurationMinutes) ||
       input.defaultDurationMinutes < 1 || input.defaultDurationMinutes > 1440)) {
     errors.default_duration_minutes = "Enter a whole number from 1 to 1,440 minutes, or leave blank.";
   }
-  if (input.endDate != null) {
-    try {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.endDate) || input.endDate < "0001-01-01" ||
-          Temporal.PlainDate.from(input.endDate).toString() !== input.endDate) throw new Error("Invalid date");
-    } catch { errors.end_date = "Enter a valid end date, or leave blank."; }
+  if (input.endOn != null && !isLocalDate(input.endOn)) errors.end_on = "Enter a valid date, or leave blank.";
+  if (input.endTime != null && (!isLocalTime(input.endTime) || input.endOn == null)) {
+    errors.end_time = "Enter a valid time, or leave it blank for the end of the day.";
+  }
+  const pause = input.pause;
+  if (pause) {
+    if (!isLocalDate(pause.fromOn) || !isLocalDate(pause.backOn) ||
+        (pause.fromTime !== null && !isLocalTime(pause.fromTime))) {
+      errors.pause = "Enter a valid first paused day and back-on day.";
+    } else if (pause.backOn <= pause.fromOn) {
+      errors.pause = PAUSE_BACK_ON_MESSAGE;
+    }
+  }
+  const now = options.now;
+  const timezone = options.timezone;
+  if (now && timezone) {
+    if (options.checkEnd !== false && input.endOn != null && !errors.end_on && !errors.end_time) {
+      const end = behaviorEndInstant({ endOn: input.endOn, endTime: input.endTime ?? null, timezone });
+      if (end && Temporal.Instant.compare(end, now) <= 0) errors.end_on = RUN_STOP_IN_PAST_MESSAGE;
+    }
+    if (options.checkPause !== false && pause && !errors.pause) {
+      const today = now.toZonedDateTimeISO(timezone).toPlainDate().toString();
+      if (pause.fromOn < today) errors.pause = RUN_STOP_IN_PAST_MESSAGE;
+      else if (pause.backOn <= today) errors.pause = PAUSE_BACK_ON_MESSAGE;
+    }
   }
   if (Object.keys(errors).length) throw new BehaviorValidationError("Check the highlighted fields.", errors);
+}
+
+function isLocalDate(value: string): boolean {
+  try {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= "0001-01-02" &&
+      Temporal.PlainDate.from(value).toString() === value;
+  } catch { return false; }
+}
+
+function isLocalTime(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d(:00)?$/.test(value);
 }

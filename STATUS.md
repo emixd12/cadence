@@ -64,7 +64,7 @@ Check the cited entry before acting on a row.
 | Mac leave reminders for newly added Calendar events | PR #198 in 0.1.10; installed run on November 12 inconclusive (event too close to plan a reminder) | Rerun on the test Mac with an event at least two hours ahead | STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026" |
 | Updater key rotation and new Developer ID identity | 0.1.10 published November 12, 05:29–05:33Z, with the rotated key and new identity; 0.1.9 and earlier install it by hand once | Renew the certificate before December 11, 2027. PR #241 and PR #243 shipped dormant in 0.1.11 after ordinary installed acceptance | DECISIONS, 2026-11-11; STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026"; release packet, "PR review follow-up" |
 | Ticket 325: release credential backup and restore | Identity, notarization-password and updater backups verified November 12; API-key backup and checks recorded as passed in `dd4cb67b`; notarization uses the API key (0.1.10) | Certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026"; 0.1.10 release packet |
-| Cadence for Mac 0.1.11 | Published November 14, 2026, 06:14Z (0.1.10 on November 12) | macOS 14 not tested; 0.1.9 and earlier install by hand once (rotated updater key); Apple sign-in on the installed app not run; a first link of test account A fails on the branched-history defect | `docs/qa/2026-11-13-desktop-0.1.11-release-packet.md`, "Publication" |
+| Cadence for Mac 0.1.12 | Published November 19, 2026, 23:34Z (0.1.11 on November 14) | Accept all, Undo all and Re-plan beside another open line on A's first brief of November 20 (then turn A's Daily Brief off); macOS 14 not tested; 0.1.9 and earlier install by hand once | `docs/qa/2026-11-19-desktop-0.1.12-release-packet.md` |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
@@ -93,6 +93,80 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ended and Paused Behaviors, server and core — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-p37rj8`).** Behaviors no longer
+  archive by themselves. `end_date` becomes `end_on` (last day it runs) plus optional
+  `end_time`; a single pause (`pause_from_on`, optional `pause_from_time`,
+  `pause_back_on`) stops scheduling until the back-on day. Run state is derived by
+  `packages/core/src/resolvers/behavior-run.resolver.ts`. Run actions End now, Start
+  again, Pause and Resume now write one configuration revision each. The archive job,
+  its RPCs and the automatic-archive notices are removed. MCP 1.4.0 adds `run_state`,
+  `end_on`, `end_time`, `pause`, the `running` and `not_running` filters, and
+  `end_behavior`, `pause_behavior`, `resume_behavior`; `end_date` stays as a deprecated
+  alias. Account sync contract 7. Docs: `docs/RECURRENCE_RULES.md`, "Behavior end and
+  pause"; `docs/DATA_MODEL.md`, same title; `docs/MESSAGING_CHANGES.md` P-074 to P-076.
+- **Verification:** migration replayed on a fresh local Postgres; backfill checked
+  (end_date 2026-12-01 became end_on 2026-11-30, `updated_at` unchanged);
+  `tests/sql/behavior-end-and-pause-smoke.sql` passes. `npm run test`: 6,304 pass; the 16
+  failures are the 4 files that need Node 24 and fail the same way on main here.
+- **Production:** migration `20261120120000_behavior_end_and_pause.sql` not applied. It
+  needs the owner's OK, and should be applied right before the merge.
+- **Next:** web UI (Not running list, End now, Pause, Resume, notices) and Mac
+  workstreams. The Mac Rust store still uses `end_date` and must move before the next
+  Mac release. The trial-shift rule (T6) belongs to the AI helpers workstream.
+
+## Advisor plan Phase 5 (5A): chat server — November 19, 2026
+
+- **Merged November 20 (PR #318).** `POST /api/advisor/chat`
+  streams chat replies as NDJSON events; confirm, Undo and conversation routes sit beside it.
+  The turn runs as the person on the `chat` agent token over every MCP operation plus two
+  chat-only reads (`list_calendar_events` with event titles, `list_workouts`). Moves are
+  checked against calendar events. The first single-record write in a question runs at
+  once with Undo; Behavior changes and further writes wait for one Yes (stored in
+  `chat_confirms`, 15 minutes). Medical questions get a one-line refusal and the disclaimer.
+  Limits: 8 tool calls, US$0.25 per question, 12 KB per tool result, last 20 messages plus
+  a summary. Wire types: `packages/core/src/types/chat.ts`. Docs: `docs/DATA_MODEL.md`,
+  "Chat conversations"; `docs/ROUTE_MAP.md`.
+- **Verification:** `tests/chat-turn.test.ts` (25 tests, scripted model); migration and RLS
+  checked on a local Postgres 16 (chat token reads and writes its own rows; the person,
+  MCP grants, other agents and other users see none; delete refused; account delete
+  cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
+  fail the same way on main in this container. No live run against a real model yet.
+- **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
+- **Next:** switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
+  add `search_advice` once 4A's matcher merges.
+
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
+  mobile layout and a `/design-system` bench with fixture conversations.
+
+## Cadence for Mac 0.1.12 published — November 19, 2026
+
+- **Published 23:34Z** on the owner's instruction of November 19, 21:20Z. Version bump PR #311
+  (`afeb8a9e`); notarized (app `10f02d12…`, DMG `e2bc170b…`), 14 artifact checks, quarantined
+  download passes. Carries advisor Phase 2 per-day moves on the Mac (SQLite schema 25) and Phase 3
+  brief move answers (PRs #303, #306–#310).
+- **Upgrade.** With the owner's yes, the test Mac went back to published 0.1.11 with A's protected
+  schema-24 database, then updated through the real updater (21:30–21:33Z): schema 24 → 25, no lost
+  rows (52 Behaviors, 230 Occurrences).
+- **Area checks pass:** session renewal (61 minutes); revoked session (A's Mac session deleted
+  22:28Z with the owner's yes, signed-out state 23:30Z, Google reconnect and sync 23:32Z); native
+  reminder delivered with Cadence quit. Sign-in and Calendar callback files unchanged.
+- **Brief moves on the installed app:** brief opens with move lines, Yes, Undo, Other time kept after
+  Close and reopen (`appliedTo`), No and single-line Re-plan pass. Accept all, Undo all and Re-plan
+  beside another open line wait for A's first brief of November 20: A used both Refreshes on
+  November 19. A's Daily Brief stays on until then.
+- **Finding:** a Behavior created with an end date of today is archived at once.
+
+Platform impact: Mac release; web, marketing and mobile not applicable. Messaging impact: none new.
 
 ## Advisor plan Phase 4 (4C): base schedule proposals — November 19, 2026
 

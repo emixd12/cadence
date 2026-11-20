@@ -477,6 +477,20 @@ instructions, so a brief that follows another within five minutes reads them at 
 cached price. A brief with no recent neighbour pays the write price on them instead.
 OpenAI caches a repeated prefix on its own and charges nothing extra to write it.
 
+### Chat eval candidates
+
+Phase 5D added these for the chat model eval. Prices are US$ per million tokens from
+the OpenRouter model list, checked November 19, 2026. The two OpenAI models run direct
+on the OpenAI key at the same prices; DeepSeek and GLM run through OpenRouter
+(`openrouter/<creator>/<model>`, key `OPENROUTER_API_KEY`), which is for evals only.
+
+| Model | Input | Cached input | Output |
+| --- | --- | --- | --- |
+| `openai/gpt-6.1-terra` | 1.00 | 0.05 | 5.00 |
+| `openai/gpt-6-luna` | 0.10 | 0.01 | 0.50 |
+| `openrouter/deepseek/deepseek-v4.1-flash-1017` | 0.15 | 0.003 | 0.60 |
+| `openrouter/z-ai/glm-5.3-flash` | 0.15 | 0.03 | 0.50 |
+
 ### Ticket 290 workbench candidate models
 
 The development workbench can run a candidate on another model, another reasoning

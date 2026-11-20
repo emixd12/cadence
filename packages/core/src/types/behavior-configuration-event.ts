@@ -11,6 +11,8 @@ export const BEHAVIOR_CONFIGURATION_CHANGED_FIELDS = [
   "reminder_offset_minutes",
   "active",
   "timezone",
+  "end",
+  "pause",
 ] as const;
 
 export type BehaviorConfigurationChangedField =
@@ -45,7 +47,14 @@ export type BehaviorConfigurationSnapshot = {
   reminderOffsetMinutes: number;
   active: boolean;
   timezone: string;
+  /** Ends after. Absent in snapshots written before Ended and Paused; read as none. */
+  end?: BehaviorConfigurationEnd | null;
+  /** The one pause. Absent in older snapshots; read as none. */
+  pause?: BehaviorConfigurationPause | null;
 };
+
+export type BehaviorConfigurationEnd = { on: string; time: string | null };
+export type BehaviorConfigurationPause = { fromOn: string; fromTime: string | null; backOn: string };
 
 export type BehaviorConfigurationEventPlan = {
   eventKind: "baseline" | "revision";

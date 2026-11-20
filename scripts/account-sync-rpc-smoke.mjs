@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { buildSmokePassword, cleanupTemporaryUsers, readLocalSmokeConfig, readSmokeConfig } from "./supabase-rls-smoke.mjs";
 
+// Contract 7 (Ended and Paused) is also the writer floor: contracts 1-6 read but cannot write.
+const CURRENT_CONTRACT = 7;
 const config = process.argv.includes("--local") ? readLocalSmokeConfig() : readSmokeConfig();
 const admin = createClient(config.url, config.serviceRoleKey, { auth: { persistSession: false } });
 const password = buildSmokePassword(randomUUID().slice(0, 8));
@@ -74,7 +76,7 @@ try {
   first.snapshot = habitResult.snapshot;
   first.fingerprint = habitResult.fingerprint;
   // Contract 1 is the pre-contract shape of desktop 0.1.5: no contract argument or field.
-  const current = await readSnapshot(clients[0]);
+  const current = await readSnapshot(clients[0], 2);
   const legacy = await readSnapshot(clients[0], null);
   const c1Profile = legacy.entities.find((row) => row.kind === "profile");
   const c2Profile = current.entities.find((row) => row.kind === "profile");
@@ -88,7 +90,7 @@ try {
   assert(Array.isArray(savedDayNote) && savedDayNote.length === 1, "day note saved for contract 3");
   const c3 = await readSnapshot(clients[0], 3);
   assert(c3.entities.some((row) => row.kind === "day_note" && row.value.note === "Account sync smoke day note"), "contract 3 shows day notes");
-  assert(!(await readSnapshot(clients[0])).entities.some((row) => row.kind === "day_note"), "contract 2 omits day notes");
+  assert(!(await readSnapshot(clients[0], 2)).entities.some((row) => row.kind === "day_note"), "contract 2 omits day notes");
   assert(!(await readSnapshot(clients[1], 3)).entities.some((row) => row.kind === "day_note"), "day notes stay with their owner");
   assert(c3.fingerprint === entityDigest(c3.entities), "contract 3 fingerprint covers its projection");
   // Contract 4 adds the day_notes Note shortcut state (Ticket 292); contracts 1-3 never see it.
@@ -107,26 +109,22 @@ try {
   assert((await readSnapshot(clients[0], 5)).entities.length === c4.entities.length, "contract 5 reads the contract 4 rows when no connector records exist");
   // Contract 6 adds read-only per-day moves (advisor Phase 2A); this account has none.
   assert((await readSnapshot(clients[0], 6)).entities.length === c4.entities.length, "contract 6 reads the contract 5 rows when no moves exist");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 7 }), "unknown read contract");
+  // Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
+  const c7 = await readSnapshot(clients[0], 7);
+  assert(c7.entities.filter((row) => row.kind === "behavior").every((row) => "end_on" in row.value && !("end_date" in row.value)), "contract 7 behaviors carry end_on");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 8 }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
   const c1Request = (writes, key) => { const value = payload(legacy, writes, entityDigest(c1Merged), key); delete value.contract; return value; };
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
-    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: { ...c1Value, travel_place_modes: [] } }], "c1a1".repeat(16)) }),
-    "contract 1 cannot write a later field");
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c7c7".repeat(16)), contract: 7 } }), "unknown apply contract");
-  const c1Result = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
-    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
-  assert(c1Result.fingerprint === entityDigest(c1Merged) && c1Result.snapshot.entities.length === legacy.entities.length, "contract 1 apply returns its projection");
-  const preserved = (await readSnapshot(clients[0])).entities.find((row) => row.kind === "profile").value;
-  assert(preserved.base_location_text === "Legacy client base", "contract 1 profile change applies");
-  for (const key of ["travel_preparation_minutes", "travel_arrival_buffer_minutes", "travel_place_modes", "travel_leave_feedback", "travel_habits_updated_at"]) {
-    assert(JSON.stringify(preserved[key]) === JSON.stringify(c2Profile.value[key]), `contract 1 write preserves ${key}`);
-  }
-  const c1Replay = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
-    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
-  assert(c1Replay.fingerprint === c1Result.fingerprint, "contract 1 receipt replay");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c8c8".repeat(16)), contract: 8 } }), "unknown apply contract");
+  // Builds before contract 7 still write end_date, so the writer floor refuses them.
+  const c1Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) });
+  assert(c1Refused.error?.message.includes("Update Cadence"), "contract 1 writes are refused below the writer floor");
+  const c6 = await readSnapshot(clients[0], 6);
+  const c6Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(c6, [], c6.fingerprint, "c6c6".repeat(16)), contract: 6 } });
+  assert(c6Refused.error?.message.includes("Update Cadence"), "contract 6 writes are refused below the writer floor");
   const afterContracts = await readSnapshot(clients[0]);
   first.snapshot = afterContracts;
   first.fingerprint = afterContracts.fingerprint;
@@ -135,7 +133,7 @@ try {
   const timestampValue = { ...category.value, name: "Timestamp roundtrip", description: "Synced category context", updated_at: "2026-09-01T06:00:00.123457Z" };
   const timestampMerged = first.snapshot.entities.map((row) => row.kind === "category" && row.id === category.id ? { ...row, value: timestampValue } : row);
   const timestampPlan = { writes: [{ kind: "category", id: category.id, operation: "upsert", expected: category.value, value: timestampValue }], mergedFingerprint: entityDigest(timestampMerged), conflicts: [] };
-  const timestampRequest = { schemaVersion: 1, contract: 2, idempotencyKey: "4".repeat(64), baselineFingerprint: first.fingerprint, localFingerprint: first.fingerprint,
+  const timestampRequest = { schemaVersion: 1, contract: CURRENT_CONTRACT, idempotencyKey: "4".repeat(64), baselineFingerprint: first.fingerprint, localFingerprint: first.fingerprint,
     hostedFingerprint: first.fingerprint, planFingerprint: digest(timestampPlan), plan: timestampPlan, attemptedAt: "2026-09-01T06:00:01.000Z" };
   const timestampResult = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: timestampRequest }));
   assert(timestampResult.fingerprint === timestampPlan.mergedFingerprint, "timestamp precision roundtrip");
@@ -294,12 +292,12 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection and preserving writes, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 7 writer floor, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }
 
-async function readSnapshot(client, contract = 2) {
+async function readSnapshot(client, contract = CURRENT_CONTRACT) {
   const { data, error } = contract === null
     ? await client.rpc("read_account_sync_snapshot")
     : await client.rpc("read_account_sync_snapshot", { contract });
@@ -308,7 +306,7 @@ async function readSnapshot(client, contract = 2) {
 }
 function payload(snapshot, writes, mergedFingerprint, idempotencyKey) {
   const plan = { writes, mergedFingerprint, conflicts: [] };
-  return { schemaVersion: 1, contract: 2, idempotencyKey, baselineFingerprint: snapshot.fingerprint, localFingerprint: snapshot.fingerprint,
+  return { schemaVersion: 1, contract: CURRENT_CONTRACT, idempotencyKey, baselineFingerprint: snapshot.fingerprint, localFingerprint: snapshot.fingerprint,
     hostedFingerprint: snapshot.fingerprint, planFingerprint: digest(plan), plan, attemptedAt: "2026-09-01T06:00:00.000Z" };
 }
 async function rejects(operation, label) { const { error } = await operation; assert(error, label); }

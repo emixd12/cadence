@@ -89,6 +89,16 @@ export function normalizeBehaviorConfiguration(
     reminderOffsetMinutes: configuration.reminderOffsetMinutes,
     active: configuration.active,
     timezone,
+    end: configuration.end
+      ? { on: configuration.end.on, time: configuration.end.time ? normalizeLocalTime(configuration.end.time) : null }
+      : null,
+    pause: configuration.pause
+      ? {
+          fromOn: configuration.pause.fromOn,
+          fromTime: configuration.pause.fromTime ? normalizeLocalTime(configuration.pause.fromTime) : null,
+          backOn: configuration.pause.backOn,
+        }
+      : null,
   };
 }
 
@@ -154,6 +164,12 @@ function findChangedFields(
   }
   if (previous.timezone !== next.timezone) {
     changedFields.push("timezone");
+  }
+  if (!jsonEqual(previous.end ?? null, next.end ?? null)) {
+    changedFields.push("end");
+  }
+  if (!jsonEqual(previous.pause ?? null, next.pause ?? null)) {
+    changedFields.push("pause");
   }
 
   return changedFields;

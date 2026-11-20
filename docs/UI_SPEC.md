@@ -71,12 +71,13 @@ open, the drawer traps focus and locks body scrolling. A narrow drawer shadow
 is allowed for separation from the backdrop. The mobile drawer header does not
 draw a bottom divider.
 
-Use four primary screens:
+Use five primary screens:
 
 1. Timeline
-2. Behaviors
-3. Export & Import
-4. Settings
+2. Chat (advisor plan Phase 5; web only until Phase 5C adds it to Cadence for Mac)
+3. Behaviors
+4. Export & Import
+5. Settings
 
 The Timeline screen is the default screen after login.
 
