@@ -462,6 +462,16 @@ pub enum Request {
         cancel_pending_reminders: bool,
         event: Option<OccurrenceStatusEvent>,
     },
+    /// Advisor plan 4G: a same-status detail event ("done_at" or "not_done:<reason>").
+    ApplyMarkDetail {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        occurrence_id: String,
+        expected_latest_event_id: String,
+        completed_at: Option<String>,
+        event: OccurrenceStatusEvent,
+    },
     UpdateOccurrenceNote {
         profile_id: String,
         mutation_id: String,
@@ -896,6 +906,7 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
         ),
         Request::ApplyOccurrenceGeneration { .. } => occurrence::generate(db, request),
         Request::ApplyStatusTransition { .. } => occurrence::status(db, request),
+        Request::ApplyMarkDetail { .. } => occurrence::mark_detail(db, request),
         Request::UpdateOccurrenceNote {
             profile_id,
             now,
@@ -1054,6 +1065,12 @@ impl Request {
                 ..
             }
             | Self::ApplyStatusTransition {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::ApplyMarkDetail {
                 profile_id,
                 mutation_id,
                 now,

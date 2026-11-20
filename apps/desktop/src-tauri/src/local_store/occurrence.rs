@@ -474,6 +474,92 @@ pub fn status(db: &Connection, request: &Request) -> Result<Value> {
     )
 }
 
+/// Advisor plan 4G: appends a same-status detail event while the latest event is the
+/// expected one. "done_at" sets `completed_at` (the tap time stays in
+/// `status_marked_at`); "not_done:<reason>" leaves the Occurrence as it is. The shared
+/// resolver checks that the done time falls on the item's day.
+pub fn mark_detail(db: &Connection, request: &Request) -> Result<Value> {
+    let Request::ApplyMarkDetail {
+        profile_id,
+        now,
+        occurrence_id,
+        expected_latest_event_id,
+        completed_at,
+        event,
+        ..
+    } = request
+    else {
+        return Err("Invalid mark detail operation.".into());
+    };
+    let mut current: Occurrence = db::by_id(db, profile_id, occurrence_id)?;
+    let latest = latest_event(db, profile_id, occurrence_id)?
+        .ok_or("Occurrence status history changed. Review the latest status and try again.")?;
+    if latest.id != *expected_latest_event_id {
+        return Err(
+            "Occurrence status history changed. Review the latest status and try again.".into(),
+        );
+    }
+    db::validate_row(profile_id, event)?;
+    let behavior: Behavior = db::by_id(db, profile_id, &current.behavior_id)?;
+    let reason = event.reason_code.as_deref().unwrap_or_default();
+    let done_at = reason == "done_at";
+    let not_done = matches!(
+        reason,
+        "not_done:no_time"
+            | "not_done:forgot"
+            | "not_done:low_energy"
+            | "not_done:away"
+            | "not_done:chose_not_to"
+    );
+    let expected_status = if done_at {
+        "completed"
+    } else if not_done {
+        "not_completed"
+    } else {
+        return Err("Unsupported mark detail.".into());
+    };
+    if current.status != expected_status || latest.status != expected_status {
+        return Err("Occurrence status changed. Review the latest status and try again.".into());
+    }
+    if event.occurrence_id != current.id
+        || event.behavior_id != current.behavior_id
+        || event.previous_status.as_deref() != Some(expected_status)
+        || event.status != expected_status
+        || event.revises_event_id.as_ref() != Some(&latest.id)
+        || event.status_semantics != "explicit_user_correction"
+        || event.source_capture_method != "manual_tap"
+        || event.source_confidence != "high"
+        || event.local_date != current.local_date
+        || event.timezone != behavior.timezone
+        || db::instant_key(&event.recorded_at)? < db::instant_key(&latest.recorded_at)?
+    {
+        return Err(
+            "The status event does not match the mark detail and owned Occurrence.".into(),
+        );
+    }
+    if done_at {
+        let marked = current
+            .status_marked_at
+            .as_deref()
+            .ok_or("Completed snapshots require both status timestamps.")?;
+        let Some(done) = completed_at.as_deref() else {
+            return Err("The done time is missing.".into());
+        };
+        if event.effective_at.as_deref() != Some(done)
+            || db::instant_key(done)? > db::instant_key(marked)?
+        {
+            return Err("The done time must come before the item was marked.".into());
+        }
+        current.completed_at = Some(done.to_string());
+        current.updated_at = now.clone();
+        db::update(db, profile_id, occurrence_id, &current)?;
+    } else if completed_at.is_some() || event.effective_at != current.status_marked_at {
+        return Err("A reason keeps the Not Completed mark as it is.".into());
+    }
+    db::insert(db, profile_id, event)?;
+    Ok(json!({"occurrence":current,"statusEvent":event}))
+}
+
 pub fn note(
     db: &Connection,
     profile_id: &str,

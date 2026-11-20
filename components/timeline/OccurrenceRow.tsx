@@ -6,6 +6,7 @@ import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
 
 import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
+import { useOccurrenceMarkDetailParts, type JustMarked } from "@/components/timeline/OccurrenceMarkDetails";
 import { OccurrenceMovedLine, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
 import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
@@ -146,12 +147,19 @@ export function OccurrenceRow({
     },
     [serverStatusKey],
   );
+  // Advisor plan 4G: a mark made here offers "Done at" (late Completed) or "Why?" (Not
+  // Completed) on the next line. Held by the row, so a refresh keeps the line.
+  const [justMarked, setJustMarked] = useState<JustMarked | null>(null);
+  const markDetail = useOccurrenceMarkDetailParts({ occurrence: visibleOccurrence, justMarked, toneClass: TIME_TONE_CLASSES[visibleOccurrence.visualTone] });
   const handleStatusConfirmed = useCallback(
     (nextStatus: TimelineStatusActionStatus | null) => {
       setKeyedOptimisticStatus({
         serverStatusKey,
         value: confirmOptimisticStatus(nextStatus),
       });
+      setJustMarked(nextStatus === "completed" || nextStatus === "not_completed"
+        ? { status: nextStatus, at: new Date().toISOString() }
+        : null);
     },
     [serverStatusKey],
   );
@@ -203,14 +211,24 @@ export function OccurrenceRow({
                 <ScheduledTimeLabel label={visibleOccurrence.scheduledTimeLabel} />
               </time>
 
-              <h3
-                className={[
-                  "timeline-occurrence-title min-w-0 truncate text-base font-bold leading-tight sm:text-lg",
-                  titleActionBufferClass,
-                ].join(" ")}
-              >
-                {visibleOccurrence.title}
-              </h3>
+              {markDetail.inline ? (
+                // The mark detail sits right of the title and wraps under it only when the row has no room.
+                <div className={["col-start-2 flex min-w-0 flex-wrap items-baseline gap-x-3", titleActionBufferClass].join(" ")}>
+                  <h3 className="timeline-occurrence-title min-w-0 max-w-full truncate text-base font-bold leading-tight sm:text-lg">
+                    {visibleOccurrence.title}
+                  </h3>
+                  {markDetail.inline}
+                </div>
+              ) : (
+                <h3
+                  className={[
+                    "timeline-occurrence-title min-w-0 truncate text-base font-bold leading-tight sm:text-lg",
+                    titleActionBufferClass,
+                  ].join(" ")}
+                >
+                  {visibleOccurrence.title}
+                </h3>
+              )}
               <OccurrenceMovedLine occurrence={visibleOccurrence} toneClass={visibleOccurrence.visualTone === "default" ? "text-muted-readable" : TIME_TONE_CLASSES[visibleOccurrence.visualTone]} />
               {sourceLine ? <p className={["timeline-occurrence-source col-start-2 min-w-0 text-xs font-normal leading-5", TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")} data-source-completion={occurrence.sourceEvidence?.source}>
                 {sourceLine}
@@ -336,6 +354,7 @@ export function OccurrenceRow({
         ) : null}
 
       </div>
+      {markDetail.below}
       <OccurrenceMoveNotice occurrence={visibleOccurrence} />
     </article>
   );

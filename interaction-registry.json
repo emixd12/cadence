@@ -372,6 +372,8 @@
         "INT-WEATHER-001",
         "INT-TIMELINE-012",
         "INT-TIMELINE-018",
+        "INT-TIMELINE-019",
+        "INT-TIMELINE-020",
         "INT-ADVISOR-001",
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
@@ -861,6 +863,15 @@
       ]
     },
     {
+      "path": "components/timeline/OccurrenceMarkDetails.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 16,
+      "interaction_ids": [
+        "INT-TIMELINE-018",
+        "INT-TIMELINE-019"
+      ]
+    },
+    {
       "path": "components/timeline/OccurrenceMoves.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 4,
@@ -892,9 +903,9 @@
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
-        "INT-TIMELINE-001",
         "INT-SHELL-001",
-        "INT-TIMELINE-018"
+        "INT-TIMELINE-001",
+        "INT-TIMELINE-020"
       ]
     },
     {
@@ -1324,7 +1335,7 @@
       "classification": "cataloged",
       "interaction_marker_count": 7,
       "interaction_ids": [
-        "INT-TIMELINE-018"
+        "INT-TIMELINE-020"
       ]
     }
   ],
@@ -18770,6 +18781,172 @@
       }
     },
     {
+      "id": "INT-TIMELINE-018",
+      "name": "Say when a late item was done",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-when-or-why-to-a-mark"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Record the time an item was really done when it is marked Completed well after its set time.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Done at, Just now or Other time next to the name of a just-completed row"
+        }
+      ],
+      "availability": "Timeline on web and Mac, right after marking an item Completed more than two hours after its set time (or after a time range ends).",
+      "success_result": "Done at saves the set time and Other time saves a chosen time as when it was done; the tap time is kept. Just now closes the line and changes nothing.",
+      "failure_result": "A time after the tap or before the item's day, or a change on another device, is refused under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMarkDetails.tsx",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/(app)/timeline/mark-detail-actions.ts",
+        "lib/services/occurrence.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mark-details.test.ts"
+        ],
+        "notes": "Covers the stored done-at and tap time, refusals, the late-mark rule, reasons, and sync of a reason web to Mac and back."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMarkDetails.tsx"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-occurrence.service.ts"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ],
+          "reason": "The Mac uses the same row component and line through the shared provider; the local store writes the same history event (Rust test mark_details_append_same_status_events_and_keep_the_tap_time)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-019",
+      "name": "Give a reason an item was not done",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-when-or-why-to-a-mark"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Note why an item was not done, in one optional tap.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "No time, Forgot, Low energy, Away or Chose not to next to the name of a just-marked Not Completed row"
+        }
+      ],
+      "availability": "Timeline on web and Mac, right after marking an item Not Completed.",
+      "success_result": "Cadence notes the reason on the item's history. The status does not change.",
+      "failure_result": "A change on another device or a changed status is refused under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMarkDetails.tsx",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/(app)/timeline/mark-detail-actions.ts",
+        "lib/services/occurrence.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mark-details.test.ts"
+        ],
+        "notes": "Covers the stored done-at and tap time, refusals, the late-mark rule, reasons, and sync of a reason web to Mac and back."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMarkDetails.tsx"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-occurrence.service.ts"
+          ],
+          "evidence": [
+            "tests/mark-details.test.ts"
+          ],
+          "reason": "The Mac uses the same row component and line through the shared provider; the local store writes the same history event (Rust test mark_details_append_same_status_events_and_keep_the_tap_time)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
       "id": "INT-BRIEF-006",
       "name": "Answer a Daily Brief move line",
       "user_guidance": {
@@ -19796,7 +19973,7 @@
       }
     },
     {
-      "id": "INT-TIMELINE-018",
+      "id": "INT-TIMELINE-020",
       "name": "Act on or close an ended, paused or back-today notice",
       "user_guidance": {
         "audience": "user",

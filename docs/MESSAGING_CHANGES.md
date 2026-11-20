@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-078` is next; P-070 to P-072 are taken on open branches). Never reuse an ID.
+1. Give a new entry the next ID (`P-078` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2088,6 +2088,19 @@ cite has not changed.
 - **Update needed:** when P-064 is written up, list the pattern families in general terms
   and describe tips (what reaches the model, how long tips are kept).
 - **Related:** P-064, P-065.
+
+## P-072: Outside AI clients see why an item was not done (MCP contract 1.5.0)
+
+- **Change:** implemented November 19, 2026 (advisor Phase 4G). MCP contract 1.5.0 adds
+  `not_done_reason` to each `status_history` entry of `get_occurrence`. `effective_at`
+  can now be earlier than `recorded_at` on a Completed mark when the person said when
+  they did it. Additive only; no tool or field was renamed or removed.
+- **Affected:** `packages/core/src/integration/domain.ts`, `docs/MCP_CONTRACT.md`,
+  `apps/marketing/src/data/developer-reference.json` (regenerated), `docs/EXPORT_FORMATS.md`.
+- **Surfaces:** marketing developer pages (regenerated in the same change).
+- **Conflicting current text:** none found.
+- **Update needed:** none.
+- **Status:** logged.
 
 ## P-073: End date must come after today
 

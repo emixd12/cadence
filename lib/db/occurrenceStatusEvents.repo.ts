@@ -291,3 +291,36 @@ function normalizeStatusTransitionRpcResult(
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+/** Advisor plan 4G: one same-status detail event ("Done at" or "Why not done"). */
+export type ApplyOccurrenceMarkDetailRpcInput = {
+  occurrenceId: string;
+  expectedLatestEventId: string;
+  completedAt: string | null;
+  event: { recordedAt: string; effectiveAt: string | null; reasonCode: string };
+};
+
+export async function applyOccurrenceMarkDetailRpc(
+  supabase: AppSupabaseClient,
+  input: ApplyOccurrenceMarkDetailRpcInput,
+): Promise<{ occurrence: Occurrence; statusEvent: OccurrenceStatusEvent }> {
+  const { data, error } = await (supabase as unknown as {
+    rpc: (fn: "apply_occurrence_mark_detail", args: Record<string, string | null>) => Promise<{ data: unknown; error: unknown }>;
+  }).rpc("apply_occurrence_mark_detail", {
+    target_occurrence_id: input.occurrenceId,
+    expected_latest_event_id: input.expectedLatestEventId,
+    planned_completed_at: input.completedAt,
+    planned_event_recorded_at: input.event.recordedAt,
+    planned_event_effective_at: input.event.effectiveAt,
+    planned_event_reason_code: input.event.reasonCode,
+  });
+  if (error) {
+    if (isRecord(error) && error.code === "40001") throw new Error(STALE_OCCURRENCE_STATUS_MESSAGE);
+    if (isRecord(error) && error.code === "22023" && typeof error.message === "string") throw new Error(error.message);
+    throw error instanceof Error ? error : new Error("Unable to update this occurrence.");
+  }
+  if (!isRecord(data) || !isRecord(data.occurrence) || !isRecord(data.status_event)) {
+    throw new Error("Occurrence mark detail returned an invalid payload.");
+  }
+  return { occurrence: data.occurrence as unknown as Occurrence, statusEvent: data.status_event as unknown as OccurrenceStatusEvent };
+}
