@@ -3,10 +3,10 @@ import type { OccurrenceFormAction, TimeTrackingFormAction } from "../../../lib/
 import { markLocalOccurrence, saveLocalOccurrenceNote, trackLocalOccurrence } from "./local-occurrence.service";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  applyBehaviorRunAction, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
 } from "@cadence/core/services/behavior.service";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
-import { behaviorErrorToActionState, parseBehaviorFormData } from "../../../lib/services/behavior-form";
+import { behaviorErrorToActionState, parseBehaviorFormData, parseBehaviorRunActionFormData } from "../../../lib/services/behavior-form";
 import type { BehaviorFormAction } from "../../../lib/types/behavior";
 import type { Profile } from "../../../lib/types/database";
 import { createLocalBehaviorStore, withNativeReminderSummary } from "./local-behavior.service";
@@ -82,6 +82,13 @@ export function localErrorMessage(error: unknown): string {
   return "Unable to save the local change. Try again.";
 }
 
+const RUN_ACTION_MESSAGES = {
+  end_now: "Behavior ended.",
+  start_again: "Behavior started again.",
+  pause: "Behavior paused.",
+  resume: "Behavior resumed.",
+} as const;
+
 export function createLocalBehaviorActions(profile: Profile, refresh: () => void) {
   const createAction: BehaviorFormAction = async (_previous, form) => {
     try {
@@ -92,7 +99,7 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
         userId: profile.id, timezone: profile.timezone, values, recordedAt: now.toString(),
       });
       refresh();
-      return { status: "success", message: "Behavior created.", behavior: withNativeReminderSummary(toBehaviorView(behavior)) };
+      return { status: "success", message: "Behavior created.", behavior: withNativeReminderSummary(toBehaviorView(behavior, now)) };
     } catch (error) { return behaviorErrorToActionState(error); }
   };
   const updateAction: BehaviorFormAction = async (_previous, form) => {
@@ -145,5 +152,25 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
       return { status: "success", message: "Archive note saved." };
     } catch (error) { return behaviorErrorToActionState(error); }
   };
-  return { createAction, updateAction, archiveAction: lifecycle(false), restoreAction: lifecycle(true), archiveNoteAction };
+  /**
+   * Ended and Paused: End now, Start again, Pause and Resume now write one local
+   * configuration revision, the same rule the web uses. The refresh regenerates
+   * Occurrences, so stopped rows leave the Timeline and restarted ones come back.
+   */
+  const runAction: BehaviorFormAction = async (_previous, form) => {
+    try {
+      const now = Temporal.Now.instant();
+      const behaviorId = form.get("behavior_id");
+      if (typeof behaviorId !== "string" || !behaviorId) throw new Error("Choose an existing behavior.");
+      const expectedUpdatedAt = form.get("expected_updated_at");
+      if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) throw new Error("Reload this behavior before saving changes.");
+      const action = parseBehaviorRunActionFormData(form);
+      await applyBehaviorRunAction(createLocalBehaviorStore(profile.id, now), {
+        behaviorId, action, expectedUpdatedAt, recordedAt: now.toString(),
+      });
+      refresh();
+      return { status: "success", message: RUN_ACTION_MESSAGES[action.kind] };
+    } catch (error) { return behaviorErrorToActionState(error); }
+  };
+  return { createAction, updateAction, archiveAction: lifecycle(false), restoreAction: lifecycle(true), archiveNoteAction, runAction };
 }

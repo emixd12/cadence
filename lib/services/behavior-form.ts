@@ -3,6 +3,7 @@ import { isBehaviorWhereKind } from "@cadence/core/services/behavior-where";
 export { BehaviorValidationError, normalizeRecurrenceRule, recurrenceRuleToJson, recurrenceDefaultsFromRule, defaultRecurrenceDefaults, summarizeRecurrenceRule, normalizeScheduledTime, formatScheduledTimeLabel, formatScheduleSlotLabel, summarizeReminders, formatReminderOffset } from "@cadence/core/services/behavior-values";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import type { BehaviorPause } from "@cadence/core/resolvers/behavior-run.resolver";
+import type { BehaviorRunAction } from "@cadence/core/services/behavior.service";
 import { legacyEndDateColumns } from "@cadence/core/services/behavior-run-fields";
 import type {
   BehaviorActionState,
@@ -151,6 +152,27 @@ function parseRunFields(formData: FormData): {
     pause = fromOn || backOn ? { fromOn: fromOn ?? "", fromTime: text("pause_from_time"), backOn: backOn ?? "" } : null;
   }
   return { endOn, endTime, pause };
+}
+
+/**
+ * End now, Start again, Pause or Resume now from a form: run_action, and for a pause
+ * pause_from_on, pause_from_time and pause_back_on. Shared by the web server action and
+ * the Mac's local action.
+ */
+export function parseBehaviorRunActionFormData(formData: FormData): BehaviorRunAction {
+  const kind = formData.get("run_action");
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  };
+  if (kind === "end_now" || kind === "start_again" || kind === "resume") return { kind };
+  if (kind === "pause") {
+    const fromOn = text("pause_from_on");
+    const backOn = text("pause_back_on");
+    if (!fromOn || !backOn) throw new Error("Choose the first paused day and the back-on day.");
+    return { kind, pause: { fromOn, fromTime: text("pause_from_time"), backOn } };
+  }
+  throw new Error("Choose what to do with this behavior.");
 }
 
 export function behaviorErrorToActionState(error: unknown): BehaviorActionState {

@@ -27,6 +27,7 @@ import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import {
   behaviorErrorToActionState,
   parseBehaviorFormData,
+  parseBehaviorRunActionFormData,
 } from "@/lib/services/behavior-form";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 export { behaviorErrorToActionState };
@@ -172,25 +173,9 @@ export async function applyBehaviorRunActionFromFormData(formData: FormData): Pr
   const userId = await requireUserId(supabase);
   await applyBehaviorRunActionForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData),
-    action: getRunActionFromFormData(formData),
+    action: parseBehaviorRunActionFormData(formData),
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
   });
-}
-
-function getRunActionFromFormData(formData: FormData): BehaviorRunAction {
-  const kind = formData.get("run_action");
-  const text = (name: string) => {
-    const value = formData.get(name);
-    return typeof value === "string" && value.trim() ? value.trim() : null;
-  };
-  if (kind === "end_now" || kind === "start_again" || kind === "resume") return { kind };
-  if (kind === "pause") {
-    const fromOn = text("pause_from_on");
-    const backOn = text("pause_back_on");
-    if (!fromOn || !backOn) throw new Error("Choose the first paused day and the back-on day.");
-    return { kind, pause: { fromOn, fromTime: text("pause_from_time"), backOn } };
-  }
-  throw new Error("Choose what to do with this behavior.");
 }
 
 export async function syncBehaviorGraphForUser(
