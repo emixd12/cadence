@@ -9,6 +9,12 @@
 
 begin;
 
+-- The account sync writer floor is 7 since Ended and Paused (contracts 1-6 wrote
+-- end_date). This file checks how older contracts behave, so it lowers the floor
+-- inside its rolled-back transaction.
+create or replace function cadence_private.account_sync_min_writer_contract()
+returns integer language sql immutable set search_path = '' as $floor$ select 1 $floor$;
+
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
 select ('f1000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid,
   'authenticated', 'authenticated', 'sync-timezone-' || i || '@example.test',

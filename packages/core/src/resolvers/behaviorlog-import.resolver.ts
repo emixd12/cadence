@@ -32,6 +32,7 @@ import type {
   BehaviorLogSourceConfidence,
   BehaviorLogStatusSemantics,
   BehaviorLogUnsupportedField,
+  BehaviorLogImportBehaviorRun,
 } from "../types/behaviorlog-import";
 import type { OccurrenceStatus } from "../types/database";
 import { behaviorLogScheduleIdentity, collectBehaviorLogPortability } from "../services/behaviorlog-preservation";
@@ -1045,7 +1046,7 @@ function toBehaviorPlan(
     "expected_duration_minutes",
     errors,
   );
-  const cadenceEndDate = readExtensionLocalDate(cadence, "end_date", row, errors);
+  const cadenceRun = readExtensionRun(cadence, row, errors);
   const cadenceAutoArchivedAt = readExtensionInstant(
     cadence,
     "auto_archived_at",
@@ -1105,7 +1106,7 @@ function toBehaviorPlan(
     ...(Object.hasOwn(row.record, "expected_duration_minutes")
       ? { expectedDurationMinutes }
       : {}),
-    ...(cadenceEndDate === undefined ? {} : { cadenceEndDate }),
+    ...(cadenceRun === undefined ? {} : { cadenceRun }),
     ...(cadenceAutoArchivedAt === undefined ? {} : { cadenceAutoArchivedAt }),
     active: archivedAtUtc === null,
     cadenceActive,
@@ -5592,6 +5593,65 @@ function readArchiveNotes(
     });
     return undefined;
   }
+}
+
+/**
+ * End and pause under `extensions.app.cadence` (docs/EXPORT_FORMATS.md). A bundle
+ * written before Ended and Paused carries `end_date`, the first day the Behavior no
+ * longer ran; it reads as `end_on` the day before. Returns undefined when the bundle
+ * carries none of these fields, so restore keeps the stored values.
+ */
+function readExtensionRun(
+  extension: JsonRecord | null,
+  row: ParsedJsonlRecord,
+  errors: BehaviorLogImportIssue[],
+): BehaviorLogImportBehaviorRun | undefined {
+  const fields = ["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"];
+  if (!extension) return undefined;
+  const hasCurrent = fields.some((field) => Object.hasOwn(extension, field));
+  if (!hasCurrent) {
+    const legacy = readExtensionLocalDate(extension, "end_date", row, errors);
+    if (legacy === undefined) return undefined;
+    return {
+      endOn: legacy === null || legacy <= "0001-01-01" ? null : Temporal.PlainDate.from(legacy).subtract({ days: 1 }).toString(),
+      endTime: null, pauseFromOn: null, pauseFromTime: null, pauseBackOn: null,
+    };
+  }
+  const run: BehaviorLogImportBehaviorRun = {
+    endOn: readExtensionLocalDate(extension, "end_on", row, errors) ?? null,
+    endTime: readExtensionLocalTime(extension, "end_time", row, errors) ?? null,
+    pauseFromOn: readExtensionLocalDate(extension, "pause_from_on", row, errors) ?? null,
+    pauseFromTime: readExtensionLocalTime(extension, "pause_from_time", row, errors) ?? null,
+    pauseBackOn: readExtensionLocalDate(extension, "pause_back_on", row, errors) ?? null,
+  };
+  const invalid = (run.endTime !== null && run.endOn === null)
+    || (run.pauseFromOn === null) !== (run.pauseBackOn === null)
+    || (run.pauseFromTime !== null && run.pauseFromOn === null)
+    || (run.pauseFromOn !== null && run.pauseBackOn !== null && run.pauseBackOn <= run.pauseFromOn);
+  if (invalid) {
+    errors.push({ severity: "error", code: "cadence_run_fields_invalid",
+      message: `${row.file} row ${row.row}: extensions.app.cadence end and pause fields are incomplete or out of order.`,
+      file: row.file, row: row.row, path: "extensions.app.cadence" });
+  }
+  return run;
+}
+
+function readExtensionLocalTime(
+  extension: JsonRecord,
+  field: string,
+  row: ParsedJsonlRecord,
+  errors: BehaviorLogImportIssue[],
+): string | null | undefined {
+  if (!Object.hasOwn(extension, field)) return undefined;
+  const value = extension[field];
+  if (value === null) return null;
+  if (typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d(:00)?$/.test(value)) {
+    return value.length === 5 ? `${value}:00` : value;
+  }
+  errors.push({ severity: "error", code: `cadence_${field}_invalid`,
+    message: `${row.file} row ${row.row}: extensions.app.cadence.${field} must be a local time HH:MM:00 or null.`,
+    file: row.file, row: row.row, path: `extensions.app.cadence.${field}` });
+  return undefined;
 }
 
 function readExtensionLocalDate(

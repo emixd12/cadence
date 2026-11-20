@@ -2240,6 +2240,58 @@ for inserts, updates, and elapsed-row cleanup, independent of configuration line
 Migration:
 `20260918010100_add_behavior_duration_and_scheduled_archive.sql`.
 
+Superseded by Behavior end and pause below: `end_date` and the archive job are
+gone. `auto_archived_at` stays for history and BehaviorLog; nothing sets it now.
+
+## Behavior end and pause (Ended and Paused plan, November 2026)
+
+Behaviors never archive by themselves. Five nullable local columns replace
+`behaviors.end_date`:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `end_on` | `date` | Last local day the Behavior runs. |
+| `end_time` | `time` | Local time on `end_on` when it stops. Null means the end of that day. Requires `end_on`. |
+| `pause_from_on` | `date` | First paused local day. |
+| `pause_from_time` | `time` | Local time on `pause_from_on` when the pause starts. Null means the start of that day. Requires `pause_from_on`. |
+| `pause_back_on` | `date` | Local day it runs again, from the start of the day. Later than `pause_from_on`. |
+
+`behaviors_end_valid` and `behaviors_pause_valid` enforce whole minutes and the
+pairing rules. The pause columns are all set or all null, apart from the
+optional time. Values are local to the Behavior's timezone, never instants.
+
+The backfill sets `end_on = end_date - 1` for every real end date, without
+touching `updated_at`. The migration drops `end_date`, its check,
+`archive_due_behaviors`, `archive_my_due_behaviors`,
+`cadence_private.archive_due_behaviors_for_owner` and
+`behavior_end_date_boundary`.
+
+The configuration snapshot gains `end` (`{on, time}` or null) and `pause`
+(`{from_on, from_time, back_on}` or null). `changed_fields` accepts `end` and
+`pause`, and baselines list both. The `updated_at` trigger watches the five
+columns. A configuration plan without `end` and `pause` keys (an older writer)
+reads as keeping the stored values, through
+`cadence_private.behavior_configuration_with_run`, as a plan without
+`where_kind` already does.
+
+Private helpers `behavior_local_instant`, `behavior_end_instant`,
+`behavior_planned_range_end` and `behavior_stops_occurrence` turn local values
+into instants with the "compatible" rule. `apply_occurrence_generation_plan`
+refuses an insert or update of a stopped row ("Behavior end or pause changed
+after occurrence planning.") and allows deleting a stopped Unresolved row even
+when it is past or moved. The rules are in docs/RECURRENCE_RULES.md, "Behavior
+end and pause".
+
+Account synchronization moves to contract 7, and the minimum writer contract is
+7. Contract 7 adds the five columns with null defaults. A baseline saved under an
+older contract reads `end_date` as `end_on = end_date - 1`. The Settings
+timezone RPC accepts a per-Behavior `run` object so past stops keep their
+moment. The advisor snapshot carries the five fields and drops
+`dueArchiveCount`. Export, BehaviorLog import and restore carry the five fields;
+BehaviorLog reads a legacy `end_date` the same way.
+
+Migration: `20261120120000_behavior_end_and_pause.sql`.
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
@@ -2675,6 +2727,30 @@ Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
   `finish_daily_brief` fence the new sources without being rewritten.
 - `read_daily_brief_preferences` returns the new keys. The repository treats a
   missing key as off and rejects a disclosure without its fence.
+
+Migration `20261120100000_ai_features_approval.sql` (advisor 4F, owner decision D2):
+
+- One AI features approval covers Daily Brief, Advisor tips, Chat and every source.
+  The source choices on `daily_brief_preferences` (Notes, reminder history, the
+  connected-sources choice and its four exclusions) are now shared by all three
+  features. The two checks that required them off while Daily Brief is off
+  (`..._optional_sources_need_enablement`, `..._source_choice_needs_enablement`)
+  are dropped. `save_daily_brief_preferences_v4` still enforces the old rule for
+  older clients.
+- `cadence_advisor_private.ai_feature_settings` (user_id, approved_at, tips_enabled,
+  chat_enabled, revision, updated_at), RLS forced, no table grants. No row means the
+  person has not answered: tips and Chat read as off.
+- `read_ai_settings()` returns the approval, the three switches and the shared
+  source choices. It reads by `auth.uid()`, so the person's session and Cadence's
+  agent tokens (coach, chat) can both call it. App helper:
+  `lib/services/ai-settings.service.ts` (`readAiSettings`, `aiFeatureOn`,
+  `aiSourceAllowed`).
+- `save_ai_settings(daily_brief_enabled, tips_enabled, chat_enabled,
+  use_connected_sources, four exclusions, include_reminder_history, include_notes,
+  expected_revision)` needs the person's own session. It records `approved_at` on
+  first save. It writes the Daily Brief row only when one of its fields changes, so a
+  tips or Chat change keeps today's saved brief. A stale Daily Brief revision raises
+  `55000`.
 
 Migration `20261110150000_daily_brief_connected_sources.sql` (Ticket 306, additive):
 
@@ -3216,7 +3292,12 @@ shown to the person; Phase 4 matches the signals to advice cards.
 
 - `cadence_advisor_private.coach_signals`: one row per signal per account per local
   day. `kind` is `completion_drop`, `repeated_move`, `late_marking`,
-  `new_behavior_settled` or `brief_answers`; `behavior_id` is null for an
+  `new_behavior_settled` or `brief_answers` (version 1), or, since version 2 (Phase 4,
+  migration `20261119220500`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
+  `timing_mode_gap`, `steady_behavior`, `never_done`, `dip_recovery`, `day_shape`,
+  `unmarked_items`, `marking_time`, `done_together`, `crowded_hour`, `setup_gaps`,
+  `reminder_response`, `session_length` or `moved_vs_unmoved`. At most
+  one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
   local times of day only, never titles, notes or calendar data; `signal_version`
   names the resolver version; `run_id` links the visit's `agent_runs` row. RLS on,
@@ -3238,6 +3319,48 @@ shown to the person; Phase 4 matches the signals to advice cards.
 - Account deletion cascades; deleting a Behavior removes its signals.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.
+
+## Advisor tips (advisor plan Phase 4, workstream 4B)
+
+Migration `20261119221000_advisor_tips.sql`. Each morning, after the signals visit,
+the tip run turns up to three matched advice cards into one-line tips.
+
+- `cadence_advisor_private.coach_tips`: one row per tip. `local_date` and `position`
+  (1 to 3, unique per account and day); `text` (at most 280 characters, one line);
+  `card_id` and `card_revision` (the advice card in
+  `packages/core/src/services/advice-library.ts`); `behavior_id` (null for an
+  account-wide tip; set null when the Behavior is deleted, the tip stays); `fact_ids`
+  and `fact_values` (the counted facts the tip states, for the 14-day card rest and the
+  7-day fact rest); `source` `model` or `seed` (the card's own wording filled by code);
+  `run_id`; `shown_at` (set when the app first shows it); `reaction` `helpful`,
+  `not_now` or `dont_suggest` with `reacted_at`. Tips are kept (decision D7), not purged
+  after 30 days; account deletion cascades. RLS on, no policies, no grants to API roles.
+- `cadence_advisor_private.coach_tip_suppressions`: cards the person turned off with
+  "Don't suggest this again", per account. The matcher and `coach_write_tips` skip them
+  on every later day and device.
+- Coach token (the tip run): `coach_read_signals(date)`, `coach_tip_history(since)`
+  (tips and suppressed cards), `coach_write_tips(run_id, tips)` (at most three; replaces
+  today's tips not yet shown or answered; skips suppressed cards and cards already used
+  today).
+- Service role: `coach_tips_due_accounts(after, limit)`: accounts at 03:00 to 08:59 local
+  with today's signals stored, no successful tip run today and fewer than three tries.
+- The person (web session or the Mac's bearer token): `advisor_next_tip(spacing)` returns
+  the next unshown tip for today and marks it shown, at most one new tip per call and
+  two hours apart (`state` `tip` or `none` with `reason` `no_tips_today`, `all_shown` or
+  `later`, and `next_at`). Nothing waits on undecided brief lines.
+  `advisor_react_tip(tip_id, reaction)` records a reaction (P0002 when the tip is not
+  the caller's); `dont_suggest` also adds the suppression.
+- Each tip run is one `agent_runs` row: agent `coach`, prompt version `coach-tips-1`,
+  trigger `scheduled` (or `on_demand` for a new account's first-day tips, which make no
+  model call). Job: `lib/services/advisor-tips-job.service.ts`; wording and checks:
+  `lib/services/advisor-tips-writer.ts`; routes: `lib/services/advisor-tips-request.ts`
+  behind `GET /api/advisor/tips/next` and `POST /api/advisor/tips/reaction`.
+- 4E (migration `20261120140000_advisor_recent_tips.sql`): `advisor_recent_tips(days, limit)`,
+  the person only, returns tips shown on the last `days` local days before today, newest
+  first (at most `limit`), for the advisor panel's "Earlier" list behind
+  `GET /api/advisor/tips/recent`. Read only.
+
+Local verification: `tests/sql/advisor-4b-tips.sql`.
 
 ## Chat conversations (advisor plan Phase 5, workstream 5A)
 

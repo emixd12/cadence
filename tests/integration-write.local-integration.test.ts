@@ -204,6 +204,8 @@ localDescribe("integration writes on isolated local Supabase", () => {
       update_occurrence_note: { occurrence_id: occurrenceId, note: "Foreign" },
       update_behavior: { behavior_id: behaviorId, expected_revision: Temporal.Instant.from(behavior!.updated_at).toString(), title: "Foreign" },
       archive_behavior: { behavior_id: behaviorId }, restore_behavior: { behavior_id: behaviorId },
+      end_behavior: { behavior_id: behaviorId }, resume_behavior: { behavior_id: behaviorId },
+      pause_behavior: { behavior_id: behaviorId, from_on: "2099-01-01", back_on: "2099-01-03" },
     };
     for (const name of Object.keys(inputs) as (keyof typeof inputs)[]) {
       expect(await writeOperationHandlers[name](b, inputs[name])).toMatchObject({ ok: false, error: { code: "not_found" } });
@@ -322,6 +324,8 @@ localDescribe("integration writes on isolated local Supabase", () => {
       create_behavior: { ...createInput, external_ref: `invalid-${name}`, idempotency_key: `invalid-${name}` },
       update_behavior: { behavior_id: id, expected_revision: Temporal.Instant.from(behavior!.updated_at).toString(), title: "Changed" },
       archive_behavior: { behavior_id: id }, restore_behavior: { behavior_id: id },
+      end_behavior: { behavior_id: id }, pause_behavior: { behavior_id: id, from_on: "2099-01-01", back_on: "2099-01-03" },
+      resume_behavior: { behavior_id: id },
       update_occurrence_note: { occurrence_id: oid, note: "Changed" },
       set_occurrence_status: { occurrence_id: oid, status: "completed" },
     };

@@ -11,7 +11,7 @@ import { Product } from "../apps/desktop/src/product";
 import { DesktopErrorBoundary } from "../apps/desktop/src/desktop-error-boundary";
 
 const mocks = vi.hoisted(() => ({ timeline: vi.fn(), behaviors: vi.fn(), command: vi.fn(),
-  listen: vi.fn(), events: vi.fn(), reminders: vi.fn(), reconcileEndDates: vi.fn(), retainDeliveries: vi.fn(), shortcutContext: vi.fn(), shortcutStates: vi.fn(), shortcutCommit: vi.fn(), linked: false, sync: vi.fn(),
+  listen: vi.fn(), events: vi.fn(), reminders: vi.fn(), retainDeliveries: vi.fn(), shortcutContext: vi.fn(), shortcutStates: vi.fn(), shortcutCommit: vi.fn(), linked: false, sync: vi.fn(),
   failTimeline: false }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true, invoke: vi.fn(async (command: string) => {
   if (command === "read_update_configuration") return { configured: false, version: "0.1.0" };
@@ -34,7 +34,6 @@ vi.mock("../apps/desktop/src/account/account-sync", () => ({
 vi.mock("../apps/desktop/src/native-spike", () => ({ readNativeEvents: mocks.events }));
 vi.mock("../apps/desktop/src/local-timeline.service", () => ({ loadLocalTimeline: mocks.timeline }));
 vi.mock("../apps/desktop/src/local-behaviors-read.service", () => ({ getLocalBehaviorsPageData: mocks.behaviors }));
-vi.mock("../apps/desktop/src/local-behavior-lifecycle.service", () => ({ reconcileLocalBehaviorEndDates: mocks.reconcileEndDates }));
 vi.mock("../apps/desktop/src/local-store", () => ({ localCommand: mocks.command }));
 vi.mock("../apps/desktop/src/local-note-shortcut.service", () => ({
   createLocalNoteShortcutStore: () => ({
@@ -76,7 +75,6 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   localStorage.setItem("cadence-first-run-dismissed", "true");
   mocks.listen.mockResolvedValue(() => {}); mocks.events.mockResolvedValue([]);
-  mocks.reconcileEndDates.mockResolvedValue(0);
   mocks.reminders.mockRejectedValue(new Error("OS readback unavailable in this test"));
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   mocks.command.mockImplementation(async (operation: string) => {
@@ -87,29 +85,12 @@ beforeEach(() => {
   });
   mocks.shortcutContext.mockResolvedValue({ state: null, globalState: null, behavior: null, notes: [], importedOccurrenceIds: [] });
   mocks.shortcutStates.mockResolvedValue([]);
-  // Account A's state at the defect: one automatically archived Behavior.
   mocks.timeline.mockResolvedValue({ profile, behaviors: [], categories: [],
-    timeline: { ...resolveTimeline({ now, timezone: profile.timezone, occurrences: [] }),
-      archiveNotifications: [{ behaviorId: "22222222-2222-4222-8222-222222222222", title: "W6 Library stop", endDate: "2026-08-29" }] } });
+    timeline: resolveTimeline({ now, timezone: profile.timezone, occurrences: [] }) });
   mocks.behaviors.mockResolvedValue({ behaviors: { activeBehaviors: [], archivedBehaviors: [], categories: [] },
     analytics: resolveAnalytics({ now, timezone: profile.timezone, occurrences: [] }) });
 });
 afterEach(async () => { await act(() => root.unmount()); container.remove(); vi.restoreAllMocks(); });
-
-describe("desktop Timeline archive notice", () => {
-  it("renders the notice and opens Behaviors from its link", async () => {
-    await act(() => root.render(<Product />)); await settle();
-    expect(container.querySelector("h1")?.textContent).toBe("Timeline");
-    expect(container.textContent).toContain("“W6 Library stop” was automatically archived for its 2026-08-29 end date.");
-    const link = Array.from(container.querySelectorAll("a")).find((element) => element.textContent === "Review archived behaviors");
-    expect(link?.getAttribute("href")).toBe("/behaviors");
-    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
-    await act(() => { link!.dispatchEvent(click); }); await settle();
-    // The webview never loads the href; the app switches screens instead.
-    expect(click.defaultPrevented).toBe(true);
-    expect(container.querySelector("h1")?.textContent).toBe("Behaviors");
-  });
-});
 
 describe("desktop render recovery", () => {
   it("shows the recovery message for a failed screen and keeps navigation and Settings working", async () => {

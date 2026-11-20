@@ -1,4 +1,5 @@
 import type { BehaviorWhereKind } from "./types/behavior";
+import type { BehaviorPause } from "./resolvers/behavior-run.resolver";
 import type { BehaviorConfigurationEventPlan } from "./types/behavior-configuration-event";
 import type { BehaviorDefinition, BehaviorDefinitionEventPlan } from "./types/behavior-definition-event";
 import type { Json } from "./types/json";
@@ -7,7 +8,11 @@ import type { BehaviorScheduleInput } from "./types/schedule";
 
 export type BehaviorInput = {
   defaultDurationMinutes?: number | null;
-  endDate?: string | null;
+  /** Ends after: last local day, optional local time. Undefined leaves the stored value. */
+  endOn?: string | null;
+  endTime?: string | null;
+  /** Undefined leaves the stored pause; null clears it. */
+  pause?: BehaviorPause | null;
   title: string;
   description: string | null;
   /** Omitted by callers that predate Where; the service derives it from `locationText`. */
@@ -25,7 +30,11 @@ export type BehaviorInput = {
 
 export type BehaviorFields = {
   default_duration_minutes?: number | null;
-  end_date?: string | null;
+  end_on?: string | null;
+  end_time?: string | null;
+  pause_from_on?: string | null;
+  pause_from_time?: string | null;
+  pause_back_on?: string | null;
   auto_archived_at?: string | null;
   category_id: string | null;
   title: string;

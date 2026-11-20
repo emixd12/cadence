@@ -35,12 +35,14 @@ export type AgentModelSetting = Readonly<{
 
 /**
  * Per-agent defaults. The Daily Brief values are today's production values
- * (`gpt-5.6-luna`, effort low, 2,000 output tokens). Chat uses GPT-6.1 Terra, which Emi picked
- * from the Phase 5D eval on November 19, 2026. Coach is a placeholder until Phase 4 picks its model.
+ * (`gpt-5.6-luna`, effort low, 2,000 output tokens). The coach uses `gpt-5.6-terra` at
+ * effort low, picked by the Phase 4 coach eval (Nov 19, 2026): grade 4.83 against luna's
+ * 4.42, about US$0.09 per account per month at the 95th percentile. Chat uses GPT-6.1 Terra,
+ * which Emi picked from the Phase 5D eval on November 19, 2026.
  */
 export const AGENT_MODEL_SETTINGS = {
   daily_brief: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 30_000 },
-  coach: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
+  coach: { model: "openai/gpt-5.6-terra", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
   chat: { model: "openai/gpt-6.1-terra", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 60_000 },
 } as const satisfies Record<AgentName, AgentModelSetting>;
 
@@ -51,16 +53,18 @@ export function agentModelSetting(agent: AgentName, override: Partial<AgentModel
 
 const GATEWAY_MODEL_ID = /^[a-z0-9-]{1,32}\/[A-Za-z0-9._:-]{1,64}$/;
 const BARE_MODEL_ID = /^[A-Za-z0-9._:-]{1,64}$/;
+/** Eval-only: a model reached through OpenRouter, for example `openrouter/deepseek/deepseek-v4.1-flash-1017`. */
+const OPENROUTER_MODEL_ID = /^openrouter\/[a-z0-9-]{1,32}\/[A-Za-z0-9._:-]{1,64}$/;
 
 /** A bare OpenAI model ID saved before Phase 1B (for example `gpt-5.6-luna`) becomes `openai/gpt-5.6-luna`. */
 export function normalizeModelId(value: string): string {
-  if (GATEWAY_MODEL_ID.test(value)) return value;
+  if (GATEWAY_MODEL_ID.test(value) || OPENROUTER_MODEL_ID.test(value)) return value;
   if (BARE_MODEL_ID.test(value)) return `openai/${value}`;
   throw new AgentModelError("invalid_model", "model_id_invalid");
 }
 
 export function isModelId(value: unknown): value is string {
-  return typeof value === "string" && (GATEWAY_MODEL_ID.test(value) || BARE_MODEL_ID.test(value));
+  return typeof value === "string" && (GATEWAY_MODEL_ID.test(value) || OPENROUTER_MODEL_ID.test(value) || BARE_MODEL_ID.test(value));
 }
 
 export type ModelTransport = "gateway" | "direct";
@@ -176,8 +180,26 @@ function resolveModel(id: string, env: Env, customFetch?: typeof fetch): Languag
     const apiKey = env.AI_GATEWAY_API_KEY;
     return createGateway({ ...(apiKey ? { apiKey } : {}), ...(customFetch ? { fetch: customFetch } : {}) })(id);
   }
-  const [creator, name] = id.split("/", 2);
+  const slash = id.indexOf("/");
+  const creator = slash === -1 ? id : id.slice(0, slash);
+  const name = slash === -1 ? "" : id.slice(slash + 1);
   if (!name) throw new AgentModelError("invalid_model", "model_id_invalid");
+  if (creator === "openrouter") {
+    // Eval-only route to models neither direct provider serves ("openrouter/deepseek/...").
+    if (!env.OPENROUTER_API_KEY) throw new AgentModelError("not_configured", "openrouter_key_missing");
+    if (!name.includes("/")) throw new AgentModelError("invalid_model", "model_id_invalid");
+    const hosts = (env.OPENROUTER_PROVIDERS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+    const baseFetch = customFetch ?? fetch;
+    // OPENROUTER_PROVIDERS pins the hosts OpenRouter may route to (in order, no fallback to others),
+    // since one model id is served by many hosts at different precisions.
+    const routedFetch: typeof fetch = hosts.length ? (async (url, init) => {
+      if (typeof init?.body !== "string") return baseFetch(url, init);
+      const body = JSON.parse(init.body) as Record<string, unknown>;
+      return baseFetch(url, { ...init, body: JSON.stringify({ ...body, provider: { order: hosts, allow_fallbacks: false } }) });
+    }) as typeof fetch : baseFetch;
+    return createOpenAI({ apiKey: env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1", name: "openrouter",
+      ...(customFetch || hosts.length ? { fetch: routedFetch } : {}) }).chat(name);
+  }
   if (creator === "openai") {
     if (!env.OPENAI_API_KEY) throw new AgentModelError("not_configured", "openai_key_missing");
     return createOpenAI({ apiKey: env.OPENAI_API_KEY, ...(customFetch ? { fetch: customFetch } : {}) }).responses(name);

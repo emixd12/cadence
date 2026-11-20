@@ -61,7 +61,6 @@ import { latestNotificationActivation, leaveReminderTarget, loadNotificationOccu
 import { useDesktopLeaveReminders } from "./use-leave-reminders";
 import { scrollAfterDesktopNavigation } from "./desktop-navigation";
 import { scheduleLocalDayRefresh } from "./desktop-lifecycle";
-import { reconcileLocalBehaviorEndDates } from "./local-behavior-lifecycle.service";
 import type { AnalyticsSelection } from "@cadence/core/services/analytics";
 import "./timeline.css";
 
@@ -131,7 +130,6 @@ export function Product() {
   const activation = useRef<{ occurrenceId: string; requestKey: number } | null>(null);
   const activationSequence = useRef(0);
   const reminderRevision = useRef(0);
-  const archiveLifecycle = useRef<Promise<void>>(Promise.resolve());
   const parameters = useRef<{ days: number; analytics: AnalyticsSelection }>({ days: 7, analytics: {} });
   const revision = useRef(0);
   const refreshRunning = useRef(false);
@@ -163,11 +161,7 @@ export function Product() {
       refreshWaiters.current.splice(0).forEach((resolve) => resolve(true));
       return completion;
     }
-    archiveLifecycle.current = reconcileLocalBehaviorEndDates(Temporal.Now.instant())
-      .then(() => refreshReminders())
-      .catch((failure) => {
-        if (mounted.current) setReminderError(localErrorMessage(failure));
-      });
+    refreshReminders();
     if (refreshRunning.current) return completion;
     refreshRunning.current = true;
     void (async () => {
@@ -179,7 +173,6 @@ export function Product() {
         const requestedActivation = activation.current;
         const now = Temporal.Now.instant();
         try {
-          await archiveLifecycle.current;
           const timeline = await loadLocalTimeline(parameters.current.days, now);
           if (!mounted.current || current !== revision.current) continue;
           const [behaviors, imports, day, accepted, behaviorViews] = await Promise.all([

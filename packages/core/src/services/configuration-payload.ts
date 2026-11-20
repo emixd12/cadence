@@ -45,6 +45,10 @@ export function toBehaviorConfigurationSnapshotPayload(
     reminder_offset_minutes: snapshot.reminderOffsetMinutes,
     active: snapshot.active,
     timezone: snapshot.timezone,
+    end: snapshot.end ? { on: snapshot.end.on, time: snapshot.end.time } : null,
+    pause: snapshot.pause
+      ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn }
+      : null,
   };
 }
 
@@ -80,7 +84,17 @@ export function toStoredConfigurationSnapshot(value: Json): Json {
     reminder_offset_minutes: snapshot.reminderOffsetMinutes ?? null,
     active: snapshot.active ?? null,
     timezone: snapshot.timezone ?? null,
+    // Ended and Paused: the Mac's camelCase pause becomes the hosted snake_case one.
+    ...(snapshot.end === undefined ? {} : { end: snapshot.end ?? null }),
+    ...(snapshot.pause === undefined ? {} : { pause: storedPause(snapshot.pause) }),
   };
+}
+
+function storedPause(value: Json | undefined): Json {
+  if (value === null || value === undefined) return null;
+  const pause = snapshotObject(value);
+  if ("from_on" in pause) return value;
+  return { from_on: pause.fromOn ?? null, from_time: pause.fromTime ?? null, back_on: pause.backOn ?? null };
 }
 
 function snapshotObject(value: Json | undefined): { [key: string]: Json | undefined } {

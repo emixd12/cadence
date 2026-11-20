@@ -892,6 +892,8 @@ describe("BehaviorLog restore apply service", () => {
           "reminder_offset_minutes",
           "active",
           "timezone",
+          "end",
+          "pause",
         ],
         recorded_at: expect.any(String),
         effective_at: expect.any(String),

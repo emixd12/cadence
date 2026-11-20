@@ -1,4 +1,4 @@
-import { LinkProvider, RuntimeLink, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
+import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
@@ -11,6 +11,7 @@ import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { useTimelineWheelReload } from "@/lib/ui/timeline-wheel-reload";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
+import { AdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
 import type { NotificationTarget } from "./notification-activation";
 import type { DesktopScreen } from "./desktop-app";
 import type {
@@ -152,39 +153,39 @@ export function TimelineScreen({
             {reloadMessage}
           </p>
         ) : null}
-        <div className="w-full overflow-hidden bg-background">
-          <div className="aspect-[1423/367] w-full sm:aspect-[2041/239]">
-            <picture className="block h-full w-full">
-              <source
-                media="(max-width: 639px)"
-                srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png"
-              />
-              {/* Local files need no Next image loader inside the native webview. */}
-              <img
-                src="/brand/cadence-timeline-horse-lines-dots-clear-background.png"
-                width={2041}
-                height={239}
-                alt=""
-                aria-hidden="true"
-                fetchPriority="high"
-                className="block h-full w-full object-fill lg:mt-1"
-              />
-            </picture>
+        {/* Advisor Phase 4 (4E, placement K): with an account, the horse sits at the top centre and the
+            brief opens in the advisor's panel; a Mac with no account keeps the banner horse and no advisor. */}
+        <AdvisorTimelineFrame client={dailyBriefClient?.advisor} fallbackBanner={<>
+          <div className="w-full overflow-hidden bg-background">
+            <div className="aspect-[1423/367] w-full sm:aspect-[2041/239]">
+              <picture className="block h-full w-full">
+                <source
+                  media="(max-width: 639px)"
+                  srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png"
+                />
+                {/* Local files need no Next image loader inside the native webview. */}
+                <img
+                  src="/brand/cadence-timeline-horse-lines-dots-clear-background.png"
+                  width={2041}
+                  height={239}
+                  alt=""
+                  aria-hidden="true"
+                  fetchPriority="high"
+                  className="block h-full w-full object-fill lg:mt-1"
+                />
+              </picture>
+            </div>
           </div>
-          <div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10">
-            <DailyBriefLauncher travelAccountId={dailyBriefSessionKey === "local" ? null : dailyBriefSessionKey} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
+        </>} banner={(
+          <div className="w-full overflow-hidden bg-background pt-1">
+            <img src="/brand/cadence-page-banner-lines-dots.png" width={1965} height={64} alt="" aria-hidden="true" className="block h-auto w-full" />
           </div>
+        )}>
+        <div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10">
+          <DailyBriefLauncher travelAccountId={dailyBriefSessionKey === "local" ? null : dailyBriefSessionKey} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
           <div className="grid gap-8 pb-32 sm:pb-24">
-            {timeline.archiveNotifications?.length ? (
-              <div role="status" className="grid gap-2 border-b border-line py-4 text-sm">
-                {timeline.archiveNotifications.map((notice) => (
-                  <p key={notice.behaviorId}>“{notice.title}” was automatically archived{notice.endDate ? ` for its ${notice.endDate} end date` : ""}. History is preserved.</p>
-                ))}
-                <RuntimeLink href="/behaviors" className="product-action product-action-primary justify-self-start">Review archived behaviors</RuntimeLink>
-              </div>
-            ) : null}
             {notificationTarget ? (
               <section className="grid gap-3 border-b border-line py-4" aria-label="Opened reminder">
                 <p data-notification-result tabIndex={-1} role={notificationTarget.status === "error" ? "alert" : "status"}
@@ -240,6 +241,7 @@ export function TimelineScreen({
             ) : null}
           </div>
         </div>
+        </AdvisorTimelineFrame>
       </div>
     </RefreshProvider>
     </LinkProvider>

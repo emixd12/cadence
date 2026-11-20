@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { DailyBriefing, DailyBriefSettings } from "@cadence/core/types/daily-brief";
 
 import {
@@ -30,6 +31,7 @@ import { briefCalendarBusy } from "@/lib/ui/brief-calendar";
 import { DAILY_BRIEF_MOVE_FEATURES } from "@/lib/ui/daily-brief-moves";
 import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
 import { DailyBriefBubble } from "./DailyBriefBubble";
+import { useAdvisorBriefSlot } from "@/components/advisor/AdvisorProvider";
 
 type DailyBriefLauncherProps = Readonly<{
   client?: DailyBriefClient | null;
@@ -68,6 +70,9 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   const [viewSession, setViewSession] = useState(sessionKey);
   const travel = useBriefTravel();
   const [refreshState, setRefreshState] = useState<RefreshState>(REFRESH_IDLE);
+  // Advisor Phase 4 (4E, placement K): inside the advisor the brief lives in the advisor's
+  // panel, and the line under today's date says when it is waiting. Elsewhere it keeps its bubble.
+  const advisorSlot = useAdvisorBriefSlot();
   const settingsRef = useRef<DailyBriefSettings | null>(null);
   const epoch = useRef(0);
   const actions = useRef<{ retry: () => void; dismiss: () => void; reopen: () => void; refresh: () => void }>({
@@ -292,8 +297,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     load(true);
 
     const onSettings = (event: Event) => {
-      const next = (event as CustomEvent<{ accountRef?: string }>).detail;
+      const next = (event as CustomEvent<{ accountRef?: string; startNow?: boolean }>).detail;
       if (!next?.accountRef || next.accountRef === settingsRef.current?.accountRef) withdraw();
+      // Answering the AI features question (4F) turns the brief on: read the settings again and start today's brief.
+      if (next?.startNow) load(true);
     };
     // A mount that never read preferences (failure or offline desktop) may still make the day's automatic start.
     const onFocus = () => load(!evaluated);
@@ -325,10 +332,25 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     };
   }, [resolvedClient, desktop, sessionKey, travelAccountId]);
 
+  const publishBrief = advisorSlot?.publish;
+  useEffect(() => {
+    if (!publishBrief) return;
+    const settings = settingsRef.current;
+    const key = settings ? `${settings.accountRef}:${settings.localDate}` : null;
+    if (!resolvedClient || viewSession !== sessionKey || view.kind === "hidden") publishBrief({ kind: "none" });
+    else if (view.kind === "loading") publishBrief({ kind: "loading" });
+    else if (view.kind === "notice") publishBrief({ kind: "notice" });
+    else if (view.kind === "closed") publishBrief(key ? { kind: "closed", key, reopen: () => actions.current.reopen() } : { kind: "none" });
+    else publishBrief({ kind: "ready", key: key ?? `${sessionKey}:${view.briefing.localDate}`, openMoves: openMoveCount(view.briefing) });
+  }, [publishBrief, resolvedClient, view, viewSession, sessionKey]);
+  useEffect(() => () => publishBrief?.({ kind: "none" }), [publishBrief]);
+  const embedded = !!advisorSlot;
+  const place = (node: ReactNode) => !advisorSlot ? node : advisorSlot.target ? createPortal(node, advisorSlot.target) : null;
+
   if (!resolvedClient || view.kind === "hidden" || viewSession !== sessionKey) return null;
   const onDismiss = () => actions.current.dismiss();
-  if (view.kind === "closed") return <ReopenBriefLink onReopen={() => actions.current.reopen()} />;
-  if (view.kind === "loading") return <DailyBriefBubble state="loading" onDismiss={onDismiss} />;
+  if (view.kind === "closed") return place(<ReopenBriefLink embedded={embedded} onReopen={() => actions.current.reopen()} />);
+  if (view.kind === "loading") return place(<DailyBriefBubble state="loading" onDismiss={onDismiss} embedded={embedded} />);
   const shown = view;
   const planControls = resolvedClient.plan;
   // A cancelled or failed sign-in leaves the notice in place; a finished one retries the brief.
@@ -355,13 +377,14 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       error: refreshState.error,
       available: refreshAvailability(shown.briefing),
     } : null;
-    return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} refresh={refresh} />;
+    return place(<DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} refresh={refresh} embedded={embedded} />);
   }
   if (shown.kind !== "notice") return null;
   const action = planControls && shown.action === "manage_usage" ? { label: "Manage usage", onClick: planControls.manageUsage }
     : planControls && shown.action === "connect" ? { label: "Continue with ChatGPT", onClick: connectPlan, chatGpt: true } : undefined;
-  return (
+  return place(
     <DailyBriefBubble
+      embedded={embedded}
       state="error"
       message={shown.message}
       action={action}
@@ -374,7 +397,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
 }
 
 /** A Timeline link that reopens today's brief after Close. Text-like, right-aligned under the horse. */
-function ReopenBriefLink({ onReopen }: Readonly<{ onReopen: () => void }>) {
+function ReopenBriefLink({ onReopen, embedded }: Readonly<{ onReopen: () => void; embedded: boolean }>) {
+  if (embedded) {
+    return <p><button type="button" onClick={onReopen} className="underline underline-offset-2">Open today’s brief</button></p>;
+  }
   return (
     <p className="relative z-10 -mt-6 ml-auto w-fit text-sm leading-6 text-muted-readable sm:-mt-4" data-daily-brief-reopen>
       <button type="button" onClick={onReopen} className="-my-2 inline-block min-h-11 py-2 underline underline-offset-2 hover:text-foreground">
@@ -382,6 +408,11 @@ function ReopenBriefLink({ onReopen }: Readonly<{ onReopen: () => void }>) {
       </button>
     </p>
   );
+}
+
+/** Move lines still waiting for an answer, for the advisor's line ("2 moves suggested for today."). */
+function openMoveCount(briefing: DailyBriefing): number {
+  return briefing.moves?.lines.filter((line) => line.status === "proposed").length ?? 0;
 }
 
 /** Closed today: show the reopen link when a brief was delivered on this device, else nothing. */
