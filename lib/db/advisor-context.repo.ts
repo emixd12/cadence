@@ -13,7 +13,6 @@ export type AdvisorCadenceSnapshot = Readonly<{
   historyOccurrences: AdvisorHistoryOccurrenceRow[];
   historySessions: AdvisorHistorySessionRow[];
   syncState: AdvisorSyncStateRow | null;
-  dueArchiveCount: number;
   staleConfigurationCount: number;
   /** Phase 3A1: today's answered brief lines and open schedule-edit notices. Absent before that migration. */
   moveAnswers?: readonly Readonly<{ occurrenceId: string; kind: string }>[];
@@ -26,7 +25,13 @@ export type AdvisorBehaviorRow = Readonly<{
   defaultDurationMinutes: number | null;
   currentConfigurationEventId: string | null;
   updatedAt: string;
-  endDate: string | null;
+  /** End and pause (docs/RECURRENCE_RULES.md, "Behavior end and pause"); times are HH:MM:SS. */
+  endOn: string | null;
+  endTime: string | null;
+  pauseFromOn: string | null;
+  pauseFromTime: string | null;
+  pauseBackOn: string | null;
+  timezone: string;
 }>;
 
 export type AdvisorOccurrenceRow = Readonly<{
@@ -144,7 +149,12 @@ function parseSnapshot(value: unknown): AdvisorCadenceSnapshot {
         defaultDurationMinutes: nullableInteger(behavior.defaultDurationMinutes, "behavior.defaultDurationMinutes"),
         currentConfigurationEventId: nullableString(behavior.currentConfigurationEventId, "behavior.currentConfigurationEventId"),
         updatedAt: string(behavior.updatedAt, "behavior.updatedAt"),
-        endDate: nullableString(behavior.endDate, "behavior.endDate"),
+        endOn: nullableString(behavior.endOn, "behavior.endOn"),
+        endTime: nullableString(behavior.endTime, "behavior.endTime"),
+        pauseFromOn: nullableString(behavior.pauseFromOn, "behavior.pauseFromOn"),
+        pauseFromTime: nullableString(behavior.pauseFromTime, "behavior.pauseFromTime"),
+        pauseBackOn: nullableString(behavior.pauseBackOn, "behavior.pauseBackOn"),
+        timezone: string(behavior.timezone, "behavior.timezone"),
       };
     }),
     occurrences: list(row.occurrences, "occurrences").map((item) => {
@@ -199,7 +209,6 @@ function parseSnapshot(value: unknown): AdvisorCadenceSnapshot {
       }),
     } : {}),
     syncState: row.syncState === null ? null : parseSyncState(row.syncState),
-    dueArchiveCount: integer(row.dueArchiveCount, "dueArchiveCount"),
     staleConfigurationCount: integer(row.staleConfigurationCount, "staleConfigurationCount"),
   };
 }

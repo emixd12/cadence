@@ -39,6 +39,7 @@ export const REGISTRY_TOOLS = Object.freeze([
   'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
   'set_occurrence_status', 'update_occurrence_note', 'move_occurrence_for_day', 'revert_occurrence_move',
   'update_day_note', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
+  'end_behavior', 'pause_behavior', 'resume_behavior',
 ]);
 export const WRITE_SCOPE = Object.freeze({
   set_occurrence_status: 'cadence.occurrences.write', update_occurrence_note: 'cadence.occurrences.write',
@@ -46,6 +47,7 @@ export const WRITE_SCOPE = Object.freeze({
   update_day_note: 'cadence.occurrences.write',
   create_behavior: 'cadence.behaviors.write', update_behavior: 'cadence.behaviors.write',
   archive_behavior: 'cadence.behaviors.write', restore_behavior: 'cadence.behaviors.write',
+  end_behavior: 'cadence.behaviors.write', pause_behavior: 'cadence.behaviors.write', resume_behavior: 'cadence.behaviors.write',
 });
 export const READ_TOOLS = Object.freeze(REGISTRY_TOOLS.filter((name) => !WRITE_SCOPE[name]));
 export const SCENARIOS = Object.freeze(['preflight', 'behaviors-a', 'read-a', 'full-a', 'isolation-b', 'ratelimit-a', 'cleanup-a', 'cleanup-grants']);
@@ -323,6 +325,9 @@ export async function runProtocolSuite({
       update_behavior: { behavior_id: behaviorId, expected_revision: behaviors.behaviorRevision ?? 1, title: `${behaviorTitle} denied` },
       archive_behavior: { behavior_id: behaviorId },
       restore_behavior: { behavior_id: behaviorId },
+      end_behavior: { behavior_id: behaviorId },
+      pause_behavior: { behavior_id: behaviorId, from_on: today, back_on: '2099-01-01' },
+      resume_behavior: { behavior_id: behaviorId },
     };
     for (const [name, args] of Object.entries(writes)) {
       const response = await protocol.raw(tokens.authorization(), name, args);
@@ -403,6 +408,7 @@ export async function runProtocolSuite({
         ['set_occurrence_status', { occurrence_id: occurrenceId, status: 'completed' }], ['update_occurrence_note', { occurrence_id: occurrenceId, note: SAMPLE_NOTE }],
         ['update_behavior', { behavior_id: behaviorId, title: `${behaviorTitle} foreign`, expected_revision: behaviors.behaviorRevision ?? 1 }],
         ['archive_behavior', { behavior_id: behaviorId }], ['restore_behavior', { behavior_id: behaviorId }],
+        ['end_behavior', { behavior_id: behaviorId }], ['resume_behavior', { behavior_id: behaviorId }],
       ]) {
         const response = await protocol.raw(tokens.authorization(), name, args);
         check(`${name}-not-found`, response.isError && response.errorCode === 'not_found', `status=${response.status} code=${response.errorCode}`);

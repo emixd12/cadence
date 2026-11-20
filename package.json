@@ -17,6 +17,8 @@
     "advisor:brief-eval": "CADENCE_ADVISOR_EVAL=1 vitest run tests/advisor-brief-eval.live.test.ts --silent=false",
     "advisor:coach-eval": "CADENCE_ADVISOR_EVAL=1 vitest run tests/advisor-coach-eval.live.test.ts --silent=false",
     "advisor:grade": "CADENCE_ADVISOR_GRADE=1 vitest run tests/advisor-grade.live.test.ts --silent=false",
+    "chat:eval": "CADENCE_CHAT_EVAL=1 vitest run tests/chat-eval.live.test.ts -t 'chat eval' --silent=false",
+    "chat:grade": "CADENCE_CHAT_GRADE=1 vitest run tests/chat-eval.live.test.ts -t 'grading' --silent=false",
     "test:web-client": "CADENCE_WEB_CLIENT_TEST=1 vitest run tests/acceptance-web-client.test.mjs",
     "mcp:oauth": "node scripts/acceptance/oauth-driver.mjs",
     "mcp:accept:protocol": "node scripts/acceptance/protocol.mjs",

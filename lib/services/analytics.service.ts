@@ -18,7 +18,6 @@ import {
 } from "@cadence/core/resolvers/analytics.resolver";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { ensureUserOccurrencesFresh } from "@/lib/services/occurrence.service";
-import { reconcileMyDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import { readOccurrenceSyncState } from "@/lib/services/occurrence-sync-state.service";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -51,7 +50,6 @@ export async function getAnalyticsPageDataForUser(
   options: GetAnalyticsPageDataOptions = {},
 ): Promise<AnalyticsView> {
   const now = options.now ?? Temporal.Now.instant();
-  await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, syncState] = await Promise.all([
     readCachedProfileTimezone(supabase, userId),
     readCachedUserBehaviors(supabase, userId),

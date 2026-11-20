@@ -10,7 +10,8 @@ import { beginIdempotentWrite, releaseIdempotentWrite, recordIntegrationActivity
 import { createIntegrationWriteClient, readIntegrationWriteSnapshot, type IntegrationWriteSnapshot } from "@/lib/db/integration-write.repo";
 import { getBehaviorById, listBehaviorCategories } from "@/lib/db/behaviors.repo";
 import { getOccurrenceById } from "@/lib/db/occurrences.repo";
-import { createBehaviorForUser, updateBehaviorForUser, setBehaviorActiveForUser, syncBehaviorGraphForUser } from "@/lib/services/behavior.service";
+import { applyBehaviorRunActionForUser, createBehaviorForUser, updateBehaviorForUser, setBehaviorActiveForUser, syncBehaviorGraphForUser } from "@/lib/services/behavior.service";
+import { BehaviorRunStateError, type BehaviorRunAction } from "@cadence/core/services/behavior.service";
 import { applyOccurrenceStatusTransition, updateOccurrenceNote, repairClearedDecisionReminderCoverage } from "@/lib/services/occurrence.service";
 import { BehaviorValidationError } from "@/lib/services/behavior-form";
 import { integrationInstant, serializeIntegrationBehavior, serializeIntegrationOccurrence } from "@/lib/services/integration-read-serialization";
@@ -20,7 +21,8 @@ import { integrationBehaviorInput } from "./integration-behavior-input";
 import { resolveDayNoteUpdate } from "@cadence/core/resolvers/day-note.resolver";
 
 export type WriteOperationName = "set_occurrence_status" | "update_occurrence_note" | "update_day_note" | "create_behavior" |
-  "update_behavior" | "archive_behavior" | "restore_behavior";
+  "update_behavior" | "archive_behavior" | "restore_behavior" | RunOperationName;
+type RunOperationName = "end_behavior" | "pause_behavior" | "resume_behavior";
 export type WriteOperationResult<N extends WriteOperationName> =
   | { ok: true; value: IntegrationOperationOutput<N> }
   | { ok: false; error: IntegrationError };
@@ -52,7 +54,7 @@ function outputFromSnapshot(name: WriteOperationName, snapshot: IntegrationWrite
       ? { occurrence, previous_status: snapshot.previous_status, changed: snapshot.changed }
       : { occurrence, changed: snapshot.changed };
   }
-  const behavior = serializeIntegrationBehavior(snapshot.behavior, snapshot.external_ref);
+  const behavior = serializeIntegrationBehavior(snapshot.behavior, snapshot.external_ref, Temporal.Instant.from(snapshot.as_of));
   return name === "create_behavior" ? { behavior } : { behavior, changed: snapshot.changed };
 }
 
@@ -91,6 +93,14 @@ async function performWrite<N extends WriteOperationName>(
     const values = integrationBehaviorInput(value);
     await checkCategory(context, values.categoryId);
     await createBehaviorForUser(supabase, userId, values, recordedAt);
+  } else if (name === "end_behavior" || name === "pause_behavior" || name === "resume_behavior") {
+    const value = input as IntegrationOperationInput<RunOperationName>;
+    const current = await getBehaviorById(supabase, userId, value.behavior_id);
+    if (!current) return fail("not_found", "This Behavior does not exist in your account.");
+    checkRevision(value.expected_revision, current.updated_at);
+    await applyBehaviorRunActionForUser(supabase, userId, {
+      behaviorId: current.id, action: runAction(name, value), expectedUpdatedAt: current.updated_at,
+    }, recordedAt);
   } else {
     const value = input as IntegrationOperationInput<"update_behavior"> | IntegrationOperationInput<"archive_behavior"> | IntegrationOperationInput<"restore_behavior">;
     const current = await getBehaviorById(supabase, userId, value.behavior_id);
@@ -110,6 +120,13 @@ async function performWrite<N extends WriteOperationName>(
       }, recordedAt);
     }
   }
+}
+
+function runAction(name: RunOperationName, input: IntegrationOperationInput<RunOperationName>): BehaviorRunAction {
+  if (name === "end_behavior") return { kind: "end_now" };
+  if (name === "resume_behavior") return { kind: "resume" };
+  const pause = input as IntegrationOperationInput<"pause_behavior">;
+  return { kind: "pause", pause: { fromOn: pause.from_on, fromTime: pause.from_time ?? null, backOn: pause.back_on } };
 }
 
 function replayTargetIds(replay: IntegrationOperationOutput<WriteOperationName>): string[] {
@@ -145,6 +162,7 @@ async function checkCategory(context: IntegrationContext, categoryId: string | n
 
 function mapError(error: unknown): IntegrationError {
   if (error instanceof WriteError) return error.contractError;
+  if (error instanceof BehaviorRunStateError) return createIntegrationError("invalid_state", error.message);
   if (error instanceof BehaviorValidationError) return createIntegrationError("invalid_input", "Check the Behavior fields.", {
     fieldErrors: Object.entries(error.fieldErrors).map(([path, message]) => ({ path: `$.${path}`, message })),
   });
@@ -217,7 +235,8 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
     if (recover) {
       if (name.includes("behavior")) {
         await syncBehaviorGraphForUser(context.supabase, context.userId,
-          name === "create_behavior" ? "create" : name === "update_behavior" ? "update" : name === "archive_behavior" ? "archive" : "restore");
+          name === "create_behavior" ? "create" : name === "update_behavior" ? "update" : name === "archive_behavior" ? "archive"
+            : name === "restore_behavior" ? "restore" : "run");
       } else if (name === "set_occurrence_status" && "occurrence" in projected && projected.occurrence.status === "unresolved") {
         const current = await getOccurrenceById(context.supabase, context.userId, projected.occurrence.id);
         if (current?.status === "unresolved") await repairClearedDecisionReminderCoverage(context.supabase, context.userId, {

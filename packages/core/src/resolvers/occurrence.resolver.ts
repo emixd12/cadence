@@ -1,5 +1,9 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import {
+  earliestStoppedLocalDate, isStoppedByRunFields, plannedRangeEnd,
+  type BehaviorRunFields,
+} from "./behavior-run.resolver";
 import { resolveOccurrenceSchedule } from "./recurrence.resolver";
 import type { OccurrenceStatus } from "../types/database";
 import { DEFAULT_TIMEZONE, type RecurrenceRule } from "../types/recurrence";
@@ -19,43 +23,15 @@ export type OccurrenceGenerationBehavior = {
   scheduleSlots: OccurrenceGenerationScheduleSlot[];
   timezone?: string;
   active: boolean;
-  endDate?: string | null;
+  /** End and pause (docs/RECURRENCE_RULES.md, "Behavior end and pause"). Absent means none. */
+  endOn?: string | null;
+  endTime?: string | null;
+  pauseFromOn?: string | null;
+  pauseFromTime?: string | null;
+  pauseBackOn?: string | null;
   createdAt: string;
   anchorDate?: string;
 };
-
-export type BehaviorEndDateCandidate = {
-  id: string;
-  active: boolean;
-  endDate: string | null | undefined;
-  timezone?: string;
-};
-
-export type DueBehaviorArchive = {
-  id: string;
-  endDate: string;
-  effectiveAt: string;
-  effectiveLocalDate: string;
-};
-
-export function resolveDueBehaviorArchives(input: {
-  behaviors: BehaviorEndDateCandidate[];
-  now: Temporal.Instant;
-}): DueBehaviorArchive[] {
-  return input.behaviors.flatMap((behavior) => {
-    if (!behavior.active || !behavior.endDate) return [];
-    const timezone = behavior.timezone || DEFAULT_TIMEZONE;
-    const endDate = Temporal.PlainDate.from(behavior.endDate);
-    const today = input.now.toZonedDateTimeISO(timezone).toPlainDate();
-    if (Temporal.PlainDate.compare(today, endDate) < 0) return [];
-    return [{
-      id: behavior.id,
-      endDate: endDate.toString(),
-      effectiveAt: endDate.toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant().toString(),
-      effectiveLocalDate: endDate.toString(),
-    }];
-  }).sort((left, right) => left.id.localeCompare(right.id));
-}
 
 export type OccurrenceGenerationSchedule = {
   id: string | null;
@@ -94,6 +70,9 @@ export type ExistingOccurrenceForGeneration = {
    * stands in for the new plan's item on its day, so the day never gets a second copy.
    */
   moved?: boolean;
+  /** The moved time, when `moved`. An end or a pause compares against it (rule T4). */
+  effectiveStartAt?: string | null;
+  effectiveEndAt?: string | null;
 };
 
 export type PlannedOccurrenceInsert = {
@@ -187,7 +166,7 @@ export function planOccurrenceGeneration(
     now: input.now,
     timezone,
     horizonDays,
-    behaviorEndDate: input.behavior.endDate,
+    earliestStoppedLocalDate: earliestStoppedLocalDate(runFieldsOf(input.behavior, timezone)),
   });
 
   return planOccurrenceGenerationForWindow(input, generationWindow);
@@ -279,19 +258,34 @@ function planOccurrenceGenerationForWindow(
   generationWindow: OccurrenceGenerationWindow,
 ): OccurrenceGenerationPlan {
   const timezone = input.behavior.timezone || DEFAULT_TIMEZONE;
-  const endDate = input.behavior.endDate
-    ? Temporal.PlainDate.from(input.behavior.endDate).toString()
-    : null;
-  const desiredOccurrences = input.behavior.active && (endDate === null || endDate > generationWindow.startLocalDate)
+  const runFields = runFieldsOf(input.behavior, timezone);
+  const stoppedByRun = (occurrence: ExistingOccurrenceForGeneration) =>
+    isStoppedByRunFields(runFields, existingStopCandidate(occurrence, timezone));
+  const existingOccurrenceKeys = new Set(
+    input.existingOccurrences.map(occurrenceIdentityKey),
+  );
+  // A row the stop removes by its effective (moved) time keeps its slot empty (T4).
+  const stoppedExistingKeys = new Set(
+    input.existingOccurrences.filter(stoppedByRun).map(occurrenceIdentityKey),
+  );
+  // Once a stop starts today or earlier, generation adds no row that already started,
+  // so a removed moved row does not come back at its planned time.
+  const stopStartedByToday = stopStartsOnOrBefore(runFields, input.now.toZonedDateTimeISO(timezone).toPlainDate().toString());
+  const desiredOccurrences = input.behavior.active
     ? resolveDesiredOccurrences({
         behavior: input.behavior,
         timezone,
         generationWindow,
-      }).filter((occurrence) => endDate === null || occurrence.localDate < endDate)
+      }).filter((occurrence) => !isStoppedByRunFields(runFields, {
+        startsAt: occurrence.scheduledFor,
+        endsAt: occurrence.scheduleEndTime
+          ? plannedRangeEnd(occurrence.localDate, occurrence.scheduleStartTime, occurrence.scheduleEndTime, timezone)
+          : null,
+      }) && !stoppedExistingKeys.has(occurrenceIdentityKey(occurrence)) && !(
+        stopStartedByToday && !existingOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
+        !isAfter(occurrence.scheduledFor, input.now)
+      ))
     : [];
-  const existingOccurrenceKeys = new Set(
-    input.existingOccurrences.map(occurrenceIdentityKey),
-  );
   const desiredOccurrenceKeys = new Set(
     desiredOccurrences.map(occurrenceIdentityKey),
   );
@@ -387,12 +381,12 @@ function planOccurrenceGenerationForWindow(
             normalizeInstant(occurrence.scheduledFor),
             generationWindow,
           ) &&
-          (isAfter(normalizeInstant(occurrence.scheduledFor), input.now) ||
-            (endDate !== null && occurrence.localDate >= endDate)) &&
           !hasNonEmptyNote(occurrence.note) &&
           !occurrence.hasTimeSessions &&
-          !occurrence.moved &&
-          !desiredOccurrenceKeys.has(occurrenceIdentityKey(occurrence)),
+          !desiredOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
+          // An end or a pause removes its rows even when they are past or moved (T4).
+          (stoppedByRun(occurrence) ||
+            (isAfter(normalizeInstant(occurrence.scheduledFor), input.now) && !occurrence.moved)),
       )
       .map((occurrence) => ({
         id: occurrence.id,
@@ -628,7 +622,8 @@ export function resolveGenerationWindow(input: {
   now: Temporal.Instant;
   timezone?: string;
   horizonDays?: number;
-  behaviorEndDate?: string | null;
+  /** The earliest day an end or a pause may still clear (`earliestStoppedLocalDate`). */
+  earliestStoppedLocalDate?: string | null;
 }): OccurrenceGenerationWindow {
   const timezone = input.timezone || DEFAULT_TIMEZONE;
   const horizonDays = validateHorizonDays(
@@ -636,9 +631,9 @@ export function resolveGenerationWindow(input: {
   );
   const today = input.now.toZonedDateTimeISO(timezone).toPlainDate();
   const endDate = today.add({ days: horizonDays });
-  // Read from an expired boundary so delayed reconciliation can remove bare generated rows.
-  const startDate = input.behaviorEndDate && input.behaviorEndDate < today.toString()
-    ? Temporal.PlainDate.from(input.behaviorEndDate) : today;
+  // Read from a stop that is already past, so rows a stop entered elsewhere left behind go too.
+  const startDate = input.earliestStoppedLocalDate && input.earliestStoppedLocalDate < today.toString()
+    ? Temporal.PlainDate.from(input.earliestStoppedLocalDate) : today;
   const rangeStart = startOfLocalDay(startDate, timezone);
   const rangeEnd = startOfLocalDay(endDate.add({ days: 1 }), timezone).subtract({
     nanoseconds: 1,
@@ -650,6 +645,41 @@ export function resolveGenerationWindow(input: {
     startLocalDate: startDate.toString(),
     endLocalDate: endDate.toString(),
     timezone,
+  };
+}
+
+function stopStartsOnOrBefore(fields: BehaviorRunFields, localDate: string): boolean {
+  const endDay = fields.endOn && !fields.endTime
+    ? Temporal.PlainDate.from(fields.endOn).add({ days: 1 }).toString() : fields.endOn;
+  return Boolean((endDay && endDay <= localDate) || (fields.pauseFromOn && fields.pauseBackOn
+    && fields.pauseFromOn <= localDate && localDate < fields.pauseBackOn));
+}
+
+function runFieldsOf(behavior: OccurrenceGenerationBehavior, timezone: string): BehaviorRunFields {
+  return {
+    active: behavior.active,
+    timezone,
+    endOn: behavior.endOn ?? null,
+    endTime: behavior.endTime ?? null,
+    pauseFromOn: behavior.pauseFromOn ?? null,
+    pauseFromTime: behavior.pauseFromTime ?? null,
+    pauseBackOn: behavior.pauseBackOn ?? null,
+  };
+}
+
+function existingStopCandidate(occurrence: ExistingOccurrenceForGeneration, timezone: string) {
+  if (occurrence.moved && occurrence.effectiveStartAt) {
+    return {
+      startsAt: normalizeInstant(occurrence.effectiveStartAt),
+      endsAt: occurrence.scheduleKind === "range" && occurrence.effectiveEndAt
+        ? normalizeInstant(occurrence.effectiveEndAt) : null,
+    };
+  }
+  return {
+    startsAt: normalizeInstant(occurrence.scheduledFor),
+    endsAt: occurrence.scheduleKind === "range" && occurrence.scheduleEndTime
+      ? plannedRangeEnd(occurrence.localDate, occurrence.scheduleStartTime, occurrence.scheduleEndTime, timezone)
+      : null,
   };
 }
 

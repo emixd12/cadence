@@ -43,6 +43,8 @@ export const OCCURRENCE_STATUS_LABELS = Object.freeze({
 
 export const STATUS_LABEL_VALUES = ["Unresolved", "Completed", "Not Completed"] as const;
 export const BEHAVIOR_STATES = ["active", "archived"] as const;
+/** Whether a Behavior schedules Occurrences right now. Archive wins; an end that has passed wins over a pause. */
+export const BEHAVIOR_RUN_STATES = ["running", "ended", "paused", "archived"] as const;
 export const SCHEDULE_KINDS = ["exact", "range"] as const;
 export const TIME_RANGE_PRESET_NAMES = ["morning", "afternoon", "evening", "night"] as const;
 export const STATUS_SEMANTICS = [
@@ -275,6 +277,12 @@ export const archiveNoteOutput = object({
   updated_at: utcInstant(),
 });
 
+export const behaviorPauseOutput = object({
+  from_on: localDate("First paused local day."),
+  from_time: nullable(localTime("Local time on from_on when the pause starts. Null means the start of that day.")),
+  back_on: localDate("Local day the Behavior runs again by itself, from the start of the day."),
+}, { description: "A pause: no Occurrences from from_on (at from_time) until the start of back_on." });
+
 export const behaviorOutput = object({
   id: uuid(),
   title: string(),
@@ -283,8 +291,12 @@ export const behaviorOutput = object({
   category: nullable(categoryRef),
   state: enumOf(BEHAVIOR_STATES, { description: "Archived Behaviors keep their history but schedule no new Occurrences." }),
   archived_at: nullable(utcInstant()),
-  auto_archived_at: nullable(utcInstant(), { description: "Set when the end date archived the Behavior automatically." }),
-  end_date: nullable(localDate("First local date on which the Behavior is archived.")),
+  auto_archived_at: nullable(utcInstant(), { description: "Set on Behaviors that an end date archived automatically before Cadence stopped archiving on an end. New ends never set it." }),
+  run_state: enumOf(BEHAVIOR_RUN_STATES, { description: "running schedules Occurrences; ended has passed its end and paused is inside a pause, both still active and shown under Not running; archived is archived." }),
+  end_on: nullable(localDate("Last local day the Behavior runs. Null when it has no end.")),
+  end_time: nullable(localTime("Local time on end_on when it stops. Null means it stops at the end of that day.")),
+  pause: nullable(behaviorPauseOutput, { description: "The current or upcoming pause. Null when none is set or the pause is over." }),
+  end_date: nullable(localDate("Deprecated: read end_on. The day after end_on, kept for one minor version.")),
   default_duration_minutes: nullable(integer({ minimum: 1 })),
   timezone: timezone(),
   schedules: array(scheduleOutput),
