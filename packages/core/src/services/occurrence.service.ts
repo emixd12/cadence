@@ -4,6 +4,9 @@ import type { OccurrenceDataStore } from "../data-store";
 import type { OccurrenceStatus } from "../types/database";
 import { resolveReminderDeliveryCancellation } from "../resolvers/reminder.resolver";
 import {
+  MarkDetailRefusal,
+  resolveDoneAtDetail,
+  resolveNotDoneReasonDetail,
   resolveExpectedNote,
   resolveNoteUpdate,
   resolveStatusEvent,
@@ -47,6 +50,47 @@ export async function applyOccurrenceStatusTransition(
     event,
   });
   return { result, timezone: context.timezone };
+}
+
+/**
+ * Advisor plan 4G: "Done at" after a late Completed mark. `doneAt` is an instant from
+ * the start of the item's local day up to the tap time.
+ */
+export async function recordOccurrenceDoneAt(
+  store: Pick<OccurrenceDataStore, "readStatusContext" | "applyMarkDetail">,
+  input: { occurrenceId: string; doneAt: Temporal.Instant; now: Temporal.Instant },
+) {
+  const context = await store.readStatusContext(input.occurrenceId);
+  if (!context) throw new Error("Occurrence not found.");
+  if (!context.latestStatusEventId) throw new MarkDetailRefusal("not_completed");
+  const plan = resolveDoneAtDetail({
+    occurrence: { status: context.occurrence.status, statusMarkedAt: context.occurrence.status_marked_at, localDate: context.occurrence.local_date },
+    timezone: context.timezone,
+    doneAt: input.doneAt,
+    now: input.now,
+  });
+  return store.applyMarkDetail({ occurrenceId: context.occurrence.id, expectedLatestEventId: context.latestStatusEventId, ...plan });
+}
+
+/** Advisor plan 4G: an optional one-tap reason on Not Completed. */
+export async function recordOccurrenceNotDoneReason(
+  store: Pick<OccurrenceDataStore, "readStatusContext" | "applyMarkDetail">,
+  input: { occurrenceId: string; reason: unknown; now: Temporal.Instant },
+) {
+  const context = await store.readStatusContext(input.occurrenceId);
+  if (!context) throw new Error("Occurrence not found.");
+  if (!context.latestStatusEventId) throw new MarkDetailRefusal("not_not_completed");
+  const plan = resolveNotDoneReasonDetail({
+    occurrence: { status: context.occurrence.status, statusMarkedAt: context.occurrence.status_marked_at },
+    reason: input.reason,
+    now: input.now,
+  });
+  return store.applyMarkDetail({
+    occurrenceId: context.occurrence.id,
+    expectedLatestEventId: context.latestStatusEventId,
+    completedAt: plan.completedAt,
+    event: plan.event,
+  });
 }
 
 export async function updateOccurrenceNote(
