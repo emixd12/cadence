@@ -413,6 +413,7 @@ describe("chat history and tools (5A)", () => {
     expect(names).not.toContain("update_occurrence_note");
     expect(names).not.toContain("list_calendar_events");
     expect(names).toContain("list_workouts");
+    expect(names).toContain("search_advice");
   });
 
   it("gives the model no top-level anyOf and no idempotency key", () => {

@@ -164,10 +164,10 @@ Check the cited entry before acting on a row.
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.3` (research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
 - **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
   approval while chat is on, and reads only the sources left on.
-- **Next:** add `search_advice` (4A's matcher has merged).
+- Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
@@ -185,6 +185,15 @@ Check the cited entry before acting on a row.
   message id, a polite status line for run states, `?c=` reopens after a reload, and
   stream validation with a plain-text fallback. Waiting on Emi's UI review.
 - **Next:** set `CHAT_PAGE_LIVE_ON_WEB` once 5A's route is on main; 5C adds the Mac screen.
+
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
+  mobile layout and a `/design-system` bench with fixture conversations.
 
 ## Cadence for Mac 0.1.12 published — November 19, 2026
 
@@ -237,3 +246,22 @@ Platform impact: Mac release; web, marketing and mobile not applicable. Messagin
   this container (Node 24-only and Preview access suites).
 - **Next:** apply the migration to production, merge, and confirm the first hourly runs.
   Answer reading switches to Phase 3A1's `move_proposal_answers` once it exists.
+
+## Advisor plan Phase 1A: data foundations in source — November 16, 2026
+
+- **Merged (PR #290) and applied to the hosted database** on November 16, 2026, with the
+  owner's go-ahead. First-party caller (one token channel and first-party grant per agent),
+  agent run log with 30-day content store and daily deletion, Postgres spend budget
+  (US$5 per account per month; Daily Brief US$0.50 protected, quips US$1.00, Chat
+  US$3.50). The hosted Daily Brief now writes a run, reserves before its model call and
+  stores its facts and output. Settles Ticket 185. Docs: `docs/DATA_MODEL.md`, "Advisor
+  agents"; `docs/COSTS.md`, "Advisor agent budget"; `docs/SUPABASE_WORKFLOW.md`, "Agent
+  token channels".
+- **Verification (local stack, Node 22):** clean `db reset` replay of all 125 migrations;
+  all 49 `tests/sql` fixtures pass (Ticket 232 maintenance smoke now counts the three
+  seeded agent clients separately); local integration tests pass except
+  `mcp-server.local-integration`, which needs its own assigned stack; `npm run test`
+  passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
+  interactions checks pass.
+- **Owner decisions:** hosted migrations approved; US$25 global daily breaker confirmed.
+- **Phase 1B follow-up (done in #291):** the brief runs through the AI SDK model setting, and its calls still go through `daily-brief-agent-run.ts` over these functions. 1B's stub metering module was removed; `agent-model-pricing.ts` gained the eval candidate prices.
