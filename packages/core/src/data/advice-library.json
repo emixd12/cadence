@@ -235,7 +235,7 @@
       "limitation": "The studies tested monitoring more often, not marking sooner; marking on the same day is our reading of it.",
       "quip_seeds": [
         "{later_day} of your last {decisions|mark|marks} came a day or more late.",
-        "Your marks usually land {median_lag_days|day|days} after the item.",
+        "When a mark comes late, it usually lands {median_lag_days|day|days} after the item.",
         "{behavior}: {later_day} of the last {decisions|mark|marks} came a day or more late."
       ],
       "audience": "any_account",

@@ -1,5 +1,6 @@
 export type AppNavHref =
   | "/timeline"
+  | "/chat"
   | "/behaviors"
   | "/export"
   | "/settings";
@@ -21,6 +22,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: "Current occurrences and prior unresolved decisions",
   },
   {
+    href: "/chat",
+    label: "Chat",
+    description: "Ask about and change your Cadence records in plain words",
+  },
+  {
     href: "/behaviors",
     label: "Behaviors",
     description: "Behavior settings, adherence, and dated review",
@@ -36,6 +42,33 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: "Timezone, notifications, and categories",
   },
 ];
+
+/**
+ * Chat lands in steps (advisor plan, Phase 5). The page stays out of
+ * production web until the chat server is on main; the final 5B change sets
+ * this to true. Cadence for Mac hides Chat until Phase 5C adds its screen.
+ */
+export const CHAT_PAGE_LIVE_ON_WEB = false;
+
+export type AppNavSurface = "web" | "desktop";
+
+export function isChatPageAvailable(
+  surface: AppNavSurface,
+  production = process.env.NODE_ENV === "production",
+) {
+  if (surface === "desktop") return false;
+  return CHAT_PAGE_LIVE_ON_WEB || !production;
+}
+
+export function getAppNavItems(
+  surface: AppNavSurface,
+  production = process.env.NODE_ENV === "production",
+): AppNavItem[] {
+  return APP_NAV_ITEMS.filter(
+    (item) =>
+      item.href !== "/chat" || isChatPageAvailable(surface, production),
+  );
+}
 
 const PROTECTED_APP_ROUTES: ProtectedAppHref[] = [
   ...APP_NAV_ITEMS.map((item) => item.href),
