@@ -60,7 +60,7 @@ export function resolvePersistedTimeline(input: {
 export function resolveBehaviorRunNotices(behaviors: readonly BehaviorGraphRecord[], now: Temporal.Instant): BehaviorRunNotice[] {
   return behaviors.flatMap((behavior) => {
     const notice = behaviorRunNotice(runFieldsFromStored(behavior), now);
-    return notice ? [{ behaviorId: behavior.id, title: behavior.title, kind: notice.kind, backOn: notice.backOn }] : [];
+    return notice ? [{ behaviorId: behavior.id, title: behavior.title, kind: notice.kind, backOn: notice.backOn, updatedAt: behavior.updated_at }] : [];
   }).sort((left, right) => left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
 }
 

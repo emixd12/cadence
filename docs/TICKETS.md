@@ -19403,3 +19403,38 @@ Verification: the callback integration test in `shared` and `separate` modes and
 the code before the fix, Ticket 339's refresh test in both modes, unit tests, `dagger check
 --cadence --progress=report`, a verifier before merge.
 
+
+## Ticket 342: Ended and Paused Behaviors in Cadence for Mac
+
+Status: open. Filed November 20, 2026 by the Ended and Paused web workstream. Design: the
+Ended and Paused plan (`docs/RECURRENCE_RULES.md`, "Behavior end and pause"). Dependencies:
+the server and core workstream (`end_on`, `end_time`, pause columns, account sync contract
+7). Ships with Cadence for Mac 0.1.13; publishing needs the owner's written OK.
+
+Goal: the Mac shows and changes Ended and Paused Behaviors through the shared web
+components.
+
+Scope and acceptance:
+
+- The local SQLite store carries the five run columns and syncs them (contract 7).
+- Mac Behavior views carry `runState` (`toBehaviorView(record, now)`), so the shared
+  `BehaviorList` shows the Not running group.
+- The Mac passes a local `runAction` to `BehaviorList` (End now, Start again, Pause through
+  the shared `PauseRangePicker`, Resume now, Cancel pause) and renders
+  `BehaviorRunNotices` on its Timeline with the same action.
+- `INT-BEHAVIOR-033` to `INT-BEHAVIOR-036` and `INT-TIMELINE-020` move to implemented for
+  desktop.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: the web ships the shared components and server actions. |
+| Desktop | This ticket. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable until a mobile app is ticketed. |
+
+Messaging impact: P-077 (shared copy).
+
+Verification: Mac DOM tests with local actions; a dev-signed build on the test Mac
+(`.claude/skills/desktop-acceptance`).

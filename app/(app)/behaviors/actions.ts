@@ -9,6 +9,7 @@ import {
   updateOccurrenceNoteFromFormData,
 } from "@/lib/services/occurrence.service";
 import {
+  applyBehaviorRunActionFromFormData,
   archiveBehaviorFromFormData,
   behaviorErrorToActionState,
   createBehaviorFromFormData,
@@ -95,6 +96,24 @@ export async function restoreBehaviorAction(
       status: "success",
       message: "Behavior restored.",
     };
+  } catch (error) {
+    return behaviorErrorToActionState(error);
+  }
+}
+
+/**
+ * End now, Start again, Pause and Resume now, from the Behaviors list and the Timeline
+ * notices (Ended and Paused plan). Messages are logged in docs/MESSAGING_CHANGES.md.
+ */
+export async function behaviorRunAction(
+  _previousState: BehaviorActionState,
+  formData: FormData,
+): Promise<BehaviorActionState> {
+  try {
+    const result = await applyBehaviorRunActionFromFormData(formData);
+    revalidatePath("/behaviors");
+    revalidatePath("/timeline");
+    return { status: "success", message: result.message };
   } catch (error) {
     return behaviorErrorToActionState(error);
   }

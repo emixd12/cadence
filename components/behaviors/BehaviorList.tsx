@@ -9,6 +9,8 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom";
 
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
+import { BehaviorRunControls } from "@/components/behaviors/BehaviorRunControls";
+import { isNotRunning, localDateIn, notRunningLabel, upcomingRunNote } from "@/lib/ui/behavior-run";
 import { BehaviorPlaceAssist, type WhereDraft } from "@/components/travel/PlaceLabels";
 import { BehaviorReviewTimeReset } from "@/components/behaviors/BehaviorReviewTimeReset";
 import {
@@ -58,6 +60,12 @@ type BehaviorListProps = Readonly<{
   archiveAction: BehaviorFormAction;
   restoreAction: BehaviorFormAction;
   archiveNoteAction: BehaviorFormAction;
+  /**
+   * End now, Start again, Pause and Resume now (Ended and Paused). FormData:
+   * behavior_id, expected_updated_at, run_action, and for a pause pause_from_on and
+   * pause_back_on. Without it the run controls are hidden.
+   */
+  runAction?: BehaviorFormAction;
   statusAction: OccurrenceFormAction;
   noteAction: OccurrenceFormAction;
   stopTimeTrackingAction: TimeTrackingFormAction;
@@ -130,6 +138,7 @@ export function BehaviorList({
   archiveAction,
   restoreAction,
   archiveNoteAction,
+  runAction,
   statusAction,
   noteAction,
   stopTimeTrackingAction,
@@ -148,6 +157,14 @@ export function BehaviorList({
     setUpdateAnnouncement(result);
     return result;
   }, [updateAction]);
+  // A run action can move the row between groups, so its outcome shows at the top.
+  const [runOutcome, setRunOutcome] = useState<string | null>(null);
+  const announcedRunAction = useCallback<BehaviorFormAction>(async (previous, form) => {
+    const result = await runAction!(previous, form);
+    setRunOutcome(result.status === "success" ? result.message : null);
+    return result;
+  }, [runAction]);
+  const listRunAction = runAction ? announcedRunAction : undefined;
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState<BehaviorSort>("time");
   const removedCategory = categoryFilter !== "all" && categoryFilter !== "none" &&
@@ -201,7 +218,11 @@ export function BehaviorList({
     (current, behavior) => upsertBehaviorView(current, behavior),
     activeBehaviors,
   );
-  const activeList = projectBehaviorList(activeBehaviorRows, categories, effectiveCategory, sort);
+  // Ended and paused Behaviors are still active; they get their own Not running group.
+  const runningRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior));
+  const notRunningRows = activeBehaviorRows.filter(isNotRunning);
+  const activeList = projectBehaviorList(runningRows, categories, effectiveCategory, sort);
+  const notRunningList = projectBehaviorList(notRunningRows, categories, effectiveCategory, sort);
   const archivedList = projectBehaviorList(archivedBehaviors, categories, effectiveCategory, sort);
   const behaviorAnalyticsById = new Map(
     analytics.behaviorSummaries.map((summary) => [summary.behaviorId, summary]),
@@ -232,6 +253,7 @@ export function BehaviorList({
       ) : null}
 
       {updateAnnouncement?.message ? <BehaviorActionResultAnnouncement result={updateAnnouncement} /> : null}
+      {runOutcome ? <p role="status" className="text-sm italic">{runOutcome}</p> : null}
       <OverallAdherence analytics={analytics} />
       <div className="flex flex-wrap items-end gap-4">
         <label className="grid min-w-0 max-w-full gap-2 text-sm">
@@ -256,7 +278,8 @@ export function BehaviorList({
           onClick={() => { setCategoryFilter("all"); setSort("time"); setFilterNotice(""); }}>Clear filters</button>
       </div>
       <p role="status" className="text-sm text-muted-readable">
-        {filterNotice} {activeList.visibleIds.size} of {activeBehaviorRows.length} active behaviors;
+        {filterNotice} {activeList.visibleIds.size} of {runningRows.length} active behaviors;
+        {notRunningRows.length ? ` ${notRunningList.visibleIds.size} of ${notRunningRows.length} not running;` : ""}
         {" "}{archivedList.visibleIds.size} of {archivedBehaviors.length} archived behaviors.
         {effectiveCategory !== "all" ? " Overall adherence and category counts include all categories." : ""}
       </p>
@@ -269,7 +292,7 @@ export function BehaviorList({
           </h2>
         </div>
 
-        {activeBehaviorRows.length === 0 ? (
+        {runningRows.length === 0 ? (
           <p className="border-t border-line pt-4 text-base leading-7 text-muted-readable">
             No active behaviors.
           </p>
@@ -287,6 +310,7 @@ export function BehaviorList({
                 updateAction={announcedUpdateAction}
                 lifecycleFormAction={lifecycleFormAction}
                 lifecycleResult={lifecycleState}
+                runAction={listRunAction}
                 statusAction={statusAction}
                 noteAction={noteAction}
                 stopTimeTrackingAction={stopTimeTrackingAction}
@@ -301,6 +325,45 @@ export function BehaviorList({
           </div>
         )}
       </section>
+
+      {notRunningRows.length > 0 ? (
+        <section className="grid gap-4 border-t border-line pt-4" aria-labelledby="not-running-behaviors-title">
+          <details open>
+            <summary id="not-running-behaviors-title"
+              className="product-disclosure-trigger flex min-h-11 items-center py-3 text-xl leading-tight text-foreground">
+              <span aria-hidden="true" className="product-disclosure-indicator" />
+              <span className="product-disclosure-trigger-label">
+                Not running ({notRunningList.visibleIds.size === notRunningRows.length ? notRunningRows.length : `${notRunningList.visibleIds.size} of ${notRunningRows.length}`})
+              </span>
+            </summary>
+            <div className="mt-4 divide-y divide-line border-t border-line">
+              {notRunningList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
+              {notRunningList.rows.map((behavior) => (
+                <div key={behavior.id} hidden={!notRunningList.visibleIds.has(behavior.id)}>
+                <BehaviorRecord
+                  behavior={behavior}
+                  reminderRuntime={reminderRuntime}
+                  categories={categories}
+                  analytics={analytics}
+                  behaviorAnalytics={behaviorAnalyticsById.get(behavior.id) ?? null}
+                  updateAction={announcedUpdateAction}
+                  lifecycleFormAction={lifecycleFormAction}
+                  lifecycleResult={lifecycleState}
+                  runAction={listRunAction}
+                  statusAction={statusAction}
+                  noteAction={noteAction}
+                  stopTimeTrackingAction={stopTimeTrackingAction}
+                  resetTimeTrackingAction={resetTimeTrackingAction}
+                  noteShortcutView={noteShortcutViews[behavior.id]}
+                  noteShortcutAction={noteShortcutAction}
+                  sourceLinkCoordinator={linkCoordinator}
+                />
+                </div>
+              ))}
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       <CategoryCounts analytics={analytics} />
 
@@ -452,6 +515,7 @@ function BehaviorRecord({
   updateAction,
   lifecycleFormAction,
   lifecycleResult,
+  runAction,
   statusAction,
   noteAction,
   stopTimeTrackingAction,
@@ -469,6 +533,7 @@ function BehaviorRecord({
   updateAction: BehaviorFormAction;
   lifecycleFormAction: BehaviorLifecycleFormAction;
   lifecycleResult: BehaviorLifecycleActionState;
+  runAction?: BehaviorFormAction;
   statusAction?: OccurrenceFormAction;
   noteAction?: OccurrenceFormAction;
   stopTimeTrackingAction?: TimeTrackingFormAction;
@@ -504,6 +569,9 @@ function BehaviorRecord({
     setHasOpenedEdit(true);
     if (settingsRef.current) settingsRef.current.open = true;
   }, [behavior.updatedAt]);
+  const todayLocalDate = localDateIn(behavior.timezone);
+  const notRunning = behavior.active ? notRunningLabel(behavior, todayLocalDate) : null;
+  const upcoming = upcomingRunNote(behavior, todayLocalDate);
   const selectedBehaviorDay =
     analytics?.selectedBehaviorDay?.behaviorId === behavior.id
       ? analytics.selectedBehaviorDay
@@ -521,6 +589,27 @@ function BehaviorRecord({
               </span>
             ) : null}
           </div>
+
+          {upcoming ? <p className="-mt-3 text-xs text-muted-readable">{upcoming}</p> : null}
+          {notRunning ? (
+            <div className="-mt-3 grid gap-1">
+            <p className="text-sm italic">{notRunning}</p>
+            {runAction ? (
+            <BehaviorRunControls behavior={behavior} runAction={runAction} extra={
+              <BehaviorStateForm
+                behaviorId={behavior.id}
+                expectedUpdatedAt={behavior.updatedAt}
+                intent="archive"
+                action={lifecycleFormAction}
+                result={lifecycleResult}
+                buttonLabel="Archive"
+                pendingLabel="Archiving..."
+                variant="danger"
+              />
+            } />
+            ) : null}
+            </div>
+          ) : null}
 
           {behavior.active ? (
             <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null} />
@@ -600,6 +689,12 @@ function BehaviorRecord({
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
+                  {runAction && !notRunning ? (
+                    <div className="grid gap-1 border-t border-line pt-4">
+                      <h4 className="text-sm">When it runs</h4>
+                      <BehaviorRunControls behavior={behavior} runAction={runAction} />
+                    </div>
+                  ) : null}
                   <div className="grid justify-items-end">
                     <BehaviorStateForm
                       behaviorId={behavior.id}

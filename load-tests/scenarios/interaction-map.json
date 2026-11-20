@@ -1789,6 +1789,31 @@
       "reason": "Schedule answers edit a Behavior's schedule and need an open stored proposal; run serially on a synthetic account."
     },
     {
+      "id": "INT-BEHAVIOR-033",
+      "classification": "destructive_serial_only",
+      "reason": "End now and Start again change a Behavior's run state and remove or restore today's rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-034",
+      "classification": "destructive_serial_only",
+      "reason": "Pause, Resume now and Cancel pause change a Behavior's run state and remove or restore rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-035",
+      "classification": "browser_only",
+      "reason": "Not running disclosure state is client-side."
+    },
+    {
+      "id": "INT-BEHAVIOR-036",
+      "classification": "browser_only",
+      "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
+    },
+    {
+      "id": "INT-TIMELINE-020",
+      "classification": "destructive_serial_only",
+      "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
+    },
+    {
       "id": "INT-ADVISOR-005",
       "classification": "browser_only",
       "reason": "Following a tip's link is navigation; the Behaviors editor reads what the page already loads."
