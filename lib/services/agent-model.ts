@@ -37,13 +37,13 @@ export type AgentModelSetting = Readonly<{
  * Per-agent defaults. The Daily Brief values are today's production values
  * (`gpt-5.6-luna`, effort low, 2,000 output tokens). The coach uses `gpt-5.6-terra` at
  * effort low, picked by the Phase 4 coach eval (Nov 19, 2026): grade 4.83 against luna's
- * 4.42, about US$0.09 per account per month at the 95th percentile. Chat is a placeholder
- * until Phase 5 picks its model.
+ * 4.42, about US$0.09 per account per month at the 95th percentile. Chat uses GPT-6.1 Terra,
+ * which Emi picked from the Phase 5D eval on November 19, 2026.
  */
 export const AGENT_MODEL_SETTINGS = {
   daily_brief: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 30_000 },
   coach: { model: "openai/gpt-5.6-terra", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
-  chat: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 60_000 },
+  chat: { model: "openai/gpt-6.1-terra", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 60_000 },
 } as const satisfies Record<AgentName, AgentModelSetting>;
 
 export function agentModelSetting(agent: AgentName, override: Partial<AgentModelSetting> = {}): AgentModelSetting {
@@ -161,6 +161,16 @@ export async function generateStructured(input: StructuredCallInput): Promise<un
   if (Buffer.byteLength(result.text, "utf8") > MAX_OUTPUT_BYTES) throw new AgentModelError("rejected", "provider_body_too_large");
   try { return result.output; }
   catch { throw new AgentModelError("rejected", "output_not_json"); }
+}
+
+/** The AI SDK model for a Gateway model string, on this deployment's transport. Chat (Phase 5) streams with it. */
+export function resolveAgentModel(id: string, env: Env = process.env, customFetch?: typeof fetch): LanguageModel {
+  return resolveModel(id, env, customFetch);
+}
+
+/** Maps a provider failure to an AgentModelError, as generateStructured does. */
+export function agentModelFailure(error: unknown, signal: AbortSignal): unknown {
+  return mapProviderError(error, signal);
 }
 
 function resolveModel(id: string, env: Env, customFetch?: typeof fetch): LanguageModel {
