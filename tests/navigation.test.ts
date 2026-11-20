@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_NAV_ITEMS,
-  CHAT_PAGE_LIVE_ON_WEB,
+  CHAT_PAGE_LIVE,
   DEFAULT_APP_ROUTE,
   getAppNavItems,
   isChatPageAvailable,
@@ -19,10 +19,16 @@ describe("app navigation", () => {
     ]);
   });
 
-  it("never shows Chat on Cadence for Mac until its screen exists", () => {
-    expect(getAppNavItems("desktop", false).map((item) => item.href)).not.toContain("/chat");
-    expect(getAppNavItems("desktop", true).map((item) => item.href)).not.toContain("/chat");
-    expect(isChatPageAvailable("desktop", false)).toBe(false);
+  it("shows Chat on Cadence for Mac after Timeline in development, and in release builds once Chat is live", () => {
+    expect(getAppNavItems("desktop", false).map((item) => item.href)).toEqual([
+      "/timeline",
+      "/chat",
+      "/behaviors",
+      "/export",
+      "/settings",
+    ]);
+    expect(isChatPageAvailable("desktop", true)).toBe(CHAT_PAGE_LIVE);
+    expect(isChatPageAvailable("desktop", true)).toBe(isChatPageAvailable("web", true));
   });
 
   it("shows Chat on web after Timeline outside production", () => {
@@ -33,7 +39,7 @@ describe("app navigation", () => {
       "/export",
       "/settings",
     ]);
-    expect(isChatPageAvailable("web", true)).toBe(CHAT_PAGE_LIVE_ON_WEB);
+    expect(isChatPageAvailable("web", true)).toBe(CHAT_PAGE_LIVE);
   });
 
   it("keeps Timeline as the default app route", () => {

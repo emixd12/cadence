@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChatPage } from "@/components/chat/ChatPage";
+import { CHAT_SETTINGS_LINK_CLASS } from "@/lib/ui/chat";
 import { CadencePageBanner } from "@/components/layout/ScreenFrame";
 import { isChatPageAvailable } from "@/lib/navigation";
 
@@ -38,6 +40,11 @@ export default async function ChatRoute({ searchParams }: ChatRouteProps) {
             syncUrl
             initialConversationId={conversationId}
             initialView={initialView}
+            settingsLink={
+              <Link href="/settings" className={CHAT_SETTINGS_LINK_CLASS}>
+                Change this in Settings
+              </Link>
+            }
           />
         </div>
       </div>
