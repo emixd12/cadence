@@ -125,7 +125,7 @@ describe("shipped advice library", () => {
   });
 
   // Signals with no card on purpose (Emi's card review, Nov 20): the research found did not fit
-  // the pattern the signal measures, so tips about them use the person's own numbers only.
+  // the pattern the signal measures, so these signals produce no tip until a fitting card exists.
   const NO_CARD_YET = ["brief_answers", "late_marking", "marking_time", "time_of_day_gap", "timing_mode_gap", "day_shape", "reminder_response"];
 
   it("covers every other signal and serves new accounts once content is in", () => {
