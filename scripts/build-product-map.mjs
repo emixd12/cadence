@@ -1,0 +1,1003 @@
+#!/usr/bin/env node
+// Builds Cadence's product map: one graph that joins the repository's registries.
+// Deterministic: no model, no network, no timestamps. Same inputs give the same output.
+//
+//   node scripts/build-product-map.mjs check          build in memory, fail on errors
+//   node scripts/build-product-map.mjs build          also write product-map.json and docs/PRODUCT_MAP.md
+//   node scripts/build-product-map.mjs show <id|text> print one item and its links
+//
+// Every link names the registry entry it came from by a stable id (never an array
+// position). "asserted" links are written in a registry by a person; "derived" links
+// come from scanning source code. See docs/PRODUCT_MAP_GUIDE.md.
+
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, posix, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SCHEMA_VERSION = 1;
+
+/** Kinds whose items must carry a meaning sentence. */
+const MEANING_REQUIRED = new Set(["journey", "feature", "interaction", "component", "family", "term", "mcp-tool", "notice"]);
+/** Token meanings are required only in the canonical token file; other token files warn. */
+const CANONICAL_TOKEN_FILE = "packages/ui/tokens.css";
+
+const SCAN_ROOTS = ["app", "components", "lib", "apps/desktop/src", "packages/core/src", "packages/ui"];
+const SCAN_EXCLUDE = [/(^|\/)node_modules\//, /\.test\.tsx?$/, /\.d\.ts$/, /(^|\/)__fixtures__\//, /^apps\/desktop\/src-tauri\//];
+
+const read = path => readFileSync(join(root, path), "utf8");
+const readJson = path => JSON.parse(read(path));
+const exists = path => existsSync(join(root, path));
+const isFile = path => exists(path) && statSync(join(root, path)).isFile();
+
+// ---------------------------------------------------------------------------
+// Graph
+
+const nodes = new Map();
+const links = new Map();
+const errors = [];
+const warnings = new Map(); // category -> messages
+const sources = new Set();
+
+function warn(category, message) {
+  if (!warnings.has(category)) warnings.set(category, []);
+  warnings.get(category).push(message);
+}
+
+function addNode(id, kind, fields, source) {
+  if (nodes.has(id)) {
+    errors.push(`Duplicate id ${id} (${source}; first from ${nodes.get(id).source})`);
+    return nodes.get(id);
+  }
+  const node = { id, kind, ...fields, source };
+  nodes.set(id, node);
+  return node;
+}
+
+function addLink(from, type, to, grade, source) {
+  const key = `${from}\u0000${type}\u0000${to}`;
+  if (!links.has(key)) links.set(key, { from, type, to, grade, source });
+}
+
+function stripAnchor(reference) {
+  const index = reference.indexOf("#");
+  return index === -1 ? reference : reference.slice(0, index);
+}
+
+function fileKind(path) {
+  if (/^tests\//.test(path) || /\.test\.tsx?$/.test(path)) return "test";
+  if (/^app\/api\/.+\/route\.tsx?$/.test(path)) return "api";
+  if (/^lib\/services\//.test(path) || /^packages\/core\/src\/services\//.test(path)) return "service";
+  if (/^lib\/db\//.test(path)) return "repository";
+  return "file";
+}
+
+function apiPath(path) {
+  return "/" + path.replace(/^app\//, "").replace(/\/route\.tsx?$/, "");
+}
+
+/** Returns the node id for a repository file, creating the node on first use. */
+function fileNode(path) {
+  const kind = fileKind(path);
+  const id = kind === "api" ? `api:${apiPath(path)}` : `${kind}:${path}`;
+  if (!nodes.has(id)) addNode(id, kind, { name: kind === "api" ? apiPath(path) : path, path }, "repository file");
+  return id;
+}
+
+/** Links to a referenced path when it exists; returns the node id or null. */
+function referencedFile(reference, category, context) {
+  const path = stripAnchor(reference);
+  if (!path || /\s/.test(path)) return null;
+  if (!isFile(path)) {
+    warn(category, `${context}: ${reference} is not a file`);
+    return null;
+  }
+  return fileNode(path);
+}
+
+// ---------------------------------------------------------------------------
+// Journeys: the table in docs/UX_JOURNEY_INVENTORY.md
+
+function addJourneys() {
+  const path = "docs/UX_JOURNEY_INVENTORY.md";
+  sources.add(path);
+  const text = read(path);
+  const headings = new Map([...text.matchAll(/^### (J\d{2}) (.+)$/gm)].map(match => [match[1], match[2]]));
+  const rows = [...text.matchAll(/^\| (J\d{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$/gm)];
+  const fileId = fileNode(path);
+  for (const [, id, name, personas, entry, success] of rows) {
+    addNode(`journey:${id}`, "journey", {
+      name: name.trim(),
+      meaning: success.trim(),
+      personas: personas.split(",").map(persona => persona.trim()),
+      entry: entry.trim(),
+    }, `${path}#journey-map/${id}`);
+    addLink(`journey:${id}`, "defined-in", fileId, "asserted", `${path}#journey-map/${id}`);
+    if (!headings.has(id)) errors.push(`${path}: journey ${id} is in the table but has no "### ${id}" section`);
+  }
+  for (const id of headings.keys()) {
+    if (!rows.some(row => row[1] === id)) errors.push(`${path}: "### ${id}" has no row in the journey map table`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Features, surfaces, routes and interactions: interaction-registry.json
+
+function addRegistry() {
+  const path = "interaction-registry.json";
+  sources.add(path);
+  const registry = readJson(path);
+
+  for (const surface of registry.surfaces) {
+    addNode(`surface:${surface.id}`, "surface", { name: surface.label, surfaceKind: surface.kind }, `${path}#surfaces/${surface.id}`);
+    for (const route of surface.routes) {
+      routeNode(route);
+      addLink(`surface:${surface.id}`, "contains", `route:${route}`, "asserted", `${path}#surfaces/${surface.id}/routes/${route}`);
+    }
+  }
+
+  for (const feature of registry.features) {
+    addNode(`feature:${feature.id}`, "feature", { name: feature.name, meaning: feature.meaning, spec: feature.spec },
+      `${path}#features/${feature.id}`);
+    const spec = referencedFile(feature.spec, "missing references", `feature ${feature.id} spec`);
+    if (spec) addLink(`feature:${feature.id}`, "defined-in", spec, "asserted", `${path}#features/${feature.id}/spec`);
+  }
+
+  for (const interaction of registry.interactions) {
+    const id = `interaction:${interaction.id}`;
+    const at = `${path}#${interaction.id}`;
+    addNode(id, "interaction", {
+      name: interaction.name,
+      meaning: interaction.intent,
+      status: interaction.status,
+      risk: interaction.risk,
+    }, at);
+    linkTo(`feature:${interaction.feature}`, "contains", id, `${at}/feature`);
+    for (const journey of interaction.journeys) linkTo(`journey:${journey}`, "contains", id, `${at}/journeys/${journey}`);
+    for (const surface of interaction.surfaces) linkTo(id, "on", `surface:${surface}`, `${at}/surfaces/${surface}`);
+    for (const route of interaction.routes) {
+      routeNode(route);
+      addLink(id, "on", `route:${route}`, "asserted", `${at}/routes/${route}`);
+    }
+    for (const reference of interaction.implementation) {
+      const file = referencedFile(reference, "missing references", interaction.id);
+      if (file) addLink(id, "implemented-in", file, "asserted", `${at}/implementation/${reference}`);
+    }
+    for (const [platform, entry] of Object.entries(interaction.platforms)) {
+      for (const reference of entry.implementation ?? []) {
+        const file = referencedFile(reference, "missing references", `${interaction.id} ${platform}`);
+        if (file) addLink(id, "implemented-in", file, "asserted", `${at}/platforms/${platform}/implementation/${reference}`);
+      }
+      for (const reference of entry.evidence ?? []) {
+        if (fileKind(stripAnchor(reference)) !== "test") continue;
+        const file = referencedFile(reference, "missing references", `${interaction.id} ${platform} evidence`);
+        if (file) addLink(id, "tested-by", file, "asserted", `${at}/platforms/${platform}/evidence/${reference}`);
+      }
+    }
+    for (const reference of interaction.test_coverage.references) {
+      if (fileKind(stripAnchor(reference)) !== "test") continue;
+      const file = referencedFile(reference, "missing references", `${interaction.id} test`);
+      if (file) addLink(id, "tested-by", file, "asserted", `${at}/test_coverage/references/${reference}`);
+    }
+    for (const reference of interaction.user_guidance.references) {
+      const file = referencedFile(reference, "missing references", `${interaction.id} guidance`);
+      if (file) addLink(id, "explained-in", file, "asserted", `${at}/user_guidance/references/${reference}`);
+    }
+  }
+}
+
+function routeNode(route) {
+  const id = `route:${route}`;
+  if (!nodes.has(id)) addNode(id, "route", { name: route }, "interaction-registry.json");
+}
+
+/** An asserted link whose two ends must both exist once every registry has loaded. */
+const pendingLinks = [];
+function linkTo(from, type, to, source) {
+  pendingLinks.push({ from, type, to, source });
+}
+
+// ---------------------------------------------------------------------------
+// Design system: components, families, tokens
+
+function addDesignSystem() {
+  const manifestPath = "design-system.manifest.json";
+  const surfacesPath = "design-system.surfaces.json";
+  sources.add(manifestPath);
+  sources.add(surfacesPath);
+  const manifest = readJson(manifestPath);
+  for (const component of manifest.components) {
+    const id = `component:${component.id}`;
+    addNode(id, "component", {
+      name: component.name,
+      meaning: component.notes,
+      componentKind: component.kind,
+      status: component.status,
+      usageNames: component.usageNames,
+      bench: component.benchAnchor ?? null,
+    }, `${manifestPath}#${component.id}`);
+    if (!isFile(component.source)) errors.push(`${manifestPath}#${component.id}: source ${component.source} is not a file`);
+    else addLink(id, "defined-in", fileNode(component.source), "asserted", `${manifestPath}#${component.id}/source`);
+  }
+
+  const catalog = readJson(surfacesPath);
+  for (const family of catalog.componentFamilies) {
+    const id = `family:${family.id}`;
+    addNode(id, "family", { name: family.name, meaning: family.definition, tier: family.tier }, `${surfacesPath}#${family.id}`);
+    for (const implementation of family.surfaceImplementations) {
+      const at = `${surfacesPath}#${family.id}/${implementation.surfaceId}`;
+      for (const componentId of implementation.implementationIds) {
+        linkTo(`component:${componentId}`, "belongs-to", id, `${at}/implementationIds/${componentId}`);
+      }
+      for (const reference of implementation.sources ?? []) {
+        const file = referencedFile(reference, "missing references", `${family.id} ${implementation.surfaceId}`);
+        if (file) addLink(id, "implemented-in", file, "asserted", `${at}/sources/${reference}`);
+      }
+    }
+  }
+}
+
+/** Parses CSS custom properties. A comment applies to the declarations directly under it, up to a blank line. */
+function parseTokens(path) {
+  const tokens = [];
+  let comment = null;
+  let commentLines = [];
+  let inComment = false;
+  let block = null;
+  for (const line of read(path).split("\n")) {
+    const trimmed = line.trim();
+    if (inComment) {
+      commentLines.push(trimmed.replace(/\*\/.*$/, "").replace(/^\*\s?/, ""));
+      if (trimmed.includes("*/")) {
+        inComment = false;
+        comment = commentLines.join(" ").trim();
+      }
+      continue;
+    }
+    if (trimmed.startsWith("/*")) {
+      commentLines = [trimmed.replace(/^\/\*\s?/, "").replace(/\*\/.*$/, "")];
+      if (trimmed.includes("*/")) comment = commentLines.join(" ").trim();
+      else inComment = true;
+      continue;
+    }
+    if (trimmed === "") {
+      comment = null;
+      continue;
+    }
+    const blockMatch = trimmed.match(/^(.+?)\s*\{$/);
+    if (blockMatch) {
+      block = blockMatch[1];
+      continue;
+    }
+    if (trimmed === "}") {
+      comment = null;
+      continue;
+    }
+    const declaration = trimmed.match(/^(--[a-zA-Z0-9-]+)\s*:\s*(.+?);?\s*(?:\/\*\s*(.+?)\s*\*\/)?$/);
+    if (declaration) {
+      tokens.push({ name: declaration[1], value: declaration[2].replace(/;$/, "").trim(), meaning: declaration[3] ?? comment, block });
+    }
+  }
+  return tokens;
+}
+
+const colorUtilities = new Map(); // tailwind color name -> token id
+const knownTokens = new Set();
+
+function addTokens() {
+  const configPath = "design-system.config.json";
+  sources.add(configPath);
+  const config = readJson(configPath);
+  const aliases = [];
+  for (const path of config.tokens.sources) {
+    sources.add(path);
+    const fileId = fileNode(path);
+    for (const token of parseTokens(path)) {
+      const id = `token:${token.name}`;
+      knownTokens.add(token.name);
+      const alias = token.value.match(/^var\((--[a-zA-Z0-9-]+)\)$/);
+      const color = token.block === "@theme inline" ? token.name.match(/^--color-(.+)$/) : null;
+      if (color) colorUtilities.set(color[1], id);
+      // A Tailwind color adapter's meaning follows from its own name and value.
+      const meaning = token.meaning
+        ?? (color && alias ? `Tailwind adapter: the ${color[1]} color utilities (bg-${color[1]}, text-${color[1]} and so on), same as ${alias[1]}.` : null);
+      if (!nodes.has(id)) {
+        addNode(id, "token", { name: token.name, value: token.value, meaning: meaning ?? undefined }, `${path}#${token.name}`);
+        if (!meaning) {
+          const message = `${path}: ${token.name} has no description comment`;
+          if (path === CANONICAL_TOKEN_FILE) errors.push(message);
+          else warn("token descriptions", message);
+        }
+      }
+      addLink(id, "defined-in", fileId, "asserted", `${path}#${token.name}${token.block && token.block !== ":root" ? `@${token.block}` : ""}`);
+      if (alias) aliases.push({ from: id, to: `token:${alias[1]}`, source: `${path}#${token.name}/value` });
+    }
+  }
+  for (const alias of aliases) {
+    if (alias.from === alias.to) continue;
+    if (nodes.has(alias.to)) addLink(alias.from, "aliases", alias.to, "asserted", alias.source);
+    else warn("token aliases", `${alias.source}: ${alias.to} is not defined in a token source`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ontology terms: docs/ontology/*.json
+
+function addTerms() {
+  const directory = "docs/ontology";
+  if (!exists(directory)) return;
+  for (const name of readdirSync(join(root, directory)).filter(file => file.endsWith(".json")).sort()) {
+    const path = `${directory}/${name}`;
+    sources.add(path);
+    const ontology = readJson(path);
+    for (const term of ontology.terms) {
+      addNode(`term:${term.id}`, "term", { name: term.label, meaning: term.definition, category: term.category, scope: ontology.scope },
+        `${path}#${term.id}`);
+      for (const contract of term.contracts) {
+        const file = referencedFile(contract.path, "missing references", `term ${term.id}`);
+        if (file) addLink(`term:${term.id}`, "defined-in", file, "asserted", `${path}#${term.id}/contracts/${contract.path}#${contract.symbol}`);
+      }
+      for (const related of term.relatedIds) linkTo(`term:${term.id}`, "relates-to", `term:${related}`, `${path}#${term.id}/relatedIds/${related}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Architecture: database tables, MCP tools
+
+function addTables() {
+  const directory = "supabase/migrations";
+  const tables = new Map();
+  for (const name of readdirSync(join(root, directory)).filter(file => file.endsWith(".sql")).sort()) {
+    const path = `${directory}/${name}`;
+    const sql = read(path).replace(/--.*$/gm, "");
+    for (const match of sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?\s*\(/gi)) {
+      const table = match[1].toLowerCase();
+      if (!tables.has(table)) tables.set(table, path);
+    }
+    for (const match of sql.matchAll(/alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?\s+rename\s+to\s+"?([a-z_][a-z0-9_]*)"?/gi)) {
+      const from = match[1].toLowerCase();
+      if (tables.has(from)) {
+        tables.delete(from);
+        tables.set(match[2].toLowerCase(), path);
+      }
+    }
+    for (const match of sql.matchAll(/drop\s+table\s+(?:if\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?/gi)) {
+      tables.delete(match[1].toLowerCase());
+    }
+  }
+  sources.add(`${directory}/*.sql`);
+  for (const [table, path] of [...tables].sort()) {
+    addNode(`table:${table}`, "table", { name: table }, `${path}#${table}`);
+    addLink(`table:${table}`, "defined-in", fileNode(path), "asserted", `${path}#create-table/${table}`);
+  }
+}
+
+function stringValue(node) {
+  if (!node) return null;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = stringValue(node.left);
+    const right = stringValue(node.right);
+    return left !== null && right !== null ? left + right : null;
+  }
+  if (ts.isParenthesizedExpression(node)) return stringValue(node.expression);
+  if (ts.isTemplateExpression(node)) {
+    return node.head.text + node.templateSpans.map(span => `{${span.expression.getText()}}${span.literal.text}`).join("");
+  }
+  return null;
+}
+
+function addMcpTools() {
+  const path = "packages/core/src/integration/operations.ts";
+  if (!exists(path)) return;
+  sources.add(path);
+  const file = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const handlerFiles = ["lib/integrations/operations/read/index.ts", "lib/integrations/operations/write/index.ts"].filter(exists);
+  const visit = node => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && /^(read|write)Operation$/.test(node.expression.text)) {
+      const literal = node.arguments[0];
+      if (literal && ts.isObjectLiteralExpression(literal)) {
+        const property = name => literal.properties.find(candidate =>
+          ts.isPropertyAssignment(candidate) && ts.isIdentifier(candidate.name) && candidate.name.text === name);
+        const name = stringValue(property("name")?.initializer);
+        if (name) {
+          const id = `mcp-tool:${name}`;
+          addNode(id, "mcp-tool", {
+            name,
+            title: stringValue(property("title")?.initializer) ?? undefined,
+            meaning: stringValue(property("description")?.initializer) ?? undefined,
+            access: node.expression.text.startsWith("read") ? "read" : "write",
+          }, `${path}#${name}`);
+          addLink(id, "defined-in", fileNode(path), "asserted", `${path}#${name}`);
+          for (const handlerFile of handlerFiles) {
+            if (new RegExp(`^\\s+${name}:`, "m").test(read(handlerFile))) {
+              addLink(id, "implemented-in", fileNode(handlerFile), "derived", `scan:${handlerFile}#${name}`);
+            }
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+}
+
+// ---------------------------------------------------------------------------
+// Source scan: imports, component renders, API calls, table reads, token uses
+
+function listSourceFiles() {
+  const files = [];
+  const walk = directory => {
+    for (const entry of readdirSync(join(root, directory), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = posix.join(directory, entry.name);
+      if (SCAN_EXCLUDE.some(pattern => pattern.test(path))) continue;
+      if (entry.isDirectory()) walk(path);
+      else if (/\.(tsx?|mts)$/.test(entry.name)) files.push(path);
+    }
+  };
+  for (const directory of SCAN_ROOTS) if (exists(directory)) walk(directory);
+  return files;
+}
+
+const corePackage = exists("packages/core/package.json") ? readJson("packages/core/package.json") : null;
+const uiPackage = exists("packages/ui/package.json") ? readJson("packages/ui/package.json") : null;
+
+function resolveCandidates(base) {
+  const stripped = base.replace(/\.(m?js)$/, "");
+  for (const candidate of [base, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}/index.ts`, `${stripped}/index.tsx`]) {
+    if (isFile(candidate)) return candidate;
+  }
+  return null;
+}
+
+function packageExport(pkg, directory, subpath) {
+  if (!pkg?.exports) return null;
+  for (const [key, target] of Object.entries(pkg.exports)) {
+    const value = typeof target === "string" ? target : target?.default ?? target?.import;
+    if (typeof value !== "string") continue;
+    if (key === `./${subpath}`) return posix.join(directory, value);
+    if (key.endsWith("/*") && `./${subpath}`.startsWith(key.slice(0, -1))) {
+      const rest = `./${subpath}`.slice(key.length - 1);
+      return posix.join(directory, value.replace("*", rest));
+    }
+  }
+  return null;
+}
+
+function resolveImport(fromFile, specifier) {
+  if (specifier.startsWith("@/")) return resolveCandidates(specifier.slice(2));
+  if (specifier.startsWith(".")) return resolveCandidates(posix.normalize(posix.join(posix.dirname(fromFile), specifier)));
+  if (specifier.startsWith("@cadence/core/")) {
+    const target = packageExport(corePackage, "packages/core", specifier.slice("@cadence/core/".length));
+    return target ? resolveCandidates(target) : null;
+  }
+  if (specifier.startsWith("@cadence/ui/")) {
+    const target = packageExport(uiPackage, "packages/ui", specifier.slice("@cadence/ui/".length));
+    return target ? resolveCandidates(target) : null;
+  }
+  return null;
+}
+
+function apiRoutes() {
+  const routes = [];
+  const walk = directory => {
+    for (const entry of readdirSync(join(root, directory), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = posix.join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/^route\.tsx?$/.test(entry.name)) routes.push({ path, segments: apiPath(path).split("/").filter(Boolean) });
+    }
+  };
+  if (exists("app/api")) walk("app/api");
+  return routes;
+}
+
+const DYNAMIC = "\u0000";
+
+function matchApiRoute(routes, url) {
+  const clean = url.split(/[?#]/)[0].replace(/\/$/, "");
+  const segments = clean.split("/").filter(Boolean);
+  for (const route of routes) {
+    const catchAll = route.segments.findIndex(segment => /^\[\.\.\..+\]$/.test(segment));
+    if (catchAll === -1 && route.segments.length !== segments.length) continue;
+    if (catchAll !== -1 && segments.length < catchAll + 1) continue;
+    const limit = catchAll === -1 ? segments.length : catchAll;
+    let ok = true;
+    for (let index = 0; index < limit; index += 1) {
+      const routeSegment = route.segments[index];
+      const segment = segments[index];
+      if (/^\[.+\]$/.test(routeSegment)) continue;
+      if (segment.includes(DYNAMIC) || segment !== routeSegment) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return route.path;
+  }
+  return null;
+}
+
+function urlLiteral(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isTemplateExpression(node)) return node.head.text + node.templateSpans.map(span => DYNAMIC + span.literal.text).join("");
+  return null;
+}
+
+const tokenUtilityPattern = /(?<![\w-])(?:[a-z-]+:)*(?:bg|text|border(?:-[trblxy])?|ring|ring-offset|fill|stroke|outline|decoration|divide|placeholder|caret|accent|from|via|to|shadow)-([a-z][a-z0-9-]*?)(?:\/\d+)?(?![\w-])/g;
+const fontSizeUtilities = new Set(["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"]);
+
+function scanSources() {
+  const files = listSourceFiles();
+  const routes = apiRoutes();
+  const componentsBySource = new Map();
+  for (const node of nodes.values()) {
+    if (node.kind !== "component") continue;
+    const sourceLink = [...links.values()].find(link => link.from === node.id && link.type === "defined-in");
+    if (!sourceLink) continue;
+    const path = nodes.get(sourceLink.to).path;
+    if (!componentsBySource.has(path)) componentsBySource.set(path, []);
+    componentsBySource.get(path).push(node);
+  }
+
+  const imports = new Map(); // file -> resolved files
+  const apiCalls = new Map(); // file -> api route files
+  const renders = [];
+  const tableReads = new Map();
+  for (const path of files) {
+    const text = read(path);
+    const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const resolved = new Set();
+    const localNames = new Map(); // local identifier -> { file, imported }
+    const calls = new Set();
+    const tables = new Set();
+    const visit = node => {
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+        const target = resolveImport(path, node.moduleSpecifier.text);
+        if (target) {
+          resolved.add(target);
+          const clause = ts.isImportDeclaration(node) ? node.importClause : null;
+          if (clause?.name) localNames.set(clause.name.text, { file: target, imported: "default" });
+          const bindings = clause?.namedBindings;
+          if (bindings && ts.isNamedImports(bindings)) {
+            for (const element of bindings.elements) {
+              localNames.set(element.name.text, { file: target, imported: (element.propertyName ?? element.name).text });
+            }
+          }
+        }
+      } else if (ts.isCallExpression(node)) {
+        if (ts.isIdentifier(node.expression) && node.expression.text === "import" || node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+          const argument = node.arguments[0];
+          if (argument && ts.isStringLiteral(argument)) {
+            const target = resolveImport(path, argument.text);
+            if (target) resolved.add(target);
+          }
+        }
+        if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "from") {
+          const table = node.arguments[0] && stringValue(node.arguments[0]);
+          if (table && nodes.has(`table:${table}`)) tables.add(table);
+        }
+      } else if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node)) {
+        const url = urlLiteral(node);
+        if (url && url.startsWith("/api/")) {
+          const route = matchApiRoute(routes, url);
+          if (route && route !== path) calls.add(route);
+        }
+      }
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        if (ts.isIdentifier(node.tagName)) {
+          const tag = node.tagName.text;
+          const local = localNames.get(tag);
+          if (local && componentsBySource.has(local.file)) {
+            for (const component of componentsBySource.get(local.file)) {
+              if (component.usageNames.includes(local.imported) || component.usageNames.includes(tag)) {
+                renders.push({ file: path, component: component.id, tag });
+              }
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    imports.set(path, resolved);
+    apiCalls.set(path, calls);
+    if (tables.size) tableReads.set(path, tables);
+  }
+
+  const configPath = "design-system.config.json";
+  for (const mapping of readJson(configPath).manualMappings ?? []) {
+    if (!nodes.has(`component:${mapping.componentId}`)) errors.push(`${configPath}#manualMappings/${mapping.componentId}: unknown component`);
+    else if (!isFile(mapping.file)) errors.push(`${configPath}#manualMappings/${mapping.componentId}: ${mapping.file} is not a file`);
+    else {
+      addLink(fileNode(mapping.file), "renders", `component:${mapping.componentId}`, "asserted", `${configPath}#manualMappings/${mapping.componentId}@${mapping.file}`);
+      renders.push({ file: mapping.file, component: `component:${mapping.componentId}`, tag: mapping.componentId, manual: true });
+    }
+  }
+  for (const { file, component, tag, manual } of renders) {
+    if (manual) continue;
+    addLink(fileNode(file), "renders", component, "derived", `scan:${file}#${tag}`);
+  }
+
+  // Architecture reach: services and API routes a file uses directly, or through up to
+  // two local helper files that are not themselves services or routes.
+  const isArchitecture = path => ["service", "api", "repository"].includes(fileKind(path));
+  const reach = (path, depth, seen) => {
+    const found = new Set();
+    for (const target of imports.get(path) ?? []) {
+      if (seen.has(target)) continue;
+      seen.add(target);
+      if (isArchitecture(target)) found.add(target);
+      else if (depth > 0 && !componentsBySource.has(target)) for (const inner of reach(target, depth - 1, seen)) found.add(inner);
+    }
+    for (const route of apiCalls.get(path) ?? []) found.add(route);
+    return found;
+  };
+  const implementationFiles = new Set([...links.values()].filter(link => link.type === "implemented-in").map(link => nodes.get(link.to)?.path).filter(Boolean));
+  for (const path of files) {
+    if (!implementationFiles.has(path) && !isArchitecture(path)) continue;
+    for (const target of reach(path, 2, new Set([path]))) {
+      if (target === path) continue;
+      const type = fileKind(target) === "api" && !(imports.get(path) ?? new Set()).has(target) ? "calls" : "uses";
+      addLink(fileNode(path), type, fileNode(target), "derived", `scan:${path}#${type === "calls" ? apiPath(target) : target}`);
+    }
+  }
+  for (const [path, tables] of tableReads) {
+    for (const table of [...tables].sort()) addLink(fileNode(path), "uses", `table:${table}`, "derived", `scan:${path}#from(${table})`);
+  }
+
+  // Tokens used by each component's source file.
+  for (const [path, components] of componentsBySource) {
+    const text = read(path);
+    const used = new Set();
+    for (const match of text.matchAll(tokenUtilityPattern)) {
+      const name = match[1];
+      if (colorUtilities.has(name)) used.add(colorUtilities.get(name));
+      else if (match[0].includes("text-") && fontSizeUtilities.has(name) && knownTokens.has(`--text-${name}`)) used.add(`token:--text-${name}`);
+    }
+    for (const match of text.matchAll(/var\((--[a-zA-Z0-9-]+)\)/g)) if (knownTokens.has(match[1])) used.add(`token:${match[1]}`);
+    for (const component of components) {
+      for (const token of [...used].sort()) addLink(component.id, "styled-by", token, "derived", `scan:${path}`);
+    }
+    for (const match of text.matchAll(/(?:\[|["'`])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?:\]|["'`])/g)) {
+      warn("hard-coded colors", `${path}: ${match[0]} (use a token)`);
+    }
+  }
+
+  linkMcpHandlers();
+  compareUsageFile(renders);
+  return files.length;
+}
+
+/** Links each MCP tool to the services or repositories its handler entry calls. */
+function linkMcpHandlers() {
+  for (const path of ["lib/integrations/operations/read/index.ts", "lib/integrations/operations/write/index.ts"]) {
+    if (!exists(path)) continue;
+    const source = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const imported = new Map();
+    const localCalls = new Map();
+    const calledIn = node => {
+      const names = new Set();
+      const visit = child => {
+        if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) names.add(child.expression.text);
+        if (ts.isCallExpression(child)) for (const argument of child.arguments) if (ts.isIdentifier(argument)) names.add(argument.text);
+        ts.forEachChild(child, visit);
+      };
+      visit(node);
+      return names;
+    };
+    for (const statement of source.statements) {
+      if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+        const target = resolveImport(path, statement.moduleSpecifier.text);
+        const bindings = statement.importClause?.namedBindings;
+        if (target && bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) imported.set(element.name.text, target);
+      } else if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+        localCalls.set(statement.name.text, calledIn(statement.body));
+      }
+    }
+    const visit = node => {
+      if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && nodes.has(`mcp-tool:${node.name.text}`) && ts.isCallExpression(node.initializer)) {
+        const tool = `mcp-tool:${node.name.text}`;
+        const names = calledIn(node.initializer);
+        for (const name of [...names]) for (const inner of localCalls.get(name) ?? []) names.add(inner);
+        for (const name of [...names].sort()) {
+          const target = imported.get(name);
+          if (target && ["service", "repository"].includes(fileKind(target))) {
+            addLink(tool, "implemented-in", fileNode(target), "derived", `scan:${path}#${node.name.text}/${name}`);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+}
+
+function compareUsageFile(renders) {
+  const path = "design-system.usage.json";
+  if (!exists(path)) return;
+  // The bench page and tests are outside the comparison: usage.json records tests, the scan skips them.
+  const compared = file => !file.startsWith("app/design-system/") && fileKind(file) !== "test";
+  const recorded = new Set(readJson(path).usages.filter(usage => usage.usageKind === "render" && compared(usage.file)).map(usage => `${usage.componentId}\u0000${usage.file}`));
+  const scanned = new Set(renders.filter(render => compared(render.file)).map(render => `${render.component.replace(/^component:/, "")}\u0000${render.file}`));
+  for (const key of [...scanned].sort()) if (!recorded.has(key)) warn("design-system.usage.json differences", `found in code, missing from ${path}: ${key.replace("\u0000", " in ")}`);
+  for (const key of [...recorded].sort()) if (!scanned.has(key)) warn("design-system.usage.json differences", `in ${path}, not found in code: ${key.replace("\u0000", " in ")}`);
+}
+
+// ---------------------------------------------------------------------------
+// Notices: lib/notices/*.json (added in build step 2; read when present)
+
+function addNotices() {
+  const directory = "lib/notices";
+  if (!exists(directory)) return;
+  for (const name of readdirSync(join(root, directory)).filter(file => file.endsWith(".json")).sort()) {
+    const path = `${directory}/${name}`;
+    sources.add(path);
+    const catalog = readJson(path);
+    for (const notice of catalog.notices ?? []) {
+      const id = `notice:${notice.id}`;
+      addNode(id, "notice", {
+        name: notice.id,
+        meaning: notice.meaning,
+        text: notice.text,
+        style: notice.style,
+        channel: notice.channel ?? "in-app",
+        status: notice.status ?? "active",
+      }, `${path}#${notice.id}`);
+      if (notice.feature) linkTo(id, "belongs-to", `feature:${notice.feature}`, `${path}#${notice.id}/feature`);
+      for (const interaction of notice.interactions ?? []) linkTo(id, "shown-by", `interaction:${interaction}`, `${path}#${notice.id}/interactions/${interaction}`);
+      for (const token of notice.tokens ?? []) linkTo(id, "styled-by", `token:${token}`, `${path}#${notice.id}/tokens/${token}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Build and validate
+
+function build() {
+  addJourneys();
+  addRegistry();
+  addDesignSystem();
+  addTokens();
+  addTerms();
+  addTables();
+  addMcpTools();
+  addNotices();
+  for (const link of pendingLinks) {
+    if (!nodes.has(link.from)) errors.push(`${link.source}: unknown ${link.from}`);
+    else if (!nodes.has(link.to)) errors.push(`${link.source}: unknown ${link.to}`);
+    else addLink(link.from, link.type, link.to, "asserted", link.source);
+  }
+  const scanned = scanSources();
+  for (const node of nodes.values()) {
+    if (MEANING_REQUIRED.has(node.kind) && !(typeof node.meaning === "string" && node.meaning.trim())) {
+      errors.push(`${node.source}: ${node.id} has no meaning`);
+    }
+  }
+  for (const link of links.values()) {
+    if (!nodes.has(link.from) || !nodes.has(link.to)) errors.push(`${link.source}: link ${link.from} ${link.type} ${link.to} has a missing end`);
+  }
+  for (const node of nodes.values()) {
+    if (node.kind === "feature" && ![...links.values()].some(link => link.from === node.id && link.type === "contains")) {
+      errors.push(`${node.source}: ${node.id} contains no interactions`);
+    }
+  }
+  const sortedNodes = [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedLinks = [...links.values()].sort((a, b) =>
+    a.from.localeCompare(b.from) || a.type.localeCompare(b.type) || a.to.localeCompare(b.to));
+  const counts = {};
+  for (const node of sortedNodes) counts[node.kind] = (counts[node.kind] ?? 0) + 1;
+  const linkCounts = {};
+  for (const link of sortedLinks) linkCounts[`${link.type} (${link.grade})`] = (linkCounts[`${link.type} (${link.grade})`] ?? 0) + 1;
+  return {
+    map: {
+      schemaVersion: SCHEMA_VERSION,
+      sources: [...sources].sort(),
+      counts: { nodes: counts, links: Object.fromEntries(Object.entries(linkCounts).sort()) },
+      nodes: sortedNodes,
+      links: sortedLinks,
+      warnings: Object.fromEntries([...warnings].sort().map(([category, messages]) => [category, [...messages].sort()])),
+    },
+    scanned,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Output
+
+function index(map) {
+  const out = new Map();
+  const into = new Map();
+  for (const link of map.links) {
+    if (!out.has(link.from)) out.set(link.from, []);
+    out.get(link.from).push(link);
+    if (!into.has(link.to)) into.set(link.to, []);
+    into.get(link.to).push(link);
+  }
+  return { out, into, node: new Map(map.nodes.map(node => [node.id, node])) };
+}
+
+/** A file that implements this many features or more is a shared screen, not one feature's code. */
+const SHARED_FILE_FEATURES = 4;
+
+function fileFeatureCounts(graph) {
+  if (graph.fileFeatures) return graph.fileFeatures;
+  const counts = new Map();
+  for (const [from, list] of graph.out) {
+    if (!from.startsWith("feature:")) continue;
+    const files = new Set();
+    for (const link of list) {
+      if (link.type !== "contains") continue;
+      for (const implementation of graph.out.get(link.to) ?? []) if (implementation.type === "implemented-in") files.add(implementation.to);
+    }
+    for (const file of files) counts.set(file, (counts.get(file) ?? 0) + 1);
+  }
+  graph.fileFeatures = counts;
+  return counts;
+}
+
+function featureArchitecture(map, graph, featureId) {
+  const interactions = (graph.out.get(featureId) ?? []).filter(link => link.type === "contains").map(link => link.to);
+  const files = new Set();
+  const tests = new Set();
+  const journeys = new Set();
+  const surfaces = new Set();
+  for (const interaction of interactions) {
+    for (const link of graph.out.get(interaction) ?? []) {
+      if (link.type === "implemented-in") files.add(link.to);
+      if (link.type === "tested-by") tests.add(link.to);
+      if (link.type === "on" && link.to.startsWith("surface:")) surfaces.add(link.to);
+    }
+    for (const link of graph.into.get(interaction) ?? []) if (link.type === "contains" && link.to && link.from.startsWith("journey:")) journeys.add(link.from);
+  }
+  const counts = fileFeatureCounts(graph);
+  const shared = new Set([...files].filter(file => (counts.get(file) ?? 0) >= SHARED_FILE_FEATURES));
+  const own = [...files].filter(file => !shared.has(file));
+  const followed = own.length ? own : [...files];
+  const components = new Set();
+  const services = new Set();
+  const apis = new Set();
+  const repositories = new Set();
+  const collect = link => {
+    if (link.to.startsWith("service:")) services.add(link.to);
+    if (link.to.startsWith("api:")) apis.add(link.to);
+    if (link.to.startsWith("repository:")) repositories.add(link.to);
+  };
+  for (const file of followed) {
+    for (const link of graph.out.get(file) ?? []) {
+      if (link.type === "renders") components.add(link.to);
+      collect(link);
+    }
+    for (const link of graph.into.get(file) ?? []) if (link.type === "defined-in" && link.from.startsWith("component:")) components.add(link.from);
+  }
+  // One more hop: API routes to their services and repositories, services to repositories.
+  for (const api of [...apis]) for (const link of graph.out.get(api) ?? []) if (!link.to.startsWith("api:")) collect(link);
+  for (const service of [...services]) for (const link of graph.out.get(service) ?? []) if (link.to.startsWith("repository:")) collect(link);
+  const tables = new Set();
+  for (const holder of [...services, ...apis, ...repositories, ...followed]) for (const link of graph.out.get(holder) ?? []) if (link.to.startsWith("table:")) tables.add(link.to);
+  const tools = new Set();
+  for (const node of map.nodes) {
+    if (node.kind !== "mcp-tool") continue;
+    for (const link of graph.out.get(node.id) ?? []) if (link.type === "implemented-in" && (services.has(link.to) || repositories.has(link.to))) tools.add(node.id);
+  }
+  const sorted = set => [...set].sort();
+  return { interactions: sorted(interactions), journeys: sorted(journeys), surfaces: sorted(surfaces),
+    files: sorted(own.length ? own : files), sharedScreens: sorted(own.length ? shared : []),
+    components: sorted(components), services: sorted(services), repositories: sorted(repositories), apis: sorted(apis), tables: sorted(tables), tools: sorted(tools), tests: sorted(tests) };
+}
+
+function markdown(map) {
+  const graph = index(map);
+  const name = id => graph.node.get(id)?.name ?? id;
+  const code = id => `\`${id.replace(/^[a-z-]+:/, "")}\``;
+  const lines = [
+    "# Cadence product map",
+    "",
+    "Generated by `npm run map:build` from the repository's registries. Do not edit by hand; edit the registry named in each item's source.",
+    "",
+    "| Kind | Items |",
+    "| --- | ---: |",
+    ...Object.entries(map.counts.nodes).map(([kind, count]) => `| ${kind} | ${count} |`),
+    "",
+    "## Features",
+    "",
+  ];
+  for (const feature of map.nodes.filter(node => node.kind === "feature")) {
+    const a = featureArchitecture(map, graph, feature.id);
+    lines.push(`### ${feature.name}`, "", `\`${feature.id}\`. ${feature.meaning}`, "", `Spec: [${feature.spec}](${posix.relative("docs", stripAnchor(feature.spec))}${feature.spec.includes("#") ? feature.spec.slice(feature.spec.indexOf("#")) : ""})`, "");
+    lines.push(`- Journeys: ${a.journeys.map(id => `${id.slice(8)} ${name(id)}`).join("; ") || "none"}`);
+    lines.push(`- Surfaces: ${a.surfaces.map(name).join(", ") || "none"}`);
+    lines.push(`- Interactions (${a.interactions.length}): ${a.interactions.map(id => `${id.slice(12)} ${name(id)}`).join("; ")}`);
+    if (a.sharedScreens.length) lines.push(`- Shared screens, not followed (${a.sharedScreens.length}): ${a.sharedScreens.map(code).join(", ")}`);
+    lines.push(`- Components (${a.components.length}): ${a.components.map(name).join(", ") || "none"}`);
+    lines.push(`- Services (${a.services.length}): ${a.services.map(code).join(", ") || "none"}`);
+    lines.push(`- Repositories (${a.repositories.length}): ${a.repositories.map(code).join(", ") || "none"}`);
+    lines.push(`- API routes (${a.apis.length}): ${a.apis.map(code).join(", ") || "none"}`);
+    lines.push(`- Database tables (${a.tables.length}): ${a.tables.map(code).join(", ") || "none"}`);
+    if (a.tools.length) lines.push(`- MCP tools on its services (${a.tools.length}): ${a.tools.map(code).join(", ")}`);
+    lines.push(`- Tests: ${a.tests.length}`, "");
+  }
+  lines.push("## Journeys", "");
+  for (const journey of map.nodes.filter(node => node.kind === "journey")) {
+    const features = new Set();
+    for (const link of graph.out.get(journey.id) ?? []) {
+      for (const owner of graph.into.get(link.to) ?? []) if (owner.from.startsWith("feature:")) features.add(owner.from);
+    }
+    const count = (graph.out.get(journey.id) ?? []).filter(link => link.type === "contains").length;
+    lines.push(`- **${journey.id.slice(8)} ${journey.name}** (${count} interactions): ${journey.meaning} Features: ${[...features].sort().map(name).join(", ")}.`);
+  }
+  lines.push("", "## MCP tools", "");
+  for (const tool of map.nodes.filter(node => node.kind === "mcp-tool")) {
+    const services = (graph.out.get(tool.id) ?? []).filter(link => link.type === "implemented-in" && !link.to.startsWith("file:")).map(link => code(link.to));
+    lines.push(`- **${tool.name}** (${tool.access}): ${tool.meaning} Services: ${services.join(", ") || "none"}.`);
+  }
+  lines.push("", "## Component families", "");
+  for (const family of map.nodes.filter(node => node.kind === "family")) {
+    const members = (graph.into.get(family.id) ?? []).filter(link => link.type === "belongs-to").map(link => name(link.from)).sort();
+    lines.push(`- **${family.name}**: ${family.meaning} Components: ${members.join(", ") || "none"}.`);
+  }
+  if (Object.keys(map.warnings).length) {
+    lines.push("", "## Warnings", "");
+    for (const [category, messages] of Object.entries(map.warnings)) lines.push(`- ${category}: ${messages.length}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function show(map, query) {
+  const graph = index(map);
+  const node = graph.node.get(query);
+  if (!node) {
+    const matches = map.nodes.filter(candidate => candidate.id.toLowerCase().includes(query.toLowerCase())
+      || candidate.name?.toLowerCase().includes(query.toLowerCase()));
+    if (!matches.length) {
+      console.log(`No item matches "${query}".`);
+      return 1;
+    }
+    console.log(`${matches.length} items match "${query}":`);
+    for (const match of matches.slice(0, 50)) console.log(`  ${match.id}  ${match.name ?? ""}`);
+    return 0;
+  }
+  console.log(JSON.stringify(node, null, 2));
+  const print = (title, list, end) => {
+    if (!list?.length) return;
+    console.log(`\n${title}`);
+    for (const link of list) console.log(`  ${link.type} ${link[end]}  (${link.grade}; ${link.source})`);
+  };
+  print("Links out", graph.out.get(query), "to");
+  print("Links in", graph.into.get(query), "from");
+  if (node.kind === "feature") {
+    console.log("\nArchitecture");
+    for (const [key, values] of Object.entries(featureArchitecture(map, graph, node.id))) console.log(`  ${key}: ${values.length ? values.join(", ") : "none"}`);
+  }
+  return 0;
+}
+
+const [mode = "check", ...rest] = process.argv.slice(2);
+const verbose = rest.includes("--verbose");
+const { map, scanned } = build();
+
+if (mode === "show") {
+  process.exitCode = show(map, rest.filter(arg => arg !== "--verbose").join(" "));
+} else if (mode === "check" || mode === "build") {
+  const summary = Object.entries(map.counts.nodes).map(([kind, count]) => `${count} ${kind}`).join(", ");
+  if (errors.length) {
+    console.error(`map:${mode} failed with ${errors.length} error(s):`);
+    for (const error of errors.sort()) console.error(`- ${error}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`map:${mode} passed: ${summary}; ${map.links.length} links; ${scanned} source files scanned.`);
+  }
+  for (const [category, messages] of Object.entries(map.warnings)) {
+    console.log(`warning: ${category}: ${messages.length}`);
+    for (const message of verbose ? messages : messages.slice(0, 3)) console.log(`  - ${message}`);
+    if (!verbose && messages.length > 3) console.log(`  … ${messages.length - 3} more (run with --verbose)`);
+  }
+  if (mode === "build" && !errors.length) {
+    writeFileSync(join(root, "product-map.json"), `${JSON.stringify(map, null, 2)}\n`);
+    writeFileSync(join(root, "docs/PRODUCT_MAP.md"), markdown(map));
+    console.log(`Wrote ${relative(root, join(root, "product-map.json"))} and docs/PRODUCT_MAP.md.`);
+  }
+} else {
+  console.error(`Unknown mode ${mode}. Use check, build or show <id>.`);
+  process.exitCode = 2;
+}

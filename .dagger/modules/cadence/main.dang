@@ -99,6 +99,13 @@ type Cadence {
   }
 
   """
+  Product map check (npm run map:check).
+  """
+  pub productMap: Void @check {
+    run(["map:check"])
+  }
+
+  """
   Resolver boundary check (npm run resolvers:check).
   """
   pub resolvers: Void @check {

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "registry_id": "cadence.user-interactions",
-  "registry_schema_version": "1.3.0",
+  "registry_schema_version": "1.4.0",
   "entries": [
     {
       "id": "INT-DATABASE-004",

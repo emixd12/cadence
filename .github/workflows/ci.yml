@@ -31,6 +31,7 @@ jobs:
         uses: ./.github/actions/setup
       - run: npm run agents:check
       - run: npm run interactions:check
+      - run: npm run map:check
       - run: npm run resolvers:check
       - name: Verify complete Git history
         run: test "$(git rev-parse --is-shallow-repository)" = "false"

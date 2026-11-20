@@ -1,26 +1,60 @@
 :root {
+  /* Bleached Newsprint: the main app background. */
   --background: oklch(99.16% 0.0017 67.8);
+
+  /* Ink Black: main text, icons and hard text hierarchy. Outcome notices use it in italic. */
   --foreground: oklch(14.89% 0.0027 248.1);
+
+  /* Cold Surface: secondary panels, empty states, inline note areas and inactive heatmap cells. */
   --surface: oklch(96.97% 0.0017 247.8);
+
+  /* Card background and text: the same as the page background and Ink Black. */
   --card: var(--background);
   --card-foreground: var(--foreground);
+
+  /* Monolith Blue: selected states, completed Timeline rows and completed heatmap cells. */
   --primary: #3572b3;
+
+  /* Calendar overlap magenta: the next trip's marker and span on the Timeline. */
   --calendar-overlap: #DA3278;
+
   /* Ticket 270 (D13): the same magenta, darker, for small text such as the next trip's leader label (5.4:1 on the background). */
   --calendar-overlap-text: #C0286A;
+
+  /* Text on Monolith Blue fills, such as a completed Timeline row. */
   --primary-foreground: oklch(99.16% 0.0017 67.8);
+
+  /* Timeline Row Hover: unresolved and Not Completed row hover, and the current navigation route. */
   --timeline-row-hover: #eef6ff;
+
+  /* Needs Decision Hover: hover for prior-day unresolved rows. */
   --timeline-needs-decision-hover: #e8f2ff;
+
+  /* Completed Row Hover: hover for Completed Timeline rows. */
   --timeline-completed-hover: #2f669f;
+
+  /* Readable Ash: secondary text that must stay readable. Note-style notices use it at text-xs. */
   --muted-readable: oklch(52.59% 0.0187 245.3);
+
+  /* Muted text: an alias of Readable Ash. */
   --muted-foreground: var(--muted-readable);
+
+  /* Rust Signal: explicit Not Completed decisions and rare destructive or caution states. */
   --accent: oklch(57.69% 0.1656 33.1);
+
+  /* Ash Line: the single border color for dividers, controls, rows and inputs. */
   --line: oklch(83% 0.006 248);
+
+  /* Focus outline color: the same hue as Rust Signal. */
   --focus: oklch(57.69% 0.1656 33.1);
+
   /* Advisor plan Phase 1C: the shared alert notice (DESIGN.md, "Alert notice"). Errors use these, never the advice styles. */
   --alert-signal: var(--accent);
   --alert-foreground: var(--foreground);
+
+  /* Focus ring: an alias of the focus outline color. */
   --ring: var(--focus);
+
   /* Shift Tailwind's default type scale down one step for product UI. */
   --text-xs: 0.6875rem;
   --text-xs--line-height: 1rem;
@@ -48,6 +82,7 @@
   --text-8xl--line-height: 1;
   --text-9xl: 6rem;
   --text-9xl--line-height: 1;
+
   /* Experimental no-bold pass: all Tailwind weight utilities resolve to normal. */
   --font-weight-thin: 400;
   --font-weight-extralight: 400;

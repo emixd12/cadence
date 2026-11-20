@@ -24,7 +24,7 @@ interaction IDs and implementation traceability.
 - `scripts/check-interactions.mjs`: structural, reference, coverage, and drift
   validation.
 
-The current schema version is `1.3.0`. Version 1.1 added required
+The current schema version is `1.4.0`. Version 1.1 added required
 `user_guidance` metadata without changing the meaning of existing interaction
 fields. Version 1.2 adds optional `effect_checks`. Each check binds one recorded
 effect to a named implementation handler and stable evidence inside that
@@ -39,6 +39,15 @@ web or marketing contract while the desktop port is pending. Desktop-only
 controls use new IDs, with explicit web/marketing exclusions and native evidence
 gates. Partial native proof belongs in the applicable intent’s notes; it does
 not establish all variants as implemented.
+
+Version 1.4 adds a top-level `features` list and a required `feature` field on
+every interaction. A feature is a named product area a person would recognize,
+such as Timeline, Daily Brief or Hevy connector. Each feature has a stable id, a
+plain-language `meaning`, and a `spec` reference to the doc section that defines
+it. `npm run interactions:check` fails when a feature's spec heading is missing,
+when an interaction names an unknown feature, or when a feature has no
+interactions. The product map (`docs/PRODUCT_MAP_GUIDE.md`) joins features to
+journeys, components, tokens, services, API routes, database tables and MCP tools.
 
 Do not maintain a second hand-written list of interaction entries. Query or
 transform the JSON registry when another representation is needed.

@@ -27,6 +27,7 @@ marketing-site, workspace, desktop, or mobile work.
 npm ci
 npm run agents:check
 npm run interactions:check
+npm run map:check
 npm run resolvers:check
 npm run lint
 npm run typecheck
@@ -204,6 +205,7 @@ Before marking a coding task complete, run:
 ```bash
 npm run agents:check
 npm run interactions:check
+npm run map:check
 npm run resolvers:check
 npm run lint
 npm run typecheck
@@ -224,7 +226,7 @@ Its checks run as parallel jobs:
 
 | Job | Runs |
 | --- | --- |
-| `checks` | `agents:check`, `interactions:check`, `resolvers:check`, the full-history check, `public-source:check`, `public-trust:check`, `public-trust:fixtures`, `typecheck` |
+| `checks` | `agents:check`, `interactions:check`, `map:check`, `resolvers:check`, the full-history check, `public-source:check`, `public-trust:check`, `public-trust:fixtures`, `typecheck` |
 | `lint` | `lint` |
 | `test` | `npm run test` in three shards (`--shard=N/3`), one runner each |
 | `build` | `build`, with the Next.js build cache |
@@ -275,7 +277,7 @@ curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=1.0.0-beta.21
 Run from the repository root:
 
 ```bash
-dagger check --cadence                # the ten Cadence checks, concurrently
+dagger check --cadence                # the eleven Cadence checks, concurrently
 dagger check -l --cadence             # list them
 dagger check cadence/typecheck        # one check
 dagger check cadence/lint cadence/test

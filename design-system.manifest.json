@@ -29,7 +29,7 @@
       "benchAnchor": "design-system#ds-composite-occurrence-note-form",
       "trackUsages": "optional",
       "status": "active",
-      "notes": ""
+      "notes": "The note editor inside an expanded Timeline row: write, edit or clear the note on one occurrence, with note shortcuts."
     },
     {
       "id": "composite.note-editor",
@@ -71,7 +71,7 @@
       "benchAnchor": "design-system#ds-composite-occurrence-row",
       "trackUsages": "optional",
       "status": "active",
-      "notes": ""
+      "notes": "One Timeline occurrence row: the behavior and time, Completed and Not Completed actions, and an expandable area for the note and Move for today."
     },
     {
       "id": "flow.sign-in-methods",
@@ -85,7 +85,7 @@
       "benchAnchor": "design-system#ds-flow-sign-in-methods",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The sign-in choices on the login page: Google, Apple and email (a link or a 6-digit code)."
     },
     {
       "id": "flow.email-sign-in",
@@ -171,7 +171,7 @@
       "benchAnchor": "design-system#ds-layout-app-shell",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The signed-in app frame: primary navigation (Timeline, Chat, Behaviors, Export, Settings), the account footer and the mobile drawer."
     },
     {
       "id": "layout.cadence-page-banner",
@@ -199,7 +199,7 @@
       "benchAnchor": "design-system#ds-layout-screen-frame",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The frame for each primary screen: page banner, title area, placeholder panels and the loading state for screen content."
     },
     {
       "id": "module.behavior-create-section",
@@ -213,7 +213,7 @@
       "benchAnchor": "design-system#ds-module-behavior-create-section",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The Create behavior section on Behaviors: the disclosure that opens the behavior form for a new behavior."
     },
     {
       "id": "module.behavior-list",
@@ -227,7 +227,7 @@
       "benchAnchor": "design-system#ds-module-behavior-list",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The list of behaviors on Behaviors, active and archived, filtered and sorted by category, with each behavior's edit, archive and restore actions."
     },
     {
       "id": "module.behavior-log-import-panel",
@@ -241,7 +241,7 @@
       "benchAnchor": "design-system#ds-module-behavior-log-import-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Export screen panel to upload a BehaviorLog bundle, review its validation and conflict warnings, and apply a safe import plan."
     },
     {
       "id": "module.behavior-log-restore-panel",
@@ -255,7 +255,7 @@
       "benchAnchor": "design-system#ds-module-behavior-log-restore-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Export screen panel to restore a full backup, with its destructive-action gates, acknowledgements and stale-preview refusal."
     },
     {
       "id": "module.export-panel",
@@ -269,7 +269,7 @@
       "benchAnchor": "design-system#ds-module-export-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The Export screen's main panel: choose a range and archive options, then download JSONL, CSV, full JSON backup or a BehaviorLog bundle."
     },
     {
       "id": "module.export-range-selector",
@@ -297,7 +297,7 @@
       "benchAnchor": "design-system#ds-module-markdown-summary-actions",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Copy or download the Markdown summary of an export, with a fallback message when copying is unavailable."
     },
     {
       "id": "module.prompt-library-panel",
@@ -311,7 +311,7 @@
       "benchAnchor": "design-system#ds-module-prompt-library-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Export screen list of analysis prompts to paste into the user's own AI assistant, each stating the export format it needs."
     },
     {
       "id": "module.prompt-copy-action",
@@ -325,7 +325,7 @@
       "benchAnchor": "design-system#ds-module-prompt-copy-action",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The copy action for one analysis prompt, with copied and copy-unavailable states."
     },
     {
       "id": "module.mobile-timeline-pull-to-refresh",
@@ -383,7 +383,7 @@
       "benchAnchor": "design-system#ds-module-needs-decision-dialog",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The Needs decision dialog: resolve prior-day unresolved occurrences one by one without punitive language."
     },
     {
       "id": "module.notification-permission-panel",
@@ -397,7 +397,7 @@
       "benchAnchor": "design-system#ds-module-notification-permission-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Settings panel for browser notifications: asks permission, registers this device and reports enabled, blocked or unavailable states."
     },
     {
       "id": "module.timezone-panel",
@@ -425,7 +425,7 @@
       "benchAnchor": "design-system#ds-module-reminder-editor",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "The reminders section of the behavior form: browser reminder times and optional email reminder offsets for one behavior."
     },
     {
       "id": "module.settings-sections",
@@ -604,7 +604,7 @@
       "benchAnchor": "design-system#ds-module-timeline-group",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "One day or group on the Timeline (such as Needs decision or a date), with its heading, day note and occurrence rows."
     },
     {
       "id": "module.category-panel",
@@ -618,7 +618,7 @@
       "benchAnchor": "design-system#ds-module-category-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": ""
+      "notes": "Settings panel to create, rename, reorder and delete categories."
     },
     {
       "id": "module.day-progress-timeline",

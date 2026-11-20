@@ -62,7 +62,7 @@ different risk in the product.
 |---|---|---|---|---|
 | J01 | Public discovery | Maya, Sam, Robin | Marketing homepage or direct marketing route | User understands Cadence, BehaviorLog's role, and the next action without mistaking future scope for current scope. |
 | J02 | Trust before sign-in | Maya, Robin | `/login`, `/terms`, `/privacy`, `/trust` | User can decide whether the product boundary, privacy model, reminders, export, and deletion posture are acceptable. |
-| J03 | Google sign-in | Maya, Robin | `/login` to `/auth/google` and `/auth/callback` | User reaches `/timeline` after auth, or receives a recoverable error without exposing provider details. |
+| J03 | Sign-in | Maya, Robin | `/login` to Google, Apple or email sign-in and `/auth/callback`; `/settings#sign-in-methods` | User reaches `/timeline` after auth, or receives a recoverable error without exposing provider details, and can add or remove sign-in methods. |
 | J04 | First-run activation | Maya, Lina | `/timeline` after first login | User sees the Timeline first, can use the setup pop-up, and can skip setup without losing the core workflow. |
 | J05 | Create first behavior | Maya, Jordan | `/behaviors#create-behavior` | User creates a behavior with title, recurrence, and at least one schedule slot, then sees it represented in the app. |
 | J06 | Maintain behaviors | Jordan, Priya | `/behaviors` | User edits recurrence/schedule/reminders, archives, restores, and understands active versus archived records. |
@@ -82,6 +82,12 @@ different risk in the product.
 | J20 | Empty and error states | Maya, Alex | All primary routes | User can recover from no behaviors, no occurrences, invalid import, auth failure, save failure, unsupported push, or blocked permission states. |
 | J21 | Mobile navigation and task flow | Jordan, Alex | Protected routes under 1024px | User opens and closes the drawer, navigates, uses Timeline actions, and reaches settings without layout overlap. |
 | J22 | Machine-readable public docs | Sam | Marketing `/docs`, `llms.txt`, Markdown mirrors | User or agent can find route manifests, examples, and machine-readable outputs without scraping the app shell. |
+| J23 | Connect a calendar | Jordan, Alex | `/settings` calendar sections, `/timeline` | User connects Google, Outlook or iCloud Calendar, picks which calendars Cadence reads, refreshes or disconnects, and sees events as context on the Timeline. |
+| J24 | Connect Hevy and count workouts | Alex | `/settings` Hevy section, `/behaviors`, `/timeline` | User connects Hevy, links a behavior so logged workouts complete it, counts an unlinked workout by hand, refreshes or disconnects. |
+| J25 | Daily Brief and its moves | Jordan, Lina | `/timeline`, `/settings` Daily Brief and ChatGPT plan sections | User reads today's brief, answers or undoes its same-day moves, refreshes or reopens it, chooses what data it uses, and can run it on their own ChatGPT plan. |
+| J26 | Travel and leave times | Jordan, Lina | `/settings#travel`, `/behaviors`, `/timeline` | User saves Home and usual travel, picks a behavior's Where, answers leave-time questions, corrects estimates, and turns travel estimates and leave reminders on or off. |
+| J27 | Completion places | Priya, Robin | `/settings` completion places section, `/behaviors` | User turns completion places on or off, records or removes place markers, reviews Where suggestions, and deletes labels or markers. |
+| J28 | Connect an AI app | Sam, Robin | `/oauth/consent`, `/settings#connected-apps` | User approves or denies an AI app's access, narrows its permissions, reviews its recent activity, and disconnects it. |
 
 ## Journey Details
 
@@ -135,16 +141,17 @@ Likely failure points:
 - Users may expect email/password login if provider-level settings still allow
   it even though the UI does not expose it.
 
-### J03 Google Sign-In
+### J03 Sign-In
 
 Primary persona: Maya.
 
 Steps:
 
-1. Click the Google sign-in action.
-2. Complete provider account selection.
+1. Choose Google, Apple or email sign-in.
+2. Complete provider account selection, or open the emailed sign-in link.
 3. Return through `/auth/callback`.
 4. Land on `/timeline`.
+5. Later, add or remove a sign-in method in `/settings#sign-in-methods`.
 
 Success criteria:
 
@@ -157,6 +164,8 @@ Likely failure points:
 - A failed OAuth return may leave the user unsure whether retrying is safe.
 - Production and local auth allow-list differences can create test-only
   failures that look like product failures.
+- Removing the last working sign-in method would lock the user out, so the
+  last method cannot be removed.
 
 ### J04 First-Run Activation
 
@@ -594,6 +603,137 @@ Likely failure points:
 
 - Machine-readable links can drift from generated outputs if marketing checks
   are not run after route changes.
+
+### J23 Connect A Calendar
+
+Primary persona: Jordan.
+
+Steps:
+
+1. Open the calendar section in `/settings`.
+2. Connect Google, Outlook or iCloud Calendar.
+3. Choose which calendars Cadence reads and whether they show on the Timeline.
+4. Open `/timeline` and see events as context beside behaviors.
+5. Refresh, reconnect or disconnect when needed.
+
+Success criteria:
+
+- Calendar events show as context, never as Cadence behaviors or tasks.
+- Disconnecting removes stored calendar data and says so.
+- A failed refresh keeps the last good context and says when it was fetched.
+
+Likely failure points:
+
+- An expired provider grant can look like an empty calendar.
+- iCloud app-specific passwords are unfamiliar to many users.
+
+### J24 Connect Hevy And Count Workouts
+
+Primary persona: Alex.
+
+Steps:
+
+1. Connect Hevy in `/settings` with an API key.
+2. Link a behavior to Hevy in `/behaviors`.
+3. Log a workout in Hevy and see the linked occurrence complete on `/timeline`.
+4. Count an unlinked workout by hand when it belongs to a behavior.
+5. Refresh or disconnect Hevy.
+
+Success criteria:
+
+- Connector completions are marked as coming from Hevy.
+- A manual status always wins over a later connector match.
+
+Likely failure points:
+
+- Workouts logged across midnight can land on an unexpected day.
+
+### J25 Daily Brief And Its Moves
+
+Primary persona: Jordan.
+
+Steps:
+
+1. Open `/timeline` and read today's Daily Brief.
+2. Answer each suggested move for today: yes, no, or another time.
+3. Accept all or undo all moves.
+4. Refresh the brief later in the day, or reopen it after closing it.
+5. Choose what data the brief uses in `/settings`, and optionally run it on
+   the user's own ChatGPT plan.
+
+Success criteria:
+
+- Moves change today only; the base schedule stays the same.
+- Every move can be undone.
+- The brief names its sources and says when data is missing or stale.
+
+Likely failure points:
+
+- A failed model call must not leave half-applied moves.
+- Usage limits can stop a refresh; the notice must say when it can run again.
+
+### J26 Travel And Leave Times
+
+Primary persona: Lina.
+
+Steps:
+
+1. Save Home and usual travel in `/settings#travel`.
+2. Choose a behavior's Where in `/behaviors`.
+3. See leave times on `/timeline` and answer the leave-time question.
+4. Correct travel for one event, or edit learned travel habits.
+5. Turn travel estimates or leave reminders on or off.
+
+Success criteria:
+
+- A missing estimate says what is needed next.
+- Device location is read only when the user asks.
+
+Likely failure points:
+
+- macOS Location Services can be off without the user knowing.
+
+### J27 Completion Places
+
+Primary persona: Priya.
+
+Steps:
+
+1. Turn on completion places in `/settings`.
+2. Record a place marker when completing a behavior.
+3. Review or dismiss a Where suggestion in `/behaviors`.
+4. Change label retention, or delete labels and markers.
+5. Turn completion places off.
+
+Success criteria:
+
+- No location is recorded before the user turns the feature on.
+- Deletion removes the stored labels or markers and says what was removed.
+
+Likely failure points:
+
+- Users may not understand the difference between labels and markers.
+
+### J28 Connect An AI App
+
+Primary persona: Sam.
+
+Steps:
+
+1. Start a connection from an AI app such as Claude or ChatGPT.
+2. Review requested permissions on `/oauth/consent`, narrow them, then
+   approve or deny.
+3. Review the app's recent activity in `/settings#connected-apps`.
+4. Disconnect the app.
+
+Success criteria:
+
+- The consent screen names the app and each permission in plain words.
+- Disconnecting stops access at once.
+
+Likely failure points:
+
+- A denied or narrowed grant can make the AI app report confusing errors.
 
 ## Cross-Journey Acceptance Themes
 
