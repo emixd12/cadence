@@ -214,11 +214,11 @@ npm run test
 npm run build
 ```
 
-`npm run test` skips `tests/acceptance-web-client.test.mjs`. After changing
+`npm run test` skips the tests in `tests/acceptance-web-client/`. After changing
 `scripts/acceptance/**`, `scripts/mcp-acceptance-cleanup.mjs`,
-`scripts/mcp-fixture-cleanup.mjs`, `scripts/mcp-session-broker.mjs` or that test,
-also run `npm run test:web-client`. It needs installed Google Chrome and takes
-about ten minutes.
+`scripts/mcp-fixture-cleanup.mjs`, `scripts/mcp-session-broker.mjs` or those tests,
+also run `npm run test:web-client`. It needs installed Google Chrome. The ten test
+files run in parallel, each with its own headless Chrome and stub servers.
 
 ### GitHub Actions CI
 
@@ -327,7 +327,7 @@ It must equal `FIXTURE_SOURCE` in `scripts/build-mcp-hosted-fixtures.mjs`;
 `.git`. This works the same from the main checkout and from a worktree.
 
 **Not covered.** `public-source:check` needs the full local history, and
-`tests/acceptance-web-client.test.mjs` needs installed Google Chrome, which the
+the tests in `tests/acceptance-web-client/` need installed Google Chrome, which the
 image lacks; containers on the owner's Mac cannot `apt-get` it. GitHub Actions
 runs both. Dagger runs only on local machines: do not enable Dagger Cloud, Cloud
 Checks or Cloud engines (`docs/DECISIONS.md`, 2026-10-24).
