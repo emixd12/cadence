@@ -1739,26 +1739,6 @@
       "reason": "The Hevy link form reads routine titles from Hevy and saving binds the link to the connected Hevy account; load tests need separate synthetic provider authorization."
     },
     {
-      "id": "INT-BEHAVIOR-033",
-      "classification": "destructive_serial_only",
-      "reason": "End now and Start again change a Behavior's run state and remove or restore today's rows; they need a seeded Behavior and serial verification."
-    },
-    {
-      "id": "INT-BEHAVIOR-034",
-      "classification": "destructive_serial_only",
-      "reason": "Pause, Resume now and Cancel pause change a Behavior's run state and remove or restore rows; they need a seeded Behavior and serial verification."
-    },
-    {
-      "id": "INT-BEHAVIOR-035",
-      "classification": "browser_only",
-      "reason": "Not running disclosure state is client-side."
-    },
-    {
-      "id": "INT-BEHAVIOR-036",
-      "classification": "browser_only",
-      "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
-    },
-    {
       "id": "INT-TIMELINE-014",
       "classification": "destructive_serial_only",
       "reason": "Per-day moves need today's clock in the account's timezone, the Occurrence's current revision and idempotency verification; run serially on a synthetic account."
@@ -1777,6 +1757,46 @@
       "id": "INT-TIMELINE-017",
       "classification": "destructive_serial_only",
       "reason": "The overlap notice exists only after a schedule edit collides with today's move; it needs a seeded collision and serial verification."
+    },
+    {
+      "id": "INT-ADVISOR-001",
+      "classification": "browser_only",
+      "reason": "Opening the advisor panel is page state; its reads (today's tip, the schedule question, earlier tips) are single database reads with no model call."
+    },
+    {
+      "id": "INT-ADVISOR-002",
+      "classification": "destructive_serial_only",
+      "reason": "A tip reaction needs a stored tip for the account's local today, written by the nightly coach run; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-ADVISOR-003",
+      "classification": "browser_only",
+      "reason": "The research card comes with the tip; opening it makes no request."
+    },
+    {
+      "id": "INT-ADVISOR-004",
+      "classification": "destructive_serial_only",
+      "reason": "Schedule answers edit a Behavior's schedule and need an open stored proposal; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-BEHAVIOR-033",
+      "classification": "destructive_serial_only",
+      "reason": "End now and Start again change a Behavior's run state and remove or restore today's rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-034",
+      "classification": "destructive_serial_only",
+      "reason": "Pause, Resume now and Cancel pause change a Behavior's run state and remove or restore rows; they need a seeded Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-035",
+      "classification": "browser_only",
+      "reason": "Not running disclosure state is client-side."
+    },
+    {
+      "id": "INT-BEHAVIOR-036",
+      "classification": "browser_only",
+      "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
     },
     {
       "id": "INT-TIMELINE-018",

@@ -15,6 +15,9 @@ const productAssets = [
   "brand/cadence-page-banner-lines-dots.png",
   "brand/cadence-timeline-horse-lines-dots-clear-background.png",
   "brand/cadence-timeline-horse-lines-dots-mobile-right-18.png",
+  // Advisor Phase 4 (4E): the window horse (draft art).
+  "brand/cadence-advisor-window-draft.webp",
+  "brand/cadence-advisor-window-draft-small.webp",
   "sounds/completion-chime.mp3",
 ];
 const publicRoot = new URL("../../public/", import.meta.url);
@@ -30,7 +33,7 @@ function localProductAssets(): Plugin {
           const bytes = await readFile(new URL(path, publicRoot));
           response.setHeader(
             "Content-Type",
-            path.endsWith(".mp3") ? "audio/mpeg" : path.endsWith(".svg") ? "image/svg+xml" : "image/png",
+            path.endsWith(".mp3") ? "audio/mpeg" : path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".webp") ? "image/webp" : "image/png",
           );
           response.end(bytes);
         } catch (error) {

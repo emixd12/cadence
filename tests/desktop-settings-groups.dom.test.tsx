@@ -89,7 +89,7 @@ describe("desktop Settings groups (Ticket 302)", () => {
     expect(titles("settings-general")).toEqual(["Local profile", "Cadence account", "Timezone", "Notifications", "Categories"]);
     expect(group("settings-general").querySelector("h4")?.textContent).toBe("Reminder coverage");
     expect(titles("settings-connections")[0]).toBe("Connected sources");
-    expect(titles("settings-planning")).toEqual(["Travel", "Daily Brief"]);
+    expect(titles("settings-planning")).toEqual(["Travel", "AI features"]);
     expect(titles("settings-account")).toEqual(["Export"]);
     expect(titles("settings-mac")).toEqual(["Local database", "App updates", "Setup guide"]);
     expect(container.textContent).not.toContain("Note shortcuts");
@@ -118,7 +118,7 @@ describe("desktop Settings groups (Ticket 302)", () => {
     expect(account.querySelector("[data-settings-state]")?.textContent).toBe("Not linked");
     expect(account.querySelector("summary")?.textContent).toBe("Link a Cadence account");
     expect(account.querySelector("details")?.open).toBe(false);
-    expect(drawer("Daily Brief").querySelector("[data-settings-state]")?.textContent).toBe("Link a Cadence account");
+    expect(drawer("AI features").querySelector("[data-settings-state]")?.textContent).toBe("Link a Cadence account");
     expect(drawer("Categories").querySelector("summary")?.textContent).toBe("Edit 2 categories");
   });
 

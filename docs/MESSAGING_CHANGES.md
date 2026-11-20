@@ -2046,6 +2046,49 @@ cite has not changed.
 - **Related:** P-061, P-063.
 - **Status:** logged.
 
+## P-070: One AI features question replaces the Daily Brief opt-in
+
+- **Change:** advisor Phase 4, workstream 4F (Emi, November 19, D2). On first open of
+  Timeline every account answers one question, "AI features": Daily Brief, Advisor tips,
+  Chat, and what they use (Behaviors and history, Notes, Reminder history, Connected
+  calendars and Hevy), all on, each with "If you turn it off: …". **Continue** turns
+  everything on; **Keep AI features off** turns every feature off. Settings > Daily Brief
+  becomes Settings > AI features, with a switch per feature and source choices shared by
+  all three. The Daily Brief panel's old disclosure ("The briefing cannot change tracking
+  or Calendar records", "Connected sources, reminder history and Notes are optional") and
+  the per-source "Event titles … are not sent" lines are replaced: Chat reads event
+  titles (D4).
+- **Affected:** `components/onboarding/AiFeaturesApproval.tsx`,
+  `components/briefing/DailyBriefSettingsPanel.tsx`, `lib/ui/ai-features-copy.ts`.
+- **Surfaces:** in-app copy (new). User guide `docs/user-guide/timeline.md#daily-brief`,
+  Privacy, Terms and marketing still describe an opt-in Daily Brief that sends no event
+  titles.
+- **Update needed:** user guide and public pages, at beta launch.
+
+## P-071: Overnight coach signals widen, and the advisor writes daily tips
+
+- **Change:** implemented November 19, 2026 (advisor plan Phase 4, workstream 4B). The
+  overnight coach signals (P-064) widen from five patterns to twenty-one, still counts only,
+  no model call, no titles or notes: weekly numbers, weekday gap, time-of-day gap, set time
+  or range, steady item, never done, dip and recovery, day shape, unmarked items, marking
+  time, done together, crowded hour, setup gaps, reminder response, time spent against the
+  set length, and moved against unmoved items. They now also read sent reminders and timed
+  sessions. Each morning the advisor turns up to three of them into short tips. A tip pairs
+  one counted fact with one action from a reviewed research card. The model sees the counts,
+  the Behavior titles the tips name, and, only when the person's AI choices allow notes, up
+  to seven recent day notes. A new account's first tips are filled from the cards' own
+  wording with no model call. Tips are stored with the card and the facts they state, and
+  kept until the person deletes their data. "Don't suggest this again" turns a card off for
+  that account.
+- **Affected:** `packages/core/src/resolvers/coach-signals-v2.resolver.ts`,
+  `lib/services/advisor-tips-*.ts`, `app/api/advisor/tips/*`,
+  `supabase/migrations/20261119221000_advisor_tips.sql`.
+- **Surfaces:** none in-app until workstream 4E shows tips. Privacy and Terms describe
+  five overnight patterns and no tips (P-064, P-065).
+- **Update needed:** when P-064 is written up, list the pattern families in general terms
+  and describe tips (what reaches the model, how long tips are kept).
+- **Related:** P-064, P-065.
+
 ## P-073: End date must come after today
 
 - **Change:** implemented November 20, 2026. Creating a Behavior, or changing an active

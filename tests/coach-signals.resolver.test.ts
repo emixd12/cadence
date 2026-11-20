@@ -13,6 +13,14 @@ import {
 // Advisor plan Phase 3, workstream 3D. Expected signals come from hand-counted
 // fixtures and the thresholds in the plan, not from the implementation.
 
+
+// Version 2 added more kinds (tests/coach-signals-v2.resolver.test.ts). These cases pin
+// the version 1 kinds only.
+const V1_KINDS = new Set(["completion_drop", "repeated_move", "late_marking", "new_behavior_settled", "brief_answers"]);
+function resolveV1(value: ResolveCoachSignalsInput) {
+  return resolveCoachSignals(value).filter((signal) => V1_KINDS.has(signal.kind));
+}
+
 const TODAY = "2026-11-19";
 const ZONE = "America/New_York";
 const READING: CoachSignalBehavior = { id: "b-reading", createdAt: "2026-08-01T12:00:00Z", timezone: ZONE, active: true };
@@ -39,7 +47,7 @@ describe("completion_drop", () => {
   const baseline = occurrences(READING.id, -42, [...Array(10).fill(c), ...Array(2).fill(n)]); // 10/12 = 0.83
   it("fires when the recent rate is 25 points or more below the baseline", () => {
     const recent = occurrences(READING.id, -14, [c, c, c, n, n, n, u]); // 3/6 = 0.5
-    const signals = resolveCoachSignals(input({ occurrences: [...baseline, ...recent] }));
+    const signals = resolveV1(input({ occurrences: [...baseline, ...recent] }));
     expect(signals).toEqual([{
       kind: "completion_drop",
       behaviorId: READING.id,
@@ -53,17 +61,17 @@ describe("completion_drop", () => {
 
   it("stays quiet for a smaller drop, too few recent decisions, or today's outcomes", () => {
     const smallDrop = occurrences(READING.id, -14, [c, c, c, c, n, n]); // 4/6 = 0.67, drop 0.17
-    expect(resolveCoachSignals(input({ occurrences: [...baseline, ...smallDrop] }))).toEqual([]);
+    expect(resolveV1(input({ occurrences: [...baseline, ...smallDrop] }))).toEqual([]);
     const fewRecent = occurrences(READING.id, -14, [n, n, n, n, u, u]); // only 4 resolved
-    expect(resolveCoachSignals(input({ occurrences: [...baseline, ...fewRecent] }))).toEqual([]);
+    expect(resolveV1(input({ occurrences: [...baseline, ...fewRecent] }))).toEqual([]);
     const todayOnly = [...occurrences(READING.id, -14, [c, c, c, c, c]), ...occurrences(READING.id, 0, [n, n, n, n, n])];
-    expect(resolveCoachSignals(input({ occurrences: [...baseline, ...todayOnly] }))).toEqual([]);
+    expect(resolveV1(input({ occurrences: [...baseline, ...todayOnly] }))).toEqual([]);
   });
 
   it("ignores archived Behaviors", () => {
     const recent = occurrences(READING.id, -14, [n, n, n, n, n, n]);
     const archived = { ...READING, active: false };
-    expect(resolveCoachSignals(input({ behaviors: [archived], occurrences: [...baseline, ...recent] }))).toEqual([]);
+    expect(resolveV1(input({ behaviors: [archived], occurrences: [...baseline, ...recent] }))).toEqual([]);
   });
 });
 
@@ -84,7 +92,7 @@ describe("repeated_move", () => {
       move("o3", -2, "23:30", { source: "daily_brief" }), // Tue Nov 17, 18:30 local
       move("o4", -1, "11:00"), // 06:00 local, earlier: the one exception
     ];
-    const [signal] = resolveCoachSignals(input({ moves }));
+    const [signal] = resolveV1(input({ moves }));
     expect(signal).toEqual({
       kind: "repeated_move",
       behaviorId: GYM.id,
@@ -92,7 +100,24 @@ describe("repeated_move", () => {
         window_days: 28, moved_days: 4, same_direction_days: 3, direction: "later",
         median_shift_minutes: 690, median_target_time: "18:30", target_spread_minutes: 30,
         weekdays: [2, 5], by_source: { person: 2, daily_brief: 1 }, last_moved_date: day(-2),
+        // Version 2: per-weekday counts over the last five matching weekdays (no Occurrence
+        // rows in this fixture, so the moved dates are the matching dates).
+        weekday_matching: { 2: 2, 3: 1, 5: 1 }, weekday_later: { 2: 2, 3: 0, 5: 1 }, weekday_earlier: { 2: 0, 3: 1, 5: 0 },
       },
+    });
+  });
+
+  it("version 2: counts moves on the last 5 matching weekdays, reaching back past 28 days", () => {
+    // Gym every Tuesday for five weeks (Oct 20 .. Nov 17), moved later on four of them.
+    // Oct 20 is outside the 28-day window but still one of the last five Tuesdays.
+    const tuesdays = [-30, -23, -16, -9, -2];
+    const rows: CoachSignalOccurrence[] = tuesdays.map((offset) => ({ behaviorId: GYM.id, localDate: day(offset), status: c }));
+    const moves = [move("t1", -30, "23:30"), move("t2", -23, "23:30"), move("t4", -9, "23:30"), move("t5", -2, "23:30")];
+    const [signal] = resolveV1(input({ occurrences: rows, moves }));
+    expect(signal?.kind).toBe("repeated_move");
+    expect(signal?.facts).toMatchObject({
+      window_days: 28, same_direction_days: 3, direction: "later",
+      weekday_matching: { 2: 5 }, weekday_later: { 2: 4 }, weekday_earlier: { 2: 0 },
     });
   });
 
@@ -101,7 +126,7 @@ describe("repeated_move", () => {
       move("o3", -2, "23:30"),
       { ...move("o3", -2, "12:00"), kind: "revert", chainPosition: 2, fromStartAt: `${day(-2)}T23:30:00Z`, toPlanned: true },
     ];
-    expect(resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...undone] }))).toEqual([]);
+    expect(resolveV1(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...undone] }))).toEqual([]);
   });
 
   it("uses the net move of a re-moved Occurrence, from its planned time", () => {
@@ -109,7 +134,7 @@ describe("repeated_move", () => {
       move("o3", -2, "14:00"),
       { ...move("o3", -2, "23:30"), chainPosition: 2, fromStartAt: `${day(-2)}T14:00:00Z` },
     ];
-    const [signal] = resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...removed] }));
+    const [signal] = resolveV1(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...removed] }));
     expect(signal?.facts).toMatchObject({ moved_days: 3, same_direction_days: 3, median_shift_minutes: 690 });
   });
 
@@ -120,14 +145,14 @@ describe("repeated_move", () => {
       { ...move("o3", -2, "01:00"), chainPosition: 2, fromStartAt: `${day(-2)}T23:30:00Z`, toStartAt: `${day(-1)}T01:00:00Z`, source: "daily_brief" },
       { ...move("o3", -2, "23:30"), kind: "revert", chainPosition: 3, fromStartAt: `${day(-1)}T01:00:00Z`, source: "person" },
     ];
-    const [signal] = resolveCoachSignals(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...partial] }));
+    const [signal] = resolveV1(input({ moves: [move("o1", -9, "23:30"), move("o2", -6, "23:00"), ...partial] }));
     expect(signal?.facts).toMatchObject({ moved_days: 3, same_direction_days: 3, median_target_time: "18:30", by_source: { person: 3 } });
   });
 
   it("stays quiet when moves go both ways", () => {
     const moves = [move("o1", -9, "23:30"), move("o2", -6, "23:30"), move("o3", -4, "23:30"),
       move("o4", -3, "11:00"), move("o5", -2, "11:00")]; // 3 of 5 later is under two thirds
-    expect(resolveCoachSignals(input({ moves }))).toEqual([]);
+    expect(resolveV1(input({ moves }))).toEqual([]);
   });
 });
 
@@ -147,7 +172,7 @@ describe("late_marking", () => {
       // A correction recorded later does not replace the first decision.
       decision("r4", READING.id, -4, `${day(-1)}T13:00:00Z`),
     ];
-    expect(resolveCoachSignals(input({ decisions }))).toEqual([{
+    expect(resolveV1(input({ decisions }))).toEqual([{
       kind: "late_marking",
       behaviorId: READING.id,
       facts: { window_days: 14, decisions: 5, later_day: 3, late_share: 0.6, median_lag_days: 1 },
@@ -158,7 +183,7 @@ describe("late_marking", () => {
     // 03:30Z is 22:30 the previous evening in New York: same day, not late.
     const decisions = Array.from({ length: 5 }, (_, index) =>
       decision(`r${index}`, READING.id, -10 + index, `${day(-9 + index)}T03:30:00Z`));
-    expect(resolveCoachSignals(input({ decisions }))).toEqual([]);
+    expect(resolveV1(input({ decisions }))).toEqual([]);
   });
 
   it("adds an account-wide signal across Behaviors", () => {
@@ -166,7 +191,7 @@ describe("late_marking", () => {
     const sameDay = Array.from({ length: 4 }, (_, index) => decision(`r${index}`, READING.id, -12 + index, `${day(-12 + index)}T20:00:00Z`));
     const twoMore = [decision("g9", GYM.id, -3, `${day(-3)}T20:00:00Z`), decision("r9", READING.id, -3, `${day(-3)}T20:00:00Z`)];
     // Gym: 4 of 5 late. Reading: 0 of 5. Account: 4 of 10 = 0.4.
-    const signals = resolveCoachSignals(input({ decisions: [...late, ...sameDay, ...twoMore] }));
+    const signals = resolveV1(input({ decisions: [...late, ...sameDay, ...twoMore] }));
     expect(signals.map((signal) => [signal.behaviorId, signal.facts.later_day, signal.facts.decisions])).toEqual([
       [GYM.id, 4, 5],
       [null, 4, 10],
@@ -179,7 +204,7 @@ describe("new_behavior_settled", () => {
     // Created 2026-11-05 at 09:00 local; today is day 14.
     const fresh: CoachSignalBehavior = { id: "b-new", createdAt: "2026-11-05T14:00:00Z", timezone: ZONE, active: true };
     const rows = occurrences(fresh.id, -14, [c, c, n, c, u, c, c, n, c, c, c, u, c, n, c]); // last one is today
-    expect(resolveCoachSignals(input({ behaviors: [fresh], occurrences: rows }))).toEqual([{
+    expect(resolveV1(input({ behaviors: [fresh], occurrences: rows }))).toEqual([{
       kind: "new_behavior_settled",
       behaviorId: fresh.id,
       facts: { age_days: 14, first_days: 14, completed: 9, not_completed: 3, unresolved: 2, completion_rate: 0.75 },
@@ -188,7 +213,7 @@ describe("new_behavior_settled", () => {
 
   it("stays quiet on day 13 and from day 21", () => {
     for (const createdAt of ["2026-11-06T14:00:00Z", "2026-10-29T14:00:00Z"]) {
-      expect(resolveCoachSignals(input({ behaviors: [{ id: "b-new", createdAt, timezone: ZONE, active: true }] }))).toEqual([]);
+      expect(resolveV1(input({ behaviors: [{ id: "b-new", createdAt, timezone: ZONE, active: true }] }))).toEqual([]);
     }
   });
 });
@@ -202,7 +227,7 @@ describe("brief_answers", () => {
       { behaviorId: READING.id, localDate: day(0), kind: "yes" as const },
       { behaviorId: READING.id, localDate: day(-40), kind: "yes" as const }, // outside the window
     ];
-    expect(resolveCoachSignals(input({ answers }))).toEqual([
+    expect(resolveV1(input({ answers }))).toEqual([
       { kind: "brief_answers", behaviorId: GYM.id, facts: {
         window_days: 28, answers: 3, by_kind: { no: 2, other_time: 1 }, answered_days: 2, declined_days: 2, last_answer_date: day(-1),
       } },
@@ -216,6 +241,6 @@ describe("brief_answers", () => {
   });
 
   it("emits nothing before the brief offers moves", () => {
-    expect(resolveCoachSignals(input({}))).toEqual([]);
+    expect(resolveV1(input({}))).toEqual([]);
   });
 });
