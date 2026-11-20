@@ -1,7 +1,7 @@
 name: Web client runner
 
 # The headless-Chrome tests for the ChatGPT web and Claude web acceptance
-# runner take about ten minutes. They run here, only when the runner or a file
+# runner take about two minutes. They run here, only when the runner or a file
 # it imports changes, and not in the CI workflow's required `verify` check.
 on:
   pull_request:
@@ -43,7 +43,7 @@ jobs:
   web-client:
     name: Web client runner tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,4 +51,7 @@ jobs:
           persist-credentials: false
       - name: Set up Node.js and dependencies
         uses: ./.github/actions/setup
+      # One worker per test file. The tests wait on timers and use little CPU,
+      # so ten files fit on the runner's four cores: 100 s, against 244 s with
+      # Vitest's default of three workers (November 20, 2026).
       - run: npm run test:web-client -- --maxWorkers=10
