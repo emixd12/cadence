@@ -216,7 +216,8 @@ export function ChatPage({
   const send = useCallback(
     (raw: string) => {
       const text = raw.trim();
-      if (!text || sending) return;
+      // While a requested conversation is still opening, a send would start a new one instead.
+      if (!text || sending || restoring) return;
       // The same words after a failure keep their id, so the server never runs them twice.
       const clientMessageId = unsent && unsent.text === text ? unsent.clientMessageId : newClientMessageId();
       setUnsent(null);
@@ -228,7 +229,7 @@ export function ChatPage({
       setThread((current) => addPendingUserMessage(expireOpenConfirms(current), clientMessageId, text));
       void runTurn(clientMessageId, text, thread.conversationId);
     },
-    [runTurn, sending, thread.conversationId, unsent],
+    [restoring, runTurn, sending, thread.conversationId, unsent],
   );
 
   /** Ends the running turn. What streamed stays; a turn the server never took goes back into the box. */
@@ -418,6 +419,7 @@ export function ChatPage({
             onSend={() => send(draft)}
             onStop={stop}
             sending={sending}
+            locked={restoring}
             unsentAlert={unsent?.alert ?? null}
             showJump={showJump}
             onJump={jumpToLatest}
@@ -471,6 +473,7 @@ function ChatComposer({
   onSend,
   onStop,
   sending,
+  locked,
   unsentAlert,
   showJump,
   onJump,
@@ -480,6 +483,8 @@ function ChatComposer({
   onSend: () => void;
   onStop: () => void;
   sending: boolean;
+  /** True while a requested conversation is opening; Send stays off. */
+  locked: boolean;
   unsentAlert: ChatAlert | null;
   showJump: boolean;
   onJump: () => void;
@@ -505,21 +510,21 @@ function ChatComposer({
     return () => viewport.removeEventListener("resize", keepInView);
   }, []);
 
+  const canSend = !locked && value.trim().length > 0;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (sending) onStop();
-    else onSend();
+    else if (canSend) onSend();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      if (!sending) onSend();
+      if (!sending && canSend) onSend();
     } else if (event.key === "Escape" && sending) {
       event.preventDefault();
       onStop();
     }
   };
-  const canSend = value.trim().length > 0;
 
   return (
     <form

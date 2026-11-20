@@ -80,7 +80,8 @@ export function applyChatEvent(
       const pendingUser = pendingUserId(clientMessageId);
       const pendingReply = pendingReplyId(clientMessageId);
       const messages = state.messages
-        .filter((message) => message.id !== pendingReply)
+        // A replayed turn reuses the server's reply id: drop the old partial reply so events land once.
+        .filter((message) => message.id !== pendingReply && message.id !== event.messageId)
         .map((message) =>
           message.id === pendingUser ? { ...message, id: event.userMessageId } : message,
         );

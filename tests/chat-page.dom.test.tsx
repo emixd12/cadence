@@ -133,7 +133,9 @@ describe("Chat page", () => {
     const sendTurn = vi.fn(async (request: { clientMessageId: string }, onEvent: (event: ChatEvent) => void) => {
       onEvent({ type: "start", conversationId: "c1", userMessageId: "u1", messageId: "r1", protocol: "1" });
       onEvent({ type: "text", delta: "Meds is at 8:00 AM and" });
-      throw new TypeError("network");
+      if (sendTurn.mock.calls.length === 1) throw new TypeError("network");
+      onEvent({ type: "text", delta: " Walk is at noon." });
+      onEvent({ type: "done", messageId: "r1" } as ChatEvent);
     });
     const client: ChatClient = { ...fixtureChatClient({ delayMs: 0 }), sendTurn };
     await act(async () => root.render(<ChatPage client={client} />));
@@ -147,6 +149,10 @@ describe("Chat page", () => {
     await settle();
     expect(sendTurn.mock.calls[1]![0].clientMessageId).toBe(sendTurn.mock.calls[0]![0].clientMessageId);
     expect(container.querySelectorAll('[data-chat-role="user"]')).toHaveLength(1);
+    // The replayed reply replaces the partial one instead of streaming into a copy.
+    expect(container.querySelectorAll('[data-chat-role="assistant"]')).toHaveLength(1);
+    expect(container.textContent?.split("Meds is at 8:00 AM and")).toHaveLength(2);
+    expect(container.textContent).not.toContain("Could not reach Cadence.");
   });
 
   it("Stop ends the reply, keeps what streamed, and asks the server to stop", async () => {
@@ -199,8 +205,20 @@ describe("Chat page", () => {
   });
 
   it("reopens the conversation named in the address after a reload", async () => {
-    await act(async () => root.render(<ChatPage client={fixtureChatClient({ delayMs: 0 })} syncUrl initialConversationId="conv-refusal" />));
+    const fixture = fixtureChatClient({ delayMs: 0 });
+    let open!: () => void;
+    const opened = new Promise<void>((resolve) => { open = resolve; });
+    const getConversation = vi.fn(async (id: string) => { await opened; return fixture.getConversation(id); });
+    const sendTurn = vi.spyOn(fixture, "sendTurn");
+    const client: ChatClient = { ...fixture, getConversation, sendTurn };
+    await act(async () => root.render(<ChatPage client={client} syncUrl initialConversationId="conv-refusal" />));
     expect(container.textContent).toContain("Opening your conversation…");
+    // Send stays off until the conversation is open, so a message cannot start a new one.
+    await type("Is that still on?");
+    expect((container.querySelector('[data-chat-action="send"]') as HTMLButtonElement).disabled).toBe(true);
+    await pressEnter();
+    expect(sendTurn).not.toHaveBeenCalled();
+    await act(async () => open());
     await settle();
     expect(container.textContent).toContain("Your 7:00 PM has Team dinner on your calendar.");
     expect(container.querySelector('[aria-label="Try starting with"]')).toBeNull();
