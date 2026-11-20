@@ -51,4 +51,4 @@ jobs:
           persist-credentials: false
       - name: Set up Node.js and dependencies
         uses: ./.github/actions/setup
-      - run: npm run test:web-client
+      - run: npm run test:web-client -- --maxWorkers=10
