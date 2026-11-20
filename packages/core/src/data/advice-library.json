@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-20.1",
+  "version": "2026-11-20.2",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -95,8 +95,8 @@
   "cards": [
     {
       "id": "plan-when-and-where-after-a-drop",
-      "revision": 2,
-      "status": "draft",
+      "revision": 3,
+      "status": "active",
       "advice": "When a routine starts slipping, a specific when-and-where plan helps more than trying harder, and a fresh one can help when the current one stopped working.",
       "applies_when": [
         {
@@ -106,7 +106,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "If it has no set time and Where, give it both; if it has them, try a different specific time or place for two weeks.",
+      "action": "Write the plan as a time and a place, such as 7:00 AM at the gym on the way to work; if it already has both, try a different pair for two weeks.",
       "evidence": {
         "source_id": "gollwitzer-sheeran-2006",
         "kind": "meta_analysis",
@@ -117,17 +117,17 @@
       },
       "limitation": "Most studies were short and many were lab tasks; the effect in a busy everyday routine may be smaller. The review did not test changing an existing plan.",
       "quip_seeds": [
-        "{behavior} dropped to {recent_completed} of {recent_resolved} in the last {recent_days|day|days}, from {baseline_rate_pct}. Try a new specific time or place?",
-        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A specific when-and-where plan, or a fresh one, may help."
+        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A specific when-and-where plan, like a set time just after something you already do, may help.",
+        "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A specific when and where, such as a time and the place you will be, may help."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "name-the-obstacle",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Name the obstacle that keeps getting in the way, and decide now what you will do when it shows up.",
       "applies_when": [
         {
@@ -158,13 +158,13 @@
         "{behavior}: {recent_completed} of {recent_resolved} lately. What gets in the way, and what will you do when it does?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "set-it-where-you-keep-moving-it",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "A routine sticks when it is repeated at the same cue, so set the time where you actually do it.",
       "applies_when": [
         {
@@ -189,13 +189,13 @@
         "{behavior} keeps landing near {median_target_time_clock}. Setting it there may stick better."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "weeks-not-days",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "New routines take weeks to months to feel automatic, and the time varies a lot, so the first two weeks are too early to judge one.",
       "applies_when": [
         {
@@ -226,13 +226,13 @@
         "{behavior} is {age_days|day|days} old. Routines often need weeks more to feel automatic, so it is early to judge it."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "look-at-the-week",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Comparing what you did against what you planned, and adjusting, works better than tracking alone.",
       "applies_when": [
         {
@@ -263,13 +263,13 @@
         "{behavior} this week: {week_rate_pct}, against {prior_rate_pct} usually. Worth a look at what got in the way?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "same-cue-every-day",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Habits tend to form more reliably at a time and place that stay the same each time the routine comes up.",
       "applies_when": [
         {
@@ -294,13 +294,13 @@
         "{weekday_name}s get done {weekday_rate_pct} of the time, against {other_rate_pct} on other days. What is different about {weekday_name}s?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "leave-steady-items-alone",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "A steady routine often runs on its cue, so keeping its time and place protects it.",
       "applies_when": [
         {
@@ -337,13 +337,13 @@
         "{behavior} has held at {rate_pct} for {weeks|week|weeks}. Worth leaving its time and place as they are."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "one-miss-is-fine",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "A Not Completed day now and then does not undo a routine; what matters is picking it up the next time.",
       "applies_when": [
         {
@@ -374,13 +374,13 @@
         "{behavior} is at {rate_pct} for {weeks|week|weeks}, with a few Not Completed days. Those do not undo a routine."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "make-it-smaller",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "When a Behavior rarely gets done, a smaller version can be easier to start and repeat.",
       "applies_when": [
         {
@@ -405,13 +405,13 @@
         "{behavior} is at {rate_pct} for {weeks|week|weeks}. A smaller version, a new time, or archive it for now?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "plan-for-the-dip",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Plan ahead for the weeks that go badly, so getting back is a step you already know.",
       "applies_when": [
         {
@@ -442,13 +442,13 @@
         "{behavior} is back to {recent_rate_pct} after a dip to {dip_rate_pct}. What helped? Note it in its description."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "unmarked-is-not-missed",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "An Unresolved Occurrence is not a failure; it just has no decision yet.",
       "applies_when": [
         {
@@ -473,13 +473,13 @@
         "{behavior} has {unmarked|past Occurrence|past Occurrences} with no mark. Mark the ones you remember; the rest can stay Unresolved."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "stack-after-a-routine",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Doing a newer routine right after an established one, rather than before it, can help it stick.",
       "applies_when": [
         {
@@ -510,13 +510,13 @@
         "{behavior} pairs with another Behavior on {together_days} of {either_days|day|days}. Keep the newer of the two right after the other."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "one-slot-one-item",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "People tend to underestimate how long tasks take, so several Behaviors set for one hour can crowd each other out.",
       "applies_when": [
         {
@@ -541,13 +541,13 @@
         "{behavior} shares {hour_label} with other Behaviors and gets done {hour_rate_pct} of the time there. Move it to a quieter hour?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "give-it-a-length",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "People underestimate how long their own tasks take, unless they think back to how long it took before.",
       "applies_when": [
         {
@@ -594,13 +594,13 @@
         "{without_length|Behavior has|Behaviors have} no length set. How long did each take last time? That keeps the day from overfilling."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "set-the-length-it-takes",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "If sessions keep running longer than planned, plan for the time they actually take.",
       "applies_when": [
         {
@@ -631,13 +631,13 @@
         "{longer} of the last {sessions|session|sessions} of {behavior} ran past the planned {planned_minutes|minute|minutes}. Plan for the time it takes?"
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "moving-it-costs-something",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Repeating a routine at its usual cue helps it become automatic, so keep a Behavior at its usual time when the day allows.",
       "applies_when": [
         {
@@ -668,13 +668,13 @@
         "Left at their usual time, Behaviors got done {unmoved_rate_pct} of the time; moved, {moved_rate_pct}. Keep the usual time when the day allows."
       ],
       "audience": "any_account",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "start-with-when-and-where",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "A new routine starts more reliably with a plan for when and where it happens.",
       "applies_when": [
         {
@@ -705,13 +705,13 @@
         "To make new routines easier to start, add a Where to the {behaviors_without_place|Behavior|Behaviors} without one. Anywhere counts too."
       ],
       "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "start-with-fewer",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Planning many new routines at once can make the load feel harder to keep; starting with a few is easier to hold.",
       "applies_when": [
         {
@@ -747,13 +747,13 @@
         "You are starting with {active_behaviors|Behavior|Behaviors}. A few at a time are easier to keep. Archive some for later?"
       ],
       "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "anchor-to-an-existing-routine",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Setting a new Behavior right after something you already do every day gives it a steady starting point.",
       "applies_when": [
         {
@@ -784,13 +784,13 @@
         "Is there a daily routine just before each of your {active_behaviors|Behavior|Behaviors}? Setting the time right after it gives a steady start."
       ],
       "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     },
     {
       "id": "marking-is-the-core",
       "revision": 2,
-      "status": "draft",
+      "status": "active",
       "advice": "Recording what you actually did, Completed or Not Completed, is one of the ingredients most linked to changing a routine.",
       "applies_when": [
         {
@@ -821,8 +821,8 @@
         "Mark your {active_behaviors|Behavior|Behaviors} Completed or Not Completed; an honest record is the part that helps most."
       ],
       "audience": "first_two_weeks",
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
     }
   ]
 }
