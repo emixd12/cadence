@@ -7,7 +7,7 @@ import type { BehaviorConfigurationEvent, BehaviorDefinitionEvent } from "@/lib/
 
 export const CONTRACT_NOW = Temporal.Instant.from("2026-08-30T12:00:00Z");
 export const CONTRACT_VALUES: BehaviorInput = {
-  defaultDurationMinutes: 45, endDate: "2099-12-31",
+  defaultDurationMinutes: 45, endOn: "2099-12-30",
   title: "  Contract walk  ", description: " Original description ", categoryId: null,
   recurrenceRule: { frequency: "daily", interval: 1 }, scheduledTime: "09:00",
   schedules: [{ recurrenceRule: { frequency: "daily", interval: 1 }, sortOrder: 0,
@@ -40,7 +40,7 @@ export async function exerciseBehaviorStoreContract(adapter: ContractAdapter) {
   expect(created.title).toBe("Contract walk");
   expect(created.description).toBe("Original description");
   expect(created.default_duration_minutes).toBe(45);
-  expect(created.end_date).toBe("2099-12-31");
+  expect(created.end_on).toBe("2099-12-30");
   expect(created.auto_archived_at).toBeNull();
   expect(created.active).toBe(true);
   expect(created.schedules).toHaveLength(1);
@@ -62,7 +62,7 @@ export async function exerciseBehaviorStoreContract(adapter: ContractAdapter) {
   });
   expect(updated.description).toBeNull();
   expect(updated.default_duration_minutes).toBe(45);
-  expect(updated.end_date).toBe("2099-12-31");
+  expect(updated.end_on).toBe("2099-12-30");
   const edited = await adapter.readSnapshot();
   expect(edited.definitions.map((event) => event.next_title)).toEqual(["Contract walk", "Contract walk revised"]);
   expect(edited.configurations.map((event) => event.reason_code)).toEqual(["behavior_created", "behavior_edited"]);
@@ -91,7 +91,7 @@ export async function exerciseBehaviorStoreContract(adapter: ContractAdapter) {
   const archived = await adapter.readSnapshot();
   expect(archived.graphs[0].active).toBe(false);
   expect(archived.graphs[0].default_duration_minutes).toBe(45);
-  expect(archived.graphs[0].end_date).toBe("2099-12-31");
+  expect(archived.graphs[0].end_on).toBe("2099-12-30");
   expect(Boolean(archived.graphs[0].archived_at)).toBe(true);
   expect(archived.definitions).toHaveLength(2);
   expect(archived.configurations.map((event) => event.reason_code)).toEqual([
@@ -103,7 +103,7 @@ export async function exerciseBehaviorStoreContract(adapter: ContractAdapter) {
   const restored = await adapter.readSnapshot();
   expect(restored.graphs[0].active).toBe(true);
   expect(restored.graphs[0].default_duration_minutes).toBe(45);
-  expect(restored.graphs[0].end_date).toBe("2099-12-31");
+  expect(restored.graphs[0].end_on).toBe("2099-12-30");
   expect(restored.graphs[0].auto_archived_at).toBeNull();
   expect(restored.graphs[0].archived_at).toBeNull();
   expect(restored.definitions).toHaveLength(2);

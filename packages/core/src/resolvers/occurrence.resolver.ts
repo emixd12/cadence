@@ -259,6 +259,18 @@ function planOccurrenceGenerationForWindow(
 ): OccurrenceGenerationPlan {
   const timezone = input.behavior.timezone || DEFAULT_TIMEZONE;
   const runFields = runFieldsOf(input.behavior, timezone);
+  const stoppedByRun = (occurrence: ExistingOccurrenceForGeneration) =>
+    isStoppedByRunFields(runFields, existingStopCandidate(occurrence, timezone));
+  const existingOccurrenceKeys = new Set(
+    input.existingOccurrences.map(occurrenceIdentityKey),
+  );
+  // A row the stop removes by its effective (moved) time keeps its slot empty (T4).
+  const stoppedExistingKeys = new Set(
+    input.existingOccurrences.filter(stoppedByRun).map(occurrenceIdentityKey),
+  );
+  // Once a stop starts today or earlier, generation adds no row that already started,
+  // so a removed moved row does not come back at its planned time.
+  const stopStartedByToday = stopStartsOnOrBefore(runFields, input.now.toZonedDateTimeISO(timezone).toPlainDate().toString());
   const desiredOccurrences = input.behavior.active
     ? resolveDesiredOccurrences({
         behavior: input.behavior,
@@ -269,13 +281,11 @@ function planOccurrenceGenerationForWindow(
         endsAt: occurrence.scheduleEndTime
           ? plannedRangeEnd(occurrence.localDate, occurrence.scheduleStartTime, occurrence.scheduleEndTime, timezone)
           : null,
-      }))
+      }) && !stoppedExistingKeys.has(occurrenceIdentityKey(occurrence)) && !(
+        stopStartedByToday && !existingOccurrenceKeys.has(occurrenceIdentityKey(occurrence)) &&
+        !isAfter(occurrence.scheduledFor, input.now)
+      ))
     : [];
-  const stoppedByRun = (occurrence: ExistingOccurrenceForGeneration) =>
-    isStoppedByRunFields(runFields, existingStopCandidate(occurrence, timezone));
-  const existingOccurrenceKeys = new Set(
-    input.existingOccurrences.map(occurrenceIdentityKey),
-  );
   const desiredOccurrenceKeys = new Set(
     desiredOccurrences.map(occurrenceIdentityKey),
   );
@@ -636,6 +646,13 @@ export function resolveGenerationWindow(input: {
     endLocalDate: endDate.toString(),
     timezone,
   };
+}
+
+function stopStartsOnOrBefore(fields: BehaviorRunFields, localDate: string): boolean {
+  const endDay = fields.endOn && !fields.endTime
+    ? Temporal.PlainDate.from(fields.endOn).add({ days: 1 }).toString() : fields.endOn;
+  return Boolean((endDay && endDay <= localDate) || (fields.pauseFromOn && fields.pauseBackOn
+    && fields.pauseFromOn <= localDate && localDate < fields.pauseBackOn));
 }
 
 function runFieldsOf(behavior: OccurrenceGenerationBehavior, timezone: string): BehaviorRunFields {

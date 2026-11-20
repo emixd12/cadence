@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   readCachedUserBehaviors: vi.fn(),
   readOccurrenceSyncState: vi.fn(),
   ensureUserOccurrencesFresh: vi.fn(),
-  reconcileMyDueBehaviorArchives: vi.fn(),
   listOccurrencesBetweenLocalDates: vi.fn(),
   listUnresolvedOccurrencesBeforeLocalDate: vi.fn(),
   listTimeSessionHistory: vi.fn(),
@@ -30,9 +29,6 @@ vi.mock("@/lib/services/occurrence-sync-state.service", () => ({
 }));
 vi.mock("@/lib/services/occurrence.service", () => ({
   ensureUserOccurrencesFresh: mocks.ensureUserOccurrencesFresh,
-}));
-vi.mock("@/lib/services/behavior-lifecycle.service", () => ({
-  reconcileMyDueBehaviorArchives: mocks.reconcileMyDueBehaviorArchives,
 }));
 vi.mock("@/lib/db/occurrences.repo", () => ({
   listOccurrencesBetweenLocalDates: mocks.listOccurrencesBetweenLocalDates,
@@ -57,7 +53,6 @@ describe("analytics service time-session routing", () => {
     mocks.readCachedUserBehaviors.mockResolvedValue([]);
     mocks.readOccurrenceSyncState.mockResolvedValue(null);
     mocks.ensureUserOccurrencesFresh.mockResolvedValue({ synced: false });
-    mocks.reconcileMyDueBehaviorArchives.mockResolvedValue([]);
     mocks.listOccurrencesBetweenLocalDates.mockResolvedValue([]);
     mocks.listUnresolvedOccurrencesBeforeLocalDate.mockResolvedValue([]);
     mocks.listTimeSessionHistory.mockResolvedValue([]);
