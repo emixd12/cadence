@@ -38,6 +38,9 @@ export function BehaviorRunControls({
       setPickerOpen(false);
       setRange({ fromOn: localDateIn(behavior.timezone), backOn: null });
       refresh();
+      // End now ends at the start of the next minute, so the row only moves to Not
+      // running then: refresh again just after that boundary.
+      if (form.get("run_action") === "end_now") window.setTimeout(refresh, msUntilNextMinute() + 1_000);
     }
     return result;
   }, [behavior.timezone, refresh, runAction]);
@@ -95,6 +98,10 @@ export function BehaviorRunControls({
       ) : null}
     </div>
   );
+}
+
+function msUntilNextMinute(now: number = Date.now()): number {
+  return 60_000 - (now % 60_000);
 }
 
 function Dot() {
