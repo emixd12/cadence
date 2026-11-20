@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import {
   CHAT_MESSAGE_MAX_CHARS,
   type ChatAlert,
@@ -14,6 +13,7 @@ import { AlertNotice } from "@/components/feedback/AlertNotice";
 import { ChatAlertLine, ChatMessages } from "@/components/chat/ChatMessages";
 import {
   CHAT_RUN_ANNOUNCEMENTS,
+  CHAT_SETTINGS_LINK_CLASS,
   ChatRequestError,
   EMPTY_CHAT_THREAD,
   addAlertAfterOutcome,
@@ -47,6 +47,12 @@ const LINK =
 export const CHAT_OPENING_LINE =
   "Chat can read all of your Cadence data, including notes and connected calendars.";
 
+const DEFAULT_SETTINGS_LINK = (
+  <a href="/settings" className={CHAT_SETTINGS_LINK_CLASS}>
+    Change this in Settings
+  </a>
+);
+
 type View = "thread" | "past";
 
 /** A message the server did not take (it failed or was stopped before `start`). Sent again with the same id. */
@@ -72,8 +78,13 @@ export type ChatPageProps = Readonly<{
   now?: Date;
   /** The real page keeps the open conversation in `?c=` so a reload reopens it. */
   syncUrl?: boolean;
-  /** The conversation named in `?c=` when the page loaded. */
+  /** The conversation named in `?c=` when the page loaded, or the one the Mac menu opened. */
   initialConversationId?: string;
+  /**
+   * "Change this in Settings" after the opening line. Web passes a page link; the Mac
+   * passes a button that opens its Settings screen (Phase 5C). Defaults to a plain link.
+   */
+  settingsLink?: ReactNode;
 }>;
 
 export function ChatPage({
@@ -84,6 +95,7 @@ export function ChatPage({
   now,
   syncUrl = false,
   initialConversationId,
+  settingsLink = DEFAULT_SETTINGS_LINK,
 }: ChatPageProps) {
   const client = useMemo(() => providedClient ?? createChatClient(), [providedClient]);
   const [thread, setThread] = useState<ChatThreadState>(initialThread ?? EMPTY_CHAT_THREAD);
@@ -398,7 +410,7 @@ export function ChatPage({
                 Could not open that conversation. It is still in Past conversations.
               </AlertNotice>
             ) : null}
-            {empty && !restoring ? <ChatOpening starters={starters} onPick={send} disabled={sending} /> : null}
+            {empty && !restoring ? <ChatOpening starters={starters} onPick={send} disabled={sending} settingsLink={settingsLink} /> : null}
             <ChatMessages
               messages={thread.messages}
               streamingId={thread.streamingId}
@@ -443,15 +455,12 @@ function ChatOpening({
   starters,
   onPick,
   disabled,
-}: Readonly<{ starters: readonly string[] | null; onPick: (text: string) => void; disabled: boolean }>) {
+  settingsLink,
+}: Readonly<{ starters: readonly string[] | null; onPick: (text: string) => void; disabled: boolean; settingsLink: ReactNode }>) {
   return (
     <div className="flex max-w-prose flex-col gap-4 text-base leading-6">
       <p className="text-sm leading-5 text-muted-readable">
-        {CHAT_OPENING_LINE}{" "}
-        <Link href="/settings" className="underline underline-offset-2 hover:text-foreground">
-          Change this in Settings
-        </Link>
-        .
+        {CHAT_OPENING_LINE} {settingsLink}.
       </p>
       {/* Three lines are reserved while the person's own starters load, so nothing jumps. */}
       <ul className="flex min-h-[4.75rem] flex-col gap-1" aria-label="Try starting with" aria-busy={starters === null} data-chat-starters={starters === null ? "loading" : "ready"}>

@@ -3,7 +3,10 @@ import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
 import { Temporal } from "@js-temporal/polyfill";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { DesktopApp, type DesktopScreen } from "./desktop-app";
+import { DesktopApp, type DesktopChatNav, type DesktopScreen } from "./desktop-app";
+import { ChatScreen, type DesktopChatTarget } from "./chat-screen";
+import { createDesktopChatClient } from "./chat";
+import { isChatPageAvailable } from "@/lib/navigation";
 import { openCalendarSourceUrl, readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
@@ -26,6 +29,7 @@ import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
+import { CHAT_CONVERSATIONS_CHANGED_EVENT, type ChatConversationsChangedDetail } from "@/lib/ui/chat";
 import { createDesktopDailyBriefClient, type DesktopDailyBriefPlan } from "./daily-brief";
 import { chatGptPlanSwitchOn } from "./chatgpt/plan-switch";
 import { createChatGptAccountScope, createChatGptConnection } from "./chatgpt/connection";
@@ -82,7 +86,7 @@ type Bundle = { timeline: Awaited<ReturnType<typeof loadLocalTimeline>>;
   behaviors: Awaited<ReturnType<typeof getLocalBehaviorsPageData>>; hasImportRuns: boolean;
   shortcuts: { day: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
 type SyncCompletion = Readonly<{ status: SyncStatus; localCurrent: boolean }>;
-const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "behaviors", "export", "settings"];
+const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "chat", "behaviors", "export", "settings"];
 
 export function Product() {
   const [activeScreen, setActiveScreen] = useState<DesktopScreen>("timeline");
@@ -129,6 +133,9 @@ export function Product() {
   const refreshTravelStops = useRef<() => void>(() => undefined);
   const refreshLeaveStops = useCallback(() => refreshTravelStops.current(), []);
   const [navigationRequest, setNavigationRequest] = useState<{ anchor?: string } | null>(null);
+  // Advisor Phase 5C: what the Chat screen opens with, and a count so a repeated menu pick starts fresh.
+  const [chatTarget, setChatTarget] = useState<{ target: DesktopChatTarget; request: number }>({ target: { kind: "new" }, request: 0 });
+  const [chatActiveId, setChatActiveId] = useState<string | null>(null);
   // A tip's link: the Behavior and field the Behaviors screen opens (one-tap changes).
   const [behaviorEditTarget, setBehaviorEditTarget] = useState<BehaviorEditTarget | null>(null);
   const activation = useRef<{ occurrenceId: string; requestKey: number } | null>(null);
@@ -274,7 +281,9 @@ export function Product() {
     const service = new DesktopAuth(config, (state) => {
       if (!active) return;
       chatGptAccountScope.setAccount(state.status === "linked" ? state.userId : null);
-      setAccount(state); setAccountKnown(true); setCalendarClient(state.status === "linked" ? service.accountClient() : null);
+      setAccount(state); setAccountKnown(true);
+      // Advisor Phase 5C: Chat needs the account, so a Mac that signs out while Chat is open goes back to the Timeline.
+      if (state.status !== "linked") setActiveScreen((screen) => screen === "chat" ? "timeline" : screen); setCalendarClient(state.status === "linked" ? service.accountClient() : null);
     }, chatGptPlan?.disconnect, readDesktopCalendarBrokerOrigin());
     auth.current = service;
     let stop: (() => void) | undefined;
@@ -367,6 +376,27 @@ export function Product() {
     // Settings can change the grant while the Timeline is unmounted and its attempt is remembered.
     return accountChatGpt.subscribe((change) => { if (change.kind === "start") discardDailyBriefAttempt(dailyBriefClient); });
   }, [accountChatGpt, dailyBriefClient]);
+  // Advisor Phase 5C: Chat runs on the hosted server with this Mac's sign-in, so only a linked Mac
+  // has it. Its writes reach this Mac through account sync, like brief answers.
+  const chatClient = useMemo(() => calendarClient && accountUserId && isChatPageAvailable("desktop", !import.meta.env.DEV)
+    ? createDesktopChatClient(calendarClient, () => setSyncRequest((previous) => previous + 1)) : null,
+  [calendarClient, accountUserId]);
+  // The menu marks the conversation on screen; the Chat page says when it changes.
+  useEffect(() => {
+    const onChanged = (event: Event) => setChatActiveId((event as CustomEvent<ChatConversationsChangedDetail>).detail?.activeId ?? null);
+    window.addEventListener(CHAT_CONVERSATIONS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CHAT_CONVERSATIONS_CHANGED_EVENT, onChanged);
+  }, []);
+  const chatNav = useMemo<DesktopChatNav | null>(() => chatClient ? {
+    load: () => chatClient.listConversations(null).then((page) => page.conversations),
+    activeId: chatActiveId,
+    onOpen: (target) => {
+      setChatTarget((current) => ({ target: target.kind === "past" ? { kind: "past" } : { kind: "conversation", id: target.id }, request: current.request + 1 }));
+      setChatActiveId(target.kind === "conversation" ? target.id : null);
+      setActiveScreen("chat");
+      setNavigationRequest({});
+    },
+  } : null, [chatActiveId, chatClient]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
     return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
@@ -574,6 +604,10 @@ export function Product() {
   const permission = reminders?.permission ?? "checking";
   const navigate = (screen: DesktopScreen, anchor?: string) => {
     if (screen !== "timeline") setTravelCorrections({ accountId: null, items: [] });
+    // The Chat menu item opens the conversation that was on screen, or a new one.
+    if (screen === "chat" && activeScreen !== "chat") {
+      setChatTarget((current) => ({ target: chatActiveId ? { kind: "conversation", id: chatActiveId } : { kind: "new" }, request: current.request + 1 }));
+    }
     activation.current = null;
     setNotificationTarget(null);
     setActiveScreen(screen);
@@ -642,7 +676,7 @@ export function Product() {
     {conflictReview ? <AccountConflictReview conflicts={conflictReview.conflicts} busy={accountBusy} error={conflictReview.error} onResolve={resolveConflicts} /> : null}
     {account.status === "linked" || syncReady || disconnectResult ? <AccountDisconnectPanel busy={accountBusy} result={disconnectResult} error={disconnectError} onDisconnect={disconnect} /> : null}</>;
 
-  return <DevelopmentBuildProvider value={import.meta.env.DEV}><DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0}>
+  return <DevelopmentBuildProvider value={import.meta.env.DEV}><DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0} chat={chatNav}>
     <PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
@@ -708,6 +742,8 @@ export function Product() {
         busy={reminderBusy} error={reminderError} onRequestPermission={() => refreshReminders(true)}
         onReconcile={() => refreshReminders()} onShowOnboarding={() => { setGuideRequest((value) => value + 1); navigate("timeline"); }} /> : null}
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
+      {activeScreen === "chat" && chatClient ? <ChatScreen client={chatClient} target={chatTarget.target} openRequest={chatTarget.request}
+        onOpenSettings={() => navigate("settings", "settings-planning")} /> : null}
     </> : null}
     </DesktopErrorBoundary>
     </PlaceLabelProvider>
