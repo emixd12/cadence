@@ -157,6 +157,34 @@ describe("Behaviors list", () => {
     expect(container.textContent).toContain("Morning walk is paused, back Dec 8.");
   });
 
+  it("refreshes again once End now's rounded end minute has passed", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date(NOW.epochMilliseconds + 20_000)); // 9:00:20 AM
+    const onRefresh = vi.fn();
+    const runAction = vi.fn(async () => ({ status: "success" as const, message: "Morning walk ended. Start again brings it back." }));
+    const unchanged = async <T,>(state: T) => state;
+    await act(() => root.render(
+      <LinkProvider component={(props) => <a {...props} />}>
+        <RefreshProvider onRefresh={onRefresh}>
+          <BehaviorList activeBehaviors={[running]} archivedBehaviors={[]} categories={[]}
+            analytics={resolveAnalytics({ occurrences: [], now: NOW, timezone: "America/New_York" })}
+            updateAction={unchanged} archiveAction={unchanged} restoreAction={unchanged} archiveNoteAction={unchanged}
+            statusAction={unchanged} noteAction={unchanged} stopTimeTrackingAction={unchanged} resetTimeTrackingAction={unchanged}
+            runAction={runAction} />
+        </RefreshProvider>
+      </LinkProvider>,
+    ));
+    const details = container.querySelector("article details") as HTMLDetailsElement;
+    await act(() => { details.open = true; details.dispatchEvent(new Event("toggle")); });
+    await click("End now");
+    expect(runAction).toHaveBeenCalledOnce();
+    const afterSave = onRefresh.mock.calls.length;
+    await act(async () => { vi.advanceTimersByTime(40_000); });
+    expect(onRefresh.mock.calls.length).toBe(afterSave);
+    await act(async () => { vi.advanceTimersByTime(1_000); });
+    expect(onRefresh.mock.calls.length).toBe(afterSave + 1);
+  });
+
   it("shows a refused pause in the error style next to the picker", async () => {
     const runAction = vi.fn(async () => ({
       status: "error" as const, message: "Check the highlighted fields.",
