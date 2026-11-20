@@ -21,7 +21,8 @@ export async function updateLocalTimezone(value: unknown, now = Temporal.Now.ins
         ? configurationRow(plan.configurationEventPlan, profileId, plan.behaviorId, now.toString()) : null;
       const { revision, ...graph } = previous;
       return { expectedRevision: revision, configurationEvent: event,
-        graph: event ? { ...graph, behavior: { ...graph.behavior, timezone,
+        // Rule T1: `run` re-expresses an end or pause start that already happened.
+        graph: event ? { ...graph, behavior: { ...graph.behavior, ...plan.run, timezone,
           current_configuration_event_id: event.id, updated_at: now.toString() } } : graph };
     }),
   });

@@ -103,6 +103,50 @@ fn history_rows<T: StoredRow>(db: &Connection, profile_id: &str, ids: &[String])
     Ok(output)
 }
 
+/// Ended and Paused Behaviors: true when the Behavior's end or pause removes every
+/// Occurrence planned on this local day, whatever its time. The core planner applies the
+/// exact rule (isStoppedByRunFields); this date-only check refuses a stale plan that
+/// would create a row on a day that cannot run. A day after `end_on`, a day strictly
+/// inside the pause, and the first paused day when the pause starts at its beginning.
+fn run_stops_whole_day(behavior: &Behavior, local_date: &str) -> bool {
+    let ended = behavior
+        .end_on
+        .as_deref()
+        .is_some_and(|end| local_date > end);
+    let paused = match (behavior.pause_from_on.as_deref(), behavior.pause_back_on.as_deref()) {
+        (Some(from), Some(back)) => {
+            local_date < back
+                && (local_date > from
+                    || local_date == from && behavior.pause_from_time.is_none())
+        }
+        _ => false,
+    };
+    ended || paused
+}
+
+/// Ended and Paused Behaviors (rule T4): true when the end or pause may remove some
+/// Occurrence planned on this local day, so a delete of an elapsed unresolved row there
+/// is allowed. The day before each stop counts too: a time range planned overnight is
+/// still open when the stop arrives. Marked, noted and timed rows stay protected.
+fn run_may_stop_day(behavior: &Behavior, local_date: &str) -> bool {
+    let day_before = |day: &str| {
+        chrono::NaiveDate::parse_from_str(day, "%Y-%m-%d")
+            .ok()
+            .and_then(|date| date.pred_opt())
+            .map(|date| date.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| day.to_string())
+    };
+    let ended = behavior
+        .end_on
+        .as_deref()
+        .is_some_and(|end| local_date >= day_before(end).as_str());
+    let paused = match (behavior.pause_from_on.as_deref(), behavior.pause_back_on.as_deref()) {
+        (Some(from), Some(back)) => local_date >= day_before(from).as_str() && local_date < back,
+        _ => false,
+    };
+    ended || paused
+}
+
 fn protected(
     db: &Connection,
     profile_id: &str,
@@ -159,13 +203,12 @@ pub fn generate(db: &Connection, request: &Request) -> Result<Value> {
     if behavior.current_configuration_event_id.as_ref() != Some(expected_configuration_event_id) {
         return Err("Behavior configuration changed after occurrence planning.".into());
     }
-    if behavior.end_date.as_ref().is_some_and(|end| {
-        create.iter().any(|row| &row.local_date >= end)
-            || update
-                .iter()
-                .any(|replacement| &replacement.next.local_date >= end)
-    }) {
-        return Err("Behavior end date changed after occurrence planning.".into());
+    if create.iter().any(|row| run_stops_whole_day(&behavior, &row.local_date))
+        || update
+            .iter()
+            .any(|replacement| run_stops_whole_day(&behavior, &replacement.next.local_date))
+    {
+        return Err("Behavior end or pause changed after occurrence planning.".into());
     }
     if create.len() + update.len() + delete.len() > db::READ_LIMIT {
         return Err("The generation plan exceeds 100,000 rows.".into());
@@ -221,10 +264,7 @@ pub fn generate(db: &Connection, request: &Request) -> Result<Value> {
                 profile_id,
                 &before,
                 now,
-                behavior
-                    .end_date
-                    .as_ref()
-                    .is_some_and(|end| &before.local_date >= end),
+                run_may_stop_day(&behavior, &before.local_date),
             )?
         {
             return Err("An occurrence delete target changed or is protected.".into());

@@ -6,7 +6,7 @@ import {
   type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
-import { formatRunDay, localDateIn } from "@/lib/ui/behavior-run";
+import { behaviorRunOutcomeMessage, localDateIn } from "@/lib/ui/behavior-run";
 import {
   getProfileTimezone,
   listUserBehaviors,
@@ -29,6 +29,7 @@ import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import {
   behaviorErrorToActionState,
   parseBehaviorFormData,
+  parseBehaviorRunActionFormData,
 } from "@/lib/services/behavior-form";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 export { behaviorErrorToActionState };
@@ -158,6 +159,8 @@ type BehaviorGraphOperation = "create" | "update" | "archive" | "restore" | "run
  * and pause"). The action writes one configuration revision; the post-write sync then
  * removes the rows the end or pause stops, or brings rows back.
  */
+export { behaviorRunOutcomeMessage };
+
 export async function applyBehaviorRunActionForUser(
   supabase: AppSupabaseClient, userId: string,
   input: { behaviorId: string; action: BehaviorRunAction; expectedUpdatedAt: string },
@@ -177,40 +180,13 @@ export async function applyBehaviorRunActionForUser(
 export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<{ message: string }> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  const action = getRunActionFromFormData(formData);
+  const action = parseBehaviorRunActionFormData(formData);
   const updated = await applyBehaviorRunActionForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData),
     action,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
   });
   return { message: behaviorRunOutcomeMessage(updated.title, action, localDateIn(updated.timezone)) };
-}
-
-/** The italic outcome line after a run action (P-077). */
-export function behaviorRunOutcomeMessage(title: string, action: BehaviorRunAction, todayLocalDate: string): string {
-  if (action.kind === "end_now") return `${title} ended. Start again brings it back.`;
-  if (action.kind === "start_again") return `${title} is running again.`;
-  if (action.kind === "resume") return `${title} has no pause and runs as scheduled.`;
-  const back = formatRunDay(action.pause.backOn, todayLocalDate);
-  return action.pause.fromOn <= todayLocalDate
-    ? `${title} is paused, back ${back}.`
-    : `${title} pauses from ${formatRunDay(action.pause.fromOn, todayLocalDate)}, back ${back}.`;
-}
-
-function getRunActionFromFormData(formData: FormData): BehaviorRunAction {
-  const kind = formData.get("run_action");
-  const text = (name: string) => {
-    const value = formData.get(name);
-    return typeof value === "string" && value.trim() ? value.trim() : null;
-  };
-  if (kind === "end_now" || kind === "start_again" || kind === "resume") return { kind };
-  if (kind === "pause") {
-    const fromOn = text("pause_from_on");
-    const backOn = text("pause_back_on");
-    if (!fromOn || !backOn) throw new Error("Choose the first paused day and the back-on day.");
-    return { kind, pause: { fromOn, fromTime: text("pause_from_time"), backOn } };
-  }
-  throw new Error("Choose what to do with this behavior.");
 }
 
 export async function syncBehaviorGraphForUser(

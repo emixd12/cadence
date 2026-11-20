@@ -25,7 +25,8 @@ export async function getLocalBehaviorsPageData(profile: Profile,
   const needsDecisionOccurrences = [...priorUnresolved,
     ...rows.filter((row) => row.status === "unresolved" && row.local_date < range.endLocalDate)];
   const history = await localCommand("readOccurrenceHistory", { profileId, occurrenceIds: occurrences.map(({ id }) => id) });
-  const page = assembleBehaviorPageData({ behaviors, categories, profileTimezone: profile.timezone });
+  // Ended and Paused: views carry runState so the shared list groups Not running items.
+  const page = assembleBehaviorPageData({ behaviors, categories, profileTimezone: profile.timezone, now });
   return {
     behaviors: { ...page, activeBehaviors: page.activeBehaviors.map(withNativeReminderSummary),
       archivedBehaviors: page.archivedBehaviors.map(withNativeReminderSummary) },
