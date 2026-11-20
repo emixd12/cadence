@@ -16,7 +16,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/image", () => ({ default: () => null }));
 
-// Advisor plan Phase 5B: recent chats as a closed-by-default drawer under Chat in the side menu.
+// Advisor plan Phase 5B: recent chats as a drawer, open on the first visit, under Chat in the side menu.
 
 let container: HTMLDivElement;
 let root: Root;
@@ -38,17 +38,12 @@ const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 40))
 const desktopNav = () => container.querySelectorAll("aside")[1]!;
 
 describe("recent chats in the side menu", () => {
-  it("starts closed, opens to five recent chats and All conversations, and remembers the choice", async () => {
+  it("starts open on the first visit, lists five recent chats and All conversations, and remembers a close", async () => {
     const load = vi.fn(async () => CHAT_FIXTURE_CONVERSATIONS);
     await act(async () => root.render(<AppShell chatRecentsLoader={load}><p>Page</p></AppShell>));
     await settle();
     const toggle = desktopNav().querySelector('button[aria-controls="chat-nav-recents"]') as HTMLButtonElement;
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(desktopNav().querySelector("#chat-nav-recents")).toBeNull();
-    expect(load).not.toHaveBeenCalled();
-
-    await act(async () => toggle.click());
-    await settle();
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const links = Array.from(desktopNav().querySelectorAll("#chat-nav-recents a"));
     expect(links.map((link) => link.textContent)).toEqual([
       ...CHAT_FIXTURE_CONVERSATIONS.slice(0, 5).map((item) => item.title),
@@ -56,7 +51,21 @@ describe("recent chats in the side menu", () => {
     ]);
     expect(links[0]!.getAttribute("href")).toBe("/chat?c=conv-today");
     expect(links.at(-1)!.getAttribute("href")).toBe("/chat?view=past");
-    expect(window.localStorage.getItem("nav-chat-recents-open")).toBe("true");
+
+    await act(async () => toggle.click());
+    await settle();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(desktopNav().querySelector("#chat-nav-recents")).toBeNull();
+    expect(window.localStorage.getItem("nav-chat-recents-open")).toBe("false");
+  });
+
+  it("stays closed once the person has closed it", async () => {
+    window.localStorage.setItem("nav-chat-recents-open", "false");
+    const load = vi.fn(async () => CHAT_FIXTURE_CONVERSATIONS);
+    await act(async () => root.render(<AppShell chatRecentsLoader={load}><p>Page</p></AppShell>));
+    await settle();
+    expect(desktopNav().querySelector("#chat-nav-recents")).toBeNull();
+    expect(load).not.toHaveBeenCalled();
   });
 
   it("marks the open conversation and reloads when the Chat page starts a new one", async () => {

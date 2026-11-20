@@ -7,7 +7,7 @@ import type { ChatConversationSummary } from "@cadence/core/types/chat";
 import { CHAT_CONVERSATIONS_CHANGED_EVENT, type ChatConversationsChangedDetail } from "@/lib/ui/chat";
 
 // Advisor plan Phase 5B: recent chats as a quiet drawer under the Chat item in the
-// side menu. Closed by default and remembered per browser, so Chat stays one
+// side menu. Open on the first visit (Emi, Nov 20) and remembered per browser, so Chat stays one
 // menu item among others rather than a column of conversations.
 
 const STORAGE_KEY = "nav-chat-recents-open";
@@ -17,9 +17,10 @@ export type ChatRecentsLoader = () => Promise<readonly ChatConversationSummary[]
 
 function readStoredOpen(): boolean {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "true";
+    // Open on the first visit; after that, whatever the person last chose.
+    return window.localStorage.getItem(STORAGE_KEY) !== "false";
   } catch {
-    return false;
+    return true;
   }
 }
 

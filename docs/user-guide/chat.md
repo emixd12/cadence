@@ -57,7 +57,7 @@ follow; choosing one asks Chat to move the item there.
 Choose **Past conversations** to see your conversations, newest first, and open
 one to continue it. **New conversation** starts a fresh one.
 
-Your most recent chats are also in the side menu. Choose the small arrow next to
-**Chat** to show up to five of them under it, with **All conversations** at the
-end; choose the arrow again to hide them. The menu remembers which you picked. Conversations are
+Your most recent chats are also in the side menu. Up to five of them show under
+**Chat**, with **All conversations** at the end. Choose the small arrow next to
+**Chat** to hide them, and again to show them. The menu remembers which you picked. Conversations are
 kept until you delete your data in Settings.
