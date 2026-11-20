@@ -60,7 +60,7 @@
     "packages/core/src/resolvers/export.resolver.ts": 12,
     "packages/core/src/resolvers/native-reminder.resolver.ts": 1,
     "packages/core/src/resolvers/note-suggestion.resolver.ts": 2,
-    "packages/core/src/resolvers/occurrence.resolver.ts": 19,
+    "packages/core/src/resolvers/occurrence.resolver.ts": 22,
     "packages/core/src/resolvers/place-label.resolver.ts": 2,
     "packages/core/src/resolvers/recurrence.resolver.ts": 5,
     "packages/core/src/resolvers/reminder.resolver.ts": 2,

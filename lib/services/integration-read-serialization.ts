@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import { OCCURRENCE_STATUS_LABELS, type BehaviorOutput, type OccurrenceOutput } from "@cadence/core/integration";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
+import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { resolvePersistedTimelineOccurrence } from "@cadence/core/services/timeline.service";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "@cadence/core/services/occurrence-generation";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
@@ -11,7 +12,27 @@ export const integrationInstant = (value: string): string => Temporal.Instant.fr
 const nullableInstant = (value: string | null): string | null => value === null ? null : integrationInstant(value);
 
 // Allowlist every field; database rows also contain private import and ownership metadata.
-export function serializeIntegrationBehavior(behavior: BehaviorWithCategory, externalRef: string | null): BehaviorOutput {
+/**
+ * run_state, end_on, end_time and pause, plus end_date: the deprecated alias, the
+ * first day without the Behavior (end_on + 1), kept for one minor version.
+ */
+function integrationRunFields(behavior: BehaviorWithCategory, now: Temporal.Instant) {
+  const fields = runFieldsFromStored(behavior);
+  const state = behaviorRunState(fields, now);
+  return {
+    run_state: state.state,
+    end_on: fields.endOn,
+    end_time: fields.endTime ? fields.endTime.slice(0, 5) : null,
+    pause: fields.pauseFromOn && fields.pauseBackOn && state.backOn
+      ? { from_on: fields.pauseFromOn, from_time: fields.pauseFromTime ? fields.pauseFromTime.slice(0, 5) : null, back_on: fields.pauseBackOn }
+      : null,
+    end_date: fields.endOn ? Temporal.PlainDate.from(fields.endOn).add({ days: 1 }).toString() : null,
+  };
+}
+
+export function serializeIntegrationBehavior(
+  behavior: BehaviorWithCategory, externalRef: string | null, now: Temporal.Instant = Temporal.Now.instant(),
+): BehaviorOutput {
   const view = toBehaviorView(behavior);
   return {
     id: behavior.id,
@@ -22,7 +43,7 @@ export function serializeIntegrationBehavior(behavior: BehaviorWithCategory, ext
     state: behavior.active ? "active" : "archived",
     archived_at: nullableInstant(behavior.archived_at),
     auto_archived_at: nullableInstant(behavior.auto_archived_at ?? null),
-    end_date: behavior.end_date ?? null,
+    ...integrationRunFields(behavior, now),
     default_duration_minutes: behavior.default_duration_minutes ?? null,
     timezone: behavior.timezone,
     schedules: (view.schedules ?? []).map((schedule) => {

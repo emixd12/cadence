@@ -346,7 +346,9 @@ function toBehaviorPayload(
     ...("default_duration_minutes" in behavior
       ? { default_duration_minutes: behavior.default_duration_minutes ?? null }
       : {}),
-    ...("end_date" in behavior ? { end_date: behavior.end_date ?? null } : {}),
+    // Each end and pause column changes only when the payload carries it.
+    ...Object.fromEntries((["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"] as const)
+      .filter((column) => column in behavior).map((column) => [column, behavior[column] ?? null])),
     ...("auto_archived_at" in behavior
       ? { auto_archived_at: behavior.auto_archived_at ?? null }
       : {}),

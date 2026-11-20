@@ -128,6 +128,8 @@ describe("createBehaviorFromFormData", () => {
             "reminder_offset_minutes",
             "active",
             "timezone",
+            "end",
+            "pause",
           ],
           reasonCode: "behavior_created",
           source: "manual",

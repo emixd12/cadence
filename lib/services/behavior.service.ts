@@ -1,8 +1,8 @@
 import type { BehaviorInput } from "@cadence/core/behavior-store";
-import { reconcileMyDueBehaviorArchives } from "./behavior-lifecycle.service";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
-  createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  applyBehaviorRunAction, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
 import {
@@ -41,7 +41,6 @@ export async function getBehaviorReadDataForUser(supabase: AppSupabaseClient, us
 export async function getBehaviorPageData(): Promise<BehaviorPageData> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await reconcileMyDueBehaviorArchives(supabase, userId);
   const [categories, behaviors, profileTimezone] = await Promise.all([
     readCachedBehaviorCategories(supabase, userId),
     readCachedUserBehaviors(supabase, userId),
@@ -149,10 +148,55 @@ export async function updateBehaviorArchiveNoteFromFormData(formData: FormData):
   invalidateBehaviorData(userId);
 }
 
+type BehaviorGraphOperation = "create" | "update" | "archive" | "restore" | "run";
+
+/**
+ * End now, Start again, Pause or Resume now (docs/RECURRENCE_RULES.md, "Behavior end
+ * and pause"). The action writes one configuration revision; the post-write sync then
+ * removes the rows the end or pause stops, or brings rows back.
+ */
+export async function applyBehaviorRunActionForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { behaviorId: string; action: BehaviorRunAction; expectedUpdatedAt: string },
+  recordedAt = new Date().toISOString(),
+) {
+  const updated = await applyBehaviorRunAction(createBehaviorStore(supabase, userId), { ...input, recordedAt });
+  invalidateBehaviorData(userId);
+  await syncBehaviorGraphForUser(supabase, userId, "run");
+  return updated;
+}
+
+/** Form fields: behavior_id, expected_updated_at, run_action, and for a pause pause_from_on, pause_from_time, pause_back_on. */
+export async function applyBehaviorRunActionFromFormData(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const userId = await requireUserId(supabase);
+  await applyBehaviorRunActionForUser(supabase, userId, {
+    behaviorId: getBehaviorIdForArchive(formData),
+    action: getRunActionFromFormData(formData),
+    expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
+  });
+}
+
+function getRunActionFromFormData(formData: FormData): BehaviorRunAction {
+  const kind = formData.get("run_action");
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  };
+  if (kind === "end_now" || kind === "start_again" || kind === "resume") return { kind };
+  if (kind === "pause") {
+    const fromOn = text("pause_from_on");
+    const backOn = text("pause_back_on");
+    if (!fromOn || !backOn) throw new Error("Choose the first paused day and the back-on day.");
+    return { kind, pause: { fromOn, fromTime: text("pause_from_time"), backOn } };
+  }
+  throw new Error("Choose what to do with this behavior.");
+}
+
 export async function syncBehaviorGraphForUser(
   supabase: AppSupabaseClient,
   userId: string,
-  operation: "create" | "update" | "archive" | "restore",
+  operation: BehaviorGraphOperation,
 ): Promise<void> {
   const syncTimezone = await readAuthoritativeProfileTimezone(
     supabase,
@@ -183,7 +227,7 @@ export async function syncBehaviorGraphForUser(
 async function readAuthoritativeProfileTimezone(
   supabase: AppSupabaseClient,
   userId: string,
-  operation: "create" | "update" | "archive" | "restore",
+  operation: BehaviorGraphOperation,
 ): Promise<string | null> {
   try {
     const timezone = await readCachedProfileTimezone(supabase, userId);
@@ -211,7 +255,7 @@ async function readAuthoritativeProfileTimezone(
 function reportBehaviorGraphErrorSafely(
   name: string,
   error: unknown,
-  operation: "create" | "update" | "archive" | "restore",
+  operation: BehaviorGraphOperation,
 ): void {
   try {
     reportMonitoringError(name, error, { operation });

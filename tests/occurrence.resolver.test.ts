@@ -6,7 +6,6 @@ import {
   normalizeOccurrenceScheduleGraph,
   planOccurrenceGeneration,
   planOccurrenceRepair,
-  resolveDueBehaviorArchives,
   type ExistingOccurrenceForGeneration,
   type OccurrenceGenerationBehavior,
 } from "../lib/resolvers/occurrence.resolver";
@@ -838,9 +837,9 @@ describe("planOccurrenceGeneration", () => {
     expect(deleteIds(plan)).toEqual(["future-unresolved"]);
   });
 
-  it("treats the end date as the first archived local day", () => {
+  it("treats end_on as the last local day that runs", () => {
     const plan = planOccurrenceGeneration({
-      behavior: { ...BASE_BEHAVIOR, endDate: "2026-01-04" },
+      behavior: { ...BASE_BEHAVIOR, endOn: "2026-01-03" },
       existingOccurrences: [
         existingOccurrence("end-date-row", "2026-01-04T14:00:00Z", "2026-01-04"),
       ],
@@ -854,52 +853,48 @@ describe("planOccurrenceGeneration", () => {
     ]);
     expect(deleteIds(plan)).toEqual(["end-date-row"]);
   });
+
+  it("an end removes a past-due unmarked row after it, as an end entered offline leaves", () => {
+    // NOW is 11 AM in New York; the end is 8:30 AM, after which the 9 AM row is still unmarked.
+    const plan = planOccurrenceGeneration({
+      behavior: { ...BASE_BEHAVIOR, endOn: "2026-01-02", endTime: "08:30" },
+      existingOccurrences: [
+        existingOccurrence("after-end-past", "2026-01-02T14:00:00Z", "2026-01-02"),
+        { ...existingOccurrence("after-end-done", "2026-01-02T14:00:00Z", "2026-01-02"), status: "completed" },
+      ],
+      now: NOW,
+      horizonDays: 3,
+    });
+    expect(plan.create).toEqual([]);
+    expect(deleteIds(plan)).toEqual(["after-end-past"]);
+  });
+
+  it("a pause removes rows inside it, even one moved into it, and resumes on the back-on day", () => {
+    // NOW is 11 AM. The pause starts at noon; the 9 AM row was moved to 1 PM today.
+    const moved = { ...existingOccurrence("moved-into-pause", "2026-01-02T14:00:00Z", "2026-01-02"),
+      moved: true, effectiveStartAt: "2026-01-02T18:00:00Z", effectiveEndAt: "2026-01-02T18:30:00Z" };
+    const plan = planOccurrenceGeneration({
+      behavior: { ...BASE_BEHAVIOR, pauseFromOn: "2026-01-02", pauseFromTime: "12:00", pauseBackOn: "2026-01-05" },
+      existingOccurrences: [moved, existingOccurrence("paused", "2026-01-04T14:00:00Z", "2026-01-04")],
+      now: NOW,
+      horizonDays: 5,
+    });
+    expect(plan.create.map(({ localDate }) => localDate)).toEqual(["2026-01-05", "2026-01-06", "2026-01-07"]);
+    expect(deleteIds(plan).sort()).toEqual(["moved-into-pause", "paused"]);
+  });
 });
 
-it("cleans delayed end-date rows while preserving decisions, notes, and tracked time", () => {
+it("cleans delayed end rows while preserving decisions, notes, and tracked time", () => {
   const row = (id: string) => existingOccurrence(id, "2026-01-04T14:00:00Z", "2026-01-04");
   const plan = planOccurrenceGeneration({
-    behavior: { ...BASE_BEHAVIOR, active: false, endDate: "2026-01-04" },
+    behavior: { ...BASE_BEHAVIOR, active: false, endOn: "2026-01-03" },
     existingOccurrences: [row("bare"), { ...row("note"), note: "Keep" },
       { ...row("tracked"), hasTimeSessions: true }, { ...row("done"), status: "completed" }],
     now: Temporal.Instant.from("2026-01-08T15:00:00Z"),
   });
-  expect(plan.generationWindow.startLocalDate).toBe("2026-01-04");
+  expect(plan.generationWindow.startLocalDate).toBe("2026-01-03");
   expect(plan.create).toEqual([]);
   expect(deleteIds(plan)).toEqual(["bare"]);
-});
-
-describe("resolveDueBehaviorArchives", () => {
-  it("uses each Behavior timezone and returns the exact local-midnight boundary", () => {
-    expect(resolveDueBehaviorArchives({
-      behaviors: [
-        { id: "future", active: true, endDate: "2026-01-03", timezone: "America/New_York" },
-        { id: "due", active: true, endDate: "2026-01-02", timezone: "America/New_York" },
-        { id: "havana", active: true, endDate: "2026-11-01", timezone: "America/Havana" },
-        { id: "already-archived", active: false, endDate: "2026-01-01", timezone: "UTC" },
-      ],
-      now: Temporal.Instant.from("2026-11-01T12:00:00Z"),
-    })).toEqual([
-      {
-        id: "due",
-        endDate: "2026-01-02",
-        effectiveAt: "2026-01-02T05:00:00Z",
-        effectiveLocalDate: "2026-01-02",
-      },
-      {
-        id: "future",
-        endDate: "2026-01-03",
-        effectiveAt: "2026-01-03T05:00:00Z",
-        effectiveLocalDate: "2026-01-03",
-      },
-      {
-        id: "havana",
-        endDate: "2026-11-01",
-        effectiveAt: "2026-11-01T04:00:00Z",
-        effectiveLocalDate: "2026-11-01",
-      },
-    ]);
-  });
 });
 
 describe("normalizeOccurrenceScheduleGraph", () => {

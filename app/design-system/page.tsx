@@ -2084,7 +2084,7 @@ const previewFactories: Record<
       <ProductPreview maxHeight="50rem">
         <BehaviorList
           activeBehaviors={[activeBehavior]}
-          archivedBehaviors={[{ ...archivedBehavior, endDate: "2026-06-10", autoArchivedAt: "2026-06-10T04:00:00Z" }]}
+          archivedBehaviors={[{ ...archivedBehavior, endOn: "2026-06-09", autoArchivedAt: "2026-06-10T04:00:00Z" }]}
           categories={categoryOptions}
           analytics={analyticsFixture}
           updateAction={behaviorAction}
@@ -2565,7 +2565,6 @@ const futureSection: TimelineDaySection = {
 };
 
 const timelineFixture: TimelineView = {
-  archiveNotifications: [{ behaviorId: "archived-fixture", title: "Course practice", endDate: "2026-06-08" }],
   durationEstimates: {
     "behavior-water": { kind: "known", seconds: 1800, durationLabel: "30m", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
   },

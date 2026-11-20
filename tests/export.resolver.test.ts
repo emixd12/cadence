@@ -2601,7 +2601,11 @@ describe("resolveExportBundle", () => {
     ];
     const persistence = {
       defaultDurationMinutes: 45,
-      endDate: "2026-06-01",
+      endOn: "2026-05-31",
+      endTime: "18:30:00",
+      pauseFromOn: null,
+      pauseFromTime: null,
+      pauseBackOn: null,
       autoArchivedAt: "2026-06-01T12:00:00Z",
       active: false,
       archivedAt: "2026-06-01T12:00:00Z",
@@ -2628,14 +2632,18 @@ describe("resolveExportBundle", () => {
     ]);
     expect(withNotes.jsonBackup.behaviors[0]).toMatchObject({
       default_duration_minutes: 45,
-      end_date: "2026-06-01",
+      end_on: "2026-05-31",
+      end_time: "18:30:00",
+      pause_from_on: null,
+      pause_back_on: null,
       auto_archived_at: "2026-06-01T12:00:00Z",
     });
     expect(withNotesBehavior).toMatchObject({ expected_duration_minutes: 45 });
     expect(withNotesBehavior.extensions).toMatchObject({
       "app.cadence": {
         archive_notes: [{ note: "Paused while traveling." }],
-        end_date: "2026-06-01",
+        end_on: "2026-05-31",
+        end_time: "18:30:00",
         auto_archived_at: "2026-06-01T12:00:00Z",
       },
     });

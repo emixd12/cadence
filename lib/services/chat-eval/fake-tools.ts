@@ -120,7 +120,8 @@ function behaviorOutput(world: ChatWorld, item: WorldBehavior) {
   const created = toInstant(world, "2026-09-01", "09:00");
   return {
     id: item.id, title: item.title, description: item.description, location_text: null, category: item.category,
-    state: item.state, archived_at: item.state === "archived" ? nowInstant(world) : null, auto_archived_at: null, end_date: null,
+    state: item.state, archived_at: item.state === "archived" ? nowInstant(world) : null, auto_archived_at: null,
+    run_state: item.state === "archived" ? "archived" : "running", end_on: null, end_time: null, pause: null, end_date: null,
     default_duration_minutes: item.durationMinutes, timezone: world.timezone,
     schedules: [{ id: derivedId(item.id, "00000001"), recurrence, recurrence_summary: recurrenceSummary,
       time_entries: [{ id: derivedId(item.id, "00000002"), kind: "exact", preset: null, start_time: item.time, end_time: null, label: clockLabel(item.time) }],
@@ -398,7 +399,21 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     if (changed) { item.state = "active"; item.revision += 1; }
     return ok({ behavior: behaviorOutput(world, item), changed });
   },
+
+  // The eval world has no end or pause; these answer as for a running Behavior.
+  end_behavior: (world, input) => runActionUnsupported(world, input),
+  pause_behavior: (world, input) => runActionUnsupported(world, input),
+  resume_behavior: (world, input) => {
+    const item = findBehavior(world, input.behavior_id);
+    return item ? ok({ behavior: behaviorOutput(world, item), changed: false }) : fail("not_found", "No Behavior with this id.");
+  },
 };
+
+function runActionUnsupported(world: ChatWorld, input: Record<string, unknown>): ChatToolResult {
+  const item = findBehavior(world, input.behavior_id);
+  if (!item) return fail("not_found", "No Behavior with this id.");
+  return fail("invalid_state", "The chat eval world does not model ended or paused Behaviors.");
+}
 
 function moveRecord(world: ChatWorld, item: WorldOccurrence, from: string, kind: "move" | "revert") {
   const behavior = findBehavior(world, item.behaviorId)!;

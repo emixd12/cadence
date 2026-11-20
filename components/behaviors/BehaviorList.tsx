@@ -220,13 +220,6 @@ export function BehaviorList({
       ) : null}
 
       {updateAnnouncement?.message ? <BehaviorActionResultAnnouncement result={updateAnnouncement} /> : null}
-      {archivedBehaviors.some((behavior) => behavior.autoArchivedAt) ? (
-        <div role="status" className="grid gap-2 border-b border-line pb-4 text-sm">
-          {archivedBehaviors.filter((behavior) => behavior.autoArchivedAt).map((behavior) => (
-            <p key={behavior.id}>“{behavior.title}” was automatically archived{behavior.endDate ? ` for its ${behavior.endDate} end date` : ""}. Find it under Archived behaviors. History is preserved.</p>
-          ))}
-        </div>
-      ) : null}
       <OverallAdherence analytics={analytics} />
       <div className="flex flex-wrap items-end gap-4">
         <label className="grid min-w-0 max-w-full gap-2 text-sm">

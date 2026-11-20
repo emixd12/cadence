@@ -199,9 +199,12 @@ const listBehaviors = readOperation({
   name: "list_behaviors",
   title: "List Behaviors",
   description:
-    "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
+    "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
   input: object({
-    state: optional(enumOf(["active", "archived", "all"] as const, { default: "all", description: "Which Behaviors to include." })),
+    state: optional(enumOf(["active", "archived", "running", "not_running", "all"] as const, {
+      default: "all",
+      description: "Which Behaviors to include. running is active and scheduling; not_running is active but ended or paused; active is both.",
+    })),
     category_id: optional(uuid("Only Behaviors in this category.")),
     updated_since: optional(updatedSince()),
     page_size: optional(pageSize()),
@@ -217,7 +220,7 @@ const getBehavior = readOperation({
   name: "get_behavior",
   title: "Get Behavior",
   description:
-    "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, end date, archive notes, and revision. Use it before editing a Behavior.",
+    "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, and revision. Use it before editing a Behavior.",
   input: object({ behavior_id: behaviorIdInput() }),
   output: object({ behavior: behaviorOutput }),
   errors: ["not_found"],
@@ -541,7 +544,9 @@ const createBehavior = writeOperation({
     schedules: schedulesInput,
     reminders: optional(remindersInput),
     default_duration_minutes: optional(defaultDurationInput()),
-    end_date: optional(localDate("Optional first local date on which the Behavior is archived automatically.")),
+    end_on: optional(localDate("Optional last local day the Behavior runs. It stays active and moves to Not running after it.")),
+    end_time: optional(localTime("Optional local time on end_on when it stops. Needs end_on. Without it the Behavior stops at the end of end_on.")),
+    end_date: optional(localDate("Deprecated: send end_on. The first day without the Behavior; Cadence stores end_on as the day before.")),
     external_ref: optional(externalRef("Optional id of the matching record in the calling app. Stored for this client only.")),
     idempotency_key: optional(idempotencyKey()),
   }),
@@ -561,6 +566,8 @@ const behaviorChangeFields = [
   "schedules",
   "reminders",
   "default_duration_minutes",
+  "end_on",
+  "end_time",
   "end_date",
 ] as const;
 
@@ -568,7 +575,7 @@ const updateBehavior = writeOperation({
   name: "update_behavior",
   title: "Update Behavior",
   description:
-    "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end date. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
+    "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),
@@ -580,7 +587,9 @@ const updateBehavior = writeOperation({
     schedules: optional(schedulesInput),
     reminders: optional(remindersInput),
     default_duration_minutes: optional(nullable(defaultDurationInput(), { description: "New duration in minutes, or null to clear it." })),
-    end_date: optional(nullable(localDate(), { description: "New end date, or null to clear it." })),
+    end_on: optional(nullable(localDate(), { description: "New last local day, or null to clear the end. It must be later than now. To stop right away, use end_behavior." })),
+    end_time: optional(nullable(localTime(), { description: "New local stop time on end_on, or null to stop at the end of that day." })),
+    end_date: optional(nullable(localDate(), { description: "Deprecated: send end_on. The first day without the Behavior, or null to clear the end." })),
     idempotency_key: optional(idempotencyKey()),
   }, { requireOneOf: behaviorChangeFields }),
   output: object({
@@ -639,6 +648,80 @@ const restoreBehavior = writeOperation({
     "Modifies an existing Behavior's state and resumes scheduling, which Claude's review criteria treat as a data modification, so destructiveHint is true. Under OpenAI's guidance the change is easy to reverse, so the value is conservative there. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.",
 });
 
+const runActionErrors = ["not_found", "conflict", "idempotency_key_reused", "invalid_state"] as const;
+
+const endBehavior = writeOperation({
+  name: "end_behavior",
+  since: "1.4.0",
+  title: "End Behavior now",
+  description:
+    "Ends a Behavior this minute. It stays active, moves to Not running, and schedules nothing more; its Unresolved Occurrences later today, including a window still open, are removed. Marked, noted, and timed Occurrences stay. To end on a later day, use update_behavior with end_on. resume_behavior starts it again. Ending an ended Behavior changes nothing.",
+  scope: INTEGRATION_SCOPES.behaviorsWrite,
+  input: object({
+    behavior_id: behaviorIdInput(),
+    expected_revision: optional(revision()),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    behavior: behaviorOutput,
+    changed: boolean({ description: "False when the Behavior had already ended." }),
+  }),
+  errors: [...runActionErrors],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Stops scheduling and removes the rest of today's Unresolved Occurrences, so destructiveHint is true under both Claude's and OpenAI's guidance. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.",
+});
+
+const pauseBehavior = writeOperation({
+  name: "pause_behavior",
+  since: "1.4.0",
+  title: "Pause Behavior",
+  description:
+    "Pauses a Behavior from from_on until back_on, when it runs again by itself from the start of that day. A pause can start today or later; today starts now unless from_time is later. A Behavior has one pause at a time: a new pause replaces the old one. No Occurrences are scheduled while paused, and Unresolved ones inside the pause are removed. Marked, noted, and timed Occurrences stay.",
+  scope: INTEGRATION_SCOPES.behaviorsWrite,
+  input: object({
+    behavior_id: behaviorIdInput(),
+    from_on: localDate("First paused local day. Today or later."),
+    from_time: optional(nullable(localTime("Optional local time on from_on when the pause starts."))),
+    back_on: localDate("Local day it runs again. After from_on and after today."),
+    expected_revision: optional(revision()),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    behavior: behaviorOutput,
+    changed: boolean({ description: "False when the Behavior already had this pause." }),
+  }),
+  errors: [...runActionErrors],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Replaces any earlier pause and removes Unresolved Occurrences inside the pause, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments leave the same pause, so idempotentHint is true. openWorldHint is false.",
+});
+
+const resumeBehavior = writeOperation({
+  name: "resume_behavior",
+  since: "1.4.0",
+  title: "Resume Behavior",
+  description:
+    "Runs a paused or ended Behavior again from now: it clears the pause, and an end that has passed. An end still to come stays. Resuming a running Behavior changes nothing. Use restore_behavior for an archived Behavior.",
+  scope: INTEGRATION_SCOPES.behaviorsWrite,
+  input: object({
+    behavior_id: behaviorIdInput(),
+    expected_revision: optional(revision()),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    behavior: behaviorOutput,
+    changed: boolean({ description: "False when the Behavior was already running with no pause set." }),
+  }),
+  errors: [...runActionErrors],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Modifies the Behavior's end or pause and resumes scheduling, which Claude's review criteria treat as a data modification, so destructiveHint is true. Repeating it changes nothing, so idempotentHint is true. openWorldHint is false.",
+});
+
 /** Every operation, keyed by its published tool name. Insertion order is the `tools/list` order. */
 export const INTEGRATION_OPERATIONS = Object.freeze({
   get_account_context: getAccountContext,
@@ -661,6 +744,9 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   update_behavior: updateBehavior,
   archive_behavior: archiveBehavior,
   restore_behavior: restoreBehavior,
+  end_behavior: endBehavior,
+  pause_behavior: pauseBehavior,
+  resume_behavior: resumeBehavior,
 });
 
 type Operations = typeof INTEGRATION_OPERATIONS;

@@ -39,7 +39,14 @@ export type BehaviorWhereKind = (typeof BEHAVIOR_WHERE_KINDS)[number];
 
 export type BehaviorView = {
   defaultDurationMinutes?: number | null;
-  endDate?: string | null;
+  /** Last local day it runs ("Ends after"), with an optional local stop time. */
+  endOn?: string | null;
+  endTime?: string | null;
+  /** The one pause: first paused day (optional start time) and back-on day. */
+  pause?: { fromOn: string; fromTime: string | null; backOn: string } | null;
+  /** Running, ended, paused or archived when the view was built (docs/RECURRENCE_RULES.md). */
+  runState?: "running" | "ended" | "paused" | "archived";
+  /** Set only on Behaviors the retired end-date rule archived. They stay in Archived. */
   autoArchivedAt?: string | null;
   id: string;
   title: string;
@@ -69,6 +76,7 @@ export type BehaviorView = {
 
 export type BehaviorPageData = {
   categories: CategoryOption[];
+  /** Every non-archived Behavior, running or not. Group by `runState`. */
   activeBehaviors: BehaviorView[];
   archivedBehaviors: BehaviorView[];
   defaultTimezone: string;
@@ -81,7 +89,9 @@ export const BEHAVIOR_FORM_FIELDS = [
   "where_kind",
   "location_text",
   "default_duration_minutes",
-  "end_date",
+  "end_on",
+  "end_time",
+  "pause",
   "category_id",
   "schedule",
   "recurrence",
