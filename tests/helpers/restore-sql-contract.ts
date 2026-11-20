@@ -180,10 +180,12 @@ export async function exerciseRestoreSqlContract(client: AppSupabaseClient, user
   expect(snapshotHash(afterMixed.statusEvents)).toBe(snapshotHash(beforeMixed.statusEvents));
   expect(snapshotHash(afterMixed.timeSessions)).toBe(snapshotHash(beforeMixed.timeSessions));
 
-  // A pre-feature bundle can reactivate an automatically archived Behavior.
+  // A pre-feature bundle can reactivate an automatically archived Behavior. The End date must
+  // come after the write's local date (2026-08-30); the database's real clock is past it, so
+  // the archive RPC treats it as due.
   await updateBehavior(createBehaviorStore(client, userId), { behaviorId: current.behavior.id,
     expectedUpdatedAt: afterMixed.graphs[0].behavior.updated_at,
-    values: { ...addedValues, endDate: "2000-01-01" }, recordedAt: now.add({ seconds: 114 }).toString() });
+    values: { ...addedValues, endDate: "2026-08-31" }, recordedAt: now.add({ seconds: 114 }).toString() });
   const archived = await client.rpc("archive_my_due_behaviors", {});
   expect(archived.error).toBeNull();
   expect(archived.data).toHaveLength(1);

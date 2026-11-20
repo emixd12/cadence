@@ -24,7 +24,7 @@ export async function createBehavior(
   input: { values: BehaviorInput; userId: string; timezone: string; recordedAt: string },
 ): Promise<BehaviorGraphRecord> {
   const values = input.values;
-  validateBehaviorPlanningFields(values);
+  validateBehaviorPlanningFields(values, { today: localDateAt(input.recordedAt, input.timezone) });
   const behavior: BehaviorFields & { user_id: string } = {
     user_id: input.userId,
     default_duration_minutes: values.defaultDurationMinutes ?? null,
@@ -86,7 +86,10 @@ export async function updateBehavior(
     source: "manual",
   });
   const values = input.values;
-  validateBehaviorPlanningFields(values);
+  // A changed End date on an active Behavior must come after today; an unchanged one is left alone.
+  const endDateChanged = values.endDate !== undefined && values.endDate !== (existing.end_date ?? null);
+  validateBehaviorPlanningFields(values, values.active && endDateChanged
+    ? { today: localDateAt(input.recordedAt, existing.timezone) } : {});
   const archiveNotes = parseArchiveNotes(existing.archive_notes);
   if (existing.active && !values.active && !input.newArchiveNoteId) {
     throw new Error("Archive note id is required when archiving a behavior.");
@@ -326,4 +329,9 @@ export function toBehaviorConfigurationSnapshot(behavior: BehaviorFields, schedu
 function configurationWhere(behavior: BehaviorFields) {
   const where = storedBehaviorWhere(behavior);
   return { whereKind: where.where_kind, locationText: where.location_text };
+}
+
+/** The local calendar date of an instant in a timezone. */
+function localDateAt(recordedAt: string, timezone: string): string {
+  return Temporal.Instant.from(recordedAt).toZonedDateTimeISO(timezone).toPlainDate().toString();
 }

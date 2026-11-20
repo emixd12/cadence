@@ -38,6 +38,7 @@
     "lib/services/briefing-fixtures.ts": 3,
     "lib/services/briefing-history.service.ts": 3,
     "lib/services/briefing-pipeline.ts": 1,
+    "lib/services/chat-eval/fake-tools.ts": 1,
     "lib/services/connector-completion-job.service.ts": 1,
     "lib/services/imported-intervention-promotion.service.ts": 1,
     "lib/services/integration-read-serialization.ts": 1,

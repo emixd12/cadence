@@ -94,6 +94,37 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor plan Phase 5 (5A): chat server — November 19, 2026
+
+- **Merged November 20 (PR #318).** `POST /api/advisor/chat`
+  streams chat replies as NDJSON events; confirm, Undo and conversation routes sit beside it.
+  The turn runs as the person on the `chat` agent token over every MCP operation plus two
+  chat-only reads (`list_calendar_events` with event titles, `list_workouts`). Moves are
+  checked against calendar events. The first single-record write in a question runs at
+  once with Undo; Behavior changes and further writes wait for one Yes (stored in
+  `chat_confirms`, 15 minutes). Medical questions get a one-line refusal and the disclaimer.
+  Limits: 8 tool calls, US$0.25 per question, 12 KB per tool result, last 20 messages plus
+  a summary. Wire types: `packages/core/src/types/chat.ts`. Docs: `docs/DATA_MODEL.md`,
+  "Chat conversations"; `docs/ROUTE_MAP.md`.
+- **Verification:** `tests/chat-turn.test.ts` (25 tests, scripted model); migration and RLS
+  checked on a local Postgres 16 (chat token reads and writes its own rows; the person,
+  MCP grants, other agents and other users see none; delete refused; account delete
+  cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
+  fail the same way on main in this container. No live run against a real model yet.
+- **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
+- **Next:** switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
+  add `search_advice` once 4A's matcher merges.
+
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
+  mobile layout and a `/design-system` bench with fixture conversations.
+
 ## Cadence for Mac 0.1.12 published — November 19, 2026
 
 - **Published 23:34Z** on the owner's instruction of November 19, 21:20Z. Version bump PR #311
