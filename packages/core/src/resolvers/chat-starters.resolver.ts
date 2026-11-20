@@ -11,7 +11,7 @@ import type { ChatStarter } from "../types/chat";
  * when a caller passes those signal kinds; until then their questions stay unused.
  */
 
-export const CHAT_STARTERS_VERSION = "chat-starters-1";
+export const CHAT_STARTERS_VERSION = "chat-starters-2";
 export const CHAT_STARTER_COUNT = 3;
 /** At most this many questions about patterns; the rest are about today or general. */
 export const CHAT_STARTER_MAX_INSIGHTS = 2;
@@ -38,7 +38,14 @@ export type ChatStarterLane =
   | "low_behavior" | "steady_behavior" | "week_down" | "week_up" | "early"
   | ChatStarterSignalLane;
 
-export type ChatStarterEntry = Readonly<{ id: string; lane: ChatStarterLane; text: string; advice_card?: string }>;
+export type ChatStarterEntry = Readonly<{
+  id: string;
+  lane: ChatStarterLane;
+  text: string;
+  advice_card?: string;
+  /** Hidden until the account has at least this many active Behaviors. */
+  min_behaviors?: number;
+}>;
 export type ChatStarterLibrary = Readonly<{ version: string; starters: readonly ChatStarterEntry[] }>;
 
 export type ChatStarterBehaviorFacts = Readonly<{
@@ -77,7 +84,7 @@ export const CHAT_STARTER_LIBRARY: ChatStarterLibrary = rawLibrary as ChatStarte
 
 /** The three questions shown when nothing about the account can be read. */
 export const CHAT_STARTER_FALLBACK: readonly ChatStarter[] = Object.freeze(
-  ["today-whats-on", "week-what-skipped", "week-how-going"].map((id) => {
+  ["today-whats-on", "week-how-going", "today-plan-rest"].map((id) => {
     const entry = CHAT_STARTER_LIBRARY.starters.find((item) => item.id === id)!;
     return { id: entry.id, text: entry.text };
   }),
@@ -148,7 +155,8 @@ export function pickChatStarters(facts: ChatStarterFacts, library: ChatStarterLi
   const used = new Set<string>();
   const take = (lane: ChatStarterLane, title: string | null, offset = 0) => {
     const entries = library.starters.filter((entry) => entry.lane === lane && !used.has(entry.id)
-      && (title !== null || !entry.text.includes("{behavior}")));
+      && (title !== null || !entry.text.includes("{behavior}"))
+      && facts.behaviors.length >= (entry.min_behaviors ?? 0));
     if (entries.length === 0) return false;
     const entry = entries[(dayHash(`${facts.today}:${lane}`) + offset) % entries.length]!;
     used.add(entry.id);

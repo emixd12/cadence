@@ -452,7 +452,7 @@ function ChatOpening({
         .
       </p>
       {/* Three lines are reserved while the person's own starters load, so nothing jumps. */}
-      <ul className="flex min-h-[4.75rem] flex-col gap-1" aria-label="Try asking" aria-busy={starters === null} data-chat-starters={starters === null ? "loading" : "ready"}>
+      <ul className="flex min-h-[4.75rem] flex-col gap-1" aria-label="Try starting with" aria-busy={starters === null} data-chat-starters={starters === null ? "loading" : "ready"}>
         {(starters ?? []).map((prompt) => (
           <li key={prompt}>
             <button type="button" className={LINK} disabled={disabled} onClick={() => onPick(prompt)}>

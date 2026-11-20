@@ -30,12 +30,23 @@ describe("chat starter library", () => {
   });
 
   it("keeps today's three as the fallback", () => {
-    expect(CHAT_STARTER_FALLBACK.map((item) => item.text)).toEqual(["What is on today?", "What did I skip this week?", "How is my week going?"]);
+    expect(CHAT_STARTER_FALLBACK.map((item) => item.text)).toEqual(["What is on today?", "How is my week going?", "Help me plan the rest of today."]);
     expect(CHAT_STARTER_PROMPTS).toEqual(CHAT_STARTER_FALLBACK.map((item) => item.text));
   });
 });
 
 describe("picking starters", () => {
+  it("asks about starting too many Behaviors only with four or more", () => {
+    const row = { decided: 2, rate: 0.5 };
+    const facts = (count: number): ChatStarterFacts => ({
+      ...QUIET, month: { decided: 4, rate: 0.5 },
+      behaviors: Array.from({ length: count }, (_, index) => ({ ...row, title: `B${index}` })),
+    });
+    const library = { version: "t", starters: CHAT_STARTER_LIBRARY.starters.filter((entry) => entry.lane !== "early" || entry.id === "early-too-many") };
+    expect(pickChatStarters(facts(3), library).map((item) => item.id)).not.toContain("early-too-many");
+    expect(pickChatStarters(facts(4), library).map((item) => item.id)).toContain("early-too-many");
+  });
+
   it("gives three general questions to an account with nothing to go on", () => {
     const picked = pickChatStarters(QUIET);
     expect(picked).toHaveLength(3);

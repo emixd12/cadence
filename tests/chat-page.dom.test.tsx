@@ -58,11 +58,11 @@ describe("Chat page", () => {
     await act(async () => root.render(<ChatPage client={client} now={CHAT_FIXTURE_NOW} />));
     expect(container.textContent).toContain("Chat can read all of your Cadence data, including notes and connected calendars.");
     expect(container.querySelector('a[href="/settings"]')?.textContent).toBe("Change this in Settings");
-    expect(container.querySelector('[aria-label="Try asking"]')?.getAttribute("data-chat-starters")).toBe("loading");
-    expect(container.querySelectorAll('[aria-label="Try asking"] button')).toHaveLength(0);
+    expect(container.querySelector('[aria-label="Try starting with"]')?.getAttribute("data-chat-starters")).toBe("loading");
+    expect(container.querySelectorAll('[aria-label="Try starting with"] button')).toHaveLength(0);
     await act(async () => resolveStarters(["Why does Piano practice keep slipping?", "What did I skip this week?", "What should I do next today?"]));
     expect(starters).toHaveBeenCalledTimes(1);
-    expect(Array.from(container.querySelectorAll('[aria-label="Try asking"] button')).map((item) => item.textContent)).toEqual([
+    expect(Array.from(container.querySelectorAll('[aria-label="Try starting with"] button')).map((item) => item.textContent)).toEqual([
       "Why does Piano practice keep slipping?", "What did I skip this week?", "What should I do next today?",
     ]);
 
@@ -72,7 +72,7 @@ describe("Chat page", () => {
     expect(sendTurn.mock.calls[0]![0]).toMatchObject({ conversationId: null, message: "What did I skip this week?" });
     expect(container.querySelector('[data-chat-tool="adherence"]')?.textContent).toBe("Looked at this week");
     expect(container.textContent).toContain("You skipped Run on Tuesday");
-    expect(container.querySelector('[aria-label="Try asking"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Try starting with"]')).toBeNull();
   });
 
   it("shows an outcome in italic with Undo, and Undo replaces it", async () => {
@@ -203,7 +203,7 @@ describe("Chat page", () => {
     expect(container.textContent).toContain("Opening your conversation…");
     await settle();
     expect(container.textContent).toContain("Your 7:00 PM has Team dinner on your calendar.");
-    expect(container.querySelector('[aria-label="Try asking"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Try starting with"]')).toBeNull();
   });
 
   it("lists past conversations newest first and opens one", async () => {
