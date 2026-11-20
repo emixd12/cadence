@@ -2269,7 +2269,10 @@ touching `updated_at`. The migration drops `end_date`, its check,
 The configuration snapshot gains `end` (`{on, time}` or null) and `pause`
 (`{from_on, from_time, back_on}` or null). `changed_fields` accepts `end` and
 `pause`, and baselines list both. The `updated_at` trigger watches the five
-columns.
+columns. A configuration plan without `end` and `pause` keys (an older writer)
+reads as keeping the stored values, through
+`cadence_private.behavior_configuration_with_run`, as a plan without
+`where_kind` already does.
 
 Private helpers `behavior_local_instant`, `behavior_end_instant`,
 `behavior_planned_range_end` and `behavior_stops_occurrence` turn local values
