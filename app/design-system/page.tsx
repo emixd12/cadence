@@ -94,6 +94,7 @@ import { AiFeaturesPreview } from "@/app/design-system/AiFeaturesBench";
 import { SettingsDrawerBench, SettingsRowBench, SettingsSavingBench, SettingsSectionsBench } from "@/app/design-system/SettingsSectionsBench";
 import { AlertNoticeBench } from "@/app/design-system/AlertNoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
+import { MarkDetailsBench } from "@/app/design-system/MarkDetailsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -2212,6 +2213,7 @@ const previewFactories: Record<
   "module.settings-saving": () => <ProductPreview><SettingsSavingBench /></ProductPreview>,
   "module.alert-notice": () => <ProductPreview><AlertNoticeBench /></ProductPreview>,
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
+  "module.occurrence-mark-details": () => <ProductPreview maxHeight="32rem"><MarkDetailsBench /></ProductPreview>,
   "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,
   "module.trust-and-legal-panel": () => (
       <ProductPreview>

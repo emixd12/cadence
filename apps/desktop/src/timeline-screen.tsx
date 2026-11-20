@@ -1,5 +1,5 @@
 import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
@@ -9,6 +9,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { DayProgressTimeline, type DayProgressContext } from "@/components/timeline/DayProgressTimeline";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
+import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { useTimelineWheelReload } from "@/lib/ui/timeline-wheel-reload";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
@@ -41,6 +42,8 @@ export type TimelineScreenProps = Readonly<{
   onNavigate?: (screen: DesktopScreen, anchor?: string) => void;
   /** A tip's link (one-tap changes): opens the Behaviors screen at the named field. */
   onOpenAdvisorLink?: (link: AdvisorTipLink) => void;
+  /** Advisor plan 4G: the "Done at" and "Why?" lines after a mark. */
+  markDetailActions?: OccurrenceMarkDetailActions;
 }>;
 
 type NavigateScreen = (screen: DesktopScreen, anchor?: string) => void;
@@ -86,6 +89,7 @@ export function TimelineScreen({
   dailyBriefSessionKey,
   onNavigate,
   onOpenAdvisorLink,
+  markDetailActions,
   ...actions
 }: TimelineScreenProps) {
   const nextFutureDays = timeline.nextFutureDays;
@@ -149,6 +153,7 @@ export function TimelineScreen({
     <ScreenNavigation.Provider value={onNavigate}>
     <LinkProvider component={DesktopScreenLink}>
     <RefreshProvider onRefresh={onRefresh}>
+    <MarkDetails actions={markDetailActions} timezone={timeline.timezone}>
       <div ref={rootRef} className="flex w-full flex-col">
         <h1 className="sr-only">Timeline</h1>
         {reloadMessage ? (
@@ -247,8 +252,13 @@ export function TimelineScreen({
         </div>
         </AdvisorTimelineFrame>
       </div>
+    </MarkDetails>
     </RefreshProvider>
     </LinkProvider>
     </ScreenNavigation.Provider>
   );
+}
+
+function MarkDetails({ actions, timezone, children }: Readonly<{ actions?: OccurrenceMarkDetailActions; timezone: string; children: ReactNode }>) {
+  return actions ? <OccurrenceMarkDetailsProvider actions={actions} timezone={timezone}>{children}</OccurrenceMarkDetailsProvider> : <>{children}</>;
 }

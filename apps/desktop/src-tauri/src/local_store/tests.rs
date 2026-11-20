@@ -546,6 +546,44 @@ fn status_history_snapshot_reminders_and_outbox_are_atomic_with_aba_guard() {
     );
 }
 
+fn mark_detail_request(profile: &str, status: &str, latest: u32, event_id: u32, recorded: &str,
+    effective: Option<&str>, completed: Option<&str>, reason: &str) -> Value {
+    json!({"operation":"applyMarkDetail","occurrenceId":id(10),"expectedLatestEventId":id(latest),"completedAt":completed,"event":{"id":id(event_id),"user_id":profile,"occurrence_id":id(10),"behavior_id":id(1),"previous_status":status,"status":status,"status_semantics":"explicit_user_correction","recorded_at":recorded,"effective_at":effective,"local_date":"2026-08-31","timezone":"America/New_York","source_capture_method":"manual_tap","source_confidence":"high","revises_event_id":id(latest),"reason_code":reason,"created_at":recorded,"updated_at":recorded}})
+}
+
+#[test]
+fn mark_details_append_same_status_events_and_keep_the_tap_time() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    fixture.occurrence();
+    let tap = "2026-08-31T18:12:00Z";
+    fixture.run(status_request(&fixture.profile, "unresolved", None, "completed", 20, tap), 102).unwrap();
+    // Done at 9:00 AM (13:00Z): completed_at moves, status_marked_at keeps the tap.
+    let done = "2026-08-31T13:00:00Z";
+    let result = fixture.run(mark_detail_request(&fixture.profile, "completed", 20, 21, "2026-08-31T18:13:00Z", Some(done), Some(done), "done_at"), 103).unwrap();
+    assert_eq!(result["occurrence"]["completed_at"], done);
+    assert_eq!(result["occurrence"]["status_marked_at"], tap);
+    let occurrence = db::by_id::<Occurrence>(&fixture.db, &fixture.profile, &id(10)).unwrap();
+    assert_eq!(occurrence.completed_at.as_deref(), Some(done));
+    assert_eq!(occurrence.status_marked_at.as_deref(), Some(tap));
+    assert_eq!(fixture.count("occurrence_status_events"), 2);
+    // A done time after the tap, a stale latest event and a foreign reason are refused.
+    assert!(fixture.run(mark_detail_request(&fixture.profile, "completed", 21, 22, "2026-08-31T18:14:00Z", Some("2026-08-31T18:30:00Z"), Some("2026-08-31T18:30:00Z"), "done_at"), 104).is_err());
+    assert!(fixture.run(mark_detail_request(&fixture.profile, "completed", 20, 23, "2026-08-31T18:14:00Z", Some(done), Some(done), "done_at"), 105).unwrap_err().contains("history changed"));
+    assert!(fixture.run(mark_detail_request(&fixture.profile, "completed", 21, 24, "2026-08-31T18:14:00Z", Some(done), Some(done), "not_done:forgot"), 106).is_err());
+    assert_eq!(fixture.count("occurrence_status_events"), 2);
+    // A later status change revises the detail event as the latest.
+    fixture.run(status_request(&fixture.profile, "completed", Some(21), "not_completed", 25, "2026-08-31T18:20:00Z"), 107).unwrap();
+    let reason = fixture.run(mark_detail_request(&fixture.profile, "not_completed", 25, 26, "2026-08-31T18:21:00Z", Some("2026-08-31T18:20:00Z"), None, "not_done:low_energy"), 108).unwrap();
+    assert_eq!(reason["statusEvent"]["reason_code"], "not_done:low_energy");
+    let occurrence = db::by_id::<Occurrence>(&fixture.db, &fixture.profile, &id(10)).unwrap();
+    assert_eq!(occurrence.status, "not_completed");
+    assert_eq!(occurrence.status_marked_at.as_deref(), Some("2026-08-31T18:20:00Z"));
+    // A reason must keep the mark's effective time and set no done time.
+    assert!(fixture.run(mark_detail_request(&fixture.profile, "not_completed", 26, 27, "2026-08-31T18:22:00Z", Some("2026-08-31T18:22:00Z"), None, "not_done:away"), 109).is_err());
+    assert_eq!(fixture.count("occurrence_status_events"), 4);
+}
+
 #[test]
 fn generation_preserves_notes_and_configuration_lineage() {
     let mut fixture = Fixture::new();
