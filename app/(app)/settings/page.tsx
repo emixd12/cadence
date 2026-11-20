@@ -124,10 +124,10 @@ async function SettingsContent({ searchParams }: Readonly<{ searchParams: Settin
           <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
         </SettingsDrawer>
         <SettingsDrawer
-          title="Daily Brief"
+          title="AI features"
           description={SETTINGS_DAILY_BRIEF_PURPOSE}
-          label="Daily Brief settings"
-          setupLabel="Set up Daily Brief"
+          label="AI settings"
+          setupLabel="Choose AI features"
         >
           <DailyBriefSettingsPanel />
         </SettingsDrawer>
