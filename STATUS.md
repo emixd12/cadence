@@ -136,8 +136,9 @@ Check the cited entry before acting on a row.
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
   RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
-- **Next:** switch `lib/services/chat/chat-settings.ts` to 4F's `readAiSettings` once PR #317 merges;
-  add `search_advice` once 4A's matcher merges.
+- **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
+  approval while chat is on, and reads only the sources left on.
+- **Next:** add `search_advice` (4A's matcher has merged).
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
