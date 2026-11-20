@@ -104,6 +104,16 @@ describe("advisor placement K", () => {
     expect(horseLabel()).toBe("Advisor");
   });
 
+  it("asks for the next tip on focus even when today's tip is unanswered", async () => {
+    const client = fixtureAdvisorClient();
+    const nextTip = vi.spyOn(client, "nextTip");
+    await render(client);
+    expect(nextTip).toHaveBeenCalledTimes(1);
+    await act(async () => { window.dispatchEvent(new Event("focus")); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(nextTip).toHaveBeenCalledTimes(2);
+    expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
+  });
+
   it("opens the panel with the full tip, the trial and earlier tips, and closes it", async () => {
     await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_TRIAL }));
     await click("Advisor · 1 new");

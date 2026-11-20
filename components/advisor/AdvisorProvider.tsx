@@ -136,9 +136,9 @@ function AdvisorState({ client, chatHref, children }: Readonly<{ client: Advisor
     void loadTip();
     void loadProposal();
     // Returning to the app is an open: the server decides whether a new tip is due (two hours apart).
+    // Asked even when today's tip is unanswered, so a Timeline left open moves on to the next tip.
     const onFocus = () => {
-      const current = tipRef.current;
-      if (!current || current.tip.reaction !== null) void loadTip();
+      if (!pending.current) void loadTip();
       if (!proposalRef.current) void loadProposal();
     };
     window.addEventListener("focus", onFocus);
