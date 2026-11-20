@@ -7,7 +7,7 @@ import {
 } from "@cadence/core/types/chat";
 import { finishAgentRun, reserveAgentSpend, settleAgentSpend, startAgentRun } from "@/lib/db/agent-runs.repo";
 import {
-  ChatStorageError, chatStopRequested, claimChatConfirm, claimChatUndo, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
+  ChatStorageError, chatStopRequested, claimChatConfirm, claimChatUndo, releaseChatConfirm, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
   readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
 } from "@/lib/db/chat.repo";
 import { agentCallerConfigured, createAgentContext } from "@/lib/integrations/agent-caller";
@@ -23,7 +23,7 @@ import { createLiveChatExecutor, liveChatConnectorReads } from "./chat-executor"
 import { CHAT_PROMPT_VERSION, buildChatSystemPrompt } from "./chat-prompt";
 import { chatEnabled, chatSources, chatSourcesOff, readChatAiSettings } from "./chat-settings";
 import { buildChatToolDefinitions, trimToolResult, withoutNotes } from "./chat-tools";
-import { CHAT_LIMITS, budgetText, runChatTurn, summarizeOlderMessages, type ChatSpendGate } from "./chat-turn";
+import { CHAT_LIMITS, budgetText, runChatTurn, summarizeOlderMessages, type ChatSpendGate, type ChatTurnWrite } from "./chat-turn";
 import type { ChatPendingWrite, ChatUndoPlan } from "./chat-writes";
 
 /**
@@ -171,8 +171,11 @@ async function runAndStore(input: Readonly<{
 
   let runId: string | null = null;
   const usage: AgentModelUsage[] = [];
+  // What the person has seen so far, kept so a turn that fails later still stores it.
   const sentParts: ChatPart[] = [];
-  const send = (event: ChatEvent) => { input.send(event); };
+  const send = (event: ChatEvent) => { recordSentPart(sentParts, event); input.send(event); };
+  const saveWrite = (write: ChatTurnWrite) => saveChatActions(client, { userId: caller.user.id, conversationId: input.conversationId,
+    messageId: input.replyId, actions: [{ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo }] });
   try {
     ({ runId } = await startAgentRun(client, { trigger: "chat_turn", model: setting.model, promptVersion: CHAT_PROMPT_VERSION }, signal));
   } catch {
@@ -206,7 +209,7 @@ async function runAndStore(input: Readonly<{
     const result = await runChatTurn({
       setting, instructions, tools, history: earlier, summary: summarizeOlderMessages(earlier, CHAT_LIMITS.historyMessages),
       timelineJson, userMessage: input.message, executor, replyId: input.replyId, signal, onEvent: send,
-      onUsage: (item) => usage.push(item), spend, stop: stopController.signal,
+      onUsage: (item) => usage.push(item), spend, stop: stopController.signal, onWrite: saveWrite,
     });
     parts = result.parts;
     toolCalls = result.toolCalls;
@@ -214,8 +217,6 @@ async function runAndStore(input: Readonly<{
     if (result.stop === "budget_reached") { outcome = "refused_budget"; errorCode = "budget_reached"; }
     else if (result.stop === "stopped") errorCode = "stopped";
     else if (result.stop === "model_error") { outcome = "model_error"; errorCode = "model_unavailable"; errorReason = result.errorReason ?? null; }
-    await saveChatActions(client, { userId: caller.user.id, conversationId: input.conversationId, messageId: input.replyId,
-      actions: result.writes.map((write) => ({ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo })) });
     if (result.pending) {
       await saveChatConfirm(client, { userId: caller.user.id, conversationId: input.conversationId, messageId: input.replyId,
         confirm: result.pending.confirm, writes: result.pending.writes });
@@ -226,7 +227,7 @@ async function runAndStore(input: Readonly<{
     errorCode = timedOut ? "timeout" : error instanceof AgentModelError ? "model_unavailable" : "internal_error";
     const alert: ChatAlert = { code: "failed", text: timedOut ? "Chat took too long to answer. Try again." : "Chat could not answer just now. Try again in a moment." };
     send({ type: "alert", alert });
-    parts = [...sentParts, { type: "alert", alert }];
+    parts = [...sentParts];
   } finally {
     clearInterval(stopPoll);
   }
@@ -305,20 +306,29 @@ export async function answerChatConfirm(session: ChatSession, body: Readonly<{ c
     await setConfirmState("declined");
     return { confirm: { ...row.confirm, state: "declined" }, outcomes: [], refusals: [] };
   }
-  const settings = await readChatAiSettings(caller.client);
-  const sources = chatSources(settings);
-  const timezone = await profileTimezone(caller);
-  const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
-  const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today });
-  const run = await runChatConfirm({ confirmId: row.id, writes: row.writes as ChatPendingWrite[], executor });
+  let run;
+  try {
+    const settings = await readChatAiSettings(caller.client);
+    const sources = chatSources(settings);
+    const timezone = await profileTimezone(caller);
+    const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
+    const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today });
+    run = await runChatConfirm({ confirmId: row.id, writes: row.writes as ChatPendingWrite[], executor, resumed: claim.resumed === true });
+    if (run.state !== "expired") {
+      await saveChatActions(client, { userId: caller.user.id, conversationId: row.conversationId, messageId: row.messageId,
+        actions: run.writes.map((write) => ({ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo })) });
+    }
+  } catch (error) {
+    // The next Yes resumes: the write keys replay what already ran, and the rest runs.
+    await releaseChatConfirm(client, row.id).catch(() => undefined);
+    throw error;
+  }
   if (run.state === "expired") {
     await finishChatConfirm(client, row.id, "expired");
     await setConfirmState("expired");
     return { confirm: { ...row.confirm, state: "expired" }, outcomes: [], refusals: [],
       alert: { code: "failed", text: "Something changed since chat asked, so nothing was changed. Ask again." } };
   }
-  await saveChatActions(client, { userId: caller.user.id, conversationId: row.conversationId, messageId: row.messageId,
-    actions: run.writes.map((write) => ({ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo })) });
   await finishChatConfirm(client, row.id, "accepted");
   const outcomes = run.writes.map((write) => write.outcome);
   await setConfirmState("accepted", [
@@ -408,3 +418,22 @@ export function chatModelPriced(): boolean {
 }
 
 export { budgetText, randomUUID as newChatId };
+
+/** Adds one streamed event to the parts the person has seen (text deltas join the last text part). */
+export function recordSentPart(parts: ChatPart[], event: ChatEvent): void {
+  switch (event.type) {
+    case "text": {
+      const last = parts.at(-1);
+      if (last?.type === "text") parts[parts.length - 1] = { type: "text", text: last.text + event.delta };
+      else parts.push({ type: "text", text: event.delta });
+      return;
+    }
+    case "tool": parts.push({ type: "tool", tool: event.tool }); return;
+    case "outcome": parts.push({ type: "outcome", outcome: event.outcome }); return;
+    case "refusal": parts.push({ type: "refusal", refusal: event.refusal }); return;
+    case "notice": parts.push({ type: "notice", notice: event.notice }); return;
+    case "alert": parts.push({ type: "alert", alert: event.alert }); return;
+    // A confirm is stored only with its pending writes, so a failed turn leaves it out.
+    default: return;
+  }
+}

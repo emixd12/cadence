@@ -27,13 +27,15 @@ export async function runChatConfirm(input: Readonly<{
   writes: readonly ChatPendingWrite[];
   executor: ChatToolExecutor;
   newId?: () => string;
+  /** A Yes resumed after a failed one: earlier writes may have run, so the guards are not checked again. */
+  resumed?: boolean;
 }>): Promise<ChatConfirmRun> {
   const newId = input.newId ?? randomUUID;
   const facts: ChatWriteFacts[] = [];
   for (const write of input.writes) {
     const read = factsReadFor(write.call);
     const current = factsFrom(write.call, read ? await input.executor(read.name, read.args, { idempotencyKey: null }) : null);
-    if (write.guard && revisionOf(current) !== write.guard.revision) return { state: "expired", writes: [], refusals: [] };
+    if (!input.resumed && write.guard && revisionOf(current, write.guard.kind) !== write.guard.revision) return { state: "expired", writes: [], refusals: [] };
     facts.push(current);
   }
   const writes: Array<ChatConfirmRun["writes"][number]> = [];
@@ -71,7 +73,8 @@ function sameRecordAsEarlier(writes: readonly ChatPendingWrite[], index: number)
   return !!target && writes.slice(0, index).some((write) => write.guard?.id === target);
 }
 
-function revisionOf(facts: ChatWriteFacts): string | null {
+function revisionOf(facts: ChatWriteFacts, kind: NonNullable<ChatPendingWrite["guard"]>["kind"]): string | null {
+  if (kind === "day_note") return facts.dayNote === undefined ? null : facts.dayNoteRevision ?? "none";
   const record = (facts.occurrence ?? facts.behavior) as Record<string, unknown> | null | undefined;
   return record && typeof record.revision === "string" ? record.revision : null;
 }
@@ -79,19 +82,13 @@ function revisionOf(facts: ChatWriteFacts): string | null {
 export type ChatUndoRun = Readonly<{ ok: true; text: string } | { ok: false; reason: "changed" | "failed" }>;
 
 /**
- * Undoes one write. Moves read the item's current revision first (the move functions
- * check it); note and status Undo carry the state right after the write, so they
- * refuse when the person changed the record since (T11).
+ * Undoes one write. Every Undo carries the state right after the write (a move's
+ * revision, a note's revision, a status), so it refuses when the record changed since (T11).
  */
 export async function runChatUndo(input: Readonly<{
   outcome: ChatOutcome; plan: ChatUndoPlan; executor: ChatToolExecutor; idempotencyKey: string;
 }>): Promise<ChatUndoRun> {
-  let call = input.plan.call;
-  if (input.plan.refreshRevision) {
-    const read = await input.executor("get_occurrence", { occurrence_id: input.plan.refreshRevision.occurrenceId }, { idempotencyKey: null });
-    if (!read.ok) return { ok: false, reason: "failed" };
-    call = withRevision({ ...call, args: Object.fromEntries(Object.entries(call.args).filter(([key]) => key !== "expected_revision")) }, factsFrom(call, read));
-  }
+  const call = input.plan.call;
   const done = await input.executor(call.name, call.args, { idempotencyKey: input.idempotencyKey });
   if (!done.ok) return { ok: false, reason: done.error.code === "conflict" || done.error.code === "invalid_state" ? "changed" : "failed" };
   if (moveRefusal(done.result)) return { ok: false, reason: "changed" };

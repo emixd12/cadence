@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4 } from "ai/test";
 import { simulateReadableStream } from "ai";
-import type { ChatEvent, ChatMessage } from "@cadence/core/types/chat";
+import type { ChatEvent, ChatMessage, ChatPart } from "@cadence/core/types/chat";
 import { agentModelSetting } from "@/lib/services/agent-model";
 import { modelPrice, usageMicrodollars } from "@/lib/services/agent-model-pricing";
 import { buildChatSystemPrompt } from "@/lib/services/chat/chat-prompt";
 import { buildChatToolDefinitions, trimToolResult } from "@/lib/services/chat/chat-tools";
 import { buildHistoryMessages, messageText, runChatTurn, summarizeOlderMessages } from "@/lib/services/chat/chat-turn";
 import { runChatConfirm, runChatUndo } from "@/lib/services/chat/chat-confirm";
+import { recordSentPart } from "@/lib/services/chat/chat.service";
 import type { ChatToolExecutor, ChatToolResult } from "@/lib/services/chat/chat-writes";
 
 const ALL_ON = { notes: true, googleCalendar: true, outlookCalendar: true, icloudCalendar: true, hevy: true };
@@ -49,6 +50,7 @@ const OCC = (id: string, extra: Record<string, unknown> = {}) => ({
 function fakeExecutor() {
   const state: Record<string, ReturnType<typeof OCC>> = { o1: OCC("o1"), o2: OCC("o2") };
   const calls: Array<{ name: string; args: Record<string, unknown>; key: string | null }> = [];
+  const dayNote: { note: string | null; revision: string } = { note: "Busy day", revision: "d1" };
   let revision = 1;
   const executor: ChatToolExecutor = async (name, args, { idempotencyKey }): Promise<ChatToolResult> => {
     calls.push({ name, args: { ...args }, key: idempotencyKey });
@@ -69,6 +71,7 @@ function fakeExecutor() {
         return { ok: true, result: { occurrence: state[id], changed: true } };
       }
       case "move_occurrence_for_day": {
+        if (args.expected_revision && args.expected_revision !== state[id]!.revision) return { ok: false, error: { code: "conflict", message: "changed" } };
         if (args.start_time === "19:00") {
           return { ok: true, result: { outcome: "refused", occurrence: state[id], move: null, refusal: { reason: "calendar_busy", message: "Your 7 pm has Team dinner on your calendar.",
             alternatives: [{ start_at: "2026-11-20T01:30:00Z", start_time: "20:30" }] } } };
@@ -77,12 +80,18 @@ function fakeExecutor() {
         return { ok: true, result: { outcome: "moved", occurrence: state[id], move: { id: "m1" }, refusal: null } };
       }
       case "revert_occurrence_move":
+        if (args.expected_revision && args.expected_revision !== state[id]!.revision) return { ok: false, error: { code: "conflict", message: "changed" } };
         state[id] = { ...state[id]!, effective_start_at: state[id]!.scheduled_for, revision: `r${++revision}` };
         return { ok: true, result: { outcome: "undone", occurrence: state[id], move: { id: "m2" }, refusal: null } };
+      case "list_day_notes": return { ok: true, result: { day_notes: dayNote.note === null ? [] : [{ local_date: "2026-11-19", ...dayNote }] } };
+      case "update_day_note":
+        if (args.expected_revision && args.expected_revision !== dayNote.revision) return { ok: false, error: { code: "conflict", message: "changed" } };
+        dayNote.note = args.note as string; dayNote.revision = `d${++revision}`;
+        return { ok: true, result: { day_note: { local_date: "2026-11-19", ...dayNote }, changed: true } };
       default: return { ok: true, result: {} };
     }
   };
-  return { executor, calls, state };
+  return { executor, calls, state, dayNote };
 }
 
 function turn(steps: Step[], fake = fakeExecutor(), extra: Partial<Parameters<typeof runChatTurn>[0]> = {}) {
@@ -312,6 +321,53 @@ describe("chat confirm and Undo (5A)", () => {
     const undo = await runChatUndo({ outcome: result.writes[0]!.outcome, plan: result.writes[0]!.undo!, executor: fake.executor, idempotencyKey: "chat:undo:x3" });
     expect(undo.ok).toBe(true);
     expect(fake.calls.at(-1)).toMatchObject({ name: "revert_occurrence_move", args: { occurrence_id: "o2", expected_revision: expect.any(String) } });
+  });
+
+  it("Undo of a move refuses after the person moved the item again", async () => {
+    const { promise, fake } = turn([{ calls: [{ name: "move_occurrence_for_day", input: { occurrence_id: "o2", start_time: "18:00" } }] }, { text: "ok" }]);
+    const result = await promise;
+    // The person moves Walk again from the Timeline.
+    fake.state.o2 = { ...fake.state.o2!, effective_start_at: "2026-11-20T00:00:00Z", revision: "r-timeline" };
+    const undo = await runChatUndo({ outcome: result.writes[0]!.outcome, plan: result.writes[0]!.undo!, executor: fake.executor, idempotencyKey: "chat:undo:x4" });
+    expect(undo).toEqual({ ok: false, reason: "changed" });
+    expect(fake.state.o2!.effective_start_at).toBe("2026-11-20T00:00:00Z");
+  });
+
+  it("does nothing on Yes when the day note changed while waiting", async () => {
+    const fake = fakeExecutor();
+    const run = () => runChatConfirm({ confirmId: "c2", executor: fake.executor, writes: [
+      { call: { name: "update_day_note", args: { local_date: "2026-11-19", note: "Chat's text" } }, item: { text: "Save a day note", kind: "day_note" }, guard: { kind: "day_note", id: "2026-11-19", revision: "d1" } },
+    ] });
+    fake.dayNote.note = "Person's newer text"; fake.dayNote.revision = "d7";
+    expect((await run()).state).toBe("expired");
+    expect(fake.dayNote.note).toBe("Person's newer text");
+  });
+
+  it("a resumed Yes finishes without re-checking guards its own writes changed", async () => {
+    const fake = fakeExecutor();
+    fake.state.o1 = { ...fake.state.o1!, status: "completed", revision: "r5" }; // the first Yes already ran this write
+    const run = await runChatConfirm({ confirmId: "c3", executor: fake.executor, resumed: true, writes: [
+      { call: { name: "set_occurrence_status", args: { occurrence_id: "o1", status: "completed" } }, item: { text: "Mark Meds done", kind: "status" }, guard: { kind: "occurrence", id: "o1", revision: "r1" } },
+    ] });
+    expect(run.state).toBe("accepted");
+  });
+});
+
+describe("chat writes survive a failed turn (5A)", () => {
+  it("stores each write before the turn goes on", async () => {
+    const stored: string[] = [];
+    const { promise } = turn([{ calls: [{ name: "set_occurrence_status", input: { occurrence_id: "o1", status: "completed" } }] }, { text: "Done." }],
+      fakeExecutor(), { onWrite: async (write) => { stored.push(write.outcome.text); } });
+    await promise;
+    expect(stored).toEqual(["Marked Meds done."]);
+  });
+
+  it("keeps streamed parts in order, joining text deltas", () => {
+    const parts: ChatPart[] = [];
+    const outcome = { id: "o", kind: "status" as const, text: "Marked Meds done.", confirmed: false, undo: "available" as const };
+    for (const event of [{ type: "text", delta: "Marking " }, { type: "text", delta: "it." }, { type: "outcome", outcome },
+      { type: "confirm", confirm: {} }, { type: "text", delta: "Then" }] as ChatEvent[]) recordSentPart(parts, event);
+    expect(parts).toEqual([{ type: "text", text: "Marking it." }, { type: "outcome", outcome }, { type: "text", text: "Then" }]);
   });
 });
 

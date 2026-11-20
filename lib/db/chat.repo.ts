@@ -178,18 +178,30 @@ export type ChatConfirmRow = Readonly<{
   id: string; conversationId: string; messageId: string; confirm: ChatConfirm; writes: unknown; state: string; expiresAt: string;
 }>;
 
+/** How long a Yes may run before another Yes can take its claim over (the confirm deadline plus margin). */
+export const CHAT_CONFIRM_LEASE_MS = 90_000;
+
 /**
  * Claims a pending, unexpired confirm for answering. Returns the row and whether this
- * call claimed it; an expired one is marked expired here.
+ * call claimed it; an expired one is marked expired here. A claim whose Yes failed or
+ * stopped midway (still `answering` after the lease) is taken over with `resumed`: the
+ * person already said Yes in time, and the write keys replay what already ran.
  */
 export async function claimChatConfirm(client: AppSupabaseClient, confirmId: string, now = new Date()): Promise<Readonly<{
-  row: ChatConfirmRow; claimed: boolean;
+  row: ChatConfirmRow; claimed: boolean; resumed?: boolean;
 }>> {
-  const { data: claimed, error } = await client.from("chat_confirms").update({ state: "answering" })
+  const select = "id, conversation_id, message_id, confirm, writes, state, expires_at";
+  const { data: claimed, error } = await client.from("chat_confirms").update({ state: "answering", answered_at: now.toISOString() })
     .eq("id", confirmId).eq("state", "pending").gt("expires_at", now.toISOString())
-    .select("id, conversation_id, message_id, confirm, writes, state, expires_at").maybeSingle();
+    .select(select).maybeSingle();
   if (error) fail(error);
   if (claimed) return { row: confirmRow(claimed), claimed: true };
+  const staleBefore = new Date(now.getTime() - CHAT_CONFIRM_LEASE_MS).toISOString();
+  const { data: resumed, error: resumeError } = await client.from("chat_confirms").update({ answered_at: now.toISOString() })
+    .eq("id", confirmId).eq("state", "answering").lt("answered_at", staleBefore)
+    .select(select).maybeSingle();
+  if (resumeError) fail(resumeError);
+  if (resumed) return { row: confirmRow(resumed), claimed: true, resumed: true };
   const { data: current, error: readError } = await client.from("chat_confirms")
     .select("id, conversation_id, message_id, confirm, writes, state, expires_at").eq("id", confirmId).maybeSingle();
   if (readError) fail(readError);
@@ -204,6 +216,13 @@ export async function claimChatConfirm(client: AppSupabaseClient, confirmId: str
 function confirmRow(row: Row<{ id: string; conversation_id: string; message_id: string; confirm: unknown; writes: unknown; state: string; expires_at: string }>): ChatConfirmRow {
   return { id: row.id, conversationId: row.conversation_id, messageId: row.message_id, confirm: row.confirm as ChatConfirm,
     writes: row.writes, state: row.state, expiresAt: row.expires_at };
+}
+
+/** Gives up a claim after a failed Yes, so the next Yes resumes at once. */
+export async function releaseChatConfirm(client: AppSupabaseClient, confirmId: string): Promise<void> {
+  const { error } = await client.from("chat_confirms").update({ answered_at: new Date(0).toISOString() })
+    .eq("id", confirmId).eq("state", "answering");
+  if (error) fail(error);
 }
 
 export async function finishChatConfirm(client: AppSupabaseClient, confirmId: string, state: "accepted" | "declined" | "expired"): Promise<void> {
