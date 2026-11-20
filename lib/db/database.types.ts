@@ -3408,6 +3408,7 @@ export type Database = {
         }
         Returns: Json
       }
+      read_ai_settings: { Args: never; Returns: Json }
       read_daily_brief_preferences: { Args: never; Returns: Json }
       read_daily_brief_tip_history: { Args: never; Returns: Json }
       read_day_note_shortcut_context: { Args: never; Returns: Json }
@@ -3540,6 +3541,22 @@ export type Database = {
           p_include_notes: boolean
           p_include_outlook_calendar: boolean
           p_include_reminder_history: boolean
+        }
+        Returns: Json
+      }
+      save_ai_settings: {
+        Args: {
+          p_chat_enabled: boolean
+          p_daily_brief_enabled: boolean
+          p_exclude_google_calendar: boolean
+          p_exclude_hevy: boolean
+          p_exclude_icloud_calendar: boolean
+          p_exclude_outlook_calendar: boolean
+          p_expected_revision: number
+          p_include_notes: boolean
+          p_include_reminder_history: boolean
+          p_tips_enabled: boolean
+          p_use_connected_sources: boolean
         }
         Returns: Json
       }

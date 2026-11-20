@@ -292,8 +292,10 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     load(true);
 
     const onSettings = (event: Event) => {
-      const next = (event as CustomEvent<{ accountRef?: string }>).detail;
+      const next = (event as CustomEvent<{ accountRef?: string; startNow?: boolean }>).detail;
       if (!next?.accountRef || next.accountRef === settingsRef.current?.accountRef) withdraw();
+      // Answering the AI features question (4F) turns the brief on: read the settings again and start today's brief.
+      if (next?.startNow) load(true);
     };
     // A mount that never read preferences (failure or offline desktop) may still make the day's automatic start.
     const onFocus = () => load(!evaluated);
