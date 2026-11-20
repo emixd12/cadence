@@ -7,6 +7,7 @@ import { executeMcpOperation } from "@/lib/integrations/operations/execute";
 import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { searchAdviceCards } from "./chat-advice";
 import { getHevyActivities } from "@/lib/services/hevy.service";
 import { withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
 import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
@@ -120,6 +121,10 @@ export function createLiveChatExecutor(input: Readonly<{
   return async (name: ChatToolName, args, options): Promise<ChatToolResult> => {
     if (name === "list_calendar_events") return calendarTool(input.reads, args, input.today());
     if (name === "list_workouts") return workoutsTool(input.reads, args);
+    if (name === "search_advice") {
+      if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
+      return { ok: true, result: searchAdviceCards(args.query.slice(0, 200)) };
+    }
     if (!input.sources.notes && (name === "list_day_notes" || name === "update_occurrence_note" || name === "update_day_note")) {
       return { ok: false, error: { code: "source_off", message: "Notes are off in Settings." } };
     }

@@ -135,10 +135,10 @@ Check the cited entry before acting on a row.
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.3` (research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
 - **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
   approval while chat is on, and reads only the sources left on.
-- **Next:** add `search_advice` (4A's matcher has merged).
+- Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
