@@ -90,12 +90,14 @@ function PrimaryNav({
   isCollapsed,
   onNavigate,
   chatRecents,
+  accessory,
 }: Readonly<{
   pathname: string;
   pendingHref?: AppNavHref | null;
   isCollapsed: boolean;
   onNavigate?: (href: AppNavHref) => void;
   chatRecents?: Readonly<{ open: boolean; onToggle: () => void; load: ChatRecentsLoader }>;
+  accessory?: React.ReactNode;
 }>) {
   return (
     <nav aria-label="Primary" className="flex flex-1 flex-col overflow-y-auto py-3">
@@ -174,6 +176,7 @@ function PrimaryNav({
           </div>
         );
       })}
+      {accessory}
     </nav>
   );
 }
@@ -355,6 +358,8 @@ export function AppShell({
   chatRecentsLoader = defaultChatRecentsLoader,
   defaultChatRecentsOpen,
   defaultMobileNavOpen = false,
+  navAccessory,
+  mobileHeaderAccessory,
 }: Readonly<{
   children: React.ReactNode;
   user?: AppShellUser;
@@ -365,6 +370,10 @@ export function AppShell({
   defaultChatRecentsOpen?: boolean;
   /** Bench only: start with the phone menu open. */
   defaultMobileNavOpen?: boolean;
+  /** Advisor plan 4D bench: an extra line under the primary navigation (both sidebars). */
+  navAccessory?: (isCollapsed: boolean) => React.ReactNode;
+  /** Advisor plan 4D bench: an extra control in the mobile header, left of the menu button. */
+  mobileHeaderAccessory?: React.ReactNode;
 }>) {
   const pathname = usePathname();
   const [chatRecentsOpen, toggleChatRecents] = useChatRecentsOpen(defaultChatRecentsOpen);
@@ -658,7 +667,7 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-40 grid h-16 grid-cols-[minmax(0,1fr)_4rem] bg-card lg:hidden">
+      <header className={["sticky top-0 z-40 grid h-16 bg-card lg:hidden", mobileHeaderAccessory ? "grid-cols-[minmax(0,1fr)_auto_4rem]" : "grid-cols-[minmax(0,1fr)_4rem]"].join(" ")}>
         <Link
           href={DEFAULT_APP_ROUTE}
           aria-label="Open Timeline"
@@ -670,6 +679,7 @@ export function AppShell({
           </span>
           <span className="truncate text-lg">Cadence</span>
         </Link>
+        {mobileHeaderAccessory}
         <button
           type="button"
           aria-label="Open navigation"
@@ -736,6 +746,7 @@ export function AppShell({
             isCollapsed={false}
             onNavigate={handlePrimaryNavNavigate}
             chatRecents={chatRecents}
+            accessory={navAccessory?.(false)}
           />
 
           <div className="border-t border-line">
@@ -817,6 +828,7 @@ export function AppShell({
             isCollapsed={!isDesktopSidebarOpen}
             onNavigate={handlePrimaryNavNavigate}
             chatRecents={chatRecents}
+            accessory={navAccessory?.(!isDesktopSidebarOpen)}
           />
 
           <div className="border-t border-line">

@@ -934,7 +934,7 @@ native update or recovery controls. Future mobile remains deferred.
 
 ## Set duration and scheduled archive (Tickets 142–143)
 
-Create or edit a Behavior, optionally enter Default duration (minutes) and End date, then Save behavior. Blank fields disable either option. Timeline uses the default ahead of its measured estimate. The Behavior stops generating Occurrences at the start of its end date in its timezone. Automatic archive uses existing archive history and reminder cancellation; a durable in-app notification explains the archive. Open Behaviors to review or restore it. Restoring clears an expired end date.
+Create or edit a Behavior, optionally enter Default duration (minutes) and End date, then Save behavior. Blank fields disable either option. Timeline uses the default ahead of its measured estimate. The Behavior stops generating Occurrences at the start of its end date in its timezone. Save refuses an end date of today or earlier. Automatic archive uses existing archive history and reminder cancellation; a durable in-app notification explains the archive. Open Behaviors to review or restore it. Restoring clears an expired end date.
 
 ## Compare historical completion timing
 
