@@ -19167,6 +19167,7 @@
     {
       "id": "INT-TIMELINE-018",
       "name": "Say when a late item was done",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -19250,6 +19251,7 @@
     {
       "id": "INT-TIMELINE-019",
       "name": "Give a reason an item was not done",
+      "feature": "timeline",
       "user_guidance": {
         "audience": "user",
         "references": [
