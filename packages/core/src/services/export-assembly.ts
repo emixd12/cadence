@@ -250,6 +250,26 @@ function parseConfigurationSnapshot(
     ),
     active: requireBoolean(snapshot.active, "configuration active"),
     timezone: requireString(snapshot.timezone, "configuration timezone"),
+    ...(snapshot.end === undefined ? {} : { end: parseConfigurationEnd(snapshot.end) }),
+    ...(snapshot.pause === undefined ? {} : { pause: parseConfigurationPause(snapshot.pause) }),
+  };
+}
+
+function parseConfigurationEnd(value: Json | undefined): ExportBehaviorConfigurationSnapshot["end"] {
+  if (value === null || value === undefined) return null;
+  const end = requireJsonObject(value, "configuration end");
+  const time = requireNullableString(end.time ?? null, "configuration end time");
+  return { on: requireString(end.on, "configuration end on"), time: time === null ? null : normalizeExportTime(time) };
+}
+
+function parseConfigurationPause(value: Json | undefined): ExportBehaviorConfigurationSnapshot["pause"] {
+  if (value === null || value === undefined) return null;
+  const pause = requireJsonObject(value, "configuration pause");
+  const time = requireNullableString(pause.from_time ?? null, "configuration pause from_time");
+  return {
+    fromOn: requireString(pause.from_on, "configuration pause from_on"),
+    fromTime: time === null ? null : normalizeExportTime(time),
+    backOn: requireString(pause.back_on, "configuration pause back_on"),
   };
 }
 

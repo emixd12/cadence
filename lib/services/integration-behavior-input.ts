@@ -9,8 +9,15 @@ export function integrationBehaviorInput(
   const form = new FormData();
   const set = (key: string, value: unknown) => form.set(key, value == null ? "" : String(value));
   const fields = { ...current, ...input };
-  for (const name of ["title", "description", "location_text", "default_duration_minutes", "end_date"] as const) {
+  for (const name of ["title", "description", "location_text", "default_duration_minutes"] as const) {
     set(name, fields[name]);
+  }
+  // end_date is the deprecated alias (the first day without the Behavior); end_on wins.
+  if (input.end_on !== undefined || input.end_time !== undefined || input.end_date === undefined) {
+    set("end_on", input.end_on !== undefined ? input.end_on : current?.end_on);
+    set("end_time", input.end_time !== undefined ? input.end_time : input.end_on !== undefined ? null : current?.end_time);
+  } else {
+    set("end_date", input.end_date);
   }
   set("category_id", input.category_id === undefined ? current?.category?.id : input.category_id);
   set("behavior_id", current?.id);

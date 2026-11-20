@@ -182,6 +182,9 @@ export type ExportBehaviorConfigurationSnapshot = {
   reminderOffsetMinutes: number;
   active: boolean;
   timezone: string;
+  /** Absent on snapshots written before Behavior end and pause (November 2026). */
+  end?: { on: string; time: string | null } | null;
+  pause?: { fromOn: string; fromTime: string | null; backOn: string } | null;
 };
 
 export type ExportBehaviorConfigurationEventInput = {
@@ -436,6 +439,8 @@ export type ExportJsonBehaviorConfigurationSnapshot = {
   reminder_offset_minutes: number;
   active: boolean;
   timezone: string;
+  end?: { on: string; time: string | null } | null;
+  pause?: { from_on: string; from_time: string | null; back_on: string } | null;
 };
 
 export type ExportJsonBehaviorConfigurationEvent = {

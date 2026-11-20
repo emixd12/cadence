@@ -571,6 +571,10 @@ function toJsonBehaviorConfigurationSnapshot(
     reminder_offset_minutes: snapshot.reminderOffsetMinutes,
     active: snapshot.active,
     timezone: snapshot.timezone,
+    ...(snapshot.end === undefined ? {} : { end: snapshot.end }),
+    ...(snapshot.pause === undefined ? {} : {
+      pause: snapshot.pause ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn } : null,
+    }),
   };
 }
 

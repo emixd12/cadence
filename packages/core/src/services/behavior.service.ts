@@ -242,26 +242,25 @@ export async function applyBehaviorRunAction(
   input: { behaviorId: string; action: BehaviorRunAction; recordedAt: string; expectedUpdatedAt?: string },
 ) {
   const existing = await requireBehavior(store, input.behaviorId);
-  if (!existing.active) throw new Error("Restore this behavior before changing when it runs.");
+  if (!existing.active) throw new BehaviorRunStateError("Restore this behavior before changing when it runs.");
   const now = Temporal.Instant.from(input.recordedAt);
-  const current = storedRunValues(existing);
   const state = behaviorRunState(runFieldsFromStored(existing), now).state;
   const fields = storedBehaviorFields(existing);
   const action = input.action;
+  // Repeating an action that already holds changes nothing: no revision is written.
   if (action.kind === "end_now") {
-    if (state === "ended") throw new Error("This behavior has already ended.");
-    Object.assign(fields, endNowFields(now, existing.timezone));
+    if (state !== "ended") Object.assign(fields, endNowFields(now, existing.timezone));
   } else if (action.kind === "start_again") {
-    if (current.end_on === null) throw new Error("This behavior has no end to clear.");
     Object.assign(fields, storedEnd(null, null));
   } else if (action.kind === "pause") {
-    if (state === "ended") throw new Error("Start this behavior again before pausing it.");
+    if (state === "ended") throw new BehaviorRunStateError("Start this behavior again before pausing it.");
     const pause = startPauseNow(action.pause, now, existing.timezone);
     validateBehaviorPlanningFields({ pause }, { now, timezone: existing.timezone, checkEnd: false });
     Object.assign(fields, storedPause(pause));
   } else {
-    if (current.pause_from_on === null) throw new Error("This behavior has no pause to end.");
+    // Resume clears the pause, and an end that has passed, so the Behavior runs from now.
     Object.assign(fields, storedPause(null));
+    if (state === "ended") Object.assign(fields, storedEnd(null, null));
   }
   const schedules = toStoredBehaviorScheduleGraph(existing);
   const expectedDefinition = { title: existing.title, description: existing.description };
@@ -273,10 +272,10 @@ export async function applyBehaviorRunAction(
     source: "manual",
     reasonCode: BEHAVIOR_RUN_REASON_CODES[action.kind],
   });
-  if (!configurationEventPlan) return existing;
+  // The store is called even when nothing changed, so an MCP write still gets its receipt.
   const updated = await store.updateBehaviorWithAtomicScheduleGraph({
     behaviorId: existing.id,
-    behavior: fields,
+    behavior: configurationEventPlan ? fields : storedBehaviorFields(existing),
     expectedDefinition,
     expectedNormalizedDefinition: normalizeBehaviorDefinition(expectedDefinition),
     expectedScheduleGraph: schedules,
@@ -287,6 +286,11 @@ export async function applyBehaviorRunAction(
   });
   if (!updated) throw new Error("Behavior not found.");
   return updated;
+}
+
+/** A run action the Behavior's state does not allow (archived, or pausing an ended Behavior). */
+export class BehaviorRunStateError extends Error {
+  override readonly name = "BehaviorRunStateError";
 }
 
 /**

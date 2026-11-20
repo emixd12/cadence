@@ -2,6 +2,8 @@ import { BehaviorValidationError, isWeekday, validateBehaviorPlanningFields } fr
 import { isBehaviorWhereKind } from "@cadence/core/services/behavior-where";
 export { BehaviorValidationError, normalizeRecurrenceRule, recurrenceRuleToJson, recurrenceDefaultsFromRule, defaultRecurrenceDefaults, summarizeRecurrenceRule, normalizeScheduledTime, formatScheduledTimeLabel, formatScheduleSlotLabel, summarizeReminders, formatReminderOffset } from "@cadence/core/services/behavior-values";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
+import type { BehaviorPause } from "@cadence/core/resolvers/behavior-run.resolver";
+import { legacyEndDateColumns } from "@cadence/core/services/behavior-run-fields";
 import type {
   BehaviorActionState,
   BehaviorFormField,
@@ -52,8 +54,8 @@ export function parseBehaviorFormData(
   const categoryId = getOptionalString(formData, "category_id").trim();
   const duration = getOptionalString(formData, "default_duration_minutes").trim();
   const defaultDurationMinutes = duration ? Number(duration) : null;
-  const endDate = getOptionalString(formData, "end_date").trim() || null;
-  try { validateBehaviorPlanningFields({ defaultDurationMinutes, endDate }); }
+  const { endOn, endTime, pause } = parseRunFields(formData);
+  try { validateBehaviorPlanningFields({ defaultDurationMinutes, endOn, endTime, pause }); }
   catch (error) {
     if (!(error instanceof BehaviorValidationError)) throw error;
     Object.assign(fieldErrors, error.fieldErrors);
@@ -102,7 +104,8 @@ export function parseBehaviorFormData(
   return {
     behaviorId,
     defaultDurationMinutes,
-    endDate,
+    ...(endOn === undefined ? {} : { endOn, endTime }),
+    ...(pause === undefined ? {} : { pause }),
     title,
     description: description || null,
     whereKind: whereKind === undefined ? undefined : isBehaviorWhereKind(whereKind) ? whereKind : null,
@@ -118,6 +121,35 @@ export function parseBehaviorFormData(
     active:
       options.mode === "create" ? true : getCheckboxValue(formData, "active"),
   };
+}
+
+/**
+ * The end and pause a form carries. A form without the fields keeps the stored values
+ * (undefined). `end_date`, the first day without the Behavior, is the earlier form
+ * field: it reads as `end_on` the day before (rule T9).
+ */
+function parseRunFields(formData: FormData): {
+  endOn?: string | null; endTime?: string | null; pause?: BehaviorPause | null;
+} {
+  const text = (name: string) => getOptionalString(formData, name).trim() || null;
+  let endOn: string | null | undefined;
+  let endTime: string | null | undefined;
+  if (formData.has("end_on")) {
+    endOn = text("end_on");
+    endTime = endOn ? text("end_time") : null;
+  } else if (formData.has("end_date")) {
+    const endDate = text("end_date");
+    // An invalid date passes through as is so the validator reports it.
+    try { endOn = legacyEndDateColumns(endDate).end_on; } catch { endOn = endDate; }
+    endTime = null;
+  }
+  let pause: BehaviorPause | null | undefined;
+  if (formData.has("pause_from_on") || formData.has("pause_back_on")) {
+    const fromOn = text("pause_from_on");
+    const backOn = text("pause_back_on");
+    pause = fromOn || backOn ? { fromOn: fromOn ?? "", fromTime: text("pause_from_time"), backOn: backOn ?? "" } : null;
+  }
+  return { endOn, endTime, pause };
 }
 
 export function behaviorErrorToActionState(error: unknown): BehaviorActionState {

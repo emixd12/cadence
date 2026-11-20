@@ -27,4 +27,7 @@ export const writeOperationHandlers = {
   update_behavior: handler("update_behavior"),
   archive_behavior: handler("archive_behavior"),
   restore_behavior: handler("restore_behavior"),
+  end_behavior: handler("end_behavior"),
+  pause_behavior: handler("pause_behavior"),
+  resume_behavior: handler("resume_behavior"),
 };
