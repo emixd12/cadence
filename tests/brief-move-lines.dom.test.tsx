@@ -24,6 +24,7 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   refresh = vi.fn<() => void>();
+  inFlight = 0;
 });
 afterEach(async () => { await act(() => root.unmount()); container.remove(); document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
@@ -37,13 +38,39 @@ const timelineActions: OccurrenceMoveActions = {
   keep: vi.fn(async () => ({ status: "kept" as const })),
 };
 
+// The fixture client answers after a real timer, and act() does not wait for timers. On a
+// busy machine the answer arrived after the assertions (16 of 24 parallel runs failed on
+// November 20, 2026). render and click count the client calls in flight and wait for them.
+let inFlight = 0;
+const trackedClients = new WeakMap<BriefMoveClient, BriefMoveClient>();
+/** The same client, counting its calls in flight. It reads each method at call time, so spies set later still apply. */
+function tracked(client: BriefMoveClient): BriefMoveClient {
+  const known = trackedClients.get(client);
+  if (known) return known;
+  type Method = (...args: unknown[]) => Promise<unknown>;
+  const methods = client as unknown as Record<string, Method | undefined>;
+  const counting = Object.fromEntries(Object.keys(methods).map((key) => [key, (...args: unknown[]) => {
+    inFlight += 1;
+    const result = methods[key]!(...args);
+    void result.catch(() => undefined).finally(() => { inFlight -= 1; });
+    return result;
+  }])) as unknown as BriefMoveClient;
+  trackedClients.set(client, counting);
+  return counting;
+}
+/** Waits one timer turn and lets React apply the result, until no client call is in flight. */
+async function settle() {
+  do { await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); }); } while (inFlight > 0);
+}
+
 async function render(client: BriefMoveClient, moves: BriefMoves = structuredClone(BRIEF_MOVE_FIXTURE), withTimeline = true) {
-  const lines = <BriefMoveLines moves={moves} client={client} planningContext={() => context} />;
+  const lines = <BriefMoveLines moves={moves} client={tracked(client)} planningContext={() => context} />;
   await act(() => root.render(<RefreshProvider onRefresh={refresh}>
     {withTimeline
       ? <OccurrenceMovesProvider actions={timelineActions} timezone={moves.timezone} todayLocalDate={moves.localDate} hasMovedBefore={false}>{lines}</OccurrenceMovesProvider>
       : lines}
   </RefreshProvider>));
+  await settle();
 }
 
 function line(proposalId: string): HTMLElement {
@@ -56,6 +83,7 @@ function button(scope: ParentNode, label: string): HTMLButtonElement {
 }
 async function click(target: HTMLButtonElement) {
   await act(async () => { target.click(); });
+  await settle();
 }
 
 describe("move lines", () => {
@@ -156,7 +184,6 @@ describe("move lines", () => {
     const client = fixtureBriefMoveClient({ stale: ["gym"] });
     const recheck = vi.spyOn(client, "recheck");
     await render(client);
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(recheck).toHaveBeenCalledWith({ localDate: "2026-11-18", context, proposalIds: ["walk", "gym", "vitamins"] }, expect.any(AbortSignal));
     expect(line("gym")).toBeNull();
     expect(line("gym-rechecked").textContent).toContain("12:30 PM → 6:30 PM");
