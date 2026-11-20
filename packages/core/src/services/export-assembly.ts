@@ -450,7 +450,7 @@ function toExportBehaviorInput(
     archivedAt: behavior.archived_at,
     archiveNotes: parseArchiveNotes(behavior.archive_notes),
     defaultDurationMinutes: behavior.default_duration_minutes ?? null,
-    endDate: behavior.end_date ?? null,
+    ...exportRunFields(behavior),
     autoArchivedAt: behavior.auto_archived_at ?? null,
     createdAt: behavior.created_at,
     updatedAt: behavior.updated_at,
@@ -788,4 +788,14 @@ export function assertConfigurationHistoryStable(input: {
       );
     }
   }
+}
+
+function exportRunFields(behavior: BehaviorGraphRecord) {
+  return {
+    endOn: behavior.end_on ?? null,
+    endTime: behavior.end_time ?? null,
+    pauseFromOn: behavior.pause_from_on ?? null,
+    pauseFromTime: behavior.pause_from_time ?? null,
+    pauseBackOn: behavior.pause_back_on ?? null,
+  };
 }

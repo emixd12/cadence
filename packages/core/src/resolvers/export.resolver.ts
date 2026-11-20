@@ -478,7 +478,13 @@ function toJsonBehavior(
     ...(behavior.defaultDurationMinutes === undefined
       ? {}
       : { default_duration_minutes: behavior.defaultDurationMinutes }),
-    ...(behavior.endDate === undefined ? {} : { end_date: behavior.endDate }),
+    ...(behavior.endOn === undefined ? {} : {
+      end_on: behavior.endOn,
+      end_time: behavior.endTime ?? null,
+      pause_from_on: behavior.pauseFromOn ?? null,
+      pause_from_time: behavior.pauseFromTime ?? null,
+      pause_back_on: behavior.pauseBackOn ?? null,
+    }),
     ...(behavior.autoArchivedAt === undefined
       ? {}
       : { auto_archived_at: behavior.autoArchivedAt }),
@@ -1388,7 +1394,13 @@ function toBehaviorLogBehavior(
         ...(behavior.archive_notes !== undefined
           ? { archive_notes: behavior.archive_notes }
           : {}),
-        ...(behavior.end_date !== undefined ? { end_date: behavior.end_date } : {}),
+        ...(behavior.end_on !== undefined ? {
+          end_on: behavior.end_on,
+          end_time: behavior.end_time ?? null,
+          pause_from_on: behavior.pause_from_on ?? null,
+          pause_from_time: behavior.pause_from_time ?? null,
+          pause_back_on: behavior.pause_back_on ?? null,
+        } : {}),
         ...(behavior.auto_archived_at !== undefined
           ? { auto_archived_at: behavior.auto_archived_at }
           : {}),

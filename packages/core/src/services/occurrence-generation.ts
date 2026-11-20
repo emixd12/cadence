@@ -28,7 +28,7 @@ export function planPersistedOccurrences(input: {
       configurationEventId: behavior.current_configuration_event_id,
       recurrenceRule: normalizeRecurrenceRule(behavior.recurrence_rule),
       schedules, scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
-      timezone: behavior.timezone, active: behavior.active, endDate: behavior.end_date,
+      timezone: behavior.timezone, active: behavior.active, ...generationRunFields(behavior),
       createdAt: behavior.created_at,
     },
     existingOccurrences: input.occurrences.map((row) =>
@@ -49,6 +49,22 @@ export function toExistingOccurrenceForGeneration(
     note: row.note, hasTimeSessions: timeSessionOccurrenceIds.has(row.id),
     behaviorConfigurationEventId: row.behavior_configuration_event_id,
     moved: Boolean(row.effective_start_at),
+    effectiveStartAt: row.effective_start_at ?? null,
+    effectiveEndAt: row.effective_end_at ?? null,
+  };
+}
+
+/** The end and pause fields generation reads from a stored Behavior row. */
+export function generationRunFields(behavior: {
+  end_on?: string | null; end_time?: string | null; pause_from_on?: string | null;
+  pause_from_time?: string | null; pause_back_on?: string | null;
+}) {
+  return {
+    endOn: behavior.end_on ?? null,
+    endTime: behavior.end_time ?? null,
+    pauseFromOn: behavior.pause_from_on ?? null,
+    pauseFromTime: behavior.pause_from_time ?? null,
+    pauseBackOn: behavior.pause_back_on ?? null,
   };
 }
 
