@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-077` is next; P-070 and P-071 are taken on open branches). Never reuse an ID.
+1. Give a new entry the next ID (`P-077` is next; P-070 is taken on an open branch). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2044,6 +2044,30 @@ cite has not changed.
 - **Update needed:** none beyond P-061.
 - **Related:** P-061, P-063.
 - **Status:** logged.
+
+## P-071: Overnight coach signals widen, and the advisor writes daily tips
+
+- **Change:** implemented November 19, 2026 (advisor plan Phase 4, workstream 4B). The
+  overnight coach signals (P-064) widen from five patterns to twenty-one, still counts only,
+  no model call, no titles or notes: weekly numbers, weekday gap, time-of-day gap, set time
+  or range, steady item, never done, dip and recovery, day shape, unmarked items, marking
+  time, done together, crowded hour, setup gaps, reminder response, time spent against the
+  set length, and moved against unmoved items. They now also read sent reminders and timed
+  sessions. Each morning the advisor turns up to three of them into short tips. A tip pairs
+  one counted fact with one action from a reviewed research card. The model sees the counts,
+  the Behavior titles the tips name, and, only when the person's AI choices allow notes, up
+  to seven recent day notes. A new account's first tips are filled from the cards' own
+  wording with no model call. Tips are stored with the card and the facts they state, and
+  kept until the person deletes their data. "Don't suggest this again" turns a card off for
+  that account.
+- **Affected:** `packages/core/src/resolvers/coach-signals-v2.resolver.ts`,
+  `lib/services/advisor-tips-*.ts`, `app/api/advisor/tips/*`,
+  `supabase/migrations/20261119221000_advisor_tips.sql`.
+- **Surfaces:** none in-app until workstream 4E shows tips. Privacy and Terms describe
+  five overnight patterns and no tips (P-064, P-065).
+- **Update needed:** when P-064 is written up, list the pattern families in general terms
+  and describe tips (what reaches the model, how long tips are kept).
+- **Related:** P-064, P-065.
 
 ## P-072: Outside AI clients see why an item was not done (MCP contract 1.5.0)
 

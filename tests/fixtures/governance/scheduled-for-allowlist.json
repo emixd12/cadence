@@ -25,6 +25,7 @@
     "components/timeline/OccurrenceRow.tsx": 1,
     "lib/db/advisor-analysis.repo.ts": 2,
     "lib/db/advisor-context.repo.ts": 2,
+    "lib/db/coach-signals.repo.ts": 2,
     "lib/db/database.types.ts": 4,
     "lib/db/exportPageRead.repo.ts": 1,
     "lib/db/integration-read.repo.ts": 1,
