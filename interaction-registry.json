@@ -241,7 +241,7 @@
     {
       "path": "apps/desktop/src/desktop-app.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 21,
+      "interaction_marker_count": 24,
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-SHELL-002",
@@ -249,7 +249,8 @@
         "INT-SHELL-005",
         "INT-SHELL-006",
         "INT-AUTH-010",
-        "INT-SHELL-003"
+        "INT-SHELL-003",
+        "INT-CHAT-004"
       ]
     },
     {
@@ -1361,9 +1362,36 @@
     {
       "path": "components/layout/ChatNavRecents.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 6,
+      "interaction_marker_count": 2,
       "interaction_ids": [
         "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "components/chat/ChatRecents.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "apps/desktop/src/chat-screen.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-CHAT-001",
+        "INT-CHAT-002",
+        "INT-CHAT-003",
+        "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "app/(app)/chat/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-CHAT-001"
       ]
     },
     {
@@ -3377,7 +3405,7 @@
         {
           "id": "chat",
           "label": "Chat",
-          "result": "Navigate to /chat. Web only, and not in production web until the chat server ships; Cadence for Mac hides it until Phase 5C."
+          "result": "Navigate to /chat. On web, and on Cadence for Mac when the Mac is linked to an account (Phase 5C)."
         },
         {
           "id": "behaviors",
@@ -20695,7 +20723,7 @@
           "control": "Jump to latest after scrolling up during a reply"
         }
       ],
-      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships.",
+      "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts).",
       "success_result": "Starter questions come from the person's own week (no model call) and fall back to three general ones. The message shows at once; the reply streams with tool lines, text, outcome lines, confirms, refusals and notices. The page follows the reply only while the newest line is on screen; otherwise Jump to latest appears. Stop keeps what streamed, ends the reply with \"Stopped.\" and asks the server to stop. The open conversation is kept in ?c= so a reload reopens it. Opening a newer message expires open confirms.",
       "failure_result": "A message the server never took goes back into the message field with one red sentence above it; sending the same words again reuses the message id. A connection that drops mid-reply keeps the partial reply and offers Send again with the same id, so the server never runs it twice. Malformed stream lines are skipped; an unknown part with text shows as plain text.",
       "effects": [
@@ -20735,9 +20763,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/chat-screen.tsx",
+            "apps/desktop/src/chat.ts",
+            "components/chat/ChatPage.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-chat.dom.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20778,7 +20813,7 @@
           "control": "Undo after an outcome line"
         }
       ],
-      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships. Shown on outcome lines whose Undo is available.",
+      "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts). Shown on outcome lines whose Undo is available.",
       "success_result": "The outcome line is replaced by Cadence's undone wording and Undo disappears.",
       "failure_result": "A refused or failed Undo adds one red sentence under the outcome and keeps it.",
       "effects": [
@@ -20811,9 +20846,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/chat-screen.tsx",
+            "apps/desktop/src/chat.ts",
+            "components/chat/ChatPage.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-chat.dom.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20858,7 +20900,7 @@
           "control": "No"
         }
       ],
-      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships. Shown while a confirm is pending.",
+      "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts). Shown while a confirm is pending.",
       "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed.",
       "failure_result": "An expired confirm or a changed record changes nothing and says so. A failed request shows one red sentence.",
       "effects": [
@@ -20891,9 +20933,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/chat-screen.tsx",
+            "apps/desktop/src/chat.ts",
+            "components/chat/ChatPage.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-chat.dom.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20954,7 +21003,7 @@
           "control": "Arrow next to Chat in the side menu, then a recent chat or All conversations"
         }
       ],
-      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships.",
+      "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts).",
       "success_result": "The list loads newest first with Today, Yesterday or a short date; opening one shows it exactly as it was streamed, with current confirm and outcome states. In the side menu an arrow next to Chat opens up to five recent chats and All conversations under it (closed by default, remembered per browser); the open one is marked.",
       "failure_result": "A failed load shows one red sentence and keeps the current view.",
       "effects": [
@@ -20991,9 +21040,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/desktop-app.tsx",
+            "apps/desktop/src/chat-screen.tsx",
+            "components/chat/ChatRecents.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-chat.dom.test.tsx"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",

@@ -9,4 +9,6 @@
 @source "../../../components/feedback";
 /* Advisor plan Phase 3C: the shared Daily Brief bubble and its move lines. */
 @source "../../../components/briefing";
+/* Advisor plan Phase 5C: the shared Chat page, its message parts and the recent chats list. */
+@source "../../../components/chat";
 @source "./";

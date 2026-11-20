@@ -74,7 +74,7 @@ draw a bottom divider.
 Use five primary screens:
 
 1. Timeline
-2. Chat (advisor plan Phase 5; web only until Phase 5C adds it to Cadence for Mac)
+2. Chat (advisor plan Phase 5; on Cadence for Mac only when the Mac is linked to an account, Phase 5C)
 3. Behaviors
 4. Export & Import
 5. Settings

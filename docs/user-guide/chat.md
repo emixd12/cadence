@@ -2,8 +2,9 @@
 
 **Chat** talks to Cadence in plain words: ask what is on today, what you skipped
 this week, or ask it to mark, note or move an item. It answers about your own
-Cadence records and connected calendars. Chat is web only for now and is not yet
-in production.
+Cadence records and connected calendars. Chat is on the web and on Cadence for Mac
+when the Mac is signed in to your account; a Mac without an account has no Chat. On the Mac, a change Chat makes shows on your Timeline
+after the next account sync, usually within a few seconds.
 
 ## Ask a question
 

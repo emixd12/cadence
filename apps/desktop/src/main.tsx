@@ -163,6 +163,8 @@ if (new URLSearchParams(window.location.search).get("bench") === "native") {
   void import("./spike.css").then(() => root.render(<NativeBench />));
 } else if (new URLSearchParams(window.location.search).get("bench") === "settings") {
   void Promise.all([import("./timeline.css"), import("./settings-bench")]).then(([, { SettingsBench }]) => root.render(<SettingsBench />));
+} else if (new URLSearchParams(window.location.search).get("bench") === "chat") {
+  void Promise.all([import("./timeline.css"), import("./chat-bench")]).then(([, { ChatBench }]) => root.render(<ChatBench />));
 } else {
   // Ticket 285: without a boundary, one render error unmounted everything and left a blank window.
   void import("./product").then(({ Product }) => root.render(<DesktopErrorBoundary scope="app"><Product /></DesktopErrorBoundary>)).catch(() => {
