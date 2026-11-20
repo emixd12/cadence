@@ -21,9 +21,11 @@ import {
   type ChatNotice,
   type ChatOutcome,
   type ChatPart,
+  type ChatStarterList,
   type ChatTurnRequest,
   type ChatUndoResponse,
 } from "@cadence/core/types/chat";
+import { CHAT_STARTER_COUNT, CHAT_STARTER_FALLBACK } from "@cadence/core/resolvers/chat-starters.resolver";
 
 export type ChatThreadState = Readonly<{
   conversationId: string | null;
@@ -396,11 +398,22 @@ export const CHAT_ALERT_LABELS: Readonly<Record<ChatAlertCode, string>> = Object
   invalid_request: "Not sent",
 });
 
-export const CHAT_STARTER_PROMPTS = Object.freeze([
-  "What is on today?",
-  "What did I skip this week?",
-  "How is my week going?",
-]);
+/** Shown while the person's own starters load, and whenever they cannot be read. */
+export const CHAT_STARTER_PROMPTS: readonly string[] = Object.freeze(CHAT_STARTER_FALLBACK.map((starter) => starter.text));
+
+const STARTER_TEXT_MAX = 200;
+
+/** Keeps well-formed starters only; anything else falls back to the general three. */
+export function parseChatStarters(value: unknown): readonly string[] {
+  const list = value && typeof value === "object" ? (value as { starters?: unknown }).starters : null;
+  const texts = Array.isArray(list)
+    ? list.flatMap((item) => {
+      const text = item && typeof item === "object" ? (item as { text?: unknown }).text : null;
+      return typeof text === "string" && text.trim() && text.length <= STARTER_TEXT_MAX ? [text.trim()] : [];
+    }).slice(0, CHAT_STARTER_COUNT)
+    : [];
+  return texts.length > 0 ? texts : CHAT_STARTER_PROMPTS;
+}
 
 /** The message a refusal's other time sends (5A: "Move it to 18:30"). */
 export function alternativeMessage(startTime: string) {
@@ -437,6 +450,8 @@ export type ChatClient = Readonly<{
   getConversation(id: string): Promise<ChatConversationView>;
   /** Asks the server to end a running turn early. Never throws. */
   stop(clientMessageId: string): Promise<void>;
+  /** Starter questions picked from the person's own week. Never throws: falls back to the general three. */
+  starters(): Promise<readonly string[]>;
 }>;
 
 export class ChatRequestError extends Error {
@@ -497,6 +512,13 @@ export function createChatClient(fetchImpl: FetchLike = (input, init) => fetch(i
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ clientMessageId }),
       }).catch(() => undefined);
+    },
+    async starters() {
+      try {
+        return parseChatStarters(await json<ChatStarterList>(CHAT_ROUTES.starters));
+      } catch {
+        return CHAT_STARTER_PROMPTS;
+      }
     },
   };
 }

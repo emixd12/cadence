@@ -19079,7 +19079,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Starter question link"
+          "control": "Starter question link (picked from the person's own week)"
         },
         {
           "kind": "activate",
@@ -19103,7 +19103,7 @@
         }
       ],
       "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships.",
-      "success_result": "The message shows at once; the reply streams with tool lines, text, outcome lines, confirms, refusals and notices. The page follows the reply only while the newest line is on screen; otherwise Jump to latest appears. Stop keeps what streamed, ends the reply with \"Stopped.\" and asks the server to stop. The open conversation is kept in ?c= so a reload reopens it. Opening a newer message expires open confirms.",
+      "success_result": "Starter questions come from the person's own week (no model call) and fall back to three general ones. The message shows at once; the reply streams with tool lines, text, outcome lines, confirms, refusals and notices. The page follows the reply only while the newest line is on screen; otherwise Jump to latest appears. Stop keeps what streamed, ends the reply with \"Stopped.\" and asks the server to stop. The open conversation is kept in ?c= so a reload reopens it. Opening a newer message expires open confirms.",
       "failure_result": "A message the server never took goes back into the message field with one red sentence above it; sending the same words again reuses the message id. A connection that drops mid-reply keeps the partial reply and offers Send again with the same id, so the server never runs it twice. Malformed stream lines are skipped; an unknown part with text shows as plain text.",
       "effects": [
         "database_write",
@@ -19113,16 +19113,20 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/chat/ChatPage.tsx",
+        "app/api/advisor/chat/starters/route.ts",
         "components/chat/ChatMessages.tsx",
-        "lib/ui/chat.ts"
+        "components/chat/ChatPage.tsx",
+        "lib/services/chat/chat-starters.ts",
+        "lib/ui/chat.ts",
+        "packages/core/src/resolvers/chat-starters.resolver.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/chat-page.dom.test.tsx"
+          "tests/chat-page.dom.test.tsx",
+          "tests/chat-starters.resolver.test.ts"
         ],
-        "notes": "DOM checks cover a starter question, a picked free time, a failed send restoring the draft with the same id, a mid-stream drop with Send again, Stop, scroll anchoring with Jump to latest, the status announcement and reopening from ?c=."
+        "notes": "DOM checks cover loading and sending a starter question, a picked free time, a failed send restoring the draft with the same id, a mid-stream drop with Send again, Stop, scroll anchoring with Jump to latest, the status announcement and reopening from ?c=. Resolver tests cover the starter lanes, thresholds and the fallback."
       },
       "platforms": {
         "web": {

@@ -14,7 +14,6 @@ import { AlertNotice } from "@/components/feedback/AlertNotice";
 import { ChatAlertLine, ChatMessages } from "@/components/chat/ChatMessages";
 import {
   CHAT_RUN_ANNOUNCEMENTS,
-  CHAT_STARTER_PROMPTS,
   ChatRequestError,
   EMPTY_CHAT_THREAD,
   addAlertAfterOutcome,
@@ -97,6 +96,7 @@ export function ChatPage({
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [showJump, setShowJump] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [starters, setStarters] = useState<readonly string[] | null>(null);
   const runRef = useRef<RunningTurn | null>(null);
   const anchoredRef = useRef(true);
   const followNextRef = useRef(false);
@@ -348,6 +348,20 @@ export function ChatPage({
   );
 
   const empty = thread.messages.length === 0;
+  const wantsStarters = empty && !restoring && starters === null;
+
+  // Starter questions come from the person's own week (no model call). Loaded once,
+  // only when an empty conversation is on screen; the client never throws.
+  useEffect(() => {
+    if (!wantsStarters) return;
+    let live = true;
+    void client.starters().then((list) => {
+      if (live) setStarters(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, [client, wantsStarters]);
 
   return (
     <div className="flex min-h-[calc(100dvh-12rem)] w-full flex-col">
@@ -383,7 +397,7 @@ export function ChatPage({
                 Could not open that conversation. It is still in Past conversations.
               </AlertNotice>
             ) : null}
-            {empty && !restoring ? <ChatOpening onPick={send} disabled={sending} /> : null}
+            {empty && !restoring ? <ChatOpening starters={starters} onPick={send} disabled={sending} /> : null}
             <ChatMessages
               messages={thread.messages}
               streamingId={thread.streamingId}
@@ -423,7 +437,11 @@ function setConversationParam(id: string | null) {
   window.history.replaceState(window.history.state, "", url);
 }
 
-function ChatOpening({ onPick, disabled }: Readonly<{ onPick: (text: string) => void; disabled: boolean }>) {
+function ChatOpening({
+  starters,
+  onPick,
+  disabled,
+}: Readonly<{ starters: readonly string[] | null; onPick: (text: string) => void; disabled: boolean }>) {
   return (
     <div className="flex max-w-prose flex-col gap-4 text-base leading-6">
       <p className="text-sm leading-5 text-muted-readable">
@@ -433,8 +451,9 @@ function ChatOpening({ onPick, disabled }: Readonly<{ onPick: (text: string) => 
         </Link>
         .
       </p>
-      <ul className="flex flex-col gap-1" aria-label="Try asking">
-        {CHAT_STARTER_PROMPTS.map((prompt) => (
+      {/* Three lines are reserved while the person's own starters load, so nothing jumps. */}
+      <ul className="flex min-h-[4.75rem] flex-col gap-1" aria-label="Try asking" aria-busy={starters === null} data-chat-starters={starters === null ? "loading" : "ready"}>
+        {(starters ?? []).map((prompt) => (
           <li key={prompt}>
             <button type="button" className={LINK} disabled={disabled} onClick={() => onPick(prompt)}>
               {prompt}

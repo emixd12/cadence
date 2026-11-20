@@ -343,6 +343,20 @@ tests: `tests/advice-matcher.resolver.test.ts` and `tests/advice-library.test.ts
 caller: the coach's daily quip run (4B). Forbidden bypasses: routes, components or the
 model choosing cards.
 
+## Chat starters (advisor plan Phase 5B)
+
+`packages/core/src/resolvers/chat-starters.resolver.ts` picks up to three starter
+questions for an empty Chat conversation from injected facts: today's items, unmarked
+items, this week and the last four weeks of done and not-done marks, per-Behavior rates,
+and optional coach signal kinds. It makes no model call and reads no clock, database or
+environment; the local date only rotates questions within a lane. Questions live in
+`packages/core/src/data/chat-starters.json`, grouped by lane, and may name the advice card
+they draw on. At most two questions are about patterns; the rest are about today or
+general. Paired test: `tests/chat-starters.resolver.test.ts`. Allowed caller:
+`lib/services/chat/chat-starters.ts` behind `GET /api/advisor/chat/starters`, which falls
+back to the three general questions when any read fails. Forbidden bypasses: the model
+writing starters, or components choosing them.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

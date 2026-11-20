@@ -7,7 +7,8 @@ import type {
   ChatPart,
 } from "@cadence/core/types/chat";
 import { CHAT_MEDICAL_NOTICE, CHAT_STOPPED_NOTICE } from "@cadence/core/types/chat";
-import type { ChatClient, ChatThreadState } from "@/lib/ui/chat";
+import { pickChatStarters, type ChatStarterFacts } from "@cadence/core/resolvers/chat-starters.resolver";
+import { CHAT_STARTER_PROMPTS, type ChatClient, type ChatThreadState } from "@/lib/ui/chat";
 
 // Advisor plan Phase 5B bench: synthetic conversations in 5A's stored shapes.
 // No account, no model call. The fixture client answers in memory.
@@ -228,6 +229,24 @@ const VIEWS: Record<string, ChatThreadState> = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** A bench week: Piano practice slipping, Meds steady, two items still open today. */
+export const CHAT_FIXTURE_STARTER_FACTS: ChatStarterFacts = {
+  today: "2026-11-20",
+  todayTotal: 4,
+  todayDone: 2,
+  todayOpen: 2,
+  movedToday: null,
+  unmarked: 1,
+  week: { decided: 18, rate: 0.72 },
+  month: { decided: 76, rate: 0.78 },
+  behaviors: [
+    { title: "Meds", decided: 28, rate: 1 },
+    { title: "Walk", decided: 24, rate: 0.83 },
+    { title: "Run", decided: 12, rate: 0.67 },
+    { title: "Piano practice", decided: 12, rate: 0.33 },
+  ],
+};
+
 /**
  * Answers in memory. A message with "skip" streams a read; anything else marks one item done.
  * `offline`: every send fails before the server takes it (the "unsent" bench state).
@@ -235,6 +254,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function fixtureChatClient({ delayMs = 120, offline = false }: Readonly<{ delayMs?: number; offline?: boolean }> = {}): ChatClient {
   let counter = 0;
   return {
+    async starters() {
+      await sleep(delayMs);
+      return offline ? CHAT_STARTER_PROMPTS : pickChatStarters(CHAT_FIXTURE_STARTER_FACTS).map((starter) => starter.text);
+    },
     async sendTurn(request, onEvent, signal) {
       if (offline) {
         await sleep(delayMs);

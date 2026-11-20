@@ -8,7 +8,9 @@ in production.
 ## Ask a question
 
 Open **Chat** in the navigation. A new conversation opens with three questions to
-try; choose one, or type in the field at the bottom and press **Send** (or Enter;
+try. They come from your own week: a Behavior that keeps slipping, items still
+waiting for a mark, or what is left today. With little to go on, you see three
+general questions instead. Choose one, or type in the field at the bottom and press **Send** (or Enter;
 Shift+Enter starts a new line). Chat can read all of your Cadence data, including
 notes and connected calendars; **Change this in Settings** opens Settings.
 

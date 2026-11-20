@@ -50,13 +50,21 @@ const button = (name: string) =>
   Array.from(container.querySelectorAll("button")).find((element) => element.textContent?.trim() === name) as HTMLButtonElement | undefined;
 
 describe("Chat page", () => {
-  it("opens with the data line and three starter prompts, and sends one", async () => {
+  it("opens with the data line and the person's three starter questions, and sends one", async () => {
     const client = fixtureChatClient({ delayMs: 0 });
     const sendTurn = vi.spyOn(client, "sendTurn");
+    let resolveStarters: (list: readonly string[]) => void = () => undefined;
+    const starters = vi.spyOn(client, "starters").mockReturnValue(new Promise((resolve) => { resolveStarters = resolve; }));
     await act(async () => root.render(<ChatPage client={client} now={CHAT_FIXTURE_NOW} />));
     expect(container.textContent).toContain("Chat can read all of your Cadence data, including notes and connected calendars.");
     expect(container.querySelector('a[href="/settings"]')?.textContent).toBe("Change this in Settings");
-    expect(container.querySelectorAll('[aria-label="Try asking"] button')).toHaveLength(3);
+    expect(container.querySelector('[aria-label="Try asking"]')?.getAttribute("data-chat-starters")).toBe("loading");
+    expect(container.querySelectorAll('[aria-label="Try asking"] button')).toHaveLength(0);
+    await act(async () => resolveStarters(["Why does Piano practice keep slipping?", "What did I skip this week?", "What should I do next today?"]));
+    expect(starters).toHaveBeenCalledTimes(1);
+    expect(Array.from(container.querySelectorAll('[aria-label="Try asking"] button')).map((item) => item.textContent)).toEqual([
+      "Why does Piano practice keep slipping?", "What did I skip this week?", "What should I do next today?",
+    ]);
 
     await act(async () => button("What did I skip this week?")!.click());
     await settle();
