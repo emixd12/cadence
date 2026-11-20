@@ -87,6 +87,14 @@
       ]
     },
     {
+      "id": "chat",
+      "label": "Chat",
+      "kind": "authenticated",
+      "routes": [
+        "/chat"
+      ]
+    },
+    {
       "id": "behaviors",
       "label": "Behaviors and behavior date review",
       "kind": "authenticated",
@@ -706,7 +714,7 @@
     {
       "path": "components/layout/AppShell.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 26,
+      "interaction_marker_count": 27,
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-SHELL-002",
@@ -715,7 +723,8 @@
         "INT-SHELL-005",
         "INT-SHELL-006",
         "INT-SHELL-007",
-        "INT-SHELL-008"
+        "INT-SHELL-008",
+        "INT-CHAT-004"
       ]
     },
     {
@@ -1339,6 +1348,40 @@
       "interaction_ids": [
         "INT-TIMELINE-020"
       ]
+    },
+    {
+      "path": "components/chat/ChatPage.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 24,
+      "interaction_ids": [
+        "INT-CHAT-001",
+        "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "components/layout/ChatNavRecents.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "components/chat/ChatMessages.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 8,
+      "interaction_ids": [
+        "INT-CHAT-001",
+        "INT-CHAT-002",
+        "INT-CHAT-003"
+      ]
+    },
+    {
+      "path": "app/design-system/ChatBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes \u00b7 No and Undo answer in memory. Excluded from product interaction counts."
     }
   ],
   "features": [
@@ -1509,6 +1552,12 @@
       "name": "Advisor tips",
       "meaning": "The advisor's panel on the Timeline: opening it, its daily tips and the research behind them, and the schedule questions it asks.",
       "spec": "docs/MESSAGING_CHANGES.md#p-071-overnight-coach-signals-widen-and-the-advisor-writes-daily-tips"
+    },
+    {
+      "id": "chat",
+      "name": "Chat",
+      "meaning": "The Chat page: talking with Cadence about the schedule, the changes Chat makes with confirms and Undo, and past conversations.",
+      "spec": "docs/DATA_MODEL.md#chat-conversations-advisor-plan-phase-5-workstream-5a"
     },
     {
       "id": "travel-and-leave-times",
@@ -20586,6 +20635,365 @@
             "tests/desktop-run-actions.test.ts"
           ],
           "reason": "Ticket 342: the Mac Timeline renders the shared notices from local run fields with the local run action."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CHAT-001",
+      "name": "Send a chat message",
+      "feature": "chat",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/chat.md#ask-a-question"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "chat"
+      ],
+      "routes": [
+        "/chat"
+      ],
+      "journeys": [
+        "J29"
+      ],
+      "intent": "Ask Cadence about or for a change to the person's own records in plain words (advisor plan Phase 5B).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Starter question link (picked from the person's own week)"
+        },
+        {
+          "kind": "activate",
+          "control": "Send, or Enter in the message field"
+        },
+        {
+          "kind": "activate",
+          "control": "Stop, or Escape in the message field, while a reply streams"
+        },
+        {
+          "kind": "activate",
+          "control": "Send again after a dropped connection"
+        },
+        {
+          "kind": "activate",
+          "control": "A free time under a refused change"
+        },
+        {
+          "kind": "activate",
+          "control": "Jump to latest after scrolling up during a reply"
+        }
+      ],
+      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships.",
+      "success_result": "Starter questions come from the person's own week (no model call) and fall back to three general ones. The message shows at once; the reply streams with tool lines, text, outcome lines, confirms, refusals and notices. The page follows the reply only while the newest line is on screen; otherwise Jump to latest appears. Stop keeps what streamed, ends the reply with \"Stopped.\" and asks the server to stop. The open conversation is kept in ?c= so a reload reopens it. Opening a newer message expires open confirms.",
+      "failure_result": "A message the server never took goes back into the message field with one red sentence above it; sending the same words again reuses the message id. A connection that drops mid-reply keeps the partial reply and offers Send again with the same id, so the server never runs it twice. Malformed stream lines are skipped; an unknown part with text shows as plain text.",
+      "effects": [
+        "database_write",
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "app/api/advisor/chat/starters/route.ts",
+        "components/chat/ChatMessages.tsx",
+        "components/chat/ChatPage.tsx",
+        "lib/services/chat/chat-starters.ts",
+        "lib/ui/chat.ts",
+        "packages/core/src/resolvers/chat-starters.resolver.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/chat-page.dom.test.tsx",
+          "tests/chat-starters.resolver.test.ts"
+        ],
+        "notes": "DOM checks cover loading and sending a starter question, a picked free time, a failed send restoring the draft with the same id, a mid-stream drop with Send again, Stop, scroll anchoring with Jump to latest, the status announcement and reopening from ?c=. Resolver tests cover the starter lanes, thresholds and the fallback."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/chat/ChatPage.tsx",
+            "components/chat/ChatMessages.tsx",
+            "lib/ui/chat.ts"
+          ],
+          "evidence": [
+            "tests/chat-page.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CHAT-002",
+      "name": "Undo a change Chat made",
+      "feature": "chat",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/chat.md#undo-a-change"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "chat"
+      ],
+      "routes": [
+        "/chat"
+      ],
+      "journeys": [
+        "J29"
+      ],
+      "intent": "Reverse a single change Chat made in reply to a question.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Undo after an outcome line"
+        }
+      ],
+      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships. Shown on outcome lines whose Undo is available.",
+      "success_result": "The outcome line is replaced by Cadence's undone wording and Undo disappears.",
+      "failure_result": "A refused or failed Undo adds one red sentence under the outcome and keeps it.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/chat/ChatMessages.tsx",
+        "components/chat/ChatPage.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/chat-page.dom.test.tsx"
+        ],
+        "notes": "DOM check covers Undo replacing the outcome."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/chat/ChatMessages.tsx",
+            "components/chat/ChatPage.tsx"
+          ],
+          "evidence": [
+            "tests/chat-page.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CHAT-003",
+      "name": "Answer a chat confirm",
+      "feature": "chat",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/chat.md#answer-yes-or-no"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "chat"
+      ],
+      "routes": [
+        "/chat"
+      ],
+      "journeys": [
+        "J29"
+      ],
+      "intent": "Approve or decline every pending change of one question at once (Behavior changes and any second write).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes"
+        },
+        {
+          "kind": "activate",
+          "control": "No"
+        }
+      ],
+      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships. Shown while a confirm is pending.",
+      "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed.",
+      "failure_result": "An expired confirm or a changed record changes nothing and says so. A failed request shows one red sentence.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/chat/ChatMessages.tsx",
+        "components/chat/ChatPage.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/chat-page.dom.test.tsx"
+        ],
+        "notes": "DOM check covers Yes listing what ran."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/chat/ChatMessages.tsx",
+            "components/chat/ChatPage.tsx"
+          ],
+          "evidence": [
+            "tests/chat-page.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CHAT-004",
+      "name": "Open past or new conversations",
+      "feature": "chat",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/chat.md#past-conversations"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "chat"
+      ],
+      "routes": [
+        "/chat"
+      ],
+      "journeys": [
+        "J29"
+      ],
+      "intent": "See past conversations newest first, open one to continue it, or start a new one.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Past conversations"
+        },
+        {
+          "kind": "activate",
+          "control": "A conversation title"
+        },
+        {
+          "kind": "activate",
+          "control": "Show older"
+        },
+        {
+          "kind": "activate",
+          "control": "Back to chat"
+        },
+        {
+          "kind": "activate",
+          "control": "New conversation"
+        },
+        {
+          "kind": "activate",
+          "control": "Arrow next to Chat in the side menu, then a recent chat or All conversations"
+        }
+      ],
+      "availability": "Web Chat page; not in production web until the chat server (Phase 5A) ships.",
+      "success_result": "The list loads newest first with Today, Yesterday or a short date; opening one shows it exactly as it was streamed, with current confirm and outcome states. In the side menu an arrow next to Chat opens up to five recent chats and All conversations under it (closed by default, remembered per browser); the open one is marked.",
+      "failure_result": "A failed load shows one red sentence and keeps the current view.",
+      "effects": [
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/chat/ChatPage.tsx",
+        "components/layout/ChatNavRecents.tsx",
+        "components/layout/AppShell.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/chat-page.dom.test.tsx",
+          "tests/chat-nav-recents.dom.test.tsx"
+        ],
+        "notes": "DOM check covers the list order and opening a conversation."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/chat/ChatPage.tsx",
+            "components/layout/ChatNavRecents.tsx",
+            "components/layout/AppShell.tsx"
+          ],
+          "evidence": [
+            "tests/chat-page.dom.test.tsx",
+            "tests/chat-nav-recents.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Advisor plan Phase 5C adds the Chat screen to Cadence for Mac with the same shared components."
         },
         "marketing": {
           "applicability": "not_applicable",

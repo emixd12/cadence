@@ -47,7 +47,7 @@ const ABANDONED_AFTER_MS = 100_000;
 /** How often a running turn checks whether the person pressed Stop. */
 const STOP_POLL_MS = 1_000;
 
-type ChatSession = Readonly<{ caller: CalendarCaller; context: IntegrationContext }>;
+export type ChatSession = Readonly<{ caller: CalendarCaller; context: IntegrationContext }>;
 
 /** Signs the person in and opens their chat agent context. Refuses when chat is off (4F setting). */
 export async function openChatSession(request: Request): Promise<ChatSession> {

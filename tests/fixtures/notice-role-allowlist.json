@@ -25,6 +25,8 @@
     "components/briefing/ChatGptPlanCard.tsx": 6,
     "components/briefing/DailyBriefBubble.tsx": 2,
     "components/briefing/DailyBriefSettingsPanel.tsx": 2,
+    "components/chat/ChatMessages.tsx": 1,
+    "components/chat/ChatPage.tsx": 2,
     "components/export/BehaviorLogImportPanel.tsx": 3,
     "components/export/BehaviorLogRestorePanel.tsx": 5,
     "components/export/ExportPanel.tsx": 4,

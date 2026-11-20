@@ -179,7 +179,7 @@ Other open items:
   wording or style change.
 - Ended and Paused web (PR #328) added raw status and alert lines in
   `BehaviorList.tsx`, `BehaviorRunControls.tsx` and the action results in
-  `BehaviorRunNotices.tsx`; #319 added one in `OccurrenceMarkDetails.tsx`. Move them into
+  `BehaviorRunNotices.tsx`; #319 added one in `OccurrenceMarkDetails.tsx`; #325 added three in `components/chat/`. Move them into
   the catalog with the remaining areas.
 
 ## Agent readability roadmap

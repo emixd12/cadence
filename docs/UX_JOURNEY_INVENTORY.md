@@ -88,6 +88,7 @@ different risk in the product.
 | J26 | Travel and leave times | Jordan, Lina | `/settings#travel`, `/behaviors`, `/timeline` | User saves Home and usual travel, picks a behavior's Where, answers leave-time questions, corrects estimates, and turns travel estimates and leave reminders on or off. |
 | J27 | Completion places | Priya, Robin | `/settings` completion places section, `/behaviors` | User turns completion places on or off, records or removes place markers, reviews Where suggestions, and deletes labels or markers. |
 | J28 | Connect an AI app | Sam, Robin | `/oauth/consent`, `/settings#connected-apps` | User approves or denies an AI app's access, narrows its permissions, reviews its recent activity, and disconnects it. |
+| J29 | Chat with Cadence | any signed-in person | `/chat` | User asks Chat about their schedule, confirms or undoes the changes it makes, and opens past or new conversations. |
 
 ## Journey Details
 
@@ -734,6 +735,28 @@ Success criteria:
 Likely failure points:
 
 - A denied or narrowed grant can make the AI app report confusing errors.
+
+### J29 Chat With Cadence
+
+Primary persona: any signed-in person (advisor plan Phase 5).
+
+Steps:
+
+1. Open **Chat** from the navigation.
+2. Ask about today or the week, or ask for a change.
+3. Undo a single change, or answer **Yes** · **No** for a Behavior change.
+4. Reopen a past conversation.
+
+Success criteria:
+
+- Answers name the person's own items and calendar events.
+- Every change Chat makes shows an outcome line; single changes offer Undo.
+- Refusals and failures are one red sentence with what to do next.
+
+Likely failure points:
+
+- A dropped connection mid-reply; Send again must never run a turn twice.
+- The phone keyboard hiding the last line or the field.
 
 ## Cross-Journey Acceptance Themes
 

@@ -99,7 +99,7 @@ Check the cited entry before acting on a row.
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the
   product map and notices library plan (owner decisions of November 20, 2026).
   `scripts/build-product-map.mjs` joins the registries into one deterministic graph:
-  journeys, 34 features, interactions, components, families, tokens, ontology terms,
+  journeys, 35 features, interactions, components, families, tokens, ontology terms,
   database tables, MCP tools, services and API routes (`docs/PRODUCT_MAP_GUIDE.md`).
   `npm run map:check` runs in CI and Dagger; `npm run map -- <id>` shows one item.
 - Interaction registry 1.4.0 adds `features` and a required `feature` on every
@@ -115,7 +115,7 @@ Check the cited entry before acting on a row.
   confirmations italic, Timeline row refusals and brief load errors as one Rust Signal
   line, the reload line by result. `docs/NOTICES.md` (committed, checked) lists every
   notice and the 39 changes. A new `advisor-tips` feature holds the Timeline advisor
-  interactions from #321 (34 features).
+  interactions from #321, and `chat` holds the Chat page from #325, whose journey is J29 (35 features).
 
 ## Tips with one-tap changes — November 20, 2026
 
@@ -212,6 +212,23 @@ Check the cited entry before acting on a row.
 - **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
   approval while chat is on, and reads only the sources left on.
 - Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
+
+## Advisor plan Phase 5B: web Chat page — November 19, 2026
+
+- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
+  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
+- **Chat page (second change):** `components/chat/ChatPage.tsx` and `ChatMessages.tsx` on
+  5A's `@cadence/core/types/chat` events (`lib/ui/chat.ts` folds the stream), past
+  conversations, composer fixed to the bottom on phones, bench
+  `/design-system?preview=chat&state=…`. Registry INT-CHAT-001..004, journey J29,
+  `docs/user-guide/chat.md`, DESIGN.md "Chat". Second pass against an AI chat UI
+  checklist: Stop (5A's `CHAT_ROUTES.stop`), scroll that follows only when the newest
+  line is on screen plus Jump to latest, failed sends back in the field with the same
+  message id, a polite status line for run states, `?c=` reopens after a reload, and
+  stream validation with a plain-text fallback. Waiting on Emi's UI review.
+- **Next:** set `CHAT_PAGE_LIVE_ON_WEB` once 5A's route is on main; 5C adds the Mac screen.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 

@@ -41,6 +41,11 @@ export const CHAT_ROUTES = Object.freeze({
   conversations: "/api/advisor/chat/conversations",
   /** GET `${conversations}/<id>` → ChatConversationView (JSON). */
   conversation: (id: string) => `/api/advisor/chat/conversations/${encodeURIComponent(id)}`,
+  /**
+   * GET → ChatStarterList (JSON). Up to three starter questions for an empty
+   * conversation, picked in code from the person's own week. Runs no model call.
+   */
+  starters: "/api/advisor/chat/starters",
 });
 
 /** Longest message a person can send, in characters. Longer input is refused with `invalid_request`. */
@@ -127,6 +132,11 @@ export type ChatConversationList = Readonly<{
   /** Pass as `before` for the next page; null on the last page. */
   nextBefore: string | null;
 }>;
+
+/** A starter question: tapping it sends `text` as the person's message. */
+export type ChatStarter = Readonly<{ id: string; text: string }>;
+
+export type ChatStarterList = Readonly<{ starters: readonly ChatStarter[] }>;
 
 export type ChatConversationView = Readonly<{
   conversation: ChatConversationSummary;
