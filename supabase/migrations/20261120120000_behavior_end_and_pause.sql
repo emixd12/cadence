@@ -221,6 +221,27 @@ as $$
   ]::text[], null) end;
 $$;
 
+-- A configuration plan written before end and pause existed (an older client, a
+-- saved fixture) has no 'end' or 'pause' keys. It reads as keeping the stored
+-- values, as a plan without where_kind already does.
+create or replace function cadence_private.behavior_configuration_with_run(planned jsonb, stored jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when planned is null or jsonb_typeof(planned) <> 'object' then planned
+    else planned
+      || case when planned ? 'end' then '{}'::jsonb
+        else jsonb_build_object('end', coalesce(stored -> 'end', 'null'::jsonb)) end
+      || case when planned ? 'pause' then '{}'::jsonb
+        else jsonb_build_object('pause', coalesce(stored -> 'pause', 'null'::jsonb)) end
+  end;
+$$;
+
+revoke all on function cadence_private.behavior_configuration_with_run(jsonb, jsonb) from public, anon, authenticated;
+
 -- A small text patcher for the function rewrites below: each anchor must occur once.
 create function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
 returns text
@@ -508,6 +529,34 @@ $a$, '', 'Advisor snapshot archive count');
     $p$        or (p_operation = 'restore_behavior' and (before_row->>'active')::boolean)
         or (p_operation in ('end_behavior', 'pause_behavior', 'resume_behavior')
           and nullif(p_args->'configuration_event_plan', 'null'::jsonb) is null) then$p$, 'Integration Behavior no-op writes');
+  execute definition;
+
+  -- Configuration plans without end and pause keys keep the stored values.
+  select pg_get_functiondef('cadence_private.insert_behavior_configuration_event(uuid,uuid,jsonb,jsonb,jsonb)'::regprocedure) into definition;
+  definition := pg_temp.patch_definition(definition, $a$    or cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'previous_configuration')
+      is distinct from coalesce(previous_configuration, 'null'::jsonb)
+    or cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'next_configuration')
+      is distinct from next_configuration$a$, $p$    or cadence_private.behavior_configuration_with_run(
+      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'previous_configuration'),
+      previous_configuration)
+      is distinct from coalesce(previous_configuration, 'null'::jsonb)
+    or cadence_private.behavior_configuration_with_run(
+      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'next_configuration'),
+      next_configuration)
+      is distinct from next_configuration$p$, 'Configuration event plan snapshots');
+  definition := pg_temp.patch_definition(definition, $a$    or planned_changed_fields is distinct from (case
+      when (configuration_event_plan -> 'next_configuration') ? 'where_kind' then expected_changed_fields
+      else array_remove(expected_changed_fields, 'where_kind')
+    end)$a$, $p$    or planned_changed_fields is distinct from (case
+      when (configuration_event_plan -> 'next_configuration') ? 'where_kind' then (case
+        when (configuration_event_plan -> 'next_configuration') ? 'end' then expected_changed_fields
+        else array_remove(array_remove(expected_changed_fields, 'end'), 'pause')
+      end)
+      else array_remove((case
+        when (configuration_event_plan -> 'next_configuration') ? 'end' then expected_changed_fields
+        else array_remove(array_remove(expected_changed_fields, 'end'), 'pause')
+      end), 'where_kind')
+    end)$p$, 'Configuration event plan changed fields');
   execute definition;
 end
 $migration$;
