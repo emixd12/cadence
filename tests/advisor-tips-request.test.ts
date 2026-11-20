@@ -173,7 +173,7 @@ describe("GET recent tips", () => {
   });
 
   it("with tips off: an empty list and no read", async () => {
-    const body = await (await handleRecentTips(recent(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false }) }))).json();
+    const body = await (await handleRecentTips(recent(), deps({ settings: async () => ({ tipsOn: false, notesAllowed: false, reminderHistoryAllowed: true }) }))).json();
     expect(body).toEqual({ tips: [] });
     expect(repo.recentTips).not.toHaveBeenCalled();
   });
