@@ -20,7 +20,7 @@ function card(overrides: Partial<AdviceCard> & Pick<AdviceCard, "id">): AdviceCa
     applies_when: [{ signal: "completion_drop", scope: "behavior", facts: [] }], does_not_apply_when: [],
     evidence: { source_id: "s", kind: "meta_analysis", strength: "moderate", claim: "Claim.", quote: "Quote.", locator: "Abstract" },
     quip_seeds: ["{behavior}: {recent_completed} of {recent_resolved}.", "Two."], audience: "any_account",
-    reviewed_at: "2026-11-19", reviewer: "Emi",
+    reviewed_at: "2026-11-19", reviewer: "Emi", offer: null,
     ...overrides,
   };
 }

@@ -2,6 +2,7 @@ import { LinkProvider, RefreshProvider, type RuntimeLinkProps } from "@cadence/u
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
+import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
 
 import { NeedsDecisionDialog } from "@/components/timeline/NeedsDecisionDialog";
 import { openCalendarSourceUrl } from "./calendar/google-calendar";
@@ -41,6 +42,8 @@ export type TimelineScreenProps = Readonly<{
   dailyBriefSessionKey?: string;
   // Shared links on the Timeline switch desktop screens instead of loading a URL.
   onNavigate?: (screen: DesktopScreen, anchor?: string) => void;
+  /** A tip's link (one-tap changes): opens the Behaviors screen at the named field. */
+  onOpenAdvisorLink?: (link: AdvisorTipLink) => void;
   /** Ended and Paused: Start again and Resume now on the Timeline notices (local action). */
   runAction?: BehaviorFormAction;
   /** Advisor plan 4G: the "Done at" and "Why?" lines after a mark. */
@@ -90,6 +93,7 @@ export function TimelineScreen({
   dailyBriefClient,
   dailyBriefSessionKey,
   onNavigate,
+  onOpenAdvisorLink,
   markDetailActions,
   ...actions
 }: TimelineScreenProps) {
@@ -165,7 +169,7 @@ export function TimelineScreen({
         ) : null}
         {/* Advisor Phase 4 (4E, placement K): with an account, the horse sits at the top centre and the
             brief opens in the advisor's panel; a Mac with no account keeps the banner horse and no advisor. */}
-        <AdvisorTimelineFrame client={dailyBriefClient?.advisor} fallbackBanner={<>
+        <AdvisorTimelineFrame client={dailyBriefClient?.advisor} onOpenLink={onOpenAdvisorLink} fallbackBanner={<>
           <div className="w-full overflow-hidden bg-background">
             <div className="aspect-[1423/367] w-full sm:aspect-[2041/239]">
               <picture className="block h-full w-full">

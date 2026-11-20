@@ -1,4 +1,4 @@
-import type { AdvisorTipReaction } from "@cadence/core/types/advisor-tips";
+import { ADVISOR_TIP_LINK_TARGETS, advisorTipLink, type AdvisorTipLink, type AdvisorTipLinkTarget, type AdvisorTipReaction } from "@cadence/core/types/advisor-tips";
 import type { AdviceSignalInput, AdviceSignalKind } from "@cadence/core/types/advice-cards";
 
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -54,6 +54,8 @@ export type StoredTip = Readonly<{
   source: "model" | "seed";
   shownAt: string | null;
   reaction: AdvisorTipReaction | null;
+  /** The tip's question got a No: the card rests 30 days for this Behavior. */
+  proposalDeclined?: boolean;
 }>;
 
 export type TipHistory = Readonly<{ tips: readonly StoredTip[]; suppressedCardIds: readonly string[] }>;
@@ -78,6 +80,7 @@ export async function readTipHistory(client: AppSupabaseClient, since: string): 
         source: row.source === "model" ? "model" : "seed",
         shownAt: typeof row.shown_at === "string" ? row.shown_at : null,
         reaction: isReaction(row.reaction) ? row.reaction : null,
+        proposalDeclined: row.proposal_declined === true,
       }];
     }),
     suppressedCardIds: Array.isArray(body.suppressed) ? body.suppressed.filter((id): id is string => typeof id === "string") : [],
@@ -92,6 +95,11 @@ export type TipToWrite = Readonly<{
   factIds: readonly string[];
   factValues: Readonly<Record<string, unknown>>;
   source: "model" | "seed";
+  /** The question this tip carries (a proposal made for it this run). */
+  proposalId?: string | null;
+  /** Where the tip's link goes, when it carries no question. */
+  linkTarget?: AdvisorTipLinkTarget | null;
+  linkBehaviorId?: string | null;
 }>;
 
 /** Coach token: writes the run's day of tips (replacing ones not yet shown). Returns how many landed. */
@@ -101,6 +109,7 @@ export async function writeTips(client: AppSupabaseClient, runId: string, tips: 
     p_tips: tips.map((tip) => ({
       text: tip.text, card_id: tip.cardId, card_revision: tip.cardRevision, behavior_id: tip.behaviorId,
       fact_ids: [...tip.factIds], fact_values: tip.factValues, source: tip.source,
+      proposal_id: tip.proposalId ?? null, link_target: tip.linkTarget ?? null, link_behavior_id: tip.linkBehaviorId ?? null,
     })) as unknown as Json,
   });
   if (error || typeof data !== "number") throw new AdvisorTipsError("write_failed");
@@ -117,6 +126,8 @@ export type TipRow = Readonly<{
   behaviorId: string | null;
   shownAt: string;
   reaction: AdvisorTipReaction | null;
+  proposalId: string | null;
+  link: AdvisorTipLink | null;
 }>;
 
 export type NextTipResult =
@@ -171,6 +182,10 @@ function parseTipRow(value: unknown): TipRow | null {
     behaviorId: typeof row.behavior_id === "string" ? row.behavior_id : null,
     shownAt: typeof row.shown_at === "string" ? row.shown_at : new Date(0).toISOString(),
     reaction: isReaction(row.reaction) ? row.reaction : null,
+    proposalId: typeof row.proposal_id === "string" ? row.proposal_id : null,
+    link: ADVISOR_TIP_LINK_TARGETS.includes(row.link_target as AdvisorTipLinkTarget)
+      ? advisorTipLink(row.link_target as AdvisorTipLinkTarget, typeof row.link_behavior_id === "string" ? row.link_behavior_id : null)
+      : null,
   };
 }
 

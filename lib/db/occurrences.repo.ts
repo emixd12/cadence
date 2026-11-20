@@ -39,6 +39,23 @@ export async function listBehaviorOccurrencesFrom(
   );
 }
 
+/** One Behavior's Occurrences on one local date: status, planned start and moved start. */
+export async function listBehaviorOccurrenceTimesOnLocalDate(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behaviorId: string,
+  localDate: string,
+): Promise<Array<Pick<Occurrence, "status" | "schedule_start_time" | "effective_start_at">>> {
+  const { data, error } = await supabase
+    .from("occurrences")
+    .select("status,schedule_start_time,effective_start_at")
+    .eq("user_id", userId)
+    .eq("behavior_id", behaviorId)
+    .eq("local_date", localDate);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function listUnresolvedOccurrencesBeforeLocalDate(
   supabase: AppSupabaseClient,
   userId: string,

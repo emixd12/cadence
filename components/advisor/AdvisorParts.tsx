@@ -1,8 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
-import type { AdvisorTip, AdvisorTipReaction } from "@cadence/core/types/advisor-tips";
-import type { ScheduleProposalAnswer } from "@cadence/core/types/behavior-change-proposals";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { AdvisorTip, AdvisorTipReaction, AdvisorTipResearch } from "@cadence/core/types/advisor-tips";
+import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
 
 import {
   TIP_REACTION_OUTCOME,
@@ -84,8 +84,7 @@ function ErrorLine({ text }: Readonly<{ text: string | null }>) {
 }
 
 /** The "Why this?" research card, under the tip with a 1px left rule. */
-export function ResearchCard({ tip, full }: Readonly<{ tip: AdvisorTip; full: boolean }>) {
-  const research = tip.research;
+export function ResearchCard({ research, full }: Readonly<{ research: AdvisorTipResearch; full: boolean }>) {
   const audience = audienceLabel(research.audience);
   return (
     <div className="mt-2 border-l border-line pl-3" data-advisor-card>
@@ -113,16 +112,21 @@ function TipBlock({ full }: Readonly<{ full: boolean }>) {
   return (
     <div className="text-sm leading-6" data-advisor-tip={tip.id}>
       <p className="break-words text-foreground [overflow-wrap:anywhere]">{tip.text}</p>
-      {advisor.researchOpen ? <ResearchCard tip={tip} full={full} /> : null}
+      {advisor.researchOpen ? <ResearchCard research={tip.research} full={full} /> : null}
       {answered && (answeredHere || tip.reaction === "helpful") ? (
         <>
           <Outcome>{TIP_REACTION_OUTCOME[tip.reaction!]}</Outcome>
-          {!advisor.researchOpen && tip.reaction === "helpful" ? (
-            <p><button type="button" className={LINK} onClick={advisor.toggleResearch}>Why this?</button></p>
+          {tip.reaction === "helpful" && (tip.link || !advisor.researchOpen) ? (
+            <p>
+              {tip.link ? <TipLinkButton tip={tip} /> : null}
+              {tip.link && !advisor.researchOpen ? <Dot /> : null}
+              {!advisor.researchOpen ? <button type="button" className={LINK} onClick={advisor.toggleResearch}>Why this?</button> : null}
+            </p>
           ) : null}
         </>
       ) : (
         <p>
+          {tip.link ? <span className="whitespace-nowrap"><TipLinkButton tip={tip} /><Dot /></span> : null}
           <span className="whitespace-nowrap">
             <button type="button" className={LINK} onClick={advisor.toggleResearch} aria-expanded={advisor.researchOpen}>
               {advisor.researchOpen ? "Hide research" : "Why this?"}
@@ -141,7 +145,15 @@ function TipBlock({ full }: Readonly<{ full: boolean }>) {
   );
 }
 
-function ProposalAnswers({ answers }: Readonly<{ answers: readonly (readonly [ScheduleProposalAnswer, string])[] }>) {
+/** A tip's link: "Set a length", "Change the set time", "Open Needs decision". */
+function TipLinkButton({ tip }: Readonly<{ tip: AdvisorTip }>) {
+  const advisor = useAdvisor();
+  const link = tip.link;
+  if (!advisor || !link) return null;
+  return <button type="button" className={LINK} onClick={() => advisor.openLink(link)} data-advisor-tip-link={link.target}>{link.label}</button>;
+}
+
+function ProposalAnswers({ answers, trailing }: Readonly<{ answers: readonly (readonly [ScheduleProposalAnswer, string])[]; trailing?: ReactNode }>) {
   const advisor = useAdvisor();
   const state = advisor?.proposal;
   if (!advisor || !state) return null;
@@ -153,7 +165,48 @@ function ProposalAnswers({ answers }: Readonly<{ answers: readonly (readonly [Sc
           <button type="button" className={LINK} disabled={state.pending !== null} onClick={() => advisor.answer(answer)}>{label}</button>
         </span>
       ))}
+      {trailing ? <span className="whitespace-nowrap"><Dot />{trailing}</span> : null}
     </p>
+  );
+}
+
+/** The italic outcome of an answer; after Change for good it offers Undo (regular text). */
+function ProposalOutcome() {
+  const advisor = useAdvisor();
+  const state = advisor?.proposal;
+  if (!advisor || !state?.outcome) return null;
+  return (
+    <>
+      <Outcome>{state.outcome}</Outcome>
+      {state.undoable ? (
+        <p><button type="button" className={LINK} disabled={state.pending !== null} onClick={() => advisor.answer("undo")}>Undo</button></p>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A question that came from a tip: the tip's sentence, Cadence's question with the value
+ * a Yes applies, the three answers and the tip's "Why this?" card.
+ */
+function TipQuestion({ view }: Readonly<{ view: Extract<ScheduleProposalView, { kind: "proposal" }> }>) {
+  const advisor = useAdvisor();
+  const [researchOpen, setResearchOpen] = useState(false);
+  const tip = view.tip;
+  if (!advisor || !tip) return null;
+  const answered = !!advisor.proposal?.outcome;
+  const why = tip.research ? (
+    <button type="button" className={LINK} onClick={() => setResearchOpen((open) => !open)} aria-expanded={researchOpen}>
+      {researchOpen ? "Hide research" : "Why this?"}
+    </button>
+  ) : null;
+  return (
+    <div data-advisor-tip-question={view.proposalId}>
+      <p className="break-words text-foreground [overflow-wrap:anywhere]">{tip.text}</p>
+      <p>{tip.question}</p>
+      {answered ? <ProposalOutcome /> : <ProposalAnswers answers={PROPOSAL_ANSWERS} trailing={why} />}
+      {researchOpen && tip.research ? <ResearchCard research={tip.research} full /> : null}
+    </div>
   );
 }
 
@@ -173,7 +226,7 @@ export function AdvisorDayLine() {
     body = (
       <>
         <p>{proposalShortLine(item.view)}{proposal?.outcome ? null : <> <button type="button" className={LINK} onClick={advisor.openPanel}>Answer</button></>}</p>
-        {proposal?.outcome ? <Outcome>{proposal.outcome}</Outcome> : null}
+        <ProposalOutcome />
       </>
     );
   } else if (item.kind === "check_in") {
@@ -238,11 +291,11 @@ export function AdvisorPanel() {
         {brief.kind !== "none" ? <BriefSection /> : null}
         {view && (view.kind === "proposal" || view.kind === "check_in" || view.kind === "notice") ? (
           <Section heading="Needs your answer">
-            {view.kind === "proposal" ? (
+            {view.kind === "proposal" && view.tip ? <TipQuestion view={view} /> : view.kind === "proposal" ? (
               <>
                 <p>{view.line}</p>
                 {view.reason ? <p className="text-xs leading-5 text-muted-readable">{view.reason}</p> : null}
-                {proposal?.outcome ? <Outcome>{proposal.outcome}</Outcome> : <ProposalAnswers answers={PROPOSAL_ANSWERS} />}
+                {proposal?.outcome ? <ProposalOutcome /> : <ProposalAnswers answers={PROPOSAL_ANSWERS} />}
               </>
             ) : view.kind === "check_in" ? (
               <>
@@ -253,7 +306,9 @@ export function AdvisorPanel() {
             <ErrorLine text={proposal?.error ?? null} />
           </Section>
         ) : null}
-        {tip ? <Section heading="Today’s tip"><TipBlock full /></Section> : null}
+        {/* A tip that carries the question above is shown there, once. */}
+        {tip && !(view?.kind === "proposal" && tip.tip.proposalId && tip.tip.proposalId === view.proposalId)
+          ? <Section heading="Today’s tip"><TipBlock full /></Section> : null}
         {view?.kind === "trial" ? (
           <Section heading="Trying for two weeks">
             <p>{view.line}</p>

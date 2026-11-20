@@ -5,7 +5,7 @@ import type { AdviceCard, AdviceSignalInput } from "@cadence/core/types/advice-c
 
 import type { StoredTip, TipHistory, TipToWrite } from "@/lib/db/advisor-tips.repo";
 import type { AgentModelSetting } from "@/lib/services/agent-model";
-import { processCoachTips, visitAdvisorTips, type TipVisitPort } from "@/lib/services/advisor-tips-job.service";
+import { processCoachTips, visitAdvisorTips, withOffers, type TipVisitPort } from "@/lib/services/advisor-tips-job.service";
 import type { AdvisorTipsSettings } from "@/lib/services/advisor-tips-settings";
 
 // Advisor plan Phase 4, workstream 4B steps 2, 6 and 9: the daily tip run.
@@ -17,7 +17,7 @@ function card(id: string, signal: string, seeds: string[]): AdviceCard {
     id, revision: 1, status: "active", advice: "Advice.", action: "Pick one fixed time.", limitation: "Limitation.",
     applies_when: [{ signal: signal as never, scope: "behavior", facts: [] }], does_not_apply_when: [],
     evidence: { source_id: "s", kind: "meta_analysis", strength: "moderate", claim: "Claim.", quote: "Quote.", locator: "Abstract" },
-    quip_seeds: seeds, audience: "any_account", reviewed_at: "2026-11-19", reviewer: "Emi",
+    quip_seeds: seeds, audience: "any_account", reviewed_at: "2026-11-19", reviewer: "Emi", offer: null,
   };
 }
 
@@ -263,5 +263,47 @@ describe("processCoachTips", () => {
     });
     expect(timed.visited + timed.leftOver).toBe(timed.selected);
     expect(timed.leftOver).toBeGreaterThan(0);
+  });
+});
+
+describe("offers on the day's tips (one-tap changes)", () => {
+  const setup = {
+    behaviors: [
+      { id: "b-gym", createdAt: "2026-08-01T10:00:00Z", timezone: "UTC", active: true, hasLength: true, hasPlace: true },
+      { id: "b-read", createdAt: "2026-08-01T10:00:00Z", timezone: "UTC", active: true, hasLength: false, hasPlace: false },
+    ],
+    occurrences: [],
+    titles: new Map([["b-gym", "Gym"], ["b-read", "Reading"]]),
+  };
+  const tip = (cardId: string, behaviorId: string | null): TipToWrite => ({
+    text: "A line.", cardId, cardRevision: 1, behaviorId, factIds: [], factValues: {}, source: "seed",
+  });
+  const cards = [
+    { ...card("set-it", "repeated_move", ["One."]), offer: { kind: "set_time" as const } },
+    { ...card("give-length", "missing_length", ["One."]), offer: { kind: "open" as const, target: "length" as const } },
+    { ...card("unmarked", "unmarked", ["One."]), offer: { kind: "open" as const, target: "unmarked" as const } },
+    card("plain", "completion_drop", ["One."]),
+  ];
+
+  it("stores the question first and falls back to a link when it is refused", async () => {
+    const offers = vi.fn(async (_run: string, _date: string, list: readonly { key: string }[]) => list.map((item) => ({ key: item.key, proposalId: "p-1", reason: null })));
+    const tips = await withOffers({ offers }, { runId: "r", localDate: "2026-11-19", tips: [tip("set-it", "b-gym"), tip("plain", "b-gym")], matches: [], setup, cards });
+    expect(tips[0]).toMatchObject({ proposalId: "p-1", linkTarget: null });
+    expect(tips[1]).not.toHaveProperty("proposalId");
+    const refused = await withOffers({ offers: async () => [{ key: "0", proposalId: null, reason: "below_bar" }] },
+      { runId: "r", localDate: "2026-11-19", tips: [tip("set-it", "b-gym")], matches: [], setup, cards });
+    expect(refused[0]).toMatchObject({ proposalId: null, linkTarget: "time", linkBehaviorId: "b-gym" });
+  });
+
+  it("a failed proposal step never stops the tips", async () => {
+    const tips = await withOffers({ offers: async () => { throw new Error("db"); } },
+      { runId: "r", localDate: "2026-11-19", tips: [tip("set-it", "b-gym")], matches: [], setup, cards });
+    expect(tips[0]).toMatchObject({ proposalId: null, linkTarget: "time" });
+  });
+
+  it("an account tip links to the first Behavior missing that field; Needs decision has no Behavior", async () => {
+    const tips = await withOffers({}, { runId: "r", localDate: "2026-11-19", tips: [tip("give-length", null), tip("unmarked", null)], matches: [], setup, cards });
+    expect(tips[0]).toMatchObject({ linkTarget: "length", linkBehaviorId: "b-read" });
+    expect(tips[1]).toMatchObject({ linkTarget: "unmarked", linkBehaviorId: null });
   });
 });

@@ -1814,6 +1814,11 @@
       "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
     },
     {
+      "id": "INT-ADVISOR-005",
+      "classification": "browser_only",
+      "reason": "Following a tip's link is navigation; the Behaviors editor reads what the page already loads."
+    },
+    {
       "id": "INT-CHAT-001",
       "classification": "external_provider",
       "reason": "A chat turn invokes the model provider and needs separate synthetic provider testing."
