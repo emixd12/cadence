@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/supabase-rehearsal.yml
+      - .github/actions/setup/**
       - supabase/**
       - scripts/supabase-rehearsal.sh
       - scripts/supabase-rehearsal-diagnostics.mjs
@@ -67,12 +68,10 @@ jobs:
               printf 'PR base: `%s`\n\n' "$PR_BASE_SHA"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.x
-          cache: npm
-      - run: npm ci
+      # Restores node_modules from the Actions cache, as the CI workflow does, and
+      # runs npm ci only when a package manifest or the lockfile changed.
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
       - name: Verify Docker isolation and private-log diagnostics
         run: npx vitest run tests/supabase-docker-proxy.test.ts tests/supabase-rehearsal-diagnostics.test.ts
       - name: Replay migrations and run local contracts

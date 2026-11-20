@@ -101,6 +101,12 @@ export function dailyBriefSectionState(load: SettingsSectionLoad<DailyBriefSetti
   if (load.phase === "loading") return SETTINGS_SECTION_CHECKING;
   if (load.phase === "failed") return SETTINGS_SECTION_UNAVAILABLE;
   const settings = load.value;
+  if (settings.ai) {
+    // Advisor 4F: the drawer covers every AI feature.
+    if (!settings.ai.approved) return state("Not answered yet", false, true);
+    const on = [settings.available && settings.enabled, settings.ai.tipsEnabled, settings.ai.chatEnabled].filter(Boolean).length;
+    return on === 0 ? state("Off", false) : state(on === 3 ? "On" : `On · ${on} of 3 features`, true);
+  }
   if (!settings.available) return state("Unavailable", false);
   if (!settings.enabled) return state("Off", false);
   if (settings.useConnectedSources !== undefined) {
@@ -134,7 +140,8 @@ export function connectorUnavailableSectionState(reason: "local" | "build" | nul
 
 export const CATEGORY_PANEL_PURPOSE = "Group Behaviors your way. A category’s description shows in Behavior forms and exports.";
 export const SETTINGS_TRAVEL_PURPOSE = "Know when to leave for events and Behaviors that have a place.";
-export const SETTINGS_DAILY_BRIEF_PURPOSE = "A short briefing the first time you open Timeline each day.";
+/** Advisor 4F: the drawer holds every AI feature and the sources they share. */
+export const SETTINGS_DAILY_BRIEF_PURPOSE = "Daily Brief, Advisor tips and Chat, and what they use.";
 /** Ticket 292: the day-note pool. One line for its Settings drawer. */
 export const DAY_NOTE_SHORTCUTS_PURPOSE = "Suggests a shortcut when you save the same day note on three days.";
 

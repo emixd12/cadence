@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { getImageProps } from "next/image";
 import { Suspense } from "react";
 
-import { ScreenContentLoading } from "@/components/layout/ScreenFrame";
+import { CadencePageBanner, ScreenContentLoading } from "@/components/layout/ScreenFrame";
+import { WebAdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
+import { AiFeaturesApproval } from "@/components/onboarding/AiFeaturesApproval";
 import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getCurrentUserClaims } from "@/lib/auth/current-user";
@@ -47,19 +48,6 @@ const MOVE_ACTIONS: OccurrenceMoveActions = {
   keep: keepMovedOccurrenceAction,
 };
 
-const TIMELINE_BANNER_IMAGES = {
-  desktop: {
-    src: "/brand/cadence-timeline-horse-lines-dots-clear-background.png",
-    width: 2041,
-    height: 239,
-  },
-  mobile: {
-    src: "/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png",
-    width: 1423,
-    height: 367,
-  },
-} as const;
-
 type TimelinePageProps = Readonly<{
   searchParams?: Promise<{
     days?: string | string[];
@@ -73,20 +61,21 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   // Ticket 278: a leave reminder's link names its trip by digest only.
   const leaveReminderDigest = parseLeaveReminderDigest(params?.[LEAVE_REMINDER_LINK_PARAM]);
 
+  // Advisor Phase 4 (4E, placement K): the advisor (the horse) sits at the top centre and the
+  // banner keeps only its wave line. The brief, tips and schedule questions open from the horse.
   return (
-    <div className="flex w-full flex-col">
+    <WebAdvisorTimelineFrame banner={<>
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
         <h1 className="sr-only">Timeline</h1>
       </div>
-
-      <TimelineBanner />
-
+      <CadencePageBanner />
+    </>}>
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
         <Suspense fallback={<ScreenContentLoading label="Loading timeline" />}>
           <TimelineContent futureDays={futureDays} leaveReminderDigest={leaveReminderDigest} />
         </Suspense>
       </div>
-    </div>
+    </WebAdvisorTimelineFrame>
   );
 }
 
@@ -124,7 +113,10 @@ async function TimelineContent({
       hasMovedBefore={moveState.hasMovedBefore}
     >
       <DailyBriefLauncher travelAccountId={userId} />
-      <FirstRunOnboardingPanel onboarding={onboarding} />
+      {/* Advisor 4F: the one AI features question comes before the setup pop-up, in its place. */}
+      <AiFeaturesApproval>
+        <FirstRunOnboardingPanel onboarding={onboarding} />
+      </AiFeaturesApproval>
       <MoveConflictNotices conflicts={moveState.conflicts} timeline={timeline} />
       <Timeline
         key={userId}
@@ -161,51 +153,6 @@ async function loadMoveState(userId: string | null, todayLocalDate: string)
   } catch {
     return { hasMovedBefore: true, conflicts: [] };
   }
-}
-
-function TimelineBanner() {
-  const sharedImageProps = {
-    alt: "",
-    "aria-hidden": true,
-    className: "block h-full w-full object-fill lg:mt-1",
-    fetchPriority: "high",
-    loading: "eager",
-    sizes: "100vw",
-  } as const;
-
-  const {
-    props: { sizes: mobileSizes, srcSet: mobileSrcSet },
-  } = getImageProps({
-    ...sharedImageProps,
-    ...TIMELINE_BANNER_IMAGES.mobile,
-  });
-
-  const {
-    props: { sizes: desktopSizes, srcSet: desktopSrcSet, ...desktopImageProps },
-  } = getImageProps({
-    ...sharedImageProps,
-    ...TIMELINE_BANNER_IMAGES.desktop,
-  });
-
-  return (
-    <div className="w-full overflow-hidden bg-background">
-      <div className="aspect-[1423/367] w-full sm:aspect-[2041/239]">
-        <picture className="block h-full w-full">
-          <source
-            media="(max-width: 639px)"
-            sizes={mobileSizes}
-            srcSet={mobileSrcSet}
-          />
-          <source
-            media="(min-width: 640px)"
-            sizes={desktopSizes}
-            srcSet={desktopSrcSet}
-          />
-          <img {...desktopImageProps} alt="" aria-hidden="true" />
-        </picture>
-      </div>
-    </div>
-  );
 }
 
 function parseFutureDays(value: string | string[] | undefined): number | undefined {

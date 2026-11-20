@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/desktop-native.yml
+      - .github/actions/setup/**
       - apps/desktop/src-tauri/**
       - apps/desktop/package.json
       - package.json
@@ -17,6 +18,7 @@ on:
       - main
     paths:
       - .github/workflows/desktop-native.yml
+      - .github/actions/setup/**
       - apps/desktop/src-tauri/**
       - apps/desktop/package.json
       - package.json
@@ -57,16 +59,18 @@ jobs:
       CADENCE_RUST_TOOLCHAIN: "1.97.1"
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       CARGO_BUILD_JOBS: "2"
+      # A fresh checkout rebuilds the application crate in full, so incremental
+      # data would only enlarge the cached target folder.
+      CARGO_INCREMENTAL: "0"
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.x
-          cache: npm
+      # Restores node_modules from the Actions cache, as the CI workflow does, and
+      # runs npm ci only when a package manifest or the lockfile changed.
+      - name: Set up Node.js and dependencies
+        uses: ./.github/actions/setup
       - name: Install release Rust toolchain
         run: rustup toolchain install "$CADENCE_RUST_TOOLCHAIN" --profile minimal --no-self-update --target aarch64-apple-darwin
       - name: Record native build environment
@@ -76,10 +80,35 @@ jobs:
           xcodebuild -version
           rustc +"$CADENCE_RUST_TOOLCHAIN" --version --verbose
           cargo +"$CADENCE_RUST_TOOLCHAIN" --version
-      - run: npm ci
+      # Compiled dependencies come from the cache saved on main. Cargo rebuilds
+      # the application crate on every run, because a fresh checkout is newer
+      # than any cached artifact. The key covers the toolchain and Cargo.lock,
+      # so a dependency or compiler change starts from an empty target folder.
+      - name: Restore the Rust build cache
+        id: rust-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/desktop/src-tauri/target
+          key: rust-build-${{ runner.os }}-${{ runner.arch }}-${{ env.CADENCE_RUST_TOOLCHAIN }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
       - name: Build desktop frontend assets
         run: npm run desktop:build
       - name: Check native application
         run: cargo +"$CADENCE_RUST_TOOLCHAIN" check --locked --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Run native unit tests
         run: cargo +"$CADENCE_RUST_TOOLCHAIN" test --locked --lib --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
+      # Pull requests only read the cache. A push to main or a manual run saves
+      # it once per key, so pull requests cannot fill the 10 GB cache quota.
+      - name: Save the Rust build cache
+        if: github.event_name != 'pull_request' && steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/desktop/src-tauri/target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}

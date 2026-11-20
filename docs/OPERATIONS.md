@@ -113,6 +113,9 @@ the checked commit/tree and PR head/base. It runs on a fresh `ubuntu-24.04` VM
 with Node 24, read-only repository permission and no hosted secrets or deployment
 environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
 runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
+The job installs Node.js and dependencies through `.github/actions/setup`, so it
+restores `node_modules` from the Actions cache like the `CI` jobs. Before
+November 20, 2026 it ran `npm ci` on every run (68 s at the median of 44 runs).
 
 The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
 project-scoped Docker proxy. It pulls the seven existing pinned images from
@@ -211,11 +214,11 @@ npm run test
 npm run build
 ```
 
-`npm run test` skips `tests/acceptance-web-client.test.mjs`. After changing
+`npm run test` skips the tests in `tests/acceptance-web-client/`. After changing
 `scripts/acceptance/**`, `scripts/mcp-acceptance-cleanup.mjs`,
-`scripts/mcp-fixture-cleanup.mjs`, `scripts/mcp-session-broker.mjs` or that test,
-also run `npm run test:web-client`. It needs installed Google Chrome and takes
-about ten minutes.
+`scripts/mcp-fixture-cleanup.mjs`, `scripts/mcp-session-broker.mjs` or those tests,
+also run `npm run test:web-client`. It needs installed Google Chrome. The ten test
+files run in parallel, each with its own headless Chrome and stub servers.
 
 ### GitHub Actions CI
 
@@ -245,9 +248,14 @@ cache would not shorten a run.
 
 `.github/workflows/web-client-runner.yml` runs `npm run test:web-client` when a pull
 request or a push to `main` changes the web client acceptance runner, a file its
-test imports, the package manifests or `vitest.config.ts`. The test drives headless
+tests import, the package manifests or `vitest.config.ts`. The tests drive headless
 Chrome against stub chat sites and took about ten minutes of each 12.5-minute CI
-run while it was part of `npm run test`. The workflow is not a required check, like
+run while they were part of `npm run test`. Since November 20, 2026 they are ten
+files in `tests/acceptance-web-client/` that share `harness.mjs`, and the workflow
+runs all ten at once with `--maxWorkers=10`. The 71 tests and their names did not
+change. The job took 609 s at the median as one file and 110 s after the
+split (one run). Add a test to the file for its area, or to a new file that calls
+`startWebClientHarness()`. The workflow is not a required check, like
 `desktop-native.yml` and `supabase-rehearsal.yml`. Read its result before merging a
 change to those paths. Decision: `docs/DECISIONS.md`, 2026-11-11, "CI checks run in
 parallel".
@@ -324,7 +332,7 @@ It must equal `FIXTURE_SOURCE` in `scripts/build-mcp-hosted-fixtures.mjs`;
 `.git`. This works the same from the main checkout and from a worktree.
 
 **Not covered.** `public-source:check` needs the full local history, and
-`tests/acceptance-web-client.test.mjs` needs installed Google Chrome, which the
+the tests in `tests/acceptance-web-client/` need installed Google Chrome, which the
 image lacks; containers on the owner's Mac cannot `apt-get` it. GitHub Actions
 runs both. Dagger runs only on local machines: do not enable Dagger Cloud, Cloud
 Checks or Cloud engines (`docs/DECISIONS.md`, 2026-10-24).
