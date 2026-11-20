@@ -3268,7 +3268,12 @@ shown to the person; Phase 4 matches the signals to advice cards.
 
 - `cadence_advisor_private.coach_signals`: one row per signal per account per local
   day. `kind` is `completion_drop`, `repeated_move`, `late_marking`,
-  `new_behavior_settled` or `brief_answers`; `behavior_id` is null for an
+  `new_behavior_settled` or `brief_answers` (version 1), or, since version 2 (Phase 4,
+  migration `20261119220500`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
+  `timing_mode_gap`, `steady_behavior`, `never_done`, `dip_recovery`, `day_shape`,
+  `unmarked_items`, `marking_time`, `done_together`, `crowded_hour`, `setup_gaps`,
+  `reminder_response`, `session_length` or `moved_vs_unmoved`. At most
+  one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
   local times of day only, never titles, notes or calendar data; `signal_version`
   names the resolver version; `run_id` links the visit's `agent_runs` row. RLS on,
@@ -3290,6 +3295,44 @@ shown to the person; Phase 4 matches the signals to advice cards.
 - Account deletion cascades; deleting a Behavior removes its signals.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.
+
+## Advisor tips (advisor plan Phase 4, workstream 4B)
+
+Migration `20261119221000_advisor_tips.sql`. Each morning, after the signals visit,
+the tip run turns up to three matched advice cards into one-line tips.
+
+- `cadence_advisor_private.coach_tips`: one row per tip. `local_date` and `position`
+  (1 to 3, unique per account and day); `text` (at most 280 characters, one line);
+  `card_id` and `card_revision` (the advice card in
+  `packages/core/src/services/advice-library.ts`); `behavior_id` (null for an
+  account-wide tip; set null when the Behavior is deleted, the tip stays); `fact_ids`
+  and `fact_values` (the counted facts the tip states, for the 14-day card rest and the
+  7-day fact rest); `source` `model` or `seed` (the card's own wording filled by code);
+  `run_id`; `shown_at` (set when the app first shows it); `reaction` `helpful`,
+  `not_now` or `dont_suggest` with `reacted_at`. Tips are kept (decision D7), not purged
+  after 30 days; account deletion cascades. RLS on, no policies, no grants to API roles.
+- `cadence_advisor_private.coach_tip_suppressions`: cards the person turned off with
+  "Don't suggest this again", per account. The matcher and `coach_write_tips` skip them
+  on every later day and device.
+- Coach token (the tip run): `coach_read_signals(date)`, `coach_tip_history(since)`
+  (tips and suppressed cards), `coach_write_tips(run_id, tips)` (at most three; replaces
+  today's tips not yet shown or answered; skips suppressed cards and cards already used
+  today).
+- Service role: `coach_tips_due_accounts(after, limit)`: accounts at 03:00 to 08:59 local
+  with today's signals stored, no successful tip run today and fewer than three tries.
+- The person (web session or the Mac's bearer token): `advisor_next_tip(spacing)` returns
+  the next unshown tip for today and marks it shown, at most one new tip per call and
+  two hours apart (`state` `tip` or `none` with `reason` `no_tips_today`, `all_shown` or
+  `later`, and `next_at`). Nothing waits on undecided brief lines.
+  `advisor_react_tip(tip_id, reaction)` records a reaction (P0002 when the tip is not
+  the caller's); `dont_suggest` also adds the suppression.
+- Each tip run is one `agent_runs` row: agent `coach`, prompt version `coach-tips-1`,
+  trigger `scheduled` (or `on_demand` for a new account's first-day tips, which make no
+  model call). Job: `lib/services/advisor-tips-job.service.ts`; wording and checks:
+  `lib/services/advisor-tips-writer.ts`; routes: `lib/services/advisor-tips-request.ts`
+  behind `GET /api/advisor/tips/next` and `POST /api/advisor/tips/reaction`.
+
+Local verification: `tests/sql/advisor-4b-tips.sql`.
 
 ## Chat conversations (advisor plan Phase 5, workstream 5A)
 
