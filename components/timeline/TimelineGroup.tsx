@@ -1,3 +1,4 @@
+import { noticeText } from "@cadence/core/notices";
 import type {
   OccurrenceFormAction,
   TimeTrackingFormAction,
@@ -119,15 +120,7 @@ export function TimelineGroup({
 }
 
 function decisionCountLabel(count: number): string {
-  if (count === 0) {
-    return "None left to decide";
-  }
-
-  if (count === 1) {
-    return "1 left to decide";
-  }
-
-  return `${count} left to decide`;
+  return noticeText("timeline.left-to-decide", { count });
 }
 
 function OccurrenceStack({

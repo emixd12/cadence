@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { TimelineOccurrenceView, TimelineView } from "@cadence/core/types/timeline";
+import { noticeText } from "@cadence/core/notices";
+import { Notice } from "@/components/feedback/Notice";
 import { useOccurrenceMoves } from "./OccurrenceMoves";
 
 export type MoveConflictNotice = Readonly<{ id: string; occurrenceId: string; conflictingOccurrenceId: string | null }>;
@@ -32,9 +34,11 @@ export function MoveConflictNotices({ conflicts, timeline }: Readonly<{ conflict
   return (
     <div role="status" className="grid gap-2 border-b border-line py-3 text-base leading-6" data-move-conflicts>
       {open.map(({ conflict, occurrence, other }) => (
-        <p key={conflict.id} data-move-conflict={conflict.id}>
-          Your schedule changed, and {occurrence.title} at {occurrence.scheduledTimeLabel} today now overlaps{" "}
-          {other ? `${other.title} at ${other.scheduledTimeLabel}` : "another item"}. Keep {occurrence.title} at {occurrence.scheduledTimeLabel}?{" "}
+        <div key={conflict.id} data-move-conflict={conflict.id}><p>
+          {noticeText("move.conflict", {
+            title: occurrence.title, time: occurrence.scheduledTimeLabel,
+            hasOther: other ? "yes" : "no", other: other?.title ?? "", otherTime: other?.scheduledTimeLabel ?? "",
+          })}{" "}
           <button type="button" className={LINK} onClick={async () => {
             setFailed(null);
             if (await moves.keep(conflict.id)) answer(conflict.id);
@@ -49,9 +53,9 @@ export function MoveConflictNotices({ conflicts, timeline }: Readonly<{ conflict
           <button type="button" className={LINK} onClick={() => {
             answer(conflict.id);
             moves.openMenu(occurrence.id);
-          }}>Other time</button>
-          {failed === conflict.id ? <span className="block text-sm text-muted-readable">That answer was not saved. Try again.</span> : null}
-        </p>
+          }}>Other time</button></p>
+          {failed === conflict.id ? <Notice id="move.conflict-not-saved" /> : null}
+        </div>
       ))}
     </div>
   );

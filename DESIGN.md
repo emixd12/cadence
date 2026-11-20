@@ -360,15 +360,26 @@ One look for "something is wrong", everywhere in the product: the model failed, 
 - **Announcing:** a refused write answers the person's own action and uses `role="alert"`. Standing states use `role="status"`.
 - **Never advice:** advice and advisor quips never use the warning icon, Rust Signal text or an alert label. An alert never carries a suggestion that could be read as the advisor's opinion; its one action only recovers.
 
+### Notices
+
+Every sentence about what just happened or the state something is in is a notice in the notices library: `packages/core/src/notices/catalog/*.json`, one file per feature, listed with its change record in `docs/NOTICES.md`. Screens show one with `<Notice id="…" />` (`components/feedback/Notice.tsx`), which draws it in its style; server code and plain strings use `noticeText("…")` from `@cadence/core/notices`. Change the words or style in the catalog, never at the call site, and add a `previous` record so the change can be reverted.
+
+- **outcome:** what an action did. Ink italic; links in it (Undo) stay upright.
+- **error:** something failed or was refused. One Rust Signal line through the Alert notice's inline variant, label first when it has one ("Not changed."), any recovery link in Ink below.
+- **note:** a small aside, assumption or explainer. Readable Ash, the only grey; usually `text-xs`.
+- **question:** asks the person to choose, with its answers as text links beside it. Ink, upright.
+
+A raw `role="status"` or `role="alert"` outside `components/feedback/` is an older notice waiting to move into the library; `tests/notices.test.tsx` keeps their count from growing.
+
 ### Move for today
 
 The person's own per-day move on the web Timeline (advisor plan, Phase 2C). Components: `components/timeline/OccurrenceMoveMenu.tsx`, `OccurrenceMoves.tsx`, `MoveConflictNotices.tsx` (bench: `/design-system#ds-module-occurrence-move`).
 
 - **Menu:** "Move for today" is the last line of an expanded row, after Save note, as a secondary (Readable Ash) text button. Moves should come mostly from the advisor, so the person's own move is not promoted. It opens "Free today:" with up to three times as underlined text links, then "Other time" with a time field and a "Move" text link. No drag, no boxes, no filled buttons.
 - **No confirmation:** a tap moves at once. Undo is the safety net: the move's notice in the bottom drawer (below) and the lasting "Moved from 9:00 AM · Undo" line on the row. Never a dark filled bar.
-- **Confirmation (owner decision, 2026-11-18):** the shared Bottom drawer notice holds "Gym moved to 10:00 AM for today. Undo", the one-time first-move line and the reasons. It stays until closed or replaced by the next notice, so the reasons are not missed (owner decision, 2026-11-18).
+- **Confirmation (owner decision, 2026-11-18):** the shared Bottom drawer notice holds "Gym moved to 10:00 AM for today. Undo" (outcome text: Ink italic, Undo upright), the one-time first-move line and the reasons. It stays until closed or replaced by the next notice, so the reasons are not missed (owner decision, 2026-11-18).
 - **Reasons:** right after a move, one muted line in the drawer offers "Why? Running late · Conflict · Low energy · Other". Ignoring it is fine; a tap reads back as "Reason noted".
-- **Refusals** use the Alert notice with the "Not changed" label, without the icon and at the row's 12px size for label, message and action, and offer free times or "Move it again". Never advice.
+- **Refusals** use the Alert notice's inline variant, as in the brief: one Rust Signal line at the row's size that starts with "Not changed.", then free times or "Move it again" in Ink below. Never advice. (Until 2026-11-20 the row used the stacked label; docs/NOTICES.md, Changes.)
 - **Overlap after a schedule edit:** one plain line above the Timeline with "Yes · No · Other time" as text links. Nothing failed, so it is not an alert.
 
 ### Bottom drawer notice

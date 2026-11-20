@@ -1,0 +1,75 @@
+{
+  "feature": "timeline",
+  "notices": {
+    "timeline.reloading": {
+      "meaning": "Shows at the top of the Timeline while a pull, wheel or Refresh reloads Cadence and its connectors.",
+      "text": "Reloading Cadence and connectors",
+      "style": "note",
+      "interactions": ["INT-TIMELINE-010"]
+    },
+    "timeline.reloaded": {
+      "meaning": "Confirms that the Timeline reloaded Cadence and every connector.",
+      "text": "Cadence and connectors reloaded.",
+      "style": "outcome",
+      "interactions": ["INT-TIMELINE-010"],
+      "previous": [{ "look": "Readable Ash, small", "until": "2026-11-20", "change": "Outcome style: italic Ink at the same small size (Emi, product map answer 1)." }]
+    },
+    "timeline.reload-incomplete": {
+      "meaning": "Says a reload finished but Cadence or a connector did not refresh, so shown data may be old.",
+      "text": "Reload incomplete. Cadence or connector data may be stale.",
+      "style": "error",
+      "interactions": ["INT-TIMELINE-010"],
+      "previous": [{ "look": "Readable Ash, small", "until": "2026-11-20", "change": "Error style: one Rust Signal line at the same small size (Emi, product map answer 1)." }]
+    },
+    "timeline.reload-offline": {
+      "meaning": "Web: says a reload could not run while offline, so shown data may be old.",
+      "text": "Reload failed while offline. Displayed data may be stale.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-010"],
+      "previous": [{ "look": "Readable Ash, small", "until": "2026-11-20", "change": "Error style: one Rust Signal line at the same small size (Emi, product map answer 1)." }]
+    },
+    "timeline.left-to-decide": {
+      "meaning": "Counts the earlier items in Needs decision that still wait for Completed or Not Completed.",
+      "text": "{count, plural, =0 {None left to decide} other {# left to decide}}",
+      "style": "note",
+      "feature": "needs-decision",
+      "interactions": ["INT-TIMELINE-002"]
+    },
+    "reminder.opening": {
+      "meaning": "Mac: shows while Cadence opens the item a tapped reminder points to.",
+      "text": "Opening reminder…",
+      "style": "note",
+      "feature": "reminders",
+      "platforms": ["mac"],
+      "interactions": ["INT-NOTIFICATION-001"]
+    },
+    "reminder.opened": {
+      "meaning": "Mac: confirms which item and day a tapped reminder opened.",
+      "text": "Opened reminder for {title} on {date}.",
+      "style": "outcome",
+      "feature": "reminders",
+      "platforms": ["mac"],
+      "interactions": ["INT-NOTIFICATION-001"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Outcome style: italic Ink (Emi, product map answer 1)." }]
+    },
+    "reminder.open-failed": {
+      "meaning": "Mac: says a tapped reminder could not open its item, with the reason.",
+      "text": "Could not open this reminder. {reason}",
+      "style": "error",
+      "feature": "reminders",
+      "platforms": ["mac"],
+      "interactions": ["INT-NOTIFICATION-001"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "reminder.unavailable": {
+      "meaning": "Mac: says the item a tapped reminder points to is no longer in this Mac's local data.",
+      "text": "That reminder’s occurrence is no longer available in this local profile.",
+      "style": "error",
+      "feature": "reminders",
+      "platforms": ["mac"],
+      "interactions": ["INT-NOTIFICATION-001"],
+      "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    }
+  }
+}

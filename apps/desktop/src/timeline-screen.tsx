@@ -3,7 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
+import { noticeText } from "@cadence/core/notices";
+import { Notice } from "@/components/feedback/Notice";
 import { NeedsDecisionDialog } from "@/components/timeline/NeedsDecisionDialog";
+import { TimelineReloadLine, type ReloadNoticeId } from "@/components/timeline/TimelineReloadLine";
 import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { DayProgressTimeline, type DayProgressContext } from "@/components/timeline/DayProgressTimeline";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
@@ -88,7 +91,7 @@ export function TimelineScreen({
   const rootRef = useRef<HTMLDivElement>(null);
   const reloadInFlightRef = useRef(false);
   const resultTimerRef = useRef<number | null>(null);
-  const [reloadMessage, setReloadMessage] = useState("");
+  const [reloadMessage, setReloadMessage] = useState<ReloadNoticeId | "reloading" | "">("");
   const targetOccurrence = notificationTarget?.status === "available" ? notificationTarget.occurrence : null;
   const targetInFeed = !!targetOccurrence && timeline.daySections.some((section) =>
     section.occurrences.some((occurrence) => occurrence.id === targetOccurrence.id));
@@ -116,13 +119,11 @@ export function TimelineScreen({
       window.clearTimeout(resultTimerRef.current);
       resultTimerRef.current = null;
     }
-    setReloadMessage("Reloading Cadence and connectors");
+    setReloadMessage("reloading");
     void onReload().then((success) => {
-      setReloadMessage(success
-        ? "Cadence and connectors reloaded."
-        : "Reload incomplete. Cadence or connector data may be stale.");
+      setReloadMessage(success ? "timeline.reloaded" : "timeline.reload-incomplete");
     }).catch(() => {
-      setReloadMessage("Reload incomplete. Cadence or connector data may be stale.");
+      setReloadMessage("timeline.reload-incomplete");
     }).finally(() => {
       reloadInFlightRef.current = false;
       if (resultTimerRef.current !== null) window.clearTimeout(resultTimerRef.current);
@@ -148,10 +149,7 @@ export function TimelineScreen({
       <div ref={rootRef} className="flex w-full flex-col">
         <h1 className="sr-only">Timeline</h1>
         {reloadMessage ? (
-          <p role="status" aria-live="polite"
-            className="pointer-events-none fixed left-1/2 top-[calc(4rem+max(0.5rem,env(safe-area-inset-top)))] z-30 -translate-x-1/2 border border-line bg-background px-3 py-1.5 text-xs text-muted-readable">
-            {reloadMessage}
-          </p>
+          <TimelineReloadLine result={reloadMessage === "reloading" ? null : reloadMessage} feedback={noticeText("timeline.reloading")} />
         ) : null}
         {/* Advisor Phase 4 (4E, placement K): with an account, the horse sits at the top centre and the
             brief opens in the advisor's panel; a Mac with no account keeps the banner horse and no advisor. */}
@@ -188,13 +186,12 @@ export function TimelineScreen({
           <div className="grid gap-8 pb-32 sm:pb-24">
             {notificationTarget ? (
               <section className="grid gap-3 border-b border-line py-4" aria-label="Opened reminder">
-                <p data-notification-result tabIndex={-1} role={notificationTarget.status === "error" ? "alert" : "status"}
-                  className="text-base text-muted-readable">
-                  {notificationTarget.status === "loading" ? "Opening reminder…"
-                    : notificationTarget.status === "error" ? `Could not open this reminder. ${notificationTarget.message}`
-                    : notificationTarget.status === "unavailable" ? "That reminder’s occurrence is no longer available in this local profile."
-                    : <>Opened reminder for {notificationTarget.occurrence.title} on <time dateTime={notificationTarget.occurrence.localDate}>{notificationTarget.occurrence.localDate}</time>.</>}
-                </p>
+                <div data-notification-result tabIndex={-1} className="text-base">
+                  {notificationTarget.status === "loading" ? <Notice id="reminder.opening" announce="status" />
+                    : notificationTarget.status === "error" ? <Notice id="reminder.open-failed" params={{ reason: notificationTarget.message }} size="body" />
+                    : notificationTarget.status === "unavailable" ? <Notice id="reminder.unavailable" size="body" />
+                    : <Notice id="reminder.opened" params={{ title: notificationTarget.occurrence.title, date: notificationTarget.occurrence.localDate }} />}
+                </div>
                 {targetOccurrence && !targetInFeed ? <OccurrenceRow occurrence={targetOccurrence} shortcuts={shortcutsByBehavior[targetOccurrence.behaviorId]} {...actions} /> : null}
               </section>
             ) : null}

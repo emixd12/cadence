@@ -1,3 +1,4 @@
+import { noticeText } from "../notices";
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 import type { BehaviorFormField, BehaviorRecurrenceFormDefaults } from "../types/behavior";
@@ -251,9 +252,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** P-074: an end or a pause start entered as a moment that has passed. */
-export const RUN_STOP_IN_PAST_MESSAGE = "Pick a time later than now. To stop it right away, use End now.";
+export const RUN_STOP_IN_PAST_MESSAGE = noticeText("run.end-time-passed");
 /** P-075: a pause whose back-on day does not come after its first paused day and after today. */
-export const PAUSE_BACK_ON_MESSAGE = "Pick a back-on day after the first paused day and after today.";
+export const PAUSE_BACK_ON_MESSAGE = noticeText("run.pause-back-on");
 
 /**
  * Checks Default duration, Ends after and Pause. With `now`, a changed end or pause

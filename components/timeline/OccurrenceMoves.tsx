@@ -13,7 +13,9 @@ import {
 import { canSelfMoveOccurrence } from "@cadence/core/resolvers/move.resolver";
 import { formatClockTimeLabel } from "@cadence/core/services/schedule";
 import { useRefresh } from "@cadence/ui/runtime";
+import { noticeText } from "@cadence/core/notices";
 import { BottomDrawerNotice } from "@/components/feedback/BottomDrawerNotice";
+import { Notice } from "@/components/feedback/Notice";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 
@@ -46,7 +48,7 @@ export const MOVE_REASON_OPTIONS = [
   { value: "other", label: "Other" },
 ] as const;
 
-export const FIRST_MOVE_LINE = "This changes today only. Your schedule stays.";
+export const FIRST_MOVE_LINE = noticeText("move.first-move");
 
 /** A refusal or another device's change, shown on the row in the shared alert style. */
 export type MoveRowNotice = Readonly<{
@@ -187,7 +189,7 @@ export function OccurrenceMovesProvider({
     const movedElsewhere = state.reason === "revision_changed" && state.currentStartAt
       && !sameInstant(state.currentStartAt, occurrence.scheduledFor);
     setNotice(occurrence.id, movedElsewhere
-      ? { message: `${occurrence.title} was just moved to ${moveTimeLabel(state.currentStartAt!, timezone)} on another device.`, alternatives: [], revision: state.revision, moveAgain: true }
+      ? { message: noticeText("move.moved-on-another-device", { title: occurrence.title, time: moveTimeLabel(state.currentStartAt!, timezone) }), alternatives: [], revision: state.revision, moveAgain: true }
       : { message: state.message, alternatives: state.alternatives, revision: state.revision, moveAgain: state.reason === "revision_changed" });
     refresh();
   }, [refresh, setNotice, timezone]);
@@ -298,9 +300,9 @@ export function OccurrenceMovesProvider({
 
 const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:opacity-60";
 
-function toastSentence(toast: MoveToast): string {
-  if (toast.kind === "undone") return toast.to ? `${toast.title} is back at ${toast.to}.` : `${toast.title} is back at its usual time.`;
-  return `${toast.title} moved to ${toast.to} for today.`;
+function toastNotice(toast: MoveToast): Readonly<{ id: "move.moved" | "move.undone" | "move.undone-usual-time"; params: Readonly<Record<string, string>> }> {
+  if (toast.kind === "undone") return toast.to ? { id: "move.undone", params: { title: toast.title, time: toast.to } } : { id: "move.undone-usual-time", params: { title: toast.title } };
+  return { id: "move.moved", params: { title: toast.title, time: toast.to ?? "" } };
 }
 
 /**
@@ -314,7 +316,7 @@ export function MoveReasonLine({ occurrenceId, className }: Readonly<{ occurrenc
   const reasonLabel = rowMove.reason ? MOVE_REASON_OPTIONS.find((option) => option.value === rowMove.reason)?.label : null;
   return (
     <p className={className} data-move-reasons>
-      {reasonLabel ? <>Reason noted: {reasonLabel.toLowerCase()}</> : <>
+      {reasonLabel ? <Notice id="move.reason-noted" params={{ reason: reasonLabel.toLowerCase() }} as="span" announce={false} /> : <>
         Why?{" "}
         {MOVE_REASON_OPTIONS.map((option, index) => (
           <span key={option.value} className="whitespace-nowrap">
@@ -343,15 +345,12 @@ function MoveConfirmation({ toast, controller, onClose, onUndo }: Readonly<{
   const rowMove = toast.kind === "moved" ? controller.rowMove(toast.occurrenceId) : null;
   return (
     <BottomDrawerNotice onClose={onClose} dataAttribute="data-move-toast">
-      <p className="text-base leading-6">
-        {toastSentence(toast)}
-        {toast.canUndo ? <>{" "}
-          <button type="button" className={`font-bold text-foreground ${LINK}`} disabled={controller.pendingId === toast.occurrenceId}
-            onClick={() => onUndo(toast)} data-move-confirmation-undo>Undo</button>
-        </> : null}
-      </p>
+      <Notice {...toastNotice(toast)} announce={false} className="text-base leading-6" action={toast.canUndo
+        ? <button type="button" className={`font-bold text-foreground ${LINK}`} disabled={controller.pendingId === toast.occurrenceId}
+          onClick={() => onUndo(toast)} data-move-confirmation-undo>Undo</button>
+        : undefined} />
       {rowMove ? <div className="grid gap-1 text-sm leading-5 text-muted-readable">
-        {rowMove.first ? <p data-first-move>{FIRST_MOVE_LINE}</p> : null}
+        {rowMove.first ? <Notice id="move.first-move" data={{ "data-first-move": true }} /> : null}
         <MoveReasonLine occurrenceId={toast.occurrenceId} />
       </div> : null}
     </BottomDrawerNotice>

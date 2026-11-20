@@ -505,6 +505,20 @@
       "notes": "Advisor plan Phase 1C. The one style for something going wrong: model failed, data out of date, budget reached, write refused. Warning icon plus a Rust Signal label; never used for advice."
     },
     {
+      "id": "module.notice",
+      "name": "Notice",
+      "kind": "module",
+      "source": "components/feedback/Notice.tsx",
+      "exportName": "Notice",
+      "usageNames": [
+        "Notice"
+      ],
+      "benchAnchor": "design-system#ds-module-notice",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "The notices library's renderer: shows one notice from packages/core/src/notices by id in its style. Outcome is Ink italic with upright links; error is one Rust Signal line through AlertNotice's inline variant; note is Readable Ash; question is Ink. Every notice and its change record: docs/NOTICES.md."
+    },
+    {
       "id": "module.occurrence-move",
       "name": "OccurrenceMoveMenu",
       "kind": "module",

@@ -33,6 +33,7 @@ import { readBriefMoveDay, type BriefMoveDay } from "@/lib/services/brief-move-d
 import { syncReminderDeliveriesForBehavior } from "@/lib/services/reminder.service";
 import type { Occurrence } from "@/lib/types/database";
 import type { Tables } from "@/lib/db/database.types";
+import { noticeText } from "@cadence/core/notices";
 
 /**
  * Per-day moves (advisor plan, Phase 2A): the one path every caller takes to move
@@ -116,8 +117,8 @@ export class OccurrenceMoveKeyReusedError extends Error {
 
 const ALTERNATIVE_REASONS: ReadonlySet<string> = new Set(["time_passed", "start_not_on_day", "slot_taken", "calendar_busy"]);
 const DETAIL_MESSAGES = Object.freeze({
-  too_close: "That is too close to something else. Cadence keeps 10 minutes between items.",
-  travel_busy: "That time is needed for travel.",
+  too_close: noticeText("move.refused.too-close"),
+  travel_busy: noticeText("move.refused.travel-busy"),
 });
 
 /** Move today's Occurrence to a new start. Refusals come back as values, not errors. */

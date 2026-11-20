@@ -3,7 +3,7 @@
 // Deterministic: no model, no network, no timestamps. Same inputs give the same output.
 //
 //   node scripts/build-product-map.mjs check          build in memory, fail on errors
-//   node scripts/build-product-map.mjs build          also write product-map.json and docs/PRODUCT_MAP.md
+//   node scripts/build-product-map.mjs build          also write product-map.json, docs/PRODUCT_MAP.md and docs/NOTICES.md
 //   node scripts/build-product-map.mjs show <id|text> print one item and its links
 //
 // Every link names the registry entry it came from by a stable id (never an array
@@ -551,6 +551,7 @@ function scanSources() {
     const localNames = new Map(); // local identifier -> { file, imported }
     const calls = new Set();
     const tables = new Set();
+    const shownNotices = new Set();
     const visit = node => {
       if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
         const target = resolveImport(path, node.moduleSpecifier.text);
@@ -597,9 +598,11 @@ function scanSources() {
           }
         }
       }
+      if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && noticeCatalog.has(node.text)) shownNotices.add(node.text);
       ts.forEachChild(node, visit);
     };
     visit(source);
+    for (const noticeId of [...shownNotices].sort()) addLink(fileNode(path), "shows", `notice:${noticeId}`, "derived", `scan:${path}#${noticeId}`);
     imports.set(path, resolved);
     apiCalls.set(path, calls);
     if (tables.size) tableReads.set(path, tables);
@@ -725,31 +728,102 @@ function compareUsageFile(renders) {
 }
 
 // ---------------------------------------------------------------------------
-// Notices: lib/notices/*.json (added in build step 2; read when present)
+// Notices: packages/core/src/notices/catalog/*.json (docs/NOTICES.md)
+
+const NOTICE_DIRECTORY = "packages/core/src/notices/catalog";
+const NOTICES_DOC = "docs/NOTICES.md";
+const NOTICE_STYLES = new Set(["outcome", "error", "note", "question"]);
+const NOTICE_CHANNELS = new Set(["in-app", "reminder", "email"]);
+const NOTICE_STATUSES = new Set(["active", "planned", "retired"]);
+const NOTICE_PLATFORMS = ["web", "mac"];
+const NOTICE_ALERTS = new Set(["model_failed", "data_stale", "budget_reached", "write_refused"]);
+/** The token each style is drawn in (DESIGN.md text styles; components/feedback/Notice.tsx). */
+const NOTICE_STYLE_TOKENS = { outcome: "--foreground", error: "--alert-signal", note: "--muted-readable", question: "--foreground" };
+
+/** Checks a notice template's braces and that every select or plural has "other". */
+function noticeTemplateProblem(template) {
+  let depth = 0;
+  for (const char of template) {
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+    if (depth < 0) return "has an unmatched }";
+  }
+  if (depth !== 0) return "has an unmatched {";
+  for (const match of template.matchAll(/\{\s*([A-Za-z][A-Za-z0-9_]*)\s*,\s*(\w+)\s*,/g)) {
+    if (match[2] !== "select" && match[2] !== "plural") return `uses unsupported type ${match[2]}`;
+    let index = match.index + match[0].length;
+    let level = 1;
+    let branchStart = index;
+    let hasOther = false;
+    for (; index < template.length && level > 0; index += 1) {
+      if (template[index] === "{") {
+        if (level === 1 && template.slice(branchStart, index).trim() === "other") hasOther = true;
+        level += 1;
+      } else if (template[index] === "}") {
+        level -= 1;
+        if (level === 1) branchStart = index + 1;
+      }
+    }
+    if (!hasOther) return `needs an "other" branch for ${match[1]}`;
+  }
+  return null;
+}
+
+const noticeCatalog = new Map(); // notice id -> { path, entry, feature }
 
 function addNotices() {
-  const directory = "lib/notices";
-  if (!exists(directory)) return;
-  for (const name of readdirSync(join(root, directory)).filter(file => file.endsWith(".json")).sort()) {
-    const path = `${directory}/${name}`;
+  if (!exists(NOTICE_DIRECTORY)) return;
+  for (const name of readdirSync(join(root, NOTICE_DIRECTORY)).filter(file => file.endsWith(".json")).sort()) {
+    const path = `${NOTICE_DIRECTORY}/${name}`;
     sources.add(path);
     const catalog = readJson(path);
-    for (const notice of catalog.notices ?? []) {
-      const id = `notice:${notice.id}`;
+    if (typeof catalog.feature !== "string") errors.push(`${path}: the catalog needs a feature`);
+    for (const [noticeId, notice] of Object.entries(catalog.notices ?? {})) {
+      const id = `notice:${noticeId}`;
+      const at = `${path}#${noticeId}`;
+      const feature = notice.feature ?? catalog.feature;
+      const style = notice.style;
+      const status = notice.status ?? "active";
+      const platforms = notice.platforms ?? NOTICE_PLATFORMS;
+      if (noticeCatalog.has(noticeId)) errors.push(`${at}: duplicate notice id (also in ${noticeCatalog.get(noticeId).path})`);
+      noticeCatalog.set(noticeId, { path, entry: notice, feature });
+      if (!/^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/.test(noticeId)) errors.push(`${at}: notice ids are lowercase words joined by dots and hyphens`);
+      if (!NOTICE_STYLES.has(style)) errors.push(`${at}: style must be outcome, error, note or question`);
+      if (!NOTICE_CHANNELS.has(notice.channel ?? "in-app")) errors.push(`${at}: channel must be in-app, reminder or email`);
+      if (!NOTICE_STATUSES.has(status)) errors.push(`${at}: status must be active, planned or retired`);
+      if (!platforms.length || platforms.some(platform => !NOTICE_PLATFORMS.includes(platform))) errors.push(`${at}: platforms must be web and/or mac`);
+      if ((notice.alert || notice.label) && style !== "error") errors.push(`${at}: only an error has an alert kind or a label`);
+      if (notice.alert && !NOTICE_ALERTS.has(notice.alert)) errors.push(`${at}: unknown alert kind ${notice.alert}`);
+      if (typeof notice.text !== "string" || !notice.text.trim()) errors.push(`${at}: the notice has no text`);
+      else {
+        const problem = noticeTemplateProblem(notice.text);
+        if (problem) errors.push(`${at}: text ${problem}`);
+      }
+      for (const [index, revision] of (notice.previous ?? []).entries()) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(revision.until ?? "") || !revision.change || !(revision.text || revision.look)) {
+          errors.push(`${at}/previous/${revision.until ?? index}: a change record needs until (YYYY-MM-DD), change, and the earlier text or look`);
+        }
+      }
+      if (!Array.isArray(notice.interactions)) errors.push(`${at}: interactions must be a list (empty for a planned notice)`);
+      else if (!notice.interactions.length && status === "active") errors.push(`${at}: an active notice names the interactions that show it`);
       addNode(id, "notice", {
-        name: notice.id,
+        name: noticeId,
         meaning: notice.meaning,
         text: notice.text,
-        style: notice.style,
+        style,
         channel: notice.channel ?? "in-app",
-        status: notice.status ?? "active",
-      }, `${path}#${notice.id}`);
-      if (notice.feature) linkTo(id, "belongs-to", `feature:${notice.feature}`, `${path}#${notice.id}/feature`);
-      for (const interaction of notice.interactions ?? []) linkTo(id, "shown-by", `interaction:${interaction}`, `${path}#${notice.id}/interactions/${interaction}`);
-      for (const token of notice.tokens ?? []) linkTo(id, "styled-by", `token:${token}`, `${path}#${notice.id}/tokens/${token}`);
+        status,
+        platforms,
+        ...(notice.label ? { label: notice.label } : {}),
+        ...(notice.previous?.length ? { previous: notice.previous } : {}),
+      }, at);
+      linkTo(id, "belongs-to", `feature:${feature}`, `${at}/feature`);
+      for (const interaction of notice.interactions ?? []) linkTo(id, "shown-by", `interaction:${interaction}`, `${at}/interactions/${interaction}`);
+      if (NOTICE_STYLE_TOKENS[style]) pendingStyleTokens.push({ id, token: `token:${NOTICE_STYLE_TOKENS[style]}`, source: `${at}/style/${style}` });
     }
   }
 }
+const pendingStyleTokens = [];
 
 // ---------------------------------------------------------------------------
 // Build and validate
@@ -768,7 +842,17 @@ function build() {
     else if (!nodes.has(link.to)) errors.push(`${link.source}: unknown ${link.to}`);
     else addLink(link.from, link.type, link.to, "asserted", link.source);
   }
+  for (const { id, token, source } of pendingStyleTokens) {
+    if (!nodes.has(token)) errors.push(`${source}: unknown ${token}`);
+    else addLink(id, "styled-by", token, "derived", source);
+  }
   const scanned = scanSources();
+  for (const [noticeId, { path, entry }] of noticeCatalog) {
+    const shown = [...links.values()].some(link => link.type === "shows" && link.to === `notice:${noticeId}`);
+    const status = entry.status ?? "active";
+    if (status === "active" && !shown) errors.push(`${path}#${noticeId}: no source file shows this active notice (mark it planned or retired)`);
+    if (status === "retired" && shown) errors.push(`${path}#${noticeId}: a retired notice is still shown in code`);
+  }
   for (const node of nodes.values()) {
     if (MEANING_REQUIRED.has(node.kind) && !(typeof node.meaning === "string" && node.meaning.trim())) {
       errors.push(`${node.source}: ${node.id} has no meaning`);
@@ -943,6 +1027,57 @@ function markdown(map) {
   return `${lines.join("\n")}\n`;
 }
 
+const STYLE_WORDS = { outcome: "Outcome (Ink italic)", error: "Error (one Rust Signal line)", note: "Note (Readable Ash)", question: "Question (Ink)" };
+const cell = text => String(text).replaceAll("|", "\\|").replaceAll("\n", " ");
+
+/** docs/NOTICES.md: every notice by feature, then the record of every change. Committed. */
+function noticesMarkdown(map) {
+  const graph = index(map);
+  const notices = map.nodes.filter(node => node.kind === "notice");
+  const featureOf = notice => (graph.out.get(notice.id) ?? []).find(link => link.type === "belongs-to")?.to;
+  const files = notice => (graph.into.get(notice.id) ?? []).filter(link => link.type === "shows").map(link => `\`${link.from.replace(/^[a-z-]+:/, "")}\``);
+  const interactions = notice => (graph.out.get(notice.id) ?? []).filter(link => link.type === "shown-by").map(link => link.to.slice(12));
+  const lines = [
+    "# Notices",
+    "",
+    "Every sentence Cadence shows about what just happened or the state something is in. Generated by `npm run map:build` from `packages/core/src/notices/catalog/*.json`; edit the catalog, never this file. `npm run map:check` fails when this file is out of date.",
+    "",
+    "Styles: **outcome** is Ink italic (what an action did; links beside it stay upright). **error** is one Rust Signal line, through the Alert notice. **note** is Readable Ash, the only grey. **question** is Ink and asks the person to choose. Values in braces are filled in when the notice shows; see `packages/core/src/notices/format.ts` for `select` and `plural`.",
+    "",
+    "Show a notice with `<Notice id=\"…\" />` (`components/feedback/Notice.tsx`) or its words with `noticeText(\"…\")` (`@cadence/core/notices`). Guide: [PRODUCT_MAP_GUIDE.md](PRODUCT_MAP_GUIDE.md#notices).",
+    "",
+    "| Style | Notices |",
+    "| --- | ---: |",
+    ...Object.keys(STYLE_WORDS).map(style => `| ${style} | ${notices.filter(notice => notice.style === style).length} |`),
+    "",
+  ];
+  const features = [...new Set(notices.map(featureOf))].sort((a, b) => (graph.node.get(a)?.name ?? a).localeCompare(graph.node.get(b)?.name ?? b));
+  for (const feature of features) {
+    lines.push(`## ${graph.node.get(feature)?.name ?? feature}`, "", "| Notice | Style | Words | Where | Shown in |", "| --- | --- | --- | --- | --- |");
+    for (const notice of notices.filter(candidate => featureOf(candidate) === feature)) {
+      const words = `${notice.label ? `${notice.label}. ` : ""}${notice.text}`;
+      const where = [notice.platforms.length === 2 ? "web, Mac" : notice.platforms.map(platform => platform === "mac" ? "Mac" : platform).join(", "),
+        notice.channel === "in-app" ? null : notice.channel, notice.status === "active" ? null : notice.status].filter(Boolean).join("; ");
+      lines.push(`| \`${notice.name}\` ${cell(notice.meaning)} | ${notice.style} | ${cell(words)} | ${where} | ${[...interactions(notice), ...files(notice)].join(", ") || "none"} |`);
+    }
+    lines.push("");
+  }
+  const changes = notices.flatMap(notice => (notice.previous ?? []).map(revision => ({ notice, revision })))
+    .sort((a, b) => b.revision.until.localeCompare(a.revision.until) || a.notice.name.localeCompare(b.notice.name));
+  lines.push("## Changes", "", "Each row is one change to one notice, newest first. To revert one, copy its Before back into the catalog entry and remove the row's `previous` record.", "");
+  if (!changes.length) lines.push("No changes yet.", "");
+  else {
+    lines.push("| Notice | Last shown | Before | After | Change |", "| --- | --- | --- | --- | --- |");
+    for (const { notice, revision } of changes) {
+      const before = [revision.text ? `“${revision.text}”` : null, revision.look ?? null].filter(Boolean).join("; ");
+      const after = [revision.text ? `“${notice.text}”` : null, revision.look ? STYLE_WORDS[notice.style] : null].filter(Boolean).join("; ");
+      lines.push(`| \`${notice.name}\` | ${revision.until} | ${cell(before)} | ${cell(after)} | ${cell(revision.change)} |`);
+    }
+    lines.push("");
+  }
+  return `${lines.join("\n")}`;
+}
+
 function show(map, query) {
   const graph = index(map);
   const node = graph.node.get(query);
@@ -992,10 +1127,16 @@ if (mode === "show") {
     for (const message of verbose ? messages : messages.slice(0, 3)) console.log(`  - ${message}`);
     if (!verbose && messages.length > 3) console.log(`  … ${messages.length - 3} more (run with --verbose)`);
   }
+  const noticesDoc = noticesMarkdown(map);
+  const noticesCurrent = exists(NOTICES_DOC) && read(NOTICES_DOC) === noticesDoc;
   if (mode === "build" && !errors.length) {
     writeFileSync(join(root, "product-map.json"), `${JSON.stringify(map, null, 2)}\n`);
     writeFileSync(join(root, "docs/PRODUCT_MAP.md"), markdown(map));
-    console.log(`Wrote ${relative(root, join(root, "product-map.json"))} and docs/PRODUCT_MAP.md.`);
+    writeFileSync(join(root, NOTICES_DOC), noticesDoc);
+    console.log(`Wrote ${relative(root, join(root, "product-map.json"))}, docs/PRODUCT_MAP.md and ${NOTICES_DOC}.`);
+  } else if (mode === "check" && !noticesCurrent) {
+    console.error(`${NOTICES_DOC} is out of date with the notices catalog. Run npm run map:build and commit it.`);
+    process.exitCode = 1;
   }
 } else {
   console.error(`Unknown mode ${mode}. Use check, build or show <id>.`);

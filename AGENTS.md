@@ -661,6 +661,13 @@ component, token, service, table or MCP tool links to the rest of the product. T
 map is built from the registries above, never edited by hand
 (`docs/PRODUCT_MAP_GUIDE.md`).
 
+Notices (what just happened, what state something is in) live in the notices
+library, `packages/core/src/notices/catalog/*.json`. Show one with `<Notice id>`
+from `components/feedback/Notice.tsx` or `noticeText(id)` from
+`@cadence/core/notices`; never write a notice's words at the call site. When you
+change a notice's words or style, add a `previous` record and run
+`npm run map:build` to update the committed `docs/NOTICES.md`.
+
 ## Completion criteria for any coding task
 
 A task is complete only when:

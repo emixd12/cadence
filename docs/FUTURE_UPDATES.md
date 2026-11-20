@@ -169,6 +169,17 @@ Other open items:
   function-level call graph rather than the map's file-level import scan.
 - 21 tokens in `app/globals.css` and the marketing stylesheet have no description
   comment; the map warns about them.
+- Notices in the remaining areas: Settings, Behaviors, connectors (Calendar, Hevy,
+  travel), export and restore, sign-in, onboarding, Chat and the advisor's tips,
+  plus reminder and email words (`channel` reminder and email, from
+  `docs/NOTIFICATION_SPEC.md` and the Sequenzy templates). The owner asked for these
+  after the advisor work merges (product map answer 8). Each area moves its notices
+  into `packages/core/src/notices/catalog/`, lowers its counts in
+  `tests/fixtures/notice-role-allowlist.json`, and adds `previous` records for any
+  wording or style change.
+- When Ended and Paused (PR #328) merges, switch `components/timeline/BehaviorRunNotices.tsx`
+  to `run.ended`, `run.paused` and `run.back-today`, mark them active and link
+  their interactions.
 
 ## Agent readability roadmap
 

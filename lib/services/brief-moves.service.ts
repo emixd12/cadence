@@ -1,3 +1,4 @@
+import { noticeText } from "@cadence/core/notices";
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartInstant } from "@cadence/core/resolvers/time.resolver";
@@ -610,7 +611,7 @@ async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, move
 function closedRefusal(proposal: ProposalRow): BriefMoveRefusal {
   const title = lineFromRow(proposal)?.title;
   return {
-    reason: "proposal_closed", message: "This suggestion was already answered.", alternatives: [], revision: null,
+    reason: "proposal_closed", message: noticeText("brief-moves.refused.closed"), alternatives: [], revision: null,
     cause: { kind: "answered_elsewhere", ...(title ? { title } : {}), changedAfterBrief: true },
   };
 }
@@ -667,12 +668,12 @@ async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, re
   asked: Readonly<{ startAt: string; context: BriefPlanningContext }>, batchId: string | null): Promise<NamedCause | null> {
   const line = lineFromRow(proposal);
   if (!line) return null;
-  if (reason === "proposal_closed") return { cause: closedRefusal(proposal).cause!, message: "This suggestion was already answered." };
+  if (reason === "proposal_closed") return { cause: closedRefusal(proposal).cause!, message: noticeText("brief-moves.refused.closed") };
   if (reason === "occurrence_resolved") {
-    return { cause: { kind: "answered_elsewhere", title: line.title, changedAfterBrief: true }, message: `${line.title} is already marked.` };
+    return { cause: { kind: "answered_elsewhere", title: line.title, changedAfterBrief: true }, message: noticeText("brief-moves.refused.already-marked", { title: line.title }) };
   }
   if (reason === "revision_changed") {
-    return { cause: { kind: "item_changed", title: line.title, changedAfterBrief: true }, message: `${line.title} changed after this brief was written.` };
+    return { cause: { kind: "item_changed", title: line.title, changedAfterBrief: true }, message: noticeText("brief-moves.refused.item-changed", { title: line.title }) };
   }
   if (reason !== "slot_taken" && reason !== "calendar_busy" && reason !== "too_close") return null;
   const { person } = callers;
@@ -705,10 +706,10 @@ function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMov
   if (block.kind === "calendar") {
     // The line's time was free when it was written, so the event arrived since.
     const cause: BriefMoveRefusalCause = { kind: "calendar_event", ...(block.title ? { title: block.title } : {}), changedAfterBrief: true };
-    const what = block.title ? `${block.title} was added to your calendar` : "a calendar event was added there";
+    const event = { time, hasEvent: block.title ? "yes" : "no", event: block.title ?? "" };
     return { cause, message: reason === "too_close"
-      ? `${time} is too close to a calendar event now: ${block.title ? `${block.title} was added` : "one was added"} after this brief was written.`
-      : `${time} is taken now: ${what} after this brief was written.` };
+      ? noticeText("brief-moves.refused.calendar-too-close", event)
+      : noticeText("brief-moves.refused.calendar-taken", event) };
   }
   const occurrence = day.occurrences.get(block.ref);
   const item = day.items.find((candidate) => candidate.occurrenceId === block.ref);
@@ -716,20 +717,20 @@ function describeBlock(day: BriefMoveDay, proposal: ProposalRow, block: BriefMov
   if (sameBatch.has(block.ref)) {
     // Moved by this same Accept all, a moment ago: nothing changed behind the brief's back.
     const cause: BriefMoveRefusalCause = { kind: "item_there", title, changedAfterBrief: false };
-    return { cause, message: reason === "too_close" ? `${time} is too close to ${title}, which Accept all just moved.`
-      : `${time} is taken: Accept all just moved ${title} there.` };
+    return { cause, message: reason === "too_close" ? noticeText("brief-moves.refused.batch-too-close", { time, title })
+      : noticeText("brief-moves.refused.batch-taken", { time, title }) };
   }
   const changed = !!item && Temporal.Instant.compare(Temporal.Instant.from(item.revision), Temporal.Instant.from(proposal.created_at)) > 0;
   const moved = changed && !!occurrence?.effective_start_at;
   const cause: BriefMoveRefusalCause = { kind: "item_there", title, changedAfterBrief: changed };
   if (reason === "too_close") {
-    return { cause, message: moved ? `${time} is too close to ${title} now: you moved it after this brief was written.`
-      : changed ? `${time} is too close to ${title} now: it changed after this brief was written.`
-        : `${time} is too close to ${title}. Cadence keeps 10 minutes between items.` };
+    return { cause, message: moved ? noticeText("brief-moves.refused.too-close-moved", { time, title })
+      : changed ? noticeText("brief-moves.refused.too-close-changed", { time, title })
+        : noticeText("brief-moves.refused.too-close", { time, title }) };
   }
-  return { cause, message: moved ? `${time} is taken now: you moved ${title} there after this brief was written.`
-    : changed ? `${time} is taken now: ${title} changed after this brief was written.`
-      : `${time} is taken: ${title} is there.` };
+  return { cause, message: moved ? noticeText("brief-moves.refused.taken-moved", { time, title })
+    : changed ? noticeText("brief-moves.refused.taken-changed", { time, title })
+      : noticeText("brief-moves.refused.taken", { time, title }) };
 }
 
 // ------------------------------------------------------------------ Re-check on open
