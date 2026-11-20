@@ -387,6 +387,9 @@ export function announceConversationsChanged(activeId: string | null) {
 
 // ----------------------------------------------------------------- wording
 
+/** The look of "Change this in Settings" after Chat's opening line, on web and the Mac. */
+export const CHAT_SETTINGS_LINK_CLASS = "underline underline-offset-2 hover:text-foreground";
+
 /** The alert label for each code, written before the server's sentence ("Chat paused. …"). */
 export const CHAT_ALERT_LABELS: Readonly<Record<ChatAlertCode, string>> = Object.freeze({
   budget_reached: "Chat paused",

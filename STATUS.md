@@ -213,11 +213,25 @@ Check the cited entry before acting on a row.
   approval while chat is on, and reads only the sources left on.
 - Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
 
+## Advisor plan Phase 5C: Mac Chat screen — November 20, 2026
+
+- **In review (branch `claude/project-thread-csiyb8`).** Cadence for Mac gets the Chat
+  screen (`apps/desktop/src/chat-screen.tsx`) on 5B's shared `ChatPage`, and recent chats
+  under Chat in the Mac menu (shared list `components/chat/ChatRecents.tsx`). Only a linked
+  Mac shows Chat. The Mac calls the hosted chat routes with its bearer session
+  (`apps/desktop/src/chat.ts`); a turn, Yes or Undo that changed records asks account
+  sync to run, so the Timeline redraws after one sync round. One switch,
+  `CHAT_PAGE_LIVE` in `lib/navigation.ts`, now covers production web and Mac release
+  builds; development builds always show Chat. Bench `?bench=chat&state=…` in the
+  desktop dev server. Tests `tests/desktop-chat.dom.test.tsx`.
+- **Next:** set `CHAT_PAGE_LIVE`, then the installed Mac check (desktop-acceptance) and
+  the usual Mac release with the owner's written go-ahead.
+
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
 - **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
   primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
   set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
 - **Chat page (second change):** `components/chat/ChatPage.tsx` and `ChatMessages.tsx` on
   5A's `@cadence/core/types/chat` events (`lib/ui/chat.ts` folds the stream), past
@@ -228,13 +242,13 @@ Check the cited entry before acting on a row.
   line is on screen plus Jump to latest, failed sends back in the field with the same
   message id, a polite status line for run states, `?c=` reopens after a reload, and
   stream validation with a plain-text fallback. Waiting on Emi's UI review.
-- **Next:** set `CHAT_PAGE_LIVE_ON_WEB` once 5A's route is on main; 5C adds the Mac screen.
+- **Next:** set `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) once 5A's route is on main; 5C adds the Mac screen.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
 - **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
   primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
   set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
 - **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
   mobile layout and a `/design-system` bench with fixture conversations.
