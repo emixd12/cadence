@@ -4,6 +4,7 @@ import { ADVICE_CARDS, adviceSourceFor } from "@cadence/core/services/advice-lib
 import type { AdviceCard } from "@cadence/core/types/advice-cards";
 import {
   ADVISOR_TIP_MINIMUM_SPACING_MINUTES,
+  ADVISOR_RECENT_TIPS,
   ADVISOR_TIP_REACTIONS,
   type AdvisorTip,
   type AdvisorTipReaction,
@@ -11,9 +12,10 @@ import {
   type AdvisorTipResearch,
   type AdvisorTipsErrorCode,
   type AdvisorTipsNextResponse,
+  type AdvisorTipsRecentResponse,
 } from "@cadence/core/types/advisor-tips";
 
-import { AdvisorTipsError, nextTip, reactToTip, type TipRow } from "@/lib/db/advisor-tips.repo";
+import { AdvisorTipsError, nextTip, reactToTip, recentTips, type TipRow } from "@/lib/db/advisor-tips.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { agentCallerConfigured } from "@/lib/integrations/agent-caller";
 import { readAdvisorTipsSettings, type AdvisorTipsSettings } from "./advisor-tips-settings";
@@ -84,6 +86,18 @@ export async function handleTipReaction(request: Request, deps: TipRequestDeps =
     const tip = toAdvisorTip(row, deps.cards);
     if (!tip) throw new TipRequestError("tip_not_found");
     return { tip } satisfies AdvisorTipReactionResponse;
+  });
+}
+
+/** 4E: the panel's "Earlier" list. Tips off returns an empty list, so nothing shows. */
+export async function handleRecentTips(request: Request, deps: TipRequestDeps = hostedDeps): Promise<Response> {
+  return respond(request, async () => {
+    const caller = await authenticate(request);
+    const settings = await deps.settings(caller.client);
+    if (!settings.tipsOn) return { tips: [] } satisfies AdvisorTipsRecentResponse;
+    const rows = await recentTips(caller.client, ADVISOR_RECENT_TIPS.days, ADVISOR_RECENT_TIPS.limit);
+    const tips = rows.map((row) => toAdvisorTip(row, deps.cards)).filter((tip): tip is AdvisorTip => tip !== null);
+    return { tips } satisfies AdvisorTipsRecentResponse;
   });
 }
 
