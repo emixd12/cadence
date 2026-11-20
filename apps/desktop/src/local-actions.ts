@@ -8,6 +8,7 @@ import {
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
 import { behaviorErrorToActionState, parseBehaviorFormData, parseBehaviorRunActionFormData } from "../../../lib/services/behavior-form";
 import type { BehaviorFormAction } from "../../../lib/types/behavior";
+import { behaviorRunOutcomeMessage, localDateIn } from "../../../lib/ui/behavior-run";
 import type { Profile } from "../../../lib/types/database";
 import { createLocalBehaviorStore, withNativeReminderSummary } from "./local-behavior.service";
 import { localCommand } from "./local-store";
@@ -81,13 +82,6 @@ export function localErrorMessage(error: unknown): string {
   }
   return "Unable to save the local change. Try again.";
 }
-
-const RUN_ACTION_MESSAGES = {
-  end_now: "Behavior ended.",
-  start_again: "Behavior started again.",
-  pause: "Behavior paused.",
-  resume: "Behavior resumed.",
-} as const;
 
 export function createLocalBehaviorActions(profile: Profile, refresh: () => void) {
   const createAction: BehaviorFormAction = async (_previous, form) => {
@@ -165,11 +159,11 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
       const expectedUpdatedAt = form.get("expected_updated_at");
       if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) throw new Error("Reload this behavior before saving changes.");
       const action = parseBehaviorRunActionFormData(form);
-      await applyBehaviorRunAction(createLocalBehaviorStore(profile.id, now), {
+      const updated = await applyBehaviorRunAction(createLocalBehaviorStore(profile.id, now), {
         behaviorId, action, expectedUpdatedAt, recordedAt: now.toString(),
       });
       refresh();
-      return { status: "success", message: RUN_ACTION_MESSAGES[action.kind] };
+      return { status: "success", message: behaviorRunOutcomeMessage(updated.title, action, localDateIn(updated.timezone)) };
     } catch (error) { return behaviorErrorToActionState(error); }
   };
   return { createAction, updateAction, archiveAction: lifecycle(false), restoreAction: lifecycle(true), archiveNoteAction, runAction };

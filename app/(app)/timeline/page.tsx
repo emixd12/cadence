@@ -19,6 +19,7 @@ import {
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
 } from "./actions";
+import { behaviorRunAction } from "../behaviors/actions";
 import {
   keepMovedOccurrenceAction,
   moveOccurrenceAction,
@@ -139,6 +140,7 @@ async function TimelineContent({
         dayNoteAction={saveDayNoteAction}
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
+        runAction={behaviorRunAction}
       />
     </OccurrenceMovesProvider>
   );
