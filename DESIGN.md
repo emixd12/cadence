@@ -914,6 +914,51 @@ change with its next release.
 
 Design bench: `module.occurrence-mark-details`.
 
+## Advisor placement — advisor Phase 4D (option K)
+
+On November 19, 2026 the owner chose option K for where the advisor (the horse) lives.
+Today it exists only on the development bench
+(`/design-system?preview=advisor-placement&option=k&view=open|why|answered|brief|checkin|none|panel`,
+`app/design-system/AdvisorPlacementBench.tsx`). The product build is 4E. In the interface it
+is called "Advisor"; "coach" stays internal.
+
+- **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
+  round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
+  so it never looks cropped. The artwork is a draft
+  (`public/brand/cadence-advisor-window-draft.webp`, plus a heavier-line `-small` version for
+  sizes up to 72px).
+- **Where it sits.** Top centre of the page, and it stays there when you scroll. It is 48px on
+  desktop and the Mac. On phones it is 40px and sits in the middle of the top bar. It is never
+  smaller than 40px.
+- **Its label.** Plain "Advisor" text under the horse, with no pill and no shadow. When
+  something is new, the label reads "Advisor · 1 new". There is no dot, so nothing can be
+  confused with the banner's decorative dots.
+- **The line under today's date.** One line of plain text, with no avatar, shows the most
+  pressing item, in this order:
+  - the brief: "2 moves suggested for today. Open"
+  - a schedule question: a short form, with the full choice in the panel
+  - a trial check-in: "Keep Gym at 6:30 PM on Tuesdays? Keep · Go back", answered on the line
+  - a tip: one short sentence, then "Why this? · Helpful · Not now" on one line
+- **Line rules.**
+  - "Don't suggest this again" is only in the panel.
+  - After an answer, the italic outcome ("Saved as helpful.") replaces the links.
+  - "Why this?" opens the research card under the line, with a 1px left rule.
+  - A day with nothing shows no line, and the label reads just "Advisor".
+- **The panel.** Tapping the horse opens it. It holds a large avatar and the name, then these
+  sections, separated by thin rules:
+  - Today's brief
+  - Needs your answer (schedule proposals: "Try for two weeks · Change for good · No")
+  - Today's tip, with all four reactions
+  - Trying for two weeks
+  - Earlier
+  - Chat with the advisor (an underlined link)
+- **Panel width.** From 1280px wide, the panel is a 26rem column on the right, and the Timeline
+  narrows beside it so the status links stay usable. Below 1280px, which includes a typical Mac
+  window and phones, the panel fills the window and its text column is capped at 36rem. "Close"
+  returns to the Timeline.
+- **Styles.** The usual text styles apply. Italic is only for outcomes, grey only for small
+  notes, and one red line only for errors. Advice never uses the Alert notice.
+
 ## ChatGPT plan card and Daily Brief plan states — Ticket 299
 
 Mac only, and hidden: Cadence for Mac renders none of this unless its build sets

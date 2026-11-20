@@ -2,6 +2,7 @@
   "description": "Files that mention scheduled_for or scheduledFor on 2026-11-16, with line counts. tests/scheduled-for-drift.test.ts fails when a file exceeds its count. Lower counts as readers move to the time helper; never raise one without a reason in the pull request. See docs/DATETIME_STRATEGY.md, Time helper.",
   "files": {
     "app/design-system/CalendarBench.tsx": 1,
+    "app/design-system/AdvisorPlacementBench.tsx": 1,
     "app/design-system/DayProgressBench.tsx": 5,
     "app/design-system/DepartureStatesBench.tsx": 2,
     "app/design-system/MarkDetailsBench.tsx": 1,
@@ -39,6 +40,7 @@
     "lib/services/briefing-fixtures.ts": 3,
     "lib/services/briefing-history.service.ts": 3,
     "lib/services/briefing-pipeline.ts": 1,
+    "lib/services/chat-eval/fake-tools.ts": 1,
     "lib/services/connector-completion-job.service.ts": 1,
     "lib/services/imported-intervention-promotion.service.ts": 1,
     "lib/services/integration-read-serialization.ts": 1,
