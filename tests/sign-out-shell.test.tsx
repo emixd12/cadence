@@ -19,6 +19,7 @@ describe("app-shell sign out control", () => {
 
     for (const [href, label] of [
       ["/timeline", "Timeline"],
+      ["/chat", "Chat"],
       ["/behaviors", "Behaviors"],
       ["/export", "Export &amp; Import"],
       ["/settings", "Settings"],

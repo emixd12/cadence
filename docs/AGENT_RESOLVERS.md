@@ -330,6 +330,20 @@ of day, never titles or notes. Paired test: `tests/coach-signals.resolver.test.t
 Allowed caller: `lib/services/coach-signals-job.service.ts`. Storage and the job:
 `docs/DATA_MODEL.md`, "Coach signals in shadow".
 
+## Advice matcher (advisor plan Phase 4, workstream 4A)
+
+`packages/core/src/resolvers/advice-matcher.resolver.ts` ranks advice cards for one
+account from injected coach signals, the account's setup facts (`AdviceAccountFacts`),
+the local date, the cards already shown and the cards the person turned off. It makes no
+model call, uses no embeddings and reads no clock, database or environment. Only a card's
+`does_not_apply_when` rules exclude it; there is no category or health exclusion (Phase 4
+decision D6). Cards, sources and the fact-name contract live in
+`packages/core/src/data/advice-library.json` and `packages/core/src/types/advice-cards.ts`;
+`packages/core/src/services/advice-library.ts` validates them and fills quip seeds. Paired
+tests: `tests/advice-matcher.resolver.test.ts` and `tests/advice-library.test.ts`. Allowed
+caller: the coach's daily quip run (4B). Forbidden bypasses: routes, components or the
+model choosing cards.
+
 ## Note shortcuts (Tickets 126–128)
 
 `packages/core/src/resolvers/note-suggestion.resolver.ts` owns source eligibility,

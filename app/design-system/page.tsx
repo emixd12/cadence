@@ -16,6 +16,7 @@ import {
   Download,
   ListChecks,
   Menu,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -229,6 +230,7 @@ const familyTierOrder = [
 
 const navIcons: Record<AppNavHref, LucideIcon> = {
   "/timeline": CalendarDays,
+  "/chat": MessageSquare,
   "/behaviors": ListChecks,
   "/export": Download,
   "/settings": Settings,
