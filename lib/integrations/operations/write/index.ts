@@ -1,5 +1,6 @@
 import { checkOperationScope } from "@cadence/core/integration";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
+import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
 import { executeIntegrationWrite, type WriteOperationName } from "@/lib/services/integration-write.service";
 import { executeOccurrenceMoveWrite, type MoveOperationName } from "@/lib/services/occurrence-move-integration.service";
 export type { WriteOperationName, WriteOperationResult } from "@/lib/services/integration-write.service";
@@ -11,8 +12,8 @@ function handler<N extends WriteOperationName>(name: N) {
 }
 
 function moveHandler<N extends MoveOperationName>(name: N) {
-  return (context: IntegrationContext, input: unknown) => executeOccurrenceMoveWrite(
-    name, context, input, checkOperationScope(name, context.actor.grantedScopes),
+  return (context: IntegrationContext, input: unknown, options: Readonly<{ calendarBusy?: readonly MoveCalendarBusy[] }> = {}) => executeOccurrenceMoveWrite(
+    name, context, input, checkOperationScope(name, context.actor.grantedScopes), options.calendarBusy,
   );
 }
 
@@ -26,4 +27,7 @@ export const writeOperationHandlers = {
   update_behavior: handler("update_behavior"),
   archive_behavior: handler("archive_behavior"),
   restore_behavior: handler("restore_behavior"),
+  end_behavior: handler("end_behavior"),
+  pause_behavior: handler("pause_behavior"),
+  resume_behavior: handler("resume_behavior"),
 };

@@ -96,7 +96,8 @@ describe("portable accepted BehaviorLog writes", () => {
           default_duration_minutes: 45,
           active: !archived,
           archived_at: archived ? "2026-06-01T12:00:00Z" : null,
-          end_date: archived ? "2026-06-01" : "2099-12-31",
+          end_on: archived ? "2026-05-31" : "2099-12-30",
+          end_time: null,
           auto_archived_at: archived ? "2026-06-01T12:00:00Z" : null,
         },
       })),
@@ -118,7 +119,9 @@ describe("portable accepted BehaviorLog writes", () => {
     expect(plan.graphWrites[0].graph.behavior).toMatchObject({
       default_duration_minutes: 45,
       active: true,
-      end_date: archived ? null : "2099-12-31",
+      // Restore keeps the stored end, so an ended Behavior comes back as ended.
+      end_on: archived ? "2026-05-31" : "2099-12-30",
+      end_time: null,
       auto_archived_at: null,
     });
   });
@@ -165,7 +168,9 @@ function withoutNewBehaviorFields(files: ReturnType<typeof portabilityFiles>) {
   const behavior = JSON.parse(behaviorFile.content);
   delete behavior.expected_duration_minutes;
   delete behavior.extensions["app.cadence"].archive_notes;
-  delete behavior.extensions["app.cadence"].end_date;
+  for (const field of ["end_date", "end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"]) {
+    delete behavior.extensions["app.cadence"][field];
+  }
   delete behavior.extensions["app.cadence"].auto_archived_at;
   behavior.title = "Brush teeth after dinner";
   behaviorFile.content = `${JSON.stringify(behavior)}\n`;

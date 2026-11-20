@@ -47,14 +47,6 @@ export function Timeline({
   return (
     <MobileTimelinePullToRefresh>
       <div className="grid gap-8 pb-32 sm:pb-24">
-        {timeline.archiveNotifications?.length ? (
-          <div role="status" className="grid gap-2 border-b border-line pb-4 text-sm">
-            {timeline.archiveNotifications.map((notice) => (
-              <p key={notice.behaviorId}>“{notice.title}” was automatically archived{notice.endDate ? ` for its ${notice.endDate} end date` : ""}. History is preserved.</p>
-            ))}
-            <Link href="/behaviors" className="product-action product-action-primary justify-self-start">Review archived behaviors</Link>
-          </div>
-        ) : null}
         <NeedsDecisionDialog
           title={timeline.needsDecision.title}
           occurrenceCount={timeline.needsDecision.occurrenceCount}

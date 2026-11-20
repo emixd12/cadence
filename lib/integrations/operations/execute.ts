@@ -4,13 +4,21 @@ import {
 } from "@cadence/core/integration";
 import { recordIntegrationActivity } from "@/lib/db/integration.repo";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
+import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
 import { consumeAgentRateLimit, consumeMcpRateLimit } from "@/lib/services/oauth/server";
 import { readOperationHandlers } from "./read";
 import { writeOperationHandlers } from "./write";
 
 const handlers = { ...readOperationHandlers, ...writeOperationHandlers };
 
-export async function executeMcpOperation(name: IntegrationOperationName, context: IntegrationContext, input: unknown) {
+/**
+ * Server-side extras a first-party caller may pass; never part of an operation's input.
+ * Chat (advisor Phase 5) passes today's calendar busy times so a move onto an event is
+ * refused with `calendar_busy`, as the brief's apply path does. MCP passes none.
+ */
+export type McpOperationOptions = Readonly<{ calendarBusy?: readonly MoveCalendarBusy[] }>;
+
+export async function executeMcpOperation(name: IntegrationOperationName, context: IntegrationContext, input: unknown, options: McpOperationOptions = {}) {
   const operation = getIntegrationOperation(name);
   let error: IntegrationError | null = checkOperationScope(name, context.actor.grantedScopes);
   try {
@@ -29,7 +37,7 @@ export async function executeMcpOperation(name: IntegrationOperationName, contex
       return { ok: false as const, error };
     }
     // Operations own output validation; writes also own transactional success and failure activity.
-    const result = await handlers[name](context, input);
+    const result = await handlers[name](context, input, options);
     if (operation.access === "read") {
       await recordIntegrationActivity(context.supabase, { operation: name, targetIds: [],
         outcome: result.ok ? "success" : result.error.code === "invalid_input" ? "invalid" : "error",

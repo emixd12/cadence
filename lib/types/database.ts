@@ -4,7 +4,11 @@ export type Profile = Tables<"profiles">;
 export type Category = Tables<"categories">;
 type BehaviorPersistenceField =
   | "default_duration_minutes"
-  | "end_date"
+  | "end_on"
+  | "end_time"
+  | "pause_from_on"
+  | "pause_from_time"
+  | "pause_back_on"
   | "auto_archived_at"
   | "location_text"
   | "where_kind";

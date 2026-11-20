@@ -133,7 +133,11 @@ export type ExportBehaviorInput = {
   archivedAt: string | null;
   archiveNotes?: ArchiveNote[];
   defaultDurationMinutes?: number | null;
-  endDate?: string | null;
+  endOn?: string | null;
+  endTime?: string | null;
+  pauseFromOn?: string | null;
+  pauseFromTime?: string | null;
+  pauseBackOn?: string | null;
   autoArchivedAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -178,6 +182,9 @@ export type ExportBehaviorConfigurationSnapshot = {
   reminderOffsetMinutes: number;
   active: boolean;
   timezone: string;
+  /** Absent on snapshots written before Behavior end and pause (November 2026). */
+  end?: { on: string; time: string | null } | null;
+  pause?: { fromOn: string; fromTime: string | null; backOn: string } | null;
 };
 
 export type ExportBehaviorConfigurationEventInput = {
@@ -345,7 +352,11 @@ export type ExportJsonBehavior = {
     updated_at: string;
   }>;
   default_duration_minutes?: number | null;
-  end_date?: string | null;
+  end_on?: string | null;
+  end_time?: string | null;
+  pause_from_on?: string | null;
+  pause_from_time?: string | null;
+  pause_back_on?: string | null;
   auto_archived_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -428,6 +439,8 @@ export type ExportJsonBehaviorConfigurationSnapshot = {
   reminder_offset_minutes: number;
   active: boolean;
   timezone: string;
+  end?: { on: string; time: string | null } | null;
+  pause?: { from_on: string; from_time: string | null; back_on: string } | null;
 };
 
 export type ExportJsonBehaviorConfigurationEvent = {

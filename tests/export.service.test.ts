@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   listBehaviorConfigurationEvents: vi.fn(),
   readExportPageBundle: vi.fn(),
   ensureUserOccurrencesFresh: vi.fn(),
-  reconcileMyDueBehaviorArchives: vi.fn(),
   listTimeSessionHistory: vi.fn(),
   listTimeSessionsByOccurrenceIds: vi.fn(),
   listAppliedBehaviorLogImportRuns: vi.fn(), listBehaviorLogImportRecordMappings: vi.fn(),
@@ -50,9 +49,6 @@ vi.mock("@/lib/db/exportPageRead.repo", () => ({
 vi.mock("@/lib/db/occurrenceMoves.repo", () => ({ listOccurrenceMovesForExport: async () => [] }));
 vi.mock("@/lib/services/occurrence.service", () => ({
   ensureUserOccurrencesFresh: mocks.ensureUserOccurrencesFresh,
-}));
-vi.mock("@/lib/services/behavior-lifecycle.service", () => ({
-  reconcileMyDueBehaviorArchives: mocks.reconcileMyDueBehaviorArchives,
 }));
 
 vi.mock("@/lib/db/timeSessions.repo", () => ({
@@ -105,7 +101,6 @@ describe("getUserExportBundle", () => {
       reminderDeliveries: [],
     });
     mocks.ensureUserOccurrencesFresh.mockResolvedValue({ synced: false });
-    mocks.reconcileMyDueBehaviorArchives.mockResolvedValue([]);
     mocks.listTimeSessionHistory.mockResolvedValue([]);
   });
 

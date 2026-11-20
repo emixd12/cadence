@@ -70,7 +70,6 @@ const snapshot = {
   historyOccurrences: [],
   historySessions: [],
   syncState: { timezone: "America/New_York", last_synced_local_date: "2026-09-19", synced_through_local_date: "2026-09-19", last_successful_sync_at: "2026-09-19T11:59:00Z", stale: false, stale_reason: null, state_version: 1, updated_at: "2026-09-19T11:59:00Z" },
-  dueArchiveCount: 0,
   staleConfigurationCount: 0,
 };
 
@@ -156,15 +155,6 @@ describe("advisor day-context service", () => {
     expect(result.cadence.occurrences).toHaveLength(1);
     expect(result.cadence.occurrences[0]).toMatchObject({ status: "unresolved" });
     expect(repo.readAdvisorCadenceRevision).toHaveBeenCalledOnce();
-  });
-
-  it("directs due archives to Timeline reconciliation before full synchronization", async () => {
-    repo.readAdvisorCadenceSnapshot.mockResolvedValue({ ...snapshot, dueArchiveCount: 1 });
-    await expect(readAdvisorDayContext({
-      caller: { client, user }, authorization, revalidateAuthorization: async () => authorization,
-      includeGoogleCalendar: false, opaqueRefKey: "k".repeat(32), now: Temporal.Instant.from("2026-09-19T12:00:02Z"),
-    })).rejects.toMatchObject({ code: "context_incomplete", recovery: expect.stringMatching(/Open Timeline.*Save timezone/) });
-    expect(repo.readAdvisorCadenceRevision).not.toHaveBeenCalled();
   });
 
   it("times out a hung final authorization check and releases only after the work settles", async () => {

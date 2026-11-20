@@ -1140,12 +1140,22 @@ Full JSON Behavior records include nullable `default_duration_minutes`,
 `expected_duration_minutes` field. It stores `end_date` and
 `auto_archived_at` under `extensions.app.cadence`. Older bundles that omit a
 field preserve an existing value during restore; an explicit null clears it.
-Reactivating an archived Behavior clears its automatic marker and any expired
-end date, including when an older bundle omits those fields.
+Reactivating an archived Behavior clears its automatic marker.
 Import validates the minute bound, real ISO local date, UTC instant, and the
 automatic marker's archived state. App-native JSONL and CSV remain focused on
 Occurrence snapshots and do not add Behavior columns.
 
+
+## Behavior end and pause (November 2026)
+
+Full JSON Behavior records replace `end_date` with nullable `end_on`,
+`end_time`, `pause_from_on`, `pause_from_time` and `pause_back_on`. BehaviorLog
+stores the same five keys under `extensions.app.cadence`. Configuration
+snapshots carry `end` and `pause`. Import reads a bundle that has only the old
+`end_date` as `end_on = end_date - 1`, the last day it ran. A bundle without any
+of these keys keeps the stored values during restore. Restore keeps the end, so
+an archived Behavior with a passed end comes back as ended.
+`BEHAVIORLOG_SCHEMA_VERSION` is unchanged: the new keys are Cadence extensions.
 ## Note shortcut privacy (Tickets 126–128)
 
 Shortcut records, proposals, dismissed keys, evidence hashes, exclusions, and

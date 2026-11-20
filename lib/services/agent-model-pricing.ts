@@ -33,9 +33,16 @@ const PRICES: Readonly<Record<string, ModelPrice>> = {
   "claude-sonnet-5.5": { input: 2, cachedInput: 0.1, cacheWriteInput: 2.5, output: 10 },
   "claude-opus-5.5": { input: 4, cachedInput: 0.2, cacheWriteInput: 5, output: 20 },
   "claude-fable-5.2": { input: 8, cachedInput: 0.2, cacheWriteInput: 10, output: 40 },
+  // Chat eval candidates (Phase 5D). OpenRouter model list, checked November 19, 2026
+  // (docs/COSTS.md, "Chat eval candidates"). The OpenAI two run direct at the same prices.
+  "gpt-6.1-terra": { input: 1, cachedInput: 0.05, output: 5 },
+  "gpt-6-luna": { input: 0.1, cachedInput: 0.01, output: 0.5 },
+  // Reached through OpenRouter as "openrouter/<creator>/<model>".
+  "deepseek/deepseek-v4.1-flash-1017": { input: 0.15, cachedInput: 0.003, output: 0.6 },
+  "z-ai/glm-5.3-flash": { input: 0.15, cachedInput: 0.03, output: 0.5 },
 };
 
-/** Accepts a bare model id or an AI Gateway "provider/model" string. */
+/** Accepts a bare model id, an AI Gateway "provider/model" string, or "openrouter/<creator>/<model>". */
 export function modelPrice(model: string): ModelPrice | null {
   const bare = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model;
   return PRICES[bare] ?? null;

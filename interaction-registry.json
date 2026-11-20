@@ -443,6 +443,13 @@
       "reason": "Ticket 132 development-only synthetic comparison bench. No production interaction or provider access."
     },
     {
+      "path": "app/design-system/AdvisorPlacementBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 69,
+      "interaction_ids": [],
+      "reason": "Advisor plan 4D development-only placement bench with synthetic tips. Not a product surface; no account or provider access."
+    },
+    {
       "path": "app/design-system/HorseAvatarTrial.tsx",
       "classification": "excluded",
       "interaction_marker_count": 9,
@@ -546,7 +553,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 45,
+      "interaction_marker_count": 46,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -870,7 +877,7 @@
     {
       "path": "components/timeline/Timeline.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 1,
       "interaction_ids": [
         "INT-TIMELINE-001",
         "INT-SHELL-001"
@@ -3049,7 +3056,7 @@
         }
       ],
       "availability": "Available to authenticated users in the desktop rail and mobile drawer.",
-      "success_result": "Loads the selected protected route and closes the mobile drawer when applicable. Automatic-archive notices link to Behaviors for review.",
+      "success_result": "Loads the selected protected route and closes the mobile drawer when applicable.",
       "failure_result": "An invalid session redirects to /login with the requested route preserved.",
       "effects": [
         "navigation",
@@ -3074,7 +3081,7 @@
           "tests/desktop-render-recovery.dom.test.tsx",
           "tests/navigation.test.ts"
         ],
-        "notes": "The app-shell test renders all primary navigation destinations in the owning shell. The desktop render-recovery test opens Behaviors from the Timeline's automatic-archive notice."
+        "notes": "The app-shell test renders all primary navigation destinations in the owning shell."
       },
       "platforms": {
         "web": {

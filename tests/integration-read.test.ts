@@ -34,7 +34,7 @@ function behavior(overrides: Partial<BehaviorWithCategory> = {}): BehaviorWithCa
     description: "Outside", location_text: "Park", recurrence_rule: { frequency: "daily", interval: 1 },
     scheduled_time: "09:00:00", timezone: "America/New_York", browser_reminder_enabled: true,
     email_reminder_enabled: false, reminder_offset_minutes: 0, active: true, archived_at: null,
-    auto_archived_at: null, end_date: null, default_duration_minutes: 20, archive_notes: [],
+    auto_archived_at: null, end_on: null, end_time: null, pause_from_on: null, pause_from_time: null, pause_back_on: null, default_duration_minutes: 20, archive_notes: [],
     current_configuration_event_id: id(13), created_at: at, updated_at: "2026-03-08T07:30:00.123456+00:00",
     schedule_slots: [slot], schedules: [{ id: id(11), user_id: id(1), behavior_id: id(10), recurrence_rule: { frequency: "daily", interval: 1 }, sort_order: 0,
       created_at: at, updated_at: at, schedule_slots: [slot] }], ...overrides };

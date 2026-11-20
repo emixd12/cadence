@@ -4,7 +4,7 @@ import type {
   BehaviorDataStore,
 } from "../packages/core/src/behavior-store";
 import {
-  createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  applyBehaviorRunAction, BehaviorRunStateError, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
 } from "../packages/core/src/services/behavior.service";
 
 import { recordedAt, stored, values } from "./helpers/behavior-graph-fixture";
@@ -150,70 +150,119 @@ describe("shared Behavior orchestration", () => {
 });
 
 it("preserves planning fields across ordinary edits and archive-note writes", async () => {
-  const existing = { ...stored, default_duration_minutes: 45, end_date: "2026-09-18", auto_archived_at: null };
+  const existing = { ...stored, default_duration_minutes: 45, end_on: "2026-09-17", end_time: null, auto_archived_at: null };
   const adapter = store(existing);
   await updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, values, recordedAt });
   expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
-    default_duration_minutes: 45, end_date: "2026-09-18", auto_archived_at: null,
+    default_duration_minutes: 45, end_on: "2026-09-17", end_time: null, auto_archived_at: null,
   });
   await updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at,
-    values: { ...values, defaultDurationMinutes: null, endDate: null }, recordedAt });
-  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ default_duration_minutes: null, end_date: null });
+    values: { ...values, defaultDurationMinutes: null, endOn: null }, recordedAt });
+  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ default_duration_minutes: null, end_on: null });
+  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].configurationEventPlan).toMatchObject({ changedFields: ["end"] });
 });
 
-it("records automatic archive once and clears an expired end date on restore", async () => {
-  const archivedAt = "2026-09-18T12:00:00Z";
-  const adapter = store({ ...stored, end_date: "2026-09-18", default_duration_minutes: 30 });
-  await setBehaviorActive(adapter, { behaviorId: stored.id, active: false, automatic: true,
-    recordedAt: archivedAt, effectiveAt: "2026-09-18T04:00:00Z", newArchiveNoteId: "11111111-1111-4111-8111-111111111111" });
-  const commit = adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0];
-  expect(commit.behavior).toMatchObject({ active: false, auto_archived_at: archivedAt, end_date: "2026-09-18", default_duration_minutes: 30 });
-  expect(commit.configurationEventPlan).toMatchObject({ source: "system", effectiveAt: "2026-09-18T04:00:00Z", reasonCode: "behavior_end_date_reached" });
-  adapter.getBehaviorById.mockResolvedValue({ ...stored, ...commit.behavior });
-  await setBehaviorActive(adapter, { behaviorId: stored.id, active: false, automatic: true, recordedAt: archivedAt });
-  expect(adapter.updateBehaviorWithAtomicScheduleGraph).toHaveBeenCalledTimes(1);
-  await setBehaviorActive(adapter, { behaviorId: stored.id, active: true, recordedAt: archivedAt });
-  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ active: true, end_date: null, auto_archived_at: null, default_duration_minutes: 30 });
+it("keeps an end that has passed when an archived Behavior is restored (it comes back as Ended)", async () => {
+  const adapter = store({ ...stored, active: false, archived_at: recordedAt, end_on: "2026-08-28", auto_archived_at: recordedAt });
+  await setBehaviorActive(adapter, { behaviorId: stored.id, active: true, recordedAt });
+  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
+    active: true, end_on: "2026-08-28", auto_archived_at: null,
+  });
+  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].configurationEventPlan).toMatchObject({ reasonCode: "behavior_restored" });
 });
 
-it("clears an expired date when the edit form restores a Behavior", async () => {
-  const adapter = store({ ...stored, active: false, end_date: "2026-08-29", auto_archived_at: recordedAt });
-  await updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
-    values: { ...values, active: true, endDate: "2026-08-29" } });
-  expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ active: true, end_date: null, auto_archived_at: null });
-});
-
-describe("End date must come after today", () => {
-  // recordedAt in the fixture; the Behavior's timezone decides "today".
-  const today = (timezone: string) => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date(recordedAt));
-  const addDays = (date: string, days: number) => {
-    const [year, month, day] = date.split("-").map(Number);
-    return new Date(Date.UTC(year!, month! - 1, day! + days)).toISOString().slice(0, 10);
-  };
-
-  it("refuses creating a Behavior whose End date is today or earlier", async () => {
-    for (const endDate of [today("America/New_York"), addDays(today("America/New_York"), -1)]) {
+describe("An end or a pause must be later than now", () => {
+  // recordedAt is noon on August 30, 2026 in New York.
+  it("refuses an end that has already passed, and accepts the end of today", async () => {
+    for (const end of [{ endOn: "2026-08-29", endTime: null }, { endOn: "2026-08-30", endTime: "11:59" }]) {
       const adapter = store();
-      await expect(createBehavior(adapter, { values: { ...values, endDate }, userId: "owner", timezone: "America/New_York", recordedAt }))
-        .rejects.toMatchObject({ fieldErrors: { end_date: "Choose a date after today. The Behavior’s last day is the day before its end date." } });
+      await expect(createBehavior(adapter, { values: { ...values, ...end }, userId: "owner", timezone: "America/New_York", recordedAt }))
+        .rejects.toMatchObject({ fieldErrors: { end_on: "Pick a time later than now. To stop it right away, use End now." } });
       expect(adapter.createBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
+    }
+    for (const end of [{ endOn: "2026-08-30", endTime: null }, { endOn: "2026-08-30", endTime: "12:01" }]) {
+      const adapter = store();
+      await createBehavior(adapter, { values: { ...values, ...end }, userId: "owner", timezone: "America/New_York", recordedAt });
+      expect(adapter.createBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
+        end_on: "2026-08-30", end_time: end.endTime ? `${end.endTime}:00` : null,
+      });
     }
   });
 
-  it("accepts tomorrow as the End date", async () => {
-    const adapter = store();
-    await createBehavior(adapter, { values: { ...values, endDate: addDays(today("America/New_York"), 1) }, userId: "owner", timezone: "America/New_York", recordedAt });
-    expect(adapter.createBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
-  });
-
-  it("refuses changing an active Behavior's End date to today, and leaves an unchanged date alone", async () => {
-    const existing = { ...stored, end_date: addDays(today(stored.timezone), 5) };
+  it("checks only a changed end, so an end that passed stays editable around it", async () => {
+    const existing = { ...stored, end_on: "2026-08-20", end_time: null };
     const adapter = store(existing);
     await expect(updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
-      values: { ...values, endDate: today(stored.timezone) } })).rejects.toMatchObject({ fieldErrors: { end_date: expect.any(String) } });
+      values: { ...values, endOn: "2026-08-25" } })).rejects.toMatchObject({ fieldErrors: { end_on: expect.any(String) } });
     expect(adapter.updateBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
     await updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
-      values: { ...values, endDate: existing.end_date } });
-    expect(adapter.updateBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
+      values: { ...values, title: "Read more" } });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ end_on: "2026-08-20" });
+  });
+
+  it("refuses a pause that starts before today or comes back too soon", async () => {
+    for (const pause of [
+      { fromOn: "2026-08-29", fromTime: null, backOn: "2026-09-02" },
+      { fromOn: "2026-08-30", fromTime: null, backOn: "2026-08-30" },
+    ]) {
+      const adapter = store();
+      await expect(updateBehavior(adapter, { behaviorId: stored.id, expectedUpdatedAt: stored.updated_at, recordedAt,
+        values: { ...values, pause } })).rejects.toMatchObject({ fieldErrors: { pause: expect.any(String) } });
+    }
+  });
+});
+
+describe("End now, Start again, Pause and Resume now", () => {
+  it("End now stops this minute, rounded up, and repeating it writes no revision", async () => {
+    const adapter = store();
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, action: { kind: "end_now" }, recordedAt: "2026-08-30T16:00:30Z" });
+    const commit = adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0];
+    expect(commit.behavior).toMatchObject({ end_on: "2026-08-30", end_time: "12:01:00", active: true });
+    expect(commit.configurationEventPlan).toMatchObject({ changedFields: ["end"], reasonCode: "behavior_ended" });
+    adapter.getBehaviorById.mockResolvedValue({ ...stored, ...commit.behavior });
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, action: { kind: "end_now" }, recordedAt: "2026-08-30T16:05:00Z" });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0]).toMatchObject({ configurationEventPlan: null });
+  });
+
+  it("End now in the last minute of a day stops at the end of that day", async () => {
+    const adapter = store();
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, action: { kind: "end_now" }, recordedAt: "2026-08-31T03:59:30Z" });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ end_on: "2026-08-30", end_time: null });
+  });
+
+  it("Start again clears the end", async () => {
+    const adapter = store({ ...stored, end_on: "2026-08-29", end_time: null });
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, action: { kind: "start_again" }, recordedAt });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({ end_on: null, end_time: null });
+  });
+
+  it("a pause that starts today starts now; one ahead starts with its day and replaces the old one", async () => {
+    const adapter = store({ ...stored, pause_from_on: "2026-09-10", pause_from_time: null, pause_back_on: "2026-09-12" });
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, recordedAt,
+      action: { kind: "pause", pause: { fromOn: "2026-08-30", fromTime: null, backOn: "2026-09-02" } } });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
+      pause_from_on: "2026-08-30", pause_from_time: "12:00:00", pause_back_on: "2026-09-02",
+    });
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, recordedAt,
+      action: { kind: "pause", pause: { fromOn: "2026-09-03", fromTime: null, backOn: "2026-09-05" } } });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
+      pause_from_on: "2026-09-03", pause_from_time: null, pause_back_on: "2026-09-05",
+    });
+  });
+
+  it("Resume now clears the pause and an end that has passed", async () => {
+    const adapter = store({ ...stored, end_on: "2026-08-29", pause_from_on: "2026-08-20", pause_from_time: null, pause_back_on: "2026-09-02" });
+    await applyBehaviorRunAction(adapter, { behaviorId: stored.id, action: { kind: "resume" }, recordedAt });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph.mock.lastCall![0].behavior).toMatchObject({
+      end_on: null, pause_from_on: null, pause_back_on: null,
+    });
+  });
+
+  it("refuses a run action on an archived Behavior and pausing an ended one", async () => {
+    await expect(applyBehaviorRunAction(store({ ...stored, active: false }), { behaviorId: stored.id, action: { kind: "end_now" }, recordedAt }))
+      .rejects.toBeInstanceOf(BehaviorRunStateError);
+    await expect(applyBehaviorRunAction(store({ ...stored, end_on: "2026-08-29" }), { behaviorId: stored.id, recordedAt,
+      action: { kind: "pause", pause: { fromOn: "2026-08-30", fromTime: null, backOn: "2026-09-02" } } }))
+      .rejects.toBeInstanceOf(BehaviorRunStateError);
   });
 });

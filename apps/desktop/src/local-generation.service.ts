@@ -1,3 +1,4 @@
+import { earliestStoppedLocalDate, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorGraphRecord } from "@cadence/core/behavior-store";
 import type { OccurrenceRecord } from "@cadence/core/data-store";
@@ -28,7 +29,7 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
   if (decideOccurrenceSyncCoverage(state, window).covered) return;
   const plans: OccurrenceGenerationPlan[] = [];
   for (const graph of graphs) {
-    const behaviorWindow = resolveGenerationWindow({ now, timezone: graph.behavior.timezone, horizonDays, behaviorEndDate: graph.behavior.end_date });
+    const behaviorWindow = resolveGenerationWindow({ now, timezone: graph.behavior.timezone, horizonDays, earliestStoppedLocalDate: earliestStoppedLocalDate(runFieldsFromStored(graph.behavior)) });
     const rows = await localCommand("readOccurrences", {
       profileId, behaviorId: graph.behavior.id,
       startLocalDate: behaviorWindow.startLocalDate, endLocalDate: "9999-12-31",

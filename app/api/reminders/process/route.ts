@@ -16,7 +16,6 @@ import {
   LaunchCircuitBreakerOpenError,
 } from "@/lib/security/launch-circuit-breakers";
 import { processDueReminders } from "@/lib/services/reminder.service";
-import { processDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 
 export const runtime = "nodejs";
 
@@ -99,7 +98,6 @@ async function processReminderRequest(request: NextRequest) {
 
   try {
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
-    await processDueBehaviorArchives({ limit });
     const result = await processDueReminders({
       limit,
     });

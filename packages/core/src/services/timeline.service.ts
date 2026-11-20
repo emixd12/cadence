@@ -13,6 +13,8 @@ import { effectiveStartAt, isMoved } from "../resolvers/time.resolver";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "./occurrence-generation";
 import { normalizeOccurrenceStatus } from "./occurrence.service";
 import { storedBehaviorWhere } from "./behavior-where";
+import { behaviorRunNotice, runFieldsFromStored } from "../resolvers/behavior-run.resolver";
+import type { BehaviorRunNotice } from "../types/timeline";
 
 export function resolvePersistedTimeline(input: {
   behaviors: BehaviorGraphRecord[];
@@ -50,9 +52,16 @@ export function resolvePersistedTimeline(input: {
       resolveBehaviorDurationEstimate({ behaviorId, defaultDurationMinutes: activeBehaviorById.get(behaviorId)?.default_duration_minutes, occurrences: history, now: input.now, timezone: input.timezone }),
     ]));
   }
-  timeline.archiveNotifications = input.behaviors.filter((behavior) => !behavior.active && behavior.auto_archived_at)
-    .map((behavior) => ({ behaviorId: behavior.id, title: behavior.title, endDate: behavior.end_date ?? null }));
+  timeline.runNotices = resolveBehaviorRunNotices(input.behaviors, input.now);
   return timeline;
+}
+
+/** Today's ended, paused and back-today notices, in title order (T7). */
+export function resolveBehaviorRunNotices(behaviors: readonly BehaviorGraphRecord[], now: Temporal.Instant): BehaviorRunNotice[] {
+  return behaviors.flatMap((behavior) => {
+    const notice = behaviorRunNotice(runFieldsFromStored(behavior), now);
+    return notice ? [{ behaviorId: behavior.id, title: behavior.title, kind: notice.kind, backOn: notice.backOn }] : [];
+  }).sort((left, right) => left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
 }
 
 export function resolvePersistedTimelineOccurrence(input: {
