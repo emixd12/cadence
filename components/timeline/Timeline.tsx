@@ -6,6 +6,8 @@ import { MobileTimelinePullToRefresh } from "@/components/timeline/MobileTimelin
 import { NeedsDecisionDialog } from "@/components/timeline/NeedsDecisionDialog";
 import { DayProgressTimeline, type DayProgressContext } from "@/components/timeline/DayProgressTimeline";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
+import { BehaviorRunNotices } from "@/components/timeline/BehaviorRunNotices";
+import type { BehaviorFormAction } from "@/lib/types/behavior";
 import type {
   OccurrenceFormAction,
   TimeTrackingFormAction,
@@ -27,6 +29,8 @@ type TimelineProps = Readonly<{
   travelAccountId?: string | null;
   /** Ticket 278: the trip digest from a web leave reminder's link. */
   leaveReminderDigest?: string | null;
+  /** Start again and Resume now on the ended and paused notices (Ended and Paused). */
+  runAction?: BehaviorFormAction;
 }>;
 
 export function Timeline({
@@ -43,10 +47,12 @@ export function Timeline({
   liveCalendar = false,
   travelAccountId,
   leaveReminderDigest = null,
+  runAction,
 }: TimelineProps) {
   return (
     <MobileTimelinePullToRefresh>
       <div className="grid gap-8 pb-32 sm:pb-24">
+        <BehaviorRunNotices notices={timeline.runNotices} todayLocalDate={timeline.todayLocalDate} runAction={runAction} />
         <NeedsDecisionDialog
           title={timeline.needsDecision.title}
           occurrenceCount={timeline.needsDecision.occurrenceCount}
