@@ -13,7 +13,7 @@ import {
   type ChatBenchState,
 } from "@/app/design-system/chat-fixtures";
 import type { ChatThreadState } from "@/lib/ui/chat";
-import { DesktopApp, type DesktopScreen } from "./desktop-app";
+import { DesktopApp } from "./desktop-app";
 import { ChatScreen, type DesktopChatTarget } from "./chat-screen";
 
 const THREADS: Partial<Record<ChatBenchState, ChatThreadState>> = {
@@ -36,14 +36,13 @@ export function ChatBench() {
     target: state === "past" ? { kind: "past" } : { kind: "new" },
     request: 0,
   });
-  const [message, setMessage] = useState("");
   const thread = target.request === 0 ? THREADS[state] : undefined;
   return (
     <DesktopApp
       activeScreen="chat"
       availableScreens={["timeline", "chat", "behaviors", "export", "settings"]}
       account={{ status: "linked", userId: "fixture", email: "owner@example.test", name: "Cadence User" }}
-      onNavigate={(screen: DesktopScreen) => setMessage(`Fixture navigation: ${screen}`)}
+      onNavigate={() => undefined}
       chat={{
         load: async () => CHAT_FIXTURE_CONVERSATIONS,
         activeId: thread ? "conv-today" : null,
@@ -54,12 +53,11 @@ export function ChatBench() {
           })),
       }}
     >
-      {message ? <p role="status" className="sr-only">{message}</p> : null}
       <ChatScreen
         client={client}
         target={target.target}
         openRequest={target.request}
-        onOpenSettings={() => setMessage("Fixture navigation: settings")}
+        onOpenSettings={() => undefined}
         bench={{ thread, conversations: state === "past" ? CHAT_FIXTURE_CONVERSATIONS : undefined, now: CHAT_FIXTURE_NOW }}
       />
     </DesktopApp>
