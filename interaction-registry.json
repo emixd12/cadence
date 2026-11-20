@@ -559,7 +559,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 46,
+      "interaction_marker_count": 52,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -576,13 +576,14 @@
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
         "INT-TRAVEL-005",
-        "INT-PLACE-006"
+        "INT-PLACE-006",
+        "INT-BEHAVIOR-036"
       ]
     },
     {
       "path": "components/behaviors/BehaviorList.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 27,
+      "interaction_marker_count": 28,
       "interaction_ids": [
         "INT-BEHAVIOR-001",
         "INT-BEHAVIOR-002",
@@ -603,7 +604,10 @@
         "INT-PLACE-006",
         "INT-PLACE-008",
         "INT-PLACE-009",
-        "INT-PLACE-010"
+        "INT-PLACE-010",
+        "INT-BEHAVIOR-033",
+        "INT-BEHAVIOR-034",
+        "INT-BEHAVIOR-035"
       ]
     },
     {
@@ -894,8 +898,9 @@
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
+        "INT-SHELL-001",
         "INT-TIMELINE-001",
-        "INT-SHELL-001"
+        "INT-TIMELINE-020"
       ]
     },
     {
@@ -1301,6 +1306,31 @@
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
         "INT-ADVISOR-004"
+      ]
+    },
+    {
+      "path": "components/behaviors/BehaviorRunControls.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 16,
+      "interaction_ids": [
+        "INT-BEHAVIOR-033",
+        "INT-BEHAVIOR-034"
+      ]
+    },
+    {
+      "path": "components/behaviors/PauseRangePicker.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-BEHAVIOR-034"
+      ]
+    },
+    {
+      "path": "components/timeline/BehaviorRunNotices.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-TIMELINE-020"
       ]
     }
   ],
@@ -19549,6 +19579,428 @@
           "evidence": [
             "tests/advisor-ui.dom.test.tsx"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-033",
+      "name": "End a behavior now or start it again",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior this minute without archiving it, or bring an ended one back.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "End now (When it runs)"
+        },
+        {
+          "kind": "submit",
+          "control": "Start again (Not running row)"
+        }
+      ],
+      "availability": "End now on a running Behavior's Details and Settings; Start again on an ended row in Not running.",
+      "success_result": "End now writes one configuration revision; unmarked rows later today leave the Timeline and the row moves to Not running as Ended. Start again clears the end; the Behavior runs from now with history kept. An italic outcome line shows at the top of the list.",
+      "failure_result": "A stale revision or server error shows in the error style under the row; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "occurrence_mutation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorRunControls.tsx",
+        "app/(app)/behaviors/actions.ts",
+        "lib/services/behavior.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Start again posts run_action with the Behavior's revision; the Not running group renders ended rows."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx",
+            "components/behaviors/BehaviorRunControls.tsx",
+            "app/(app)/behaviors/actions.ts",
+            "lib/services/behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-342-ended-and-paused-behaviors-in-cadence-for-mac",
+          "reason": "The Mac renders the same shared component; the Ended and Paused Mac workstream wires its local run actions and SQLite columns (Mac 0.1.13)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-034",
+      "name": "Pause a behavior with the range picker, resume it or cancel a pause",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior for a range of days; it comes back by itself on the back-on day.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Pause"
+        },
+        {
+          "kind": "activate",
+          "control": "Pause range picker day"
+        },
+        {
+          "kind": "submit",
+          "control": "Save pause"
+        },
+        {
+          "kind": "submit",
+          "control": "Resume now"
+        },
+        {
+          "kind": "submit",
+          "control": "Cancel pause"
+        }
+      ],
+      "availability": "Pause on a running Behavior's Details and Settings; Resume now on a paused row; Cancel pause when a pause is set for later.",
+      "success_result": "Save pause writes one configuration revision with the first paused day and back-on day (one pause at a time). A pause from today moves the row to Not running as Paused, back X; a later pause shows a grey note. Resume now and Cancel pause clear the pause.",
+      "failure_result": "A refused range shows P-075 or P-074 in the error style next to the picker; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "occurrence_mutation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorRunControls.tsx",
+        "components/behaviors/PauseRangePicker.tsx",
+        "app/(app)/behaviors/actions.ts",
+        "lib/services/behavior.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Picker refuses past days, picks first paused day then back-on day, posts pause_from_on and pause_back_on; refused pause shows the field error."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx",
+            "components/behaviors/BehaviorRunControls.tsx",
+            "components/behaviors/PauseRangePicker.tsx",
+            "app/(app)/behaviors/actions.ts",
+            "lib/services/behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-342-ended-and-paused-behaviors-in-cadence-for-mac",
+          "reason": "The Mac renders the same shared component; the Ended and Paused Mac workstream wires its local run actions and SQLite columns (Mac 0.1.13)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-035",
+      "name": "Toggle the Not running group",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Show or hide ended and paused Behaviors.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Not running disclosure"
+        }
+      ],
+      "availability": "Shown between active and archived Behaviors when at least one Behavior is ended or paused; open by default.",
+      "success_result": "Toggles the native disclosure without changing behavior state.",
+      "failure_result": "No stored product data changes.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "The group renders open with its count and is absent when empty."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-342-ended-and-paused-behaviors-in-cadence-for-mac",
+          "reason": "The Mac renders the same shared component; the Ended and Paused Mac workstream wires its local run actions and SQLite columns (Mac 0.1.13)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-036",
+      "name": "Set or clear an end time",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop a Behavior at a time of day on its last day instead of the end of the day.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Set a time"
+        },
+        {
+          "kind": "input",
+          "control": "Ends after time"
+        },
+        {
+          "kind": "activate",
+          "control": "End of day instead"
+        }
+      ],
+      "availability": "In the create and edit forms once an Ends after day is chosen.",
+      "success_result": "The time is saved with the form as end_time; End of day instead posts an empty time.",
+      "failure_result": "A time already past is refused with P-074 on save; the draft stays.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Covered through the shared form render; the save rule is covered by core tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-342-ended-and-paused-behaviors-in-cadence-for-mac",
+          "reason": "The Mac renders the same shared component; the Ended and Paused Mac workstream wires its local run actions and SQLite columns (Mac 0.1.13)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-020",
+      "name": "Act on or close an ended, paused or back-today notice",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#end-pause-or-start-a-behavior-again"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J08"
+      ],
+      "intent": "See at the top of the Timeline that a Behavior ended, paused or came back today, and undo it in one tap.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Start again (notice)"
+        },
+        {
+          "kind": "submit",
+          "control": "Resume now (notice)"
+        },
+        {
+          "kind": "activate",
+          "control": "Close notice"
+        }
+      ],
+      "availability": "On the day a Behavior ends, the day a pause starts, and the back-on day; derived from the Behavior's fields.",
+      "success_result": "Start again or Resume now writes one revision and the Timeline refreshes. Close hides that line on this device for the rest of the day.",
+      "failure_result": "An action error shows in the error style under the line; nothing changes.",
+      "effects": [
+        "behavior_mutation",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/BehaviorRunNotices.tsx",
+        "components/timeline/Timeline.tsx",
+        "app/(app)/timeline/page.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-run-ui.dom.test.tsx"
+        ],
+        "notes": "Three notice lines, Close persisted per day, Resume now posts the notice revision."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/BehaviorRunNotices.tsx",
+            "components/timeline/Timeline.tsx",
+            "app/(app)/timeline/page.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-run-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-342-ended-and-paused-behaviors-in-cadence-for-mac",
+          "reason": "The Mac renders the same shared component; the Ended and Paused Mac workstream wires its local run actions and SQLite columns (Mac 0.1.13)."
         },
         "marketing": {
           "applicability": "not_applicable",

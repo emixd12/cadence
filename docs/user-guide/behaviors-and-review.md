@@ -293,3 +293,21 @@ labels and support keyboard input; controls wrap on narrow screens.
 Default duration (minutes) is optional. Enter a whole number from 1 to 1,440. Timeline uses this value for planning while your tracked time and measured averages stay separate. Clear it to return to the measured estimate.
 
 Ends after is optional. It is the last day the Behavior runs, in its timezone. After that day the Behavior moves to Not running and schedules nothing more. Cadence never archives it for you, and your history stays. The day must be today or later, and the end must be later than now. Clear the field to remove the end. Restoring an archived Behavior keeps its end.
+Under **Ends after**, choose **Set a time** to stop at a time of day instead of the end of the day, such as 2:00 PM: items that start before 2:00 PM still happen, later ones don't. **End of day instead** removes the time.
+
+## End, pause, or start a Behavior again
+
+**Prerequisites:** At least one active Behavior exists.
+
+1. Open a Behavior's **Details and Settings**. Under **When it runs**, choose **End now** to stop it this minute. Items still unmarked later today, including an open window such as Evening, leave the Timeline. Items you already marked stay.
+2. Or choose **Pause**. A calendar opens with today as the first paused day. Tap the day it comes back (the back-on day) and choose **Save pause**. To start the pause on a later day, tap that day first, then the back-on day. The summary line under the calendar says what you picked.
+3. Ended and paused Behaviors move to **Not running (n)**, between your active Behaviors and **Archived behaviors**. Each row says why, such as "Ended Nov 30" or "Paused, back Dec 8".
+4. On a Not running row, choose **Start again** (ended) or **Resume now** (paused). It runs from now, with all history kept. **Archive** works from here too.
+
+A paused Behavior comes back by itself at the start of its back-on day. A pause set for later shows as a small grey note on the active row, with **Cancel pause** under **When it runs**. One pause at a time: a new pause replaces the old one. Doing a paused item records nothing; choose **Resume now** first to log it.
+
+**Timeline notices:** on the day an item ends or a pause starts, and on its back-on day, the Timeline shows one line at the top, such as "Run ended. Start again" or "Stretch is back today." **Close** hides the line on this device for the rest of the day.
+
+**Recovery or undo:** every run action is undone by another tap: **Start again** after **End now**, **Resume now** after **Pause**. None asks to confirm.
+
+**Keyboard and mobile:** the calendar's days are buttons with full date labels; past days can't be picked. Use the arrows beside the month to change month.

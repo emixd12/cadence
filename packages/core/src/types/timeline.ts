@@ -150,6 +150,8 @@ export type BehaviorRunNotice = {
   kind: "ended" | "paused" | "back";
   /** The back-on day of a pause. */
   backOn: string | null;
+  /** The Behavior's revision, sent as expected_updated_at by the notice's Start again or Resume now. */
+  updatedAt: string;
 };
 
 export type TimelineView = {
