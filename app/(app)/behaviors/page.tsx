@@ -10,6 +10,7 @@ import {
 import { getAnalyticsPageData } from "@/lib/services/analytics.service";
 import { getBehaviorPageData } from "@/lib/services/behavior.service";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
+import { parseBehaviorEditTarget, type BehaviorEditTarget } from "@/lib/ui/advisor";
 import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
 import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import {
@@ -36,6 +37,9 @@ type BehaviorsPageProps = Readonly<{
     range?: string | string[];
     behavior?: string | string[];
     day?: string | string[];
+    /** A tip's link: `?edit=<behavior id>&field=time|length|where|description`. */
+    edit?: string | string[];
+    field?: string | string[];
   }>;
 }>;
 
@@ -46,6 +50,7 @@ export default async function BehaviorsPage({
   const rangeDays = parseNumberParam(params?.range);
   const selectedBehaviorId = parseStringParam(params?.behavior);
   const selectedDayLocalDate = parseStringParam(params?.day);
+  const editTarget = parseBehaviorEditTarget(parseStringParam(params?.edit), parseStringParam(params?.field));
 
   return (
     <ScreenFrame title="Behaviors">
@@ -54,6 +59,7 @@ export default async function BehaviorsPage({
           rangeDays={rangeDays}
           selectedBehaviorId={selectedBehaviorId}
           selectedDayLocalDate={selectedDayLocalDate}
+          editTarget={editTarget}
         />
       </Suspense>
     </ScreenFrame>
@@ -64,10 +70,12 @@ async function BehaviorsContent({
   rangeDays,
   selectedBehaviorId,
   selectedDayLocalDate,
+  editTarget,
 }: Readonly<{
   rangeDays?: number;
   selectedBehaviorId?: string;
   selectedDayLocalDate?: string;
+  editTarget: BehaviorEditTarget | null;
 }>) {
   const [data, analytics] = await withPerformanceRoute(
     "/behaviors",
@@ -127,6 +135,7 @@ async function BehaviorsContent({
         resetTimeTrackingAction={resetBehaviorReviewOccurrenceTimeTrackingAction}
         noteShortcutViews={noteShortcutViews}
         noteShortcutAction={manageNoteShortcutAction}
+        editTarget={editTarget}
       />
     </>
   );

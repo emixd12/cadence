@@ -23,7 +23,7 @@ const CARD: AdviceCard = {
   id: "drop", revision: 2, status: "active", advice: "Advice.", action: "Action.", limitation: "Limitation.",
   applies_when: [{ signal: "completion_drop", scope: "behavior", facts: [] }], does_not_apply_when: [],
   evidence: { source_id: "missing", kind: "meta_analysis", strength: "moderate", claim: "Claim.", quote: "Quote.", locator: "Abstract" },
-  quip_seeds: ["One.", "Two."], audience: "any_account", reviewed_at: "2026-11-19", reviewer: "Emi",
+  quip_seeds: ["One.", "Two."], audience: "any_account", reviewed_at: "2026-11-19", reviewer: "Emi", offer: null,
 };
 
 const ROW = { id: "11111111-1111-4111-8111-111111111111", localDate: "2026-11-19", text: "Gym: 2 of 8.", cardId: "drop", cardRevision: 2, behaviorId: "b-gym", shownAt: "2026-11-19T09:00:00Z", reaction: null };

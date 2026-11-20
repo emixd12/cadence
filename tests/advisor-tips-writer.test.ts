@@ -5,6 +5,8 @@ import { ADVICE_SIGNAL_FACTS, type AdviceCard, type AdviceMatch } from "@cadence
 
 import type { StoredTip, TipHistory } from "@/lib/db/advisor-tips.repo";
 import {
+  TIP_INSTRUCTIONS,
+  buildTipPrompt,
   checkTipText,
   resolveTipOutput,
   seedTipText,
@@ -24,7 +26,7 @@ function card(id: string, overrides: Partial<AdviceCard> = {}): AdviceCard {
     applies_when: [{ signal: "completion_drop", scope: "behavior", facts: [] }], does_not_apply_when: [],
     evidence: { source_id: "s", kind: "meta_analysis", strength: "moderate", claim: "Claim.", quote: "Quote.", locator: "Abstract" },
     quip_seeds: ["{behavior}: {recent_completed} of {recent_resolved} done lately.", "{behavior} slipped to {recent_completed} of {recent_resolved}."],
-    audience: "any_account", reviewed_at: TODAY, reviewer: "Emi",
+    audience: "any_account", reviewed_at: TODAY, reviewer: "Emi", offer: null,
     ...overrides,
   };
 }
@@ -166,5 +168,35 @@ describe("shipped cards' seeds", () => {
       };
       expect(seedTipText(built, behaviorId ? "Gym" : null), shipped.id).not.toBeNull();
     }
+  });
+});
+
+describe("tips that carry a question (one-tap changes)", () => {
+  function offerMatch(): AdviceMatch {
+    const base = match("set-it", { moved_days: 3, window_days: 28 }, "b-gym", "repeated_move");
+    return { ...base, card: { ...base.card, offer: { kind: "set_time" } } };
+  }
+
+  it("rests a card 30 days for a Behavior after a No to its question", () => {
+    const declined = { ...shown("set-it", "2026-10-25", {}), proposalDeclined: true };
+    expect(selectTipMatches({ matches: [offerMatch()], history: { tips: [declined], suppressedCardIds: [] }, today: TODAY, max: 3 })).toEqual([]);
+    const older = { ...shown("set-it", "2026-10-19", {}), proposalDeclined: true };
+    expect(selectTipMatches({ matches: [offerMatch()], history: { tips: [older], suppressedCardIds: [] }, today: TODAY, max: 3 })).toHaveLength(1);
+    // Another Behavior's No does not rest it.
+    const other = { ...declined, behaviorId: "b-read" };
+    expect(selectTipMatches({ matches: [offerMatch()], history: { tips: [other], suppressedCardIds: [] }, today: TODAY, max: 3 })).toHaveLength(1);
+  });
+
+  it("refuses a question in the tip's own line: Cadence writes the question", () => {
+    expect(checkTipText("Gym moved 3 times in 28 days. Set it to 6:30 PM?", offerMatch(), "Gym")).toEqual({ ok: false, reason: "question" });
+    expect(checkTipText("Gym moved 3 times in 28 days.", offerMatch(), "Gym")).toEqual({ ok: true });
+    expect(checkTipText("Gym: 2 of 8 lately. Why not try mornings?", match("plain"), "Gym").ok).toBe(true);
+  });
+
+  it("tells the model a question follows those items", () => {
+    const prompt = JSON.parse(buildTipPrompt({ items: tipItems([offerMatch(), match("plain")], new Map([["b-gym", "Gym"]])), notes: null })) as { items: Array<Record<string, unknown>> };
+    expect(prompt.items[0]?.question_follows).toBe(true);
+    expect(prompt.items[1]).not.toHaveProperty("question_follows");
+    expect(TIP_INSTRUCTIONS).toContain("question_follows");
   });
 });

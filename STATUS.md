@@ -117,6 +117,40 @@ Check the cited entry before acting on a row.
   notice and the 39 changes. A new `advisor-tips` feature holds the Timeline advisor
   interactions from #321 (34 features).
 
+## Tips with one-tap changes — November 20, 2026
+
+- **In progress (branch `claude/project-thread-wg2oqh`, draft PR).** A tip can carry a
+  schedule or length question that Cadence writes ("Set Gym to 6:30 PM every day?"). The
+  offer uses the tip's bar: 3 same-direction moves in 28 days, targets within 60 minutes,
+  a shift of at least 30 minutes; moves on one weekday change that weekday, on 2 or more
+  every day at that set time. Length changes round to 5 minutes. A Yes applies today when
+  today's Occurrence is ahead and unmarked; a day moved by hand keeps its move. Undo
+  follows Change for good. No answers the tip Not now and rests the card 30 days for that
+  Behavior. One open proposal per Behavior. Offer cards at revision 3, seeds without
+  questions. Tip links open the Behaviors editor at a field (web `/behaviors?edit=&field=`,
+  the Mac in app) or Needs decision. New interaction `INT-ADVISOR-005`.
+- **Migration:** `20261120160000_tips_one_tap_changes.sql` (owner approved as reviewed).
+- **Verification:** unit tests for the core proposal rules, the proposals service, the tips
+  writer and job, the advice library and the advisor DOM; `tests/sql/tips-one-tap-changes-smoke.sql`
+  and `tests/tips-one-tap.local-integration.test.ts` on an isolated local Supabase (a Yes
+  moves today's item and Undo puts it back; a day moved by hand keeps its move, no second
+  copy). Lint, typecheck (web and Mac), `interactions:check`, `resolvers:check` and build
+  pass. `npm run test`: only the 4 files that fail the same way on main in this container
+  (Node 22, no Preview access).
+
+## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
+
+- **In review (draft PR, branch `claude/project-thread-vwbetq`, stacked on the web PR).**
+  SQLite migration 0026 replaces `end_date` with the five run columns (backfill
+  `end_on = end_date - 1`). Row checks, contract 7 sync fields, the configuration snapshot
+  (`end`, `pause`), the generation guard and the timezone re-expression (T1) match the
+  server. The Mac wires the shared Not running group, run controls and Timeline notices to
+  a local `runAction`.
+- **Verification:** 167 Rust store tests; `tests/desktop-run-actions.test.ts`,
+  `tests/desktop-run-ui.dom.test.tsx`; desktop and web typecheck.
+- **Next:** Cadence for Mac 0.1.13 after the server PR merges; publishing needs the
+  owner's written OK.
+
 ## Ended and Paused Behaviors, web — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-8l6iw2`, stacked on the server and
@@ -174,10 +208,10 @@ Check the cited entry before acting on a row.
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.2` (history no longer carries read lines; the medical notice no longer ends the turn).
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.3` (research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
 - **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
   approval while chat is on, and reads only the sources left on.
-- **Next:** add `search_advice` (4A's matcher has merged).
+- Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
@@ -239,3 +273,22 @@ Platform impact: Mac release; web, marketing and mobile not applicable. Messagin
   this container (Node 24-only and Preview access suites).
 - **Next:** apply the migration to production, merge, and confirm the first hourly runs.
   Answer reading switches to Phase 3A1's `move_proposal_answers` once it exists.
+
+## Advisor plan Phase 1A: data foundations in source — November 16, 2026
+
+- **Merged (PR #290) and applied to the hosted database** on November 16, 2026, with the
+  owner's go-ahead. First-party caller (one token channel and first-party grant per agent),
+  agent run log with 30-day content store and daily deletion, Postgres spend budget
+  (US$5 per account per month; Daily Brief US$0.50 protected, quips US$1.00, Chat
+  US$3.50). The hosted Daily Brief now writes a run, reserves before its model call and
+  stores its facts and output. Settles Ticket 185. Docs: `docs/DATA_MODEL.md`, "Advisor
+  agents"; `docs/COSTS.md`, "Advisor agent budget"; `docs/SUPABASE_WORKFLOW.md`, "Agent
+  token channels".
+- **Verification (local stack, Node 22):** clean `db reset` replay of all 125 migrations;
+  all 49 `tests/sql` fixtures pass (Ticket 232 maintenance smoke now counts the three
+  seeded agent clients separately); local integration tests pass except
+  `mcp-server.local-integration`, which needs its own assigned stack; `npm run test`
+  passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
+  interactions checks pass.
+- **Owner decisions:** hosted migrations approved; US$25 global daily breaker confirmed.
+- **Phase 1B follow-up (done in #291):** the brief runs through the AI SDK model setting, and its calls still go through `daily-brief-agent-run.ts` over these functions. 1B's stub metering module was removed; `agent-model-pricing.ts` gained the eval candidate prices.

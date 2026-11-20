@@ -15,7 +15,9 @@ import type { ChatOutcomeKind, ChatToolSubject } from "@cadence/core/types/chat"
 
 export const CHAT_CONNECTOR_TOOLS = ["list_calendar_events", "list_workouts"] as const;
 export type ChatConnectorToolName = (typeof CHAT_CONNECTOR_TOOLS)[number];
-export type ChatToolName = IntegrationOperationName | ChatConnectorToolName;
+/** Chat-only tool over the reviewed advice library (4A); offered whenever chat is on. */
+export const CHAT_ADVICE_TOOL = "search_advice" as const;
+export type ChatToolName = IntegrationOperationName | ChatConnectorToolName | typeof CHAT_ADVICE_TOOL;
 
 /** Writes that run at once when they are the first write of a question (T12). */
 export const CHAT_IMMEDIATE_WRITES = [
@@ -99,6 +101,14 @@ const CONNECTOR_TOOL_SPECS: Readonly<Record<ChatConnectorToolName, Readonly<{ de
   },
 };
 
+const ADVICE_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaObject }> = {
+  description: "Searches Cadence's reviewed research library for findings on habits, routines, sleep, exercise timing and planning a day. Returns up to three cards, each with the advice, what the source found, one step in Cadence, who it may not fit, and the source. Call it before stating any research finding, and state only what a card says. If it returns no cards, say Cadence has no research on that.",
+  inputSchema: {
+    type: "object", additionalProperties: false, required: ["query"],
+    properties: { query: { type: "string", minLength: 2, maxLength: 200, description: "A few plain words on the topic, such as \"evening exercise sleep\"." } },
+  } as JsonSchemaObject,
+};
+
 export type ChatToolDefinition = Readonly<{ name: ChatToolName; description: string; inputSchema: JsonSchemaObject }>;
 
 /**
@@ -113,7 +123,7 @@ export function buildChatToolDefinitions(sources: ChatSourceFlags): ChatToolDefi
   const connectors = CHAT_CONNECTOR_TOOLS
     .filter((name) => name === "list_calendar_events" ? anyCalendar : sources.hevy)
     .map((name) => ({ name, ...CONNECTOR_TOOL_SPECS[name] }));
-  return [...cadence, ...connectors];
+  return [...cadence, ...connectors, { name: CHAT_ADVICE_TOOL, ...ADVICE_TOOL_SPEC }];
 }
 
 /** AI SDK tools without `execute`, in a fixed order so the prompt prefix caches. */

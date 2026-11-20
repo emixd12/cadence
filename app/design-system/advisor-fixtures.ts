@@ -53,6 +53,51 @@ export const ADVISOR_FIXTURE_PROPOSAL: Extract<ScheduleProposalView, { kind: "pr
   answers: ["try", "for_good", "no"],
 };
 
+/** A question that came from a tip (one-tap changes): the tip's sentence, then Cadence's question. */
+export const ADVISOR_FIXTURE_TIP_QUESTION: Extract<ScheduleProposalView, { kind: "proposal" }> = {
+  kind: "proposal",
+  proposalId: "66666666-6666-4666-8666-666666666666",
+  behaviorId: "behavior-gym",
+  line: "Change your schedule: Gym at 6:30 PM every day, starting today (now 7:00 AM).",
+  reason: "You moved it to about 6:30 PM on 4 days in the last 4 weeks.",
+  before: ["Every day at 7:00 AM"],
+  after: ["Every day at 6:30 PM"],
+  firstAffectedDate: "2026-11-19",
+  answers: ["try", "for_good", "no"],
+  changeKind: "time",
+  tip: {
+    text: "You moved Gym from 7:00 AM to about 6:30 PM on 4 days in the last 4 weeks.",
+    question: "Set Gym to 6:30 PM every day?",
+    research: research("set-it-where-you-keep-moving-it"),
+  },
+};
+
+/** The tip behind that question: the panel shows it once, inside the question. */
+export const ADVISOR_FIXTURE_QUESTION_TIP: AdvisorTip = {
+  id: "77777777-7777-4777-8777-777777777777",
+  localDate: "2026-11-19",
+  text: "You moved Gym from 7:00 AM to about 6:30 PM on 4 days in the last 4 weeks.",
+  behaviorId: "behavior-gym",
+  shownAt: "2026-11-19T14:00:00Z",
+  reaction: null,
+  research: research("set-it-where-you-keep-moving-it"),
+  proposalId: "66666666-6666-4666-8666-666666666666",
+  link: null,
+};
+
+/** A tip whose card opens the editor instead of asking. */
+export const ADVISOR_FIXTURE_LINK_TIP: AdvisorTip = {
+  id: "88888888-8888-4888-8888-888888888888",
+  localDate: "2026-11-19",
+  text: "Piano practice has no length yet. With one, the day shows how much time it takes.",
+  behaviorId: "behavior-piano",
+  shownAt: "2026-11-19T14:00:00Z",
+  reaction: null,
+  research: research("give-it-a-length"),
+  proposalId: null,
+  link: { target: "length", behaviorId: "behavior-piano", label: "Set a length" },
+};
+
 export const ADVISOR_FIXTURE_CHECK_IN: Extract<ScheduleProposalView, { kind: "check_in" }> = {
   kind: "check_in",
   proposalId: "44444444-4444-4444-8444-444444444444",
@@ -75,6 +120,7 @@ const ANSWER_MESSAGES: Readonly<Record<string, string>> = {
   no: "Gym stays at 7:00 AM.",
   keep: "Gym stays at 6:30 PM every Tuesday.",
   go_back: "Gym is back at 7:00 AM every Tuesday.",
+  undo: "Gym is back at 7:00 AM.",
 };
 
 export type AdvisorFixtureOptions = Readonly<{
@@ -100,7 +146,10 @@ export function fixtureAdvisorClient(options: AdvisorFixtureOptions = {}): Advis
     scheduleProposal: async () => options.proposal ?? { kind: "none" },
     answerProposal: async (_proposalId, answer): Promise<ScheduleProposalAnswerResult> => {
       if (options.refuseWith) throw new DailyBriefRequestError(options.refuseWith);
-      return { applied: answer !== "no" && answer !== "keep", replayed: false, view: { kind: "none" }, message: ANSWER_MESSAGES[answer] ?? "Saved." };
+      return {
+        applied: answer !== "no" && answer !== "keep", replayed: false, view: { kind: "none" }, message: ANSWER_MESSAGES[answer] ?? "Saved.",
+        undoable: answer === "for_good",
+      };
     },
   };
 }

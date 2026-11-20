@@ -5,16 +5,30 @@
  * code's own.
  */
 
+import type { AdvisorTipResearch } from "./advisor-tips";
+
 export const SCHEDULE_PROPOSAL_ROUTE = "/api/advisor/coach/schedule-proposal";
 
-export type ScheduleProposalAnswer = "try" | "for_good" | "no" | "keep" | "go_back";
+/** `undo` follows Change for good, while the schedule or length is unchanged since the tap. */
+export type ScheduleProposalAnswer = "try" | "for_good" | "no" | "keep" | "go_back" | "undo";
+
+/**
+ * A question that came from a tip ("Tips with one-tap changes"): the tip's sentence, the
+ * question Cadence wrote with the value a Yes applies, and the tip's "Why this?" card.
+ */
+export type ScheduleProposalTip = Readonly<{
+  text: string;
+  /** "Set Gym to 6:30 PM every day?" or "Set Gym to 45 minutes?" */
+  question: string;
+  research: AdvisorTipResearch | null;
+}>;
 
 export type ScheduleProposalView =
   /** Nothing to show. */
   | Readonly<{ kind: "none" }>
   /**
-   * A proposal or check-in exists but waits: answering today would move one of today's
-   * items, because today is a weekday the change touches. Show nothing.
+   * No longer returned (a Yes applies today since Nov 20). Kept so an older client that
+   * still checks for it compiles; treat it as nothing to show.
    */
   | Readonly<{ kind: "hold"; proposalId: string; reason: "affected_weekday_today" }>
   /** "Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday, Nov 24 (now 7:00 AM)." */
@@ -29,6 +43,10 @@ export type ScheduleProposalView =
       after: readonly string[];
       firstAffectedDate: string;
       answers: readonly ["try", "for_good", "no"];
+      /** "time" or "length". Absent from servers before Nov 20: "time". */
+      changeKind?: "time" | "length";
+      /** Present when the question came from a tip. */
+      tip?: ScheduleProposalTip | null;
     }>
   /** A trial in progress, before its check-in day. Optional for the UI to show. */
   | Readonly<{ kind: "trial"; proposalId: string; behaviorId: string; line: string; checkInDate: string }>
@@ -57,6 +75,8 @@ export type ScheduleProposalAnswerResult = Readonly<{
   view: ScheduleProposalView;
   /** One short line confirming the answer, for example "Gym is at 6:30 PM every Tuesday for two weeks." */
   message: string;
+  /** True after Change for good: the outcome line offers Undo (answer "undo" on the same proposal). */
+  undoable?: boolean;
 }>;
 
 export type ScheduleProposalErrorCode =
@@ -64,7 +84,7 @@ export type ScheduleProposalErrorCode =
   | "invalid_request"
   | "proposal_not_found"
   | "proposal_closed"
-  /** Today is a weekday the change touches; the line is not offered today. */
+  /** No longer returned (a Yes applies today since Nov 20). */
   | "held_today"
   /** The schedule changed after the line was written; the proposal is closed. */
   | "schedule_changed"

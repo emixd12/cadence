@@ -1,6 +1,7 @@
 import type {
   BehaviorChangeDirection,
   BehaviorChangeStatus,
+  BehaviorLengthDirection,
   ProposalSchedule,
   ProposeBehaviorChangeInput,
 } from "@cadence/core/services/behavior-change-proposal";
@@ -20,18 +21,15 @@ export class BehaviorChangeProposalError extends Error {
   }
 }
 
-export type BehaviorChangeCloseReason = "unanswered" | "schedule_changed" | "kept" | "no_answer" | "edited_during_trial";
+export type BehaviorChangeCloseReason = "unanswered" | "schedule_changed" | "kept" | "no_answer" | "edited_during_trial" | "undone";
 
-export type BehaviorChangeProposalRow = Readonly<{
+/** A tip-backed proposal's tip: its card and its sentence, which the question shows. */
+export type ProposalTip = Readonly<{ cardId: string; text: string }>;
+
+type ProposalRowBase = Readonly<{
   id: string;
   behaviorId: string;
   createdLocalDate: string;
-  weekdays: Weekday[];
-  fromTime: string;
-  toTime: string;
-  direction: BehaviorChangeDirection;
-  schedulesBefore: ProposalSchedule[];
-  schedulesAfter: ProposalSchedule[];
   firstAffectedDate: string;
   reason: string;
   status: BehaviorChangeStatus;
@@ -39,45 +37,75 @@ export type BehaviorChangeProposalRow = Readonly<{
   acceptedLocalDate: string | null;
   checkInDate: string | null;
   noticeShownAt: string | null;
+  tip: ProposalTip | null;
   replayed: boolean;
 }>;
 
+export type BehaviorChangeProposalRow =
+  | (ProposalRowBase & Readonly<{
+      changeKind: "time";
+      weekdays: Weekday[];
+      fromTime: string;
+      toTime: string;
+      direction: BehaviorChangeDirection;
+      schedulesBefore: ProposalSchedule[];
+      schedulesAfter: ProposalSchedule[];
+    }>)
+  | (ProposalRowBase & Readonly<{
+      changeKind: "length";
+      fromMinutes: number;
+      toMinutes: number;
+      direction: BehaviorLengthDirection;
+    }>);
+
 export type CoachBehaviorChangeState = Readonly<{
   hasOpen: boolean;
-  declined: ReadonlyArray<Readonly<{ behaviorId: string; direction: BehaviorChangeDirection; declinedAt: string }>>;
+  declined: ReadonlyArray<Readonly<{ behaviorId: string; direction: BehaviorChangeDirection | BehaviorLengthDirection; declinedAt: string }>>;
 }>;
 
-/** Coach token: stores a proposal, or returns why the database refused it. */
+export type CoachProposeResult = Readonly<{ id: string } | { refused: string; openId?: string; openCardId?: string }>;
+
+/**
+ * Coach token: stores a proposal, or returns why the database refused it. With
+ * open_proposal, `openId` names the Behavior's open proposal and `openCardId` its tip's card.
+ */
 export async function coachProposeBehaviorChange(client: AppSupabaseClient, runId: string, proposal: ProposeBehaviorChangeInput):
-  Promise<Readonly<{ id: string } | { refused: string }>> {
+  Promise<CoachProposeResult> {
   const body: Record<string, unknown> = { ...proposal };
   delete body.run_id;
   const { data, error } = await client.rpc("coach_propose_behavior_change", { p_run_id: runId, p_proposal: body as unknown as Json });
   if (error) throw new BehaviorChangeProposalError("failed");
-  const result = data as { id?: string; refused?: string } | null;
+  const result = data as { id?: string; refused?: string; open_id?: string; open_card_id?: string } | null;
   if (result?.id) return { id: result.id };
-  return { refused: result?.refused ?? "unknown" };
+  return {
+    refused: result?.refused ?? "unknown",
+    ...(result?.open_id ? { openId: result.open_id } : {}),
+    ...(result?.open_card_id ? { openCardId: result.open_card_id } : {}),
+  };
 }
 
 /** Coach token: an open proposal, and Nos inside the 30-day cooldown. */
 export async function readCoachBehaviorChangeState(client: AppSupabaseClient): Promise<CoachBehaviorChangeState> {
   const { data, error } = await client.rpc("coach_behavior_change_state");
   if (error) throw new BehaviorChangeProposalError("failed");
-  const value = data as { has_open?: boolean; declined?: Array<{ behavior_id: string; direction: BehaviorChangeDirection; declined_at: string }> } | null;
+  const value = data as { has_open?: boolean; declined?: Array<{ behavior_id: string; direction: BehaviorChangeDirection | BehaviorLengthDirection; declined_at: string }> } | null;
   return {
     hasOpen: Boolean(value?.has_open),
     declined: (value?.declined ?? []).map((row) => ({ behaviorId: row.behavior_id, direction: row.direction, declinedAt: row.declined_at })),
   };
 }
 
-/** The person: the one proposal to show as of their local date, or null. */
-export async function readBehaviorChangeProposal(client: AppSupabaseClient, today: string): Promise<BehaviorChangeProposalRow | null> {
-  const { data, error } = await client.rpc("read_behavior_change_proposal", { p_today: today });
+/**
+ * The person: the one proposal to show as of their local date (or the one named, when
+ * answering a question that is not first in line), or null.
+ */
+export async function readBehaviorChangeProposal(client: AppSupabaseClient, today: string, proposalId?: string): Promise<BehaviorChangeProposalRow | null> {
+  const { data, error } = await client.rpc("read_behavior_change_proposal", { p_today: today, ...(proposalId ? { p_proposal_id: proposalId } : {}) });
   if (error) throw mapError(error);
   return data ? toRow(data) : null;
 }
 
-export type BehaviorChangeAnswerKind = "try" | "for_good" | "no" | "schedule_changed" | "keep" | "go_back" | "edited" | "notice_seen";
+export type BehaviorChangeAnswerKind = "try" | "for_good" | "no" | "schedule_changed" | "keep" | "go_back" | "undo" | "edited" | "notice_seen";
 
 /** The person records an answer. A repeat of an answer that took effect is a replay. */
 export async function answerBehaviorChangeProposal(client: AppSupabaseClient, input: Readonly<{
@@ -101,16 +129,11 @@ function mapError(error: { message?: string; code?: string }): Error {
 
 function toRow(data: Json): BehaviorChangeProposalRow {
   const row = data as Record<string, unknown>;
-  return {
+  const evidence = row.evidence && typeof row.evidence === "object" ? row.evidence as Record<string, unknown> : {};
+  const base: ProposalRowBase = {
     id: String(row.id),
     behaviorId: String(row.behavior_id),
     createdLocalDate: String(row.created_local_date),
-    weekdays: row.weekdays as Weekday[],
-    fromTime: String(row.from_time),
-    toTime: String(row.to_time),
-    direction: row.direction as BehaviorChangeDirection,
-    schedulesBefore: row.schedules_before as ProposalSchedule[],
-    schedulesAfter: row.schedules_after as ProposalSchedule[],
     firstAffectedDate: String(row.first_affected_date),
     reason: String(row.reason),
     status: row.status as BehaviorChangeStatus,
@@ -118,6 +141,24 @@ function toRow(data: Json): BehaviorChangeProposalRow {
     acceptedLocalDate: (row.accepted_local_date ?? null) as string | null,
     checkInDate: (row.check_in_date ?? null) as string | null,
     noticeShownAt: (row.notice_shown_at ?? null) as string | null,
+    tip: evidence.source === "tip" && typeof evidence.card_id === "string" && typeof evidence.tip_text === "string"
+      ? { cardId: evidence.card_id, text: evidence.tip_text } : null,
     replayed: row.replayed === true,
+  };
+  if (row.change_kind === "length") {
+    return {
+      ...base, changeKind: "length",
+      fromMinutes: Number(row.from_minutes), toMinutes: Number(row.to_minutes),
+      direction: row.direction as BehaviorLengthDirection,
+    };
+  }
+  return {
+    ...base, changeKind: "time",
+    weekdays: row.weekdays as Weekday[],
+    fromTime: String(row.from_time),
+    toTime: String(row.to_time),
+    direction: row.direction as BehaviorChangeDirection,
+    schedulesBefore: row.schedules_before as ProposalSchedule[],
+    schedulesAfter: row.schedules_after as ProposalSchedule[],
   };
 }

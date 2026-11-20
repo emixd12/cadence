@@ -209,7 +209,7 @@ iPhone and Android apps, inherits them.
 |---|---|
 | An Occurrence is Completed or Not Completed while a move is pending | The status wins. A resolved Occurrence is not moved, and any open proposal for it is withdrawn. |
 | Undo of a move that a later move already replaced | Refused. Undo reverses only the latest move of that Occurrence's day. |
-| The Behavior's schedule is edited after today's move | The move stays. The moved Occurrence is never deleted by the edit, and it stands in for the new schedule's item on its day, so no second copy appears (it keeps its row and its planned time for that day). If another item now sits where the moved one is, Cadence opens a move conflict notice; "keep it here" answers it for good, and moving again or Undo answers it too. |
+| The Behavior's schedule is edited after today's move | The move stays. The moved Occurrence is never deleted by the edit, and it stands in for the new schedule's item on its day, so no second copy appears (it keeps its row and its planned time for that day). The same holds for any item the edit keeps: one already marked, already started, or holding a note or timed session. If another item now sits where the moved one is, Cadence opens a move conflict notice; "keep it here" answers it for good, and moving again or Undo answers it too. |
 | The same write arrives twice with the same idempotency key | The second returns the first result and applies nothing. |
 | Two moves of the same Occurrence with the same expected revision | The first to arrive wins. The second is refused with the current state. |
 
@@ -271,10 +271,12 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 
 Advisor Phase 4C (`packages/core/src/services/behavior-change-proposal.ts`).
 
-- **Today's item never moves.** A schedule edit applies at once and regenerates today's
-  unresolved future items. So a proposal, and a trial's Go back, is not offered on a local
-  day whose weekday the change touches. The line always names a later first day, computed
-  when it is shown ("from Tuesday, Nov 24"). A change on all seven weekdays is never proposed.
+- **A Yes applies today when it can** (Tips with one-tap changes, Nov 20). A schedule edit
+  applies at once and regenerates today's unresolved future items, so today's item moves
+  to the new time when it is still ahead, unmarked, not moved by hand and holds no note or
+  timed session. Otherwise today's item stays and stands in for the new time, so the day
+  never shows a second copy, and the outcome names tomorrow (or the next touched weekday)
+  as the first day. Undo after Change for good restores the same way.
 - **Trial dates are calendar dates.** The check-in day is fourteen calendar days after the
   local day of Try, moved forward past any weekday the change touches. "Today" is the
   profile timezone's local date at the moment of reading, so a clock change or a move to

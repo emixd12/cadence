@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-20.2",
+  "version": "2026-11-20.3",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -121,6 +121,10 @@
         "{behavior} went from {baseline_rate_pct} to {recent_rate_pct}. A specific when and where, such as a time and the place you will be, may help."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "behavior"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -158,12 +162,16 @@
         "{behavior}: {recent_completed} of {recent_resolved} lately. What gets in the way, and what will you do when it does?"
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "description"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
     {
       "id": "set-it-where-you-keep-moving-it",
-      "revision": 2,
+      "revision": 3,
       "status": "active",
       "advice": "A routine sticks when it is repeated at the same cue, so set the time where you actually do it.",
       "applies_when": [
@@ -185,10 +193,13 @@
       },
       "limitation": "The trial studied one everyday eating habit over 84 days; schedules with a fixed external constraint may not move.",
       "quip_seeds": [
-        "You moved {behavior} to near {median_target_time_clock} on {same_direction_days|day|days} of the last {window_days}. Set it there?",
+        "You moved {behavior} to near {median_target_time_clock} on {same_direction_days|day|days} of the last {window_days}.",
         "{behavior} keeps landing near {median_target_time_clock}. Setting it there may stick better."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "set_time"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -226,6 +237,7 @@
         "{behavior} is {age_days|day|days} old. Routines often need weeks more to feel automatic, so it is early to judge it."
       ],
       "audience": "any_account",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -263,6 +275,10 @@
         "{behavior} this week: {week_rate_pct}, against {prior_rate_pct} usually. Worth a look at what got in the way?"
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "behaviors"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -294,6 +310,10 @@
         "{weekday_name}s get done {weekday_rate_pct} of the time, against {other_rate_pct} on other days. What is different about {weekday_name}s?"
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "behavior"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -337,6 +357,7 @@
         "{behavior} has held at {rate_pct} for {weeks|week|weeks}. Worth leaving its time and place as they are."
       ],
       "audience": "any_account",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -374,6 +395,7 @@
         "{behavior} is at {rate_pct} for {weeks|week|weeks}, with a few Not Completed days. Those do not undo a routine."
       ],
       "audience": "any_account",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -405,6 +427,10 @@
         "{behavior} is at {rate_pct} for {weeks|week|weeks}. A smaller version, a new time, or archive it for now?"
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "behavior"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -442,6 +468,10 @@
         "{behavior} is back to {recent_rate_pct} after a dip to {dip_rate_pct}. What helped? Note it in its description."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "description"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -473,6 +503,10 @@
         "{behavior} has {unmarked|past Occurrence|past Occurrences} with no mark. Mark the ones you remember; the rest can stay Unresolved."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "unmarked"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -510,6 +544,10 @@
         "{behavior} pairs with another Behavior on {together_days} of {either_days|day|days}. Keep the newer of the two right after the other."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "time"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -541,6 +579,10 @@
         "{behavior} shares {hour_label} with other Behaviors and gets done {hour_rate_pct} of the time there. Move it to a quieter hour?"
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "behavior"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -594,12 +636,16 @@
         "{without_length|Behavior has|Behaviors have} no length set. How long did each take last time? That keeps the day from overfilling."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "length"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
     {
       "id": "set-the-length-it-takes",
-      "revision": 2,
+      "revision": 3,
       "status": "active",
       "advice": "If sessions keep running longer than planned, plan for the time they actually take.",
       "applies_when": [
@@ -627,10 +673,13 @@
       },
       "limitation": "Studied with student projects and tasks, not daily routines.",
       "quip_seeds": [
-        "{behavior} is planned for {planned_minutes|minute|minutes} and usually takes {median_minutes|minute|minutes}. Change its length to match?",
-        "{longer} of the last {sessions|session|sessions} of {behavior} ran past the planned {planned_minutes|minute|minutes}. Plan for the time it takes?"
+        "{behavior} is planned for {planned_minutes|minute|minutes} and usually takes {median_minutes|minute|minutes}.",
+        "{longer} of the last {sessions|session|sessions} of {behavior} ran past the planned {planned_minutes|minute|minutes}."
       ],
       "audience": "any_account",
+      "offer": {
+        "kind": "set_length"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -668,6 +717,7 @@
         "Left at their usual time, Behaviors got done {unmoved_rate_pct} of the time; moved, {moved_rate_pct}. Keep the usual time when the day allows."
       ],
       "audience": "any_account",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -705,6 +755,10 @@
         "To make new routines easier to start, add a Where to the {behaviors_without_place|Behavior|Behaviors} without one. Anywhere counts too."
       ],
       "audience": "first_two_weeks",
+      "offer": {
+        "kind": "open",
+        "target": "where"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -747,6 +801,10 @@
         "You are starting with {active_behaviors|Behavior|Behaviors}. A few at a time are easier to keep. Archive some for later?"
       ],
       "audience": "first_two_weeks",
+      "offer": {
+        "kind": "open",
+        "target": "behaviors"
+      },
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -784,6 +842,7 @@
         "Is there a daily routine just before each of your {active_behaviors|Behavior|Behaviors}? Setting the time right after it gives a steady start."
       ],
       "audience": "first_two_weeks",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     },
@@ -821,6 +880,7 @@
         "Mark your {active_behaviors|Behavior|Behaviors} Completed or Not Completed; an honest record is the part that helps most."
       ],
       "audience": "first_two_weeks",
+      "offer": null,
       "reviewed_at": "2026-11-20",
       "reviewer": "Emi"
     }

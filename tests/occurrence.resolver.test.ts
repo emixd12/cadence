@@ -97,6 +97,19 @@ describe("planOccurrenceGeneration with per-day moves (advisor Phase 2A)", () =>
     expect(today(after)).toEqual([]);
   });
 
+  it("adds no second copy today when today's item is marked, already started, or kept by a note", () => {
+    // Tips with one-tap changes: a Yes on a day whose item cannot move starts tomorrow.
+    const done = existingOccurrence("done", "2026-01-02T14:00:00Z", "2026-01-02", "completed");
+    const missed = existingOccurrence("missed", "2026-01-02T14:00:00Z", "2026-01-02");
+    const noted = { ...existingOccurrence("noted", "2026-01-02T19:00:00Z", "2026-01-02"), scheduleStartTime: "14:00", note: "Bring shoes" };
+    for (const kept of [done, missed, noted]) {
+      const plan = planOccurrenceGeneration({ behavior: atFifteen, existingOccurrences: [kept], now: NOW, horizonDays: 1 });
+      expect(today(plan), kept.id).toEqual([]);
+      expect(deleteIds(plan), kept.id).toEqual([]);
+      expect(summarizeCreate(plan), kept.id).toEqual([{ scheduledFor: "2026-01-03T20:00:00Z", localDate: "2026-01-03" }]);
+    }
+  });
+
   it("leaves other days and other slots alone", () => {
     const twoSlots = { ...atTen, scheduleSlots: [atTen.scheduleSlots[0]!, { ...atTen.scheduleSlots[0]!, startTime: "18:00", sortOrder: 1 }] };
     const moved = { ...existingOccurrence("moved", "2026-01-02T14:00:00Z", "2026-01-02"), moved: true };
