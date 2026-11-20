@@ -42,7 +42,7 @@ const PRICES: Readonly<Record<string, ModelPrice>> = {
   "z-ai/glm-5.3-flash": { input: 0.15, cachedInput: 0.03, output: 0.5 },
 };
 
-/** Accepts a bare model id or an AI Gateway "provider/model" string. */
+/** Accepts a bare model id, an AI Gateway "provider/model" string, or "openrouter/<creator>/<model>". */
 export function modelPrice(model: string): ModelPrice | null {
   const bare = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model;
   return PRICES[bare] ?? null;
