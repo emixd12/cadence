@@ -29,6 +29,10 @@ export type WorldBehavior = {
   durationMinutes: number | null;
   revision: number;
   archiveNote: string | null;
+  /** Available as an opportunity (contract 1.6.0). */
+  isOpportunity?: boolean;
+  /** An opportunity Behavior with no fixed schedule. */
+  unscheduled?: boolean;
 };
 
 export type WorldOccurrence = {
@@ -43,6 +47,12 @@ export type WorldOccurrence = {
   /** Local `HH:MM` when the status was last marked. */
   markedAt: string | null;
   revision: number;
+  /** Added to the day from the person's opportunities; absent means scheduled. */
+  origin?: "scheduled" | "opportunity";
+  addedBy?: "user" | "daily_brief" | "chat" | "mcp" | null;
+  /** End of a range for an added item (`HH:MM`), with its preset when it has one. */
+  rangeEnd?: string | null;
+  preset?: "morning" | "afternoon" | "evening" | "night" | null;
 };
 
 export type WorldEvent = Readonly<{

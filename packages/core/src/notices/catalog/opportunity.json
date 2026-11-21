@@ -87,6 +87,22 @@
       "label": "Not removed",
       "interactions": ["INT-TIMELINE-024"]
     },
+    "opportunity.remove-refused.scheduled": {
+      "meaning": "Refuses Remove from Chat or a connected app because the item comes from the Behavior's schedule, not from the opportunity basket.",
+      "text": "{title} is on its schedule. Only an added item can be removed.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not removed",
+      "interactions": ["INT-TIMELINE-024"]
+    },
+    "opportunity.remove-refused.changed": {
+      "meaning": "Refuses Remove from Chat or a connected app because the item changed after it was read, for example on another device.",
+      "text": "{title} changed since it was read. Look at it again before removing it.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not removed",
+      "interactions": ["INT-TIMELINE-024"]
+    },
     "opportunity.failed": {
       "meaning": "Says an add, Done now or Remove did not reach Cadence, so nothing changed.",
       "text": "Cadence could not change today's items. Try again.",

@@ -9,7 +9,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | Style | Notices |
 | --- | ---: |
 | outcome | 16 |
-| error | 75 |
+| error | 77 |
 | note | 18 |
 | question | 3 |
 
@@ -26,9 +26,11 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `opportunity.refused.not-running` Refuses an add because the Behavior has ended or is paused at the chosen time. | error | Not added. {title} is not running at that time. | web, Mac | INT-TIMELINE-022, INT-TIMELINE-023, `app/design-system/OpportunityBasketBench.tsx`, `lib/services/opportunity.service.ts` |
 | `opportunity.refused.not-today` Refuses an add for a day other than today in the Behavior's timezone, such as a basket left open past midnight. | error | Not added. Opportunities can be added to today only. | web, Mac | INT-TIMELINE-022, INT-TIMELINE-023, `lib/services/opportunity.service.ts` |
 | `opportunity.refused.time` Refuses an add whose time is not a whole minute, or whose range starts and ends at the same time. | error | Not added. Choose a time, or a range that ends at a different time. | web, Mac | INT-TIMELINE-022, `app/(app)/timeline/opportunity-actions.ts`, `lib/services/opportunity.service.ts` |
+| `opportunity.remove-refused.changed` Refuses Remove from Chat or a connected app because the item changed after it was read, for example on another device. | error | Not removed. {title} changed since it was read. Look at it again before removing it. | web, Mac | INT-TIMELINE-024, `lib/services/opportunity-integration.service.ts` |
 | `opportunity.remove-refused.kept` Refuses Remove because the added item has a Note, tracked time, an earlier mark or a connected activity. | error | Not removed. {title} has a Note, tracked time, an earlier mark or a connected activity, so it stays. | web, Mac | INT-TIMELINE-024, `lib/services/opportunity.service.ts` |
 | `opportunity.remove-refused.marked` Refuses Remove because the added item is already marked Completed or Not Completed. | error | Not removed. {title} is already marked, so it stays. | web, Mac | INT-TIMELINE-024, `lib/services/opportunity.service.ts` |
 | `opportunity.remove-refused.not-found` Refuses Remove because the item is not an added opportunity in the person's account, for example after another device removed it. | error | Not removed. This item is no longer on today's Timeline. | web, Mac | INT-TIMELINE-024, `app/(app)/timeline/opportunity-actions.ts`, `app/design-system/OpportunityBasketBench.tsx`, `lib/services/opportunity.service.ts` |
+| `opportunity.remove-refused.scheduled` Refuses Remove from Chat or a connected app because the item comes from the Behavior's schedule, not from the opportunity basket. | error | Not removed. {title} is on its schedule. Only an added item can be removed. | web, Mac | INT-TIMELINE-024, `lib/services/opportunity-integration.service.ts` |
 | `opportunity.removed` Confirms that the person removed an added item from today, or from Needs decision, back to the opportunity basket. | outcome | {title} removed. It stays in your opportunities. | web, Mac | INT-TIMELINE-024, `app/design-system/OpportunityBasketBench.tsx`, `lib/services/opportunity.service.ts` |
 
 ## Daily Brief
@@ -129,7 +131,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `move.moved-on-another-device` Refuses a move or Undo because another device moved the item first, and says where it is now. | error | Not changed. {title} was just moved to {time} on another device. | web, Mac | INT-TIMELINE-014, INT-TIMELINE-015, `components/timeline/OccurrenceMoves.tsx` |
 | `move.no-free-time` Says the move menu found no free time left today, so the person picks one. | note | No free time found today. Pick a time. | web, Mac | INT-TIMELINE-014, `components/timeline/OccurrenceMoveMenu.tsx` |
 | `move.reason-noted` Confirms the one-tap reason the person gave for a move. | outcome | Reason noted: {reason} | web, Mac | INT-TIMELINE-016, `components/timeline/OccurrenceMoves.tsx` |
-| `move.refused.calendar-busy` Refuses a move to a time a calendar event holds. | error | Not changed. Your calendar is busy at that time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
+| `move.refused.calendar-busy` Refuses a move to a time a calendar event holds. | error | Not changed. Your calendar is busy at that time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts`, `lib/services/opportunity-integration.service.ts` |
 | `move.refused.no-change` Refuses a move to the time the item already has. | error | Not changed. It is already at that time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
 | `move.refused.not-latest-move` Refuses Undo of a move that a later move replaced. | error | Not changed. Only the latest move can be undone. | web, Mac | INT-TIMELINE-015, `packages/core/src/resolvers/move.resolver.ts` |
 | `move.refused.not-today` Refuses a move for an item that is not today's. | error | Not changed. Only today's items can be moved. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
@@ -138,10 +140,10 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `move.refused.occurrence-resolved` Refuses a move because the item is already marked Completed or Not Completed. | error | Not changed. This is already marked, so it stays where it is. | web, Mac | INT-TIMELINE-014, INT-TIMELINE-015, `packages/core/src/resolvers/move.resolver.ts` |
 | `move.refused.range-behavior` Refuses a move for an item scheduled as a time range. | error | Not changed. Items scheduled as a time range are not moved. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
 | `move.refused.revision-changed` Refuses a move or Undo because the item changed on another device after the screen loaded. | error | Not changed. This changed on another device. Look at its current time before moving it again. | web, Mac | INT-TIMELINE-014, INT-TIMELINE-015, `packages/core/src/resolvers/move.resolver.ts` |
-| `move.refused.slot-taken` Refuses a move to a time another item already holds. | error | Not changed. Something else is already at that time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
+| `move.refused.slot-taken` Refuses a move to a time another item already holds. | error | Not changed. Something else is already at that time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts`, `lib/services/opportunity-integration.service.ts` |
 | `move.refused.start-not-on-day` Refuses a move whose new start is not on today. | error | Not changed. A move keeps the item on today. Pick a start time today. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
 | `move.refused.time-passed` Refuses a move to a time that has already passed. | error | Not changed. That time has already passed. Pick a later time. | web, Mac | INT-TIMELINE-014, `packages/core/src/resolvers/move.resolver.ts` |
-| `move.refused.too-close` Refuses a move that leaves less than the 10 minutes Cadence keeps between items. | error | Not changed. That is too close to something else. Cadence keeps 10 minutes between items. | web, Mac | INT-TIMELINE-014, `lib/services/occurrence-move.service.ts` |
+| `move.refused.too-close` Refuses a move that leaves less than the 10 minutes Cadence keeps between items. | error | Not changed. That is too close to something else. Cadence keeps 10 minutes between items. | web, Mac | INT-TIMELINE-014, `lib/services/occurrence-move.service.ts`, `lib/services/opportunity-integration.service.ts` |
 | `move.refused.travel-busy` Refuses a move into time the person needs for travel. | error | Not changed. That time is needed for travel. | web, Mac | INT-TIMELINE-014, `lib/services/occurrence-move.service.ts` |
 | `move.undone` Confirms that Undo put a moved item back at its earlier time. | outcome | {title} is back at {time}. | web, Mac | INT-TIMELINE-015, `components/timeline/OccurrenceMoves.tsx` |
 | `move.undone-usual-time` Confirms that Undo put a moved item back when Cadence could not name the earlier time. | outcome | {title} is back at its usual time. | web, Mac | INT-TIMELINE-015, `components/timeline/OccurrenceMoves.tsx` |

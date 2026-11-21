@@ -38,6 +38,7 @@ export const OPERATION_ACCESS = Object.freeze({
   search: 'read', fetch: 'read',
   set_occurrence_status: 'write', update_occurrence_note: 'write',
   move_occurrence_for_day: 'write', revert_occurrence_move: 'write', update_day_note: 'write',
+  add_opportunity_occurrence: 'write', remove_opportunity_occurrence: 'write',
   create_behavior: 'write',
   update_behavior: 'write', archive_behavior: 'write', restore_behavior: 'write',
   end_behavior: 'write', pause_behavior: 'write', resume_behavior: 'write',

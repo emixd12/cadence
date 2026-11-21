@@ -42,7 +42,9 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 - `needs_decision` is derived (Unresolved and `local_date` before today). It is
   never stored.
 - Adherence is Completed divided by Completed plus Not Completed. Unresolved is
-  excluded. There are no streaks.
+  excluded. There are no streaks. Since 1.6.0 the counts and the rate cover
+  scheduled Occurrences; `opportunity_completed_count` counts added
+  opportunities apart.
 - Account identity appears only as `account_ref`, a per-client pairwise id.
   The internal user id and the email address are never returned.
 - Every output object sets `additionalProperties: false`. Tests check that no
@@ -72,8 +74,8 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
   or hard-to-reverse outcomes. It also asks for the standard `search` and
   `fetch` input shapes, absolute user-openable URLs, and internal ids in `id`.
 - Cadence applies the stricter rule. Every write that modifies an existing
-  record sets `destructiveHint: true`. `create_behavior` only adds a record, so
-  it sets `false`. No tool reaches the open internet, so every tool sets
+  record sets `destructiveHint: true`. `create_behavior` and
+  `add_opportunity_occurrence` only add a record, so they set `false`. No tool reaches the open internet, so every tool sets
   `openWorldHint: false`. Each tool's rationale is listed in the tool reference
   below.
 
@@ -92,7 +94,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.5.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.6.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -114,6 +116,8 @@ Contract version: `1.5.0`. Generated from `packages/core/src/integration/`.
 | `move_occurrence_for_day` | Move Occurrence for today | `cadence.occurrences.write` | no | yes | no |
 | `revert_occurrence_move` | Undo Occurrence move | `cadence.occurrences.write` | no | yes | no |
 | `update_day_note` | Update day note | `cadence.occurrences.write` | no | yes | yes |
+| `add_opportunity_occurrence` | Add opportunity to today | `cadence.occurrences.write` | no | no | no |
+| `remove_opportunity_occurrence` | Remove added opportunity | `cadence.occurrences.write` | no | yes | yes |
 | `create_behavior` | Create Behavior | `cadence.behaviors.write` | no | no | no |
 | `update_behavior` | Update Behavior | `cadence.behaviors.write` | no | yes | yes |
 | `archive_behavior` | Archive Behavior | `cadence.behaviors.write` | no | yes | yes |
@@ -129,7 +133,7 @@ Every tool sets `openWorldHint: false`.
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
 | `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior`, `end_behavior`, `pause_behavior`, `resume_behavior` |
 
 ## Error catalog
@@ -250,7 +254,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.5.0"` |
+| `contract_version` | yes | `"1.6.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -269,6 +273,7 @@ Input:
 |---|---|---|
 | `state` | no | `active`, `archived`, `running`, `not_running`, `all` |
 | `category_id` | no | string (uuid) |
+| `is_opportunity` | no | boolean |
 | `updated_since` | no | string (date-time) |
 | `page_size` | no | integer |
 | `cursor` | no | string |
@@ -435,7 +440,7 @@ Output:
 
 ### `get_adherence_summary`
 
-**Get adherence summary.** Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to 366 days. Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved. Use it for "how am I doing" questions. Cadence does not compute streaks.
+**Get adherence summary.** Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to 366 days. Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved. Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. Use it for "how am I doing" questions. Cadence does not compute streaks.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -645,9 +650,64 @@ Output:
 | `day_note` | yes | object or null |
 | `changed` | yes | boolean |
 
+### `add_opportunity_occurrence`
+
+**Add opportunity to today.** Adds one of the user's opportunity Behaviors (is_opportunity true, running, not archived) to today: at an exact start_time, in a time range (start_time and end_time, or a preset), or, with mark_completed, as done now, marked Completed at the current minute. It adds a new Occurrence and changes no schedule. When a rule stops it, nothing changes and `refusal` says why. remove_opportunity_occurrence takes back an item added by mistake.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint false, idempotentHint false, openWorldHint false
+- Annotation rationale: Adds a new Occurrence and changes no existing record, like create_behavior, so destructiveHint is false under both Claude's and OpenAI's guidance; readOnlyHint is false, so clients still treat it as a write. Calling it twice without an idempotency_key adds two items, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`
+- Since: 1.6.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `behavior_id` | yes | string (uuid) |
+| `start_time` | no | string |
+| `end_time` | no | string |
+| `preset` | no | `morning`, `afternoon`, `evening`, `night` |
+| `mark_completed` | no | boolean |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `outcome` | yes | `added`, `logged`, `refused` |
+| `occurrence` | yes | object or null |
+| `refusal` | yes | object or null |
+
+### `remove_opportunity_occurrence`
+
+**Remove added opportunity.** Removes an opportunity Occurrence that was added to a day, today or still in Needs decision, and cancels its pending reminders. The Behavior stays available as an opportunity. Only a clean item can be removed: Unresolved, never marked, with no note, tracked time or connected activity. A scheduled Occurrence is never removed. When a rule stops it, nothing changes and `refusal` says why.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Deletes an added Occurrence, so destructiveHint is true under both Claude's and OpenAI's guidance; the rules allow it only for a clean, unmarked item, and add_opportunity_occurrence can add it again. Repeating it leaves the same end state, the item gone, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`
+- Since: 1.6.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `occurrence_id` | yes | string (uuid) |
+| `expected_revision` | no | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `outcome` | yes | `removed`, `refused` |
+| `occurrence` | yes | object |
+| `refusal` | yes | object or null |
+
 ### `create_behavior`
 
-**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.
+**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint false, idempotentHint false, openWorldHint false
@@ -664,6 +724,7 @@ Input:
 | `location_text` | no | string |
 | `category_id` | no | string (uuid) or null |
 | `schedules` | yes | array of object |
+| `is_opportunity` | no | boolean |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer |
 | `end_on` | no | string (date) |
@@ -680,7 +741,7 @@ Output:
 
 ### `update_behavior`
 
-**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
+**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
@@ -699,6 +760,7 @@ Input:
 | `location_text` | no | string or null |
 | `category_id` | no | string (uuid) or null |
 | `schedules` | no | array of object |
+| `is_opportunity` | no | boolean |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer or null |
 | `end_on` | no | string (date) or null |
@@ -706,7 +768,7 @@ Input:
 | `end_date` | no | string (date) or null |
 | `idempotency_key` | no | string |
 
-At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date` is required.
+At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date`, `is_opportunity` is required.
 
 Output:
 
@@ -849,3 +911,24 @@ Output:
 ## Connector completion provenance (Ticket 322, D28.7)
 
 A status change written from a connected service's recorded activity appears in `status_history` with `semantics` `system_rule_declared` and `capture_method` `derived`; a revert after the activity is deleted at the source carries the same pair with `status` `unresolved`. Both values were already in the enums, so the tool's schema is unchanged. The user's own marks keep `explicit_user_mark` or `explicit_user_correction` with `manual_tap` or `manual_text`. Clients must not describe a `derived` entry as something the user did.
+
+## Behaviors of Opportunity (contract 1.6.0)
+
+`docs/RECURRENCE_RULES.md`, "Behaviors of Opportunity", holds the rules. In the contract:
+
+- Behaviors carry `is_opportunity`. `list_behaviors` filters on it. `create_behavior` and
+  `update_behavior` accept it, and accept `schedules: []` only for an opportunity Behavior.
+  `contract.ts` checks that rule, so tool input schemas keep no top-level `anyOf`. An update
+  that leaves out `is_opportunity` is checked against the stored flag.
+- Occurrences carry `origin` (`scheduled` or `opportunity`) and `added_by` (`user`,
+  `daily_brief`, `chat`, `mcp`, or null for scheduled ones).
+- `add_opportunity_occurrence` adds an opportunity Behavior to today at an exact time, in a
+  custom or preset range, or, with `mark_completed`, as done now. An outside client's item is
+  stored with `added_by` `mcp`, Cadence chat's with `chat`. Cadence chat also passes today's
+  busy calendar times, so an exact time that another item or an event holds is refused with
+  `slot_taken` or `calendar_busy` and up to three free times, by the free-slot rule moves use.
+  An `idempotency_key` also fixes the new Occurrence's id, so a retry after a lost reply
+  replays instead of adding twice.
+- `remove_opportunity_occurrence` removes a clean added item: Unresolved, never marked, with
+  no note, tracked time or connected activity. A scheduled Occurrence is refused with
+  `scheduled`. Pending reminders are cancelled before the row is deleted.

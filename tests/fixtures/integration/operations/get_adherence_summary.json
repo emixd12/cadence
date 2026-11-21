@@ -55,7 +55,8 @@
           "not_completed": 2,
           "unresolved": 3,
           "needs_decision": 1,
-          "adherence_rate": 0.8
+          "adherence_rate": 0.8,
+          "opportunity_completed_count": 0
         },
         "behaviors": [
           {
@@ -66,7 +67,8 @@
             "not_completed": 2,
             "unresolved": 3,
             "needs_decision": 1,
-            "adherence_rate": 0.8
+            "adherence_rate": 0.8,
+            "opportunity_completed_count": 0
           },
           {
             "behavior_id": "00000002-1111-4111-8111-000000000002",
@@ -76,7 +78,8 @@
             "not_completed": 0,
             "unresolved": 2,
             "needs_decision": 2,
-            "adherence_rate": null
+            "adherence_rate": null,
+            "opportunity_completed_count": 0
           }
         ]
       }
@@ -96,6 +99,7 @@
           "unresolved": 3,
           "needs_decision": 1,
           "adherence_rate": 0.8,
+          "opportunity_completed_count": 0,
           "current_streak": 4
         },
         "behaviors": []
@@ -115,7 +119,8 @@
           "not_completed": 2,
           "unresolved": 3,
           "needs_decision": 1,
-          "adherence_rate": 1.5
+          "adherence_rate": 1.5,
+          "opportunity_completed_count": 0
         },
         "behaviors": []
       },

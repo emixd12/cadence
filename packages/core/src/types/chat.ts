@@ -163,6 +163,7 @@ export type ChatToolLine = Readonly<{
 
 export const CHAT_OUTCOME_KINDS = [
   "status", "occurrence_note", "day_note", "move", "create_behavior", "update_behavior", "archive_behavior", "restore_behavior",
+  "opportunity",
 ] as const;
 export type ChatOutcomeKind = (typeof CHAT_OUTCOME_KINDS)[number];
 

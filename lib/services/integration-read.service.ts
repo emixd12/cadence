@@ -159,10 +159,13 @@ export async function listIntegrationBehaviors(context: IntegrationContext, inpu
     if (!row.active) return false;
     return state === "running" ? runState(row) === "running" : runState(row) !== "running";
   };
-  const rows = account.behaviors.filter((row) => inState(row) &&
+  const opportunityMatches = (row: BehaviorWithCategory) =>
+    input.is_opportunity === undefined || (row.is_opportunity === true) === input.is_opportunity;
+  const rows = account.behaviors.filter((row) => inState(row) && opportunityMatches(row) &&
     (!input.category_id || row.category_id === input.category_id) && changedSince(row.updated_at, input.updated_since),
   );
-  const selected = page(context, rows, input, ["behaviors", input.state ?? "all", input.category_id, input.updated_since], (row) => row.id);
+  const selected = page(context, rows, input, ["behaviors", input.state ?? "all", input.category_id, input.updated_since,
+    ...(input.is_opportunity === undefined ? [] : [input.is_opportunity])], (row) => row.id);
   const refs = await listExternalReferences(context.supabase, { entityType: "behavior", entityIds: selected.rows.map((row) => row.id) });
   return { behaviors: selected.rows.map((row) => serializeIntegrationBehavior(row, refs.get(row.id) ?? null, account.now)), next_cursor: selected.next_cursor };
 }
@@ -258,7 +261,8 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
         origin: row.origin === "opportunity" ? "opportunity" as const : "scheduled" as const })),
     });
     return { completed: summary.completedCount, not_completed: summary.notCompletedCount,
-      unresolved: summary.unresolvedCount, needs_decision: summary.needsDecisionCount, adherence_rate: summary.rate };
+      unresolved: summary.unresolvedCount, needs_decision: summary.needsDecisionCount, adherence_rate: summary.rate,
+      opportunity_completed_count: summary.opportunityCompletedCount ?? 0 };
   };
   return {
     start_local_date: input.start_local_date, end_local_date: input.end_local_date,

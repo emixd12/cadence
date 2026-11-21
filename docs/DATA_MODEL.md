@@ -2394,6 +2394,13 @@ Migration: `20261121100000_behaviors_of_opportunity.sql`. Fixture:
 carry them. Migration: `20261121110000_opportunity_export_read.sql` (function body only;
 signature, security and grants unchanged).
 
+MCP contract 1.6.0 and Cadence chat (Task 6): the MCP write receipt source
+(`cadence_private.integration_write_source`) keeps `is_opportunity` in a Behavior
+receipt, and `chat_actions.kind` accepts `opportunity` for chat's adds and removals.
+The two MCP tools call `add_opportunity_occurrence` and `remove_opportunity_occurrence`
+as the user; no new table or column. Migration:
+`20261121120000_opportunity_mcp_and_chat.sql` (function body and one check constraint).
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
@@ -3478,7 +3485,9 @@ them; nothing else expires them.
   (`streaming` or `complete`), `agent_run_id`, and `stop_requested_at` (set by
   Stop on a streaming reply; the running turn checks it every second, ends at its
   next safe point, keeps what it already did and drops changes waiting for a Yes).
-- `chat_actions`: one row per change chat made. `id` is the outcome id the
+- `chat_actions`: one row per change chat made. `kind` is `status`,
+  `occurrence_note`, `day_note`, `move`, `create_behavior`, `update_behavior`,
+  `archive_behavior`, `restore_behavior` or `opportunity`. `id` is the outcome id the
   client sends to Undo. `undo_plan` holds the exact write that reverses it;
   `undo_state` is `available`, `undoing`, `done` or `unavailable`.
 - `chat_confirms`: the writes waiting for one Yes. `state` is `pending`,

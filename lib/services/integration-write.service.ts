@@ -33,7 +33,8 @@ class WriteError extends Error {
 const fail = (code: IntegrationError["code"], message: string): never => { throw new WriteError(createIntegrationError(code, message)); };
 
 export function integrationWriteHash(
-  name: WriteOperationName | "move_occurrence_for_day" | "revert_occurrence_move", value: unknown,
+  name: WriteOperationName | "move_occurrence_for_day" | "revert_occurrence_move"
+    | "add_opportunity_occurrence" | "remove_opportunity_occurrence", value: unknown,
 ): string {
   return createHash("sha256").update(canonical({ name, input: value })).digest("hex");
 }

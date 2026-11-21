@@ -2236,3 +2236,31 @@ cite has not changed.
   Claims row.
 - **Related:** P-077.
 - **Status:** logged.
+
+## P-079: Outside AI clients and Cadence chat add opportunities (MCP contract 1.6.0)
+
+- **Change:** implemented November 21, 2026 (Behaviors of Opportunity, Task 6). MCP contract
+  1.6.0 shows `is_opportunity` on Behaviors, `origin` and `added_by` on Occurrences and
+  `opportunity_completed_count` in the adherence summary, and adds two tools under
+  `cadence.occurrences.write`: `add_opportunity_occurrence` (add to today at a time, in a range,
+  or done now) and `remove_opportunity_occurrence` (take a clean added item back off).
+  `create_behavior` and `update_behavior` accept `is_opportunity` and empty schedules for it.
+  Cadence chat (prompt `chat-1.5`) suggests and adds opportunities, refuses a taken time with
+  other free times, and offers a new starter question: "Is there room today for {behavior}?" /
+  "When could I fit {behavior} in today?". New notices: "{title} is on its schedule. Only an
+  added item can be removed." and "{title} changed since it was read. Look at it again before
+  removing it." Chat outcome lines: "Added {title} to today at 3 pm.", "Marked {title} done at
+  3 pm.", "Took {title} off today."
+- **Affected:** `packages/core/src/integration/`, `lib/services/opportunity-integration.service.ts`,
+  `lib/services/chat/`, `packages/core/src/data/chat-starters.json`; `docs/MCP_CONTRACT.md` and
+  `apps/marketing/src/data/developer-reference.json` (generated).
+- **Surfaces:** developer docs (generated tool pages are current; the developer overview and
+  the plugin listings name the tool count and what writes exist); Claude and ChatGPT plugin
+  submissions (the write list grows, and one new tool is destructive); Privacy and Trust,
+  where they list what connected apps can change.
+- **Conflicting current text:** any developer or listing copy that says connected apps cannot
+  add items to a day, or lists the writes without these two.
+- **Update needed:** plugin listing and submission copy before the next submission; developer
+  overview tool count.
+- **Related:** P-078, P-072.
+- **Status:** logged.

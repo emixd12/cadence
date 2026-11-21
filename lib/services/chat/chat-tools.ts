@@ -22,6 +22,7 @@ export type ChatToolName = IntegrationOperationName | ChatConnectorToolName | ty
 /** Writes that run at once when they are the first write of a question (T12). */
 export const CHAT_IMMEDIATE_WRITES = [
   "set_occurrence_status", "update_occurrence_note", "update_day_note", "move_occurrence_for_day", "revert_occurrence_move",
+  "add_opportunity_occurrence", "remove_opportunity_occurrence",
 ] as const satisfies readonly IntegrationOperationName[];
 /** Writes that always wait for a Yes. */
 export const CHAT_CONFIRM_WRITES = [
@@ -41,6 +42,7 @@ export const CHAT_OUTCOME_KIND: Readonly<Record<ChatWriteName, ChatOutcomeKind>>
   set_occurrence_status: "status", update_occurrence_note: "occurrence_note", update_day_note: "day_note",
   move_occurrence_for_day: "move", revert_occurrence_move: "move", create_behavior: "create_behavior",
   update_behavior: "update_behavior", archive_behavior: "archive_behavior", restore_behavior: "restore_behavior",
+  add_opportunity_occurrence: "opportunity", remove_opportunity_occurrence: "opportunity",
 };
 
 /** What a read looked at, for the muted line under the reply. */
