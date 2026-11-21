@@ -4,7 +4,7 @@
 // The key covers the lockfile, .npmrc and every package manifest. It leaves out
 // one thing: npm scripts that `npm ci` never runs. Adding a script such as
 // `test:web-client` changed the old key and reinstalled the same packages
-// (12 of the 19 key changes on main in the 30 days to November 21, 2026).
+// (11 of the 19 key changes on main in the 30 days to November 21, 2026).
 // Every other manifest field still changes the key, so a manifest that no
 // longer matches the lockfile misses the cache and fails in `npm ci`.
 
