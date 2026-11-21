@@ -52,8 +52,9 @@ export function BehaviorsScreen({
               defaultOpen={!hasBehaviors}
               reminderRuntime="desktop"
               sourceLinkCoordinator={sourceLinkCoordinator}
+              allowOpportunity={false}
             />
-            <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator} />
+            <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator} allowOpportunity={false} />
           </DesktopScreenFrame>
         </RefreshProvider>
       </LinkProvider>

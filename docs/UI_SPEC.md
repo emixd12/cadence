@@ -737,6 +737,15 @@ Preset time ranges:
 - Evening: 6:00 PM-Midnight
 - Night: Midnight-6:00 AM
 
+Behaviors of Opportunity (`docs/RECURRENCE_RULES.md#behaviors-of-opportunity`): the
+Schedule section has an "Available as an opportunity" checkbox. While it is on, the
+user can choose "No fixed schedule", which removes every schedule row and posts
+`behavior_schedule_count=0`, or keep one or more schedules (scheduled and available
+any time). Add schedule brings a row back. Turning the flag off while no schedule is
+left restores one default row, so the form stays valid. With no schedule the form
+shows the `opportunity.no-schedule` note and hides Reminder offset, which applies
+only to scheduled Occurrences; the stored offset is kept.
+
 Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.
 
@@ -889,6 +898,16 @@ Separate behavior settings edits from behavior date review:
 - Date of behavior and Time of behavior are display-only in date review.
 - Status and note correction controls stay hidden behind a per-occurrence
   Review disclosure until the user chooses to review that occurrence.
+
+Behaviors of Opportunity: running Behaviors that are available as an opportunity
+and have no fixed schedule sit in an Opportunity group directly below the running
+list, open by default and hidden when empty, like Not running. Paused or ended ones
+go to Not running. Their records show "Done N times" for the selected range, the
+per-behavior calendar and average tracked time, and never an adherence percentage.
+A scheduled Behavior that is also an opportunity stays in the running list with a
+muted "Opportunity" word beside its title. Overall adherence counts scheduled
+Occurrences only; when added Occurrences were Completed in the range, a muted
+"+N opportunity Completed" line follows the counts.
 
 Archived behaviors should not appear in the main active behavior feed or on the
 timeline. They should sit at the bottom of the Behaviors screen behind a

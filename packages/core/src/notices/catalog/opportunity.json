@@ -30,7 +30,6 @@
       "meaning": "Says on the Behavior form and list that an opportunity Behavior has no fixed schedule and is added to a day by hand.",
       "text": "No fixed schedule. Add it to today when there is a chance.",
       "style": "note",
-      "status": "planned",
       "interactions": ["INT-BEHAVIOR-037", "INT-BEHAVIOR-038"]
     },
     "opportunity.refused.not-available": {

@@ -75,3 +75,8 @@ export function projectBehaviorList(
   ).map((behavior) => behavior.id));
   return { rows, visibleIds };
 }
+
+/** Behaviors of Opportunity: available as an opportunity with no fixed schedule. */
+export function isUnscheduledOpportunity(behavior: Pick<BehaviorView, "isOpportunity" | "schedules">): boolean {
+  return behavior.isOpportunity === true && (behavior.schedules?.length ?? 0) === 0;
+}

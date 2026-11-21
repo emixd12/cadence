@@ -12,6 +12,7 @@ import {
 import { useFormStatus } from "react-dom";
 
 import { ReminderEditor } from "@/components/behaviors/ReminderEditor";
+import { Notice } from "@/components/feedback/Notice";
 import { PlaceMarkerControl, type WhereDraft } from "@/components/travel/PlaceLabels";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
 import { formatRunDay, localDateIn } from "@/lib/ui/behavior-run";
@@ -45,6 +46,11 @@ type BehaviorFormProps = Readonly<{
   whereDraft?: WhereDraft | null;
   /** Ticket 329: extra settings shown after reminders, such as Complete from Hevy on create. */
   extraFields?: ReactNode;
+  /**
+   * Behaviors of Opportunity: show Available as an opportunity and No fixed schedule.
+   * A runtime that cannot store the flag yet passes false; the stored flag is kept.
+   */
+  allowOpportunity?: boolean;
 }>;
 
 export type TimeEntryRow = {
@@ -111,6 +117,7 @@ export function BehaviorForm({
   reminderRuntime = "web",
   extraFields,
   whereDraft = null,
+  allowOpportunity = true,
 }: BehaviorFormProps) {
   const planningId = useId();
   const [selectedCategory, setSelectedCategory] = useState(behavior?.categoryId ?? "");
@@ -129,6 +136,8 @@ export function BehaviorForm({
   const [scheduleRows, setScheduleRows] = useState<ScheduleFormRow[]>(() =>
     initialScheduleRows(behavior),
   );
+  const [isOpportunity, setIsOpportunity] = useState(behavior?.isOpportunity === true);
+  const unscheduled = scheduleRows.length === 0;
   const [draftDirty, setDraftDirty] = useState(Boolean(whereDraft));
   const formRef = useRef<HTMLFormElement>(null);
   const draftRevisionRef = useRef(0);
@@ -165,11 +174,8 @@ export function BehaviorForm({
     setScheduleRows((rows) => [
       ...rows,
       {
+        ...defaultScheduleRow(),
         key: `new-schedule-${Date.now()}-${rows.length}`,
-        id: "",
-        recurrenceDefaults: DEFAULT_RECURRENCE,
-        recurrenceKind: "daily",
-        timeEntries: [newExactTimeEntry("09:00", 0)],
       },
     ]);
   }
@@ -181,6 +187,20 @@ export function BehaviorForm({
         ? rows
         : rows.filter((schedule) => schedule.key !== scheduleKey),
     );
+  }
+
+  function changeOpportunity(next: boolean) {
+    markDraftDirty();
+    setIsOpportunity(next);
+    // Only an opportunity Behavior may have no schedule; turning it off brings one back.
+    if (!next && scheduleRows.length === 0) {
+      setScheduleRows([defaultScheduleRow()]);
+    }
+  }
+
+  function clearSchedules() {
+    markDraftDirty();
+    setScheduleRows([]);
   }
 
   function updateScheduleRow(
@@ -263,6 +283,7 @@ export function BehaviorForm({
     setSelectedCategory(behavior?.categoryId ?? "");
     setWhereKind(behavior?.whereKind ?? "");
     setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
+    setIsOpportunity(behavior?.isOpportunity === true);
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
   }, [behavior]);
 
@@ -415,13 +436,39 @@ export function BehaviorForm({
           </div>
         </div>
 
+        {allowOpportunity ? (
+          <div className="grid gap-1 text-sm">
+            <input type="hidden" name="is_opportunity" value="false" />
+            <label className="flex min-h-11 items-center gap-2 py-1">
+              <input
+                type="checkbox"
+                name="is_opportunity"
+                value="true"
+                checked={isOpportunity}
+                onChange={(event) => changeOpportunity(event.currentTarget.checked)}
+                className="h-4 w-4 accent-[var(--primary)]"
+              />
+              Available as an opportunity
+            </label>
+            {isOpportunity && !unscheduled ? (
+              <button type="button" onClick={clearSchedules}
+                className="product-action product-action-secondary min-h-11 justify-self-start">
+                No fixed schedule
+              </button>
+            ) : null}
+          </div>
+        ) : behavior?.isOpportunity ? (
+          <input type="hidden" name="is_opportunity" value="true" />
+        ) : null}
+        {unscheduled ? <Notice id="opportunity.no-schedule" className="text-sm" /> : null}
+
         <input
           type="hidden"
           name="behavior_schedule_count"
           value={scheduleRows.length}
         />
 
-        <div className="divide-y divide-line">
+        <div className="divide-y divide-line" hidden={unscheduled}>
           {scheduleRows.map((schedule, index) => (
             <ScheduleRowEditor
               key={schedule.key}
@@ -443,7 +490,7 @@ export function BehaviorForm({
           ))}
         </div>
 
-        <div className="-mt-2 grid gap-2 text-sm">
+        <div className={unscheduled ? "grid gap-2 text-sm" : "-mt-2 grid gap-2 text-sm"}>
           <button
             type="button"
             onClick={addScheduleRow}
@@ -463,6 +510,7 @@ export function BehaviorForm({
           browserReminderEnabled={behavior?.browserReminderEnabled ?? true}
           emailReminderEnabled={behavior?.emailReminderEnabled ?? false}
           reminderOffsetMinutes={behavior?.reminderOffsetMinutes ?? 0}
+          showOffset={!unscheduled}
           error={fieldErrors.reminders}
         />
       </div>
@@ -1043,8 +1091,22 @@ function ActionMessage({
   );
 }
 
+function defaultScheduleRow(): ScheduleFormRow {
+  return {
+    key: `new-schedule-${Date.now()}`,
+    id: "",
+    recurrenceDefaults: DEFAULT_RECURRENCE,
+    recurrenceKind: "daily",
+    timeEntries: [newExactTimeEntry("09:00", 0)],
+  };
+}
+
 function initialScheduleRows(behavior?: BehaviorView): ScheduleFormRow[] {
   const schedules = behavior?.schedules ?? [];
+
+  if (schedules.length === 0 && behavior?.isOpportunity) {
+    return [];
+  }
 
   if (schedules.length === 0) {
     return [

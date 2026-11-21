@@ -574,7 +574,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 52,
+      "interaction_marker_count": 58,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -600,7 +600,7 @@
     {
       "path": "components/behaviors/BehaviorList.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 28,
+      "interaction_marker_count": 29,
       "interaction_ids": [
         "INT-BEHAVIOR-001",
         "INT-BEHAVIOR-002",
@@ -624,7 +624,8 @@
         "INT-PLACE-010",
         "INT-BEHAVIOR-033",
         "INT-BEHAVIOR-034",
-        "INT-BEHAVIOR-035"
+        "INT-BEHAVIOR-035",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -638,11 +639,12 @@
     {
       "path": "components/behaviors/ReminderEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 5,
       "interaction_ids": [
         "INT-BEHAVIOR-016",
         "INT-BEHAVIOR-017",
-        "INT-BEHAVIOR-018"
+        "INT-BEHAVIOR-018",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -20698,7 +20700,7 @@
           "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "behaviors"
       ],
@@ -20726,24 +20728,28 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/behaviors/BehaviorForm.tsx#BehaviorForm",
         "lib/services/behavior-form.ts#parseOpportunityFlag",
         "packages/core/src/services/behavior.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/behavior-opportunity-ui.dom.test.tsx",
           "tests/behavior-form.test.ts"
         ],
-        "notes": "Server parsing and validation are covered; Task 4 adds the form control and its DOM test."
+        "notes": "DOM test toggles the control on create and edit and checks the posted fields; server parsing and validation are covered separately."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
             "lib/services/behavior-form.ts"
           ],
           "evidence": [
+            "tests/behavior-opportunity-ui.dom.test.tsx",
             "tests/behavior-form.test.ts"
           ]
         },
@@ -20774,7 +20780,7 @@
           "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "behaviors"
       ],
@@ -20802,24 +20808,30 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/behaviors/BehaviorForm.tsx#BehaviorForm",
+        "components/behaviors/BehaviorList.tsx#BehaviorList",
         "lib/services/behavior-form.ts#parseBehaviorSchedulesFromForm",
         "packages/core/src/services/behavior.service.ts#storedRecurrence"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/behavior-opportunity-ui.dom.test.tsx",
           "tests/behavior-form.test.ts"
         ],
-        "notes": "Parsing covered; Task 4 adds the editor's no-schedule state."
+        "notes": "DOM test covers No fixed schedule and back, the no-schedule notice, the Opportunity group and Done N times; parsing is covered separately."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "components/behaviors/BehaviorList.tsx",
             "lib/services/behavior-form.ts"
           ],
           "evidence": [
+            "tests/behavior-opportunity-ui.dom.test.tsx",
             "tests/behavior-form.test.ts"
           ]
         },
