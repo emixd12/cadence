@@ -1204,6 +1204,71 @@ describe("processDueReminders", () => {
   });
 });
 
+describe("routine reminders at send time", () => {
+  const ROUTINE_SEND_AT = "2026-06-08T13:30:00Z";
+  const PARENT = { ...BASE_BEHAVIOR, id: "parent-1", title: "Morning routine", browser_reminder_enabled: true,
+    email_reminder_enabled: true, reminder_offset_minutes: 30, category: null, schedule_slots: [] };
+  const STEP = { ...BASE_BEHAVIOR, parent_behavior_id: "parent-1", inherit_parent_schedule: true,
+    browser_reminder_enabled: false, email_reminder_enabled: false, reminder_offset_minutes: 0, category: null, schedule_slots: [] };
+
+  function arrange(parent: typeof PARENT | null) {
+    const email = { ...BASE_DELIVERY, scheduled_send_at: ROUTINE_SEND_AT, processing_started_at: NOW_STRING };
+    const push = { ...BASE_BROWSER_DELIVERY, scheduled_send_at: ROUTINE_SEND_AT, processing_started_at: NOW_STRING };
+    vi.mocked(listDuePendingEmailReminderDeliveries).mockResolvedValue([email]);
+    vi.mocked(claimPendingEmailReminderDelivery).mockResolvedValue(email);
+    vi.mocked(listDuePendingBrowserPushReminderDeliveries).mockResolvedValue([push]);
+    vi.mocked(claimPendingBrowserPushReminderDelivery).mockResolvedValue(push);
+    vi.mocked(getBehaviorById).mockImplementation(async (_supabase, _userId, behaviorId) =>
+      behaviorId === "parent-1" ? parent : behaviorId === STEP.id ? STEP : null);
+  }
+
+  async function processBoth() {
+    const sendEmail = vi.fn().mockResolvedValue({ jobId: "job-1" });
+    const sendBrowserPush = vi.fn().mockResolvedValue(undefined);
+    const email = await processDueEmailReminders({ supabase: SUPABASE, now: NOW, limit: 1, sendEmail });
+    const push = await processDueBrowserPushReminders({ supabase: SUPABASE, now: NOW, limit: 1, sendBrowserPush });
+    return { email, push, sendEmail, sendBrowserPush };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(markReminderDeliverySent).mockResolvedValue(true);
+    vi.mocked(getOccurrenceById).mockResolvedValue(BASE_OCCURRENCE);
+    vi.mocked(getProfileSettings).mockResolvedValue({ email: "user@example.com", timezone: "America/New_York" });
+    vi.mocked(listActivePushSubscriptionsForUser).mockResolvedValue([BASE_PUSH_SUBSCRIPTION]);
+  });
+
+  it("sends both channels with the parent's settings when the step's own settings differ", async () => {
+    arrange(PARENT);
+    const result = await processBoth();
+    expect(result.email).toMatchObject({ sent: 1, cancelled: 0 });
+    expect(result.push).toMatchObject({ sent: 1, cancelled: 0 });
+    expect(result.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      variables: expect.objectContaining({ BEHAVIOR_TITLE: "Drink water", REMINDER_SCHEDULED_SEND_AT: ROUTINE_SEND_AT }),
+    }), { signal: expect.anything() });
+    expect(result.sendBrowserPush).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ title: "Drink water" }),
+    }), { signal: expect.anything() });
+    expect(getBehaviorById).toHaveBeenCalledWith(SUPABASE, "user-1", "parent-1");
+    expect(cancelPendingReminderDeliveryById).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["the parent turns both reminders off", { ...PARENT, browser_reminder_enabled: false, email_reminder_enabled: false }],
+    ["the parent's offset changed again", { ...PARENT, reminder_offset_minutes: 60 }],
+    ["the parent is archived", { ...PARENT, active: false, archived_at: "2026-06-07T00:00:00Z" }],
+    ["the parent has ended", { ...PARENT, end_on: "2026-06-07" }],
+    ["the parent is missing", null],
+  ])("cancels both channels when %s", async (_case, parent) => {
+    arrange(parent);
+    const result = await processBoth();
+    expect(result.email).toMatchObject({ sent: 0, cancelled: 1 });
+    expect(result.push).toMatchObject({ sent: 0, cancelled: 1 });
+    expect(result.sendEmail).not.toHaveBeenCalled();
+    expect(result.sendBrowserPush).not.toHaveBeenCalled();
+  });
+});
+
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[key];

@@ -183,7 +183,7 @@ const BEHAVIOR_TARGET_NAMES: readonly WriteOperationName[] = [
 ];
 const DEFINITION_FIELDS = [
   "title", "description", "location_text", "category_id", "schedules", "reminders", "default_duration_minutes",
-  "end_on", "end_time", "end_date", "parent_behavior_id", "inherit_parent_schedule",
+  "end_on", "end_time", "end_date", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule",
 ] as const;
 
 function hasDefinitionChange(input: IntegrationOperationInput<"update_behavior">): boolean {

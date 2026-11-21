@@ -529,6 +529,23 @@ function behaviorHasEnded(behavior: Behavior, processedAt: string): boolean {
   return state === "ended" || state === "paused";
 }
 
+/**
+ * The Behavior whose reminder settings planned this delivery. An inheriting sub-behavior
+ * shares its parent's routine reminder (`resolveRoutineReminderDeliveries`), so the
+ * parent's settings apply. Null when that parent is missing, archived, ended or paused.
+ */
+async function loadReminderSettingsBehavior(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behavior: BehaviorWithCategory,
+  processedAt: string,
+): Promise<Behavior | BehaviorWithCategory | null> {
+  if (!behavior.parent_behavior_id || !behavior.inherit_parent_schedule) return behavior;
+  const parent = await getBehaviorById(supabase, userId, behavior.parent_behavior_id);
+  if (!parent || parent.user_id !== userId || !parent.active || behaviorHasEnded(parent, processedAt)) return null;
+  return parent;
+}
+
 async function processClaimedEmailReminder(input: {
   supabase: AppSupabaseClient;
   delivery: ReminderDelivery;
@@ -555,11 +572,16 @@ async function processClaimedEmailReminder(input: {
     getProfileSettings(input.supabase, input.delivery.user_id),
   ]);
 
+  const settings = behavior
+    ? await loadReminderSettingsBehavior(input.supabase, input.delivery.user_id, behavior, input.processedAt)
+    : null;
+
   if (
     !behavior ||
+    !settings ||
     !behavior.active ||
     behaviorHasEnded(behavior, input.processedAt) ||
-    !isCurrentExpectedEmailDelivery(input.delivery, behavior, occurrence)
+    !isCurrentExpectedEmailDelivery(input.delivery, settings, occurrence)
   ) {
     await cancelPendingReminderDeliveryById(input.supabase, {
       id: input.delivery.id,
@@ -640,11 +662,16 @@ async function processClaimedBrowserPushReminder(input: {
     occurrence.behavior_id,
   );
 
+  const settings = behavior
+    ? await loadReminderSettingsBehavior(input.supabase, input.delivery.user_id, behavior, input.processedAt)
+    : null;
+
   if (
     !behavior ||
+    !settings ||
     !behavior.active ||
     behaviorHasEnded(behavior, input.processedAt) ||
-    !isCurrentExpectedBrowserPushDelivery(input.delivery, behavior, occurrence)
+    !isCurrentExpectedBrowserPushDelivery(input.delivery, settings, occurrence)
   ) {
     await cancelPendingReminderDeliveryById(input.supabase, {
       id: input.delivery.id,
