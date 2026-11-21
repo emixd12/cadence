@@ -619,7 +619,7 @@
     {
       "path": "components/behaviors/BehaviorList.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 29,
+      "interaction_marker_count": 30,
       "interaction_ids": [
         "INT-BEHAVIOR-001",
         "INT-BEHAVIOR-002",

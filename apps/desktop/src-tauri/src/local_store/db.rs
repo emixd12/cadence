@@ -962,6 +962,9 @@ fn validate_sub_behavior_link(value: &Value) -> Result<()> {
     if value["inherit_parent_schedule"] == true && parent.is_none() {
         return Err("Only a sub-behavior can follow a parent schedule.".into());
     }
+    if value["is_opportunity"] == true && parent.is_some() {
+        return Err("An opportunity Behavior can't be part of a routine.".into());
+    }
     Ok(())
 }
 

@@ -2825,7 +2825,11 @@ sub-behaviors.
 - **Portability and connectors.** Full JSON and BehaviorLog round-trip the links. Hevy
   source links work on a parent or a sub-behavior under D28. Following steps share one
   reminder per slot.
-- **Mac.** Parity through SQLite schema 28 and account sync contract 9.
+- **Mac.** Parity through SQLite schema 28 and account sync contract 9. The minimum
+  writer contract stays 8, so Cadence for Mac 0.1.14 keeps syncing.
+- **Behaviors of Opportunity.** An opportunity Behavior is never part of a routine: it
+  cannot be a parent or a sub-behavior. The resolver, the database trigger, the MCP
+  contract and the Behavior form all refuse it (rebase onto PR #351, November 21).
 - **Rollout.** Only the owner's dogfooding account exists, so no compatibility shims
   for older Mac builds or legacy data are added beyond the default column values.
 

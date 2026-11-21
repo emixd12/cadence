@@ -174,6 +174,15 @@ function checkSubBehaviorRules(name: IntegrationOperationName, record: Record<st
       });
     }
   }
+  // Behaviors of Opportunity: an opportunity Behavior is never part of a routine.
+  if ((name === "create_behavior" || name === "update_behavior") && record.is_opportunity === true) {
+    if (typeof record.parent_behavior_id === "string") {
+      issue("$.is_opportunity", "opportunityRoutine", "is not allowed with parent_behavior_id: an opportunity Behavior can't be part of a routine");
+    }
+    if (record.sub_behaviors !== undefined) {
+      issue("$.is_opportunity", "opportunityRoutine", "is not allowed with sub_behaviors: an opportunity Behavior can't be part of a routine");
+    }
+  }
   if (name === "update_behavior") {
     if (record.parent_behavior_id !== undefined && record.parent_behavior_id === record.behavior_id) {
       issue("$.parent_behavior_id", "selfParent", "must name another Behavior");

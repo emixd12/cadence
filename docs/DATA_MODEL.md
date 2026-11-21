@@ -2474,8 +2474,14 @@ RPCs (all as the signed-in user):
 
 Export, the advisor snapshot, the MCP receipt source and BehaviorLog restore carry the
 three columns. Account sync contract 9 adds them (defaults `null`, `0`, `false`); the
-minimum writer contract stays 7, so contract-7 writers keep syncing and keep the
-stored values. A contract-9 Behavior write must carry all three.
+minimum writer contract stays 8 (Behaviors of Opportunity), so contract-8 writers such
+as Cadence for Mac 0.1.14 keep syncing and keep the stored values. A contract-9 Behavior
+write must carry all three.
+
+An opportunity Behavior (`is_opportunity`) is never part of a routine: it cannot be a
+parent or a sub-behavior. The deferred depth trigger also runs when `is_opportunity`
+changes and refuses either case ("An opportunity Behavior can't be part of a routine.",
+migration `20261122020000`).
 
 Migration: `20261122010000_sub_behaviors.sql`. Smoke: `tests/sql/sub-behaviors-smoke.sql`.
 

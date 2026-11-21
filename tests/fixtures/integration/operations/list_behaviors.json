@@ -249,6 +249,7 @@
             "pause": null,
             "end_date": null,
             "default_duration_minutes": 20,
+            "is_opportunity": false,
             "timezone": "America/New_York",
             "schedules": [
               {
@@ -335,6 +336,7 @@
             "pause": null,
             "end_date": null,
             "default_duration_minutes": 20,
+            "is_opportunity": false,
             "timezone": "America/New_York",
             "schedules": [
               {

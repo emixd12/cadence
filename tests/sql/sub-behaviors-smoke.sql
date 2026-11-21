@@ -131,6 +131,16 @@ select pg_temp.expect_failure($s$update public.behaviors set parent_behavior_id 
 select pg_temp.expect_failure($s$update public.behaviors set sub_behavior_sort_order = -1
   where id = '14100000-0000-4000-8000-0000000000a1'$s$, 'behaviors_sub_behavior_sort_order_check');
 
+-- Behaviors of Opportunity: an opportunity Behavior is never a parent or a sub-behavior.
+select pg_temp.expect_failure($s$update public.behaviors set is_opportunity = true
+  where id = '14100000-0000-4000-8000-0000000000a0'$s$, 'An opportunity Behavior can''t be part of a routine.');
+select pg_temp.expect_failure($s$update public.behaviors set is_opportunity = true
+  where id = '14100000-0000-4000-8000-0000000000a1'$s$, 'An opportunity Behavior can''t be part of a routine.');
+update public.behaviors set is_opportunity = true where id = '14100000-0000-4000-8000-0000000000b0';
+select pg_temp.expect_failure($s$update public.behaviors set parent_behavior_id = '14100000-0000-4000-8000-0000000000a0'
+  where id = '14100000-0000-4000-8000-0000000000b0'$s$, 'An opportunity Behavior can''t be part of a routine.');
+update public.behaviors set is_opportunity = false where id = '14100000-0000-4000-8000-0000000000b0';
+
 -- An archived parent takes no new sub-behavior; existing links stay.
 update public.behaviors set active = false, archived_at = now() where id = '14100000-0000-4000-8000-0000000000b0';
 select pg_temp.expect_failure($s$update public.behaviors set parent_behavior_id = '14100000-0000-4000-8000-0000000000b0'
@@ -294,17 +304,17 @@ $$;
 do $$
 declare entity jsonb;
 begin
-  select value into entity from jsonb_array_elements(public.read_account_sync_snapshot(7) -> 'entities') value
+  select value into entity from jsonb_array_elements(public.read_account_sync_snapshot(8) -> 'entities') value
   where value ->> 'id' = '14100000-0000-4000-8000-0000000000a1';
   if entity -> 'value' ? 'parent_behavior_id' then
-    raise exception 'Contract 7 saw the sub-behavior link.';
+    raise exception 'Contract 8 saw the sub-behavior link.';
   end if;
-  select value into entity from jsonb_array_elements(public.read_account_sync_snapshot(8) -> 'entities') value
+  select value into entity from jsonb_array_elements(public.read_account_sync_snapshot(9) -> 'entities') value
   where value ->> 'id' = '14100000-0000-4000-8000-0000000000a1';
   if entity -> 'value' ->> 'parent_behavior_id' <> '14100000-0000-4000-8000-0000000000a0' then
     raise exception 'Contract 9 did not see the sub-behavior link.';
   end if;
-  if cadence_private.account_sync_min_writer_contract() <> 7 then
+  if cadence_private.account_sync_min_writer_contract() <> 8 then
     raise exception 'Contract-8 writers must keep syncing.';
   end if;
 end;
@@ -370,5 +380,6 @@ begin
   end if;
 end;
 $$;
+
 
 rollback;

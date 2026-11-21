@@ -54,6 +54,18 @@ describe("validateSubBehaviorLink", () => {
     expect(check("skin", null)).toEqual({ ok: true });
   });
 
+  it("keeps opportunity Behaviors out of routines (Behaviors of Opportunity)", () => {
+    const withPool = [...behaviors, { id: "stretch", title: "Stretch", parentBehaviorId: null, isOpportunity: true }];
+    const opportunity = { ok: false, reason: "opportunity", message: "An opportunity Behavior can't be part of a routine." };
+    expect(validateSubBehaviorLink({ behaviorId: "stretch", nextParentBehaviorId: "skin", behaviors: withPool })).toEqual(opportunity);
+    expect(validateSubBehaviorLink({ behaviorId: "walk", nextParentBehaviorId: "stretch", behaviors: withPool })).toEqual(opportunity);
+    expect(validateSubBehaviorLink({ behaviorId: "walk", nextParentBehaviorId: "skin", behaviors, nextIsOpportunity: true })).toEqual(opportunity);
+    expect(validateSubBehaviorLink({ behaviorId: "skin", nextParentBehaviorId: null, behaviors, nextIsOpportunity: true })).toEqual(opportunity);
+    expect(validateSubBehaviorLink({ behaviorId: "stretch", nextParentBehaviorId: null, behaviors: withPool })).toEqual({ ok: true });
+    expect(findSubBehaviorGraphViolations([...withPool, { id: "step", parentBehaviorId: "stretch" }]))
+      .toContainEqual({ behaviorId: "step", reason: "opportunity" });
+  });
+
   it("rejects self-parenting, missing parents, grandchildren, parents with children and archived parents", () => {
     expect(check("walk", "walk")).toMatchObject({ ok: false, reason: "self_parent" });
     expect(check("walk", "missing")).toMatchObject({ ok: false, reason: "parent_not_found" });

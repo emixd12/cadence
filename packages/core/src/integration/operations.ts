@@ -668,7 +668,7 @@ const createBehavior = writeOperation({
   name: "create_behavior",
   title: "Create Behavior",
   description:
-    `Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category. Send \`sub_behaviors\` to create a parent and up to ${L.maxInlineSubBehaviors} sub-behaviors in one change, or \`parent_behavior_id\` to add one sub-behavior to an existing parent; a sub-behavior that follows its parent's schedule needs no \`schedules\`. An opportunity Behavior is never part of a routine.`,
+    `Creates a Behavior, a recurring thing the user wants to track (a habit, routine or recurring task), with schedules (daily, every N days, weekly or every N weeks on chosen weekdays, monthly on day N) and reminders. With is_opportunity true it can be added to today when there is room, and schedules may be empty. \`sub_behaviors\` creates a parent and up to ${L.maxInlineSubBehaviors} sub-behaviors in one change; \`parent_behavior_id\` adds one sub-behavior to an existing parent, and one that follows the parent's schedule needs no \`schedules\`. An opportunity Behavior is never in a routine. list_categories lists categories.`,
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     title: behaviorTitleInput(),
@@ -724,7 +724,7 @@ const updateBehavior = writeOperation({
   name: "update_behavior",
   title: "Update Behavior",
   description:
-    `Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, whether it is available as an opportunity, or sub-behavior link. Only the fields sent change; \`schedules\`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. \`parent_behavior_id\` groups the Behavior under a parent, or null makes it top-level again; \`sub_behavior_sort_order\` moves it among its siblings. An opportunity Behavior is never part of a routine. Editing a parent's schedule also changes the sub-behaviors that follow it. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.`,
+    `Edits a Behavior's title, description, place, category, schedules, reminders, length, end, opportunity flag or sub-behavior link. Only the fields sent change; \`schedules\` replaces the whole list and may be empty only for an opportunity Behavior. \`parent_behavior_id\` groups it under a parent, or null makes it top-level; \`sub_behavior_sort_order\` moves it among its siblings. An opportunity Behavior is never part of a routine. A parent's schedule change also reaches the sub-behaviors that follow it. Past and resolved Occurrences are kept. Read get_behavior first for the revision.`,
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),

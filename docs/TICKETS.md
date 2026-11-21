@@ -19466,7 +19466,12 @@ Scope and acceptance:
   `coach-signals-3`; `coach-tips-3`; a draft advice card `smaller-step-in-the-routine`
   that the owner reviews before it is active.
 - Portability (Full JSON, BehaviorLog, Markdown) and Hevy completion on routines.
-- Mac: SQLite schema 28, Rust store, account sync contract 9 and the shared UI.
+- Mac: SQLite schema 28, Rust store, account sync contract 9 (minimum writer stays 8)
+  and the shared UI.
+- Behaviors of Opportunity (PR #351): an opportunity Behavior is never a parent or a
+  sub-behavior, in the resolver, database, MCP contract and form.
+- Phone width: the routine title keeps the row's width; the routine's two marks move to
+  a second line below 576px.
 
 Platform impact:
 

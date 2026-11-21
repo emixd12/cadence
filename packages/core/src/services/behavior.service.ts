@@ -39,7 +39,7 @@ export async function createBehavior(
   let link: CreateLink | null = null;
   if (parentId) {
     // A new Behavior has no id yet and no sub-behaviors, so any id stands in for the check.
-    assertSubBehaviorLink({ behaviorId: "", nextParentBehaviorId: parentId, behaviors });
+    assertSubBehaviorLink({ behaviorId: "", nextParentBehaviorId: parentId, behaviors, nextIsOpportunity: values.isOpportunity === true });
     const parent = behaviors.find((behavior) => behavior.id === parentId)!;
     link = {
       parentBehaviorId: parentId,
@@ -234,8 +234,13 @@ export async function updateBehavior(
   const nextParentId = values.parentBehaviorId === undefined ? previousParentId : values.parentBehaviorId;
   const linkChanged = nextParentId !== previousParentId;
   const behaviors = linkChanged && nextParentId ? await requireBehaviorList(store) : await listBehaviorsIfSupported(store);
-  if (linkChanged && nextParentId) {
-    assertSubBehaviorLink({ behaviorId: existing.id, nextParentBehaviorId: nextParentId, behaviors: behaviors ?? [] });
+  const nextIsOpportunity = values.isOpportunity ?? existing.is_opportunity === true;
+  const opportunityTurnedOn = nextIsOpportunity && existing.is_opportunity !== true;
+  if ((linkChanged && nextParentId) || opportunityTurnedOn) {
+    assertSubBehaviorLink({
+      behaviorId: existing.id, nextParentBehaviorId: nextParentId, nextIsOpportunity,
+      behaviors: behaviors ?? await requireBehaviorList(store),
+    });
   }
   if (nextParentId) {
     behavior = {
@@ -679,12 +684,13 @@ function subBehaviorError(message: string): SubBehaviorLinkError {
 }
 
 function assertSubBehaviorLink(input: {
-  behaviorId: string; nextParentBehaviorId: string | null; behaviors: readonly BehaviorGraphRecord[];
+  behaviorId: string; nextParentBehaviorId: string | null; behaviors: readonly BehaviorGraphRecord[]; nextIsOpportunity?: boolean;
 }): void {
   const result = validateSubBehaviorLink({
     behaviorId: input.behaviorId,
     nextParentBehaviorId: input.nextParentBehaviorId,
     behaviors: input.behaviors.map(toSubBehaviorLinkFacts),
+    nextIsOpportunity: input.nextIsOpportunity,
   });
   if (!result.ok) throw subBehaviorError(result.message);
 }
@@ -698,6 +704,7 @@ export function toSubBehaviorLinkFacts(behavior: BehaviorGraphRecord): SubBehavi
     inheritParentSchedule: behavior.inherit_parent_schedule ?? false,
     active: behavior.active,
     archivedAt: behavior.archived_at,
+    isOpportunity: behavior.is_opportunity === true,
   };
 }
 

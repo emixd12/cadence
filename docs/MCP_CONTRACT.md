@@ -94,7 +94,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.6.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.7.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -134,7 +134,7 @@ Every tool sets `openWorldHint: false`.
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
 | `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `set_parent_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior`, `end_behavior`, `pause_behavior`, `resume_behavior` |
 
 ## Error catalog
@@ -259,7 +259,7 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.6.0"` |
+| `contract_version` | yes | `"1.7.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -279,6 +279,8 @@ Input:
 | `state` | no | `active`, `archived`, `running`, `not_running`, `all` |
 | `category_id` | no | string (uuid) |
 | `is_opportunity` | no | boolean |
+| `parent_behavior_id` | no | string (uuid) |
+| `hierarchy` | no | `all`, `top_level`, `sub_behaviors` |
 | `updated_since` | no | string (date-time) |
 | `page_size` | no | integer |
 | `cursor` | no | string |
@@ -747,7 +749,7 @@ Output:
 
 ### `create_behavior`
 
-**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.
+**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine or recurring task), with schedules (daily, every N days, weekly or every N weeks on chosen weekdays, monthly on day N) and reminders. With is_opportunity true it can be added to today when there is room, and schedules may be empty. `sub_behaviors` creates a parent and up to 25 sub-behaviors in one change; `parent_behavior_id` adds one sub-behavior to an existing parent, and one that follows the parent's schedule needs no `schedules`. An opportunity Behavior is never in a routine. list_categories lists categories.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint false, idempotentHint false, openWorldHint false
@@ -763,7 +765,7 @@ Input:
 | `description` | no | string |
 | `location_text` | no | string |
 | `category_id` | no | string (uuid) or null |
-| `schedules` | yes | array of object |
+| `schedules` | no | array of object |
 | `is_opportunity` | no | boolean |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer |
@@ -788,7 +790,7 @@ Output:
 
 ### `update_behavior`
 
-**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
+**Update Behavior.** Edits a Behavior's title, description, place, category, schedules, reminders, length, end, opportunity flag or sub-behavior link. Only the fields sent change; `schedules` replaces the whole list and may be empty only for an opportunity Behavior. `parent_behavior_id` groups it under a parent, or null makes it top-level; `sub_behavior_sort_order` moves it among its siblings. An opportunity Behavior is never part of a routine. A parent's schedule change also reaches the sub-behaviors that follow it. Past and resolved Occurrences are kept. Read get_behavior first for the revision.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
@@ -818,7 +820,7 @@ Input:
 | `sub_behavior_sort_order` | no | integer |
 | `idempotency_key` | no | string |
 
-At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date`, `is_opportunity` is required.
+At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date`, `is_opportunity`, `parent_behavior_id`, `inherit_parent_schedule`, `sub_behavior_sort_order` is required.
 
 Output:
 

@@ -641,6 +641,9 @@ and in Needs decision. The result shows below it as `opportunity.removed` or an
   title, slot time, derived state (progress "2/3", or Completed / Not Completed with
   the status fill) and, on today and in Needs decision, bulk **Completed** and **Not
   Completed**. Future days show no bulk actions.
+- On phones (below 576px) the routine title keeps the row's width. A resolved routine
+  keeps its status label on the same line; the bulk marks move to a second line,
+  right-aligned.
 - Open, the routine lists its steps in sibling order as normal Occurrence rows, each
   with its own Completed, Not Completed, Note, time tracking and connector label.
 - Standalone Behaviors and routines share one time order (`section.rows`). On the day

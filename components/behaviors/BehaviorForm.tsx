@@ -53,6 +53,7 @@ type BehaviorFormProps = Readonly<{
    * A runtime that cannot store the flag yet passes false; the stored flag is kept.
    */
   allowOpportunity?: boolean;
+  /**
    * Sub-behaviors (depth 1): Behaviors this one may go under. Without it the form has no
    * parent field and saving keeps the stored link. Build it with `parentChoices`.
    */

@@ -7,6 +7,8 @@
 --    attachment or removal may target an Occurrence of a sub-behavior of the link's
 --    Behavior. Every other D28 precondition is unchanged. A match still records the
 --    Occurrence's own Behavior, so one activity completes each sub-behavior at most once.
+-- 3. An opportunity Behavior (Behaviors of Opportunity) is never part of a routine: it
+--    cannot be a parent or a sub-behavior. The check also runs when the flag changes.
 begin;
 
 create or replace function cadence_private.enforce_behavior_sub_behavior_depth()
@@ -20,7 +22,15 @@ declare
   parent public.behaviors;
 begin
   select * into stored from public.behaviors where id = new.id;
-  if not found or stored.parent_behavior_id is null then
+  if not found then
+    return null;
+  end if;
+  if stored.is_opportunity and (stored.parent_behavior_id is not null or exists (
+    select 1 from public.behaviors child
+    where child.user_id = stored.user_id and child.parent_behavior_id = stored.id)) then
+    raise exception 'An opportunity Behavior can''t be part of a routine.' using errcode = '23514';
+  end if;
+  if stored.parent_behavior_id is null then
     return null;
   end if;
 
@@ -28,6 +38,9 @@ begin
   where id = stored.parent_behavior_id and user_id = stored.user_id;
   if not found then
     return null;
+  end if;
+  if parent.is_opportunity then
+    raise exception 'An opportunity Behavior can''t be part of a routine.' using errcode = '23514';
   end if;
 
   if parent.parent_behavior_id is not null then
@@ -46,6 +59,12 @@ begin
 end;
 $$;
 revoke all on function cadence_private.enforce_behavior_sub_behavior_depth() from public, anon, authenticated, service_role;
+
+drop trigger enforce_behavior_sub_behavior_depth on public.behaviors;
+create constraint trigger enforce_behavior_sub_behavior_depth
+  after insert or update of parent_behavior_id, is_opportunity on public.behaviors
+  deferrable initially deferred
+  for each row execute function cadence_private.enforce_behavior_sub_behavior_depth();
 
 create or replace function cadence_private.connector_match_precondition(
   owner_id uuid,

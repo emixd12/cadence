@@ -670,7 +670,8 @@ treats `parent_behavior_id` as an optional Behavior-to-Behavior dependency and c
 depth 1 on every input and on the merged graph. Apply writes Behaviors unlinked first,
 then restores the links once every row exists, so a regroup never trips the depth
 triggers. Import apply also writes unlinked graphs first. The minimum writer contract
-stays 7.
+stays 8, so Cadence for Mac 0.1.14 (contract 8) keeps syncing. A Behavior row with
+`is_opportunity` and a parent is refused locally, as on the server.
 
 Generation passes `hasActiveSubBehaviors`, so a parent with active sub-behaviors
 generates no new Occurrences on the Mac either.

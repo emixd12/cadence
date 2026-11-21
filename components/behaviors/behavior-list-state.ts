@@ -94,6 +94,7 @@ function linkFacts(behavior: BehaviorView): SubBehaviorLinkFacts {
     inheritParentSchedule: behavior.inheritParentSchedule,
     active: behavior.active,
     archivedAt: behavior.archivedAt,
+    isOpportunity: behavior.isOpportunity === true,
   };
 }
 

@@ -15,6 +15,7 @@
     "packages/core/src/notices/catalog/ending-pausing-archiving.json",
     "packages/core/src/notices/catalog/move-for-today.json",
     "packages/core/src/notices/catalog/opportunity.json",
+    "packages/core/src/notices/catalog/sub-behaviors.json",
     "packages/core/src/notices/catalog/timeline.json",
     "packages/ui/tokens.css",
     "supabase/migrations/*.sql"
@@ -25,38 +26,38 @@
       "component": 71,
       "family": 16,
       "feature": 36,
-      "file": 337,
-      "interaction": 221,
+      "file": 344,
+      "interaction": 231,
       "journey": 29,
-      "mcp-tool": 25,
-      "notice": 124,
+      "mcp-tool": 26,
+      "notice": 131,
       "repository": 48,
       "route": 77,
       "service": 215,
       "surface": 12,
       "table": 55,
-      "term": 286,
-      "test": 153,
+      "term": 287,
+      "test": 158,
       "token": 93
     },
     "links": {
       "aliases (asserted)": 28,
-      "belongs-to (asserted)": 188,
+      "belongs-to (asserted)": 195,
       "calls (derived)": 679,
-      "contains (asserted)": 567,
-      "defined-in (asserted)": 628,
-      "explained-in (asserted)": 241,
-      "implemented-in (asserted)": 969,
-      "implemented-in (derived)": 50,
-      "on (asserted)": 609,
-      "relates-to (asserted)": 562,
+      "contains (asserted)": 588,
+      "defined-in (asserted)": 630,
+      "explained-in (asserted)": 251,
+      "implemented-in (asserted)": 1013,
+      "implemented-in (derived)": 52,
+      "on (asserted)": 629,
+      "relates-to (asserted)": 564,
       "renders (asserted)": 2,
-      "renders (derived)": 239,
-      "shown-by (asserted)": 164,
-      "shows (derived)": 154,
-      "styled-by (derived)": 503,
-      "tested-by (asserted)": 571,
-      "uses (derived)": 1761
+      "renders (derived)": 243,
+      "shown-by (asserted)": 173,
+      "shows (derived)": 165,
+      "styled-by (derived)": 510,
+      "tested-by (asserted)": 595,
+      "uses (derived)": 1787
     }
   },
   "nodes": [
@@ -2237,6 +2238,13 @@
       "source": "repository file"
     },
     {
+      "id": "file:app/design-system/TimelineSubBehaviorsBench.tsx",
+      "kind": "file",
+      "name": "app/design-system/TimelineSubBehaviorsBench.tsx",
+      "path": "app/design-system/TimelineSubBehaviorsBench.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "file:app/design-system/TravelBench.tsx",
       "kind": "file",
       "name": "app/design-system/TravelBench.tsx",
@@ -2881,6 +2889,13 @@
       "source": "repository file"
     },
     {
+      "id": "file:components/behaviors/behavior-list-state.ts",
+      "kind": "file",
+      "name": "components/behaviors/behavior-list-state.ts",
+      "path": "components/behaviors/behavior-list-state.ts",
+      "source": "repository file"
+    },
+    {
       "id": "file:components/behaviors/BehaviorCreateSection.tsx",
       "kind": "file",
       "name": "components/behaviors/BehaviorCreateSection.tsx",
@@ -2934,6 +2949,20 @@
       "kind": "file",
       "name": "components/behaviors/SourceLinkSettings.tsx",
       "path": "components/behaviors/SourceLinkSettings.tsx",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/behaviors/sub-behavior-form-data.ts",
+      "kind": "file",
+      "name": "components/behaviors/sub-behavior-form-data.ts",
+      "path": "components/behaviors/sub-behavior-form-data.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "kind": "file",
+      "name": "components/behaviors/SubBehaviorEditor.tsx",
+      "path": "components/behaviors/SubBehaviorEditor.tsx",
       "source": "repository file"
     },
     {
@@ -3399,10 +3428,24 @@
       "source": "repository file"
     },
     {
+      "id": "file:components/timeline/ParentOccurrenceRow.tsx",
+      "kind": "file",
+      "name": "components/timeline/ParentOccurrenceRow.tsx",
+      "path": "components/timeline/ParentOccurrenceRow.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "file:components/timeline/RecordedActivityList.tsx",
       "kind": "file",
       "name": "components/timeline/RecordedActivityList.tsx",
       "path": "components/timeline/RecordedActivityList.tsx",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/timeline/SemanticZoomToggle.tsx",
+      "kind": "file",
+      "name": "components/timeline/SemanticZoomToggle.tsx",
+      "path": "components/timeline/SemanticZoomToggle.tsx",
       "source": "repository file"
     },
     {
@@ -3466,6 +3509,13 @@
       "kind": "file",
       "name": "components/timeline/TravelWeather.tsx",
       "path": "components/timeline/TravelWeather.tsx",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/timeline/use-semantic-zoom.ts",
+      "kind": "file",
+      "name": "components/timeline/use-semantic-zoom.ts",
+      "path": "components/timeline/use-semantic-zoom.ts",
       "source": "repository file"
     },
     {
@@ -4740,6 +4790,69 @@
       "status": "implemented",
       "risk": "low",
       "source": "interaction-registry.json#INT-BEHAVIOR-038"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-039",
+      "kind": "interaction",
+      "name": "Choose the routine a Behavior is part of",
+      "meaning": "Make a Behavior a sub-behavior of one top-level Behavior, or a standalone Behavior again.",
+      "status": "implemented",
+      "risk": "moderate",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-040",
+      "kind": "interaction",
+      "name": "Follow the parent schedule or set a sub-behavior's own",
+      "meaning": "Let a sub-behavior use its routine's schedule, or give it its own days and times.",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-041",
+      "kind": "interaction",
+      "name": "Draft sub-behaviors while creating a Behavior",
+      "meaning": "Create a routine and its steps in one save.",
+      "status": "implemented",
+      "risk": "moderate",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-042",
+      "kind": "interaction",
+      "name": "Reorder a routine's sub-behaviors",
+      "meaning": "Change the order steps appear in under a routine.",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-043",
+      "kind": "interaction",
+      "name": "Detach a sub-behavior",
+      "meaning": "Take a step out of its routine so it becomes its own Behavior.",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-044",
+      "kind": "interaction",
+      "name": "Add a new or existing Behavior to a routine",
+      "meaning": "Add a step to a saved routine by title, or move an existing Behavior in.",
+      "status": "implemented",
+      "risk": "moderate",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044"
+    },
+    {
+      "id": "interaction:INT-BEHAVIOR-045",
+      "kind": "interaction",
+      "name": "Show or hide a routine's nested sub-behaviors",
+      "meaning": "See a routine's steps under it in the Behaviors list with rolled-up and per-step adherence.",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045"
     },
     {
       "id": "interaction:INT-BRIEF-001",
@@ -6065,6 +6178,33 @@
       "source": "interaction-registry.json#INT-TIMELINE-024"
     },
     {
+      "id": "interaction:INT-TIMELINE-025",
+      "kind": "interaction",
+      "name": "Mark a whole routine Completed or Not Completed",
+      "meaning": "Record one status for every sub-behavior Occurrence in a routine's slot at once.",
+      "status": "implemented",
+      "risk": "moderate",
+      "source": "interaction-registry.json#INT-TIMELINE-025"
+    },
+    {
+      "id": "interaction:INT-TIMELINE-026",
+      "kind": "interaction",
+      "name": "Open or close one routine's steps",
+      "meaning": "Show or hide the sub-behavior rows of one routine under its header.",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-TIMELINE-026"
+    },
+    {
+      "id": "interaction:INT-TIMELINE-027",
+      "kind": "interaction",
+      "name": "Zoom the Timeline between routines and all steps",
+      "meaning": "Switch the Timeline between Routines (each routine collapsed) and All steps (every routine open inline).",
+      "status": "implemented",
+      "risk": "low",
+      "source": "interaction-registry.json#INT-TIMELINE-027"
+    },
+    {
       "id": "interaction:INT-TRAVEL-001",
       "kind": "interaction",
       "name": "Save Home and usual travel",
@@ -6551,7 +6691,7 @@
       "kind": "mcp-tool",
       "name": "archive_behavior",
       "title": "Archive Behavior",
-      "meaning": "Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Nothing is deleted. Archiving an archived Behavior changes nothing.",
+      "meaning": "Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Archiving a parent Behavior also archives its active sub-behaviors. Nothing is deleted. Archiving an archived Behavior changes nothing.",
       "access": "write",
       "source": "packages/core/src/integration/operations.ts#archive_behavior"
     },
@@ -6560,7 +6700,7 @@
       "kind": "mcp-tool",
       "name": "create_behavior",
       "title": "Create Behavior",
-      "meaning": "Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.",
+      "meaning": "Creates a Behavior, a recurring thing the user wants to track (a habit, routine or recurring task), with schedules (daily, every N days, weekly or every N weeks on chosen weekdays, monthly on day N) and reminders. With is_opportunity true it can be added to today when there is room, and schedules may be empty. `sub_behaviors` creates a parent and up to {L.maxInlineSubBehaviors} sub-behaviors in one change; `parent_behavior_id` adds one sub-behavior to an existing parent, and one that follows the parent's schedule needs no `schedules`. An opportunity Behavior is never in a routine. list_categories lists categories.",
       "access": "write",
       "source": "packages/core/src/integration/operations.ts#create_behavior"
     },
@@ -6605,7 +6745,7 @@
       "kind": "mcp-tool",
       "name": "get_behavior",
       "title": "Get Behavior",
-      "meaning": "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, and revision. Use it before editing a Behavior.",
+      "meaning": "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, parent link, sub-behaviors, and revision. Use it before editing a Behavior.",
       "access": "read",
       "source": "packages/core/src/integration/operations.ts#get_behavior"
     },
@@ -6623,7 +6763,7 @@
       "kind": "mcp-tool",
       "name": "get_timeline",
       "title": "Get Timeline",
-      "meaning": "Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences. Use it for questions such as \"what's on today\" or \"what still needs a decision\". Covers up to {L.maxTimelineDays} days from the start date.",
+      "meaning": "Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in `parent_groups`. Use it for questions such as \"what's on today\" or \"what still needs a decision\". Covers up to {L.maxTimelineDays} days from the start date.",
       "access": "read",
       "source": "packages/core/src/integration/operations.ts#get_timeline"
     },
@@ -6632,7 +6772,7 @@
       "kind": "mcp-tool",
       "name": "list_behaviors",
       "title": "List Behaviors",
-      "meaning": "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
+      "meaning": "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, archive notes, and sub-behavior links. A parent Behavior lists its sub-behaviors (one level deep). Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
       "access": "read",
       "source": "packages/core/src/integration/operations.ts#list_behaviors"
     },
@@ -6695,7 +6835,7 @@
       "kind": "mcp-tool",
       "name": "restore_behavior",
       "title": "Restore Behavior",
-      "meaning": "Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring an active Behavior changes nothing.",
+      "meaning": "Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring a parent Behavior also restores the sub-behaviors archived with it; a sub-behavior of an archived parent can't be restored on its own. Restoring an active Behavior changes nothing.",
       "access": "write",
       "source": "packages/core/src/integration/operations.ts#restore_behavior"
     },
@@ -6736,11 +6876,20 @@
       "source": "packages/core/src/integration/operations.ts#set_occurrence_status"
     },
     {
+      "id": "mcp-tool:set_parent_occurrence_status",
+      "kind": "mcp-tool",
+      "name": "set_parent_occurrence_status",
+      "title": "Set parent Behavior slot status",
+      "meaning": "Marks every sub-behavior Occurrence in one parent Behavior slot Completed or Not Completed in one change, such as a whole skin routine one morning. Name the slot with `local_date`, plus `slot_key` from get_timeline `parent_groups` when the parent has several times that day, or list `occurrence_ids`. Occurrences that already have the status do not change. To mark one step, use set_occurrence_status.",
+      "access": "write",
+      "source": "packages/core/src/integration/operations.ts#set_parent_occurrence_status"
+    },
+    {
       "id": "mcp-tool:update_behavior",
       "kind": "mcp-tool",
       "name": "update_behavior",
       "title": "Update Behavior",
-      "meaning": "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
+      "meaning": "Edits a Behavior's title, description, place, category, schedules, reminders, length, end, opportunity flag or sub-behavior link. Only the fields sent change; `schedules` replaces the whole list and may be empty only for an opportunity Behavior. `parent_behavior_id` groups it under a parent, or null makes it top-level; `sub_behavior_sort_order` moves it among its siblings. An opportunity Behavior is never part of a routine. A parent's schedule change also reaches the sub-behaviors that follow it. Past and resolved Occurrences are kept. Read get_behavior first for the revision.",
       "access": "write",
       "source": "packages/core/src/integration/operations.ts#update_behavior"
     },
@@ -8847,6 +8996,111 @@
         "mac"
       ],
       "source": "packages/core/src/notices/catalog/ending-pausing-archiving.json#run.paused"
+    },
+    {
+      "id": "notice:sub-behaviors.added",
+      "kind": "notice",
+      "name": "sub-behaviors.added",
+      "meaning": "Says on Behaviors that a Behavior now sits under a parent Behavior.",
+      "text": "{title} is now part of {parent}.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.added"
+    },
+    {
+      "id": "notice:sub-behaviors.check-row",
+      "kind": "notice",
+      "name": "sub-behaviors.check-row",
+      "meaning": "Refuses a new parent Behavior when one of its drafted sub-behaviors is not valid.",
+      "text": "Check sub-behavior {position}: {reason}",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.check-row"
+    },
+    {
+      "id": "notice:sub-behaviors.detached",
+      "kind": "notice",
+      "name": "sub-behaviors.detached",
+      "meaning": "Says on Behaviors that a sub-behavior left its parent and is now its own Behavior.",
+      "text": "{title} is now its own behavior.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.detached"
+    },
+    {
+      "id": "notice:sub-behaviors.follows-parent",
+      "kind": "notice",
+      "name": "sub-behaviors.follows-parent",
+      "meaning": "Says in the Behavior form that a sub-behavior uses its parent's schedule, so its own schedule fields are hidden.",
+      "text": "Uses the schedule of {parent}.",
+      "style": "note",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.follows-parent"
+    },
+    {
+      "id": "notice:sub-behaviors.group-created",
+      "kind": "notice",
+      "name": "sub-behaviors.group-created",
+      "meaning": "Says on Behaviors that a new parent Behavior was saved together with its sub-behaviors.",
+      "text": "{title} created with {count, plural, one {# sub-behavior} other {# sub-behaviors}}.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.group-created"
+    },
+    {
+      "id": "notice:sub-behaviors.reordered",
+      "kind": "notice",
+      "name": "sub-behaviors.reordered",
+      "meaning": "Says on Behaviors that the new order of a parent's sub-behaviors was saved.",
+      "text": "Order saved.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.reordered"
+    },
+    {
+      "id": "notice:sub-behaviors.routine-marked",
+      "kind": "notice",
+      "name": "sub-behaviors.routine-marked",
+      "meaning": "Says on Timeline that a whole routine slot was marked Completed or Not Completed.",
+      "text": "Routine updated.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked"
     },
     {
       "id": "notice:timeline.left-to-decide",
@@ -13299,6 +13553,15 @@
       "source": "docs/ontology/briefing-workbench.json#planner.rejection.occurrence-not-unresolved"
     },
     {
+      "id": "term:planner.rejection.routine-moves-together",
+      "kind": "term",
+      "name": "Routine step moves with its routine",
+      "meaning": "A routine's steps that follow its time are one block; only the slot's first step receives options, for the steps' summed length, and the other steps move with it.",
+      "category": "Planner",
+      "scope": "Briefing workbench",
+      "source": "docs/ontology/briefing-workbench.json#planner.rejection.routine-moves-together"
+    },
+    {
       "id": "term:planner.route",
       "kind": "term",
       "name": "Planner route",
@@ -14795,6 +15058,13 @@
       "source": "repository file"
     },
     {
+      "id": "test:tests/desktop-sub-behaviors.test.ts",
+      "kind": "test",
+      "name": "tests/desktop-sub-behaviors.test.ts",
+      "path": "tests/desktop-sub-behaviors.test.ts",
+      "source": "repository file"
+    },
+    {
       "id": "test:tests/desktop-sync-engine.test.ts",
       "kind": "test",
       "name": "tests/desktop-sync-engine.test.ts",
@@ -15082,6 +15352,13 @@
       "source": "repository file"
     },
     {
+      "id": "test:tests/semantic-zoom.dom.test.tsx",
+      "kind": "test",
+      "name": "tests/semantic-zoom.dom.test.tsx",
+      "path": "tests/semantic-zoom.dom.test.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "test:tests/settings-interactions-ui.test.tsx",
       "kind": "test",
       "name": "tests/settings-interactions-ui.test.tsx",
@@ -15152,6 +15429,20 @@
       "source": "repository file"
     },
     {
+      "id": "test:tests/sub-behavior.service.test.ts",
+      "kind": "test",
+      "name": "tests/sub-behavior.service.test.ts",
+      "path": "tests/sub-behavior.service.test.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "kind": "test",
+      "name": "tests/sub-behaviors-ui.dom.test.tsx",
+      "path": "tests/sub-behaviors-ui.dom.test.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "test:tests/supabase-proxy.test.ts",
       "kind": "test",
       "name": "tests/supabase-proxy.test.ts",
@@ -15191,6 +15482,13 @@
       "kind": "test",
       "name": "tests/timeline-reload.dom.test.tsx",
       "path": "tests/timeline-reload.dom.test.tsx",
+      "source": "repository file"
+    },
+    {
+      "id": "test:tests/timeline-sub-behaviors.dom.test.tsx",
+      "kind": "test",
+      "name": "tests/timeline-sub-behaviors.dom.test.tsx",
+      "path": "tests/timeline-sub-behaviors.dom.test.tsx",
       "source": "repository file"
     },
     {
@@ -22010,6 +22308,55 @@
     },
     {
       "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-039",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-040",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-041",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-042",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-043",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-044",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-045",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/feature"
+    },
+    {
+      "from": "feature:behavior-editor",
       "type": "defined-in",
       "to": "file:docs/PRODUCT_SPEC.md",
       "grade": "asserted",
@@ -23403,6 +23750,27 @@
     },
     {
       "from": "feature:timeline",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-025",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/feature"
+    },
+    {
+      "from": "feature:timeline",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-026",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/feature"
+    },
+    {
+      "from": "feature:timeline",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-027",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/feature"
+    },
+    {
+      "from": "feature:timeline",
       "type": "defined-in",
       "to": "file:docs/PRODUCT_SPEC.md",
       "grade": "asserted",
@@ -23550,6 +23918,27 @@
     },
     {
       "from": "file:app/(app)/behaviors/actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.group-created",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/actions.ts#sub-behaviors.group-created"
+    },
+    {
+      "from": "file:app/(app)/behaviors/actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.reordered",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/actions.ts#sub-behaviors.reordered"
+    },
+    {
+      "from": "file:app/(app)/behaviors/actions.ts",
+      "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/actions.ts#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/actions.ts",
       "type": "uses",
       "to": "service:lib/services/behavior.service.ts",
       "grade": "derived",
@@ -23568,6 +23957,20 @@
       "to": "service:lib/services/time-tracking.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/behaviors/actions.ts#lib/services/time-tracking.service.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/actions.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/actions.ts#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/actions.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-views.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/actions.ts#packages/core/src/services/behavior-views.ts"
     },
     {
       "from": "file:app/(app)/behaviors/page.tsx",
@@ -23628,6 +24031,13 @@
     {
       "from": "file:app/(app)/behaviors/page.tsx",
       "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/page.tsx#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/page.tsx",
+      "type": "uses",
       "to": "service:lib/services/behavior.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/behaviors/page.tsx#lib/services/behavior.service.ts"
@@ -23659,6 +24069,20 @@
       "to": "service:lib/services/time-tracking.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/behaviors/page.tsx#lib/services/time-tracking.service.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/page.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/page.tsx#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:app/(app)/behaviors/page.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-views.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/page.tsx#packages/core/src/services/behavior-views.ts"
     },
     {
       "from": "file:app/(app)/chat/page.tsx",
@@ -24019,6 +24443,13 @@
     },
     {
       "from": "file:app/(app)/timeline/actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.routine-marked",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#sub-behaviors.routine-marked"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
       "type": "uses",
       "to": "service:lib/services/day-note.service.ts",
       "grade": "derived",
@@ -24258,6 +24689,13 @@
     {
       "from": "file:app/(app)/timeline/page.tsx",
       "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/page.tsx#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:app/(app)/timeline/page.tsx",
+      "type": "uses",
       "to": "service:lib/services/behavior.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/timeline/page.tsx#lib/services/behavior.service.ts"
@@ -24324,6 +24762,20 @@
       "to": "service:lib/services/timeline.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/timeline/page.tsx#lib/services/timeline.service.ts"
+    },
+    {
+      "from": "file:app/(app)/timeline/page.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/page.tsx#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:app/(app)/timeline/page.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-views.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/page.tsx#packages/core/src/services/behavior-views.ts"
     },
     {
       "from": "file:app/(app)/timeline/page.tsx",
@@ -25222,6 +25674,13 @@
       "source": "scan:app/design-system/SourceLinkBench.tsx#SourceLinkSettings"
     },
     {
+      "from": "file:app/design-system/TimelineSubBehaviorsBench.tsx",
+      "type": "renders",
+      "to": "component:module.timeline",
+      "grade": "derived",
+      "source": "scan:app/design-system/TimelineSubBehaviorsBench.tsx#Timeline"
+    },
+    {
       "from": "file:app/design-system/TravelBench.tsx",
       "type": "renders",
       "to": "component:composite.travel-leave-question",
@@ -25535,6 +25994,13 @@
       "to": "service:packages/core/src/services/behavior-run-fields.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/account/first-link.ts#packages/core/src/services/behavior-run-fields.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/account/first-link.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior.service.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/account/first-link.ts#packages/core/src/services/behavior.service.ts"
     },
     {
       "from": "file:apps/desktop/src/account/first-link.ts",
@@ -27113,6 +27579,27 @@
     },
     {
       "from": "file:apps/desktop/src/local-actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.group-created",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-actions.ts#sub-behaviors.group-created"
+    },
+    {
+      "from": "file:apps/desktop/src/local-actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.reordered",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-actions.ts#sub-behaviors.reordered"
+    },
+    {
+      "from": "file:apps/desktop/src/local-actions.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.routine-marked",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-actions.ts#sub-behaviors.routine-marked"
+    },
+    {
+      "from": "file:apps/desktop/src/local-actions.ts",
       "type": "uses",
       "to": "repository:lib/db/database.types.ts",
       "grade": "derived",
@@ -27681,6 +28168,13 @@
     {
       "from": "file:apps/desktop/src/local-opportunity.service.ts",
       "type": "uses",
+      "to": "service:packages/core/src/services/behavior.service.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-opportunity.service.ts#packages/core/src/services/behavior.service.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/local-opportunity.service.ts",
+      "type": "uses",
       "to": "service:packages/core/src/services/occurrence-generation.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/local-opportunity.service.ts#packages/core/src/services/occurrence-generation.ts"
@@ -27754,6 +28248,13 @@
       "to": "repository:lib/db/database.types.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/local-reminder.service.ts#lib/db/database.types.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/local-reminder.service.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior.service.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-reminder.service.ts#packages/core/src/services/behavior.service.ts"
     },
     {
       "from": "file:apps/desktop/src/local-reminder.service.ts",
@@ -27859,6 +28360,13 @@
       "to": "service:packages/core/src/services/behavior-run-fields.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/local-timeline.service.ts#packages/core/src/services/behavior-run-fields.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/local-timeline.service.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior.service.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/local-timeline.service.ts#packages/core/src/services/behavior.service.ts"
     },
     {
       "from": "file:apps/desktop/src/local-timeline.service.ts",
@@ -29164,6 +29672,27 @@
     },
     {
       "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "shows",
+      "to": "notice:sub-behaviors.follows-parent",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#sub-behaviors.follows-parent"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
       "type": "uses",
       "to": "service:packages/core/src/services/behavior.service.ts",
       "grade": "derived",
@@ -29263,9 +29792,23 @@
     {
       "from": "file:components/behaviors/BehaviorList.tsx",
       "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorList.tsx#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorList.tsx",
+      "type": "uses",
       "to": "service:lib/services/source-links.service.ts",
       "grade": "derived",
       "source": "scan:components/behaviors/BehaviorList.tsx#lib/services/source-links.service.ts"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorList.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorList.tsx#packages/core/src/services/behavior-values.ts"
     },
     {
       "from": "file:components/behaviors/BehaviorRunControls.tsx",
@@ -29294,6 +29837,76 @@
       "to": "service:lib/services/source-links.service.ts",
       "grade": "derived",
       "source": "scan:components/behaviors/SourceLinkSettings.tsx#lib/services/source-links.service.ts"
+    },
+    {
+      "from": "file:components/behaviors/sub-behavior-form-data.ts",
+      "type": "shows",
+      "to": "notice:sub-behaviors.check-row",
+      "grade": "derived",
+      "source": "scan:components/behaviors/sub-behavior-form-data.ts#sub-behaviors.check-row"
+    },
+    {
+      "from": "file:components/behaviors/sub-behavior-form-data.ts",
+      "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/sub-behavior-form-data.ts#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:components/behaviors/sub-behavior-form-data.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/sub-behavior-form-data.ts#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "renders",
+      "to": "component:module.alert-notice",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#AlertNotice"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "renders",
+      "to": "component:module.notice",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#Notice"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "shows",
+      "to": "notice:sub-behaviors.added",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#sub-behaviors.added"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "shows",
+      "to": "notice:sub-behaviors.detached",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#sub-behaviors.detached"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "shows",
+      "to": "notice:sub-behaviors.reordered",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#sub-behaviors.reordered"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "uses",
+      "to": "service:lib/services/behavior-form.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#lib/services/behavior-form.ts"
+    },
+    {
+      "from": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior-values.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/SubBehaviorEditor.tsx#packages/core/src/services/behavior-values.ts"
     },
     {
       "from": "file:components/briefing/BriefMoveLines.tsx",
@@ -31891,6 +32504,13 @@
       "to": "service:packages/core/src/services/schedule.ts",
       "grade": "derived",
       "source": "scan:components/timeline/OpportunityBasket.tsx#packages/core/src/services/schedule.ts"
+    },
+    {
+      "from": "file:components/timeline/ParentOccurrenceRow.tsx",
+      "type": "renders",
+      "to": "component:module.alert-notice",
+      "grade": "derived",
+      "source": "scan:components/timeline/ParentOccurrenceRow.tsx#AlertNotice"
     },
     {
       "from": "file:components/timeline/RecordedActivityList.tsx",
@@ -36434,6 +37054,489 @@
       "to": "test:tests/desktop-opportunity.dom.test.tsx",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-BEHAVIOR-038/platforms/desktop/evidence/tests/desktop-opportunity.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/behavior-list-state.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/implementation/components/behaviors/behavior-list-state.ts#parentChoices"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/BehaviorForm.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/implementation/components/behaviors/BehaviorForm.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "implemented-in",
+      "to": "service:lib/services/behavior.service.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/implementation/lib/services/behavior.service.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "tested-by",
+      "to": "test:tests/sub-behavior.service.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/test_coverage/references/tests/sub-behavior.service.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-039",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/platforms/desktop/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/BehaviorForm.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/implementation/components/behaviors/BehaviorForm.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/implementation/components/behaviors/SubBehaviorEditor.tsx#SubBehaviorDraftEditor"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "tested-by",
+      "to": "test:tests/sub-behavior.service.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/test_coverage/references/tests/sub-behavior.service.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-040",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "file:app/(app)/behaviors/actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/implementation/app/(app)/behaviors/actions.ts#createBehaviorAction"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/platforms/desktop/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/sub-behavior-form-data.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/implementation/components/behaviors/sub-behavior-form-data.ts#parseBehaviorGroupFormData"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/implementation/components/behaviors/SubBehaviorEditor.tsx#SubBehaviorDraftEditor"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "implemented-in",
+      "to": "service:lib/services/behavior.service.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/implementation/lib/services/behavior.service.ts#createBehaviorGroupForUser"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "tested-by",
+      "to": "test:tests/sub-behavior.service.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/test_coverage/references/tests/sub-behavior.service.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-041",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "implemented-in",
+      "to": "file:app/(app)/behaviors/actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/implementation/app/(app)/behaviors/actions.ts#reorderSubBehaviorsAction"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/platforms/desktop/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/BehaviorList.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/implementation/components/behaviors/BehaviorList.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/implementation/components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-042",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/platforms/desktop/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/sub-behavior-form-data.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/implementation/components/behaviors/sub-behavior-form-data.ts#behaviorViewFormData"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/implementation/components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-043",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/platforms/desktop/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/behavior-list-state.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/implementation/components/behaviors/behavior-list-state.ts#attachCandidates"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/sub-behavior-form-data.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/implementation/components/behaviors/sub-behavior-form-data.ts#newSubBehaviorFormData"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/SubBehaviorEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/implementation/components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-044",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/behaviors-and-review.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/user_guidance/references/docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/behaviors-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/implementation/apps/desktop/src/behaviors-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "implemented-in",
+      "to": "file:components/behaviors/BehaviorList.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/implementation/components/behaviors/BehaviorList.tsx"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "on",
+      "to": "route:/behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/routes//behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "on",
+      "to": "surface:behaviors",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-045",
+      "type": "tested-by",
+      "to": "test:tests/sub-behaviors-ui.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/platforms/web/evidence/tests/sub-behaviors-ui.dom.test.tsx"
     },
     {
       "from": "interaction:INT-BRIEF-001",
@@ -47258,6 +48361,209 @@
       "source": "interaction-registry.json#INT-TIMELINE-024/platforms/web/evidence/tests/timeline-opportunity-ui.dom.test.tsx"
     },
     {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/timeline.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/user_guidance/references/docs/user-guide/timeline.md#mark-a-routine-or-its-steps"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "implemented-in",
+      "to": "file:app/(app)/timeline/actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/implementation/app/(app)/timeline/actions.ts#markParentSlotStatusAction"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/local-actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/implementation/apps/desktop/src/local-actions.ts"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/timeline-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/implementation/apps/desktop/src/timeline-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "implemented-in",
+      "to": "file:components/timeline/ParentOccurrenceRow.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/implementation/components/timeline/ParentOccurrenceRow.tsx#ParentBulkActions"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "implemented-in",
+      "to": "service:lib/services/occurrence.service.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/implementation/lib/services/occurrence.service.ts#markParentSlotStatusFromFormData"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "on",
+      "to": "route:/timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/routes//timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "on",
+      "to": "surface:timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/surfaces/timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "tested-by",
+      "to": "test:tests/desktop-sub-behaviors.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/platforms/desktop/evidence/tests/desktop-sub-behaviors.test.ts"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "tested-by",
+      "to": "test:tests/sub-behavior.service.test.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/test_coverage/references/tests/sub-behavior.service.test.ts"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-025",
+      "type": "tested-by",
+      "to": "test:tests/timeline-sub-behaviors.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/platforms/web/evidence/tests/timeline-sub-behaviors.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/timeline.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/user_guidance/references/docs/user-guide/timeline.md#mark-a-routine-or-its-steps"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/timeline-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/implementation/apps/desktop/src/timeline-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "implemented-in",
+      "to": "file:components/timeline/DayProgressTimeline.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/implementation/components/timeline/DayProgressTimeline.tsx#dayProgressItems"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "implemented-in",
+      "to": "file:components/timeline/ParentOccurrenceRow.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/implementation/components/timeline/ParentOccurrenceRow.tsx#ParentOccurrenceRow"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "implemented-in",
+      "to": "file:components/timeline/use-semantic-zoom.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/implementation/components/timeline/use-semantic-zoom.ts#toggleParentOverride"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "on",
+      "to": "route:/timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/routes//timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "on",
+      "to": "surface:timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/surfaces/timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "tested-by",
+      "to": "test:tests/semantic-zoom.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/platforms/web/evidence/tests/semantic-zoom.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-026",
+      "type": "tested-by",
+      "to": "test:tests/timeline-sub-behaviors.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/platforms/web/evidence/tests/timeline-sub-behaviors.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "explained-in",
+      "to": "file:docs/user-guide/timeline.md",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/user_guidance/references/docs/user-guide/timeline.md#zoom-between-routines-and-all-steps"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "implemented-in",
+      "to": "file:apps/desktop/src/timeline-screen.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/implementation/apps/desktop/src/timeline-screen.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "implemented-in",
+      "to": "file:components/timeline/DayProgressTimeline.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/implementation/components/timeline/DayProgressTimeline.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "implemented-in",
+      "to": "file:components/timeline/SemanticZoomToggle.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/implementation/components/timeline/SemanticZoomToggle.tsx#SemanticZoomToggle"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "implemented-in",
+      "to": "file:components/timeline/use-semantic-zoom.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/implementation/components/timeline/use-semantic-zoom.ts#useSemanticZoom"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "on",
+      "to": "route:/timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/routes//timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "on",
+      "to": "surface:timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/surfaces/timeline"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "tested-by",
+      "to": "test:tests/semantic-zoom.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/platforms/web/evidence/tests/semantic-zoom.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-TIMELINE-027",
+      "type": "tested-by",
+      "to": "test:tests/timeline-sub-behaviors.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/platforms/web/evidence/tests/timeline-sub-behaviors.dom.test.tsx"
+    },
+    {
       "from": "interaction:INT-TRAVEL-001",
       "type": "explained-in",
       "to": "file:docs/user-guide/travel.md",
@@ -48863,6 +50169,13 @@
     {
       "from": "journey:J05",
       "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-041",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-041/journeys/J05"
+    },
+    {
+      "from": "journey:J05",
+      "type": "contains",
       "to": "interaction:INT-ONBOARD-002",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-ONBOARD-002/journeys/J05"
@@ -49083,6 +50396,48 @@
       "to": "interaction:INT-BEHAVIOR-038",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-BEHAVIOR-038/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-039",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-039/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-040",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-040/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-042",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-042/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-043",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-043/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-044",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-044/journeys/J06"
+    },
+    {
+      "from": "journey:J06",
+      "type": "contains",
+      "to": "interaction:INT-BEHAVIOR-045",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-045/journeys/J06"
     },
     {
       "from": "journey:J06",
@@ -49409,6 +50764,27 @@
     {
       "from": "journey:J07",
       "type": "contains",
+      "to": "interaction:INT-TIMELINE-025",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/journeys/J07"
+    },
+    {
+      "from": "journey:J07",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-026",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-026/journeys/J07"
+    },
+    {
+      "from": "journey:J07",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-027",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-027/journeys/J07"
+    },
+    {
+      "from": "journey:J07",
+      "type": "contains",
       "to": "interaction:INT-WEATHER-001",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-WEATHER-001/journeys/J07"
@@ -49573,6 +50949,13 @@
       "to": "interaction:INT-TIMELINE-024",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-TIMELINE-024/journeys/J09"
+    },
+    {
+      "from": "journey:J09",
+      "type": "contains",
+      "to": "interaction:INT-TIMELINE-025",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-TIMELINE-025/journeys/J09"
     },
     {
       "from": "journey:J09",
@@ -51260,6 +52643,27 @@
       "to": "service:lib/services/integration-write.service.ts",
       "grade": "derived",
       "source": "scan:lib/integrations/operations/write/index.ts#set_occurrence_status/executeIntegrationWrite"
+    },
+    {
+      "from": "mcp-tool:set_parent_occurrence_status",
+      "type": "defined-in",
+      "to": "file:packages/core/src/integration/operations.ts",
+      "grade": "asserted",
+      "source": "packages/core/src/integration/operations.ts#set_parent_occurrence_status"
+    },
+    {
+      "from": "mcp-tool:set_parent_occurrence_status",
+      "type": "implemented-in",
+      "to": "file:lib/integrations/operations/write/index.ts",
+      "grade": "derived",
+      "source": "scan:lib/integrations/operations/write/index.ts#set_parent_occurrence_status"
+    },
+    {
+      "from": "mcp-tool:set_parent_occurrence_status",
+      "type": "implemented-in",
+      "to": "service:lib/services/integration-write.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/integrations/operations/write/index.ts#set_parent_occurrence_status/executeIntegrationWrite"
     },
     {
       "from": "mcp-tool:update_behavior",
@@ -54102,6 +55506,167 @@
       "to": "token:--foreground",
       "grade": "derived",
       "source": "packages/core/src/notices/catalog/ending-pausing-archiving.json#run.paused/style/outcome"
+    },
+    {
+      "from": "notice:sub-behaviors.added",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.added/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.added",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-039",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.added/interactions/INT-BEHAVIOR-039"
+    },
+    {
+      "from": "notice:sub-behaviors.added",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-044",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.added/interactions/INT-BEHAVIOR-044"
+    },
+    {
+      "from": "notice:sub-behaviors.added",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.added/style/outcome"
+    },
+    {
+      "from": "notice:sub-behaviors.check-row",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.check-row/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.check-row",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-041",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.check-row/interactions/INT-BEHAVIOR-041"
+    },
+    {
+      "from": "notice:sub-behaviors.check-row",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.check-row/style/error"
+    },
+    {
+      "from": "notice:sub-behaviors.detached",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.detached/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.detached",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-039",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.detached/interactions/INT-BEHAVIOR-039"
+    },
+    {
+      "from": "notice:sub-behaviors.detached",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-043",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.detached/interactions/INT-BEHAVIOR-043"
+    },
+    {
+      "from": "notice:sub-behaviors.detached",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.detached/style/outcome"
+    },
+    {
+      "from": "notice:sub-behaviors.follows-parent",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.follows-parent/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.follows-parent",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-040",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.follows-parent/interactions/INT-BEHAVIOR-040"
+    },
+    {
+      "from": "notice:sub-behaviors.follows-parent",
+      "type": "styled-by",
+      "to": "token:--muted-readable",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.follows-parent/style/note"
+    },
+    {
+      "from": "notice:sub-behaviors.group-created",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.group-created/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.group-created",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-041",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.group-created/interactions/INT-BEHAVIOR-041"
+    },
+    {
+      "from": "notice:sub-behaviors.group-created",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.group-created/style/outcome"
+    },
+    {
+      "from": "notice:sub-behaviors.reordered",
+      "type": "belongs-to",
+      "to": "feature:behavior-editor",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.reordered/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.reordered",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-042",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.reordered/interactions/INT-BEHAVIOR-042"
+    },
+    {
+      "from": "notice:sub-behaviors.reordered",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.reordered/style/outcome"
+    },
+    {
+      "from": "notice:sub-behaviors.routine-marked",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked/feature"
+    },
+    {
+      "from": "notice:sub-behaviors.routine-marked",
+      "type": "shown-by",
+      "to": "interaction:INT-TIMELINE-025",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked/interactions/INT-TIMELINE-025"
+    },
+    {
+      "from": "notice:sub-behaviors.routine-marked",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked/style/outcome"
     },
     {
       "from": "notice:timeline.left-to-decide",
@@ -61113,6 +62678,13 @@
     {
       "from": "service:lib/services/integration-write.service.ts",
       "type": "uses",
+      "to": "repository:lib/db/integration-read.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/integration-write.service.ts#lib/db/integration-read.repo.ts"
+    },
+    {
+      "from": "service:lib/services/integration-write.service.ts",
+      "type": "uses",
       "to": "repository:lib/db/integration-write.repo.ts",
       "grade": "derived",
       "source": "scan:lib/services/integration-write.service.ts#lib/db/integration-write.repo.ts"
@@ -61179,6 +62751,13 @@
       "to": "service:packages/core/src/services/behavior.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/integration-write.service.ts#packages/core/src/services/behavior.service.ts"
+    },
+    {
+      "from": "service:lib/services/integration-write.service.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/timeline.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/integration-write.service.ts#packages/core/src/services/timeline.service.ts"
     },
     {
       "from": "service:lib/services/leave-reminder-delivery.ts",
@@ -61858,6 +63437,13 @@
       "to": "service:packages/core/src/services/behavior-values.ts",
       "grade": "derived",
       "source": "scan:lib/services/occurrence.service.ts#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "service:lib/services/occurrence.service.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/behavior.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/occurrence.service.ts#packages/core/src/services/behavior.service.ts"
     },
     {
       "from": "service:lib/services/occurrence.service.ts",
@@ -62567,6 +64153,13 @@
       "source": "scan:lib/services/source-count.service.ts#lib/services/occurrence.service.ts"
     },
     {
+      "from": "service:lib/services/source-count.service.ts",
+      "type": "uses",
+      "to": "table:behaviors",
+      "grade": "derived",
+      "source": "scan:lib/services/source-count.service.ts#from(behaviors)"
+    },
+    {
       "from": "service:lib/services/source-links.service.ts",
       "type": "uses",
       "to": "repository:lib/db/connectors.repo.ts",
@@ -62775,6 +64368,13 @@
       "to": "service:packages/core/src/services/timeline.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/timeline.service.ts#packages/core/src/services/timeline.service.ts"
+    },
+    {
+      "from": "service:lib/services/timeline.service.ts",
+      "type": "uses",
+      "to": "table:behaviors",
+      "grade": "derived",
+      "source": "scan:lib/services/timeline.service.ts#from(behaviors)"
     },
     {
       "from": "service:lib/services/travel-calendar-range.ts",
@@ -68181,6 +69781,13 @@
       "source": "docs/ontology/briefing-workbench.json#planner.rejection/relatedIds/planner.rejection.occurrence-not-unresolved"
     },
     {
+      "from": "term:planner.rejection",
+      "type": "relates-to",
+      "to": "term:planner.rejection.routine-moves-together",
+      "grade": "asserted",
+      "source": "docs/ontology/briefing-workbench.json#planner.rejection/relatedIds/planner.rejection.routine-moves-together"
+    },
+    {
       "from": "term:planner.rejection.calendar-missing",
       "type": "defined-in",
       "to": "file:packages/core/src/types/briefing-plan.ts",
@@ -68431,6 +70038,20 @@
       "to": "term:planner.rejection",
       "grade": "asserted",
       "source": "docs/ontology/briefing-workbench.json#planner.rejection.occurrence-not-unresolved/relatedIds/planner.rejection"
+    },
+    {
+      "from": "term:planner.rejection.routine-moves-together",
+      "type": "defined-in",
+      "to": "file:packages/core/src/types/briefing-plan.ts",
+      "grade": "asserted",
+      "source": "docs/ontology/briefing-workbench.json#planner.rejection.routine-moves-together/contracts/packages/core/src/types/briefing-plan.ts#BriefingPlanRejectionCode"
+    },
+    {
+      "from": "term:planner.rejection.routine-moves-together",
+      "type": "relates-to",
+      "to": "term:planner.rejection",
+      "grade": "asserted",
+      "source": "docs/ontology/briefing-workbench.json#planner.rejection.routine-moves-together/relatedIds/planner.rejection"
     },
     {
       "from": "term:planner.route",
@@ -71445,6 +73066,7 @@
       "found in code, missing from design-system.usage.json: layout.cadence-page-banner in app/(app)/chat/page.tsx",
       "found in code, missing from design-system.usage.json: layout.cadence-page-banner in app/(app)/timeline/page.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/advisor/AdvisorParts.tsx",
+      "found in code, missing from design-system.usage.json: module.alert-notice in components/behaviors/SubBehaviorEditor.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/briefing/BriefMoveLines.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/briefing/BriefOpportunityLines.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/briefing/DailyBriefBubble.tsx",
@@ -71452,6 +73074,7 @@
       "found in code, missing from design-system.usage.json: module.alert-notice in components/chat/ChatPage.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/feedback/Notice.tsx",
       "found in code, missing from design-system.usage.json: module.alert-notice in components/timeline/OccurrenceMoveMenu.tsx",
+      "found in code, missing from design-system.usage.json: module.alert-notice in components/timeline/ParentOccurrenceRow.tsx",
       "found in code, missing from design-system.usage.json: module.chat-page in app/(app)/chat/page.tsx",
       "found in code, missing from design-system.usage.json: module.chat-page in apps/desktop/src/chat-screen.tsx",
       "found in code, missing from design-system.usage.json: module.daily-brief-moves in components/briefing/DailyBriefBubble.tsx",
@@ -71459,6 +73082,7 @@
       "found in code, missing from design-system.usage.json: module.notice in apps/desktop/src/timeline-screen.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/behaviors/BehaviorForm.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/behaviors/BehaviorList.tsx",
+      "found in code, missing from design-system.usage.json: module.notice in components/behaviors/SubBehaviorEditor.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefMoveLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefOpportunityLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/DailyBriefBubble.tsx",

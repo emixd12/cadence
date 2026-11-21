@@ -972,6 +972,33 @@
       },
       "code": "invalid_input",
       "path": "$.sub_behaviors[0].sub_behaviors"
+    },
+    {
+      "name": "opportunity sub-behavior",
+      "value": {
+        "title": "Stretch",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "is_opportunity": true
+      },
+      "code": "invalid_input",
+      "path": "$.is_opportunity",
+      "semantic": true
+    },
+    {
+      "name": "opportunity routine with sub-behaviors",
+      "value": {
+        "title": "Stretch",
+        "schedules": [],
+        "is_opportunity": true,
+        "sub_behaviors": [
+          {
+            "title": "Step"
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.is_opportunity",
+      "semantic": true
     }
   ],
   "valid_outputs": [
@@ -1071,6 +1098,7 @@
           "pause": null,
           "end_date": null,
           "default_duration_minutes": 20,
+          "is_opportunity": false,
           "timezone": "America/New_York",
           "schedules": [
             {
@@ -1158,6 +1186,7 @@
             "pause": null,
             "end_date": null,
             "default_duration_minutes": 20,
+            "is_opportunity": false,
             "timezone": "America/New_York",
             "schedules": [
               {
@@ -1227,6 +1256,7 @@
             "pause": null,
             "end_date": null,
             "default_duration_minutes": 20,
+            "is_opportunity": false,
             "timezone": "America/New_York",
             "schedules": [
               {

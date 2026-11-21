@@ -30,6 +30,8 @@ export type SubBehaviorLinkFacts = Readonly<{
   inheritParentSchedule?: boolean;
   active?: boolean;
   archivedAt?: string | null;
+  /** Behaviors of Opportunity. An opportunity Behavior is never part of a routine. */
+  isOpportunity?: boolean;
 }>;
 
 export type SubBehaviorLinkRejection =
@@ -37,7 +39,8 @@ export type SubBehaviorLinkRejection =
   | "parent_not_found"
   | "parent_is_sub_behavior"
   | "has_sub_behaviors"
-  | "parent_archived";
+  | "parent_archived"
+  | "opportunity";
 
 export type SubBehaviorLinkValidation =
   | Readonly<{ ok: true }>

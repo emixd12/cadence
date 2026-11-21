@@ -8,10 +8,21 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 20 |
-| error | 81 |
-| note | 20 |
+| outcome | 25 |
+| error | 82 |
+| note | 21 |
 | question | 3 |
+
+## Behavior editor
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `sub-behaviors.added` Says on Behaviors that a Behavior now sits under a parent Behavior. | outcome | {title} is now part of {parent}. | web, Mac | INT-BEHAVIOR-039, INT-BEHAVIOR-044, `components/behaviors/SubBehaviorEditor.tsx` |
+| `sub-behaviors.check-row` Refuses a new parent Behavior when one of its drafted sub-behaviors is not valid. | error | Check sub-behavior {position}: {reason} | web, Mac | INT-BEHAVIOR-041, `components/behaviors/sub-behavior-form-data.ts` |
+| `sub-behaviors.detached` Says on Behaviors that a sub-behavior left its parent and is now its own Behavior. | outcome | {title} is now its own behavior. | web, Mac | INT-BEHAVIOR-039, INT-BEHAVIOR-043, `components/behaviors/SubBehaviorEditor.tsx` |
+| `sub-behaviors.follows-parent` Says in the Behavior form that a sub-behavior uses its parent's schedule, so its own schedule fields are hidden. | note | Uses the schedule of {parent}. | web, Mac | INT-BEHAVIOR-040, `components/behaviors/BehaviorForm.tsx` |
+| `sub-behaviors.group-created` Says on Behaviors that a new parent Behavior was saved together with its sub-behaviors. | outcome | {title} created with {count, plural, one {# sub-behavior} other {# sub-behaviors}}. | web, Mac | INT-BEHAVIOR-041, `app/(app)/behaviors/actions.ts`, `apps/desktop/src/local-actions.ts` |
+| `sub-behaviors.reordered` Says on Behaviors that the new order of a parent's sub-behaviors was saved. | outcome | Order saved. | web, Mac | INT-BEHAVIOR-042, `app/(app)/behaviors/actions.ts`, `apps/desktop/src/local-actions.ts`, `components/behaviors/SubBehaviorEditor.tsx` |
 
 ## Behaviors of Opportunity
 

@@ -22,6 +22,8 @@ alter table cadence_advisor_private.coach_signals
     'done_together', 'crowded_hour', 'setup_gaps',
     -- Version 2, added after the owner's review (D8).
     'reminder_response', 'session_length', 'moved_vs_unmoved',
+    -- Behaviors of Opportunity (Task 7).
+    'opportunity_ready_to_schedule',
     -- Version 3: routines and their steps (sub-behaviors).
     'sub_behavior_dropoff'
   ));

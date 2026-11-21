@@ -16,4 +16,8 @@
   .indicator { position: static; transform: translateY(-0.0625rem); }
   .indicator[data-open="true"] { transform: translateY(-0.0625rem) rotate(90deg); }
   .children { padding-left: 0.5rem; }
+  /* The title keeps the row's width: a status label needs a short reserve, and the two marks move to a second line. */
+  .row .header :global(.timeline-occurrence-summary) { padding-right: 0.75rem; }
+  .row .header[data-parent-marks="label"] :global(.timeline-occurrence-summary) { padding-right: 6.25rem; }
+  .row .header[data-parent-marks="actions"] :global(.timeline-occurrence-status) { grid-column: 1 / -1; grid-row: 2; min-height: 2.75rem; margin-top: -0.75rem; }
 }

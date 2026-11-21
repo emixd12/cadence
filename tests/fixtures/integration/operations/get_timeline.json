@@ -161,6 +161,8 @@
                 "label": "7:30 AM"
               },
               "status": "unresolved",
+              "origin": "scheduled",
+              "added_by": null,
               "status_label": "Unresolved",
               "needs_decision": true,
               "completed_at": null,
@@ -198,6 +200,8 @@
                   "label": "7:30 AM"
                 },
                 "status": "completed",
+                "origin": "scheduled",
+                "added_by": null,
                 "status_label": "Completed",
                 "needs_decision": false,
                 "completed_at": "2026-10-18T11:41:00Z",
@@ -224,6 +228,8 @@
                   "label": "7:00 AM"
                 },
                 "status": "completed",
+                "origin": "scheduled",
+                "added_by": null,
                 "status_label": "Completed",
                 "needs_decision": false,
                 "completed_at": "2026-10-18T11:05:00Z",
@@ -252,6 +258,8 @@
                   "label": "7:00 AM"
                 },
                 "status": "unresolved",
+                "origin": "scheduled",
+                "added_by": null,
                 "status_label": "Unresolved",
                 "needs_decision": false,
                 "completed_at": null,

@@ -89,11 +89,13 @@ export function ParentOccurrenceRow({
         ref={headerRef}
         className={[
           "timeline-occurrence-row transition-colors",
+          styles.header,
           TONE_CLASSES[group.visualTone],
           headerClassName ?? "",
         ].join(" ")}
         data-visual-tone={group.visualTone}
         data-status-icons-only={statusIconsOnly ? "true" : "false"}
+        data-parent-marks={showBulk ? "actions" : isResolved ? "label" : "none"}
       >
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2">
           <button

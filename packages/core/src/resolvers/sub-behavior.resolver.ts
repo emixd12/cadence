@@ -18,6 +18,7 @@ const REJECTION_MESSAGES: Record<SubBehaviorLinkRejection, string> = {
   parent_is_sub_behavior: "A sub-behavior can't have sub-behaviors.",
   has_sub_behaviors: "A Behavior with sub-behaviors can't become a sub-behavior.",
   parent_archived: "An archived Behavior can't take sub-behaviors.",
+  opportunity: "An opportunity Behavior can't be part of a routine.",
 };
 
 function reject(reason: SubBehaviorLinkRejection): SubBehaviorLinkValidation {
@@ -51,24 +52,32 @@ export function resolveSubBehaviorRole(
 }
 
 /**
- * Depth-1 rule for setting `behaviorId`'s parent to `nextParentBehaviorId`. Null always
- * passes (ungroup). Archived children still count as children, so restoring one can
- * never make a grandchild.
+ * Depth-1 rule for setting `behaviorId`'s parent to `nextParentBehaviorId`. Null passes
+ * (ungroup) unless an opportunity Behavior keeps sub-behaviors. Archived children still
+ * count as children, so restoring one can never make a grandchild.
+ *
+ * Behaviors of Opportunity: an opportunity Behavior is never a parent or a sub-behavior.
+ * `nextIsOpportunity` is the subject's flag after the write; without it the stored flag
+ * in `behaviors` applies.
  */
 export function validateSubBehaviorLink(input: {
   behaviorId: string;
   nextParentBehaviorId: string | null;
   behaviors: readonly SubBehaviorLinkFacts[];
+  nextIsOpportunity?: boolean;
 }): SubBehaviorLinkValidation {
   const parentId = input.nextParentBehaviorId;
-  if (parentId === null) return { ok: true };
+  const subjectIsOpportunity = input.nextIsOpportunity
+    ?? input.behaviors.find((behavior) => behavior.id === input.behaviorId)?.isOpportunity === true;
+  const hasChildren = input.behaviors.some((behavior) =>
+    behavior.parentBehaviorId === input.behaviorId && behavior.id !== input.behaviorId);
+  if (parentId === null) return subjectIsOpportunity && hasChildren ? reject("opportunity") : { ok: true };
   if (parentId === input.behaviorId) return reject("self_parent");
   const parent = input.behaviors.find((behavior) => behavior.id === parentId);
   if (!parent) return reject("parent_not_found");
+  if (subjectIsOpportunity || parent.isOpportunity) return reject("opportunity");
   if (parent.parentBehaviorId) return reject("parent_is_sub_behavior");
   if (!isLive(parent)) return reject("parent_archived");
-  const hasChildren = input.behaviors.some((behavior) =>
-    behavior.parentBehaviorId === input.behaviorId && behavior.id !== input.behaviorId);
   if (hasChildren) return reject("has_sub_behaviors");
   return { ok: true };
 }
@@ -92,7 +101,8 @@ export function findSubBehaviorGraphViolations(
       parentId === behavior.id ? "self_parent"
         : !parent ? "parent_not_found"
           : parent.parentBehaviorId ? "parent_is_sub_behavior"
-            : null;
+            : behavior.isOpportunity || parent.isOpportunity ? "opportunity"
+              : null;
     if (reason) violations.push({ behaviorId: behavior.id, reason });
   }
   return violations;

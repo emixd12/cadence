@@ -121,7 +121,7 @@ drop trigger set_behaviors_updated_at on public.behaviors;
 create trigger set_behaviors_updated_at
   before update of category_id, title, description, recurrence_rule, scheduled_time, timezone,
     browser_reminder_enabled, email_reminder_enabled, reminder_offset_minutes, active, archived_at,
-    end_on, end_time, pause_from_on, pause_from_time, pause_back_on,
+    end_on, end_time, pause_from_on, pause_from_time, pause_back_on, is_opportunity,
     parent_behavior_id, sub_behavior_sort_order, inherit_parent_schedule
   on public.behaviors
   for each row execute function public.set_updated_at();
@@ -138,7 +138,7 @@ alter table public.behavior_configuration_events
     and changed_fields <@ array[
       'category_id', 'location_text', 'where_kind', 'schedule_graph',
       'browser_reminder_enabled', 'email_reminder_enabled',
-      'reminder_offset_minutes', 'active', 'timezone', 'end', 'pause',
+      'reminder_offset_minutes', 'active', 'timezone', 'end', 'pause', 'is_opportunity',
       'parent_behavior_id', 'inherit_parent_schedule'
     ]::text[]
   );
@@ -158,7 +158,7 @@ as $$
   select case when previous_configuration is null then array[
     'category_id', 'location_text', 'where_kind', 'schedule_graph',
     'browser_reminder_enabled', 'email_reminder_enabled',
-    'reminder_offset_minutes', 'active', 'timezone', 'end', 'pause',
+    'reminder_offset_minutes', 'active', 'timezone', 'end', 'pause', 'is_opportunity',
     'parent_behavior_id', 'inherit_parent_schedule'
   ]::text[] else array_remove(array[
     case when previous_configuration -> 'category_id' is distinct from next_configuration -> 'category_id' then 'category_id' end,
@@ -173,6 +173,7 @@ as $$
     case when previous_configuration -> 'timezone' is distinct from next_configuration -> 'timezone' then 'timezone' end,
     case when coalesce(previous_configuration -> 'end', 'null'::jsonb) is distinct from coalesce(next_configuration -> 'end', 'null'::jsonb) then 'end' end,
     case when coalesce(previous_configuration -> 'pause', 'null'::jsonb) is distinct from coalesce(next_configuration -> 'pause', 'null'::jsonb) then 'pause' end,
+    case when coalesce(previous_configuration -> 'is_opportunity', 'false'::jsonb) is distinct from coalesce(next_configuration -> 'is_opportunity', 'false'::jsonb) then 'is_opportunity' end,
     case when coalesce(previous_configuration -> 'parent_behavior_id', 'null'::jsonb)
       is distinct from coalesce(next_configuration -> 'parent_behavior_id', 'null'::jsonb) then 'parent_behavior_id' end,
     case when coalesce(previous_configuration -> 'inherit_parent_schedule', 'false'::jsonb)
@@ -181,22 +182,49 @@ as $$
 $$;
 
 -- A configuration plan written before sub-behaviors existed has no link keys. It reads
--- as keeping the stored link, as a plan without 'end' already does.
-create function cadence_private.behavior_configuration_with_link(planned jsonb, stored jsonb)
+-- as keeping the stored link, as a plan without 'end' or 'is_opportunity' already does.
+create or replace function cadence_private.behavior_configuration_with_run(planned jsonb, stored jsonb)
 returns jsonb
 language sql
 immutable
 set search_path = ''
 as $$
   select case
-    when planned is null or jsonb_typeof(planned) <> 'object' or planned ? 'parent_behavior_id' then planned
-    else planned || jsonb_build_object(
-      'parent_behavior_id', coalesce(stored -> 'parent_behavior_id', 'null'::jsonb),
-      'inherit_parent_schedule', coalesce(stored -> 'inherit_parent_schedule', 'false'::jsonb))
+    when planned is null or jsonb_typeof(planned) <> 'object' then planned
+    else planned
+      || case when planned ? 'end' then '{}'::jsonb
+        else jsonb_build_object('end', coalesce(stored -> 'end', 'null'::jsonb)) end
+      || case when planned ? 'pause' then '{}'::jsonb
+        else jsonb_build_object('pause', coalesce(stored -> 'pause', 'null'::jsonb)) end
+      || case when planned ? 'is_opportunity' then '{}'::jsonb
+        else jsonb_build_object('is_opportunity', coalesce(stored -> 'is_opportunity', 'false'::jsonb)) end
+      || case when planned ? 'parent_behavior_id' then '{}'::jsonb
+        else jsonb_build_object(
+          'parent_behavior_id', coalesce(stored -> 'parent_behavior_id', 'null'::jsonb),
+          'inherit_parent_schedule', coalesce(stored -> 'inherit_parent_schedule', 'false'::jsonb)) end
   end;
 $$;
 
-revoke all on function cadence_private.behavior_configuration_with_link(jsonb, jsonb) from public, anon, authenticated;
+revoke all on function cadence_private.behavior_configuration_with_run(jsonb, jsonb) from public, anon, authenticated;
+
+-- The changed fields a plan must list: a plan without the link keys names no link field.
+create or replace function cadence_private.behavior_configuration_planned_fields(expected text[], planned_next jsonb)
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select array(
+    select field
+    from unnest(expected) with ordinality as listed(field, position)
+    where not (field = 'where_kind' and not coalesce(planned_next ? 'where_kind', false))
+      and not (field in ('end', 'pause') and not coalesce(planned_next ? 'end', false))
+      and not (field = 'is_opportunity' and not coalesce(planned_next ? 'is_opportunity', false))
+      and not (field in ('parent_behavior_id', 'inherit_parent_schedule')
+        and not coalesce(planned_next ? 'parent_behavior_id', false))
+    order by position
+  );
+$$;
 
 -- A small text patcher for the function rewrites below: each anchor must occur once.
 create or replace function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
@@ -229,48 +257,24 @@ begin
   )$p$, 'Behavior configuration snapshot');
   execute definition;
 
-  -- Configuration plans without link keys keep the stored link and name no link field.
-  select pg_get_functiondef('cadence_private.insert_behavior_configuration_event(uuid,uuid,jsonb,jsonb,jsonb)'::regprocedure) into definition;
-  definition := pg_temp.patch_definition(definition, $a$    or cadence_private.behavior_configuration_with_run(
-      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'previous_configuration'),
-      previous_configuration)
-      is distinct from coalesce(previous_configuration, 'null'::jsonb)
-    or cadence_private.behavior_configuration_with_run(
-      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'next_configuration'),
-      next_configuration)
-      is distinct from next_configuration$a$, $p$    or cadence_private.behavior_configuration_with_link(cadence_private.behavior_configuration_with_run(
-      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'previous_configuration'),
-      previous_configuration), previous_configuration)
-      is distinct from coalesce(previous_configuration, 'null'::jsonb)
-    or cadence_private.behavior_configuration_with_link(cadence_private.behavior_configuration_with_run(
-      cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'next_configuration'),
-      next_configuration), next_configuration)
-      is distinct from next_configuration$p$, 'Configuration event plan snapshots');
-  definition := pg_temp.patch_definition(definition, $a$    or planned_changed_fields is distinct from (case
-      when (configuration_event_plan -> 'next_configuration') ? 'where_kind' then (case$a$, $p$    or planned_changed_fields is distinct from (select case
-      when (configuration_event_plan -> 'next_configuration') ? 'parent_behavior_id' then planned_fields.fields
-      else array_remove(array_remove(planned_fields.fields, 'parent_behavior_id'), 'inherit_parent_schedule')
-    end from (select (case
-      when (configuration_event_plan -> 'next_configuration') ? 'where_kind' then (case$p$, 'Configuration event plan link fields');
-  definition := pg_temp.patch_definition(definition, $a$    end)
-    or cardinality(expected_changed_fields) = 0$a$, $p$    end) as fields) as planned_fields)
-    or cardinality(expected_changed_fields) = 0$p$, 'Configuration event plan link fields end');
-  execute definition;
-
   -- Create: the caller may choose the id, so a parent and its sub-behaviors can be
   -- planned together (create_behavior_group_with_schedule_graphs).
   select pg_get_functiondef('public.create_behavior_with_schedule_graph(jsonb,jsonb,jsonb,jsonb)'::regprocedure) into definition;
   definition := pg_temp.patch_definition(definition, $a$    pause_back_on,
     auto_archived_at,
+    is_opportunity,
     created_at,$a$, $p$    pause_back_on,
     auto_archived_at,
+    is_opportunity,
     parent_behavior_id,
     sub_behavior_sort_order,
     inherit_parent_schedule,
     id,
     created_at,$p$, 'Behavior create columns');
   definition := pg_temp.patch_definition(definition, $a$    nullif(behavior_payload ->> 'auto_archived_at', '')::timestamptz,
+    coalesce((behavior_payload ->> 'is_opportunity')::boolean, false),
     behavior_created_at,$a$, $p$    nullif(behavior_payload ->> 'auto_archived_at', '')::timestamptz,
+    coalesce((behavior_payload ->> 'is_opportunity')::boolean, false),
     nullif(behavior_payload ->> 'parent_behavior_id', '')::uuid,
     coalesce(nullif(behavior_payload ->> 'sub_behavior_sort_order', '')::integer, 0),
     coalesce(nullif(behavior_payload ->> 'inherit_parent_schedule', '')::boolean, false),
@@ -296,12 +300,10 @@ begin
 
   -- Account sync: a contract-9 Behavior write must carry the link fields.
   select pg_get_functiondef('cadence_private.apply_account_sync_plan(jsonb)'::regprocedure) into definition;
-  definition := pg_temp.patch_definition(definition, $a$      'auto_archived_at', 'location_text', 'where_kind'
-    ]) then
-      raise exception 'Update Cadence before synchronizing Behavior changes.' using errcode = '22023';
-    end if;$a$, $p$      'auto_archived_at', 'location_text', 'where_kind'
-    ]) then
-      raise exception 'Update Cadence before synchronizing Behavior changes.' using errcode = '22023';
+  definition := pg_temp.patch_definition(definition, $a$    if write_kind = 'occurrence' and not ((write -> 'value') ?& array['origin', 'added_by']) then
+      raise exception 'Update Cadence before synchronizing Occurrence changes.' using errcode = '22023';
+    end if;$a$, $p$    if write_kind = 'occurrence' and not ((write -> 'value') ?& array['origin', 'added_by']) then
+      raise exception 'Update Cadence before synchronizing Occurrence changes.' using errcode = '22023';
     end if;
     if write_kind = 'behavior' and v_contract >= 9 and not ((write -> 'value') ?& array[
       'parent_behavior_id', 'sub_behavior_sort_order', 'inherit_parent_schedule'
@@ -327,7 +329,7 @@ begin
     coalesce(nullif(row ->> 'inherit_parent_schedule', '')::boolean, false),
     nullif(row ->> 'auto_archived_at', '')::timestamptz,$p$, 'BehaviorLog restore values');
   definition := pg_temp.patch_definition(definition, $a$    archived_at = excluded.archived_at,
-    archive_notes = case$a$, $p$    parent_behavior_id = case when exists (
+    is_opportunity = case when exists ($a$, $p$    parent_behavior_id = case when exists (
       select 1 from jsonb_array_elements(restore_payload -> 'behaviors') source
       where source ->> 'id' = excluded.id::text and source ? 'parent_behavior_id'
     ) then excluded.parent_behavior_id else public.behaviors.parent_behavior_id end,
@@ -340,7 +342,7 @@ begin
       where source ->> 'id' = excluded.id::text and source ? 'parent_behavior_id'
     ) then excluded.inherit_parent_schedule else public.behaviors.inherit_parent_schedule end,
     archived_at = excluded.archived_at,
-    archive_notes = case$p$, 'BehaviorLog restore link');
+    is_opportunity = case when exists ($p$, 'BehaviorLog restore link');
   execute definition;
 
   -- Export page bundle.
