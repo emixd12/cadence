@@ -64,7 +64,7 @@ Check the cited entry before acting on a row.
 | Mac leave reminders for newly added Calendar events | PR #198 in 0.1.10; installed run on November 12 inconclusive (event too close to plan a reminder) | Rerun on the test Mac with an event at least two hours ahead | STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026" |
 | Updater key rotation and new Developer ID identity | 0.1.10 published November 12, 05:29–05:33Z, with the rotated key and new identity; 0.1.9 and earlier install it by hand once | Renew the certificate before December 11, 2027. PR #241 and PR #243 shipped dormant in 0.1.11 after ordinary installed acceptance | DECISIONS, 2026-11-11; STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026"; release packet, "PR review follow-up" |
 | Ticket 325: release credential backup and restore | Identity, notarization-password and updater backups verified November 12; API-key backup and checks recorded as passed in `dd4cb67b`; notarization uses the API key (0.1.10) | Certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026"; 0.1.10 release packet |
-| Cadence for Mac 0.1.12 | Published November 19, 2026, 23:34Z (0.1.11 on November 14); brief follow-up passed November 20 | **Linked Macs cannot sync since PR #327 (contract 7, November 20, 04:42Z)**: "The hosted account snapshot fingerprint is invalid." Needs server contract-6 compatibility or a Mac release with contract 7; macOS 14 not tested | `docs/qa/2026-11-19-desktop-0.1.12-release-packet.md`, "Sync failure after PR #327" |
+| Cadence for Mac 0.1.14 | Published November 21, 2026, 06:36Z (0.1.13 at 01:59Z): schema 27, contract 8, Behaviors of Opportunity; real-updater upgrade and Opportunity round trip passed on the test Mac | Owner signs Cadence on the owner's Mac in to check contract 8 sync there; earlier linked Macs cannot sync until they update; macOS 14 not tested | `docs/qa/2026-11-21-desktop-0.1.14-release-packet.md` |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
@@ -96,7 +96,8 @@ Check the cited entry before acting on a row.
 
 ## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
 
-- **In review (branch `feature-add`, not pushed).** A Behavior can be available as an
+- **Merged (PR #351, `07fb29ea`) and live; the Mac part shipped in Cadence for Mac 0.1.14
+  (November 21, 06:36Z).** A Behavior can be available as an
   opportunity, with or without a schedule; the person adds it to today from the Timeline's
   Opportunity Basket (a time, a window or Done now) and removes a clean added item.
   Adherence stays scheduled-only; unscheduled ones show Done N times. Five waves:
@@ -104,15 +105,14 @@ Check the cited entry before acting on a row.
   and Chat; Daily Brief "Add for today" lines and the `opportunity_ready_to_schedule`
   coach signal; Cadence for Mac (SQLite schema 27 rebuilds `behaviors` and `occurrences`,
   local add and Remove, contract 8 sync, the brief lines on a linked Mac).
-- **Migrations (local only; hosted push needs the owner's OK before merge):**
-  `20261121100000`, `20261121110000`, `20261121120000`, `20261121130000`.
+- **Hosted migrations applied before the merge:** `20261121100000`, `20261121110000`,
+  `20261121120000`, `20261121130000`.
 - **Verification (Node 24):** `cargo test` (Rust store, incl. 26 → 27 upgrade, add, Done
   now, Remove, generation guard, contract 8 round trip); real-SQLite
   `tests/desktop-opportunity-contract.test.ts`; DOM and service tests for each wave;
   typecheck (web and Mac), interactions, map, resolvers, core and agents checks. Not run:
   full `npm run test`, SQL replay (CI "Local Supabase rehearsal").
-- **Next:** hosted migration push, then CI and merge; a Mac release with schema 27 is
-  needed before linked Macs sync again (contract 8 has no contract 7 fallback).
+- **Done:** contract 8 has no contract 7 fallback, so linked Macs need 0.1.14 to sync.
 
 Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
 `apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
@@ -161,6 +161,21 @@ not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-0
   copy). Lint, typecheck (web and Mac), `interactions:check`, `resolvers:check` and build
   pass. `npm run test`: only the 4 files that fail the same way on main in this container
   (Node 22, no Preview access).
+
+## Cadence for Mac 0.1.14 published — November 21, 2026
+
+- **Published 06:36Z** under the owner's full approval for this release (Task 11). Version bump
+  PR #352 (`e3b87963`); notarized (DMG `0a78310d…`), 14 artifact checks, quarantined download
+  passes, public readback passes. Area checks: none triggered; check 4 ran for migration 27.
+- **Test Mac:** published 0.1.13 updated through the real updater; schema 26 → 27, every table
+  kept its count, contract 8 sync with 0 pending. A new opportunity Behavior and a Done now
+  Occurrence from the Basket synced and read back in hosted data as A.
+- **Owner's Mac:** 0.1.13-dev.1 → notarized 0.1.14 by rename swap after a protected backup;
+  schema 27, no rows lost. It has no account linked (149 local writes), so contract 8 sync
+  there waits for the owner's sign-in.
+- **Tooling findings:** the `click` helper refuses when the Dock's full-screen layer-20
+  window covers the point; the test-Mac permission probe times out (one accessibility read
+  takes 85–100 s). Test Mac Location is not allowed (owner step).
 
 ## Cadence for Mac 0.1.13 published — November 21, 2026
 
@@ -221,162 +236,3 @@ and future mobile not applicable. Messaging impact: none.
   changed files; `interactions:check` passes. Full `npm run test`: 6,324 pass; the 16
   failures are the Node 24 files that fail the same way on main here.
 - **Left for AI helpers:** the trial warnings before End and Pause (R3, `in_trial`).
-
-## Ended and Paused Behaviors, server and core — November 20, 2026
-
-- **In review (draft PR, branch `claude/project-thread-p37rj8`).** Behaviors no longer
-  archive by themselves. `end_date` becomes `end_on` (last day it runs) plus optional
-  `end_time`; a single pause (`pause_from_on`, optional `pause_from_time`,
-  `pause_back_on`) stops scheduling until the back-on day. Run state is derived by
-  `packages/core/src/resolvers/behavior-run.resolver.ts`. Run actions End now, Start
-  again, Pause and Resume now write one configuration revision each. The archive job,
-  its RPCs and the automatic-archive notices are removed. MCP 1.4.0 adds `run_state`,
-  `end_on`, `end_time`, `pause`, the `running` and `not_running` filters, and
-  `end_behavior`, `pause_behavior`, `resume_behavior`; `end_date` stays as a deprecated
-  alias. Account sync contract 7. Docs: `docs/RECURRENCE_RULES.md`, "Behavior end and
-  pause"; `docs/DATA_MODEL.md`, same title; `docs/MESSAGING_CHANGES.md` P-074 to P-076.
-- **Verification:** migration replayed on a fresh local Postgres; backfill checked
-  (end_date 2026-12-01 became end_on 2026-11-30, `updated_at` unchanged);
-  `tests/sql/behavior-end-and-pause-smoke.sql` passes. `npm run test`: 6,304 pass; the 16
-  failures are the 4 files that need Node 24 and fail the same way on main here.
-- **Production:** migration `20261120120000_behavior_end_and_pause.sql` not applied. It
-  needs the owner's OK, and should be applied right before the merge.
-- **Next:** web UI (Not running list, End now, Pause, Resume, notices) and Mac
-  workstreams. The Mac Rust store still uses `end_date` and must move before the next
-  Mac release. The trial-shift rule (T6) belongs to the AI helpers workstream.
-
-## Advisor plan Phase 5 (5A): chat server — November 19, 2026
-
-- **Merged November 20 (PR #318).** `POST /api/advisor/chat`
-  streams chat replies as NDJSON events; confirm, Undo and conversation routes sit beside it.
-  The turn runs as the person on the `chat` agent token over every MCP operation plus two
-  chat-only reads (`list_calendar_events` with event titles, `list_workouts`). Moves are
-  checked against calendar events. The first single-record write in a question runs at
-  once with Undo; Behavior changes and further writes wait for one Yes (stored in
-  `chat_confirms`, 15 minutes). Medical questions get a one-line refusal and the disclaimer.
-  Limits: 8 tool calls, US$0.25 per question, 12 KB per tool result, last 20 messages plus
-  a summary. Wire types: `packages/core/src/types/chat.ts`. Docs: `docs/DATA_MODEL.md`,
-  "Chat conversations"; `docs/ROUTE_MAP.md`.
-- **Verification:** `tests/chat-turn.test.ts` (25 tests, scripted model); migration and RLS
-  checked on a local Postgres 16 (chat token reads and writes its own rows; the person,
-  MCP grants, other agents and other users see none; delete refused; account delete
-  cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
-  fail the same way on main in this container. No live run against a real model yet.
-- **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.4` (a source problem is said once per conversation; Outlook or iCloud connected with no calendars chosen points to Settings; research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
-- **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
-  approval while chat is on, and reads only the sources left on.
-- Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
-
-## Advisor plan Phase 5C: Mac Chat screen — November 20, 2026
-
-- **In review (branch `claude/project-thread-csiyb8`).** Cadence for Mac gets the Chat
-  screen (`apps/desktop/src/chat-screen.tsx`) on 5B's shared `ChatPage`, and recent chats
-  under Chat in the Mac menu (shared list `components/chat/ChatRecents.tsx`). Only a linked
-  Mac shows Chat. The Mac calls the hosted chat routes with its bearer session
-  (`apps/desktop/src/chat.ts`); a turn, Yes or Undo that changed records asks account
-  sync to run, so the Timeline redraws after one sync round. One switch,
-  `CHAT_PAGE_LIVE` in `lib/navigation.ts`, now covers production web and Mac release
-  builds; development builds always show Chat. Bench `?bench=chat&state=…` in the
-  desktop dev server. Tests `tests/desktop-chat.dom.test.tsx`.
-- **Merged Nov 20 (#341).** `CHAT_PAGE_LIVE` set true the same day (owner decision), so
-  Chat is live on production web and in the next Mac build.
-- **Next:** the installed Mac check (desktop-acceptance) and
-  the usual Mac release with the owner's written go-ahead.
-
-## Advisor plan Phase 5B: web Chat page — November 19, 2026
-
-- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
-  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
-  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
-- **Chat page (second change):** `components/chat/ChatPage.tsx` and `ChatMessages.tsx` on
-  5A's `@cadence/core/types/chat` events (`lib/ui/chat.ts` folds the stream), past
-  conversations, composer fixed to the bottom on phones, bench
-  `/design-system?preview=chat&state=…`. Registry INT-CHAT-001..004, journey J29,
-  `docs/user-guide/chat.md`, DESIGN.md "Chat". Second pass against an AI chat UI
-  checklist: Stop (5A's `CHAT_ROUTES.stop`), scroll that follows only when the newest
-  line is on screen plus Jump to latest, failed sends back in the field with the same
-  message id, a polite status line for run states, `?c=` reopens after a reload, and
-  stream validation with a plain-text fallback. Waiting on Emi's UI review.
-- **Next:** set `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) once 5A's route is on main; 5C adds the Mac screen.
-
-## Advisor plan Phase 5B: web Chat page — November 19, 2026
-
-- **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
-  primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
-  set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
-- **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
-  mobile layout and a `/design-system` bench with fixture conversations.
-
-## Cadence for Mac 0.1.12 published — November 19, 2026
-
-- **Published 23:34Z** on the owner's instruction of November 19, 21:20Z. Version bump PR #311
-  (`afeb8a9e`); notarized (app `10f02d12…`, DMG `e2bc170b…`), 14 artifact checks, quarantined
-  download passes. Carries advisor Phase 2 per-day moves on the Mac (SQLite schema 25) and Phase 3
-  brief move answers (PRs #303, #306–#310).
-- **Upgrade.** With the owner's yes, the test Mac went back to published 0.1.11 with A's protected
-  schema-24 database, then updated through the real updater (21:30–21:33Z): schema 24 → 25, no lost
-  rows (52 Behaviors, 230 Occurrences).
-- **Area checks pass:** session renewal (61 minutes); revoked session (A's Mac session deleted
-  22:28Z with the owner's yes, signed-out state 23:30Z, Google reconnect and sync 23:32Z); native
-  reminder delivered with Cadence quit. Sign-in and Calendar callback files unchanged.
-- **Brief moves on the installed app:** brief opens with move lines, Yes, Undo, Other time kept after
-  Close and reopen (`appliedTo`), No and single-line Re-plan pass. Accept all, Undo all and Re-plan
-  beside another open line wait for A's first brief of November 20: A used both Refreshes on
-  November 19. A's Daily Brief stays on until then.
-- **Finding:** a Behavior created with an end date of today is archived at once.
-
-Platform impact: Mac release; web, marketing and mobile not applicable. Messaging impact: none new.
-
-## Advisor plan Phase 4 (4C): base schedule proposals — November 19, 2026
-
-- **In review (draft PR, branch `claude/project-thread-d8ll9x`).** The advisor can propose
-  a schedule change when the same Behavior was moved the same way on 4 of the last 5
-  matching weekdays: "Change your schedule: Gym at 6:30 PM every Tuesday from Tuesday,
-  Nov 24 (now 7:00 AM)." Try for two weeks, Change for good, No; a trial asks Keep or Go
-  back after 14 days. Server only for now: table, coach-token proposal function, person
-  answer functions, `/api/advisor/coach/schedule-proposal`. 4B's nightly job calls
-  `proposeBehaviorChangesForVisit`; 4E draws the lines. Docs: `docs/DATA_MODEL.md`, "Base
-  schedule proposals"; `docs/DATETIME_STRATEGY.md`; `docs/ROUTE_MAP.md`. Messaging: none.
-- **Verification:** migration applies on a fresh local database and
-  `tests/sql/behavior-change-proposals-smoke.sql` passes; unit and service tests pass.
-- **Next:** owner go-ahead for the production migration; 4B wires the call; 4E builds the UI.
-
-## Advisor plan Phase 3 (3D): coach signals in shadow — November 18, 2026
-
-- **In review (draft PR, branch `claude/project-thread-vfk26s`).** An hourly cron
-  (`/api/advisor/coach/signals/process`, minute 41) visits accounts at 03:00 to 05:59 local
-  time that were active in the last seven days, computes coach signals with no model call
-  and stores them in `cadence_advisor_private.coach_signals`. Nothing is shown. Signals:
-  completion rate dropped, same Behavior moved the same way, late marking, new Behavior past
-  two weeks, brief answers. Owner approved the cron and production table on November 18.
-  Off switch: `CADENCE_COACH_SIGNALS=off`. Docs: `docs/DATA_MODEL.md`, "Coach signals in
-  shadow"; `docs/ROUTE_MAP.md`; `docs/MESSAGING_CHANGES.md` P-064.
-- **Verification (local stack):** migration replays on a fresh local database;
-  `tests/coach-signals.local-integration.test.ts` passes (due selection, visit as the
-  person, re-run, token isolation); resolver, job and route tests pass; lint, typecheck and
-  core check pass. `npm run test`: 16 failures in 4 files that fail the same way on main in
-  this container (Node 24-only and Preview access suites).
-- **Next:** apply the migration to production, merge, and confirm the first hourly runs.
-  Answer reading switches to Phase 3A1's `move_proposal_answers` once it exists.
-
-## Advisor plan Phase 1A: data foundations in source — November 16, 2026
-
-- **Merged (PR #290) and applied to the hosted database** on November 16, 2026, with the
-  owner's go-ahead. First-party caller (one token channel and first-party grant per agent),
-  agent run log with 30-day content store and daily deletion, Postgres spend budget
-  (US$5 per account per month; Daily Brief US$0.50 protected, quips US$1.00, Chat
-  US$3.50). The hosted Daily Brief now writes a run, reserves before its model call and
-  stores its facts and output. Settles Ticket 185. Docs: `docs/DATA_MODEL.md`, "Advisor
-  agents"; `docs/COSTS.md`, "Advisor agent budget"; `docs/SUPABASE_WORKFLOW.md`, "Agent
-  token channels".
-- **Verification (local stack, Node 22):** clean `db reset` replay of all 125 migrations;
-  all 49 `tests/sql` fixtures pass (Ticket 232 maintenance smoke now counts the three
-  seeded agent clients separately); local integration tests pass except
-  `mcp-server.local-integration`, which needs its own assigned stack; `npm run test`
-  passes except Node 24-only suites; lint, typecheck, agents, resolvers, core and
-  interactions checks pass.
-- **Owner decisions:** hosted migrations approved; US$25 global daily breaker confirmed.
-- **Phase 1B follow-up (done in #291):** the brief runs through the AI SDK model setting, and its calls still go through `daily-brief-agent-run.ts` over these functions. 1B's stub metering module was removed; `agent-model-pricing.ts` gained the eval candidate prices.
