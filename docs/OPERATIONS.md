@@ -236,6 +236,10 @@ Its checks run as parallel jobs:
 | `sites` | `desktop:build`, `marketing:build`, `marketing:check` |
 | `verify` | Nothing itself. It fails unless every job above passed |
 
+`CI` also runs on `merge_group`, the event a merge queue sends for the commit it is
+about to put on `main`. The repository has no queue until it moves to an organization
+(`docs/DECISIONS.md`, 2026-11-21); until then the event never fires.
+
 Branch protection on `main` requires only the check named `verify`. Do not rename
 that job or remove its `if: always()`: GitHub counts a skipped required check as
 passing, and without `always()` the job is skipped when a job it needs fails. A new
