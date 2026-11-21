@@ -7,6 +7,7 @@ import { executeMcpOperation } from "@/lib/integrations/operations/execute";
 import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
 import { getHevyActivities } from "@/lib/services/hevy.service";
 import { withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
@@ -51,12 +52,14 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
           : await getIcloudCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true });
+      if (!read.result.ok) logConnectorRead("chat_connector_read_partial", source, read.result.error.code, null);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
       const events = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
       return { events, report: { source, state: read.result.ok ? "read" : "partial" } };
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
       const notConnected = code === "reconnect_required" || code === "not_connected" || code === "same_account_required" || code === "not_configured";
+      logConnectorRead("chat_connector_read_failed", source, code, error);
       return { events: [], report: { source, state: notConnected ? "not_connected" : "failed" } };
     }
   };
@@ -77,10 +80,18 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
         return { workouts, sources: [{ source: "hevy", state: snapshot.completeness === "complete" ? "read" : "partial" }] };
       } catch (error) {
         const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+        logConnectorRead("chat_connector_read_failed", "hevy", code, error);
         return { workouts: [], sources: [{ source: "hevy", state: code === "reconnect_required" || code === "not_connected" ? "not_connected" : "failed" }] };
       }
     },
   };
+}
+
+/** Source, error code and error class only: never event content, ids or messages. */
+function logConnectorRead(name: string, source: ChatCalendarSource | "hevy", code: string, error: unknown): void {
+  reportMonitoringEvent({ name, severity: "warning", context: {
+    source, code: code || null, error_name: error instanceof Error ? error.name : error === null ? null : typeof error,
+  } });
 }
 
 function projectEvent(event: NormalizedExternalEvent, source: ChatCalendarSource): ChatCalendarEvent[] {
