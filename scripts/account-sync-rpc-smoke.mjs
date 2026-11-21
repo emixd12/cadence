@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { buildSmokePassword, cleanupTemporaryUsers, readLocalSmokeConfig, readSmokeConfig } from "./supabase-rls-smoke.mjs";
 
-// Contract 7 (Ended and Paused) is also the writer floor: contracts 1-6 read but cannot write.
-const CURRENT_CONTRACT = 7;
+// Contract 8 (Behaviors of Opportunity) is also the writer floor: contracts 1-7 read but cannot write.
+const CURRENT_CONTRACT = 8;
 const config = process.argv.includes("--local") ? readLocalSmokeConfig() : readSmokeConfig();
 const admin = createClient(config.url, config.serviceRoleKey, { auth: { persistSession: false } });
 const password = buildSmokePassword(randomUUID().slice(0, 8));
@@ -112,19 +112,26 @@ try {
   // Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
   const c7 = await readSnapshot(clients[0], 7);
   assert(c7.entities.filter((row) => row.kind === "behavior").every((row) => "end_on" in row.value && !("end_date" in row.value)), "contract 7 behaviors carry end_on");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 8 }), "unknown read contract");
+  assert(c7.entities.every((row) => !("is_opportunity" in row.value) && !("origin" in row.value) && !("added_by" in row.value)), "contract 7 omits the opportunity fields");
+  // Contract 8 adds behaviors.is_opportunity and occurrences.origin and added_by.
+  const c8 = await readSnapshot(clients[0], 8);
+  assert(c8.entities.filter((row) => row.kind === "behavior").every((row) => row.value.is_opportunity === false), "contract 8 behaviors carry is_opportunity");
+  assert(c8.fingerprint === entityDigest(c8.entities), "contract 8 fingerprint covers its projection");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 9 }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
   const c1Request = (writes, key) => { const value = payload(legacy, writes, entityDigest(c1Merged), key); delete value.contract; return value; };
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c8c8".repeat(16)), contract: 8 } }), "unknown apply contract");
-  // Builds before contract 7 still write end_date, so the writer floor refuses them.
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c9c9".repeat(16)), contract: 9 } }), "unknown apply contract");
+  // Builds before contract 8 write end_date or omit the opportunity fields, so the writer floor refuses them.
   const c1Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) });
   assert(c1Refused.error?.message.includes("Update Cadence"), "contract 1 writes are refused below the writer floor");
   const c6 = await readSnapshot(clients[0], 6);
   const c6Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(c6, [], c6.fingerprint, "c6c6".repeat(16)), contract: 6 } });
   assert(c6Refused.error?.message.includes("Update Cadence"), "contract 6 writes are refused below the writer floor");
+  const c7Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(c7, [], c7.fingerprint, "c7c7".repeat(16)), contract: 7 } });
+  assert(c7Refused.error?.message.includes("Update Cadence"), "contract 7 writes are refused below the writer floor");
   const afterContracts = await readSnapshot(clients[0]);
   first.snapshot = afterContracts;
   first.fingerprint = afterContracts.fingerprint;
@@ -183,8 +190,8 @@ try {
   assert(configurationEvent, "seeded behavior configuration lineage");
   const occurrenceId = randomUUID();
   const occurrenceValue = { id: occurrenceId, behavior_configuration_event_id: configurationEvent.id, behavior_id: behaviorId, behavior_schedule_slot_id: null,
-    completed_at: null, created_at: "2026-09-02T13:00:00.000000Z", local_date: "2026-09-02", note: null, schedule_end_time: null,
-    schedule_kind: "exact", schedule_preset: null, schedule_range_identity: 123, schedule_start_time: "09:00:00", scheduled_for: "2026-09-02T13:00:00.000000Z",
+    added_by: null, completed_at: null, created_at: "2026-09-02T13:00:00.000000Z", local_date: "2026-09-02", note: null, schedule_end_time: null,
+    origin: "scheduled", schedule_kind: "exact", schedule_preset: null, schedule_range_identity: 123, schedule_start_time: "09:00:00", scheduled_for: "2026-09-02T13:00:00.000000Z",
     status: "unresolved", status_marked_at: null, updated_at: "2026-09-02T13:00:00.000000Z" };
   const occurrenceMerged = [...occurrenceBase.entities, { kind: "occurrence", id: occurrenceId, value: occurrenceValue }]
     .sort((left, right) => left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id));
@@ -292,7 +299,7 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 7 writer floor, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 8 writer floor and opportunity fields, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }
