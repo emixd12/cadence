@@ -21,7 +21,8 @@ import { systemClock } from "@/lib/services/clock";
 import { runChatConfirm, runChatUndo } from "./chat-confirm";
 import { createLiveChatExecutor, liveChatConnectorReads } from "./chat-executor";
 import { CHAT_PROMPT_VERSION, buildChatSystemPrompt } from "./chat-prompt";
-import { chatEnabled, chatSources, chatSourcesOff, readChatAiSettings } from "./chat-settings";
+import { chatEnabled, chatSources, chatSourcesOff, readChatAiSettings, type ChatAiSettings } from "./chat-settings";
+import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { buildChatToolDefinitions, trimToolResult, withoutNotes } from "./chat-tools";
 import { CHAT_LIMITS, budgetText, runChatTurn, summarizeOlderMessages, type ChatSpendGate, type ChatTurnWrite } from "./chat-turn";
 import type { ChatPendingWrite, ChatUndoPlan } from "./chat-writes";
@@ -39,6 +40,9 @@ export class ChatRequestError extends Error {
   }
 }
 
+/** False until this server instance has run a turn, so the timing log can mark cold starts. */
+let warmInstance = false;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The whole turn, including storage after the model; the route's maxDuration is above it. */
 const TURN_DEADLINE_MS = 75_000;
@@ -47,7 +51,8 @@ const ABANDONED_AFTER_MS = 100_000;
 /** How often a running turn checks whether the person pressed Stop. */
 const STOP_POLL_MS = 1_000;
 
-export type ChatSession = Readonly<{ caller: CalendarCaller; context: IntegrationContext }>;
+/** `settings` is the AI settings read when the session opened, so a turn does not read them again. */
+export type ChatSession = Readonly<{ caller: CalendarCaller; context: IntegrationContext; settings?: ChatAiSettings }>;
 
 /** Signs the person in and opens their chat agent context. Refuses when chat is off (4F setting). */
 export async function openChatSession(request: Request): Promise<ChatSession> {
@@ -58,7 +63,7 @@ export async function openChatSession(request: Request): Promise<ChatSession> {
   if (!chatEnabled(settings)) throw new ChatRequestError(403, { code: "chat_off", text: "Chat is off. Turn it on in Settings." });
   if (!agentCallerConfigured()) throw new ChatRequestError(503, { code: "model_unavailable", text: "Chat is not available on this server." });
   try {
-    return { caller, context: await createAgentContext(caller.user.id, "chat") };
+    return { caller, context: await createAgentContext(caller.user.id, "chat"), settings };
   } catch {
     throw new ChatRequestError(503, { code: "model_unavailable", text: "Chat could not start just now. Try again in a moment." });
   }
@@ -160,39 +165,50 @@ async function runAndStore(input: Readonly<{
   const client = context.supabase;
   const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
   const setting = agentModelSetting("chat");
-  const settings = await readChatAiSettings(caller.client);
+  const startedAt = performance.now();
+  const coldStart = !warmInstance;
+  warmInstance = true;
+  const settings = input.session.settings ?? await readChatAiSettings(caller.client);
   const sources = chatSources(settings);
-  const timezone = await profileTimezone(caller);
+  // Everything before the first model call runs at once: each is a separate database round trip.
+  const [timezone, run, history, timelineJson] = await Promise.all([
+    profileTimezone(caller),
+    startAgentRun(client, { trigger: "chat_turn", model: setting.model, promptVersion: CHAT_PROMPT_VERSION }, signal)
+      .then((value) => value.runId, () => undefined),
+    readChatHistory(client, input.conversationId, input.replyId),
+    input.firstTurn ? firstTurnTimeline(context, sources.notes) : Promise.resolve(null),
+  ]);
   const now = localNow(timezone);
   const tools = buildChatToolDefinitions(sources);
   const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources) });
   const reads = liveChatConnectorReads(caller, sources, signal);
   const executor = createLiveChatExecutor({ context, sources, reads, today: () => localNow(timezone).today });
 
-  let runId: string | null = null;
+  let firstTextMs: number | null = null;
   const usage: AgentModelUsage[] = [];
   // What the person has seen so far, kept so a turn that fails later still stores it.
   const sentParts: ChatPart[] = [];
-  const send = (event: ChatEvent) => { recordSentPart(sentParts, event); input.send(event); };
+  const send = (event: ChatEvent) => {
+    if (firstTextMs === null && event.type === "text") firstTextMs = Math.round(performance.now() - startedAt);
+    recordSentPart(sentParts, event); input.send(event);
+  };
   const saveWrite = (write: ChatTurnWrite) => saveChatActions(client, { userId: caller.user.id, conversationId: input.conversationId,
     messageId: input.replyId, actions: [{ outcome: write.outcome, operation: write.call.name, undoPlan: write.undo }] });
-  try {
-    ({ runId } = await startAgentRun(client, { trigger: "chat_turn", model: setting.model, promptVersion: CHAT_PROMPT_VERSION }, signal));
-  } catch {
+  if (run === undefined) {
     const alert: ChatAlert = { code: "failed", text: "Chat could not start just now. Try again in a moment." };
     send({ type: "alert", alert });
     await finishChatReply(client, { conversationId: input.conversationId, replyId: input.replyId, parts: [{ type: "alert", alert }], agentRunId: null }).catch(() => undefined);
     return;
   }
+  const runId = run;
   const spend: ChatSpendGate = async (estimate) => {
     const decision = await reserveAgentSpend(client, { runId, model: setting.model, estimatedMicrodollars: Math.max(1, estimate) }, signal);
     if (!decision.allowed) return { ok: false, retryAt: decision.resetsAt };
     return { ok: true, settle: async (actual) => { await settleAgentSpend(client, { reservationId: decision.reservationId, actualMicrodollars: actual ?? estimate }); } };
   };
 
-  const history = await readChatHistory(client, input.conversationId, input.replyId);
   const earlier = history.messages.filter((message) => message.id !== input.userMessageId);
-  const timelineJson = input.firstTurn ? await firstTurnTimeline(context, sources.notes) : null;
+  const setupMs = Math.round(performance.now() - startedAt);
 
   let outcome: "success" | "refused_budget" | "model_error" | "timeout" | "error" = "success";
   let errorCode: string | null = null;
@@ -240,6 +256,11 @@ async function runAndStore(input: Readonly<{
     modelCalls, inputTokens: total((item) => item.inputTokens), cachedInputTokens: total((item) => item.cachedInputTokens),
     outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens), toolCalls,
   }).catch(() => undefined);
+  // Timings only, no content: from the saved question to the first model call and to the first reply text.
+  reportMonitoringEvent({ name: "chat_turn_timing", context: {
+    agent_run_id: runId, setup_ms: setupMs, first_text_ms: firstTextMs, total_ms: Math.round(performance.now() - startedAt),
+    model_calls: modelCalls, tool_calls: toolCalls.length, first_turn: input.firstTurn, cold_start: coldStart, outcome,
+  } });
 }
 
 /** Today's Timeline for the first turn: a compact projection, cut to the tool-result size. */
