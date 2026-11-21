@@ -138,9 +138,15 @@ Check the cited entry before acting on a row.
   pass. `npm run test`: only the 4 files that fail the same way on main in this container
   (Node 22, no Preview access).
 
-## Cadence for Mac 0.1.13 release check — November 20, 2026
+## Cadence for Mac 0.1.13 published — November 21, 2026
 
-- **Release check passed on dev builds; 0.1.13 not yet notarized or published.** Dev-signed 0.1.13-dev.1 (main
+- **Published 01:59Z** on the owner's instruction of 01:13Z. Version bump PR #347 (`5c7490b6`);
+  notarized (DMG `503b6287…`), 14 artifact checks, quarantined download passes, public readback
+  passes. The test Mac went back to published 0.1.12 (owner's yes) and updated through the real
+  updater; the 7-conflict review applied on the published build and the 11 old writes synced.
+  The upgrade checker flagged 5 Occurrences that sync removed (archived on the web); classified
+  in `docs/qa/2026-11-21-desktop-0.1.13-release-packet.md`.
+- **Release check on dev builds, November 20–21.** Dev-signed 0.1.13-dev.1 (main
   `6d0f6834`) installed on the owner's Mac (schema 24 → 26, counts unchanged) and the test
   Mac (schema 25 → 26; 30 `end_date` rows backfilled as `end_on = end_date - 1`; 11 pending
   writes kept). Migration 26 passes on both.
