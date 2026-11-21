@@ -582,10 +582,11 @@ function toJsonBehaviorConfigurationSnapshot(
     ...(snapshot.pause === undefined ? {} : {
       pause: snapshot.pause ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn } : null,
     }),
-    ...(snapshot.parentBehaviorId === undefined ? {} : {
+    // A standalone snapshot carries no link, so it matches snapshots written before sub-behaviors.
+    ...(snapshot.parentBehaviorId ? {
       parent_behavior_id: snapshot.parentBehaviorId,
-      inherit_parent_schedule: snapshot.parentBehaviorId ? snapshot.inheritParentSchedule ?? true : false,
-    }),
+      inherit_parent_schedule: snapshot.inheritParentSchedule ?? true,
+    } : {}),
   };
 }
 
@@ -2268,10 +2269,10 @@ function toBehaviorLogConfigurationEvents(input: {
       })),
       extensions: { [BEHAVIORLOG_EXTENSION_NAMESPACE]: {
         category_id: value.category_id,
-        ...(value.parent_behavior_id === undefined ? {} : {
+        ...(value.parent_behavior_id ? {
           parent_behavior_id: value.parent_behavior_id,
           inherit_parent_schedule: value.inherit_parent_schedule ?? false,
-        }),
+        } : {}),
       } },
     });
     const previous = event.previous_configuration ? snapshot(event.previous_configuration) : null;

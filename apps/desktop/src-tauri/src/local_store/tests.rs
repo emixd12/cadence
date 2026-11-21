@@ -2827,7 +2827,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 27);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 28);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }

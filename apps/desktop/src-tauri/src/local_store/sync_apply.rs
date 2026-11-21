@@ -2112,7 +2112,7 @@ mod tests {
             "email_reminder_enabled":false,"reminder_offset_minutes":0,"active":true,"archived_at":null,"archive_notes":[],
             "current_configuration_event_id":null,"default_duration_minutes":20,"auto_archived_at":null,"location_text":null,
             "where_kind":"anywhere","end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,
-            "is_opportunity":true,"created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
+            "is_opportunity":true,"parent_behavior_id":null,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,"created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
         let occurrence = json!({"id":occurrence_id,"behavior_id":behavior_id,"behavior_configuration_event_id":null,
             "behavior_schedule_slot_id":null,"scheduled_for":"2026-09-01T19:00:00.000000Z","local_date":"2026-09-01",
             "schedule_kind":"exact","schedule_preset":null,"schedule_start_time":"15:00:00","schedule_end_time":null,

@@ -151,6 +151,9 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         27,
         "behaviors_of_opportunity",
         include_str!("../../migrations/0027_behaviors_of_opportunity.sql"),
+    ),
+    (
+        28,
         "sub_behaviors",
         include_str!("../../migrations/0028_sub_behaviors.sql"),
     ),
