@@ -147,7 +147,17 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "behavior_end_and_pause",
         include_str!("../../migrations/0026_behavior_end_and_pause.sql"),
     ),
+    (
+        27,
+        "behaviors_of_opportunity",
+        include_str!("../../migrations/0027_behaviors_of_opportunity.sql"),
+    ),
 ];
+
+/// Migrations that rebuild a table other tables reference. SQLite ignores the foreign-key
+/// pragma inside a transaction, so the runner turns it off before the transaction and
+/// checks every relationship before commit.
+const TABLE_REBUILD_VERSIONS: &[i64] = &[27];
 
 pub fn open(path: &Path) -> Result<Connection> {
     let mut db = connect(path)?;
@@ -498,6 +508,25 @@ pub(super) fn remove_sidecars(path: &Path) {
 }
 
 pub(super) fn migrate(db: &mut Connection, migrations: &[(i64, &str, &str)]) -> Result<()> {
+    let latest = schema_version(db)?;
+    let rebuild = migrations
+        .iter()
+        .any(|migration| migration.0 > latest && TABLE_REBUILD_VERSIONS.contains(&migration.0));
+    if !rebuild {
+        return migrate_in_transaction(db, migrations, false);
+    }
+    db.execute_batch("PRAGMA foreign_keys = OFF;").map_err(error)?;
+    let result = migrate_in_transaction(db, migrations, true);
+    db.execute_batch("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON;")
+        .map_err(error)?;
+    result
+}
+
+fn migrate_in_transaction(
+    db: &mut Connection,
+    migrations: &[(i64, &str, &str)],
+    check_foreign_keys: bool,
+) -> Result<()> {
     let tx = db
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(error)?;
@@ -531,6 +560,18 @@ pub(super) fn migrate(db: &mut Connection, migrations: &[(i64, &str, &str)]) -> 
             }
             tx.execute_batch(sql).map_err(error)?;
             tx.execute("INSERT INTO schema_migrations VALUES (?1,?2,?3,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params![version,name,sql]).map_err(error)?;
+        }
+    }
+    if check_foreign_keys {
+        let broken: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check)",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(error)?;
+        if broken {
+            return Err("A SQLite migration left invalid record relationships. The database was not changed.".into());
         }
     }
     tx.commit().map_err(error)
@@ -807,6 +848,12 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
             return Err("A Behavior default duration must be 1 through 1,440 minutes.".into());
         }
         validate_run_fields(&value)?;
+        // Behaviors of Opportunity: only an opportunity Behavior may have no legacy schedule.
+        if value["is_opportunity"] != true
+            && (value["recurrence_rule"].is_null() || value["scheduled_time"].is_null())
+        {
+            return Err("A Behavior that is not an opportunity needs a schedule.".into());
+        }
         if !value["auto_archived_at"].is_null()
             && (value["active"] != false || value["archived_at"].is_null())
         {
@@ -827,6 +874,19 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
                 return Err("A Behavior Where is invalid.".into())
             }
             None => {}
+        }
+    } else if T::TABLE == "occurrences" {
+        let origin = value["origin"].as_str();
+        let added_by = value["added_by"].as_str();
+        let valid = match origin {
+            Some("scheduled") => value["added_by"].is_null(),
+            Some("opportunity") => {
+                matches!(added_by, Some("user" | "daily_brief" | "chat" | "mcp"))
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err("An Occurrence origin is invalid.".into());
         }
     } else if T::TABLE == "note_shortcut_states" {
         validate_note_shortcut_state(&value)?;

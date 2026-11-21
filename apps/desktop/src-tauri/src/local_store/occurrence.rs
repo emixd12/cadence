@@ -108,7 +108,7 @@ fn history_rows<T: StoredRow>(db: &Connection, profile_id: &str, ids: &[String])
 /// exact rule (isStoppedByRunFields); this date-only check refuses a stale plan that
 /// would create a row on a day that cannot run. A day after `end_on`, a day strictly
 /// inside the pause, and the first paused day when the pause starts at its beginning.
-fn run_stops_whole_day(behavior: &Behavior, local_date: &str) -> bool {
+pub(super) fn run_stops_whole_day(behavior: &Behavior, local_date: &str) -> bool {
     let ended = behavior
         .end_on
         .as_deref()
@@ -179,6 +179,8 @@ fn generated_row(
         || row.completed_at.is_some()
         || row.status_marked_at.is_some()
         || row.note.is_some()
+        || row.is_opportunity()
+        || row.added_by.is_some()
     {
         return Err("A generated Occurrence must be unresolved with current owned lineage and no status or note history.".into());
     }
@@ -225,6 +227,13 @@ pub fn generate(db: &Connection, request: &Request) -> Result<Value> {
             return Err("An occurrence generation plan repeats an ID.".into());
         }
     }
+    // Behaviors of Opportunity: generation never changes or removes an added row.
+    for expected in update.iter().map(|replacement| &replacement.expected).chain(delete) {
+        let before: Occurrence = db::by_id(db, profile_id, &expected.id)?;
+        if before.is_opportunity() {
+            return Err("Occurrence generation cannot change an opportunity Occurrence.".into());
+        }
+    }
     for replacement in update {
         let before: Occurrence = db::by_id(db, profile_id, &replacement.expected.id)?;
         let next = &replacement.next;
@@ -250,6 +259,8 @@ pub fn generate(db: &Connection, request: &Request) -> Result<Value> {
             || next.schedule_start_time != before.schedule_start_time
             || next.schedule_kind != before.schedule_kind
             || next.schedule_end_time != before.schedule_end_time
+            || next.origin != before.origin
+            || next.added_by != before.added_by
         {
             return Err("An occurrence generation update cannot rewrite status, note, creation, or range identity.".into());
         }
