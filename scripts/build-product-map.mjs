@@ -19,7 +19,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SCHEMA_VERSION = 1;
 
 /** Kinds whose items must carry a meaning sentence. */
-const MEANING_REQUIRED = new Set(["journey", "feature", "interaction", "component", "family", "term", "mcp-tool", "notice"]);
+const MEANING_REQUIRED = new Set(["journey", "feature", "interaction", "component", "family", "term", "mcp-tool", "notice", "avatar"]);
 /** Token meanings are required only in the canonical token file; other token files warn. */
 const CANONICAL_TOKEN_FILE = "packages/ui/tokens.css";
 
@@ -826,6 +826,61 @@ function addNotices() {
 const pendingStyleTokens = [];
 
 // ---------------------------------------------------------------------------
+// Advisor avatar: packages/core/src/advisor-avatar/catalog.json (states, gestures, experiments)
+
+const AVATAR_CATALOG = "packages/core/src/advisor-avatar/catalog.json";
+const AVATAR_STATUSES = new Set(["planned", "undecided", "active", "retired"]);
+
+function addAvatar() {
+  if (!exists(AVATAR_CATALOG)) return;
+  sources.add(AVATAR_CATALOG);
+  const catalog = readJson(AVATAR_CATALOG);
+  if (typeof catalog.feature !== "string") errors.push(`${AVATAR_CATALOG}: the catalog needs a feature`);
+  const art = catalog.art ?? {};
+  for (const file of [art.master, ...(art.renditions ?? []).map(rendition => rendition.file)]) {
+    if (!file || !isFile(file)) errors.push(`${AVATAR_CATALOG}#art: missing file ${file}`);
+  }
+  const priorities = new Map();
+  for (const [group, type] of [["states", "state"], ["gestures", "gesture"]]) {
+    for (const [avatarId, entry] of Object.entries(catalog[group] ?? {})) {
+      const id = `avatar:${avatarId}`;
+      const at = `${AVATAR_CATALOG}#${avatarId}`;
+      if (!new RegExp(`^${type}\\.[a-z][a-z0-9-]*$`).test(avatarId)) errors.push(`${at}: ids in ${group} read ${type}.<word>`);
+      if (!AVATAR_STATUSES.has(entry.status)) errors.push(`${at}: status must be planned, undecided, active or retired`);
+      for (const field of ["when", "motion", "still"]) {
+        if (typeof entry[field] !== "string" || !entry[field].trim()) errors.push(`${at}: ${field} is required`);
+      }
+      if (type === "state") {
+        if (!Number.isInteger(entry.priority)) errors.push(`${at}: a state needs a whole-number priority (lowest wins)`);
+        else if (priorities.has(entry.priority)) errors.push(`${at}: priority ${entry.priority} is also used by ${priorities.get(entry.priority)}`);
+        else priorities.set(entry.priority, avatarId);
+      }
+      if (!Array.isArray(entry.interactions)) errors.push(`${at}: interactions must be a list`);
+      addNode(id, "avatar", {
+        name: avatarId,
+        type,
+        meaning: entry.meaning,
+        when: entry.when,
+        motion: entry.motion,
+        still: entry.still,
+        status: entry.status,
+        ...(type === "state" ? { priority: entry.priority } : {}),
+        ...(entry.fromTrial ? { fromTrial: entry.fromTrial } : {}),
+      }, at);
+      linkTo(id, "belongs-to", `feature:${catalog.feature}`, `${at}/feature`);
+      for (const interaction of entry.interactions ?? []) linkTo(id, "follows", `interaction:${interaction}`, `${at}/interactions/${interaction}`);
+    }
+  }
+  const known = new Set([...Object.keys(catalog.states ?? {}), ...Object.keys(catalog.gestures ?? {})]);
+  for (const [experimentId, experiment] of Object.entries(catalog.experiments ?? {})) {
+    const at = `${AVATAR_CATALOG}#experiments/${experimentId}`;
+    if (!known.has(experiment.subject)) errors.push(`${at}: subject must be a state or gesture id`);
+    const variants = Object.keys(experiment.variants ?? {});
+    if (variants.length < 2 || !variants.includes("still")) errors.push(`${at}: an experiment needs at least two variants, one of them "still"`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Build and validate
 
 function build() {
@@ -837,6 +892,7 @@ function build() {
   addTables();
   addMcpTools();
   addNotices();
+  addAvatar();
   for (const link of pendingLinks) {
     if (!nodes.has(link.from)) errors.push(`${link.source}: unknown ${link.from}`);
     else if (!nodes.has(link.to)) errors.push(`${link.source}: unknown ${link.to}`);

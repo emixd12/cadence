@@ -2284,3 +2284,19 @@ cite has not changed.
 - **Update needed:** user guide Daily Brief section; Privacy/Trust Daily Brief write list.
 - **Related:** P-078, P-079.
 - **Status:** logged.
+
+## P-081: Cadence may record how the advisor's avatar is used
+
+- **Change:** planned, not built (Ticket 347, blocked on the owner's confirmation). Cadence
+  would show different avatar animations to different accounts and record, per account and
+  day: the surface, the animation variant, the avatar's state, and whether the panel was
+  opened or a question answered afterwards. No tip text, Behavior names or positions. Rows
+  kept 90 days. No third-party provider.
+- **Affected:** `packages/core/src/advisor-avatar/catalog.json`,
+  `docs/plans/2026-11-21-advisor-avatar.md`.
+- **Surfaces:** Privacy (what Cadence records); Trust; the full JSON export if the owner
+  includes these rows.
+- **Conflicting current text:** any copy that says Cadence records no usage of its interface.
+- **Update needed:** Privacy wording before the first experiment runs on real accounts.
+- **Related:** P-070.
+- **Status:** logged.

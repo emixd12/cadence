@@ -2798,3 +2798,38 @@ presses (update buttons, conflict review, Settings) fail until Cadence is in fro
 
 Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
 Messaging impact: none.
+
+## 2026-11-21: Advisor avatar track
+
+The owner asked on November 21, 2026 for the advisor's avatar to be finished in three
+steps, and for the whole track to be scoped and mapped before work starts.
+
+1. **Base image first.** The large drawing (`public/brand/cadence-advisor-window-draft.webp`)
+   is the baseline. The small avatar must read as the same drawing. The image is refined in
+   review rounds, with an image model or in code, until the owner approves it.
+2. **Then the animations.** The trial's animations (`app/design-system/HorseAvatarTrial.tsx`)
+   were built for the earlier side-profile drawing and are rebuilt on the approved one.
+3. **Then scope and tests.** Each animation is tied to something the advisor does, and
+   Cadence gains a way to compare animation variants on real accounts and refine them.
+
+What this entry settles:
+
+- The states and gestures live in one catalog,
+  `packages/core/src/advisor-avatar/catalog.json`, read by the product map
+  (`avatar:` items). One pure resolver decides the state.
+- The trial's badge and orbiting dots do not carry over: placement K says the advisor has
+  no dot. The label "Advisor · 1 new" stays the signal.
+- The animated avatar ships behind a flag that is off in production until the owner
+  accepts it.
+
+What stays open, for the owner (`docs/plans/2026-11-21-advisor-avatar.md`, "Open owner
+decisions"): the line weight at small sizes, image model spend, the preparing arc, the
+advisor on the Chat page, and recording interface use. The last one touches the
+`AGENTS.md` rule "Do not add analytics/tracking scripts unrelated to this app's internal
+behavior tracking". The plan uses first-party rows in Cadence's own database and no
+third-party script. Tickets 347 and 348 wait for the owner's confirmation, and `AGENTS.md`
+changes then, not now.
+
+Platform impact: web and Mac share the catalog, resolver and component (Tickets 343–346);
+marketing not applicable; future mobile reads the same catalog when ticketed. Messaging
+impact: P-081 (logged; applies only if Ticket 347 is confirmed).

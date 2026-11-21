@@ -964,7 +964,9 @@ no advisor.
   round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
   so it never looks cropped. The artwork is a draft
   (`public/brand/cadence-advisor-window-draft.webp`, plus a heavier-line `-small` version for
-  sizes up to 72px).
+  sizes up to 72px). The two files read as different horses; Ticket 343 replaces them with
+  one approved master and sizes made from it. The avatar's states and gestures are planned
+  in `packages/core/src/advisor-avatar/catalog.json` (Tickets 343–348); it does not move yet.
 - **Where it sits.** Top centre of the page, and it stays there when you scroll. It is 48px on
   desktop and the Mac. On phones it is 40px and sits in the middle of the top bar. It is never
   smaller than 40px.

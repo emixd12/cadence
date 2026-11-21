@@ -19438,3 +19438,215 @@ Messaging impact: P-077 (shared copy).
 
 Verification: Mac DOM tests with local actions; a dev-signed build on the test Mac
 (`.claude/skills/desktop-acceptance`).
+
+## Tickets 343–348: advisor avatar
+
+Filed November 21, 2026 on the owner's instruction (`docs/DECISIONS.md`, 2026-11-21,
+"Advisor avatar track"). Plan: `docs/plans/2026-11-21-advisor-avatar.md`. Catalog:
+`packages/core/src/advisor-avatar/catalog.json`. Order: 343, then 344 and 345, then 346,
+then 347 and 348. Each of 343 and 346 ends with the owner's approval.
+
+## Ticket 343: Advisor avatar base image
+
+Status: in progress (round 1 sent to the owner November 21, 2026).
+
+Goal: one approved master drawing of the advisor, with every size made from it.
+
+Scope and acceptance:
+
+- Baseline is the large drawing, `public/brand/cadence-advisor-window-draft.webp`.
+- Each review round gives the owner one comparison sheet at 40, 48 and 120 CSS pixels,
+  at 1× and 2×, on the product background. The round's candidates and the owner's answer
+  are recorded in the plan.
+- On approval: a master of at least 1024 × 1024 with a transparent background under
+  `public/brand/advisor/`; `scripts/build-advisor-avatar.mjs` makes each size with the
+  approved line weight; the files are committed and listed in the catalog's `art` block.
+- The catalog's `art.anchors` holds the eye outlines, ear bases, mane root, jaw and neck
+  line in the master's coordinates.
+- `AdvisorHorse` (`components/advisor/AdvisorParts.tsx`) reads its files from the catalog.
+  The 40px, 48px and 120px avatars read as the same drawing. The `-draft` files are removed
+  and `DESIGN.md`, "Advisor placement", is updated.
+- Image model use needs the owner's yes and a spend cap first.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `components/advisor/AdvisorParts.tsx`; this ticket. |
+| Desktop | The Mac renders the same shared component and files; ships with the next Mac release. |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: none.
+
+Verification: screenshots of the Timeline and the panel at 1× and 2×; `map:check`.
+
+## Ticket 344: Avatar state catalog and resolver
+
+Status: in progress (catalog and product-map link landed November 21, 2026; resolver not started).
+
+Goal: one tested place decides which state and gesture the avatar shows.
+
+Scope and acceptance:
+
+- `packages/core/src/advisor-avatar/catalog.json` lists every state and gesture with its
+  meaning, trigger, motion, still form, status and interactions. `npm run map:check`
+  validates it and `npm run map -- avatar:` lists it.
+- `packages/core/src/resolvers/advisor-avatar.resolver.ts` (re-exported from
+  `lib/resolvers/`) is pure: from `hasNew`, `panelOpen`, the brief summary and pending
+  answers it returns one state; from a previous and a next input it returns at most one
+  gesture. `now` is injected for the first-open-of-day rule.
+- Tests cover every state, the priority order, every gesture and the cases with no
+  advisor (no account, AI features off).
+- `docs/AGENT_RESOLVERS.md` registers the resolver. `map:check` fails when an `active`
+  catalog item is not returned by the resolver.
+- `state.replying` stays `undecided` until the owner decides whether Chat shows the
+  advisor.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared core; consumed in Ticket 346. |
+| Desktop | Shared core; consumed in Ticket 346. |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: none.
+
+Verification: resolver tests; `resolvers:check`; `map:check`.
+
+## Ticket 345: Avatar animation rig on the approved drawing
+
+Status: not started. Depends on Tickets 343 and 344.
+
+Goal: the trial's motion rebuilt on the approved drawing, for every catalog state and gesture.
+
+Scope and acceptance:
+
+- One shared component, used by web and the Mac, takes a state, an optional gesture and a
+  size. It reuses the trial's technique (`app/design-system/HorseAvatarTrial.tsx`): the
+  still drawing, masked moving layers and an eyelid over the eye. Layers and pivots come
+  from the catalog's anchors, not from numbers in the component.
+- Every catalog item with status `planned` has motion and a still form. Motions that do
+  not read at 40px and 48px do not run at those sizes.
+- `prefers-reduced-motion` shows the still drawing in every state. No dot, badge, ring or
+  count is drawn on the avatar. Motion never shifts layout. Loops pause when the page is
+  hidden.
+- `/design-system?preview=advisor-avatar` shows every state and gesture at 40, 48 and
+  120px beside its still form, and can force an experiment variant. The `horse-avatar`
+  trial bench and `public/brand/cadence-horse-avatar.png` are removed.
+- Invoke the design-system-bench skill and the impeccable workflow; update `DESIGN.md`
+  and the design-system manifest.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket (bench only; product wiring is Ticket 346). |
+| Desktop | Same shared component; checked in the Vite build here, installed in Ticket 346. |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: none.
+
+Verification: DOM tests for state attributes and reduced motion; bench screenshots; a
+frame-time check at 48px on the test Mac.
+
+## Ticket 346: Animated avatar on the Timeline and in the panel
+
+Status: not started. Depends on Tickets 344 and 345.
+
+Goal: the advisor's avatar on the Timeline and in the panel shows the resolver's state.
+
+Scope and acceptance:
+
+- `AdvisorWindow` and `AdvisorPanel` render the rig with the resolver's state and gesture.
+- Behind `CADENCE_ADVISOR_AVATAR_MOTION` (and its Vite twin for the Mac), off in
+  production. With the flag off the avatar is the still drawing from Ticket 343.
+- The label, the line under the date and the panel keep their text and behaviour. The
+  avatar adds no interaction, so the interaction registry does not change.
+- The owner accepts it on production web behind the flag and on an installed dev-signed
+  Mac build, then turns the flag on.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `components/advisor/AdvisorParts.tsx`, `AdvisorProvider.tsx`. |
+| Desktop | `apps/desktop/src/timeline-screen.tsx` uses the same components; installed acceptance on the test Mac. |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: none.
+
+Verification: `tests/advisor-ui.dom.test.tsx` additions; web check as account A;
+`.claude/skills/desktop-acceptance`.
+
+## Ticket 347: Avatar experiments: assignment and event recording
+
+Status: blocked on the owner's confirmation (plan, "Open owner decisions", item 5).
+
+Goal: Cadence can show different animation variants to different accounts and record
+what followed.
+
+Scope and acceptance:
+
+- Experiments are entries in the catalog: subject, variants (one is `still`), shares,
+  dates and measures.
+- Assignment is a pure resolver: a hash of the account id and the experiment id. Web and
+  the Mac give the same variant. Nothing is stored to assign.
+- One hosted, user-owned table, `advisor_avatar_events` (`user_id`, RLS, a migration,
+  `docs/DATA_MODEL.md`): local date, surface, experiment, variant, state or gesture id,
+  the follow-up (panel opened, answered, reacted, none) and a time bucket. No tip text,
+  Behavior names, positions or device details. Rows older than 90 days are deleted.
+- One API route and service write events as the user through RLS. The Mac sends them
+  only when linked and online and drops them otherwise; nothing queues in SQLite.
+- Left out: AI features off, reduced motion, the Mac with no account, the owner's and
+  test accounts.
+- No third-party script or provider. `AGENTS.md` records the exception to its
+  tracking-scripts rule when the owner confirms.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket. |
+| Desktop | This ticket (linked and online only). |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: P-081.
+
+Verification: resolver tests for assignment balance and stability; SQL smoke test for
+RLS; local-stack integration test.
+
+## Ticket 348: Avatar experiment readout and change record
+
+Status: not started. Depends on Ticket 347.
+
+Goal: the owner can read an experiment's result and record what changed.
+
+Scope and acceptance:
+
+- `npm run avatar:report -- <experiment>` prints, per variant: accounts, days in
+  `state.waiting`, the share with the panel opened, answers by kind, and the guardrails
+  ("Not now", "Don't suggest this again", panel closed within 3 seconds). It prints the
+  sample size beside every share and says when it is too small to compare.
+- It is a command, not a screen. It reads counts only, through the service role, as the
+  reminder job's account selection does.
+- A promoted variant replaces the catalog item's motion and leaves a `previous` record
+  with the dates and the result.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: an operator command. |
+| Desktop | Not applicable: an operator command. |
+| Marketing | Not applicable: no public claim or marketing art changes. |
+| Future mobile | Deferred: no mobile ticket. The catalog and resolver are platform-neutral, so a phone app reads the same states. |
+
+Messaging impact: none beyond P-081.
+
+Verification: report tests on seeded rows.

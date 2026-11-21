@@ -48,6 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 343–348: advisor avatar | 343 in progress: round 1 (line weight at small sizes) sent to the owner November 21. 344: catalog and product-map link landed; resolver not started. 345, 346, 348 not started. 347 blocked | Owner: pick a round 1 candidate or give notes; say yes or no to image model spend; confirm or reject recording interface use (unblocks 347) | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21, "Advisor avatar track" |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
 | Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Done November 14: reminder email sender renamed from "Identity Scaffolding" to "Cadence" (next entry). (2) Done November 14: replies to `hello@`, `login@` and `support@cadence-me.com` reach a Microsoft 365 shared mailbox (next entry). (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history (`account-sync.resolver.ts:821`; proposed workspace). (8) After a refused CAPTCHA the email form clears the typed address. (9) Shared per-IP OTP and verify limits: fixed and live under Ticket 338 (next row). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production. (11) Token refresh in `proxy.ts` shared one per-address limit and a refused refresh signed people out: fixed and live under Ticket 339 (next row) | `docs/qa/2026-11-13-sign-in-final-verification.md` |
 | Tickets 338–340: sign-in limits per person | **Live in production since November 14, 2026, 01:44Z.** Hosted `security_sb_forwarded_for_enabled` on; Vercel Production `CADENCE_TURNSTILE_SECRET_KEY` and `SUPABASE_SECRET_KEY` (existing `default` key) set, owner-approved 01:34Z. Two-network checks passed for wrong codes, refresh and the sign-in callback | Follow-up ticket needed: forward Change address (`PUT /user`); hosted measurement shows it works. Remove-a-method check not run (no spare provider account) | TICKETS, Tickets 338–340; `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section G |
@@ -93,6 +94,26 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Advisor avatar track scoped (Tickets 343–348) — November 21, 2026
+
+- **In review (draft PR, branch `claude/eloquent-turing-ua4q6s`).** The owner asked for
+  the avatar in three steps: base image, animations on it, then scope and tests. Plan:
+  `docs/plans/2026-11-21-advisor-avatar.md`.
+- **Finding.** The trial's animations target the old side-profile drawing by fixed
+  coordinates, so none apply to the placement K drawing. The small avatar's file is the
+  same drawing with much heavier lines, which is why it reads as a different horse.
+- **Landed.** `packages/core/src/advisor-avatar/catalog.json` (7 states, 4 gestures, all
+  planned; the art block); the product map reads it as `avatar:` items and `map:check`
+  validates it. No product screen changed.
+- **Ticket 343 round 1.** Comparison sheet of four line weights made from the large
+  drawing, beside the current small file. Awaiting the owner.
+- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`,
+  `resolvers:check`, lint (0 errors), typecheck and build pass. `npm run test`: 6,801
+  pass; 1 file fails (`tests/mcp-hosted-fixtures.test.mjs` needs full git history; the
+  cloud clone is shallow).
+
+Platform impact: none yet (docs, catalog and map only). Messaging impact: P-081 (planned).
 
 ## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
 

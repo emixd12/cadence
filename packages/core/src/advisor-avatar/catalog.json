@@ -1,0 +1,136 @@
+{
+  "feature": "advisor-tips",
+  "art": {
+    "status": "draft",
+    "meaning": "The advisor's drawing. One master file is the baseline; every size is made from it.",
+    "master": "public/brand/cadence-advisor-window-draft.webp",
+    "renditions": [
+      { "maxSize": 72, "file": "public/brand/cadence-advisor-window-draft-small.webp" },
+      { "maxSize": null, "file": "public/brand/cadence-advisor-window-draft.webp" }
+    ],
+    "sizes": [
+      { "size": 40, "where": "Phone top bar" },
+      { "size": 48, "where": "Timeline top centre on desktop and the Mac" },
+      { "size": 120, "where": "Advisor panel" }
+    ],
+    "anchors": null
+  },
+  "states": {
+    "state.resting": {
+      "meaning": "Nothing waits for the person. The advisor is present and calm.",
+      "when": "No unopened brief, no unanswered question, check-in or tip, and the panel is closed.",
+      "reads": "useAdvisor(): hasNew is false and panelOpen is false",
+      "motion": "Slow breathing, one blink every few seconds, a light drift in the mane.",
+      "still": "The plain drawing.",
+      "priority": 6,
+      "fromTrial": "idle",
+      "status": "planned",
+      "interactions": []
+    },
+    "state.waiting": {
+      "meaning": "Something waits for the person: an unopened brief, an unanswered question, a check-in or a tip.",
+      "when": "The label reads \"Advisor · 1 new\".",
+      "reads": "useAdvisor(): hasNew is true; item.kind gives the reason (brief, proposal, check_in, notice, tip)",
+      "motion": "Eye open wide, ears forward, calm between gestures. No dot, badge or pulsing ring: the label carries the count.",
+      "still": "The plain drawing; the label reads \"Advisor · 1 new\".",
+      "priority": 5,
+      "fromTrial": "advice",
+      "status": "planned",
+      "interactions": []
+    },
+    "state.trouble": {
+      "meaning": "The Daily Brief could not be prepared, or it hit a limit.",
+      "when": "The brief shows a notice instead of advice.",
+      "reads": "useAdvisor(): brief.kind is \"notice\"",
+      "motion": "None. The head sits slightly lower and stays still. The notice's words explain what happened.",
+      "still": "The plain drawing.",
+      "priority": 4,
+      "fromTrial": null,
+      "status": "planned",
+      "interactions": ["INT-BRIEF-003"]
+    },
+    "state.attending": {
+      "meaning": "The advisor panel is open and the person is reading or answering.",
+      "when": "The panel is open.",
+      "reads": "useAdvisor(): panelOpen is true",
+      "motion": "A slight lean toward the panel, slower blinks, the mane settles.",
+      "still": "The plain drawing.",
+      "priority": 3,
+      "fromTrial": "open",
+      "status": "planned",
+      "interactions": ["INT-ADVISOR-001"]
+    },
+    "state.preparing": {
+      "meaning": "Cadence is preparing or refreshing today's Daily Brief.",
+      "when": "The brief is loading.",
+      "reads": "useAdvisor(): brief.kind is \"loading\"",
+      "motion": "The eye narrows in focus and the mane moves faster. Whether the spinning arc from the trial stays is an owner decision.",
+      "still": "The plain drawing; the brief's own \"preparing\" words show progress.",
+      "priority": 2,
+      "fromTrial": "thinking",
+      "status": "planned",
+      "interactions": ["INT-BRIEF-001", "INT-BRIEF-003", "INT-BRIEF-008"]
+    },
+    "state.working": {
+      "meaning": "Cadence is applying the person's answer: a brief move, a schedule answer or a tip reaction.",
+      "when": "An answer was sent and its result has not come back.",
+      "reads": "useAdvisor(): proposal.pending or tip.pending is set; the brief's move line is pending",
+      "motion": "Focused eye and a short, quick mane movement until the result arrives.",
+      "still": "The plain drawing; the answer links are disabled.",
+      "priority": 1,
+      "fromTrial": null,
+      "status": "planned",
+      "interactions": ["INT-BRIEF-006", "INT-BRIEF-007", "INT-ADVISOR-002", "INT-ADVISOR-004"]
+    },
+    "state.replying": {
+      "meaning": "Chat is reading the schedule or writing a reply.",
+      "when": "A chat reply is streaming.",
+      "reads": "components/chat/ChatPage.tsx: thread.streamingId is set",
+      "motion": "Not designed. The Chat page shows no advisor today, so this state needs a placement decision first.",
+      "still": "Not designed.",
+      "priority": 0,
+      "fromTrial": null,
+      "status": "undecided",
+      "interactions": ["INT-CHAT-001"]
+    }
+  },
+  "gestures": {
+    "gesture.arrive": {
+      "meaning": "The advisor wakes when the person first opens the Timeline on a local day.",
+      "when": "First Timeline open of the local day on this device.",
+      "motion": "The eye opens and the avatar settles into place. The trial's enlarged entrance from the page centre is kept only as a test variant.",
+      "still": "No movement.",
+      "fromTrial": "entrance top, wake",
+      "status": "planned",
+      "interactions": ["INT-BRIEF-001"]
+    },
+    "gesture.notice": {
+      "meaning": "Something new arrived for the person while the Timeline was open.",
+      "when": "hasNew changes from false to true.",
+      "motion": "One ear flick, a double blink and one gust through the mane. It plays once.",
+      "still": "No movement; the label changes to \"Advisor · 1 new\".",
+      "fromTrial": "advice (gust and double blink, played once instead of looping)",
+      "status": "planned",
+      "interactions": []
+    },
+    "gesture.acknowledge": {
+      "meaning": "Cadence applied what the person answered.",
+      "when": "An answer's outcome arrives: a move applied, a schedule change made, a tip saved as helpful.",
+      "motion": "One small nod.",
+      "still": "No movement; the italic outcome line confirms it.",
+      "fromTrial": null,
+      "status": "planned",
+      "interactions": ["INT-BRIEF-006", "INT-BRIEF-007", "INT-ADVISOR-002", "INT-ADVISOR-004"]
+    },
+    "gesture.refused": {
+      "meaning": "Cadence could not apply the person's answer.",
+      "when": "An answer returns the \"Not changed.\" line.",
+      "motion": "The ears tip back once and return.",
+      "still": "No movement; the red line explains it.",
+      "fromTrial": null,
+      "status": "planned",
+      "interactions": ["INT-BRIEF-006", "INT-ADVISOR-004"]
+    }
+  },
+  "experiments": {}
+}
