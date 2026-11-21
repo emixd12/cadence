@@ -1,7 +1,12 @@
 name: CI
 
+# `merge_group` runs every job on the commit a merge queue is about to put on
+# `main`. A queue waits for `verify` on that event and never merges without it.
+# The event fires only once the repository has a merge queue
+# (`docs/DECISIONS.md`, 2026-11-21).
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
