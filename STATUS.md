@@ -137,18 +137,25 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
   `2026-11-21.2`).
 - Registry: `INT-BEHAVIOR-039`–`045` and `INT-TIMELINE-025`–`027`, implemented on web
   and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-081–P-083.
-- Hosted migrations (additive, not pushed): `20261122010000_sub_behaviors`,
+- Hosted migrations pushed November 21, 2026 (owner-authorized): `20261122010000_sub_behaviors`,
   `20261122020000_sub_behavior_portability_connectors`,
-  `20261122030000_coach_signal_sub_behavior_dropoff`.
+  `20261122030000_coach_signal_sub_behavior_dropoff`. `migration list`: 151 local, 151
+  hosted, identical.
 - Verification (after the rebase): `dagger check --cadence` 11/11; `core:check`,
   `desktop:typecheck`, `marketing:build`, `marketing:check`; `cargo test` 180;
   `desktop:contract:test` 24; SQL: PR #351's four migrations plus ours and ten smokes
   (sub-behaviors, portability, opportunity, account sync, end and pause, tickets 060,
-  314, 321) pass in one rolled-back transaction. Not run: local-integration tests and
-  installed Mac acceptance.
+  314, 321) pass in one rolled-back transaction. Local-integration on a migrated local
+  stack: 9 files, 73 of 74 tests pass (sub-behaviors MCP, brief moves, occurrence move,
+  integration read, write, idempotency and request context, tips one-tap, coach
+  signals); `smoke:rls` 92 checks and the account sync smoke (now checks contract 9)
+  pass. The one failure is pre-existing on `main`: the coach-signals test expects
+  `brief_answers` signals and gets `setup_gaps`. Fixed here: the coach reminders read
+  named two foreign keys (PGRST201 on every call since #315). Not run: installed Mac
+  acceptance (Task 13).
 - Phone width: the routine title keeps the row's width; the two marks wrap below it.
 - Open:
-  1. Owner: push the three hosted migrations before the code reaches production.
+  1. Coach-signals local test: `brief_answers` expectation is stale on `main`.
   2. Mac: routine reminder text names the anchor step, not the routine. Installed Mac
      acceptance not run.
 
