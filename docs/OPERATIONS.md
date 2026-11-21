@@ -246,8 +246,16 @@ passing, and without `always()` the job is skipped when a job it needs fails. A 
 job blocks merges only after it is added to `verify`'s `needs` list.
 
 Every job calls `.github/actions/setup`. It installs Node.js 24 and restores
-`node_modules` from the Actions cache. The cache key covers the lockfile and every
-`package.json`, so any manifest change runs `npm ci` instead. The `build` job
+`node_modules` from the Actions cache. `.github/actions/setup/dependency-key.mjs`
+computes the cache key from the lockfile, `.npmrc` and every `package.json`. It
+leaves out the npm scripts that `npm ci` never runs, so adding a script such as
+`test:web-client` no longer reinstalls the same packages. Any other manifest change
+runs `npm ci` instead. The key names the Node.js major version, not the patch,
+because runner images with two Node.js 24 patches serve jobs of the same run. Before
+November 21, 2026 the key covered each whole manifest and the Node.js patch: 19
+merges to `main` changed it in 30 days, and 8 would have under the current key. A
+new workspace folder outside `apps/` and `packages/` needs a line in that script;
+`tests/ci-dependency-key.test.ts` fails until it has one. The `build` job
 restores `.next/cache` from the newest cache saved on `main`; only pushes to `main`
 save it. Lint runs without the ESLint cache: lint is not the slowest job, so the
 cache would not shorten a run.
