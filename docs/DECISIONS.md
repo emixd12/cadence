@@ -2781,3 +2781,20 @@ list in `AGENTS.md`).
 
 Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
 Messaging impact: none.
+
+## 2026-11-21: Agents may bring Cadence to the front on test devices
+
+The owner approved this during the 0.1.13 release and asked that it stand from now on. macOS
+suspends Cadence's page while its window sits behind another app, so accessibility reads and
+presses (update buttons, conflict review, Settings) fail until Cadence is in front.
+
+- An agent may bring Cadence for Mac to the front on a test device with `osascript -e 'tell
+  application id "app.cadence.desktop" to activate'` through `scripts/test-device.mjs exec`,
+  without asking first, even when the owner is using that Mac.
+- Keep it as short as the step needs and say so in the run report. Type nothing into another
+  app, and never close or hide the owner's windows.
+- Clicking a notification banner and answering permission or consent prompts stay with the
+  owner.
+
+Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
+Messaging impact: none.
