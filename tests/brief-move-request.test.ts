@@ -115,3 +115,21 @@ describe("brief move recheck request (3A1 follow-up)", () => {
     }
   });
 });
+
+describe("Task 7: opportunity bodies on the brief routes", () => {
+  it("parses an opportunity answer only with target opportunity, and keeps move answers unchanged", async () => {
+    const { parseBriefAnswer, parseBriefMoveRecheck } = await import("@/lib/services/brief-move-request");
+    expect(parseBriefAnswer({ target: "opportunity", kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL })).toEqual({
+      target: "opportunity", answer: { target: "opportunity", kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL, context: { calendarBusy: [] } },
+    });
+    expect(parseBriefAnswer({ target: "opportunity", kind: "other_time", idempotencyKey: "k2", proposalId: PROPOSAL, startAt: "2026-11-18T20:00:00Z" }).answer)
+      .toMatchObject({ kind: "other_time", startAt: "2026-11-18T20:00:00Z" });
+    expect(parseBriefAnswer({ kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL })).toEqual({ target: "move", answer: { kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL } });
+    expect(() => parseBriefAnswer({ target: "move", kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL })).toThrow(BriefMoveError);
+    expect(() => parseBriefAnswer({ target: "opportunity", kind: "already_done", idempotencyKey: "k4", proposalId: PROPOSAL })).toThrow(BriefMoveError);
+    expect(() => parseBriefAnswer({ target: "opportunity", kind: "never_add", idempotencyKey: "k5", proposalId: PROPOSAL, expectedRevision: REVISION })).toThrow(BriefMoveError);
+    // A re-check body without opportunity ids is the move re-check exactly as before.
+    expect(parseBriefMoveRecheck({ localDate: "2026-11-18" })).toEqual({ localDate: "2026-11-18", context: { calendarBusy: [] }, proposalIds: [] });
+    expect(parseBriefMoveRecheck({ localDate: "2026-11-18", opportunityProposalIds: [PROPOSAL, PROPOSAL] }).opportunityProposalIds).toEqual([PROPOSAL]);
+  });
+});

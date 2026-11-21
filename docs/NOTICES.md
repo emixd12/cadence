@@ -8,15 +8,25 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 16 |
-| error | 77 |
-| note | 18 |
+| outcome | 20 |
+| error | 81 |
+| note | 20 |
 | question | 3 |
 
 ## Behaviors of Opportunity
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
+| `brief-opportunity.added` Says on a brief's Add for today line that Yes or Other time added the item to today, with Undo beside it. | outcome | Added for today at {time}. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.declined` Says on a brief's Add for today line that No keeps the Behavior off today and the brief stops suggesting it today. | outcome | Not adding it today. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.never-add` Confirms that the brief will stop suggesting adding this Behavior. | outcome | The brief won’t suggest adding {title} again. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.no-time-fits` Says Re-plan found no other free time today for an Add for today line. | error | Not added. No other time fits today. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.reason` Says on a brief's Add for today line how long the free window is and when the Behavior was last Completed. | note | {minutes} min free{last, select, never {, not done yet} today {, done earlier today} yesterday {, last done yesterday} other {, last done {days} days ago}}. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.refused.late` Refuses a brief's Add for today answer because the time is not today or is after the latest start the brief offers. | error | Not added. {time} is too late for today. | web, Mac | INT-BRIEF-010, `lib/services/brief-opportunities.service.ts` |
+| `brief-opportunity.refused.passed` Refuses a brief's Add for today answer because the time has passed. | error | Not added. {time} has passed. | web, Mac | INT-BRIEF-010, `lib/services/brief-opportunities.service.ts` |
+| `brief-opportunity.refused.taken` Refuses a brief's Add for today answer because the time is no longer free under the free-slot rule. | error | Not added. {time} is not free now. | web, Mac | INT-BRIEF-010, `lib/services/brief-opportunities.service.ts` |
+| `brief-opportunity.travel-not-checked` Says on a brief's Add for today line that the Behavior happens at a place and travel to it was not checked. | note | Travel not checked. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `brief-opportunity.undone` Says on a brief's Add for today line that Undo removed the added item from today. | outcome | Removed from today. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
 | `opportunity.added` Confirms that the person added an opportunity Behavior to today at a time or in a time range. | outcome | {title} added to today: {time}. | web, Mac | INT-TIMELINE-022, `app/design-system/OpportunityBasketBench.tsx`, `lib/services/opportunity.service.ts` |
 | `opportunity.added-from` Marks a Timeline row that was added from the opportunity basket, and who added it. | note | {source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}} | web, Mac | INT-TIMELINE-022, INT-TIMELINE-024, `components/timeline/OccurrenceRow.tsx` |
 | `opportunity.failed` Says an add, Done now or Remove did not reach Cadence, so nothing changed. | error | Cadence could not change today's items. Try again. | web, Mac | INT-TIMELINE-022, INT-TIMELINE-023, INT-TIMELINE-024, `app/(app)/timeline/opportunity-actions.ts`, `packages/core/src/types/timeline.ts` |
@@ -73,7 +83,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `brief-moves.length-guess` Says the move line's length is Cadence's guess and offers to set it. | note | {minutes} min is a guess | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.moved` Says on a brief's move line that the person's Yes or Other time moved the item, with Undo beside it. | outcome | Moved to {time} for today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.never-move` Confirms that the brief will stop suggesting moves for this Behavior, and where to change that. | outcome | The brief won’t suggest moving {title} again; you can change this in its settings. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
-| `brief-moves.no-other-free-time` Says in Other time that the planner found no other free start today, so the person picks one below. | question | No other free time found today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
+| `brief-moves.no-other-free-time` Says in Other time that the planner found no other free start today, so the person picks one below. | question | No other free time found today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx`, `components/briefing/BriefOpportunityLines.tsx` |
 | `brief-moves.no-time-fits` Says Re-plan found no other time that fits today. | error | Not changed. No other time fits today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.refused.already-marked` Server refusal: the line's item was marked after the brief was written. | error | Not changed. {title} is already marked. | web, Mac | INT-BRIEF-006, `lib/services/brief-moves.service.ts` |
 | `brief-moves.refused.batch-taken` Server refusal: the same Accept all just moved another item into this line's time. | error | Not changed. {time} is taken: Accept all just moved {title} there. | web, Mac | INT-BRIEF-007, `lib/services/brief-moves.service.ts` |

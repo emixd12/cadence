@@ -108,6 +108,74 @@
       "text": "Cadence could not change today's items. Try again.",
       "style": "error",
       "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-023", "INT-TIMELINE-024"]
+    },
+    "brief-opportunity.reason": {
+      "meaning": "Says on a brief's Add for today line how long the free window is and when the Behavior was last Completed.",
+      "text": "{minutes} min free{last, select, never {, not done yet} today {, done earlier today} yesterday {, last done yesterday} other {, last done {days} days ago}}.",
+      "style": "note",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.travel-not-checked": {
+      "meaning": "Says on a brief's Add for today line that the Behavior happens at a place and travel to it was not checked.",
+      "text": "Travel not checked.",
+      "style": "note",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.added": {
+      "meaning": "Says on a brief's Add for today line that Yes or Other time added the item to today, with Undo beside it.",
+      "text": "Added for today at {time}.",
+      "style": "outcome",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.declined": {
+      "meaning": "Says on a brief's Add for today line that No keeps the Behavior off today and the brief stops suggesting it today.",
+      "text": "Not adding it today.",
+      "style": "outcome",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.undone": {
+      "meaning": "Says on a brief's Add for today line that Undo removed the added item from today.",
+      "text": "Removed from today.",
+      "style": "outcome",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.never-add": {
+      "meaning": "Confirms that the brief will stop suggesting adding this Behavior.",
+      "text": "The brief won’t suggest adding {title} again.",
+      "style": "outcome",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.refused.taken": {
+      "meaning": "Refuses a brief's Add for today answer because the time is no longer free under the free-slot rule.",
+      "text": "{time} is not free now.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.refused.passed": {
+      "meaning": "Refuses a brief's Add for today answer because the time has passed.",
+      "text": "{time} has passed.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.refused.late": {
+      "meaning": "Refuses a brief's Add for today answer because the time is not today or is after the latest start the brief offers.",
+      "text": "{time} is too late for today.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-BRIEF-010"]
+    },
+    "brief-opportunity.no-time-fits": {
+      "meaning": "Says Re-plan found no other free time today for an Add for today line.",
+      "text": "No other time fits today.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-BRIEF-010"]
     }
   }
 }

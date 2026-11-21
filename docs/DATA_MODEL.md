@@ -2401,6 +2401,26 @@ The two MCP tools call `add_opportunity_occurrence` and `remove_opportunity_occu
 as the user; no new table or column. Migration:
 `20261121120000_opportunity_mcp_and_chat.sql` (function body and one check constraint).
 
+Daily Brief "Add for today" lines (Task 7). Server only, never synced, owner-read RLS,
+writes only through security-definer functions, as `move_proposals`:
+
+| Table or column | Meaning |
+| --- | --- |
+| `opportunity_proposals` | One offered line: `behavior_id`, `local_date`, `agent_run_id`, `status` (`proposed`, `accepted`, `declined`, `other_time`, `superseded`, `withdrawn`, `undone`), `proposed_start_at`/`proposed_end_at`, stock `reason` code, `line` (what the shown line needs, no model or calendar text), `replaces_proposal_id`, and `occurrence_id`, the Occurrence Yes or Other time added (kept as a record after Undo, so not a foreign key). Rows are deleted 30 days after their day by `record_brief_opportunity_proposals`. |
+| `opportunity_proposal_answers` | One append-only row per answer: `kind` (`yes`, `no`, `other_time`, `undo`, `never_add`), `outcome` (`applied`, `refused`), `refusal_reason`, `occurrence_id`, `source` (`person`, `daily_brief`), `idempotency_key`. Deleted with its proposal. |
+| `behavior_move_preferences.never_suggest_add` | "Don't suggest adding this", per Behavior. `boolean not null default false`. |
+
+Functions: `record_brief_opportunity_proposals(uuid, date, jsonb, boolean)` and
+`withdraw_brief_opportunity_proposal(uuid)` (the Daily Brief agent token only);
+`answer_opportunity_proposal(uuid, text, text, text, uuid, text)` (the person or the Daily
+Brief agent; Yes and Other time must name an added Occurrence of the same Behavior and
+day); `set_behavior_opportunity_preference(uuid, boolean)` (the person only; switching it
+on closes the Behavior's undecided lines). Yes and Other time add the Occurrence through
+`add_opportunity_occurrence` as the person with `added_by = 'daily_brief'`; Undo removes it
+through `remove_opportunity_occurrence`. `cadence_advisor_private.coach_signals.kind`
+accepts `opportunity_ready_to_schedule`. Migration:
+`20261121130000_brief_opportunity_proposals.sql` (additive).
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its

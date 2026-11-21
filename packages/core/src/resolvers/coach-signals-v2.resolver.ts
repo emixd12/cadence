@@ -47,6 +47,7 @@ export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
   reminderResponse: { quickMinutes: 30, behavior: { minMarked: 6 }, account: { minMarked: 10 } },
   sessionLength: { minSessions: 4, shorterBelow: 0.8, longerAbove: 1.2, maxSessionMinutes: 12 * 60 },
   movedVsUnmoved: { behavior: { minEach: 5 }, account: { minEach: 8 }, minGap: 0.15 },
+  opportunityReady: { minCompleted: 3, windowMinutes: 60 },
 });
 
 const V = COACH_SIGNAL_V2_THRESHOLDS;
@@ -94,6 +95,7 @@ export function resolveCoachSignalsV2(input: ResolveCoachSignalsInput, active: R
     ...reminderResponse(ctx),
     ...sessionLength(ctx),
     ...movedVsUnmoved(ctx),
+    ...opportunityReadyToSchedule(ctx),
   ];
 }
 
@@ -713,6 +715,53 @@ function movedVsUnmoved(ctx: Ctx): CoachSignal[] {
 }
 
 /** Occurrences whose latest move record leaves them away from their planned time. */
+// ---------------------------------------------------------------------------
+// Behaviors of Opportunity (Task 7): an unscheduled opportunity Behavior that the person
+// added and Completed on the same weekday, within one hour of the same time, at least 3
+// times in the last 28 days. Ready for a future "give it a schedule" tip; no card yet.
+
+function opportunityReadyToSchedule(ctx: Ctx): CoachSignal[] {
+  const T = V.opportunityReady;
+  const signals: CoachSignal[] = [];
+  const added = ctx.recent.filter((row) => row.origin === "opportunity" && row.status === "completed");
+  for (const [behaviorId, rows] of groupBy(added, (row) => row.behaviorId)) {
+    const behavior = ctx.active.get(behaviorId);
+    if (!behavior || behavior.isOpportunity !== true || behavior.hasSchedule !== false) continue;
+    let best: { weekday: number; minutes: number[] } | null = null;
+    for (const [day, list] of groupBy(rows, (row) => weekday(row.localDate))) {
+      const minutes = list.map(startMinute).filter((value): value is number => value !== null).sort((a, b) => a - b);
+      const cluster = densestWindow(minutes, T.windowMinutes);
+      if (cluster.length < T.minCompleted) continue;
+      if (!best || cluster.length > best.minutes.length || (cluster.length === best.minutes.length && day < best.weekday)) best = { weekday: day, minutes: cluster };
+    }
+    if (!best) continue;
+    signals.push({
+      kind: "opportunity_ready_to_schedule",
+      behaviorId,
+      facts: {
+        weekday: best.weekday,
+        completed_count: best.minutes.length,
+        usual_time: clockTime(median(best.minutes)),
+        earliest_time: clockTime(best.minutes[0]!),
+        latest_time: clockTime(best.minutes.at(-1)!),
+        window_minutes: T.windowMinutes,
+      },
+    });
+  }
+  return signals;
+}
+
+/** The largest run of sorted minutes that fits in `width` minutes; the earliest on a tie. */
+function densestWindow(sorted: readonly number[], width: number): number[] {
+  let best: number[] = [];
+  for (let start = 0; start < sorted.length; start += 1) {
+    let end = start;
+    while (end + 1 < sorted.length && sorted[end + 1]! - sorted[start]! <= width) end += 1;
+    if (end - start + 1 > best.length) best = sorted.slice(start, end + 1);
+  }
+  return best;
+}
+
 function netMovedOccurrences(moves: readonly CoachSignalMove[]): Set<string> {
   const latest = new Map<string, CoachSignalMove>();
   for (const move of moves) {

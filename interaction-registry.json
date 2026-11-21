@@ -1032,6 +1032,14 @@
       ]
     },
     {
+      "path": "components/briefing/BriefOpportunityLines.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 15,
+      "interaction_ids": [
+        "INT-BRIEF-010"
+      ]
+    },
+    {
       "path": "components/briefing/DailyBriefLauncher.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 4,
@@ -19781,6 +19789,99 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Advisor plan Phase 3C: Cadence for Mac renders the same shared brief and adds its answer calls in its own workstream and release."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-010",
+      "name": "Answer a Daily Brief Add for today line",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07",
+        "J25"
+      ],
+      "intent": "Answer one of the brief's offers to add an opportunity Behavior to today in a free window: Yes, No, Other time, Undo, or Don't suggest adding this (Behaviors of Opportunity, Task 7).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes, No or Other time under an Add for today line"
+        },
+        {
+          "kind": "activate",
+          "control": "A free time, a picked time and Add, or Re-plan under Other time"
+        },
+        {
+          "kind": "activate",
+          "control": "Undo on an added line"
+        },
+        {
+          "kind": "activate",
+          "control": "Don’t suggest adding this"
+        }
+      ],
+      "availability": "Web Timeline, inside a ready Daily Brief whose client sent opportunity_lines_v1, while the line is undecided (Undo after Yes or Other time). Don’t suggest adding this after declines on 4 different days.",
+      "success_result": "Yes and Other time add an Unresolved Occurrence (origin opportunity, added by Daily Brief) at the line's time and the Timeline redraws; No keeps the Behavior off today and stops offers for it today; Undo removes the added item and counts as a No; Don’t suggest adding this stops future offers for that Behavior.",
+      "failure_result": "A time that is no longer free, a Behavior no longer available, a marked or noted item on Undo, or a failed request shows under the line in the alert style, with free times where there are some. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request",
+        "reminder_planning"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/BriefOpportunityLines.tsx#BriefOpportunityLines",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "lib/ui/daily-brief-opportunities.ts",
+        "lib/services/brief-opportunities.service.ts#answerBriefOpportunity"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/brief-opportunity-lines.dom.test.tsx",
+          "tests/brief-opportunities.service.test.ts",
+          "tests/brief-opportunity.resolver.test.ts"
+        ],
+        "notes": "DOM checks cover each answer's body with the screen's context, the added time and Undo, refusals with free times, Re-plan, re-check on open and the opt-in gate; the service test covers the slot check, added_by daily_brief, replay, Undo refusals and Re-check; the resolver test covers the free-slot rule, caps, order and Where."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/BriefOpportunityLines.tsx"
+          ],
+          "evidence": [
+            "tests/brief-opportunity-lines.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity Task 8: Cadence for Mac adds the opportunity transport and opts in to opportunity_lines_v1 in its own release."
         },
         "marketing": {
           "applicability": "not_applicable",

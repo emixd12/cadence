@@ -226,18 +226,21 @@ export type Database = {
       behavior_move_preferences: {
         Row: {
           behavior_id: string
+          never_suggest_add: boolean
           never_suggest_move: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
           behavior_id: string
+          never_suggest_add?: boolean
           never_suggest_move?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
           behavior_id?: string
+          never_suggest_add?: boolean
           never_suggest_move?: boolean
           updated_at?: string
           user_id?: string
@@ -2121,6 +2124,138 @@ export type Database = {
           },
         ]
       }
+      opportunity_proposal_answers: {
+        Row: {
+          behavior_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          kind: string
+          local_date: string
+          occurrence_id: string | null
+          outcome: string
+          proposal_id: string
+          refusal_reason: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          kind: string
+          local_date: string
+          occurrence_id?: string | null
+          outcome: string
+          proposal_id: string
+          refusal_reason?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          local_date?: string
+          occurrence_id?: string | null
+          outcome?: string
+          proposal_id?: string
+          refusal_reason?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_proposal_answers_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposal_answers_proposal_owner_fkey"
+            columns: ["user_id", "proposal_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_proposals"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      opportunity_proposals: {
+        Row: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          id: string
+          line: Json
+          local_date: string
+          occurrence_id: string | null
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_run_id?: string | null
+          behavior_id: string
+          created_at?: string
+          id?: string
+          line?: Json
+          local_date: string
+          occurrence_id?: string | null
+          proposed_end_at: string
+          proposed_start_at: string
+          reason?: string | null
+          replaces_proposal_id?: string | null
+          source?: string
+          status?: string
+          status_changed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_run_id?: string | null
+          behavior_id?: string
+          created_at?: string
+          id?: string
+          line?: Json
+          local_date?: string
+          occurrence_id?: string | null
+          proposed_end_at?: string
+          proposed_start_at?: string
+          reason?: string | null
+          replaces_proposal_id?: string | null
+          source?: string
+          status?: string
+          status_changed_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_proposals_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_replaces_owner_fkey"
+            columns: ["user_id", "replaces_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_proposals"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       place_label_settings: {
         Row: {
           enabled: boolean
@@ -2723,6 +2858,17 @@ export type Database = {
         }
         Returns: Json
       }
+      answer_opportunity_proposal: {
+        Args: {
+          p_idempotency_key: string
+          p_kind: string
+          p_occurrence_id?: string
+          p_outcome: string
+          p_proposal_id: string
+          p_refusal_reason?: string
+        }
+        Returns: Json
+      }
       apple_sign_in_forget_token: {
         Args: { apple_subject_digest: string; owner_id: string }
         Returns: undefined
@@ -3074,6 +3220,32 @@ export type Database = {
         Returns: Json
       }
       purge_ended_daily_brief_days: { Args: never; Returns: number }
+      record_brief_opportunity_proposals: {
+        Args: {
+          p_agent_run_id: string
+          p_local_date: string
+          p_proposals: Json
+          p_supersede?: boolean
+        }
+        Returns: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          id: string
+          line: Json
+          local_date: string
+          occurrence_id: string | null
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }[]
+      }
       save_daily_brief: {
         Args: {
           p_briefing: Json
@@ -3688,6 +3860,20 @@ export type Database = {
         }
         Returns: {
           behavior_id: string
+          never_suggest_add: boolean
+          never_suggest_move: boolean
+          updated_at: string
+          user_id: string
+        }
+      }
+      set_behavior_opportunity_preference: {
+        Args: {
+          p_behavior_id: string
+          p_never_suggest_add: boolean
+        }
+        Returns: {
+          behavior_id: string
+          never_suggest_add: boolean
           never_suggest_move: boolean
           updated_at: string
           user_id: string
@@ -3807,6 +3993,27 @@ export type Database = {
           move_id: string | null
           occurrence_id: string
           option_refs: Json
+          proposed_end_at: string
+          proposed_start_at: string
+          reason: string | null
+          replaces_proposal_id: string | null
+          source: string
+          status: string
+          status_changed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+      }
+      withdraw_brief_opportunity_proposal: {
+        Args: { p_proposal_id: string }
+        Returns: {
+          agent_run_id: string | null
+          behavior_id: string
+          created_at: string
+          id: string
+          line: Json
+          local_date: string
+          occurrence_id: string | null
           proposed_end_at: string
           proposed_start_at: string
           reason: string | null

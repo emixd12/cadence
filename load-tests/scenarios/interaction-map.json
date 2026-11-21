@@ -1524,6 +1524,11 @@
       "reason": "Brief move answers need a stored proposal, today's clock in the account's timezone, the Occurrence's revision and idempotency verification; run serially on a synthetic account."
     },
     {
+      "id": "INT-BRIEF-010",
+      "classification": "destructive_serial_only",
+      "reason": "Add for today answers need a stored opportunity proposal, today's clock in the account's timezone and idempotency verification; run serially on a synthetic account."
+    },
+    {
       "id": "INT-BRIEF-007",
       "classification": "destructive_serial_only",
       "reason": "Accept all and Undo all write several moves as one batch and need stored proposals from the same serial run."

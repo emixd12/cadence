@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-079` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-081` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2263,4 +2263,24 @@ cite has not changed.
 - **Update needed:** plugin listing and submission copy before the next submission; developer
   overview tool count.
 - **Related:** P-078, P-072.
+- **Status:** logged.
+
+## P-080: The Daily Brief offers to add opportunities to today
+
+- **Change:** implemented November 21, 2026 (Behaviors of Opportunity, Task 7). On the web, the
+  Daily Brief can offer up to two "Add for today" lines for opportunity Behaviors when a real
+  free window exists: "{title} 2:10 PM: 20 min free, last done 4 days ago." with Yes · No ·
+  Other time, Undo after Yes, and "Don’t suggest adding this" after declines on 4 different
+  days. Yes adds an Unresolved item marked "Added from Daily Brief"; the brief never marks it
+  Completed. New notices: "Added for today at {time}.", "Not adding it today.", "Removed from
+  today.", "The brief won’t suggest adding {title} again.", "Travel not checked.", "{time} is not
+  free now.", "{time} has passed.", "{time} is too late for today.", "No other time fits today."
+- **Affected:** `components/briefing/BriefOpportunityLines.tsx`,
+  `lib/services/brief-opportunities.service.ts`, `packages/core/src/notices/catalog/opportunity.json`.
+- **Surfaces:** the user guide's Daily Brief section; Privacy and Trust where they say what the
+  Daily Brief can change (it now adds items to today, not only moves them); in-app Daily Brief
+  disclosure.
+- **Conflicting current text:** any copy that says the Daily Brief only moves today's items.
+- **Update needed:** user guide Daily Brief section; Privacy/Trust Daily Brief write list.
+- **Related:** P-078, P-079.
 - **Status:** logged.

@@ -267,6 +267,37 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
 
+### Brief opportunity lines
+
+Behaviors of Opportunity (Task 7). The Daily Brief can offer to add an opportunity
+Behavior to today ("Add for today"), for clients that send `opportunity_lines_v1`.
+The code is `packages/core/src/resolvers/brief-opportunity.resolver.ts` and
+`lib/services/brief-opportunities.service.ts`.
+
+- **Same free-slot rule.** Lines, Yes, Other time, Re-plan and Re-check use the move
+  lines' rule. Today's open items, calendar events and travel spans block a time. A
+  move line of the same brief blocks the time it offers.
+- **Stale calendar.** When a connected calendar is stale, no line is offered.
+- **Cap.** At most 2 opportunity lines, and at most 8 brief lines with the move lines.
+- **Order.** Behaviors not on Today come first. Of these, "anywhere" and "home" come
+  before "place", then never Completed, then longest since Completed. A Behavior on
+  Today is offered only when nothing else fits.
+- **Where.** A home item is not offered between the day's first and last travel span,
+  because the person is away. A place item says "travel not checked".
+- **Yes and Other time.** The person's own session adds an Unresolved Occurrence with
+  `added_by = daily_brief`, after the slot check passes. Cadence never marks it
+  Completed. The added Occurrence id is stored on the proposal.
+- **Undo.** Removes the added Occurrence through `remove_opportunity_occurrence`. A
+  marked, noted or timed item is kept, and the line says why. Undo counts as a No.
+- **No and "Don't suggest adding this".** No closes the Behavior's lines for the rest
+  of the day. After 4 declines on different days, the line offers "Don't suggest
+  adding this", stored per Behavior.
+- **Re-check on open.** The same `recheck` route re-plans an undecided line whose time
+  is taken or has passed, with no model call. When nothing fits, the line closes as
+  `withdrawn`.
+- **Retention.** Proposals and their answers are deleted 30 days after their day. The
+  lines hold no calendar text.
+
 ### Base schedule proposals
 
 Advisor Phase 4C (`packages/core/src/services/behavior-change-proposal.ts`).

@@ -371,3 +371,29 @@ describe("rules every version 2 signal follows", () => {
     expect(resolveCoachSignals(input({ occurrences: todayOnly }))).toEqual([]);
   });
 });
+
+describe("opportunity_ready_to_schedule", () => {
+  // Thursdays in the window: Nov 12 (-7), Nov 5 (-14), Oct 29 (-21), Oct 22 (-28).
+  const O = behavior("b-o", { isOpportunity: true, hasSchedule: false });
+  const added = (offset: number, startTime: string, extra: Partial<CoachSignalOccurrence> = {}) =>
+    row("b-o", offset, c, { origin: "opportunity", startTime, ...extra });
+  const ready = (behaviors: CoachSignalBehavior[], rows: CoachSignalOccurrence[]) =>
+    resolveCoachSignals(input({ behaviors, occurrences: rows })).filter((signal) => signal.kind === "opportunity_ready_to_schedule");
+
+  it("finds an unscheduled opportunity added and Completed 3 times on one weekday within an hour", () => {
+    const rows = [added(-7, "18:10:00"), added(-14, "18:40:00"), added(-21, "17:50:00"), added(-28, "21:00:00"), added(-6, "07:00:00")];
+    expect(ready([O], rows)).toEqual([{
+      kind: "opportunity_ready_to_schedule", behaviorId: "b-o",
+      facts: { weekday: 4, completed_count: 3, usual_time: "18:10", earliest_time: "17:50", latest_time: "18:40", window_minutes: 60 },
+    }]);
+  });
+
+  it("stays quiet for a scheduled Behavior, scheduled rows, spread-out times, too few or unmarked additions", () => {
+    const rows = [added(-7, "18:10:00"), added(-14, "18:40:00"), added(-21, "17:50:00")];
+    expect(ready([behavior("b-o", { isOpportunity: true, hasSchedule: true })], rows)).toEqual([]);
+    expect(ready([O], rows.map((item) => ({ ...item, origin: "scheduled" as const })))).toEqual([]);
+    expect(ready([O], [added(-7, "08:00:00"), added(-14, "09:30:00"), added(-21, "11:00:00")])).toEqual([]);
+    expect(ready([O], rows.slice(0, 2))).toEqual([]);
+    expect(ready([O], [...rows.slice(0, 2), added(-21, "18:00:00", { status: u })])).toEqual([]);
+  });
+});
