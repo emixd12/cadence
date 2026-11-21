@@ -5,8 +5,8 @@ import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { executeMcpOperation } from "@/lib/integrations/operations/execute";
 import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
-import { getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
-import { getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
+import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
 import { getHevyActivities } from "@/lib/services/hevy.service";
@@ -23,7 +23,7 @@ import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
  */
 
 export type ChatCalendarSource = "googleCalendar" | "outlookCalendar" | "icloudCalendar";
-export type ChatSourceReport = Readonly<{ source: ChatCalendarSource | "hevy"; state: "read" | "partial" | "off" | "not_connected" | "failed" }>;
+export type ChatSourceReport = Readonly<{ source: ChatCalendarSource | "hevy"; state: "read" | "partial" | "off" | "not_connected" | "no_calendars" | "failed" }>;
 
 export type ChatCalendarEvent = Readonly<{
   title: string;
@@ -59,6 +59,9 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
       const notConnected = code === "reconnect_required" || code === "not_connected" || code === "same_account_required" || code === "not_configured";
+      if (!notConnected && code === "invalid_request" && await connectedWithNoCalendars(caller, source)) {
+        return { events: [], report: { source, state: "no_calendars" } };
+      }
       logConnectorRead("chat_source_read_failed", source, code, error);
       return { events: [], report: { source, state: notConnected ? "not_connected" : "failed" } };
     }
@@ -88,6 +91,20 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
 }
 
 /** Source, error code and error class only: never event content, ids or messages. */
+/**
+ * Outlook and iCloud refuse a read when the person connected the account but chose no
+ * calendars. Checked only after that refusal, so a normal read costs nothing extra.
+ */
+async function connectedWithNoCalendars(caller: CalendarCaller, source: ChatCalendarSource): Promise<boolean> {
+  if (source === "googleCalendar") return false;
+  try {
+    const connection = source === "outlookCalendar" ? await getOutlookCalendarConnection(caller) : await getIcloudCalendarConnection(caller);
+    return connection.status === "connected" && connection.preferences.selectedSourceIds.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 function logConnectorRead(name: string, source: ChatCalendarSource | "hevy", code: string, error: unknown): void {
   reportMonitoringEvent({ name, severity: "warning", context: {
     source, code: code || null, error_name: error instanceof Error ? error.name : error === null ? null : typeof error,
@@ -181,10 +198,12 @@ function sourceNote(sources: readonly ChatSourceReport[]): string | null {
   const failed = sources.filter((item) => item.state === "failed").map((item) => names[item.source]);
   const partial = sources.filter((item) => item.state === "partial").map((item) => names[item.source]);
   const off = sources.filter((item) => item.state === "off").map((item) => names[item.source]);
+  const unselected = sources.filter((item) => item.state === "no_calendars").map((item) => names[item.source]);
   const lines = [
     failed.length ? `Could not read ${failed.join(" and ")} just now; do not guess what is there.` : null,
     partial.length ? `Only part of ${partial.join(" and ")} could be read.` : null,
     off.length ? `${off.join(" and ")} ${off.length === 1 ? "is" : "are"} off in Settings.` : null,
+    unselected.length ? `${unselected.join(" and ")} ${unselected.length === 1 ? "is" : "are"} connected, but no calendars are chosen, so there is nothing to read. If they want it included, they can choose calendars in Settings, under Connected sources.` : null,
     sources.length === 0 ? "No calendar is connected." : null,
   ].filter(Boolean);
   return lines.length ? lines.join(" ") : null;
