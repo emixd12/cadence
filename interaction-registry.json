@@ -297,7 +297,9 @@
         "INT-BEHAVIOR-033",
         "INT-BEHAVIOR-034",
         "INT-BEHAVIOR-035",
-        "INT-BEHAVIOR-036"
+        "INT-BEHAVIOR-036",
+        "INT-BEHAVIOR-037",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -387,7 +389,12 @@
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
         "INT-ADVISOR-004",
-        "INT-ADVISOR-005"
+        "INT-ADVISOR-005",
+        "INT-TIMELINE-021",
+        "INT-TIMELINE-022",
+        "INT-TIMELINE-023",
+        "INT-TIMELINE-024",
+        "INT-BRIEF-010"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -19842,7 +19849,7 @@
           "control": "Don’t suggest adding this"
         }
       ],
-      "availability": "Web Timeline, inside a ready Daily Brief whose client sent opportunity_lines_v1, while the line is undecided (Undo after Yes or Other time). Don’t suggest adding this after declines on 4 different days.",
+      "availability": "Web Timeline and a linked Mac, inside a ready Daily Brief whose client sent opportunity_lines_v1, while the line is undecided (Undo after Yes or Other time). Don’t suggest adding this after declines on 4 different days.",
       "success_result": "Yes and Other time add an Unresolved Occurrence (origin opportunity, added by Daily Brief) at the line's time and the Timeline redraws; No keeps the Behavior off today and stops offers for it today; Undo removes the added item and counts as a No; Don’t suggest adding this stops future offers for that Behavior.",
       "failure_result": "A time that is no longer free, a Behavior no longer available, a marked or noted item on Undo, or a failed request shows under the line in the alert style, with free times where there are some. Nothing changes.",
       "effects": [
@@ -19856,14 +19863,17 @@
         "components/briefing/BriefOpportunityLines.tsx#BriefOpportunityLines",
         "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
         "lib/ui/daily-brief-opportunities.ts",
-        "lib/services/brief-opportunities.service.ts#answerBriefOpportunity"
+        "lib/services/brief-opportunities.service.ts#answerBriefOpportunity",
+        "apps/desktop/src/daily-brief.ts",
+        "apps/desktop/src/timeline-screen.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/brief-opportunity-lines.dom.test.tsx",
           "tests/brief-opportunities.service.test.ts",
-          "tests/brief-opportunity.resolver.test.ts"
+          "tests/brief-opportunity.resolver.test.ts",
+          "tests/desktop-daily-brief.test.ts"
         ],
         "notes": "DOM checks cover each answer's body with the screen's context, the added time and Undo, refusals with free times, Re-plan, re-check on open and the opt-in gate; the service test covers the slot check, added_by daily_brief, replay, Undo refusals and Re-check; the resolver test covers the free-slot rule, caps, order and Where."
       },
@@ -19879,9 +19889,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity Task 8: Cadence for Mac adds the opportunity transport and opts in to opportunity_lines_v1 in its own release."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/daily-brief.ts",
+            "lib/ui/daily-brief-opportunities.ts"
+          ],
+          "evidence": [
+            "tests/desktop-daily-brief.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20839,13 +20856,18 @@
       "implementation": [
         "components/behaviors/BehaviorForm.tsx#BehaviorForm",
         "lib/services/behavior-form.ts#parseOpportunityFlag",
-        "packages/core/src/services/behavior.service.ts"
+        "packages/core/src/services/behavior.service.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-behavior.service.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/behavior-opportunity-ui.dom.test.tsx",
-          "tests/behavior-form.test.ts"
+          "tests/behavior-form.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test toggles the control on create and edit and checks the posted fields; server parsing and validation are covered separately."
       },
@@ -20863,9 +20885,17 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-behavior.service.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20920,13 +20950,18 @@
         "components/behaviors/BehaviorForm.tsx#BehaviorForm",
         "components/behaviors/BehaviorList.tsx#BehaviorList",
         "lib/services/behavior-form.ts#parseBehaviorSchedulesFromForm",
-        "packages/core/src/services/behavior.service.ts#storedRecurrence"
+        "packages/core/src/services/behavior.service.ts#storedRecurrence",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-behavior.service.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/behavior-opportunity-ui.dom.test.tsx",
-          "tests/behavior-form.test.ts"
+          "tests/behavior-form.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test covers No fixed schedule and back, the no-schedule notice, the Opportunity group and Done N times; parsing is covered separately."
       },
@@ -20945,9 +20980,17 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-behavior.service.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -21000,13 +21043,17 @@
         "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
         "components/timeline/DayProgressTimeline.tsx",
         "packages/core/src/services/opportunity-pool.ts#resolveOpportunityPool",
-        "lib/services/timeline.service.ts"
+        "lib/services/timeline.service.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-timeline.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-opportunity-ui.dom.test.tsx",
-          "tests/opportunity.service.test.ts"
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test covers the hidden state, open, Close and Escape with focus return; the pool payload is covered by the service test."
       },
@@ -21024,9 +21071,16 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -21081,13 +21135,19 @@
         "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
         "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
         "lib/services/opportunity.service.ts#addOpportunityToToday",
-        "lib/db/opportunity.repo.ts"
+        "lib/db/opportunity.repo.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-opportunity-ui.dom.test.tsx",
-          "tests/opportunity.service.test.ts"
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test posts the exact-time default and a window preset with a fresh client_occurrence_id and shows the notice; the service test covers placements, refusals, replay and reminder planning."
       },
@@ -21106,9 +21166,18 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -21161,13 +21230,19 @@
       "implementation": [
         "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
         "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
-        "lib/services/opportunity.service.ts#addOpportunityToToday"
+        "lib/services/opportunity.service.ts#addOpportunityToToday",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-opportunity-ui.dom.test.tsx",
-          "tests/opportunity.service.test.ts"
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test checks that each tap posts done_now with a new client_occurrence_id and shows the logged notice or a refusal; the service test covers the call."
       },
@@ -21186,9 +21261,18 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -21245,13 +21329,20 @@
         "components/timeline/OccurrenceRow.tsx#OccurrenceRow",
         "app/(app)/timeline/opportunity-actions.ts#removeOpportunityOccurrenceAction",
         "lib/services/opportunity.service.ts#removeOpportunityFromToday",
-        "lib/db/opportunity.repo.ts"
+        "lib/db/opportunity.repo.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs",
+        "apps/desktop/src/local-timeline.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-opportunity-ui.dom.test.tsx",
-          "tests/opportunity.service.test.ts"
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
         ],
         "notes": "DOM test shows Remove only when canRemove is true, on today and in Needs decision, and renders removed and refused notices; the service test covers removal and each refusal."
       },
@@ -21271,9 +21362,19 @@
           ]
         },
         "desktop": {
-          "applicability": "deferred",
-          "status": "deferred",
-          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs",
+            "apps/desktop/src/local-timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",

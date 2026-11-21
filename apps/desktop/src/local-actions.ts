@@ -17,6 +17,12 @@ import { saveLocalDayNote } from "./local-day-note.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import type { OpportunityFormAction } from "../../../lib/types/timeline";
+import {
+  OPPORTUNITY_FAILED, REMOVE_OPPORTUNITY_PARSE_REFUSAL, addOpportunityParseRefusal, opportunityResultState,
+  parseAddOpportunityFormData, parseRemoveOpportunityFormData,
+} from "../../../lib/services/opportunity-placement";
+import { addLocalOpportunity, removeLocalOpportunity } from "./local-opportunity.service";
 
 export function createLocalOccurrenceActions(profileId: string, refresh: () => void) {
   const statusAction: OccurrenceFormAction = async (_previous, form) => {
@@ -82,8 +88,29 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
     doneAt: (input) => detail(() => recordLocalDoneAt(profileId, input)),
     notDoneReason: (input) => detail(() => recordLocalNotDoneReason(profileId, input)),
   };
+  // Behaviors of Opportunity: the basket's add and Done now, and a row's Remove, on the
+  // local store. A success refreshes the Timeline so the added or removed row shows.
+  const addOpportunityAction: OpportunityFormAction = async (_previous, form) => {
+    const input = parseAddOpportunityFormData(form);
+    if (!input) return addOpportunityParseRefusal(form);
+    try {
+      const result = await addLocalOpportunity(profileId, input);
+      if (result.outcome !== "refused") refresh();
+      return opportunityResultState(result);
+    } catch { return OPPORTUNITY_FAILED; }
+  };
+  const removeOpportunityAction: OpportunityFormAction = async (_previous, form) => {
+    const input = parseRemoveOpportunityFormData(form);
+    if (!input) return REMOVE_OPPORTUNITY_PARSE_REFUSAL;
+    try {
+      const result = await removeLocalOpportunity(profileId, input);
+      if (result.outcome !== "refused") refresh();
+      return opportunityResultState(result);
+    } catch { return OPPORTUNITY_FAILED; }
+  };
   return { statusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
-    stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset"), markDetailActions };
+    stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset"), markDetailActions,
+    addOpportunityAction, removeOpportunityAction };
 }
 
 export function localErrorMessage(error: unknown): string {

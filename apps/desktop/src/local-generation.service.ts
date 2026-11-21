@@ -56,7 +56,7 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
       expectedConfigurationEventId: graph.behavior.current_configuration_event_id!,
       create: plan.create.map((row): OccurrenceRecord => ({
         id: crypto.randomUUID(), user_id: profileId, behavior_id: row.behaviorId,
-        ...scheduleColumns(row), status: "unresolved", note: null,
+        ...scheduleColumns(row), status: "unresolved", note: null, origin: "scheduled", added_by: null,
         completed_at: null, status_marked_at: null, created_at: now.toString(), updated_at: now.toString(),
       })),
       update: plan.updateUnresolved.map((row) => ({ expected: expected(row.id),

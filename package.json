@@ -103,7 +103,7 @@
     "agentmail:version": "node scripts/agentmail-cli.mjs --version",
     "supabase": "supabase",
     "sequenzy": "npm exec --yes --package=@sequenzy/cli@0.0.34 -- sequenzy",
-    "desktop:contract:test": "cargo build --offline --manifest-path apps/desktop/src-tauri/Cargo.toml --features contract-harness --bin local-store-contract && CADENCE_SQLITE_CONTRACT=1 vitest run tests/desktop-store-contract.test.ts tests/desktop-portability-contract.test.ts",
+    "desktop:contract:test": "cargo build --offline --manifest-path apps/desktop/src-tauri/Cargo.toml --features contract-harness --bin local-store-contract && CADENCE_SQLITE_CONTRACT=1 vitest run tests/desktop-store-contract.test.ts tests/desktop-portability-contract.test.ts tests/desktop-opportunity-contract.test.ts",
     "services:preflight": "node scripts/service-preflight.mjs",
     "services:preflight:network": "node scripts/service-preflight.mjs --network",
     "cloudflare": "node scripts/cloudflare-api.mjs",

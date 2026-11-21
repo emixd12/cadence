@@ -115,6 +115,16 @@ are implemented. The registry is authoritative.
   Accepted ones appear as chips only in the day-note editor. Matching reads local day
   notes in SQLite schema 23. Linking synchronizes the pool under account sync contract 4.
 
+- Behaviors of Opportunity (Task 8) work offline, with or without an account. The
+  Behaviors screen uses the shared Available as an opportunity toggle, No fixed
+  schedule and the Opportunity group. The Timeline injects local add and Remove
+  actions into the shared Opportunity Basket and rows: Add to today at a time or in a
+  time window, Done now, and Remove for a clean added item, today or in Needs decision.
+  SQLite schema 27 stores them; the local store refuses with the hosted words. A linked
+  Mac renders the Daily Brief "Add for today" lines (`opportunity_lines_v1`) in the
+  shared bubble; an added item arrives by account sync contract 8. The ChatGPT-plan
+  brief does not plan these lines.
+
 See `docs/PRODUCT_SPEC.md`, `docs/RECURRENCE_RULES.md`,
 `docs/DATETIME_STRATEGY.md`, and `docs/EXPORT_FORMATS.md` for exact semantics.
 
