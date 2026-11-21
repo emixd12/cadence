@@ -19448,7 +19448,7 @@ then 347 and 348. Each of 343 and 346 ends with the owner's approval.
 
 ## Ticket 343: Advisor avatar base image
 
-Status: in progress (round 1 sent to the owner November 21, 2026).
+Status: in progress (round 2 sent to the owner November 21, 2026).
 
 Goal: one approved master drawing of the advisor, with every size made from it.
 
@@ -19466,7 +19466,10 @@ Scope and acceptance:
 - `AdvisorHorse` (`components/advisor/AdvisorParts.tsx`) reads its files from the catalog.
   The 40px, 48px and 120px avatars read as the same drawing. The `-draft` files are removed
   and `DESIGN.md`, "Advisor placement", is updated.
-- Image model use needs the owner's yes and a spend cap first.
+- Style: the side-profile drawing (`public/brand/cadence-horse-avatar.png`) is the primary
+  reference and the other horse drawings are secondary, so all read as one style (owner,
+  November 21, 2026). Small sizes stay faint: line weight between "scaled only" and ink ×1.5.
+- Image rounds may use the cloud session's OpenAI key (owner, November 21, 2026).
 
 Platform impact:
 
@@ -19500,8 +19503,8 @@ Scope and acceptance:
   advisor (no account, AI features off).
 - `docs/AGENT_RESOLVERS.md` registers the resolver. `map:check` fails when an `active`
   catalog item is not returned by the resolver.
-- `state.replying` stays `undecided` until the owner decides whether Chat shows the
-  advisor.
+- `state.replying` covers the Chat page: the owner decided on November 21, 2026 that the
+  advisor appears there.
 
 Platform impact:
 
@@ -19530,8 +19533,10 @@ Scope and acceptance:
   from the catalog's anchors, not from numbers in the component.
 - Every catalog item with status `planned` has motion and a still form. Motions that do
   not read at 40px and 48px do not run at those sizes.
-- `prefers-reduced-motion` shows the still drawing in every state. No dot, badge, ring or
-  count is drawn on the avatar. Motion never shifts layout. Loops pause when the page is
+- `state.preparing` keeps the trial's spinning arc on top of the eye and mane motion
+  (owner, November 21, 2026). The bench also shows where the avatar sits on the Chat page.
+- `prefers-reduced-motion` shows the still drawing in every state. No dot, badge or count
+  is drawn on the avatar. Motion never shifts layout. Loops pause when the page is
   hidden.
 - `/design-system?preview=advisor-avatar` shows every state and gesture at 40, 48 and
   120px beside its still form, and can force an experiment variant. The `horse-avatar`
@@ -19562,6 +19567,8 @@ Goal: the advisor's avatar on the Timeline and in the panel shows the resolver's
 Scope and acceptance:
 
 - `AdvisorWindow` and `AdvisorPanel` render the rig with the resolver's state and gesture.
+  The Chat page (`components/chat/ChatPage.tsx`) shows the avatar in the place Ticket 345
+  designs, with `state.replying` while a reply streams.
 - Behind `CADENCE_ADVISOR_AVATAR_MOTION` (and its Vite twin for the Mac), off in
   production. With the flag off the avatar is the still drawing from Ticket 343.
 - The label, the line under the date and the panel keep their text and behaviour. The
@@ -19585,7 +19592,7 @@ Verification: `tests/advisor-ui.dom.test.tsx` additions; web check as account A;
 
 ## Ticket 347: Avatar experiments: assignment and event recording
 
-Status: blocked on the owner's confirmation (plan, "Open owner decisions", item 5).
+Status: deferred by the owner on November 21, 2026 ("think about this later"). Tickets 343–346 proceed without it.
 
 Goal: Cadence can show different animation variants to different accounts and record
 what followed.
@@ -19623,7 +19630,7 @@ RLS; local-stack integration test.
 
 ## Ticket 348: Avatar experiment readout and change record
 
-Status: not started. Depends on Ticket 347.
+Status: deferred with Ticket 347.
 
 Goal: the owner can read an experiment's result and record what changed.
 

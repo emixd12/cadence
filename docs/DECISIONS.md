@@ -2873,3 +2873,23 @@ changes then, not now.
 Platform impact: web and Mac share the catalog, resolver and component (Tickets 343–346);
 marketing not applicable; future mobile reads the same catalog when ticketed. Messaging
 impact: P-081 (logged; applies only if Ticket 347 is confirmed).
+
+## 2026-11-21: Advisor avatar: owner answers after round 1
+
+The owner answered the avatar plan's open decisions on November 21, 2026.
+
+1. **Style.** The old side-profile drawing (`public/brand/cadence-horse-avatar.png`) is the
+   primary style reference. The other horse drawings on the site are secondary. Every
+   horse should read as one style. At small sizes the avatar stays "elegant and faint",
+   between the round 1 candidates A and B.
+2. **Image model.** The cloud session's OpenAI key may be used for avatar image rounds.
+   `docs/OPERATIONS.md`, "Claude cloud sessions", listed it for briefing bench runs only.
+3. **The preparing arc** stays for now, on top of the eye and mane motion. A thin arc is
+   not the dot or badge that placement K rules out.
+4. **Chat.** The advisor appears on the Chat page too.
+5. **Recording interface use** is set aside ("think about this later"). Tickets 347 and
+   348 are deferred. The `AGENTS.md` tracking-scripts rule is unchanged and P-081 stays
+   logged as planned.
+
+Platform impact: web and Mac, through Tickets 343–346; marketing not applicable; future
+mobile reads the same catalog. Messaging impact: none new.

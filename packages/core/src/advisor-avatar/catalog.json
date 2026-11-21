@@ -64,7 +64,7 @@
       "meaning": "Cadence is preparing or refreshing today's Daily Brief.",
       "when": "The brief is loading.",
       "reads": "useAdvisor(): brief.kind is \"loading\"",
-      "motion": "The eye narrows in focus and the mane moves faster. Whether the spinning arc from the trial stays is an owner decision.",
+      "motion": "The eye narrows in focus, the mane moves faster and a thin arc spins around the circle (kept from the trial by the owner, November 21, 2026).",
       "still": "The plain drawing; the brief's own \"preparing\" words show progress.",
       "priority": 2,
       "fromTrial": "thinking",
@@ -86,11 +86,11 @@
       "meaning": "Chat is reading the schedule or writing a reply.",
       "when": "A chat reply is streaming.",
       "reads": "components/chat/ChatPage.tsx: thread.streamingId is set",
-      "motion": "Not designed. The Chat page shows no advisor today, so this state needs a placement decision first.",
-      "still": "Not designed.",
+      "motion": "Focused eye and a steady mane movement while the reply arrives. The advisor's place on the Chat page is designed in Ticket 345.",
+      "still": "The plain drawing; Chat's own waiting line shows progress.",
       "priority": 0,
       "fromTrial": null,
-      "status": "undecided",
+      "status": "planned",
       "interactions": ["INT-CHAT-001"]
     }
   },

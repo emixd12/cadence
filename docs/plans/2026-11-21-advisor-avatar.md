@@ -45,14 +45,27 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   Finding: the large drawing's fine hatching fades at 40px and 48px when it is only
   scaled. Some added weight is needed at small sizes. The question is how much.
   Sheet: `docs/design-exploration/advisor-avatar/round-1-line-weight.png`. Recommendation:
-  C at 40px and 48px, A at 120px. Owner's answer: pending.
+  C at 40px and 48px, A at 120px. Owner's answer (November 21): between A and B, "elegant
+  and faint" with enough definition for the slightly realistic style.
+- **Round 2, November 21:** style. The owner made the old side-profile drawing
+  (`public/brand/cadence-horse-avatar.png`) the primary style reference and the other horse
+  drawings (Timeline banner, login page, marketing hero) secondary, so every horse reads
+  as one style. Three candidates from the image model (`gpt-image-2`, one request, the
+  five drawings as references): the placement K pose redrawn with the profile's clean
+  contours, open white areas and sparse hatching. Sheet:
+  `docs/design-exploration/advisor-avatar/round-2-style.png`, with ink ×1.25 at 40px and
+  48px. Candidates: `round-2-candidate-1.webp` to `-3.webp` beside it. Finding: with less
+  hatching the candidates are fainter than the round 1 drawing at the same ink setting,
+  and the eye and nostril carry most of the 40px reading. Owner's answer: pending.
 - **How a master gets made.** Two routes, both allowed by the owner:
   - An image model, for changes to the drawing itself (pose, line style, a higher
-    resolution master, a transparent background). Needs the owner's yes for the spend;
-    see "Open owner decisions".
-  - Code, for everything derived from the master: sizes, line weight, crops and layers. A
-    drawing made wholly in code will not reach this engraving style. Code is the right
-    tool for the derived files and the moving layers.
+    resolution master, a transparent background). The owner allowed the cloud session's
+    OpenAI key for this on November 21, 2026.
+  - Code, for everything derived from the master: sizes, line weight, crops and layers.
+    Hand-written vector paths do not suit this style: it is hundreds of irregular strokes
+    of varying weight, and paths written as numbers come out as a clean icon beside the
+    other horse drawings. Tracing an approved drawing into vector paths is code that does
+    fit, and is an option for the master if sharper small sizes are wanted.
 - **What approval produces.**
   - A master of at least 1024 × 1024 with a transparent background, stored at
     `public/brand/advisor/`.
@@ -81,7 +94,7 @@ does today.
   | `state.trouble` | The brief shows a notice instead of advice | new |
   | `state.waiting` | Something waits: brief, question, check-in or tip | Advice waiting |
   | `state.resting` | Nothing waits | Idle |
-  | `state.replying` | Chat is writing a reply | undecided: Chat shows no advisor today |
+  | `state.replying` | Chat is writing a reply | new; the advisor appears on the Chat page (owner, November 21) |
 
 - **Gestures** play once and return to the state.
 
@@ -156,18 +169,18 @@ and gesture belongs to the `advisor-tips` feature (the advisor on the Timeline) 
 to the interactions it follows. The avatar adds no interaction of its own, so it is not a
 separate feature. `npm run map:check` validates the catalog.
 
-## Open owner decisions
+## Owner decisions
 
-1. **The round 1 line weight** for small sizes, or notes for round 2.
-2. **Image model spend.** The cloud session's OpenAI key is documented for briefing bench
-   runs only (`docs/OPERATIONS.md`, "Claude cloud sessions"). Using it, or the Codex CLI on
-   the owner's Mac, for image rounds needs the owner's yes and a cap.
-3. **The preparing arc.** Keep the trial's spinning arc while the brief loads, or show
-   focus through the eye and mane only.
-4. **Chat.** Whether the advisor appears on the Chat page. `state.replying` waits on this.
-5. **Recording interface use (step 3).** `AGENTS.md` says "Do not add analytics/tracking
-   scripts unrelated to this app's internal behavior tracking". This plan records
-   first-party events in Cadence's own database and adds no third-party script. It is
-   still the first record of how people use the interface. Tickets 347 and 348 do not
-   start until the owner confirms: the fields above, 90-day retention, whether the events
-   appear in the full JSON export, and the Privacy wording (P-081).
+Answered November 21, 2026:
+
+- **Image model spend:** allowed on the cloud session's OpenAI key.
+- **The preparing arc:** kept for now, on top of the eye and mane motion.
+- **Chat:** the advisor appears on the Chat page. Its placement there is designed in
+  Ticket 345 and wired in Ticket 346.
+- **Recording interface use (step 3):** set aside. Tickets 347 and 348 are deferred until
+  the owner returns to them; nothing else waits on them. The `AGENTS.md` rule against
+  tracking scripts is unchanged.
+
+Open:
+
+1. **The round 2 drawing:** pick a candidate, or give notes for round 3.
