@@ -258,10 +258,10 @@ export function OccurrenceRow({
               value={visibleOccurrence.description || "No description."}
             />
             <DetailItem label="Category" value={visibleOccurrence.categoryName} />
-            <DetailItem
+            {visibleOccurrence.scheduleSummary ? <DetailItem
               label="Schedule"
               value={visibleOccurrence.scheduleSummary}
-            />
+            /> : null}
 
             {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Scheduling context">
               <h4 className="font-bold text-foreground">Scheduling context</h4>

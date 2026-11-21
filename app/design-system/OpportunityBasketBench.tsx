@@ -13,7 +13,8 @@ import timelineStyles from "@/components/timeline/day-progress-timeline.module.c
 const TZ = "America/New_York";
 
 function fixtures(): Readonly<{ timeline: TimelineView; rows: TimelineOccurrenceView[]; now: string }> {
-  const now = new Date();
+  // Rounded to 5 minutes so the server and client renders agree.
+  const now = new Date(Math.floor(Date.now() / 300_000) * 300_000);
   const localDate = now.toLocaleDateString("en-CA", { timeZone: TZ });
   const at = (offsetMinutes: number) => new Date(now.getTime() + offsetMinutes * 60_000);
   const localTime = (date: Date) => date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
