@@ -12,8 +12,10 @@ export const maxDuration = 30;
 export function POST(request: Request) {
   return runBriefMoveRequest(request, async (callers, _caller, body) => {
     const { opportunityProposalIds, ...recheck } = parseBriefMoveRecheck(await body());
-    const moves = await recheckBriefMoves(callers, recheck);
-    if (!opportunityProposalIds) return moves;
+    if (!opportunityProposalIds) return recheckBriefMoves(callers, recheck);
+    // The opportunity lines re-check on their own; BriefMoveLines re-checks the moves, so
+    // an empty move list here must not run a second move re-check at the same time.
+    const moves = recheck.proposalIds.length ? await recheckBriefMoves(callers, recheck) : { replaced: [] };
     const opportunities = await recheckBriefOpportunities(callers, { localDate: recheck.localDate, context: recheck.context, proposalIds: opportunityProposalIds });
     return { ...moves, opportunities };
   });

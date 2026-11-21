@@ -265,7 +265,11 @@ export async function answerBriefOpportunity(callers: BriefMoveCallers, request:
       if (!line) throw new BriefMoveError("proposal_not_found");
       let start: Temporal.Instant;
       try { start = Temporal.Instant.from(request.kind === "yes" ? proposal.proposed_start_at : request.startAt); } catch { throw new BriefMoveError("invalid_request"); }
-      const refusal = await slotRefusal(callers, proposal, line, start, request.context);
+      const occurrenceId = occurrenceIdFor(person.userId, proposal.id, request.idempotencyKey);
+      // A retry after the add saved but the answer write failed: the item already holds
+      // this time, so the slot check would refuse it as taken. The add below replays it.
+      const refusal = await addedOccurrenceExists(person, occurrenceId, proposal.behavior_id)
+        ? null : await slotRefusal(callers, proposal, line, start, request.context);
       if (refusal) {
         const recorded = await recordAnswer(person, { proposal, kind: request.kind, outcome: "refused", key: request.idempotencyKey, refusalReason: refusal.reason });
         return response(request, await readLine(person, recorded.proposal), "refused", refusal, null, recorded.replayed);
@@ -274,7 +278,7 @@ export async function answerBriefOpportunity(callers: BriefMoveCallers, request:
         behaviorId: proposal.behavior_id,
         placement: { kind: "exact", startTime: wallTime(start, line.timezone) },
         addedBy: "daily_brief",
-        occurrenceId: occurrenceIdFor(person.userId, proposal.id, request.idempotencyKey),
+        occurrenceId,
       });
       if (added.outcome === "refused") {
         const refused: BriefOpportunityRefusal = { reason: added.reason, message: noticeText(added.notice.id, added.notice.params), alternatives: [] };
@@ -526,6 +530,13 @@ function wallTime(instant: Temporal.Instant, timezone: string): string {
 }
 
 /** The same tap always adds the same Occurrence, so a lost reply replays in the database. */
+async function addedOccurrenceExists(person: OpportunityCaller, occurrenceId: string, behaviorId: string): Promise<boolean> {
+  const { data, error } = await person.supabase.from("occurrences").select("id")
+    .eq("user_id", person.userId).eq("id", occurrenceId).eq("behavior_id", behaviorId).eq("origin", "opportunity").maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
+
 function occurrenceIdFor(userId: string, proposalId: string, key: string): string {
   const hex = createHash("sha256").update(`cadence.brief-opportunity.v1\0${userId}\0${proposalId}\0${key}`).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;

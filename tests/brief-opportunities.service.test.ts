@@ -115,6 +115,27 @@ describe("answerBriefOpportunity", () => {
     expect(mocks.add.mock.calls[1]![1].occurrenceId).toBe(occurrenceId);
   });
 
+  it("a Yes retried after the add saved but the answer write failed completes instead of refusing as taken", async () => {
+    const row = proposal();
+    await answerBriefOpportunity(callers({ opportunity_proposals: [row] }, vi.fn(async () => ({ data: null, error: new Error("lost") }))),
+      { target: "opportunity", kind: "yes", proposalId: PROPOSAL, idempotencyKey: "tap-r", context }).catch(() => undefined);
+    const occurrenceId = mocks.add.mock.calls[0]![1].occurrenceId as string;
+    // The added item now holds 15:00 on the day, so the slot check alone would refuse it.
+    mocks.readDay.mockResolvedValue({ items: [item(occurrenceId, "15:00", 20)], behaviors: new Map(), occurrences: new Map() });
+    const tables = { opportunity_proposals: [row],
+      occurrences: [{ id: occurrenceId, user_id: USER, behavior_id: BEHAVIOR, origin: "opportunity",
+        scheduled_for: local("15:00").toString(), effective_start_at: null, effective_end_at: null }] };
+    const retried = await answerBriefOpportunity(callers(tables, answerRpc(row)),
+      { target: "opportunity", kind: "yes", proposalId: PROPOSAL, idempotencyKey: "tap-r", context });
+    expect(retried).toMatchObject({ outcome: "applied", occurrenceId, refusal: null });
+    expect(mocks.add.mock.calls[1]![1].occurrenceId).toBe(occurrenceId);
+
+    // Another Behavior's item at that time still refuses a fresh tap.
+    const fresh = await answerBriefOpportunity(callers({ opportunity_proposals: [row], occurrences: tables.occurrences }, answerRpc(row)),
+      { target: "opportunity", kind: "yes", proposalId: PROPOSAL, idempotencyKey: "tap-s", context });
+    expect(fresh.refusal?.reason).toBe("slot_taken");
+  });
+
   it("refuses a time a calendar event now holds, with free times, and adds nothing", async () => {
     const row = proposal();
     const rpc = answerRpc(row);
