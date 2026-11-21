@@ -210,6 +210,12 @@ describe("Behavior list: Opportunity group and adherence", () => {
     expect(group.compareDocumentPosition(section("not-running-behaviors-title")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("says No scheduled behaviors when only unscheduled opportunities are running", async () => {
+    await renderList([unscheduled]);
+    expect(section("active-behaviors-title")!.textContent).toContain("No scheduled behaviors.");
+    expect(section("active-behaviors-title")!.textContent).not.toContain("No active behaviors.");
+  });
+
   it("marks a dual-mode Behavior in Running with a quiet Opportunity label", async () => {
     await renderList([scheduled, dualMode]);
     const titles = [...section("active-behaviors-title")!.querySelectorAll("article h3")];
@@ -232,6 +238,7 @@ describe("Behavior list: Opportunity group and adherence", () => {
 
     const card = section("opportunity-behaviors-title")!.querySelector("article")!;
     expect(card.textContent).toContain("Done 2 times");
+    expect(card.textContent).not.toMatch(/Done\s*Done/);
     expect(card.textContent).not.toContain("Adherence");
     expect(card.textContent).not.toMatch(/\d+%|—%/);
   });

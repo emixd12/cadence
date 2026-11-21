@@ -21,6 +21,7 @@ import type { OpportunityActionState } from "@/lib/types/timeline";
  * to show; the hosted functions hold the rules.
  */
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FAILED: OpportunityActionState = { status: "error", noticeId: "opportunity.failed" };
 
 export async function addOpportunityOccurrenceAction(
@@ -29,7 +30,9 @@ export async function addOpportunityOccurrenceAction(
 ): Promise<OpportunityActionState> {
   const input = parseAddOpportunityFormData(formData);
   if (!input) {
-    return { status: "refused", reason: "invalid_time", noticeId: "opportunity.refused.time", noticeParams: {} };
+    return UUID.test(String(formData.get("behavior_id") ?? "").trim())
+      ? { status: "refused", reason: "invalid_time", noticeId: "opportunity.refused.time", noticeParams: {} }
+      : { status: "refused", reason: "not_available", noticeId: "opportunity.refused.not-available", noticeParams: { title: "This Behavior" } };
   }
   try {
     const caller = await personCaller();

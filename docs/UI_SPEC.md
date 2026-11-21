@@ -603,6 +603,38 @@ label "Day note", the placeholder "Add a note about this day", accepted day-note
 shortcut chips, and Save note. Saving refreshes the Timeline; a conflict keeps the
 draft and shows the factual conflict message. No modal and no status controls.
 
+### Opportunity Basket (Behaviors of Opportunity)
+
+Under today's date, after the day note control, a quiet underlined text action reads
+"Opportunity (n)", where n is the number of running opportunity Behaviors. It is absent
+when the pool is empty and on surfaces that do not inject the add action (Cadence for
+Mac until its parity task). It opens a non-modal ledger titled "Opportunities": an
+inline square panel with a 1px Ash Line border on wide screens, and a bottom sheet on
+phones (`max-height: min(24rem, 55dvh)`, internal scroll, 16px padding). Escape and the
+Close icon close it and return focus to the trigger. No focus trap, no overlay.
+
+Each item shows its title, a muted `text-xs` line "{length} min · {Where}" and, when the
+Behavior already has an Occurrence today, a muted "On today". Two underlined actions sit
+on the right (44px touch targets on phones):
+
+- **Add to today** opens an inline selector under the item. "Exact time" is the default
+  and starts at the suggested time: now rounded up to 5 minutes, or the nearest free
+  start among today's open items and, when the device holds them, today's busy Calendar
+  events. "Time window" offers Morning, Afternoon, Evening, Night (the preset that holds
+  the suggested time is selected) or Custom with From and To. Add posts once; Cancel
+  closes the selector.
+- **Done now** adds the Occurrence at the current minute and marks it Completed in one
+  tap. Each tap posts a new client id, so two taps make two items.
+
+The outcome or refusal shows under the item as its `opportunity.*` notice.
+
+An added row shows one muted line under its title from `opportunity.added-from`:
+"Added", "Added from Daily Brief", "Added in Chat" or "Added by a connected app". A
+clean added row (Unresolved, no Note, no tracked time, no earlier mark, no connected
+activity) offers an underlined **Remove** at the end of its expanded details, on today
+and in Needs decision. The result shows below it as `opportunity.removed` or an
+`opportunity.remove-refused.*` notice. Scheduled rows never show either.
+
 ## Disclosure controls
 
 Use native `details` and `summary` for hide/show sections and drawer-like

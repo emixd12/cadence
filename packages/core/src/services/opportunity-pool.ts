@@ -5,6 +5,7 @@ import { runFieldsFromStored } from "../resolvers/behavior-run.resolver";
 import {
   briefMoveItemBlocks,
   resolveBriefMoveLength,
+  type BriefMoveBlock,
   type BriefMoveDayItem,
 } from "../resolvers/brief-move.resolver";
 import { isBehaviorInOpportunityPool, suggestDefaultOpportunitySlot } from "../resolvers/opportunity.resolver";
@@ -29,10 +30,8 @@ export function resolveOpportunityPool(input: Readonly<{
   if (pool.length === 0) return [];
 
   const today = input.timeline.todayLocalDate;
-  const todayRows = input.timeline.daySections
-    .filter((section) => section.localDate === today)
-    .flatMap((section) => section.occurrences);
-  const blocks = briefMoveItemBlocks(todayRows.flatMap((row) => dayItem(row, input.timeline, input.timezone)), null);
+  const todayRows = todayOccurrences(input.timeline);
+  const blocks = todayItemBlocks(input.timeline, input.timezone);
   const onToday = new Set(todayRows.map((row) => row.behaviorId));
 
   return pool.map((behavior) => {
@@ -51,6 +50,43 @@ export function resolveOpportunityPool(input: Readonly<{
       lengthMinutes,
     };
   }).sort((left, right) => left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
+}
+
+/**
+ * The pool's default starts again, with the device's calendar events added as blocks.
+ * Without events the server's suggestions stand.
+ */
+export function resuggestOpportunityPool(input: Readonly<{
+  pool: readonly TimelineOpportunityPoolItem[];
+  timeline: TimelineView;
+  now: Temporal.Instant;
+  calendarBusy: ReadonlyArray<Readonly<{ start: string; end: string; ref?: string }>>;
+}>): TimelineOpportunityPoolItem[] {
+  if (input.pool.length === 0 || input.calendarBusy.length === 0) return [...input.pool];
+  const timezone = input.timeline.timezone;
+  const blocks: BriefMoveBlock[] = [
+    ...todayItemBlocks(input.timeline, timezone),
+    ...input.calendarBusy.map((busy, index) => ({
+      kind: "calendar" as const, ref: busy.ref ?? `calendar:${index}`,
+      start: Temporal.Instant.from(busy.start), end: Temporal.Instant.from(busy.end),
+    })),
+  ];
+  return input.pool.map((item) => {
+    const slot = suggestDefaultOpportunitySlot({
+      localDate: input.timeline.todayLocalDate, timezone, now: input.now, lengthMinutes: item.lengthMinutes, blocks,
+    });
+    return { ...item, suggestedStart: { startsAt: slot.startsAt.toString(), localTime: slot.localTime, source: slot.source } };
+  });
+}
+
+function todayOccurrences(timeline: TimelineView): TimelineOccurrenceView[] {
+  return timeline.daySections
+    .filter((section) => section.localDate === timeline.todayLocalDate)
+    .flatMap((section) => section.occurrences);
+}
+
+function todayItemBlocks(timeline: TimelineView, timezone: string): BriefMoveBlock[] {
+  return briefMoveItemBlocks(todayOccurrences(timeline).flatMap((row) => dayItem(row, timeline, timezone)), null);
 }
 
 function lengthFor(behaviorId: string, defaultMinutes: number | null, timeline: TimelineView) {

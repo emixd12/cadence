@@ -325,7 +325,7 @@ export function BehaviorList({
 
         {runningRows.length === 0 ? (
           <p className="border-t border-line pt-4 text-base leading-7 text-muted-readable">
-            No active behaviors.
+            {opportunityRows.length ? "No scheduled behaviors." : "No active behaviors."}
           </p>
         ) : (
           <div className="divide-y divide-line">
@@ -818,7 +818,7 @@ function BehaviorOutcomeStats({
   if (unscheduled) {
     return (
       <dl className="grid max-w-sm gap-1 text-sm leading-5 text-muted-readable">
-        <SummaryItem label="Done" value={behaviorAnalytics?.opportunityDoneLabel ?? "Done 0 times"} />
+        <SummaryItem label="Added" value={behaviorAnalytics?.opportunityDoneLabel ?? "Done 0 times"} />
         {behaviorAnalytics?.averageTrackedTime ? (
           <SummaryItem label="Average tracked time" value={behaviorAnalytics.averageTrackedTime.durationLabel} />
         ) : null}

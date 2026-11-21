@@ -848,7 +848,19 @@
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
-        "INT-TIMELINE-004"
+        "INT-TIMELINE-004",
+        "INT-TIMELINE-024"
+      ]
+    },
+    {
+      "path": "components/timeline/OpportunityBasket.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 28,
+      "interaction_ids": [
+        "INT-TIMELINE-021",
+        "INT-TIMELINE-022",
+        "INT-TIMELINE-023",
+        "INT-TIMELINE-024"
       ]
     },
     {
@@ -920,11 +932,7 @@
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-TIMELINE-001",
-        "INT-TIMELINE-020",
-        "INT-TIMELINE-021",
-        "INT-TIMELINE-022",
-        "INT-TIMELINE-023",
-        "INT-TIMELINE-024"
+        "INT-TIMELINE-020"
       ]
     },
     {
@@ -20862,7 +20870,7 @@
           "docs/user-guide/timeline.md#record-an-occurrence-status"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "timeline"
       ],
@@ -20876,11 +20884,11 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Opportunity basket trigger on today's Timeline"
+          "control": "Opportunity (n) under today's date"
         }
       ],
-      "availability": "On today's Timeline when one or more opportunity Behaviors are running.",
-      "success_result": "The basket lists the pool in title order with each Behavior's suggested start (now rounded up, or the nearest free start among today's items).",
+      "availability": "On today's Timeline when one or more opportunity Behaviors are running and the surface injects the add action. Hidden when the pool is empty.",
+      "success_result": "A non-modal ledger opens: inline under today's date on wide screens, a bottom sheet on phones. It lists the pool in title order with length, Where and an On today note. Escape or Close returns focus to the trigger.",
       "failure_result": "",
       "effects": [
         "ui_state"
@@ -20888,24 +20896,29 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "lib/services/timeline.service.ts",
-        "packages/core/src/services/opportunity-pool.ts#resolveOpportunityPool"
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
+        "components/timeline/DayProgressTimeline.tsx",
+        "packages/core/src/services/opportunity-pool.ts#resolveOpportunityPool",
+        "lib/services/timeline.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
           "tests/opportunity.service.test.ts"
         ],
-        "notes": "The pool payload is covered by the service test; Task 5 adds the basket UI."
+        "notes": "DOM test covers the hidden state, open, Close and Escape with focus return; the pool payload is covered by the service test."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
             "lib/services/timeline.service.ts"
           ],
           "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
             "tests/opportunity.service.test.ts"
           ]
         },
@@ -20936,7 +20949,7 @@
           "docs/user-guide/timeline.md#record-an-occurrence-status"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "timeline"
       ],
@@ -20950,7 +20963,7 @@
       "triggers": [
         {
           "kind": "submit",
-          "control": "Add at a time, a preset window or a custom range in the basket"
+          "control": "Add to today, then Exact time or Time window (preset or custom), then Add"
         }
       ],
       "availability": "In the Opportunity Basket, for today in the Behavior's timezone.",
@@ -20964,6 +20977,7 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
         "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
         "lib/services/opportunity.service.ts#addOpportunityToToday",
         "lib/db/opportunity.repo.ts"
@@ -20971,19 +20985,22 @@
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
           "tests/opportunity.service.test.ts"
         ],
-        "notes": "Service test covers placements, refusals, replay and reminder planning; Task 5 adds the basket."
+        "notes": "DOM test posts the exact-time default and a window preset with a fresh client_occurrence_id and shows the notice; the service test covers placements, refusals, replay and reminder planning."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
             "app/(app)/timeline/opportunity-actions.ts",
             "lib/services/opportunity.service.ts"
           ],
           "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
             "tests/opportunity.service.test.ts"
           ]
         },
@@ -21014,7 +21031,7 @@
           "docs/user-guide/timeline.md#record-an-occurrence-status"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "timeline"
       ],
@@ -21041,25 +21058,29 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
         "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
         "lib/services/opportunity.service.ts#addOpportunityToToday"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
           "tests/opportunity.service.test.ts"
         ],
-        "notes": "Service test covers the Done now call and notice."
+        "notes": "DOM test checks that each tap posts done_now with a new client_occurrence_id and shows the logged notice or a refusal; the service test covers the call."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
             "app/(app)/timeline/opportunity-actions.ts",
             "lib/services/opportunity.service.ts"
           ],
           "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
             "tests/opportunity.service.test.ts"
           ]
         },
@@ -21090,7 +21111,7 @@
           "docs/user-guide/timeline.md#review-needs-decision"
         ]
       },
-      "status": "planned",
+      "status": "implemented",
       "surfaces": [
         "timeline"
       ],
@@ -21105,7 +21126,7 @@
       "triggers": [
         {
           "kind": "submit",
-          "control": "Remove on an added row"
+          "control": "Remove in an added row's details"
         }
       ],
       "availability": "On an added row that is Unresolved with no Note, no tracked time, no earlier mark and no connected activity, today or in Needs decision.",
@@ -21119,6 +21140,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityRemoveControl",
+        "components/timeline/OccurrenceRow.tsx#OccurrenceRow",
         "app/(app)/timeline/opportunity-actions.ts#removeOpportunityOccurrenceAction",
         "lib/services/opportunity.service.ts#removeOpportunityFromToday",
         "lib/db/opportunity.repo.ts"
@@ -21126,19 +21149,23 @@
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
           "tests/opportunity.service.test.ts"
         ],
-        "notes": "Service test covers removal and each refusal; canRemove facts are covered by the timeline service test."
+        "notes": "DOM test shows Remove only when canRemove is true, on today and in Needs decision, and renders removed and refused notices; the service test covers removal and each refusal."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "components/timeline/OccurrenceRow.tsx",
+            "components/timeline/OpportunityBasket.tsx",
             "app/(app)/timeline/opportunity-actions.ts",
             "lib/services/opportunity.service.ts"
           ],
           "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
             "tests/opportunity.service.test.ts"
           ]
         },

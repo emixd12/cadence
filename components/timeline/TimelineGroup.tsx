@@ -1,6 +1,7 @@
 import { noticeText } from "@cadence/core/notices";
 import type {
   OccurrenceFormAction,
+  OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineDaySection,
 } from "@/lib/types/timeline";
@@ -20,6 +21,7 @@ type TimelineGroupProps = Readonly<{
   variant?: "feed" | "needsDecisionDialog";
   dayNoteAction?: OccurrenceFormAction;
   dayNote?: string;
+  removeOpportunityAction?: OpportunityFormAction;
 }>;
 
 const SECTION_CLASSES: Record<TimelineDaySection["kind"], string> = {
@@ -39,6 +41,7 @@ export function TimelineGroup({
   variant = "feed",
   dayNoteAction,
   dayNote = "",
+  removeOpportunityAction,
 }: TimelineGroupProps) {
   const dayNoteControl = dayNoteAction ? (
     <DayNoteControl
@@ -111,6 +114,7 @@ export function TimelineGroup({
               stopTimeTrackingAction={stopTimeTrackingAction}
               resetTimeTrackingAction={resetTimeTrackingAction}
               shortcutsByBehavior={shortcutsByBehavior}
+              removeOpportunityAction={removeOpportunityAction}
             />
           ))}
         </div>
@@ -131,6 +135,7 @@ function OccurrenceStack({
   stopTimeTrackingAction,
   resetTimeTrackingAction,
   shortcutsByBehavior,
+  removeOpportunityAction,
 }: Readonly<{
   group: TimelineDaySection["occurrenceGroups"][number];
   statusAction: OccurrenceFormAction;
@@ -139,6 +144,7 @@ function OccurrenceStack({
   stopTimeTrackingAction: TimeTrackingFormAction;
   resetTimeTrackingAction: TimeTrackingFormAction;
   shortcutsByBehavior: Record<string, NoteShortcut[]>;
+  removeOpportunityAction?: OpportunityFormAction;
 }>) {
   if (!group.isGroupedStack) {
     const occurrence = group.occurrences[0];
@@ -156,6 +162,7 @@ function OccurrenceStack({
         stopTimeTrackingAction={stopTimeTrackingAction}
         resetTimeTrackingAction={resetTimeTrackingAction}
         shortcuts={shortcutsByBehavior[group.behaviorId]}
+        removeOpportunityAction={removeOpportunityAction}
       />
     );
   }
@@ -178,6 +185,7 @@ function OccurrenceStack({
           stopTimeTrackingAction={stopTimeTrackingAction}
           resetTimeTrackingAction={resetTimeTrackingAction}
           shortcuts={shortcutsByBehavior[group.behaviorId]}
+          removeOpportunityAction={removeOpportunityAction}
         />
       ))}
     </div>

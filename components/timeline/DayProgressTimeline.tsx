@@ -42,6 +42,7 @@ import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
+import { OpportunityBasket } from "./OpportunityBasket";
 import { calendarBusyFromEvents, MoveCalendarEventsContext } from "./OccurrenceMoves";
 import { useDayProgressClock } from "./day-progress-clock";
 import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
@@ -71,6 +72,7 @@ import {
 } from "@cadence/core/services/travel-habits";
 import type {
   OccurrenceFormAction,
+  OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineDaySection,
   TimelineView,
@@ -131,6 +133,9 @@ type DayProgressTimelineProps = Readonly<{
   travelAccountId?: string | null;
   /** Ticket 278: the trip digest from a web leave reminder's link. */
   leaveReminderDigest?: string | null;
+  /** Behaviors of Opportunity: the basket's add and Done now, and a row's Remove. Omitted where unavailable. */
+  addOpportunityAction?: OpportunityFormAction;
+  removeOpportunityAction?: OpportunityFormAction;
 }>;
 
 /**
@@ -192,6 +197,8 @@ export function DayProgressTimeline({
   liveCalendar = false,
   travelAccountId = null,
   leaveReminderDigest = null,
+  addOpportunityAction,
+  removeOpportunityAction,
 }: DayProgressTimelineProps) {
   const runtimeRefresh = useRefresh();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -588,6 +595,9 @@ export function DayProgressTimeline({
         startTimeTrackingAction={startTimeTrackingAction}
         stopTimeTrackingAction={stopTimeTrackingAction}
         resetTimeTrackingAction={resetTimeTrackingAction}
+        removeOpportunityAction={removeOpportunityAction}
+        opportunityBasket={section.localDate === timeline.todayLocalDate
+          ? <OpportunityBasket timeline={timeline} now={now} addAction={addOpportunityAction} /> : null}
       />; })}
       {preview && previewEvents.length ? <ExternalEventPreview
         id="calendar-preview"
@@ -654,6 +664,7 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   onRestoreAllDay: () => void;
   dayNote: string;
   nextTrip: DayProgressNextTripInput | null;
+  opportunityBasket?: React.ReactNode;
 }>;
 
 function DayProgressDay({
@@ -688,6 +699,8 @@ function DayProgressDay({
   shortcutsByBehavior,
   dayNoteAction,
   dayNote,
+  removeOpportunityAction,
+  opportunityBasket = null,
 }: DayProgressDayProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -796,6 +809,7 @@ function DayProgressDay({
             action={dayNoteAction}
             shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
           /> : null}
+          {opportunityBasket}
           <RecordedActivityList activity={activity} timezone={timezone} label={section.label} />
         </div>
       </header>
@@ -830,6 +844,7 @@ function DayProgressDay({
                   statusIconsOnly={iconsOnly[occurrence.id] ?? false}
                   crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
                   countableWorkouts={countableWorkouts}
+                  removeOpportunityAction={removeOpportunityAction}
                 />
               </div>;
             })}

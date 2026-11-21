@@ -23,7 +23,6 @@
       "meaning": "Marks a Timeline row that was added from the opportunity basket, and who added it.",
       "text": "{source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}}",
       "style": "note",
-      "status": "planned",
       "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-024"]
     },
     "opportunity.no-schedule": {
