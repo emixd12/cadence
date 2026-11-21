@@ -28,6 +28,10 @@ export type BehaviorInput = {
   active: boolean;
   /** Behaviors of Opportunity. Undefined keeps the stored flag (false on create). */
   isOpportunity?: boolean;
+  /** Sub-behaviors (depth 1). Undefined leaves the stored link; null makes it standalone. */
+  parentBehaviorId?: string | null;
+  subBehaviorSortOrder?: number;
+  inheritParentSchedule?: boolean;
 };
 
 export type BehaviorFields = {
@@ -55,6 +59,9 @@ export type BehaviorFields = {
   active: boolean;
   archived_at: string | null;
   archive_notes?: Json;
+  parent_behavior_id?: string | null;
+  sub_behavior_sort_order?: number;
+  inherit_parent_schedule?: boolean;
 };
 
 export type BehaviorRecord = BehaviorFields & {
@@ -111,7 +118,7 @@ export type BehaviorScheduleGraphMutation = {
 };
 
 export type BehaviorCreateCommit = {
-  behavior: BehaviorFields & { user_id: string };
+  behavior: BehaviorFields & { user_id: string; id?: string };
   definitionEventPlan: BehaviorDefinitionEventPlan;
   configurationEventPlan: BehaviorConfigurationEventPlan;
   schedules: BehaviorScheduleGraphMutation[];
@@ -135,4 +142,14 @@ export type BehaviorDataStore = {
   getBehaviorById(behaviorId: string): Promise<BehaviorGraphRecord | null>;
   createBehaviorWithAtomicScheduleGraph(input: BehaviorCreateCommit): Promise<BehaviorRecord>;
   updateBehaviorWithAtomicScheduleGraph(input: BehaviorUpdateCommit): Promise<BehaviorRecord | null>;
+  /**
+   * Sub-behaviors (depth 1). Stores without these keep standalone Behaviors only: the
+   * service refuses links and group writes, and edits never touch other Behaviors.
+   */
+  listBehaviors?(): Promise<BehaviorGraphRecord[]>;
+  /** A parent first, then its sub-behaviors, in one transaction. Ids are set on every commit. */
+  createBehaviorGroupWithAtomicScheduleGraphs?(input: BehaviorCreateCommit[]): Promise<BehaviorRecord[]>;
+  /** Several updates in one transaction, in order. */
+  updateBehaviorGroupWithAtomicScheduleGraphs?(input: BehaviorUpdateCommit[]): Promise<Array<BehaviorRecord | null>>;
+  reorderSubBehaviors?(input: { parentBehaviorId: string; orderedBehaviorIds: string[] }): Promise<number>;
 };

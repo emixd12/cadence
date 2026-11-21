@@ -141,8 +141,19 @@ export type PortabilityTimeSessionRow = {
   user_id: string;
 };
 
+/**
+ * Sub-behavior link columns (depth 1). Every write plan sets all three; snapshots taken
+ * before sub-behaviors omit them, which reads as null, 0 and false.
+ */
+export type PortabilityBehaviorLinkColumns = {
+  parent_behavior_id: string | null;
+  sub_behavior_sort_order: number;
+  inherit_parent_schedule: boolean;
+};
+export type PortabilityBehaviorRow = import("../behavior-store").BehaviorRecord & Partial<PortabilityBehaviorLinkColumns>;
+
 export type PortabilityGraph = {
-  behavior: import("../behavior-store").BehaviorRecord;
+  behavior: PortabilityBehaviorRow;
   schedules: Omit<import("../behavior-store").BehaviorScheduleRecord, "schedule_slots">[];
   slots: import("../behavior-store").BehaviorScheduleSlotRecord[];
 };

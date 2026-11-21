@@ -134,7 +134,8 @@ describe("behavior lifecycle reminder synchronization", () => {
       await expect(
         behaviorService[methodName](behaviorForm()),
       ).rejects.toThrow("Atomic behavior and stale-marker write failed.");
-      expect(mocks.listUserBehaviors).not.toHaveBeenCalled();
+      // One read before the write finds sub-behaviors; no post-write read follows a failure.
+      expect(mocks.listUserBehaviors).toHaveBeenCalledTimes(1);
       expect(mocks.syncUserOccurrencesAndReminders).not.toHaveBeenCalled();
     },
   );
@@ -248,7 +249,7 @@ describe("behavior lifecycle reminder synchronization", () => {
     await restoreBehaviorFromFormData(behaviorForm());
 
     expect(mocks.updateBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
-    expect(mocks.listUserBehaviors).not.toHaveBeenCalled();
+    expect(mocks.listUserBehaviors).toHaveBeenCalledTimes(1);
     expect(mocks.syncUserOccurrencesAndReminders).not.toHaveBeenCalled();
     expect(mocks.reportMonitoringError).toHaveBeenCalledWith(
       "behavior_graph_profile_timezone_missing",
@@ -277,7 +278,7 @@ describe("behavior lifecycle reminder synchronization", () => {
     ).resolves.toBeUndefined();
 
     expect(mocks.updateBehaviorWithAtomicScheduleGraph).toHaveBeenCalledOnce();
-    expect(mocks.listUserBehaviors).not.toHaveBeenCalled();
+    expect(mocks.listUserBehaviors).toHaveBeenCalledTimes(1);
     expect(mocks.syncUserOccurrencesAndReminders).not.toHaveBeenCalled();
     expect(mocks.reportMonitoringError).toHaveBeenCalledWith(
       "behavior_graph_profile_timezone_read_failed",

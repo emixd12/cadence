@@ -118,6 +118,31 @@ Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
 `apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
 not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.
 
+## Sub-behaviors and Timeline Semantic Zoom (Ticket 343) — November 21, 2026
+
+State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911a`
+(after PR #351 Behaviors of Opportunity and Mac 0.1.14); not merged, not deployed.
+
+- Scope: routines (depth-1 sub-behaviors), schedule inheritance, leaf Occurrences,
+  routine slot marks, Timeline Semantic Zoom, MCP contract 1.7.0, Chat `chat-1.6`,
+  Daily Brief routine moves, `coach-signals-3` (`sub_behavior_dropoff`),
+  `coach-tips-3`, portability, Hevy completion on routines, and Mac parity (SQLite
+  0028, account sync contract 9; the minimum writer contract stays 8, so Mac 0.1.14
+  keeps syncing). Docs: TICKETS, Ticket 343; DECISIONS, 2026-11-21.
+- An opportunity Behavior is never part of a routine: it cannot be a parent or a
+  sub-behavior (resolver, database trigger, MCP and form).
+- Registry: `INT-BEHAVIOR-039`–`045` and `INT-TIMELINE-025`–`027`, implemented on web
+  and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-081–P-083.
+- Hosted migrations (additive, not pushed): `20261122010000_sub_behaviors`,
+  `20261122020000_sub_behavior_portability_connectors`,
+  `20261122030000_coach_signal_sub_behavior_dropoff`.
+- Verification: VERIFICATION_PLACEHOLDER
+- Open:
+  1. Owner: push the three hosted migrations before the code reaches production;
+     review the draft advice card `smaller-step-in-the-routine`.
+  2. Mac: Daily Brief routine moves (follow-up); routine reminder text names the
+     anchor step, not the routine. Installed Mac acceptance not run.
+
 ## Product map, features and journeys — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the

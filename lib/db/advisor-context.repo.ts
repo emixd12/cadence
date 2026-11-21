@@ -32,6 +32,10 @@ export type AdvisorBehaviorRow = Readonly<{
   pauseFromTime: string | null;
   pauseBackOn: string | null;
   timezone: string;
+  /** Sub-behaviors (depth 1). Absent from snapshots read before the link existed. */
+  parentBehaviorId?: string | null;
+  subBehaviorSortOrder?: number;
+  inheritParentSchedule?: boolean;
 }>;
 
 export type AdvisorOccurrenceRow = Readonly<{
@@ -155,6 +159,9 @@ function parseSnapshot(value: unknown): AdvisorCadenceSnapshot {
         pauseFromTime: nullableString(behavior.pauseFromTime, "behavior.pauseFromTime"),
         pauseBackOn: nullableString(behavior.pauseBackOn, "behavior.pauseBackOn"),
         timezone: string(behavior.timezone, "behavior.timezone"),
+        parentBehaviorId: behavior.parentBehaviorId === undefined ? null : nullableString(behavior.parentBehaviorId, "behavior.parentBehaviorId"),
+        subBehaviorSortOrder: typeof behavior.subBehaviorSortOrder === "number" ? behavior.subBehaviorSortOrder : 0,
+        inheritParentSchedule: behavior.inheritParentSchedule === true,
       };
     }),
     occurrences: list(row.occurrences, "occurrences").map((item) => {

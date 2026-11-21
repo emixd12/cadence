@@ -130,7 +130,8 @@ function behaviorOutput(world: ChatWorld, item: WorldBehavior) {
     schedule_summary: item.unscheduled ? "" : `${recurrenceSummary} at ${clockLabel(item.time)}`,
     reminders: { browser_enabled: true, email_enabled: false, offset_minutes: 0, summary: "Browser reminder at the scheduled time" },
     archive_notes: item.archiveNote ? [{ id: derivedId(item.id, "00000003"), archived_at: nowInstant(world), note: item.archiveNote, updated_at: nowInstant(world) }] : [],
-    external_ref: null, created_at: created, updated_at: created, revision: `r${item.revision}`,
+    external_ref: null, parent_behavior_id: null, sub_behavior_sort_order: 0, inherit_parent_schedule: false, sub_behaviors: [],
+    created_at: created, updated_at: created, revision: `r${item.revision}`,
   };
 }
 
@@ -312,6 +313,11 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     return ok({ id: input.id, title: `Day note ${entry[0]}`, url: `${APP_URL}/timeline?date=${entry[0]}`,
       text: `Day note for ${entry[0]}: ${JSON.stringify(entry[1].note)}`, metadata: { kind: "day_note", local_date: entry[0] } });
   },
+
+  // The eval world has no parent Behaviors yet (contract 1.7.0).
+  set_parent_occurrence_status: (world, input) => findBehavior(world, input.parent_behavior_id)
+    ? fail("invalid_state", "This Behavior has no sub-behaviors. Use set_occurrence_status.")
+    : fail("not_found", "No Behavior with this id."),
 
   set_occurrence_status: (world, input) => {
     const item = findOccurrence(world, input.occurrence_id);
@@ -576,7 +582,7 @@ function searchAdvice(world: ChatWorld, args: unknown): ChatToolResult {
   if (!query.trim()) return fail("invalid_input", "Send a query.");
   const words = query.split(/\W+/).filter((word) => word.length > 2);
   const cards = world.adviceCards.filter((card) => card.topics.some((topic) => words.some((word) => word.startsWith(topic) || topic.startsWith(word))));
-  return ok({ cards: cards.map(({ topics: _topics, ...card }) => card) });
+  return ok({ cards: cards.map((card) => Object.fromEntries(Object.entries(card).filter(([key]) => key !== "topics"))) });
 }
 
 /** Ids for records made during a run, distinct from the world's own ids. */

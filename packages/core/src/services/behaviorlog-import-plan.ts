@@ -1,6 +1,6 @@
 import { storedRunColumns } from "./behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
-import type { BehaviorLogImportMergePreviewResult, BehaviorLogImportSchedulePlan } from "../types/behaviorlog-import";
+import type { BehaviorLogImportBehaviorPlan, BehaviorLogImportIssue, BehaviorLogImportMergePreviewResult, BehaviorLogImportSchedulePlan } from "../types/behaviorlog-import";
 import type { LocalImportWritePlan, PortabilityGraph } from "../types/portability-rows";
 import type { OccurrenceStatusEventRecord } from "../data-store";
 import { toCadenceRecurrenceRule } from "./behaviorlog-restore-plan";
@@ -59,6 +59,7 @@ export function planBehaviorLogImportWrite(context: PortabilityPlanContext & {
       default_duration_minutes: row.expectedDurationMinutes ?? null,
       ...(row.cadenceRun ? storedRunColumns(row.cadenceRun) : {}),
       auto_archived_at: row.cadenceAutoArchivedAt ?? null,
+      ...importedSubBehaviorLink(row, ids.behaviors, result.warnings),
       created_at: row.createdAtUtc ?? now, updated_at: row.createdAtUtc ?? now }, schedules: [], slots: [] };
     const parentGroups = new Map<string, BehaviorLogImportSchedulePlan[]>();
     for (const schedule of schedules) { const key = schedule.cadenceBehaviorScheduleId ?? schedule.externalId; parentGroups.set(key, [...(parentGroups.get(key) ?? []), schedule]); }
@@ -193,3 +194,28 @@ function compareInstants(left: string, right: string) { return Temporal.Instant.
 function compareStatusEvents(left: OccurrenceStatusEventRecord, right: OccurrenceStatusEventRecord) { return compareInstants(left.effective_at ?? left.recorded_at, right.effective_at ?? right.recorded_at) || compareInstants(left.recorded_at, right.recorded_at) || left.id.localeCompare(right.id); }
 
 function slotShape(shape: NonNullable<ReturnType<typeof scheduleShape>>) { return { kind: shape.kind, preset: shape.preset, start_time: shape.start_time, end_time: shape.end_time }; }
+
+/**
+ * Parents come first in the plan, so a sub-behavior's parent already has its local ID.
+ * A parent this import did not create or map leaves the Behavior on its own.
+ */
+function importedSubBehaviorLink(
+  row: BehaviorLogImportBehaviorPlan,
+  behaviorIds: ReadonlyMap<string, string>,
+  warnings: BehaviorLogImportIssue[],
+): { parent_behavior_id: string | null; sub_behavior_sort_order: number; inherit_parent_schedule: boolean } {
+  const parentExternalId = row.cadenceParentBehaviorExternalId ?? null;
+  const parentId = parentExternalId ? behaviorIds.get(parentExternalId) ?? null : null;
+  if (parentExternalId && !parentId) {
+    warnings.push({
+      severity: "warning",
+      code: "sub_behavior_parent_not_imported",
+      message: `Behavior ${row.externalId} was imported on its own because its parent Behavior ${parentExternalId} was not imported.`,
+    });
+  }
+  return {
+    parent_behavior_id: parentId,
+    sub_behavior_sort_order: parentId ? row.cadenceSubBehaviorSortOrder ?? 0 : 0,
+    inherit_parent_schedule: parentId ? row.cadenceInheritParentSchedule ?? true : false,
+  };
+}

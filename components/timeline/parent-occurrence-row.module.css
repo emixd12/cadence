@@ -1,0 +1,19 @@
+/* Sub-behavior routines on Timeline. Child rows sit under their routine with a small indent and no border. */
+.row { display: grid; }
+/* The triangle sits in the gap before the title, so routine and standalone titles share one left edge. */
+.titleLine { position: relative; }
+.indicator { position: absolute; left: -0.75rem; top: 50%; margin: 0; transform: translateY(-50%); transition: transform 180ms ease; }
+.indicator[data-open="true"] { transform: translateY(-50%) rotate(90deg); }
+.indicator[data-tone="completed"], .indicator[data-tone="not_completed"] { border-left-color: var(--primary-foreground); }
+.indicator[data-tone="needs_decision"] { border-left-color: var(--foreground); }
+.children { padding-left: 1rem; animation: reveal 180ms ease-out; }
+@keyframes reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.row[data-motion="reduced"] .children, .row[data-motion="reduced"] .indicator { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .children { animation: none; } .indicator { transition: none; } }
+/* Phones: the time column is only as wide as its text, so the triangle stays inline and tight. */
+@media (max-width: 575px) {
+  .titleLine { gap: 0.375rem; }
+  .indicator { position: static; transform: translateY(-0.0625rem); }
+  .indicator[data-open="true"] { transform: translateY(-0.0625rem) rotate(90deg); }
+  .children { padding-left: 0.5rem; }
+}

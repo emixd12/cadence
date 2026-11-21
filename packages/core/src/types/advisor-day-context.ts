@@ -118,6 +118,20 @@ export type AdvisorOccurrence = Readonly<{
    * the time it sits at (its effective start); `plannedFor` is where the plan put it.
    */
   move?: AdvisorOccurrenceMove;
+  /**
+   * Set for a step of a routine (a sub-behavior, depth 1). Steps that follow the
+   * routine's schedule and share a start are one block in the brief: they never
+   * collide with each other and move together.
+   */
+  routine?: AdvisorOccurrenceRoutine;
+}>;
+
+export type AdvisorOccurrenceRoutine = Readonly<{
+  parentBehaviorRef: string;
+  parentTitle: string;
+  inheritParentSchedule: boolean;
+  /** Position among the routine's steps, from 0. */
+  stepOrder: number;
 }>;
 
 export const ADVISOR_MOVE_SOURCES = ["person", "daily_brief", "coach", "chat", "mcp"] as const;

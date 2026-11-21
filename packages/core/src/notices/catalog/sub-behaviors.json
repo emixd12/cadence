@@ -1,0 +1,64 @@
+{
+  "feature": "behavior-editor",
+  "notices": {
+    "sub-behaviors.group-created": {
+      "meaning": "Says on Behaviors that a new parent Behavior was saved together with its sub-behaviors.",
+      "text": "{title} created with {count, plural, one {# sub-behavior} other {# sub-behaviors}}.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BEHAVIOR-041"
+      ]
+    },
+    "sub-behaviors.reordered": {
+      "meaning": "Says on Behaviors that the new order of a parent's sub-behaviors was saved.",
+      "text": "Order saved.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BEHAVIOR-042"
+      ]
+    },
+    "sub-behaviors.added": {
+      "meaning": "Says on Behaviors that a Behavior now sits under a parent Behavior.",
+      "text": "{title} is now part of {parent}.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BEHAVIOR-039",
+        "INT-BEHAVIOR-044"
+      ]
+    },
+    "sub-behaviors.detached": {
+      "meaning": "Says on Behaviors that a sub-behavior left its parent and is now its own Behavior.",
+      "text": "{title} is now its own behavior.",
+      "style": "outcome",
+      "interactions": [
+        "INT-BEHAVIOR-039",
+        "INT-BEHAVIOR-043"
+      ]
+    },
+    "sub-behaviors.follows-parent": {
+      "meaning": "Says in the Behavior form that a sub-behavior uses its parent's schedule, so its own schedule fields are hidden.",
+      "text": "Uses the schedule of {parent}.",
+      "style": "note",
+      "interactions": [
+        "INT-BEHAVIOR-040"
+      ]
+    },
+    "sub-behaviors.check-row": {
+      "meaning": "Refuses a new parent Behavior when one of its drafted sub-behaviors is not valid.",
+      "text": "Check sub-behavior {position}: {reason}",
+      "style": "error",
+      "interactions": [
+        "INT-BEHAVIOR-041"
+      ]
+    },
+    "sub-behaviors.routine-marked": {
+      "meaning": "Says on Timeline that a whole routine slot was marked Completed or Not Completed.",
+      "text": "Routine updated.",
+      "style": "outcome",
+      "feature": "timeline",
+      "interactions": [
+        "INT-TIMELINE-025"
+      ]
+    }
+  }
+}

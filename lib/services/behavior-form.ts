@@ -98,10 +98,12 @@ export function parseBehaviorFormData(
   const { recurrenceRule, schedules, scheduleSlots } =
     parseSchedulesAndLegacyFieldsFromForm(formData, fieldErrors, isOpportunity === true);
   const reminderOffsetMinutes = parseReminderOffset(formData, fieldErrors);
+  const link = parseSubBehaviorLinkFields(formData, behaviorId);
 
   if (Object.keys(fieldErrors).length > 0) {
     throw new BehaviorValidationError("Check the highlighted fields.", fieldErrors);
   }
+  if ("error" in link) throw new BehaviorValidationError(link.error, {});
 
   return {
     behaviorId,
@@ -123,6 +125,33 @@ export function parseBehaviorFormData(
     active:
       options.mode === "create" ? true : getCheckboxValue(formData, "active"),
     ...(isOpportunity === undefined ? {} : { isOpportunity }),
+    ...link,
+  };
+}
+
+/**
+ * Sub-behavior fields (depth 1). A form without `parent_behavior_id` keeps the stored
+ * link; an empty value makes the Behavior standalone. `inherit_parent_schedule` is "true"
+ * or "false"; without it a new link inherits. `sub_behavior_sort_order` is optional.
+ */
+function parseSubBehaviorLinkFields(
+  formData: FormData,
+  behaviorId: string,
+): Pick<ParsedBehaviorFormData, "parentBehaviorId" | "inheritParentSchedule" | "subBehaviorSortOrder"> | { error: string } {
+  if (!formData.has("parent_behavior_id")) return {};
+  const parentBehaviorId = getOptionalString(formData, "parent_behavior_id").trim() || null;
+  if (parentBehaviorId && (!UUID_PATTERN.test(parentBehaviorId) || parentBehaviorId === behaviorId)) {
+    return { error: "Choose another Behavior as the parent." };
+  }
+  const inherit = getOptionalString(formData, "inherit_parent_schedule").trim();
+  const sortOrder = getOptionalString(formData, "sub_behavior_sort_order").trim();
+  if (sortOrder && !/^\d{1,4}$/u.test(sortOrder)) {
+    return { error: "Choose a valid position among the sub-behaviors." };
+  }
+  return {
+    parentBehaviorId,
+    ...(parentBehaviorId && inherit ? { inheritParentSchedule: inherit === "true" || inherit === "on" } : {}),
+    ...(parentBehaviorId && sortOrder ? { subBehaviorSortOrder: Number(sortOrder) } : {}),
   };
 }
 

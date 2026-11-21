@@ -14,7 +14,9 @@ which scheduled Occurrences to mark.
 2. Show today's Occurrences and Needs decision separately, naming each Behavior,
    local date, time, and current status. Needs decision means an Unresolved
    Occurrence before today; it is not a stored status. Never infer Not Completed
-   from elapsed time or silence.
+   from elapsed time or silence. A routine with steps appears in `parent_groups`
+   with derived progress such as `2/3`; show the routine with its steps under it.
+   That progress is derived, never a stored status.
 3. Ask which Occurrences the user wants marked Completed, Not Completed, or
    returned to Unresolved. Resolve ambiguous dates or repeated Behavior names.
    Present the exact proposed changes and obtain the user's confirmation before
@@ -25,7 +27,11 @@ which scheduled Occurrences to mark.
    expected_status and a unique idempotency_key for that change. Map displayed
    Completed to completed, Not Completed to not_completed, and Unresolved to
    unresolved. If the current status differs from the proposal, obtain a new
-   confirmation before writing.
+   confirmation before writing. When the user marks a whole routine Completed or
+   Not Completed, call `set_parent_occurrence_status()` once with its
+   parent_behavior_id, local_date, the group's slot_key, the observed
+   expected_statuses and a unique idempotency_key; mark single steps with
+   `set_occurrence_status()`.
 5. A conflict requires a fresh read and renewed confirmation. Retry an uncertain
    result only with the same key and identical input; do not invent a new change.
    Report only confirmed successful results. Distinguish failures from unchanged

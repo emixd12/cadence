@@ -5,6 +5,7 @@ import type {
   ReminderChannel,
   ReminderDeliveryStatus,
 } from "../types/database";
+import { compareSubBehaviors } from "./sub-behavior.resolver";
 
 export type ReminderResolverBehavior = {
   id: string;
@@ -80,6 +81,75 @@ export function resolveReminderDeliveries(input: {
     scheduledSendAt,
     status: "pending",
   }));
+}
+
+export type RoutineReminderChild = {
+  behavior: ReminderResolverBehavior;
+  inheritParentSchedule: boolean;
+  title?: string;
+  subBehaviorSortOrder?: number;
+  occurrences: ReminderResolverOccurrence[];
+};
+
+/** One routine reminder: the inheriting sub-behaviors due together in one parent slot. */
+export type RoutineReminderSlot = {
+  parentBehaviorId: string;
+  scheduledFor: string;
+  /** The Occurrence the stored delivery points at: the first Unresolved child in order. */
+  anchorOccurrenceId: string;
+  /** Unresolved child Occurrences the reminder covers, in sibling order. */
+  occurrenceIds: string[];
+};
+
+/**
+ * Reminders for a parent with sub-behaviors. Children that inherit the parent's schedule
+ * share one reminder per slot, sent with the parent's reminder settings; the delivery
+ * points at the first Unresolved child, so reconciliation moves it when that child is
+ * marked and cancels it when all are. Children with their own schedule keep their own
+ * reminders.
+ */
+export function resolveRoutineReminderDeliveries(input: {
+  parent: ReminderResolverBehavior;
+  children: RoutineReminderChild[];
+}): { deliveries: ResolvedReminderDelivery[]; slots: RoutineReminderSlot[] } {
+  const ordered = [...input.children].sort((left, right) =>
+    compareSubBehaviors(
+      { id: left.behavior.id, title: left.title, subBehaviorSortOrder: left.subBehaviorSortOrder },
+      { id: right.behavior.id, title: right.title, subBehaviorSortOrder: right.subBehaviorSortOrder },
+    ));
+  const slotOccurrences = new Map<string, ReminderResolverOccurrence[]>();
+  const deliveries: ResolvedReminderDelivery[] = [];
+
+  for (const child of ordered) {
+    for (const occurrence of child.occurrences) {
+      if (!child.inheritParentSchedule) {
+        deliveries.push(...resolveReminderDeliveries({ behavior: child.behavior, occurrence }));
+        continue;
+      }
+      assertSameUser(input.parent, occurrence);
+      if (occurrence.status !== "unresolved") continue;
+      const key = Temporal.Instant.from(occurrence.scheduledFor).toString();
+      slotOccurrences.set(key, [...(slotOccurrences.get(key) ?? []), occurrence]);
+    }
+  }
+
+  const slots: RoutineReminderSlot[] = [];
+  for (const [scheduledFor, occurrences] of slotOccurrences) {
+    const anchor = occurrences[0]!;
+    deliveries.push(...resolveReminderDeliveries({ behavior: input.parent, occurrence: anchor }));
+    slots.push({
+      parentBehaviorId: input.parent.id,
+      scheduledFor,
+      anchorOccurrenceId: anchor.id,
+      occurrenceIds: occurrences.map((occurrence) => occurrence.id),
+    });
+  }
+
+  return {
+    deliveries,
+    slots: slots.sort((left, right) =>
+      Temporal.Instant.compare(Temporal.Instant.from(left.scheduledFor), Temporal.Instant.from(right.scheduledFor))),
+  };
 }
 
 export function resolveReminderDeliveryCancellation(input: {

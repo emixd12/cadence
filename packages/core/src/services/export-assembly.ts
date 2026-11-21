@@ -253,6 +253,12 @@ function parseConfigurationSnapshot(
     timezone: requireString(snapshot.timezone, "configuration timezone"),
     ...(snapshot.end === undefined ? {} : { end: parseConfigurationEnd(snapshot.end) }),
     ...(snapshot.pause === undefined ? {} : { pause: parseConfigurationPause(snapshot.pause) }),
+    ...(snapshot.parent_behavior_id === undefined ? {} : {
+      parentBehaviorId: requireNullableString(snapshot.parent_behavior_id, "configuration parent_behavior_id"),
+      inheritParentSchedule: snapshot.inherit_parent_schedule === undefined
+        ? false
+        : requireBoolean(snapshot.inherit_parent_schedule, "configuration inherit_parent_schedule"),
+    }),
   };
 }
 
@@ -474,6 +480,9 @@ function toExportBehaviorInput(
     defaultDurationMinutes: behavior.default_duration_minutes ?? null,
     ...exportRunFields(behavior),
     autoArchivedAt: behavior.auto_archived_at ?? null,
+    parentBehaviorId: behavior.parent_behavior_id ?? null,
+    subBehaviorSortOrder: behavior.sub_behavior_sort_order ?? 0,
+    inheritParentSchedule: behavior.inherit_parent_schedule ?? false,
     createdAt: behavior.created_at,
     updatedAt: behavior.updated_at,
   };

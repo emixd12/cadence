@@ -549,14 +549,17 @@ export type Database = {
           end_on: string | null
           end_time: string | null
           id: string
+          inherit_parent_schedule: boolean
           is_opportunity: boolean
           location_text: string | null
+          parent_behavior_id: string | null
           pause_back_on: string | null
           pause_from_on: string | null
           pause_from_time: string | null
           recurrence_rule: Json | null
           reminder_offset_minutes: number
           scheduled_time: string | null
+          sub_behavior_sort_order: number
           timezone: string
           title: string
           updated_at: string
@@ -578,14 +581,17 @@ export type Database = {
           end_on?: string | null
           end_time?: string | null
           id?: string
+          inherit_parent_schedule?: boolean
           is_opportunity?: boolean
           location_text?: string | null
+          parent_behavior_id?: string | null
           pause_back_on?: string | null
           pause_from_on?: string | null
           pause_from_time?: string | null
           recurrence_rule: Json | null
           reminder_offset_minutes?: number
           scheduled_time: string | null
+          sub_behavior_sort_order?: number
           timezone?: string
           title: string
           updated_at?: string
@@ -607,14 +613,17 @@ export type Database = {
           end_on?: string | null
           end_time?: string | null
           id?: string
+          inherit_parent_schedule?: boolean
           is_opportunity?: boolean
           location_text?: string | null
+          parent_behavior_id?: string | null
           pause_back_on?: string | null
           pause_from_on?: string | null
           pause_from_time?: string | null
           recurrence_rule?: Json | null
           reminder_offset_minutes?: number
           scheduled_time?: string | null
+          sub_behavior_sort_order?: number
           timezone?: string
           title?: string
           updated_at?: string
@@ -642,6 +651,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "behavior_configuration_events"
             referencedColumns: ["user_id", "behavior_id", "id"]
+          },
+          {
+            foreignKeyName: "behaviors_parent_behavior_id_fkey"
+            columns: ["parent_behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "behaviors_parent_owner_fkey"
+            columns: ["user_id", "parent_behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
           },
         ]
       }
@@ -2930,6 +2953,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_parent_slot_status_transition: {
+        Args: { target_parent_behavior_id: string; transitions: Json }
+        Returns: Json
+      }
       apply_occurrence_status_transition: {
         Args: {
           expected_latest_event_id: string
@@ -3210,6 +3237,10 @@ export type Database = {
         Args: { behavior_payload: Json; definition_event_plan: Json }
         Returns: Json
       }
+      create_behavior_group_with_schedule_graphs: {
+        Args: { items: Json }
+        Returns: Json
+      }
       create_behavior_with_schedule_graph: {
         Args: {
           behavior_payload: Json
@@ -3245,6 +3276,14 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
+      }
+      update_behavior_group_with_schedule_graphs: {
+        Args: { items: Json }
+        Returns: Json
+      }
+      reorder_sub_behaviors: {
+        Args: { ordered_behavior_ids: string[]; target_parent_behavior_id: string }
+        Returns: number
       }
       save_daily_brief: {
         Args: {

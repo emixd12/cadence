@@ -2798,3 +2798,37 @@ presses (update buttons, conflict review, Settings) fail until Cadence is in fro
 
 Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
 Messaging impact: none.
+
+## 2026-11-21: Sub-behaviors and Timeline Semantic Zoom
+
+The owner decided the sub-behaviors design in chat on November 21, 2026 (Ticket 343). A
+routine, such as a Skin routine with Cerave, Facewash and Retinol, is a Behavior with
+sub-behaviors.
+
+- **Model.** Sub-behaviors are real `behaviors` rows with `parent_behavior_id`,
+  `sub_behavior_sort_order` and `inherit_parent_schedule`. Depth is 1.
+- **Schedule.** A sub-behavior follows its parent's schedule by default and may set its
+  own.
+- **Completion and adherence.** While a parent has active sub-behaviors, the
+  sub-behaviors own the generated Occurrences, so nothing is counted twice. Marking the
+  parent marks every step of the slot in one transaction. Marking single steps shows
+  derived progress such as 2/3. No fourth stored status is added.
+- **Semantic Zoom.** Timeline only, two layers: Routines (collapsed) and All steps
+  (open inline). Pinch, Ctrl/Cmd + wheel and an accessible control switch layers; a
+  per-routine open or close stays until the layer changes.
+- **Outside AI clients.** MCP contract 1.7.0 creates routines with their steps, groups
+  and ungroups through `update_behavior`, filters by hierarchy, returns parent groups
+  on `get_timeline` and adds `set_parent_occurrence_status`.
+- **Cadence Agent.** The full cascade: Chat (`chat-1.6`), Daily Brief routine moves,
+  coach signals (`sub_behavior_dropoff`; no `crowded_hour` from one routine's steps)
+  and advisor tips.
+- **Portability and connectors.** Full JSON and BehaviorLog round-trip the links. Hevy
+  source links work on a parent or a sub-behavior under D28. Following steps share one
+  reminder per slot.
+- **Mac.** Parity through SQLite schema 28 and account sync contract 9.
+- **Rollout.** Only the owner's dogfooding account exists, so no compatibility shims
+  for older Mac builds or legacy data are added beyond the default column values.
+
+Platform impact: web and Mac (Ticket 343); marketing not applicable (no public claim
+changes; P-083); future mobile inherits the model when a mobile ticket exists.
+Messaging impact: P-081, P-082, P-083.

@@ -139,6 +139,10 @@ export type BehaviorLogExistingBehavior = {
   autoArchivedAt?: string | null;
   /** Behaviors of Opportunity. Absent means not an opportunity Behavior. */
   isOpportunity?: boolean;
+  /** Sub-behavior link (depth 1). Absent reads as standalone. */
+  parentBehaviorId?: string | null;
+  subBehaviorSortOrder?: number;
+  inheritParentSchedule?: boolean;
   sourceOriginalId?: string | null;
   schedules?: BehaviorLogExistingSchedule[];
   configurationSnapshot?: BehaviorConfigurationSnapshot;
@@ -289,6 +293,14 @@ export type BehaviorLogImportBehaviorPlan = {
   cadenceAutoArchivedAt?: string | null;
   /** Behaviors of Opportunity, from `extensions.app.cadence.is_opportunity`. Absent when the bundle carries none. */
   cadenceIsOpportunity?: boolean;
+  /**
+   * Sub-behaviors (depth 1) from `extensions.app.cadence`: the bundle ID of the parent
+   * Behavior, sibling order and schedule inheritance. Absent in bundles without them,
+   * which import as standalone Behaviors (null, 0, false).
+   */
+  cadenceParentBehaviorExternalId?: string | null;
+  cadenceSubBehaviorSortOrder?: number;
+  cadenceInheritParentSchedule?: boolean;
   active?: boolean;
   cadenceActive: boolean | null;
   cadenceBrowserReminderEnabled: boolean | null;

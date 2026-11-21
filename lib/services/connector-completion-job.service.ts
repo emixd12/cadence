@@ -197,12 +197,16 @@ export function createCompletionAccountPort(caller: ConnectorCaller, source: Rec
 /** Today's Unresolved Occurrences of linked Behaviors, each with its pending reminder times. */
 async function todaysUnresolved(client: AppSupabaseClient, userId: string, behaviorIds: readonly string[], now: Temporal.Instant): Promise<CompletionCheckOccurrence[]> {
   if (behaviorIds.length === 0) return [];
-  const behaviors = await client.from("behaviors").select("id,timezone").eq("user_id", userId).in("id", [...behaviorIds]);
+  // A link on a parent reaches its sub-behaviors, which own the routine's Occurrences.
+  const list = behaviorIds.join(",");
+  const behaviors = await client.from("behaviors").select("id,timezone").eq("user_id", userId)
+    .or(`id.in.(${list}),parent_behavior_id.in.(${list})`);
   if (behaviors.error) throw behaviors.error;
+  const reachedIds = (behaviors.data ?? []).map((row) => row.id);
   const dates = [...new Set((behaviors.data ?? []).map((row) => now.toZonedDateTimeISO(row.timezone ?? DEFAULT_TIMEZONE).toPlainDate().toString()))];
   if (dates.length === 0) return [];
   const occurrences = await client.from("occurrences").select("id,behavior_id,local_date,scheduled_for,effective_start_at")
-    .eq("user_id", userId).eq("status", "unresolved").in("behavior_id", [...behaviorIds]).in("local_date", dates);
+    .eq("user_id", userId).eq("status", "unresolved").in("behavior_id", reachedIds).in("local_date", dates);
   if (occurrences.error) throw occurrences.error;
   const rows = occurrences.data ?? [];
   if (rows.length === 0) return [];

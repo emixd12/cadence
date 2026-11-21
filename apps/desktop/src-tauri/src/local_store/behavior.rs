@@ -133,7 +133,7 @@ fn snapshot(graph: &GraphRows) -> Value {
             schedule.to_string(),
         )
     });
-    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior),"isOpportunity":behavior.is_opportunity})
+    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior),"isOpportunity":behavior.is_opportunity,"parentBehaviorId":behavior.parent_behavior_id,"inheritParentSchedule":behavior.parent_behavior_id.is_some() && behavior.inherit_parent_schedule})
 }
 
 /// Ended and Paused: the snapshot's `end`, as core's toBehaviorConfigurationSnapshot writes it.
@@ -174,6 +174,17 @@ fn normalize_configuration_snapshot(value: &Value) -> Value {
         object
             .entry("isOpportunity".to_string())
             .or_insert(Value::Bool(false));
+        // Snapshots written before sub-behaviors are standalone; a linked one follows by default.
+        let parent = object
+            .entry("parentBehaviorId".to_string())
+            .or_insert(Value::Null)
+            .is_string();
+        let inherit = object
+            .entry("inheritParentSchedule".to_string())
+            .or_insert(json!(parent));
+        if !parent {
+            *inherit = json!(false);
+        }
     }
     normalized
 }
@@ -251,6 +262,8 @@ fn validate_history(
             "end",
             "pause",
             "is_opportunity",
+            "parent_behavior_id",
+            "inherit_parent_schedule",
         ];
         if event.changed_fields.is_empty()
             || event

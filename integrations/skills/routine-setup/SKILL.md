@@ -32,8 +32,46 @@ Use this workflow when the user asks to add a recurring routine to Cadence.
    }
    ```
 
+   A routine with steps, such as a skin routine of cleanser, moisturizer and
+   retinol, can be one parent Behavior with sub-behaviors, one level deep. Send the
+   steps in `sub_behaviors` to create the parent and its steps in one call. A step
+   follows the parent's schedule and takes no `schedules`; a step with its own
+   days sets `inherit_parent_schedule` to false and sends `schedules`:
+
+   ```json
+   {
+     "title": "Skin routine",
+     "schedules": [
+       {
+         "recurrence": { "frequency": "daily", "interval": 1 },
+         "time_entries": [{ "kind": "exact", "start_time": "21:30" }]
+       }
+     ],
+     "sub_behaviors": [
+       { "title": "Cleanser" },
+       { "title": "Moisturizer" },
+       {
+         "title": "Retinol",
+         "inherit_parent_schedule": false,
+         "schedules": [
+           {
+             "recurrence": { "frequency": "weekly", "interval": 1, "days_of_week": ["monday", "wednesday", "friday"] },
+             "time_entries": [{ "kind": "exact", "start_time": "21:30" }]
+           }
+         ]
+       }
+     ]
+   }
+   ```
+
+   To add one step to an existing parent, call `create_behavior()` with its
+   `parent_behavior_id`. To group or ungroup an existing Behavior, or move a step,
+   call `get_behavior()` and then `update_behavior()` with `parent_behavior_id`
+   (null to ungroup) or `sub_behavior_sort_order`. A sub-behavior can't have
+   sub-behaviors, and a Behavior with sub-behaviors can't become one.
 4. Preview the title, category, schedule, account timezone, any description or end
-   date, and reminder settings in plain language. Browser reminders default on
+   date, and reminder settings in plain language. For a routine with steps, list
+   each step and say which ones follow the parent's schedule. Browser reminders default on
    but require browser permission and subscription; email defaults off. Obtain
    the user's confirmation of the full proposal before creating anything.
    Preserve every host confirmation and permission prompt.

@@ -43,3 +43,5 @@
 .activity ul { display: grid; gap: 0.25rem; margin-top: 0.25rem; }
 .activity li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; color: var(--foreground); overflow-wrap: anywhere; }
 .activity li svg { flex: none; color: var(--muted-readable); }
+/* Semantic Zoom: Routines / All steps, aligned with the ledger. */
+.zoomToggle { margin: 0 0 0.5rem var(--timeline-gutter); }

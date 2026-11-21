@@ -100,6 +100,19 @@ export function normalizeBehaviorConfiguration(
         }
       : null,
     isOpportunity: configuration.isOpportunity === true,
+    ...normalizeParentLink(configuration),
+  };
+}
+
+// Older snapshots have no link and read as standalone. Inheritance means nothing without
+// a parent, so it reads as false there and defaults to true under one.
+function normalizeParentLink(
+  configuration: BehaviorConfigurationSnapshot,
+): Pick<BehaviorConfigurationSnapshot, "parentBehaviorId" | "inheritParentSchedule"> {
+  const parentBehaviorId = normalizeOptionalId(configuration.parentBehaviorId ?? null);
+  return {
+    parentBehaviorId,
+    inheritParentSchedule: parentBehaviorId ? configuration.inheritParentSchedule ?? true : false,
   };
 }
 
@@ -174,6 +187,12 @@ function findChangedFields(
   }
   if ((previous.isOpportunity === true) !== (next.isOpportunity === true)) {
     changedFields.push("is_opportunity");
+  }
+  if ((previous.parentBehaviorId ?? null) !== (next.parentBehaviorId ?? null)) {
+    changedFields.push("parent_behavior_id");
+  }
+  if ((previous.inheritParentSchedule ?? false) !== (next.inheritParentSchedule ?? false)) {
+    changedFields.push("inherit_parent_schedule");
   }
 
   return changedFields;

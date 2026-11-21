@@ -57,6 +57,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         end: null,
         pause: null,
         isOpportunity: false,
+        parentBehaviorId: null,
+        inheritParentSchedule: false,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -86,6 +88,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         "end",
         "pause",
         "is_opportunity",
+        "parent_behavior_id",
+        "inherit_parent_schedule",
       ],
       recordedAt: RECORDED_AT,
       effectiveAt: RECORDED_AT,

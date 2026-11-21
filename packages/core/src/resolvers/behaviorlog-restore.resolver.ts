@@ -1,4 +1,5 @@
 import { sha256 } from "../hash";
+import { findSubBehaviorGraphViolations } from "./sub-behavior.resolver";
 
 import type {
   BehaviorLogExistingRecords,
@@ -167,6 +168,7 @@ export function resolveBehaviorLogRestorePreview(
     importedNotes: importedNoteActions.sort(compareActions),
     importedInterventions: importedInterventionActions.sort(compareActions),
   };
+  const linkErrors = restoredSubBehaviorGraphErrors(input.importPreview.plan.behaviors, context);
   const allActions = flattenActions(actions);
   const summary = summarizeActions(allActions, input.importPreview.plan.notes);
   const bundleFingerprint = sha256(
@@ -211,7 +213,7 @@ export function resolveBehaviorLogRestorePreview(
 
   return {
     mode: "restore_preview",
-    valid: input.importPreview.valid && summary.unsupportedActionCount === 0,
+    valid: input.importPreview.valid && summary.unsupportedActionCount === 0 && linkErrors.length === 0,
     previewFingerprint,
     localDataFingerprint,
     bundleFingerprint,
@@ -242,7 +244,7 @@ export function resolveBehaviorLogRestorePreview(
       noteSensitivities,
       redactedInterventionFieldsPresent: redactedInterventionFieldCount > 0,
     },
-    errors: input.importPreview.errors,
+    errors: [...input.importPreview.errors, ...linkErrors],
     warnings: [...input.importPreview.warnings, ...restoreWarnings],
     actions,
   };
@@ -289,7 +291,8 @@ function actionForBehavior(
       normalizeNullableText(behavior.description) &&
     normalizeNullableText(existing.category) ===
       normalizeNullableText(behavior.cadenceCategoryName ?? behavior.category) &&
-    Boolean(existing.active ?? true) === importedActive;
+    Boolean(existing.active ?? true) === importedActive &&
+    sameSubBehaviorLink(behavior, existing, context);
 
   return action({
     recordType: "behavior",
@@ -305,6 +308,57 @@ function actionForBehavior(
       category: behavior.cadenceCategoryName ?? behavior.category,
     },
   });
+}
+
+/** A bundle without link fields keeps the local link, as restore apply does. */
+function sameSubBehaviorLink(
+  behavior: BehaviorLogImportBehaviorPlan,
+  existing: NonNullable<BehaviorLogExistingRecords["behaviors"]>[number],
+  context: RestoreContext,
+): boolean {
+  if (behavior.cadenceParentBehaviorExternalId === undefined) return true;
+  const parentId = restoredParentId(behavior, context);
+  return parentId === (existing.parentBehaviorId ?? null) &&
+    (parentId ? behavior.cadenceSubBehaviorSortOrder ?? 0 : 0) === (existing.parentBehaviorId ? existing.subBehaviorSortOrder ?? 0 : 0) &&
+    (parentId ? behavior.cadenceInheritParentSchedule ?? true : false) === (existing.parentBehaviorId ? existing.inheritParentSchedule ?? false : false);
+}
+
+function restoredParentId(behavior: BehaviorLogImportBehaviorPlan, context: RestoreContext): string | null {
+  const parentExternalId = behavior.cadenceParentBehaviorExternalId;
+  return parentExternalId ? context.mapBehaviorExternalToLocal.get(parentExternalId) ?? parentExternalId : null;
+}
+
+/**
+ * The account after restore must stay one level deep: restored links plus the links of
+ * local Behaviors the bundle does not carry (restore archives them and keeps their links).
+ */
+function restoredSubBehaviorGraphErrors(
+  behaviors: readonly BehaviorLogImportBehaviorPlan[],
+  context: RestoreContext,
+): BehaviorLogImportIssue[] {
+  const graph = new Map<string, { id: string; parentBehaviorId: string | null }>();
+  for (const existing of context.existing.behaviors) {
+    graph.set(existing.id, { id: existing.id, parentBehaviorId: existing.parentBehaviorId ?? null });
+  }
+  for (const behavior of behaviors) {
+    if (behavior.action === "skip") continue;
+    const id = context.mapBehaviorExternalToLocal.get(behavior.externalId) ?? behavior.externalId;
+    const kept = graph.get(id)?.parentBehaviorId ?? null;
+    graph.set(id, {
+      id,
+      parentBehaviorId: behavior.cadenceParentBehaviorExternalId === undefined ? kept : restoredParentId(behavior, context),
+    });
+  }
+  return findSubBehaviorGraphViolations([...graph.values()])
+    .filter((violation) => violation.reason !== "parent_not_found")
+    .map((violation) => ({
+      severity: "error" as const,
+      code: `restore_sub_behavior_${violation.reason}`,
+      message: `Restoring would leave Behavior ${violation.behaviorId} ${violation.reason === "self_parent"
+        ? "under itself"
+        : "under a parent that is itself a sub-behavior"}. Sub-behaviors are one level deep.`,
+      path: "extensions.app.cadence.parent_behavior_id",
+    }));
 }
 
 function actionForSchedule(

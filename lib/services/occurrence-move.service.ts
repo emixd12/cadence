@@ -20,6 +20,8 @@ import {
 import {
   briefMoveFreeStarts,
   briefMoveItemBlocks,
+  briefMoveRoutineMembers,
+  collapseBriefMoveRoutines,
   checkBriefMoveSlot,
   travelBlocksFor,
   type BriefMoveBlock,
@@ -47,6 +49,12 @@ import { noticeText } from "@cadence/core/notices";
  * Phase 3A1: the free-slot check and the "other times" list are the one rule set the
  * Daily Brief's planner uses (packages/core/src/resolvers/brief-move.resolver.ts): a
  * 10-minute gap, a range item blocks only its own length, every item has a length.
+ *
+ * Routines (sub-behaviors): with `routine: true`, a move takes every step that follows
+ * the routine's time in the same slot to the new start, each with its own length, and
+ * checks the slot for their summed length. When a step cannot move, the steps already
+ * moved go back, so the routine never ends up split. Undo with `routine: true` puts
+ * every moved step of the slot back.
  */
 
 export type OccurrenceMoveRecord = Omit<Tables<"occurrence_moves">, "user_id" | "client_ref" | "idempotency_key" | "request_hash">;
@@ -78,6 +86,8 @@ export type OccurrenceMoveRequest = Readonly<{
   length?: BriefMoveLength | null;
   /** Verified signed travel times for this request only (never stored). */
   travel?: BriefMoveTravelInput | null;
+  /** Move the whole routine slot the Occurrence is a step of (a Daily Brief routine line). */
+  routine?: boolean;
 }>;
 
 export type OccurrenceRevertRequest = Readonly<{
@@ -86,6 +96,8 @@ export type OccurrenceRevertRequest = Readonly<{
   moveId?: string | null;
   idempotencyKey?: string | null;
   requestHash?: string | null;
+  /** Also put back every other moved step of the same routine slot. */
+  routine?: boolean;
 }>;
 
 export type OccurrenceMoveResult =
@@ -95,6 +107,8 @@ export type OccurrenceMoveResult =
     occurrence: Occurrence;
     behavior: BehaviorWithCategory;
     move: OccurrenceMoveRecord;
+    /** A routine move or Undo: the other steps it moved, in step order. */
+    steps?: readonly Readonly<{ occurrence: Occurrence; move: OccurrenceMoveRecord }>[];
   }>
   | Readonly<{
     outcome: "refused";
@@ -130,19 +144,23 @@ export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request
     ? zonedInstant(occurrence.local_date, request.startTime, behavior.timezone)
     : Temporal.Instant.from(request.startAt ?? "");
   const day = await readBriefMoveDay(caller.supabase, caller.userId, occurrence.local_date);
-  const duration = moveDuration(occurrence, day, request.length ?? null);
+  const steps = request.routine ? briefMoveRoutineMembers(day.items, occurrence.id).filter((item) => item.occurrenceId !== occurrence.id) : [];
+  // A routine line shows the routine's summed length; each step keeps its own length.
+  const duration = moveDuration(occurrence, day, steps.length ? null : request.length ?? null);
+  const slotSeconds = steps.length ? request.length ? request.length.minutes * 60 : routineSeconds(day, occurrence.id) : duration.seconds;
   const interval = { start: requestedStart, end: requestedStart.add({ seconds: duration.seconds }) };
+  const slotInterval = { start: requestedStart, end: requestedStart.add({ seconds: slotSeconds }) };
   const slot = slotInputs(occurrence.id, day, request.calendarBusy, request.travel ?? null);
 
   // The database answers the basic refusals (resolved, not today, changed since read,
   // time passed). The slot check runs only on a request that passes those, so its
   // reason never hides a more basic one.
   if (passesBasicRules(caller, occurrence, behavior, request.expectedRevision, requestedStart)) {
-    const check = checkBriefMoveSlot({ interval, blocks: slot.blocks, travelBeforeSeconds: slot.before, travelAfterSeconds: slot.after });
+    const check = checkBriefMoveSlot({ interval: slotInterval, blocks: slot.blocks, travelBeforeSeconds: slot.before, travelAfterSeconds: slot.after });
     if (!check.ok) {
       const reason = check.reason === "calendar_busy" ? "calendar_busy" : "slot_taken";
       const detail = check.reason === "too_close" || check.reason === "travel_busy" ? check.reason : undefined;
-      return refused(reason, occurrence, behavior, alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, slot), detail);
+      return refused(reason, occurrence, behavior, alternativesFor(caller, occurrence, behavior, requestedStart, slotSeconds, slot), detail);
     }
   }
 
@@ -150,17 +168,60 @@ export async function moveOccurrenceForDay(caller: OccurrenceMoveCaller, request
   if (result.outcome === "refused") {
     const reason = result.reason as MoveRefusalReason;
     const alternatives = ALTERNATIVE_REASONS.has(reason)
-      ? alternativesFor(caller, occurrence, behavior, requestedStart, duration.seconds, slot)
+      ? alternativesFor(caller, occurrence, behavior, requestedStart, slotSeconds, slot)
       : [];
     return refused(reason, result.occurrence ?? occurrence, behavior, alternatives);
   }
-  return finish(caller, result, behavior, "moved");
+  if (!steps.length) return finish(caller, result, behavior, "moved");
+
+  const moved: Array<Readonly<{ result: FunctionResult; behavior: BehaviorWithCategory }>> = [];
+  for (const step of steps) {
+    const row = day.occurrences.get(step.occurrenceId);
+    const stepBehavior = row ? await getBehaviorById(caller.supabase, caller.userId, row.behavior_id) : null;
+    if (!row || !stepBehavior) continue;
+    const stepDuration = moveDuration(row, day, null);
+    const stepResult = await callMoveFunction(caller, {
+      ...request, occurrenceId: row.id, expectedRevision: row.updated_at, proposalId: null, length: null, routine: false,
+      idempotencyKey: request.idempotencyKey ? `${request.idempotencyKey}:step:${row.id}` : null,
+      requestHash: request.idempotencyKey ? stepHash("move_occurrence_for_day", request.idempotencyKey, row.id, requestedStart.toString()) : null,
+    }, { start: requestedStart, end: requestedStart.add({ seconds: stepDuration.seconds }) }, stepDuration);
+    if (stepResult.outcome === "refused") {
+      // One step changed since the day was read: put back what moved, so the routine stays whole.
+      await revertMoved(caller, [...moved.map((item) => item.result), result], request.idempotencyKey);
+      return refused("revision_changed", occurrence, behavior);
+    }
+    moved.push({ result: stepResult, behavior: stepBehavior });
+  }
+  for (const item of moved) await finish(caller, item.result, item.behavior, "moved");
+  const lead = await finish(caller, result, behavior, "moved");
+  return lead.outcome === "refused" ? lead : { ...lead, steps: moved.map((item) => ({ occurrence: item.result.occurrence!, move: item.result.move! })) };
+}
+
+/** A routine slot's summed length in seconds, as the one rule sees it. */
+function routineSeconds(day: BriefMoveDay, occurrenceId: string): number {
+  const lead = briefMoveRoutineMembers(day.items, occurrenceId)[0];
+  const collapsed = collapseBriefMoveRoutines(day.items).find((item) => item.occurrenceId === lead?.occurrenceId);
+  return (collapsed?.length.minutes ?? 30) * 60;
+}
+
+/** Reverts moves this request just made, newest first. Best effort: a refusal leaves that step where it is. */
+async function revertMoved(caller: OccurrenceMoveCaller, results: readonly FunctionResult[], key: string | null | undefined): Promise<void> {
+  for (const item of [...results].reverse()) {
+    if (!item.occurrence || !item.move) continue;
+    const { error } = await caller.supabase.rpc("revert_occurrence_move", {
+      p_occurrence_id: item.occurrence.id, p_expected_revision: item.occurrence.updated_at, p_move_id: item.move.id,
+      ...keyParams("revert_occurrence_move", { occurrenceId: item.occurrence.id, expectedRevision: item.occurrence.updated_at,
+        idempotencyKey: key ? `${key}:rollback:${item.occurrence.id}` : null }),
+    });
+    if (error) throw mapRpcError(error);
+  }
 }
 
 /** Undo the latest move of today's Occurrence. */
 export async function revertOccurrenceMove(caller: OccurrenceMoveCaller, request: OccurrenceRevertRequest): Promise<OccurrenceMoveResult> {
   const loaded = await loadTarget(caller, request.occurrenceId);
   if (!loaded) return refused("occurrence_not_found", null, null);
+  const steps = request.routine ? await movedRoutineSteps(caller, loaded.occurrence) : [];
   const { data, error } = await caller.supabase.rpc("revert_occurrence_move", {
     p_occurrence_id: request.occurrenceId,
     p_expected_revision: request.expectedRevision,
@@ -172,7 +233,36 @@ export async function revertOccurrenceMove(caller: OccurrenceMoveCaller, request
   if (result.outcome === "refused") {
     return refused(result.reason as MoveRefusalReason, result.occurrence ?? loaded.occurrence, loaded.behavior);
   }
-  return finish(caller, result, loaded.behavior, "undone");
+  if (!steps.length) return finish(caller, result, loaded.behavior, "undone");
+  const undone: Array<Readonly<{ result: FunctionResult; behavior: BehaviorWithCategory }>> = [];
+  for (const step of steps) {
+    const stepBehavior = await getBehaviorById(caller.supabase, caller.userId, step.behavior_id);
+    if (!stepBehavior) continue;
+    const reverted = await caller.supabase.rpc("revert_occurrence_move", {
+      p_occurrence_id: step.id, p_expected_revision: step.updated_at,
+      ...keyParams("revert_occurrence_move", { occurrenceId: step.id, expectedRevision: step.updated_at,
+        idempotencyKey: request.idempotencyKey ? `${request.idempotencyKey}:step:${step.id}` : null,
+        requestHash: request.idempotencyKey ? stepHash("revert_occurrence_move", request.idempotencyKey, step.id, null) : null }),
+    });
+    if (reverted.error) throw mapRpcError(reverted.error);
+    const stepResult = readFunctionResult(reverted.data, caller.userId);
+    // A step someone moved or marked since stays where they put it.
+    if (stepResult.outcome !== "refused") undone.push({ result: stepResult, behavior: stepBehavior });
+  }
+  for (const item of undone) await finish(caller, item.result, item.behavior, "undone");
+  const lead = await finish(caller, result, loaded.behavior, "undone");
+  return lead.outcome === "refused" ? lead : { ...lead, steps: undone.map((item) => ({ occurrence: item.result.occurrence!, move: item.result.move! })) };
+}
+
+/** The other moved steps of `occurrence`'s routine slot, read before its Undo. */
+async function movedRoutineSteps(caller: OccurrenceMoveCaller, occurrence: Occurrence): Promise<Occurrence[]> {
+  const day = await readBriefMoveDay(caller.supabase, caller.userId, occurrence.local_date);
+  return briefMoveRoutineMembers(day.items, occurrence.id)
+    .filter((item) => item.occurrenceId !== occurrence.id)
+    .flatMap((item) => {
+      const row = day.occurrences.get(item.occurrenceId);
+      return row && isMoved(row) ? [row] : [];
+    });
 }
 
 /** Keep the first reason chip a person taps after a move. Returns the stored reason. */
@@ -379,6 +469,14 @@ function keyParams(operation: string, request: OccurrenceMoveRequest | Occurrenc
     p_request_hash: request.requestHash
       ?? createHash("sha256").update(canonicalJson({ operation, request: details })).digest("hex"),
   };
+}
+
+/**
+ * A routine step's request hash. It leaves out the step's revision, which the first
+ * run itself changes, so a retried Yes or Undo replays each step instead of refusing.
+ */
+function stepHash(operation: string, key: string, occurrenceId: string, startAt: string | null): string {
+  return createHash("sha256").update(canonicalJson({ operation, key, occurrenceId, startAt })).digest("hex");
 }
 
 function canonicalJson(value: unknown): string {

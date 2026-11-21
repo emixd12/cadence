@@ -175,6 +175,7 @@ export function scopeBriefingContext(contextValue: unknown, configValue: unknown
             scheduledFor: occurrence.scheduledFor,
             schedule: occurrence.schedule,
             duration: selectDuration(occurrence, config).duration,
+            ...(occurrence.routine ? { routine: occurrence.routine } : {}),
           };
         }),
       history: {
@@ -273,6 +274,10 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
       localDate: occurrence.localDate,
       scheduledFor: occurrence.scheduledFor,
       schedule: occurrence.schedule,
+      ...(occurrence.routine ? { routine: {
+        parentBehaviorRef: occurrence.routine.parentBehaviorRef, title: occurrence.routine.parentTitle,
+        followsRoutineTime: occurrence.routine.inheritParentSchedule,
+      } } : {}),
     };
     return selected.source ? { ...fact, duration: selected.duration } : fact;
   });

@@ -299,7 +299,14 @@
         "INT-BEHAVIOR-035",
         "INT-BEHAVIOR-036",
         "INT-BEHAVIOR-037",
-        "INT-BEHAVIOR-038"
+        "INT-BEHAVIOR-038",
+        "INT-BEHAVIOR-039",
+        "INT-BEHAVIOR-040",
+        "INT-BEHAVIOR-041",
+        "INT-BEHAVIOR-042",
+        "INT-BEHAVIOR-043",
+        "INT-BEHAVIOR-044",
+        "INT-BEHAVIOR-045"
       ]
     },
     {
@@ -394,7 +401,10 @@
         "INT-TIMELINE-022",
         "INT-TIMELINE-023",
         "INT-TIMELINE-024",
-        "INT-BRIEF-010"
+        "INT-BRIEF-010",
+        "INT-TIMELINE-025",
+        "INT-TIMELINE-026",
+        "INT-TIMELINE-027"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -581,7 +591,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 58,
+      "interaction_marker_count": 63,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -601,7 +611,9 @@
         "INT-PLACE-006",
         "INT-BEHAVIOR-036",
         "INT-BEHAVIOR-037",
-        "INT-BEHAVIOR-038"
+        "INT-BEHAVIOR-038",
+        "INT-BEHAVIOR-039",
+        "INT-BEHAVIOR-040"
       ]
     },
     {
@@ -632,7 +644,23 @@
         "INT-BEHAVIOR-033",
         "INT-BEHAVIOR-034",
         "INT-BEHAVIOR-035",
-        "INT-BEHAVIOR-038"
+        "INT-BEHAVIOR-038",
+        "INT-BEHAVIOR-042",
+        "INT-BEHAVIOR-043",
+        "INT-BEHAVIOR-044",
+        "INT-BEHAVIOR-045"
+      ]
+    },
+    {
+      "path": "components/behaviors/SubBehaviorEditor.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 38,
+      "interaction_ids": [
+        "INT-BEHAVIOR-040",
+        "INT-BEHAVIOR-041",
+        "INT-BEHAVIOR-042",
+        "INT-BEHAVIOR-043",
+        "INT-BEHAVIOR-044"
       ]
     },
     {
@@ -976,13 +1004,15 @@
     {
       "path": "components/timeline/DayProgressTimeline.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 10,
       "interaction_ids": [
         "INT-TIMELINE-001",
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
         "INT-TRAVEL-004",
-        "INT-TRAVEL-008"
+        "INT-TRAVEL-008",
+        "INT-TIMELINE-026",
+        "INT-TIMELINE-027"
       ]
     },
     {
@@ -1441,6 +1471,30 @@
       "interaction_marker_count": 1,
       "interaction_ids": [],
       "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes · No and Undo answer in memory. Excluded from product interaction counts."
+    },
+    {
+      "path": "app/design-system/TimelineSubBehaviorsBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 4,
+      "interaction_ids": [],
+      "reason": "Developer-only sub-behaviors Timeline bench with synthetic routines; marks are held in memory and nothing is saved."
+    },
+    {
+      "path": "components/timeline/ParentOccurrenceRow.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 9,
+      "interaction_ids": [
+        "INT-TIMELINE-025",
+        "INT-TIMELINE-026"
+      ]
+    },
+    {
+      "path": "components/timeline/SemanticZoomToggle.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TIMELINE-027"
+      ]
     }
   ],
   "features": [
@@ -20721,6 +20775,635 @@
       }
     },
     {
+      "id": "INT-BEHAVIOR-039",
+      "name": "Choose the routine a Behavior is part of",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Make a Behavior a sub-behavior of one top-level Behavior, or a standalone Behavior again.",
+      "triggers": [
+        {
+          "kind": "input",
+          "control": "Part of"
+        }
+      ],
+      "availability": "In the create and edit forms when parent choices are passed. Only active top-level Behaviors other than itself are listed. Hidden on a Behavior that has sub-behaviors (depth 1).",
+      "success_result": "Saved with the form as parent_behavior_id; None posts an empty value and ungroups. A new sub-behavior follows the parent's schedule by default and its Occurrences replace the parent's own future Unresolved ones.",
+      "failure_result": "A link that breaks depth 1 or names an archived parent is refused with a form error; the stored link stays.",
+      "effects": [
+        "database_write",
+        "occurrence_sync_stale",
+        "occurrence_sync",
+        "reminder_planning",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx",
+        "components/behaviors/behavior-list-state.ts#parentChoices",
+        "lib/services/behavior.service.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx",
+          "tests/sub-behavior.service.test.ts",
+          "tests/desktop-sub-behaviors.test.ts"
+        ],
+        "notes": "DOM tests list depth-1 choices and hide the field on a parent; service tests cover link validation."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "components/behaviors/behavior-list-state.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: the shared form gets parentOptions on the Mac; the local update action saves the link through SQLite migration 0028 and sync contract 9."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-040",
+      "name": "Follow the parent schedule or set a sub-behavior's own",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Let a sub-behavior use its routine's schedule, or give it its own days and times.",
+      "triggers": [
+        {
+          "kind": "input",
+          "control": "Follow parent schedule"
+        }
+      ],
+      "availability": "In the create and edit forms of a sub-behavior, and on each drafted sub-behavior.",
+      "success_result": "On: the schedule fields and Ends after are hidden and the stored schedule mirrors the parent's, including later parent edits. Off: the sub-behavior's own schedule is saved.",
+      "failure_result": "An invalid own schedule shows field errors; the draft stays.",
+      "effects": [
+        "database_write",
+        "occurrence_sync_stale",
+        "occurrence_sync",
+        "reminder_planning",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx",
+        "components/behaviors/SubBehaviorEditor.tsx#SubBehaviorDraftEditor",
+        "apps/desktop/src/behaviors-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx",
+          "tests/sub-behavior.service.test.ts"
+        ],
+        "notes": "DOM tests hide and show the schedule; service tests cover mirroring."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "components/behaviors/SubBehaviorEditor.tsx"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: the shared form posts inherit_parent_schedule; the local store mirrors the parent schedule."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-041",
+      "name": "Draft sub-behaviors while creating a Behavior",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05"
+      ],
+      "intent": "Create a routine and its steps in one save.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Add sub-behavior"
+        },
+        {
+          "kind": "activate",
+          "control": "Up / Down / Remove (draft)"
+        },
+        {
+          "kind": "submit",
+          "control": "Save behavior in create mode"
+        }
+      ],
+      "availability": "In Create behavior while no parent is chosen.",
+      "success_result": "Creates the parent and 1–50 sub-behaviors in one transaction, in draft order; children copy the parent's category, Where, reminders and duration. The form resets and the routine appears nested in the list.",
+      "failure_result": "A drafted step with an invalid schedule is named in the error and nothing is created.",
+      "effects": [
+        "database_write",
+        "occurrence_sync_stale",
+        "occurrence_sync",
+        "reminder_planning",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/SubBehaviorEditor.tsx#SubBehaviorDraftEditor",
+        "components/behaviors/sub-behavior-form-data.ts#parseBehaviorGroupFormData",
+        "app/(app)/behaviors/actions.ts#createBehaviorAction",
+        "lib/services/behavior.service.ts#createBehaviorGroupForUser",
+        "apps/desktop/src/local-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx",
+          "tests/sub-behavior.service.test.ts",
+          "tests/desktop-sub-behaviors.test.ts"
+        ],
+        "notes": "DOM tests submit a parent with two drafted steps in order; desktop tests run the local group create."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/SubBehaviorEditor.tsx",
+            "app/(app)/behaviors/actions.ts#createBehaviorAction"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: the local create action sends sub_behavior_* forms to one createBehaviorGroup command."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-042",
+      "name": "Reorder a routine's sub-behaviors",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Change the order steps appear in under a routine.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Up / Down (sub-behavior)"
+        }
+      ],
+      "availability": "In a saved top-level routine's Details and Settings when a reorder action is passed.",
+      "success_result": "Moves the row at once and saves a dense sibling order for every live child in one write; the list refreshes.",
+      "failure_result": "A failed save puts the old order back and shows the error.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager",
+        "components/behaviors/BehaviorList.tsx",
+        "app/(app)/behaviors/actions.ts#reorderSubBehaviorsAction",
+        "apps/desktop/src/local-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx",
+          "tests/desktop-sub-behaviors.test.ts"
+        ],
+        "notes": "DOM tests reorder, save and revert on failure; desktop tests run the local reorder command."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/SubBehaviorEditor.tsx",
+            "app/(app)/behaviors/actions.ts#reorderSubBehaviorsAction"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: reorderAction runs the local reorderSubBehaviors command."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-043",
+      "name": "Detach a sub-behavior",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Take a step out of its routine so it becomes its own Behavior.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Detach"
+        }
+      ],
+      "availability": "On each sub-behavior in a saved routine's Details and Settings when an update action is passed.",
+      "success_result": "Saves the step with no parent; it keeps its current schedule and history and shows as a top-level Behavior.",
+      "failure_result": "A failed save shows the error; the step stays in the routine.",
+      "effects": [
+        "database_write",
+        "occurrence_sync_stale",
+        "occurrence_sync",
+        "reminder_planning",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager",
+        "components/behaviors/sub-behavior-form-data.ts#behaviorViewFormData",
+        "apps/desktop/src/behaviors-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx"
+        ],
+        "notes": "DOM tests detach through the injected update action."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/SubBehaviorEditor.tsx"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: Detach goes through the local update action."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-044",
+      "name": "Add a new or existing Behavior to a routine",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Add a step to a saved routine by title, or move an existing Behavior in.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "New sub-behavior"
+        },
+        {
+          "kind": "submit",
+          "control": "Add an existing behavior"
+        }
+      ],
+      "availability": "In a saved top-level routine's Details and Settings. Existing choices are active standalone Behaviors that pass the depth-1 check.",
+      "success_result": "Creates the new step following the routine's schedule, or saves the existing Behavior with this parent; the list refreshes.",
+      "failure_result": "A refused link or failed save shows the error; nothing changes.",
+      "effects": [
+        "database_write",
+        "occurrence_sync_stale",
+        "occurrence_sync",
+        "reminder_planning",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/SubBehaviorEditor.tsx#SubBehaviorManager",
+        "components/behaviors/behavior-list-state.ts#attachCandidates",
+        "components/behaviors/sub-behavior-form-data.ts#newSubBehaviorFormData",
+        "apps/desktop/src/behaviors-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx",
+          "tests/desktop-sub-behaviors.test.ts"
+        ],
+        "notes": "DOM tests add new and existing steps through the injected actions."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/SubBehaviorEditor.tsx"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: createAction and updateAction reach the local store."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-045",
+      "name": "Show or hide a routine's nested sub-behaviors",
+      "feature": "behavior-editor",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#group-behaviors-into-a-routine"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "See a routine's steps under it in the Behaviors list with rolled-up and per-step adherence.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Sub-behaviors (n)"
+        }
+      ],
+      "availability": "On every routine row in the Behaviors list; open by default.",
+      "success_result": "Shows the steps in sibling order. The routine row shows its rolled-up Adherence, Completed, Not Completed and full routines; each step keeps its own adherence, calendar and settings.",
+      "failure_result": "No write; nothing to fail.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorList.tsx",
+        "apps/desktop/src/behaviors-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/sub-behaviors-ui.dom.test.tsx"
+        ],
+        "notes": "DOM tests nest steps in sibling order with rolled-up adherence."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorList.tsx"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx"
+          ],
+          "evidence": [
+            "tests/sub-behaviors-ui.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: the shared BehaviorList runs with subBehaviorsEnabled on the Mac."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
       "id": "INT-TIMELINE-020",
       "name": "Act on or close an ended, paused or back-today notice",
       "feature": "ending-pausing-archiving",
@@ -21375,6 +22058,286 @@
             "tests/desktop-opportunity.dom.test.tsx",
             "tests/desktop-opportunity-contract.test.ts"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-025",
+      "name": "Mark a whole routine Completed or Not Completed",
+      "feature": "timeline",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#mark-a-routine-or-its-steps"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07",
+        "J09"
+      ],
+      "intent": "Record one status for every sub-behavior Occurrence in a routine's slot at once.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Completed"
+        },
+        {
+          "kind": "submit",
+          "control": "Not Completed"
+        }
+      ],
+      "availability": "On a routine row on today's Timeline or in Needs decision while at least one of its sub-behaviors shows status actions. Future days and fully resolved routines show no bulk actions.",
+      "success_result": "Sends every sub-behavior Occurrence in the slot to markParentSlotStatusAction, which writes only the rows whose status changes in one transaction (one status event per changed child), cancels their pending reminders, refreshes the Timeline and attempts the completion chime once for Completed. The routine then shows Completed, Not Completed or derived progress such as 2/3; no fourth status is stored.",
+      "failure_result": "Shows the factual error under the actions, refreshes server truth and keeps every child's stored status; one failed child rolls the whole slot back.",
+      "effects": [
+        "database_write",
+        "reminder_cancellation",
+        "ui_state",
+        "optional_audio"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/ParentOccurrenceRow.tsx#ParentBulkActions",
+        "app/(app)/timeline/actions.ts#markParentSlotStatusAction",
+        "lib/services/occurrence.service.ts#markParentSlotStatusFromFormData",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-sub-behaviors.dom.test.tsx",
+          "tests/sub-behavior.service.test.ts"
+        ],
+        "notes": "DOM tests submit the bulk Completed and Not Completed forms on Timeline and in Needs decision and check the parent and child ids sent. Service tests cover the one-transaction write."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/ParentOccurrenceRow.tsx",
+            "app/(app)/timeline/actions.ts#markParentSlotStatusAction"
+          ],
+          "evidence": [
+            "tests/timeline-sub-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts"
+          ],
+          "evidence": [
+            "tests/timeline-sub-behaviors.dom.test.tsx",
+            "tests/desktop-sub-behaviors.test.ts"
+          ],
+          "reason": "Sub-behaviors Mac parity: the local parentSlotStatusAction reaches DayProgressTimeline and Needs decision and marks every step in one SQLite transaction."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-026",
+      "name": "Open or close one routine's steps",
+      "feature": "timeline",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#mark-a-routine-or-its-steps"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Show or hide the sub-behavior rows of one routine under its header.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Routine header (title, time and disclosure triangle)"
+        }
+      ],
+      "availability": "On every routine row on Timeline and in Needs decision.",
+      "success_result": "Opens or closes that routine only, whatever the zoom layer. Open, each sub-behavior row keeps its own status actions, Note, time tracking and connector evidence. The choice lasts until the zoom layer changes.",
+      "failure_result": "No write; nothing to fail.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/ParentOccurrenceRow.tsx#ParentOccurrenceRow",
+        "components/timeline/use-semantic-zoom.ts#toggleParentOverride",
+        "components/timeline/DayProgressTimeline.tsx#dayProgressItems",
+        "apps/desktop/src/timeline-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-sub-behaviors.dom.test.tsx",
+          "tests/semantic-zoom.dom.test.tsx"
+        ],
+        "notes": "DOM tests open one routine on Routines, close one on All steps, and check that a layer change clears the choice."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/ParentOccurrenceRow.tsx",
+            "components/timeline/use-semantic-zoom.ts"
+          ],
+          "evidence": [
+            "tests/timeline-sub-behaviors.dom.test.tsx",
+            "tests/semantic-zoom.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/timeline-sub-behaviors.dom.test.tsx",
+            "tests/semantic-zoom.dom.test.tsx"
+          ],
+          "reason": "Sub-behaviors Mac parity: the shared DayProgressTimeline shows routines from local sub-behavior data."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-027",
+      "name": "Zoom the Timeline between routines and all steps",
+      "feature": "timeline",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#zoom-between-routines-and-all-steps"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Switch the Timeline between Routines (each routine collapsed) and All steps (every routine open inline).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Routines / All steps"
+        },
+        {
+          "kind": "gesture",
+          "control": "Trackpad pinch or Ctrl/Cmd + wheel over the Timeline"
+        },
+        {
+          "kind": "gesture",
+          "control": "Two-finger pinch on a touch screen"
+        },
+        {
+          "kind": "keyboard",
+          "control": "Ctrl/Cmd + = and Ctrl/Cmd + - with focus in the Timeline"
+        }
+      ],
+      "availability": "While at least one routine is on the visible Timeline. With no routine, pinch and the shortcuts keep their browser meaning and the control is hidden.",
+      "success_result": "Sets one layer for every visible day and for Needs decision, clears single-routine choices and stores the layer on this device under cadence:timeline-semantic-zoom. A pinch must pass a threshold and switches once per gesture; plain scrolling never switches and page zoom is held off only while pinching over the Timeline. The reveal motion is off with reduced motion.",
+      "failure_result": "When the browser refuses storage, the layer still applies until the page reloads.",
+      "effects": [
+        "ui_state",
+        "local_preference"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/use-semantic-zoom.ts#useSemanticZoom",
+        "components/timeline/SemanticZoomToggle.tsx#SemanticZoomToggle",
+        "components/timeline/DayProgressTimeline.tsx",
+        "apps/desktop/src/timeline-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/semantic-zoom.dom.test.tsx",
+          "tests/timeline-sub-behaviors.dom.test.tsx"
+        ],
+        "notes": "Hook tests dispatch ctrl+wheel, plain wheel, two- and one-finger touch and keyboard events and check thresholds, the cooldown, prevented defaults and storage. DOM tests press the control."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/use-semantic-zoom.ts",
+            "components/timeline/SemanticZoomToggle.tsx"
+          ],
+          "evidence": [
+            "tests/semantic-zoom.dom.test.tsx",
+            "tests/timeline-sub-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx"
+          ],
+          "evidence": [
+            "tests/semantic-zoom.dom.test.tsx",
+            "tests/timeline-sub-behaviors.dom.test.tsx"
+          ],
+          "reason": "Sub-behaviors Mac parity: the shared DayProgressTimeline carries the control and gestures with local routines."
         },
         "marketing": {
           "applicability": "not_applicable",

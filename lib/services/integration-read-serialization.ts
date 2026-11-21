@@ -1,6 +1,11 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
-import { OCCURRENCE_STATUS_LABELS, OPPORTUNITY_ADDED_BY_VALUES, type BehaviorOutput, type OccurrenceOutput } from "@cadence/core/integration";
+import {
+  OCCURRENCE_STATUS_LABELS, OPPORTUNITY_ADDED_BY_VALUES, type BehaviorOutput, type OccurrenceOutput, type ParentGroupOutput,
+  type SubBehaviorSummaryOutput,
+} from "@cadence/core/integration";
+import { sortSubBehaviors } from "@cadence/core/resolvers/sub-behavior.resolver";
+import type { TimelineParentGroupView } from "@cadence/core/types/timeline";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
 import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { resolvePersistedTimelineOccurrence } from "@cadence/core/services/timeline.service";
@@ -34,9 +39,34 @@ function integrationRunFields(behavior: BehaviorWithCategory, now: Temporal.Inst
   };
 }
 
+/** A parent's sub-behaviors in display order, archived ones included (contract 1.7.0). */
+export function subBehaviorsOf(
+  parentId: string, behaviors: readonly BehaviorWithCategory[],
+): BehaviorWithCategory[] {
+  const byId = new Map(behaviors.map((row) => [row.id, row]));
+  return sortSubBehaviors(behaviors
+    .filter((row) => row.parent_behavior_id === parentId && row.id !== parentId)
+    .map((row) => ({ id: row.id, title: row.title, subBehaviorSortOrder: row.sub_behavior_sort_order ?? 0 })))
+    .map((facts) => byId.get(facts.id)!);
+}
+
+function subBehaviorSummary(child: BehaviorWithCategory, now: Temporal.Instant): SubBehaviorSummaryOutput {
+  return {
+    id: child.id,
+    title: child.title,
+    sub_behavior_sort_order: child.sub_behavior_sort_order ?? 0,
+    inherit_parent_schedule: child.inherit_parent_schedule ?? false,
+    active: child.active,
+    run_state: behaviorRunState(runFieldsFromStored(child), now).state,
+  };
+}
+
+/** `subBehaviors` are the Behavior's own children; pass them from `subBehaviorsOf`. */
 export function serializeIntegrationBehavior(
   behavior: BehaviorWithCategory, externalRef: string | null, now: Temporal.Instant = Temporal.Now.instant(),
+  subBehaviors: readonly BehaviorWithCategory[] = [],
 ): BehaviorOutput {
+  const parentId = behavior.parent_behavior_id ?? null;
   const view = toBehaviorView(behavior);
   return {
     id: behavior.id,
@@ -81,14 +111,23 @@ export function serializeIntegrationBehavior(
       note: note.note, updated_at: integrationInstant(note.updatedAt),
     })),
     external_ref: externalRef,
+    parent_behavior_id: parentId,
+    sub_behavior_sort_order: parentId ? behavior.sub_behavior_sort_order ?? 0 : 0,
+    inherit_parent_schedule: parentId ? behavior.inherit_parent_schedule ?? false : false,
+    sub_behaviors: parentId ? [] : subBehaviors.map((child) => subBehaviorSummary(child, now)),
     created_at: integrationInstant(behavior.created_at),
     updated_at: integrationInstant(behavior.updated_at),
     revision: integrationInstant(behavior.updated_at),
   };
 }
 
+/**
+ * `parent` adds `parent_behavior_id` and `parent_title` (contract 1.7.0): the sub-behavior's
+ * parent, or null for a top-level Behavior. Leave it out where the parent is unknown.
+ */
 export function serializeIntegrationOccurrence(
   occurrence: Occurrence, behavior: BehaviorWithCategory, now: Temporal.Instant, timezone: string,
+  parent?: { id: string; title: string } | null,
 ): OccurrenceOutput {
   const view = resolvePersistedTimelineOccurrence({ behavior, occurrence, timeSessions: [], now, timezone });
   if (!view) throw new Error("Occurrence has no Behavior.");
@@ -118,7 +157,34 @@ export function serializeIntegrationOccurrence(
     completed_at: nullableInstant(occurrence.completed_at),
     status_marked_at: nullableInstant(occurrence.status_marked_at),
     note: occurrence.note,
+    ...(parent === undefined ? {} : { parent_behavior_id: parent?.id ?? null, parent_title: parent?.title ?? null }),
     updated_at: integrationInstant(occurrence.updated_at),
     revision: integrationInstant(occurrence.updated_at),
+  };
+}
+
+/** The parent of a sub-behavior's Occurrence, or null; looked up in the account's Behaviors. */
+export function occurrenceParent(
+  behavior: BehaviorWithCategory, behaviorsById: ReadonlyMap<string, BehaviorWithCategory>,
+): { id: string; title: string } | null {
+  const parent = behavior.parent_behavior_id ? behaviorsById.get(behavior.parent_behavior_id) : undefined;
+  return parent ? { id: parent.id, title: parent.title } : null;
+}
+
+export function serializeIntegrationParentGroup(group: TimelineParentGroupView): ParentGroupOutput {
+  return {
+    parent_behavior_id: group.parentBehaviorId,
+    title: group.title,
+    local_date: group.localDate,
+    slot_key: integrationInstant(group.scheduledFor),
+    scheduled_time_label: group.scheduledTimeLabel,
+    derived_status: group.rollup.status,
+    progress_label: group.rollup.progressLabel,
+    completed_count: group.rollup.completedCount,
+    not_completed_count: group.rollup.notCompletedCount,
+    unresolved_count: group.rollup.unresolvedCount,
+    total_count: group.rollup.totalCount,
+    needs_decision: group.visualTone === "needs_decision",
+    occurrence_ids: group.children.map((child) => child.id),
   };
 }

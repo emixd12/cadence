@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { applyHostedAccountSync, normalizeAccountSyncBaseline, planAccountSync, portabilityEntities, readAccountSyncInputs, readHostedAccountSyncEnvelope, synchronizeAccount } from "../apps/desktop/src/account/account-sync";
-import { accountSyncFingerprint, resolveAccountSync } from "@cadence/core/resolvers/account-sync.resolver";
+import { ACCOUNT_SYNC_CONTRACT, accountSyncFingerprint, resolveAccountSync } from "@cadence/core/resolvers/account-sync.resolver";
 import { emptyPortabilitySnapshot } from "./helpers/portability-fixture";
 import { canonicalJson } from "../apps/desktop/src/account/canonical-json";
 import { syncFailureStatus } from "../apps/desktop/src/sync-engine";
@@ -53,7 +53,7 @@ describe("desktop account sync adapter", () => {
     const rpc = vi.fn(() => ({ abortSignal }));
     const client = { rpc } as unknown as SupabaseClient;
     await expect(readHostedAccountSyncEnvelope(client)).resolves.toEqual(hosted);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 8 });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: ACCOUNT_SYNC_CONTRACT });
     expect(abortSignal).toHaveBeenCalledOnce();
     expect(native.invoke).toHaveBeenCalledWith("local_store", { request: { operation: "validateAccountSyncSnapshot", entities: hosted.entities } });
 
@@ -91,7 +91,7 @@ describe("desktop account sync adapter", () => {
     });
     const rpc = vi.fn(() => ({ abortSignal: vi.fn(async () => ({ data: hosted, error: null })) }));
     await expect(synchronizeAccount("local", { rpc } as unknown as SupabaseClient)).resolves.toEqual({ state: "update_required", message: "Update required to synchronize" });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 8 });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: ACCOUNT_SYNC_CONTRACT });
     expect(native.invoke.mock.calls.some(([name, args]) => name === "auth_complete_account_sync" || args?.request.operation === "applyAccountSync")).toBe(false);
   });
 

@@ -9,6 +9,7 @@ import {
 } from "@/components/layout/ScreenFrame";
 import { getAnalyticsPageData } from "@/lib/services/analytics.service";
 import { getBehaviorPageData } from "@/lib/services/behavior.service";
+import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 import { parseBehaviorEditTarget, type BehaviorEditTarget } from "@/lib/ui/advisor";
 import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
@@ -18,6 +19,7 @@ import {
   behaviorRunAction,
   createBehaviorAction,
   markBehaviorReviewOccurrenceStatusAction,
+  reorderSubBehaviorsAction,
   resetBehaviorReviewOccurrenceTimeTrackingAction,
   restoreBehaviorAction,
   stopBehaviorReviewOccurrenceTimeTrackingAction,
@@ -117,6 +119,7 @@ async function BehaviorsContent({
         categories={data.categories}
         defaultTimezone={data.defaultTimezone}
         defaultOpen={!hasBehaviors}
+        parentOptions={parentChoices(null, [...data.activeBehaviors, ...data.archivedBehaviors]).options}
       />
 
       <BehaviorList
@@ -136,6 +139,8 @@ async function BehaviorsContent({
         noteShortcutViews={noteShortcutViews}
         noteShortcutAction={manageNoteShortcutAction}
         editTarget={editTarget}
+        reorderAction={reorderSubBehaviorsAction}
+        createAction={createBehaviorAction}
       />
     </>
   );

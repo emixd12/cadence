@@ -4,7 +4,7 @@ import { integrationBehaviorInput } from "@/lib/services/integration-behavior-in
 import { writeOperationHandlers } from "@/lib/integrations/operations/write";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { recordIntegrationActivity, beginIdempotentWrite } from "@/lib/db/integration.repo";
-import { getBehaviorById } from "@/lib/db/behaviors.repo";
+import { getBehaviorById, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 
@@ -12,21 +12,24 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/integration.repo", () => ({
   beginIdempotentWrite: vi.fn(), releaseIdempotentWrite: vi.fn(), recordIntegrationActivity: vi.fn(),
 }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: vi.fn(), listBehaviorCategories: vi.fn() }));
+vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: vi.fn(), listBehaviorCategories: vi.fn(), listUserBehaviors: vi.fn() }));
 const id = "22500000-0000-4000-8000-000000000001";
 const context = { supabase: {}, userId: id, now: new Date("2026-10-18T12:00:00Z"),
   actor: { grantedScopes: ["cadence.read", "cadence.behaviors.write", "cadence.occurrences.write"] } } as unknown as IntegrationContext;
 const create = { title: "Walk", schedules: [{ recurrence: { frequency: "daily" as const, interval: 1 },
   time_entries: [{ kind: "exact" as const, start_time: "09:00" }] }] };
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(listUserBehaviors).mockResolvedValue([]);
+});
 describe("integration write boundary", () => {
   it("denies each operation before data access and records the attempt", async () => {
     for (const handler of Object.values(writeOperationHandlers)) {
       const result = await handler({ ...context, actor: { ...context.actor, grantedScopes: ["cadence.read"] } }, {});
       expect(result).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });
     }
-    expect(recordIntegrationActivity).toHaveBeenCalledTimes(14);
+    expect(recordIntegrationActivity).toHaveBeenCalledTimes(15);
     expect(beginIdempotentWrite).not.toHaveBeenCalled();
     expect(getBehaviorById).not.toHaveBeenCalled();
   });

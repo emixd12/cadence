@@ -107,6 +107,95 @@
         "is_opportunity": true,
         "default_duration_minutes": 10
       }
+    },
+    {
+      "name": "parent with sub-behaviors in one call",
+      "value": {
+        "title": "Skin routine",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "external_ref": "app-routine-1",
+        "sub_behaviors": [
+          {
+            "title": "Cleanser"
+          },
+          {
+            "title": "Moisturizer",
+            "external_ref": "app-step-2"
+          },
+          {
+            "title": "Retinol",
+            "inherit_parent_schedule": false,
+            "schedules": [
+              {
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "wednesday",
+                    "friday"
+                  ]
+                },
+                "time_entries": [
+                  {
+                    "kind": "exact",
+                    "start_time": "07:00"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "idempotency_key": "routine-create-0001"
+      }
+    },
+    {
+      "name": "sub-behavior that follows its parent",
+      "value": {
+        "title": "Sunscreen",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "sub_behavior_sort_order": 3
+      }
+    },
+    {
+      "name": "sub-behavior with its own schedule",
+      "value": {
+        "title": "Retinol",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "inherit_parent_schedule": false,
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "weekly",
+              "interval": 1,
+              "days_of_week": [
+                "monday",
+                "wednesday",
+                "friday"
+              ]
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "invalid_inputs": [
@@ -595,6 +684,294 @@
       "code": "invalid_input",
       "path": "$.schedules",
       "semantic": true
+    },
+    {
+      "name": "no schedules and no parent",
+      "value": {
+        "title": "Walk"
+      },
+      "code": "invalid_input",
+      "path": "$"
+    },
+    {
+      "name": "parent and sub_behaviors together",
+      "value": {
+        "title": "Steps",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "sub_behaviors": [
+          {
+            "title": "Step"
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.sub_behaviors",
+      "semantic": true
+    },
+    {
+      "name": "schedules on a sub-behavior that follows its parent",
+      "value": {
+        "title": "Cleanser",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules",
+      "semantic": true
+    },
+    {
+      "name": "own schedule without schedules",
+      "value": {
+        "title": "Retinol",
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "inherit_parent_schedule": false
+      },
+      "code": "invalid_input",
+      "path": "$.schedules",
+      "semantic": true
+    },
+    {
+      "name": "inherit flag without a parent",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "inherit_parent_schedule": true
+      },
+      "code": "invalid_input",
+      "path": "$.inherit_parent_schedule",
+      "semantic": true
+    },
+    {
+      "name": "inline sub-behavior with schedules but following the parent",
+      "value": {
+        "title": "Skin routine",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "sub_behaviors": [
+          {
+            "title": "Cleanser",
+            "schedules": [
+              {
+                "recurrence": {
+                  "frequency": "daily",
+                  "interval": 1
+                },
+                "time_entries": [
+                  {
+                    "kind": "exact",
+                    "start_time": "07:00"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.sub_behaviors[0].schedules",
+      "semantic": true
+    },
+    {
+      "name": "repeated external_ref in one call",
+      "value": {
+        "title": "Skin routine",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "external_ref": "same-ref",
+        "sub_behaviors": [
+          {
+            "title": "Cleanser",
+            "external_ref": "same-ref"
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.sub_behaviors[0].external_ref",
+      "semantic": true
+    },
+    {
+      "name": "too many inline sub-behaviors",
+      "value": {
+        "title": "Long routine",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "sub_behaviors": [
+          {
+            "title": "Step 0"
+          },
+          {
+            "title": "Step 1"
+          },
+          {
+            "title": "Step 2"
+          },
+          {
+            "title": "Step 3"
+          },
+          {
+            "title": "Step 4"
+          },
+          {
+            "title": "Step 5"
+          },
+          {
+            "title": "Step 6"
+          },
+          {
+            "title": "Step 7"
+          },
+          {
+            "title": "Step 8"
+          },
+          {
+            "title": "Step 9"
+          },
+          {
+            "title": "Step 10"
+          },
+          {
+            "title": "Step 11"
+          },
+          {
+            "title": "Step 12"
+          },
+          {
+            "title": "Step 13"
+          },
+          {
+            "title": "Step 14"
+          },
+          {
+            "title": "Step 15"
+          },
+          {
+            "title": "Step 16"
+          },
+          {
+            "title": "Step 17"
+          },
+          {
+            "title": "Step 18"
+          },
+          {
+            "title": "Step 19"
+          },
+          {
+            "title": "Step 20"
+          },
+          {
+            "title": "Step 21"
+          },
+          {
+            "title": "Step 22"
+          },
+          {
+            "title": "Step 23"
+          },
+          {
+            "title": "Step 24"
+          },
+          {
+            "title": "Step 25"
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.sub_behaviors"
+    },
+    {
+      "name": "grandchild inside an inline sub-behavior",
+      "value": {
+        "title": "Skin routine",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ],
+        "sub_behaviors": [
+          {
+            "title": "Cleanser",
+            "sub_behaviors": [
+              {
+                "title": "Rinse"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.sub_behaviors[0].sub_behaviors"
     }
   ],
   "valid_outputs": [
@@ -663,10 +1040,245 @@
           },
           "archive_notes": [],
           "external_ref": null,
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [],
           "created_at": "2026-09-01T12:00:00Z",
           "updated_at": "2026-10-18T13:00:00Z",
           "revision": "b1.2026-10-18T13:00:00Z"
         }
+      }
+    },
+    {
+      "name": "parent with sub-behaviors",
+      "value": {
+        "behavior": {
+          "id": "00000009-1111-4111-8111-000000000009",
+          "title": "Skin routine",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": {
+            "id": "00000003-1111-4111-8111-000000000003",
+            "name": "Fitness"
+          },
+          "state": "active",
+          "archived_at": null,
+          "auto_archived_at": null,
+          "run_state": "running",
+          "end_on": null,
+          "end_time": null,
+          "pause": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "days_of_week": [
+                  "monday",
+                  "thursday"
+                ]
+              },
+              "recurrence_summary": "Weekly on Monday and Thursday",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                {
+                  "id": "00000008-1111-4111-8111-000000000008",
+                  "kind": "range",
+                  "preset": "evening",
+                  "start_time": "18:00",
+                  "end_time": "00:00",
+                  "label": "Evening"
+                }
+              ],
+              "time_summary": "7:30 AM, Evening"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [],
+          "external_ref": "app-routine-1",
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [
+            {
+              "id": "0000000a-1111-4111-8111-00000000000a",
+              "title": "Cleanser",
+              "sub_behavior_sort_order": 0,
+              "inherit_parent_schedule": true,
+              "active": true,
+              "run_state": "running"
+            },
+            {
+              "id": "0000000b-1111-4111-8111-00000000000b",
+              "title": "Retinol",
+              "sub_behavior_sort_order": 1,
+              "inherit_parent_schedule": false,
+              "active": true,
+              "run_state": "running"
+            }
+          ],
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        },
+        "sub_behaviors": [
+          {
+            "id": "0000000a-1111-4111-8111-00000000000a",
+            "title": "Cleanser",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "run_state": "running",
+            "end_on": null,
+            "end_time": null,
+            "pause": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": true,
+            "sub_behaviors": [],
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          },
+          {
+            "id": "0000000b-1111-4111-8111-00000000000b",
+            "title": "Retinol",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "run_state": "running",
+            "end_on": null,
+            "end_time": null,
+            "pause": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+            "sub_behavior_sort_order": 1,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [],
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          }
+        ]
       }
     }
   ],
@@ -676,6 +1288,99 @@
       "value": {},
       "code": "internal_error",
       "path": "$.behavior"
+    },
+    {
+      "name": "sub-behavior summary with a stored partial state",
+      "value": {
+        "behavior": {
+          "id": "00000009-1111-4111-8111-000000000009",
+          "title": "Skin routine",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": {
+            "id": "00000003-1111-4111-8111-000000000003",
+            "name": "Fitness"
+          },
+          "state": "active",
+          "archived_at": null,
+          "auto_archived_at": null,
+          "run_state": "running",
+          "end_on": null,
+          "end_time": null,
+          "pause": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "days_of_week": [
+                  "monday",
+                  "thursday"
+                ]
+              },
+              "recurrence_summary": "Weekly on Monday and Thursday",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                {
+                  "id": "00000008-1111-4111-8111-000000000008",
+                  "kind": "range",
+                  "preset": "evening",
+                  "start_time": "18:00",
+                  "end_time": "00:00",
+                  "label": "Evening"
+                }
+              ],
+              "time_summary": "7:30 AM, Evening"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [],
+          "external_ref": "app-routine-1",
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [
+            {
+              "id": "0000000a-1111-4111-8111-00000000000a",
+              "title": "Cleanser",
+              "sub_behavior_sort_order": 0,
+              "inherit_parent_schedule": true,
+              "active": true,
+              "run_state": "partial"
+            },
+            {
+              "id": "0000000b-1111-4111-8111-00000000000b",
+              "title": "Retinol",
+              "sub_behavior_sort_order": 1,
+              "inherit_parent_schedule": false,
+              "active": true,
+              "run_state": "running"
+            }
+          ],
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.behavior.sub_behaviors[0].run_state"
     }
   ]
 }

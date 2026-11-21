@@ -1834,7 +1834,8 @@
         "planner.rejection.no-change-needed",
         "planner.rejection.no-feasible-window",
         "planner.rejection.occurrence-not-found",
-        "planner.rejection.occurrence-not-unresolved"
+        "planner.rejection.occurrence-not-unresolved",
+        "planner.rejection.routine-moves-together"
       ]
     },
     {
@@ -2040,6 +2041,21 @@
       "relatedIds": [
         "planner.rejection",
         "occurrence.status.unresolved"
+      ]
+    },
+    {
+      "id": "planner.rejection.routine-moves-together",
+      "label": "Routine step moves with its routine",
+      "category": "Planner",
+      "definition": "A routine's steps that follow its time are one block; only the slot's first step receives options, for the steps' summed length, and the other steps move with it.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-plan.ts",
+          "symbol": "BriefingPlanRejectionCode"
+        }
+      ],
+      "relatedIds": [
+        "planner.rejection"
       ]
     },
     {

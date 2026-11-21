@@ -6,6 +6,7 @@ import {
   type BriefMoveLength,
   type BriefMoveLengthSource,
   type BriefMoveReasonCode,
+  type BriefMoveRoutine,
   type BriefMoveTravel,
 } from "../types/brief-moves";
 import { localDateAt, localDayBounds } from "./time.resolver";
@@ -23,6 +24,9 @@ import { localDateAt, localDayBounds } from "./time.resolver";
  *   - Items and calendar events keep a 10-minute gap on each side. Travel spans
  *     already include their own margins, so they keep none.
  *   - The moved item's own travel (when known) pads its interval before and after.
+ *   - A routine's steps that follow its time are one block: they never collide with
+ *     each other, they occupy the routine's time for their summed length, and the
+ *     brief offers one line that moves them together.
  */
 
 export const BRIEF_MOVE_BUFFER_SECONDS = 10 * 60;
@@ -49,7 +53,86 @@ export type BriefMoveDayItem = Readonly<{
   alongside: boolean;
   revision: string;
   behaviorRevision: string;
+  /** Set for a sub-behavior's step (depth 1). */
+  routine?: BriefMoveItemRoutine;
 }>;
+
+export type BriefMoveItemRoutine = Readonly<{
+  parentBehaviorId: string;
+  parentTitle: string;
+  /** True when the step follows the routine's schedule; only those move together. */
+  inheritParentSchedule: boolean;
+  stepOrder: number;
+}>;
+
+/** One routine slot: unresolved, exact steps that follow the routine's time and sit at the same start. */
+export type BriefMoveRoutineBlock = Readonly<{
+  key: string;
+  parentBehaviorId: string;
+  title: string;
+  /** In step order. The first is the block's lead: its line, its key. */
+  members: readonly BriefMoveDayItem[];
+}>;
+
+function routineKey(item: BriefMoveDayItem): string | null {
+  if (!item.routine?.inheritParentSchedule || item.status !== "unresolved" || item.scheduleKind !== "exact") return null;
+  return `${item.routine.parentBehaviorId}@${item.localDate}@${item.start.toString()}`;
+}
+
+/** The routine slots among `items` that hold two or more steps, keyed by every member's occurrence id. */
+export function briefMoveRoutineBlocks(items: readonly BriefMoveDayItem[]): ReadonlyMap<string, BriefMoveRoutineBlock> {
+  const groups = new Map<string, BriefMoveDayItem[]>();
+  for (const item of items) {
+    const key = routineKey(item);
+    if (!key) continue;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const byMember = new Map<string, BriefMoveRoutineBlock>();
+  for (const [key, members] of groups) {
+    if (members.length < 2) continue;
+    const ordered = [...members].sort((left, right) => left.routine!.stepOrder - right.routine!.stepOrder || left.occurrenceId.localeCompare(right.occurrenceId));
+    const block = { key, parentBehaviorId: ordered[0]!.routine!.parentBehaviorId, title: ordered[0]!.routine!.parentTitle, members: ordered };
+    for (const member of ordered) byMember.set(member.occurrenceId, block);
+  }
+  return byMember;
+}
+
+/** The steps of `occurrenceId`'s routine slot, lead first, or just the item itself. */
+export function briefMoveRoutineMembers(items: readonly BriefMoveDayItem[], occurrenceId: string): readonly BriefMoveDayItem[] {
+  const block = briefMoveRoutineBlocks(items).get(occurrenceId);
+  if (block) return block.members;
+  const item = items.find((candidate) => candidate.occurrenceId === occurrenceId);
+  return item ? [item] : [];
+}
+
+/**
+ * Each routine slot as one item: the lead's id, the routine's title, and the summed
+ * length of its steps (alongside steps add nothing). Other items pass through.
+ */
+export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): BriefMoveDayItem[] {
+  const blocks = briefMoveRoutineBlocks(items);
+  const out: BriefMoveDayItem[] = [];
+  for (const item of items) {
+    const block = blocks.get(item.occurrenceId);
+    if (!block) { out.push(item); continue; }
+    if (block.members[0]!.occurrenceId !== item.occurrenceId) continue;
+    const timed = block.members.filter((member) => !member.alongside);
+    const minutes = Math.min(1440, Math.max(1, timed.reduce((sum, member) => sum + member.length.minutes, 0)));
+    const end = item.start.add({ minutes });
+    out.push({
+      ...item,
+      title: block.title,
+      end,
+      alongside: timed.length === 0,
+      length: {
+        minutes,
+        source: timed.every((member) => member.length.source === item.length.source) ? item.length.source : timed[0]?.length.source ?? item.length.source,
+        assumed: timed.some((member) => member.length.assumed),
+      },
+    });
+  }
+  return out;
+}
 
 export type BriefMoveBlock = BriefMoveInterval & Readonly<{
   kind: "item" | "calendar" | "travel";
@@ -84,7 +167,9 @@ export function briefMoveItemBlocks(
   excludeId: string | null,
   positions: ReadonlyMap<string, BriefMoveInterval> = new Map(),
 ): BriefMoveBlock[] {
-  const open = items.filter((item) => item.status === "unresolved" && item.occurrenceId !== excludeId && !item.alongside);
+  // A step's own routine never blocks it: the whole slot is left out with it.
+  const excludedLead = excludeId ? briefMoveRoutineMembers(items, excludeId)[0]?.occurrenceId ?? excludeId : null;
+  const open = collapseBriefMoveRoutines(items).filter((item) => item.status === "unresolved" && item.occurrenceId !== excludedLead && !item.alongside);
   const exact: BriefMoveBlock[] = open.filter((item) => item.scheduleKind === "exact").map((item) => {
     const at = positions.get(item.occurrenceId) ?? { start: item.start, end: item.end };
     return { kind: "item", ref: item.occurrenceId, title: item.title, start: at.start, end: later(at.end, at.start) };
@@ -212,6 +297,8 @@ export type BriefMoveCandidate = Readonly<{
   offerNeverMove: boolean;
   /** The reason or anchor names a calendar event: the stored text is kept for its day only. */
   calendarDerived: boolean;
+  /** Set when the line moves a whole routine slot; `title` is then the routine's. */
+  routine?: BriefMoveRoutine;
 }>;
 
 export type BriefMovePlanInputs = Readonly<{
@@ -248,9 +335,14 @@ export function planBriefMoveLinesFromInputs(input: BriefMovePlanInputs): BriefM
   if (input.calendar === "stale") return { candidates: [], calendar: "stale" };
   const latestStartMinute = input.latestStartMinute ?? BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE;
   const positions = new Map<string, BriefMoveInterval>();
-  const today = input.items.filter((item) => item.localDate === input.localDate);
+  const routineBlocks = briefMoveRoutineBlocks(input.items);
+  const items = collapseBriefMoveRoutines(input.items);
+  const today = items.filter((item) => item.localDate === input.localDate);
+  // A routine slot moves only when every step may: a No or "Don't suggest" on any step holds the routine.
+  const membersOf = (item: BriefMoveDayItem) => routineBlocks.get(item.occurrenceId)?.members ?? [item];
   const movable = (item: BriefMoveDayItem) => item.status === "unresolved" && item.scheduleKind === "exact" && !item.alongside
-    && !input.neverMoveBehaviorIds.has(item.behaviorId) && !input.declinedToday.has(item.occurrenceId);
+    && membersOf(item).every((member) => !input.neverMoveBehaviorIds.has(member.behaviorId) && !input.declinedToday.has(member.occurrenceId))
+    && !(item.routine && input.neverMoveBehaviorIds.has(item.routine.parentBehaviorId));
   const ordered = [...today].sort((left, right) => Temporal.Instant.compare(left.start, right.start) || left.occurrenceId.localeCompare(right.occurrenceId));
   const calendarBlocks: BriefMoveBlock[] = input.calendarBusy.map((event) => ({ kind: "calendar", ref: event.ref, title: event.title, start: event.start, end: event.end }));
   const candidates: BriefMoveCandidate[] = [];
@@ -261,6 +353,7 @@ export function planBriefMoveLinesFromInputs(input: BriefMovePlanInputs): BriefM
     const current = positions.get(item.occurrenceId) ?? { start: item.start, end: item.end };
     const travelBlocks = travelBlocksFor(input.travel, item.occurrenceId);
     const itemBlocks = briefMoveItemBlocks(input.items, item.occurrenceId, positions);
+    const routine = routineBlocks.get(item.occurrenceId);
     const problem = findProblem(item, current, {
       now: input.now, calendar: calendarBlocks, travel: travelBlocks, items: itemBlocks,
       laterMovable: (ref) => {
@@ -313,6 +406,7 @@ export function planBriefMoveLinesFromInputs(input: BriefMovePlanInputs): BriefM
       late: problem.code === "time_passed" || Temporal.Instant.compare(current.start, input.now) < 0,
       offerNeverMove: input.offerNeverMoveBehaviorIds?.has(item.behaviorId) ?? false,
       calendarDerived: problem.anchor?.kind === "calendar_event",
+      ...(routine ? { routine: { parentBehaviorId: routine.parentBehaviorId, title: routine.title, occurrenceIds: routine.members.map((member) => member.occurrenceId) } } : {}),
     });
   }
   return { candidates, calendar: input.calendar };

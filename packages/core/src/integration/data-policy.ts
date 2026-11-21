@@ -1,6 +1,7 @@
 /** Data classes the integration contract may and may not return. */
 export const INTEGRATION_INCLUDED_DATA: readonly string[] = Object.freeze([
   "Behaviors, including archived Behaviors",
+  "Parent and sub-behavior links, and derived parent slot rollups (never stored)",
   "Schedules and time entries",
   "Categories",
   "Occurrences, stored statuses, and status history",

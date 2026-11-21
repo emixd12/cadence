@@ -643,7 +643,8 @@ describe("resolveAccountSync", () => {
     expect(plan(empty, snapshot([revised]), empty).hostedWrites[0].value).toEqual({
       archive_notes: [], default_duration_minutes: null, end_on: null, end_time: null,
       pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, location_text: null, is_opportunity: false,
-      where_kind: null, id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
+      where_kind: null, parent_behavior_id: null, sub_behavior_sort_order: 0, inherit_parent_schedule: false,
+      id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
     });
   });
 
@@ -1279,5 +1280,44 @@ describe("account sync contract 8 (Behaviors of Opportunity)", () => {
     const result = plan(base, base, removed);
     expect(result.conflicts).toEqual([]);
     expect(result.localWrites).toMatchObject([{ kind: "occurrence", id: "o", operation: "delete" }]);
+  });
+});
+
+describe("sub-behavior links (contract 9)", () => {
+  const linked = (id: string, title: string, parent: string | null, inherit = parent !== null): AccountSyncEntity =>
+    ({ kind: "behavior", id, value: { id, title, user_id: "owner", parent_behavior_id: parent, sub_behavior_sort_order: 0, inherit_parent_schedule: inherit } });
+
+  it("syncs a new group with its link fields", () => {
+    const result = plan(empty, snapshot([linked("p", "Skin routine", null), linked("c", "Cerave", "p")]), empty);
+    expect(result.conflicts).toEqual([]);
+    expect(result.hostedWrites).toMatchObject([
+      { kind: "behavior", id: "c", value: { parent_behavior_id: "p", inherit_parent_schedule: true } },
+      { kind: "behavior", id: "p", value: { parent_behavior_id: null, inherit_parent_schedule: false } },
+    ]);
+  });
+
+  it("refuses a merge that nests sub-behaviors two levels deep", () => {
+    const baseline = snapshot([linked("a", "A", null), linked("b", "B", null), linked("c", "C", null)]);
+    const local = snapshot([linked("a", "A", "b"), linked("b", "B", null), linked("c", "C", null)]);
+    const hosted = snapshot([linked("a", "A", null), linked("b", "B", "c"), linked("c", "C", null)]);
+    expect(() => plan(baseline, local, hosted)).toThrow("more than one level deep");
+  });
+
+  it("rejects invalid links and links to a missing parent", () => {
+    expect(() => plan(empty, snapshot([linked("s", "Self", "s")]), empty)).toThrow("sub-behavior link is invalid");
+    expect(() => plan(empty, snapshot([linked("s", "Solo", null, true)]), empty)).toThrow("sub-behavior link is invalid");
+    expect(() => plan(empty, snapshot([linked("c", "Orphan", "gone")]), empty)).toThrow("references missing behavior gone");
+  });
+
+  it("keeps a reviewed winner's new parent on the other side", () => {
+    const baseline = snapshot([linked("c", "Cerave", null)]);
+    const local = snapshot([linked("p", "Skin routine", null), linked("c", "Cerave AM", "p")]);
+    const hosted = snapshot([linked("c", "Cerave PM", null)]);
+    const review = plan(baseline, local, hosted);
+    expect(review.conflicts).toMatchObject([{ kind: "behavior", id: "c" }]);
+    const resolved = resolveReviewedAccountSync({ accountLinkId: "link", baseline, local, hosted,
+      reviewedFingerprints: review.fingerprints, decisions: [{ kind: "behavior", id: "c", choice: "local" }] });
+    expect(resolved.hostedWrites.map(({ id }) => id)).toEqual(["c", "p"]);
+    expect(resolved.mergedEntities.find(({ id }) => id === "c")?.value).toMatchObject({ parent_behavior_id: "p" });
   });
 });

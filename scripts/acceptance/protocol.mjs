@@ -37,13 +37,14 @@ import { qaPublishableKey } from './qa-config.mjs';
 export const REGISTRY_TOOLS = Object.freeze([
   'get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences',
   'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
-  'set_occurrence_status', 'update_occurrence_note', 'move_occurrence_for_day', 'revert_occurrence_move',
-  'update_day_note', 'add_opportunity_occurrence', 'remove_opportunity_occurrence',
+  'set_occurrence_status', 'set_parent_occurrence_status', 'update_occurrence_note', 'move_occurrence_for_day',
+  'revert_occurrence_move', 'update_day_note', 'add_opportunity_occurrence', 'remove_opportunity_occurrence',
   'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
   'end_behavior', 'pause_behavior', 'resume_behavior',
 ]);
 export const WRITE_SCOPE = Object.freeze({
-  set_occurrence_status: 'cadence.occurrences.write', update_occurrence_note: 'cadence.occurrences.write',
+  set_occurrence_status: 'cadence.occurrences.write', set_parent_occurrence_status: 'cadence.occurrences.write',
+  update_occurrence_note: 'cadence.occurrences.write',
   move_occurrence_for_day: 'cadence.occurrences.write', revert_occurrence_move: 'cadence.occurrences.write',
   update_day_note: 'cadence.occurrences.write',
   add_opportunity_occurrence: 'cadence.occurrences.write', remove_opportunity_occurrence: 'cadence.occurrences.write',
@@ -319,6 +320,7 @@ export async function runProtocolSuite({
     await expectOk(session, check, 'fetch', { id: `behavior:${behaviorId}` });
     const writes = {
       set_occurrence_status: { occurrence_id: occurrenceId, status: 'completed' },
+      set_parent_occurrence_status: { parent_behavior_id: behaviorId, local_date: today, status: 'completed' },
       update_occurrence_note: { occurrence_id: occurrenceId, note: SAMPLE_NOTE },
       move_occurrence_for_day: { occurrence_id: occurrenceId, start_time: '23:55', expected_revision: 'r1' },
       revert_occurrence_move: { occurrence_id: occurrenceId, expected_revision: 'r1' },

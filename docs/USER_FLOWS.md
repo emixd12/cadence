@@ -568,6 +568,29 @@ The Behaviors screen distinguishes two edit modes:
   It shows Date of behavior, Time of behavior, Status, and Note as plain rows.
   Date and time are display-only in this review path.
 
+## Routines and sub-behaviors (Ticket 343)
+
+1. **Create a routine.** On Behaviors, open Create behavior, enter the routine's title
+   and schedule, choose Add sub-behavior for each step, order them with Up and Down and
+   turn Follow parent schedule off on any step that needs its own days. Save behavior
+   creates the routine and its steps together.
+2. **Group or ungroup.** In a Behavior's Details and Settings, choose a routine under
+   Part of, or None to make it standalone. In a routine's Details and Settings, use
+   Detach, New sub-behavior or Add an existing behavior.
+3. **Reorder.** Up and Down on a step save the order at once.
+4. **Use the Timeline.** Each routine slot shows as one row. Select it to see the steps.
+   Mark the routine Completed or Not Completed to mark every step, or mark steps one by
+   one and see progress such as 2/3.
+5. **Zoom.** Pinch or Ctrl/Cmd + wheel over the Timeline, or choose Routines or All
+   steps, to collapse or open every routine.
+6. **Needs decision.** Prior-day routine slots appear as routine rows with the same bulk
+   actions.
+7. **Review.** On Behaviors, the routine shows rolled-up adherence and full routines
+   done; each step shows its own.
+
+Web and Cadence for Mac use the same shared components. Mac data and sync:
+`docs/DESKTOP_DATA_MODEL.md`.
+
 ## Reminder flow
 
 Browser notifications are enabled by default for every behavior.

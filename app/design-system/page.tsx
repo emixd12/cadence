@@ -99,6 +99,7 @@ import { NoticeBench } from "@/app/design-system/NoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
 import { MarkDetailsBench } from "@/app/design-system/MarkDetailsBench";
 import { OpportunityBasketBench } from "@/app/design-system/OpportunityBasketBench";
+import { TimelineSubBehaviorsBench } from "@/app/design-system/TimelineSubBehaviorsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -474,6 +475,11 @@ export default async function DesignSystemPage({
         />
       </WebRuntimeProvider>
     );
+  }
+  if (selectedPreviewId === "timeline-sub-behaviors") {
+    // Sub-behaviors: routines, all steps, partial progress and Needs decision with Semantic Zoom.
+    const state = selectedFixtureState === "all-steps" || selectedFixtureState === "needs-decision" ? selectedFixtureState : "routines";
+    return <TimelineSubBehaviorsBench key={state} state={state} />;
   }
   if (selectedPreviewId === "departure-states") {
     // Ticket 266: every travel timing state on a movable bench clock, and the wording review.
@@ -2541,6 +2547,8 @@ const needsDecisionSection: TimelineDaySection = {
   emptyMessage: "No prior unresolved occurrences.",
   occurrences: [needsDecisionOccurrence],
   unresolvedOccurrenceCount: 1,
+  parentGroups: [],
+  rows: [],
   occurrenceGroups: toFixtureOccurrenceGroups([needsDecisionOccurrence]),
 };
 
@@ -2561,6 +2569,8 @@ const retainedNeedsDecisionSection: TimelineDaySection = {
   emptyMessage: "No prior unresolved occurrences.",
   occurrences: [retainedNeedsDecisionOccurrence],
   unresolvedOccurrenceCount: 0,
+  parentGroups: [],
+  rows: [],
   occurrenceGroups: toFixtureOccurrenceGroups([
     retainedNeedsDecisionOccurrence,
   ]),
@@ -2580,6 +2590,8 @@ const todaySection: TimelineDaySection = {
     currentGroupedCompletedOccurrence,
   ],
   unresolvedOccurrenceCount: 1,
+  parentGroups: [],
+  rows: [],
   occurrenceGroups: [
     {
       key: "group-water-2026-06-08",
@@ -2601,6 +2613,8 @@ const futureSection: TimelineDaySection = {
   emptyMessage: "No behaviors on this day.",
   occurrences: [futureOccurrence],
   unresolvedOccurrenceCount: 0,
+  parentGroups: [],
+  rows: [],
   occurrenceGroups: toFixtureOccurrenceGroups([futureOccurrence]),
 };
 
@@ -2683,6 +2697,7 @@ const analyticsFixture: AnalyticsView = {
       ],
     },
   ],
+  parentSummaries: [],
   categorySummaries: [
     {
       categoryName: "Home",

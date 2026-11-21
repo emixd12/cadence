@@ -51,6 +51,12 @@ export type BehaviorView = {
   id: string;
   title: string;
   description: string;
+  /** Sub-behaviors (depth 1): the parent Behavior's id, or null on a standalone or parent Behavior. */
+  parentBehaviorId?: string | null;
+  /** Order among siblings under one parent. */
+  subBehaviorSortOrder?: number;
+  /** True while a sub-behavior mirrors its parent's schedule. False on standalone Behaviors. */
+  inheritParentSchedule?: boolean;
   whereKind?: BehaviorWhereKind | null;
   locationText?: string | null;
   categoryId: string;

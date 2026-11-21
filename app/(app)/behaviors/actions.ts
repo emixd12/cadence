@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { noticeText } from "@cadence/core/notices";
+import { toBehaviorView } from "@cadence/core/services/behavior-views";
 
 import type { BehaviorActionState } from "@/lib/types/behavior";
 import {
@@ -13,6 +15,8 @@ import {
   archiveBehaviorFromFormData,
   behaviorErrorToActionState,
   createBehaviorFromFormData,
+  createBehaviorGroupForUser,
+  reorderSubBehaviorsFromFormData,
   restoreBehaviorFromFormData,
   updateBehaviorArchiveNoteFromFormData,
   updateBehaviorFromFormData,
@@ -21,6 +25,9 @@ import {
   resetOccurrenceTimeTracking,
   stopOccurrenceTimeTracking,
 } from "@/lib/services/time-tracking.service";
+import { createClient } from "@/lib/supabase/server";
+import { requireCurrentUserId } from "@/lib/auth/current-user";
+import { hasDraftSubBehaviors, parseBehaviorGroupFormData } from "@/components/behaviors/sub-behavior-form-data";
 import type {
   OccurrenceActionState,
   TimelineStatus,
@@ -34,7 +41,25 @@ export async function createBehaviorAction(
   formData: FormData,
 ): Promise<BehaviorActionState> {
   try {
+    if (hasDraftSubBehaviors(formData)) {
+      const group = parseBehaviorGroupFormData(formData);
+      const supabase = await createClient();
+      const userId = await requireCurrentUserId("Sign in again before saving behaviors.");
+      const created = await createBehaviorGroupForUser(supabase, userId, group);
+      revalidatePath("/behaviors");
+      revalidatePath("/timeline");
+
+      return {
+        status: "success",
+        message: noticeText("sub-behaviors.group-created", {
+          title: created.parent.title, count: created.subBehaviors.length,
+        }),
+        behavior: toBehaviorView(created.parent),
+      };
+    }
+
     const behavior = await createBehaviorFromFormData(formData);
+    if (behavior.parentBehaviorId) revalidatePath("/behaviors");
     revalidatePath("/timeline");
 
     return {
@@ -42,6 +67,22 @@ export async function createBehaviorAction(
       message: "Behavior created.",
       behavior,
     };
+  } catch (error) {
+    return behaviorErrorToActionState(error);
+  }
+}
+
+/** Sibling order under one parent: parent_behavior_id and repeated sub_behavior_id. */
+export async function reorderSubBehaviorsAction(
+  _previousState: BehaviorActionState,
+  formData: FormData,
+): Promise<BehaviorActionState> {
+  try {
+    await reorderSubBehaviorsFromFormData(formData);
+    revalidatePath("/behaviors");
+    revalidatePath("/timeline");
+
+    return { status: "success", message: noticeText("sub-behaviors.reordered") };
   } catch (error) {
     return behaviorErrorToActionState(error);
   }

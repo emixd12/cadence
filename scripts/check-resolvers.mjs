@@ -172,6 +172,13 @@ const resolverRegistry = [
     source: "docs/DATA_MODEL.md",
   },
   {
+    domain: "sub-behaviors",
+    resolver: "packages/core/src/resolvers/sub-behavior.resolver.ts",
+    compatibility: "lib/resolvers/sub-behavior.resolver.ts",
+    test: "tests/sub-behavior.resolver.test.ts",
+    source: "docs/RECURRENCE_RULES.md",
+  },
+  {
     domain: "optimistic timeline status",
     resolver: "packages/core/src/resolvers/timeline-optimistic-status.resolver.ts",
     compatibility: "lib/resolvers/timeline-optimistic-status.resolver.ts",

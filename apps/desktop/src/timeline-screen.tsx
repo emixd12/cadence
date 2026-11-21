@@ -32,6 +32,8 @@ export type TimelineScreenProps = Readonly<{
   timeline: TimelineView;
   dayProgress?: DayProgressContext;
   statusAction: OccurrenceFormAction;
+  /** Sub-behaviors: marks every step of one routine slot (local action). */
+  parentSlotStatusAction?: OccurrenceFormAction;
   noteAction: OccurrenceFormAction;
   dayNoteAction?: OccurrenceFormAction;
   startTimeTrackingAction: TimeTrackingFormAction;

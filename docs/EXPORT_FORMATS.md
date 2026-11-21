@@ -1184,6 +1184,34 @@ A bundle without these keys keeps the stored values during restore: an existing
 added Occurrence stays added. CSV is unchanged. `BEHAVIORLOG_SCHEMA_VERSION` is
 unchanged: the new keys are Cadence extensions.
 
+## Sub-behaviors (Ticket 343)
+
+- **Full JSON:** every Behavior record carries `parent_behavior_id` (uuid or null),
+  `sub_behavior_sort_order` (integer, default 0) and `inherit_parent_schedule`
+  (boolean, default false). Configuration snapshots carry `parent_behavior_id` and
+  `inherit_parent_schedule` when the stored snapshot has them.
+- **BehaviorLog:** `behaviors.jsonl` stores the same three keys under
+  `extensions.app.cadence`; configuration events carry the link there too.
+  `BEHAVIORLOG_SCHEMA_VERSION` is unchanged: the keys are Cadence extensions.
+- **Counts:** overall counts and Markdown use leaf Occurrences. A parent's own
+  Occurrence on a day its sub-behaviors cover is left out.
+- **Markdown:** "By behavior" lists a routine as
+  `- Skin routine (routine, 2 sub-behaviors): …` with indented `  - Cerave: …` lines in
+  sibling order, plus one line that explains the grouping. JSONL and CSV are unchanged.
+- **Import:** `plan.behaviors` lists parents first, and the bundle's parent ID maps to
+  the new local ID. Errors: `cadence_sub_behavior_self_parent`,
+  `cadence_sub_behavior_depth` (grandchildren and cycles) and
+  `cadence_parent_behavior_id_invalid`. A missing parent gives the warning
+  `cadence_sub_behavior_parent_missing` and imports the step standalone; a parent that
+  was not created or mapped gives `sub_behavior_parent_not_imported`.
+- **Restore:** the payload carries the three fields only when the bundle has them;
+  otherwise the stored link stays. A link difference makes a Behavior `replace`.
+  Errors `restore_sub_behavior_parent_is_sub_behavior` and
+  `restore_sub_behavior_self_parent` refuse a restore that would break depth 1 with
+  local Behaviors left out of the bundle.
+- **Legacy bundles** without the keys import and restore as standalone Behaviors
+  (`null`, `0`, `false`).
+
 ## Note shortcut privacy (Tickets 126–128)
 
 Shortcut records, proposals, dismissed keys, evidence hashes, exclusions, and

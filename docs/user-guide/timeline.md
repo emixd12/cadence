@@ -235,6 +235,40 @@ the action and press Enter or Space. Each action keeps at least a 44-pixel
 mobile target, even when adjacent text truncates. Saving status is announced to
 assistive technology.
 
+## Mark a routine or its steps
+
+A routine is a Behavior with sub-behaviors, such as a Skin routine with Cerave,
+Facewash and Retinol. On Timeline and in Needs decision it shows as one row at
+its time, with progress such as **2/3** (Completed out of scheduled).
+
+1. To mark every step at once, choose **Completed** or **Not Completed** on the
+   routine row. Steps that already have that status do not change.
+2. To mark one step, select the routine's title to open it, then use the
+   step's own **Completed**, **Not Completed** and **Note**.
+3. Select the title again to close it.
+
+A step with its own schedule (for example Retinol on Monday, Wednesday and
+Friday) appears in the routine only on its own days.
+
+**Result and persistence:** Marking a routine saves every changed step in one
+save. If one step cannot be saved, none are. The routine shows **Completed** or
+**Not Completed** when every step has that status, and otherwise shows progress.
+Cadence stores no separate routine status; adherence counts each step.
+
+## Zoom between routines and all steps
+
+Use **Routines** to show each routine as one row, or **All steps** to open every
+routine on the Timeline. The control appears when a routine is on the Timeline.
+
+- On a trackpad, pinch out over the Timeline for All steps and pinch in for
+  Routines. Ctrl or Cmd with the mouse wheel does the same.
+- On a touch screen, spread two fingers for All steps and pinch for Routines.
+- With focus in the Timeline, press Ctrl or Cmd with **=** for All steps and
+  with **-** for Routines.
+
+Changing the zoom resets any routine you opened or closed by hand. This device
+remembers the choice. Normal scrolling never changes it.
+
 ## Add when or why to a mark
 
 **Prerequisites:** You just marked a Timeline row, on the web or on the Mac.

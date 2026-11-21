@@ -41,6 +41,9 @@ export const ADVICE_SIGNAL_KINDS_V2 = [
   "moved_vs_unmoved",
 ] as const;
 
+/** Signal kinds added by `coach-signals-3`: routines and their steps (sub-behaviors). */
+export const ADVICE_SIGNAL_KINDS_V3 = ["sub_behavior_dropoff"] as const;
+
 /**
  * `account` is not a stored signal. It stands for the account's setup facts
  * (`AdviceAccountFacts`), which the matcher always has, so first-two-weeks cards can
@@ -49,7 +52,9 @@ export const ADVICE_SIGNAL_KINDS_V2 = [
 /** Behaviors of Opportunity (Task 7): no card uses it yet; it is ready for schedule-promotion tips. */
 export const ADVICE_SIGNAL_KINDS_OPPORTUNITY = ["opportunity_ready_to_schedule"] as const;
 
-export const ADVICE_SIGNAL_KINDS = [...ADVICE_SIGNAL_KINDS_V1, ...ADVICE_SIGNAL_KINDS_V2, ...ADVICE_SIGNAL_KINDS_OPPORTUNITY, "account"] as const;
+export const ADVICE_SIGNAL_KINDS = [
+  ...ADVICE_SIGNAL_KINDS_V1, ...ADVICE_SIGNAL_KINDS_V2, ...ADVICE_SIGNAL_KINDS_OPPORTUNITY, ...ADVICE_SIGNAL_KINDS_V3, "account",
+] as const;
 export type AdviceSignalKind = (typeof ADVICE_SIGNAL_KINDS)[number];
 
 /** Setup facts for one account, computed by code on each coach visit and at sign-up. */
@@ -117,6 +122,7 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   session_length: ["sessions", "planned_minutes", "median_minutes", "shorter", "longer", "on_target", "pattern"],
   moved_vs_unmoved: ["moved_rate", "moved_resolved", "unmoved_rate", "unmoved_resolved", "gap", "pattern"],
   opportunity_ready_to_schedule: ["weekday", "completed_count", "usual_time", "earliest_time", "latest_time", "window_minutes"],
+  sub_behavior_dropoff: ["parent_behavior_id", "step_rate", "step_completed", "step_resolved", "sibling_rate", "sibling_resolved", "other_steps", "gap"],
   account: ADVICE_ACCOUNT_FACT_NAMES,
 });
 

@@ -324,6 +324,8 @@ describe("BehaviorLog import write service", () => {
           "end",
           "pause",
           "is_opportunity",
+          "parent_behavior_id",
+          "inherit_parent_schedule",
         ],
         recorded_at: COMPLETED_AT,
         effective_at: COMPLETED_AT,

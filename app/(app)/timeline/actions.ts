@@ -2,6 +2,7 @@
 
 import {
   markOccurrenceStatusFromFormData,
+  markParentSlotStatusFromFormData,
   occurrenceErrorToActionState,
   updateOccurrenceNoteFromFormData,
 } from "@/lib/services/occurrence.service";
@@ -10,6 +11,7 @@ import {
   startOccurrenceTimeTracking,
   stopOccurrenceTimeTracking,
 } from "@/lib/services/time-tracking.service";
+import { noticeText } from "@cadence/core/notices";
 import { revalidatePath } from "next/cache";
 import { saveDayNoteFromFormData } from "@/lib/services/day-note.service";
 import type {
@@ -34,6 +36,24 @@ export async function markOccurrenceStatusAction(
     return {
       status: "success",
       message: "Occurrence updated.",
+      ...(nextStatus ? { nextStatus } : {}),
+    };
+  } catch (error) {
+    return occurrenceErrorToActionState(error);
+  }
+}
+
+/** Sub-behaviors: Completed or Not Completed for every sub-behavior in one routine slot. */
+export async function markParentSlotStatusAction(
+  _previousState: OccurrenceActionState,
+  formData: FormData,
+): Promise<OccurrenceActionState> {
+  try {
+    const nextStatus = getSubmittedStatus(formData);
+    await markParentSlotStatusFromFormData(formData);
+    return {
+      status: "success",
+      message: noticeText("sub-behaviors.routine-marked"),
       ...(nextStatus ? { nextStatus } : {}),
     };
   } catch (error) {

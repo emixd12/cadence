@@ -177,6 +177,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
+| `sub-behaviors.routine-marked` Says on Timeline that a whole routine slot was marked Completed or Not Completed. | outcome | Routine updated. | web, Mac | INT-TIMELINE-025, `app/(app)/timeline/actions.ts`, `apps/desktop/src/local-actions.ts` |
 | `timeline.reload-incomplete` Says a reload finished but Cadence or a connector did not refresh, so shown data may be old. | error | Reload incomplete. Cadence or connector data may be stale. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reload-offline` Web: says a reload could not run while offline, so shown data may be old. | error | Reload failed while offline. Displayed data may be stale. | web | INT-TIMELINE-010, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reloaded` Confirms that the Timeline reloaded Cadence and every connector. | outcome | Cadence and connectors reloaded. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |

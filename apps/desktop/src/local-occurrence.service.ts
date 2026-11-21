@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
-import type { OccurrenceDataStore, OccurrenceStatusEventRecord } from "@cadence/core/data-store";
+import type { OccurrenceDataStore, OccurrenceStatusEventRecord, StatusTransitionCommit } from "@cadence/core/data-store";
 import {
-  applyOccurrenceStatusTransition, recordOccurrenceDoneAt, recordOccurrenceNotDoneReason, updateOccurrenceNote,
+  applyOccurrenceStatusTransition, applyParentSlotStatusTransition, recordOccurrenceDoneAt, recordOccurrenceNotDoneReason, updateOccurrenceNote,
 } from "@cadence/core/services/occurrence.service";
 import {
   startOccurrenceTimeTracking, stopOccurrenceTimeTracking, resetOccurrenceTimeTracking,
@@ -13,7 +13,22 @@ import type { OccurrenceTimeSession } from "../../../lib/types/database";
 import { localCommand, localMutation } from "./local-store";
 
 export function createLocalOccurrenceStore(profileId: string, now: Temporal.Instant): OccurrenceDataStore {
-  let context: Awaited<ReturnType<OccurrenceDataStore["readStatusContext"]>> = null;
+  type StatusContext = NonNullable<Awaited<ReturnType<OccurrenceDataStore["readStatusContext"]>>>;
+  let context: StatusContext | null = null;
+  // A routine mark reads every sub-behavior Occurrence of the slot before one commit.
+  const contexts = new Map<string, StatusContext>();
+  const statusEvent = (plan: StatusTransitionCommit, read: StatusContext): OccurrenceStatusEventRecord | null => plan.event ? {
+    id: crypto.randomUUID(), user_id: profileId,
+    occurrence_id: plan.occurrenceId, behavior_id: read.occurrence.behavior_id,
+    local_date: read.occurrence.local_date, timezone: read.timezone,
+    previous_status: plan.event.previousStatus, status: plan.event.status,
+    status_semantics: plan.event.statusSemantics, recorded_at: plan.event.recordedAt,
+    effective_at: plan.event.effectiveAt, reason_code: null,
+    revises_event_id: plan.event.statusSemantics === "explicit_user_correction" ? plan.expectedLatestEventId : null,
+    source_capture_method: plan.event.sourceCaptureMethod,
+    source_confidence: plan.event.sourceConfidence,
+    created_at: now.toString(), updated_at: now.toString(),
+  } : null;
   return {
     async readStatusContext(occurrenceId) {
       const [occurrence, history, graphs] = await Promise.all([
@@ -26,23 +41,22 @@ export function createLocalOccurrenceStore(profileId: string, now: Temporal.Inst
       if (!graph) throw new Error("Behavior not found.");
       const latest = [...history.statusEvents].sort(compareStatusEvents)[0];
       context = { occurrence, latestStatusEventId: latest?.id ?? null, timezone: graph.behavior.timezone };
+      contexts.set(occurrence.id, context);
       return context;
     },
     async applyStatusTransition(plan) {
       if (!context || context.occurrence.id !== plan.occurrenceId) throw new Error("Read the occurrence before changing its status.");
-      const event: OccurrenceStatusEventRecord | null = plan.event ? {
-        id: crypto.randomUUID(), user_id: profileId,
-        occurrence_id: plan.occurrenceId, behavior_id: context.occurrence.behavior_id,
-        local_date: context.occurrence.local_date, timezone: context.timezone,
-        previous_status: plan.event.previousStatus, status: plan.event.status,
-        status_semantics: plan.event.statusSemantics, recorded_at: plan.event.recordedAt,
-        effective_at: plan.event.effectiveAt, reason_code: null,
-        revises_event_id: plan.event.statusSemantics === "explicit_user_correction" ? plan.expectedLatestEventId : null,
-        source_capture_method: plan.event.sourceCaptureMethod,
-        source_confidence: plan.event.sourceConfidence,
-        created_at: now.toString(), updated_at: now.toString(),
-      } : null;
-      return localCommand("applyStatusTransition", { ...localMutation(profileId, now.toString()), ...plan, event });
+      return localCommand("applyStatusTransition", { ...localMutation(profileId, now.toString()), ...plan, event: statusEvent(plan, context) });
+    },
+    async applyParentSlotStatusTransition({ parentBehaviorId, commits }) {
+      const transitions = commits.map((plan) => {
+        const read = contexts.get(plan.occurrenceId);
+        if (!read) throw new Error("Read the occurrence before changing its status.");
+        return { ...plan, event: statusEvent(plan, read) };
+      });
+      return localCommand("applyParentSlotStatusTransition", {
+        ...localMutation(profileId, now.toString()), parentBehaviorId, transitions,
+      });
     },
     async applyMarkDetail(plan) {
       if (!context || context.occurrence.id !== plan.occurrenceId) throw new Error("Read the occurrence before changing it.");
@@ -106,6 +120,13 @@ export async function markLocalOccurrence(profileId: string, input: {
   occurrenceId: string; expectedStatus: OccurrenceStatus; nextStatus: OccurrenceStatus;
 }, now = Temporal.Now.instant()) {
   return (await applyOccurrenceStatusTransition(createLocalOccurrenceStore(profileId, now), { ...input, now })).result;
+}
+
+/** Sub-behaviors: marks every sub-behavior Occurrence of one routine slot on the Mac. */
+export async function markLocalParentSlot(profileId: string, input: {
+  parentBehaviorId: string; occurrenceIds: string[]; nextStatus: OccurrenceStatus;
+}, now = Temporal.Now.instant()) {
+  return (await applyParentSlotStatusTransition(createLocalOccurrenceStore(profileId, now), { ...input, now })).results;
 }
 
 /** Advisor plan 4G: "Done at" after a late Completed mark on the Mac. */

@@ -135,6 +135,161 @@
           "occurrences_generated_through": "2026-11-17"
         }
       }
+    },
+    {
+      "name": "day with a parent slot",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": {
+          "occurrences": [
+            {
+              "id": "00000004-1111-4111-8111-000000000004",
+              "behavior_id": "00000001-1111-4111-8111-000000000001",
+              "behavior_title": "Morning walk",
+              "category_name": "Fitness",
+              "local_date": "2026-10-16",
+              "timezone": "America/New_York",
+              "scheduled_for": "2026-10-16T11:30:00Z",
+              "effective_start_at": "2026-10-16T11:30:00Z",
+              "move": null,
+              "schedule": {
+                "kind": "exact",
+                "preset": null,
+                "start_time": "07:30",
+                "end_time": null,
+                "label": "7:30 AM"
+              },
+              "status": "unresolved",
+              "status_label": "Unresolved",
+              "needs_decision": true,
+              "completed_at": null,
+              "status_marked_at": null,
+              "note": null,
+              "updated_at": "2026-10-18T13:00:00Z",
+              "revision": "o1.3"
+            }
+          ],
+          "total_count": 1,
+          "truncated": false,
+          "lookback_start_local_date": "2026-07-20",
+          "parent_groups": []
+        },
+        "days": [
+          {
+            "local_date": "2026-10-18",
+            "is_today": true,
+            "occurrences": [
+              {
+                "id": "00000005-1111-4111-8111-000000000005",
+                "behavior_id": "00000001-1111-4111-8111-000000000001",
+                "behavior_title": "Morning walk",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:30:00Z",
+                "effective_start_at": "2026-10-18T11:30:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:41:00Z",
+                "status_marked_at": "2026-10-18T11:41:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3"
+              },
+              {
+                "id": "0000000c-1111-4111-8111-00000000000c",
+                "behavior_id": "0000000a-1111-4111-8111-00000000000a",
+                "behavior_title": "Cleanser",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:00:00Z",
+                "effective_start_at": "2026-10-18T11:00:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:00",
+                  "end_time": null,
+                  "label": "7:00 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:05:00Z",
+                "status_marked_at": "2026-10-18T11:05:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3",
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "parent_title": "Skin routine"
+              },
+              {
+                "id": "0000000d-1111-4111-8111-00000000000d",
+                "behavior_id": "0000000b-1111-4111-8111-00000000000b",
+                "behavior_title": "Retinol",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:00:00Z",
+                "effective_start_at": "2026-10-18T11:00:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:00",
+                  "end_time": null,
+                  "label": "7:00 AM"
+                },
+                "status": "unresolved",
+                "status_label": "Unresolved",
+                "needs_decision": false,
+                "completed_at": null,
+                "status_marked_at": null,
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3",
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "parent_title": "Skin routine"
+              }
+            ],
+            "parent_groups": [
+              {
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "title": "Skin routine",
+                "local_date": "2026-10-18",
+                "slot_key": "2026-10-18T11:00:00Z",
+                "scheduled_time_label": "7:00 AM",
+                "derived_status": "partial",
+                "progress_label": "1/2",
+                "completed_count": 1,
+                "not_completed_count": 0,
+                "unresolved_count": 1,
+                "total_count": 2,
+                "needs_decision": false,
+                "occurrence_ids": [
+                  "0000000c-1111-4111-8111-00000000000c",
+                  "0000000d-1111-4111-8111-00000000000d"
+                ]
+              }
+            ]
+          }
+        ],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
     }
   ],
   "invalid_outputs": [
@@ -187,6 +342,163 @@
       },
       "code": "internal_error",
       "path": "$.days[0].occurrences[0].status_label"
+    },
+    {
+      "name": "parent slot with a missed status",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": {
+          "occurrences": [
+            {
+              "id": "00000004-1111-4111-8111-000000000004",
+              "behavior_id": "00000001-1111-4111-8111-000000000001",
+              "behavior_title": "Morning walk",
+              "category_name": "Fitness",
+              "local_date": "2026-10-16",
+              "timezone": "America/New_York",
+              "scheduled_for": "2026-10-16T11:30:00Z",
+              "effective_start_at": "2026-10-16T11:30:00Z",
+              "move": null,
+              "schedule": {
+                "kind": "exact",
+                "preset": null,
+                "start_time": "07:30",
+                "end_time": null,
+                "label": "7:30 AM"
+              },
+              "status": "unresolved",
+              "status_label": "Unresolved",
+              "needs_decision": true,
+              "completed_at": null,
+              "status_marked_at": null,
+              "note": null,
+              "updated_at": "2026-10-18T13:00:00Z",
+              "revision": "o1.3"
+            }
+          ],
+          "total_count": 1,
+          "truncated": false,
+          "lookback_start_local_date": "2026-07-20",
+          "parent_groups": []
+        },
+        "days": [
+          {
+            "local_date": "2026-10-18",
+            "is_today": true,
+            "occurrences": [
+              {
+                "id": "00000005-1111-4111-8111-000000000005",
+                "behavior_id": "00000001-1111-4111-8111-000000000001",
+                "behavior_title": "Morning walk",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:30:00Z",
+                "effective_start_at": "2026-10-18T11:30:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:41:00Z",
+                "status_marked_at": "2026-10-18T11:41:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3"
+              },
+              {
+                "id": "0000000c-1111-4111-8111-00000000000c",
+                "behavior_id": "0000000a-1111-4111-8111-00000000000a",
+                "behavior_title": "Cleanser",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:00:00Z",
+                "effective_start_at": "2026-10-18T11:00:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:00",
+                  "end_time": null,
+                  "label": "7:00 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:05:00Z",
+                "status_marked_at": "2026-10-18T11:05:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3",
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "parent_title": "Skin routine"
+              },
+              {
+                "id": "0000000d-1111-4111-8111-00000000000d",
+                "behavior_id": "0000000b-1111-4111-8111-00000000000b",
+                "behavior_title": "Retinol",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:00:00Z",
+                "effective_start_at": "2026-10-18T11:00:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:00",
+                  "end_time": null,
+                  "label": "7:00 AM"
+                },
+                "status": "unresolved",
+                "status_label": "Unresolved",
+                "needs_decision": false,
+                "completed_at": null,
+                "status_marked_at": null,
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3",
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "parent_title": "Skin routine"
+              }
+            ],
+            "parent_groups": [
+              {
+                "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+                "title": "Skin routine",
+                "local_date": "2026-10-18",
+                "slot_key": "2026-10-18T11:00:00Z",
+                "scheduled_time_label": "7:00 AM",
+                "derived_status": "missed",
+                "progress_label": "1/2",
+                "completed_count": 1,
+                "not_completed_count": 0,
+                "unresolved_count": 1,
+                "total_count": 2,
+                "needs_decision": false,
+                "occurrence_ids": [
+                  "0000000c-1111-4111-8111-00000000000c",
+                  "0000000d-1111-4111-8111-00000000000d"
+                ]
+              }
+            ]
+          }
+        ],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.days[0].parent_groups[0].derived_status"
     }
   ]
 }

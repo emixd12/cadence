@@ -14,6 +14,8 @@ export const BEHAVIOR_CONFIGURATION_CHANGED_FIELDS = [
   "end",
   "pause",
   "is_opportunity",
+  "parent_behavior_id",
+  "inherit_parent_schedule",
 ] as const;
 
 export type BehaviorConfigurationChangedField =
@@ -54,6 +56,10 @@ export type BehaviorConfigurationSnapshot = {
   pause?: BehaviorConfigurationPause | null;
   /** Behaviors of Opportunity. Absent in older snapshots; read as false. */
   isOpportunity?: boolean;
+  /** Sub-behaviors (depth 1). Absent in older snapshots; read as standalone. */
+  parentBehaviorId?: string | null;
+  /** Absent in older snapshots. Normalized to false without a parent. */
+  inheritParentSchedule?: boolean;
 };
 
 export type BehaviorConfigurationEnd = { on: string; time: string | null };

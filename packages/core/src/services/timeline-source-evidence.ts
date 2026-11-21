@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { isConnectorStatusEvent } from "../resolvers/status.resolver";
+import { mapTimelineDaySectionOccurrences } from "../resolvers/timeline.resolver";
 import type { TimelineOccurrenceView, TimelineSourceEvidence, TimelineView } from "../types/timeline";
 
 /**
@@ -68,11 +69,7 @@ export function attachTimelineSourceEvidence<T extends TimelineView>(view: T, by
   if (Object.keys(byId).length === 0) return view;
   const occurrence = (item: TimelineOccurrenceView): TimelineOccurrenceView =>
     byId[item.id] ? { ...item, sourceEvidence: byId[item.id] } : item;
-  const section = (value: TimelineView["daySections"][number]) => ({
-    ...value,
-    occurrences: value.occurrences.map(occurrence),
-    occurrenceGroups: value.occurrenceGroups.map((group) => ({ ...group, occurrences: group.occurrences.map(occurrence) })),
-  });
+  const section = (value: TimelineView["daySections"][number]) => mapTimelineDaySectionOccurrences(value, occurrence);
   return {
     ...view,
     daySections: view.daySections.map(section),
@@ -128,11 +125,7 @@ export function attachTimelineSourceCountable<T extends TimelineView>(view: T, b
   if (Object.keys(byId).length === 0) return view;
   const occurrence = (item: TimelineOccurrenceView): TimelineOccurrenceView =>
     byId[item.id] ? { ...item, sourceCountable: byId[item.id] } : item;
-  const section = (value: TimelineView["daySections"][number]) => ({
-    ...value,
-    occurrences: value.occurrences.map(occurrence),
-    occurrenceGroups: value.occurrenceGroups.map((group) => ({ ...group, occurrences: group.occurrences.map(occurrence) })),
-  });
+  const section = (value: TimelineView["daySections"][number]) => mapTimelineDaySectionOccurrences(value, occurrence);
   return { ...view, daySections: view.daySections.map(section) };
 }
 

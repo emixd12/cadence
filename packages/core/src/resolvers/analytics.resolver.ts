@@ -12,6 +12,7 @@ import type {
   AnalyticsOccurrenceInput,
   AnalyticsOpportunityCounts,
   AnalyticsOverallDayState,
+  AnalyticsParentSummary,
   AnalyticsRangeDays,
   AnalyticsSelectedBehaviorDay,
   AnalyticsStatus,
@@ -22,6 +23,7 @@ import type {
 } from "../types/analytics";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import { classifyConnectorTiming, selectTimingMatch } from "./activity-match.resolver";
+import { compareSubBehaviors, resolveParentSlotRollup } from "./sub-behavior.resolver";
 import {
   formatRecordedDuration,
   resolveOccurrenceTimeTracking,
@@ -57,7 +59,7 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
     endLocalDate: dateRange.endLocalDate,
   });
   const dates = listLocalDates(dateRange.startLocalDate, dateRange.endLocalDate);
-  const rangeOccurrences = input.occurrences
+  const rangeOccurrences = selectLeafOccurrences(input.occurrences)
     .filter((occurrence) =>
       isWithinLocalDateRange(
         occurrence.localDate,
@@ -70,7 +72,9 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
     ...toAnalyticsSummary(
       countSummaryOccurrences({
         rangeOccurrences,
-        needsDecisionOccurrences: input.needsDecisionOccurrences ?? rangeOccurrences,
+        needsDecisionOccurrences: input.needsDecisionOccurrences
+          ? selectLeafOccurrences(input.needsDecisionOccurrences)
+          : rangeOccurrences,
         todayLocalDate: dateRange.endLocalDate,
       }),
     ),
@@ -99,6 +103,12 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
       selectedBehaviorId: input.selectedBehaviorId ?? null,
       selectedDayLocalDate: selectedBehaviorDayLocalDate,
     }),
+    parentSummaries: resolveParentSummaries({
+      dates,
+      occurrences: rangeOccurrences,
+      selectedBehaviorId: input.selectedBehaviorId ?? null,
+      selectedDayLocalDate: selectedBehaviorDayLocalDate,
+    }),
     categorySummaries: resolveCategorySummaries(rangeOccurrences),
     selectedBehaviorDay: resolveSelectedBehaviorDay({
       selectedBehaviorId: input.selectedBehaviorId ?? null,
@@ -107,6 +117,24 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
       trackedTimeByOccurrenceId,
     }),
   };
+}
+
+/**
+ * Leaf Occurrences only. A parent's own Occurrence on a day where its sub-behaviors have
+ * Occurrences is the same slot counted twice, so it drops. Its Occurrences from days
+ * before it had sub-behaviors stay.
+ */
+export function selectLeafOccurrences<T extends {
+  behaviorId: string;
+  localDate: string;
+  parentBehaviorId?: string | null;
+}>(occurrences: readonly T[]): T[] {
+  const coveredParentDays = new Set(
+    occurrences.flatMap((occurrence) =>
+      occurrence.parentBehaviorId ? [`${occurrence.parentBehaviorId}|${occurrence.localDate}`] : []),
+  );
+  return occurrences.filter((occurrence) =>
+    occurrence.parentBehaviorId || !coveredParentDays.has(`${occurrence.behaviorId}|${occurrence.localDate}`));
 }
 
 /** Counts a caller-selected range without the web page's range presets or backlog summary. */
@@ -237,6 +265,77 @@ function resolveBehaviorSummaries(input: {
     .sort((left, right) => left.title.localeCompare(right.title));
 }
 
+function resolveParentSummaries(input: {
+  dates: Temporal.PlainDate[];
+  occurrences: AnalyticsOccurrenceInput[];
+  selectedBehaviorId: string | null;
+  selectedDayLocalDate: string | null;
+}): AnalyticsParentSummary[] {
+  const parentIds = new Set(
+    input.occurrences.flatMap((occurrence) => occurrence.parentBehaviorId ? [occurrence.parentBehaviorId] : []),
+  );
+
+  return Array.from(parentIds)
+    .map((parentBehaviorId): AnalyticsParentSummary => {
+      const own = input.occurrences.filter((occurrence) => occurrence.behaviorId === parentBehaviorId);
+      const children = input.occurrences.filter((occurrence) => occurrence.parentBehaviorId === parentBehaviorId);
+      const occurrences = [...own, ...children].sort(compareOccurrences);
+      const counts = countOccurrences(occurrences);
+      const firstChild = children[0];
+      const subBehaviors = new Map(children.map((child) => [child.behaviorId, {
+        id: child.behaviorId,
+        title: child.behaviorTitle,
+        subBehaviorSortOrder: child.subBehaviorSortOrder,
+      }]));
+
+      return {
+        parentBehaviorId,
+        title: own[0]?.behaviorTitle ?? children.find((child) => child.parentBehaviorTitle)?.parentBehaviorTitle
+          ?? "Untitled behavior",
+        categoryName: own[0]?.categoryName ?? firstChild?.categoryName ?? "No category",
+        subBehaviorIds: [...subBehaviors.values()].sort(compareSubBehaviors).map((child) => child.id),
+        slotCounts: countParentSlots(own, children),
+        ...counts,
+        ...calculateAdherence(counts),
+        dailyCells: input.dates.map((date) =>
+          resolveBehaviorDayCell({
+            date,
+            occurrences,
+            trackingStartLocalDate: resolveBehaviorTrackingStart(occurrences).localDate,
+            behaviorId: parentBehaviorId,
+            selectedBehaviorId: input.selectedBehaviorId,
+            selectedDayLocalDate: input.selectedDayLocalDate,
+          }),
+        ),
+      };
+    })
+    .sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function countParentSlots(
+  own: AnalyticsOccurrenceInput[],
+  children: AnalyticsOccurrenceInput[],
+): AnalyticsParentSummary["slotCounts"] {
+  const slots = new Map<string, AnalyticsStatus[]>();
+  for (const occurrence of children) {
+    const key = `${occurrence.localDate}|${Temporal.Instant.from(occurrence.scheduledFor).toString()}`;
+    slots.set(key, [...(slots.get(key) ?? []), occurrence.status]);
+  }
+  for (const occurrence of own) {
+    slots.set(`own|${occurrence.id}`, [occurrence.status]);
+  }
+  const counts = { totalSlots: 0, completedSlots: 0, partialSlots: 0, notCompletedSlots: 0, unresolvedSlots: 0 };
+  for (const statuses of slots.values()) {
+    const { status } = resolveParentSlotRollup(statuses);
+    counts.totalSlots += 1;
+    if (status === "completed") counts.completedSlots += 1;
+    else if (status === "partial") counts.partialSlots += 1;
+    else if (status === "not_completed") counts.notCompletedSlots += 1;
+    else counts.unresolvedSlots += 1;
+  }
+  return counts;
+}
+
 function resolveBehaviorDayCell(input: {
   date: Temporal.PlainDate;
   occurrences: AnalyticsOccurrenceInput[];
@@ -346,7 +445,8 @@ function resolveSelectedBehaviorDay(input: {
   const occurrences = input.occurrences
     .filter(
       (occurrence) =>
-        occurrence.behaviorId === input.selectedBehaviorId &&
+        (occurrence.behaviorId === input.selectedBehaviorId ||
+          occurrence.parentBehaviorId === input.selectedBehaviorId) &&
         occurrence.localDate === input.selectedDayLocalDate,
     )
     .sort(compareOccurrences)
@@ -369,7 +469,12 @@ function resolveSelectedBehaviorDay(input: {
 
   return {
     behaviorId: input.selectedBehaviorId,
-    behaviorTitle: occurrences[0]?.title ?? "Untitled behavior",
+    behaviorTitle:
+      occurrences.find((occurrence) => occurrence.behaviorId === input.selectedBehaviorId)?.title ??
+      input.occurrences.find((occurrence) => occurrence.parentBehaviorId === input.selectedBehaviorId)
+        ?.parentBehaviorTitle ??
+      occurrences[0]?.title ??
+      "Untitled behavior",
     localDate: input.selectedDayLocalDate,
     label: formatDateLabel(date),
     occurrences,

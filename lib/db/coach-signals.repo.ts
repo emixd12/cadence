@@ -88,13 +88,14 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
   return {
     async behaviors() {
       const { data, error } = await client.from("behaviors")
-        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind,is_opportunity,recurrence_rule").eq("user_id", userId);
+        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind,is_opportunity,recurrence_rule,parent_behavior_id,inherit_parent_schedule").eq("user_id", userId);
       if (error) throw new CoachSignalsError("read_behaviors_failed");
       return (data ?? []).map((row) => ({
         id: row.id, createdAt: row.created_at, timezone: row.timezone, active: row.active && row.archived_at === null,
         hasLength: row.default_duration_minutes !== null, lengthMinutes: row.default_duration_minutes,
         hasPlace: row.where_kind !== null,
         isOpportunity: row.is_opportunity === true, hasSchedule: row.recurrence_rule !== null,
+        parentBehaviorId: row.parent_behavior_id ?? null, inheritParentSchedule: row.inherit_parent_schedule === true,
       }));
     },
     async occurrences(since, before) {

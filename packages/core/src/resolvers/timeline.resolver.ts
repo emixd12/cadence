@@ -1,11 +1,14 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { canRemoveOpportunityOccurrence } from "./opportunity.resolver";
+import { compareSubBehaviors, resolveParentSlotRollup } from "./sub-behavior.resolver";
 import { canStartOccurrenceTimeTracking } from "./time-tracking.resolver";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import type {
+  TimelineDayRow,
   TimelineDaySection,
   TimelineOccurrenceGroup,
+  TimelineParentGroupView,
   TimelineOccurrenceInput,
   TimelineOccurrenceView,
   TimelineStatus,
@@ -68,6 +71,37 @@ export function resolveTimeline(input: ResolveTimelineInput): TimelineView {
   };
 }
 
+/**
+ * Applies one row transform everywhere a day section holds the row: the flat list,
+ * standalone groups, parent slots and the ordered rows. Parent rollups are recomputed.
+ */
+export function mapTimelineDaySectionOccurrences(
+  section: TimelineDaySection,
+  transform: (occurrence: TimelineOccurrenceView) => TimelineOccurrenceView,
+): TimelineDaySection {
+  const mapGroup = (group: TimelineOccurrenceGroup): TimelineOccurrenceGroup => ({
+    ...group,
+    occurrences: group.occurrences.map(transform),
+  });
+  const mapParent = (group: TimelineParentGroupView): TimelineParentGroupView => {
+    const children = group.children.map(transform);
+    return { ...group, children, rollup: resolveParentSlotRollup(children.map((child) => child.status)) };
+  };
+  const occurrenceGroups = section.occurrenceGroups.map(mapGroup);
+  const parentGroups = section.parentGroups.map(mapParent);
+  const groupByKey = new Map(occurrenceGroups.map((group) => [group.key, group]));
+  const parentByKey = new Map(parentGroups.map((group) => [group.key, group]));
+  return {
+    ...section,
+    occurrences: section.occurrences.map(transform),
+    occurrenceGroups,
+    parentGroups,
+    rows: section.rows.map((row): TimelineDayRow => row.kind === "parent"
+      ? { ...row, group: parentByKey.get(row.key) ?? mapParent(row.group) }
+      : { ...row, group: groupByKey.get(row.key) ?? mapGroup(row.group) }),
+  };
+}
+
 function resolveNeedsDecision(
   occurrences: TimelineOccurrenceView[],
 ): TimelineView["needsDecision"] {
@@ -112,7 +146,7 @@ function resolveForwardDaySections(input: {
       emptyMessage: EMPTY_DAY_MESSAGE,
       occurrences: dayOccurrences,
       unresolvedOccurrenceCount: countUnresolvedOccurrences(dayOccurrences),
-      occurrenceGroups: groupOccurrencesByBehavior(dayOccurrences),
+      ...groupDayRows(dayOccurrences, "day"),
     });
   }
 
@@ -144,7 +178,7 @@ function groupNeedsDecisionDays(
         emptyMessage: EMPTY_DAY_MESSAGE,
         occurrences: [...dayOccurrences].sort(compareOccurrencesByScheduledTime),
         unresolvedOccurrenceCount: countUnresolvedOccurrences(dayOccurrences),
-        occurrenceGroups: groupOccurrencesByBehavior(dayOccurrences),
+        ...groupDayRows(dayOccurrences, "needs"),
       };
     });
 }
@@ -154,6 +188,82 @@ function countUnresolvedOccurrences(
 ): number {
   return occurrences.filter((occurrence) => occurrence.status === "unresolved")
     .length;
+}
+
+function groupDayRows(
+  occurrences: TimelineOccurrenceView[],
+  scope: "day" | "needs",
+): Pick<TimelineDaySection, "occurrenceGroups" | "parentGroups" | "rows"> {
+  const standalone = occurrences.filter((occurrence) => !occurrence.parentBehaviorId);
+  const occurrenceGroups = groupOccurrencesByBehavior(standalone);
+  const parentGroups = groupOccurrencesByParentSlot(
+    occurrences.filter((occurrence) => occurrence.parentBehaviorId),
+    scope,
+  );
+  const rows: TimelineDayRow[] = [
+    ...occurrenceGroups.map((group): TimelineDayRow => ({ kind: "behavior", key: group.key, group })),
+    ...parentGroups.map((group): TimelineDayRow => ({ kind: "parent", key: group.key, group })),
+  ].sort((left, right) =>
+    compareInstants(rowStartsAt(left), rowStartsAt(right)) || left.group.title.localeCompare(right.group.title));
+
+  return { occurrenceGroups, parentGroups, rows };
+}
+
+// One group per parent, day and slot. Sub-behavior rows keep their own status; the
+// group's status is derived and never stored.
+function groupOccurrencesByParentSlot(
+  occurrences: TimelineOccurrenceView[],
+  scope: "day" | "needs",
+): TimelineParentGroupView[] {
+  const groups = new Map<string, TimelineOccurrenceView[]>();
+
+  for (const occurrence of occurrences) {
+    const slotKey = occurrence.parentSlotKey ?? occurrence.scheduledFor;
+    const key = `${scope}-parent-${occurrence.parentBehaviorId}-${occurrence.localDate}-${slotKey}`;
+    const group = groups.get(key) ?? [];
+    group.push(occurrence);
+    groups.set(key, group);
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, children]): TimelineParentGroupView => {
+      const ordered = [...children].sort((left, right) =>
+        compareSubBehaviors(
+          { id: left.behaviorId, title: left.title, subBehaviorSortOrder: left.subBehaviorSortOrder },
+          { id: right.behaviorId, title: right.title, subBehaviorSortOrder: right.subBehaviorSortOrder },
+        ) || compareOccurrencesByScheduledTime(left, right));
+      const earliest = [...children].sort(compareOccurrencesByScheduledTime)[0]!;
+      const rollup = resolveParentSlotRollup(children.map((child) => child.status));
+      const isPriorUnresolved = children.some((child) => child.visualTone === "needs_decision");
+
+      return {
+        key,
+        parentBehaviorId: earliest.parentBehaviorId!,
+        title: children.find((child) => child.parentTitle)?.parentTitle ?? "Untitled behavior",
+        localDate: earliest.localDate,
+        scheduledFor: earliest.scheduledFor,
+        scheduledTimeLabel: earliest.scheduledTimeLabel,
+        children: ordered,
+        rollup,
+        visualTone: isPriorUnresolved ? "needs_decision"
+          : rollup.status === "completed" ? "completed"
+            : rollup.status === "not_completed" ? "not_completed"
+              : "default",
+        showDecisionActions: children.some((child) => child.showDecisionActions),
+        isVisibleInNeedsDecision: children.some((child) => child.isVisibleInNeedsDecision),
+      };
+    })
+    .sort((left, right) =>
+      compareInstants(left.scheduledFor, right.scheduledFor) || left.title.localeCompare(right.title));
+}
+
+function rowStartsAt(row: TimelineDayRow): string | undefined {
+  return row.kind === "parent" ? row.group.scheduledFor : row.group.occurrences[0]?.scheduledFor;
+}
+
+function compareInstants(left: string | undefined, right: string | undefined): number {
+  if (!left || !right) return left ? -1 : right ? 1 : 0;
+  return Temporal.Instant.compare(Temporal.Instant.from(left), Temporal.Instant.from(right));
 }
 
 function groupOccurrencesByBehavior(

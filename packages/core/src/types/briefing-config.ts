@@ -117,6 +117,8 @@ export type BriefingModelOccurrence = Readonly<{
   scheduledFor: string;
   schedule: Readonly<{ kind: "exact" | "range"; startTime: string; endTime: string | null }>;
   duration?: AdvisorDuration;
+  /** A routine's step: steps with the same routine and time are one block, done together. */
+  routine?: Readonly<{ parentBehaviorRef: string; title: string; followsRoutineTime: boolean }>;
 }>;
 
 /**

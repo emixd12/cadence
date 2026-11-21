@@ -254,6 +254,26 @@ fn apply_mode(
             }
         }
     }
+    link_sub_behaviors(db, profile, writes)
+}
+
+/// Sub-behaviors: `behavior_write` stores every Behavior unlinked, so the depth-1
+/// triggers never see a half-applied regroup. The links go back once every row exists.
+fn link_sub_behaviors(db: &Connection, profile: &str, writes: &[AccountSyncWrite]) -> db::Result<()> {
+    for write in writes {
+        if write.kind != AccountSyncEntityKind::Behavior || write.operation != AccountSyncOperation::Upsert {
+            continue;
+        }
+        let value = write.value.as_ref().ok_or("An account sync upsert requires a value.")?;
+        let Some(parent) = value["parent_behavior_id"].as_str() else {
+            continue;
+        };
+        db.execute(
+            "UPDATE behaviors SET parent_behavior_id=?3,inherit_parent_schedule=?4 WHERE user_id=?1 AND id=?2",
+            params![profile, write.id, parent, value["inherit_parent_schedule"] == true],
+        )
+        .map_err(db::error)?;
+    }
     Ok(())
 }
 
@@ -336,7 +356,14 @@ fn behavior_write(db: &Connection, profile: &str, write: &AccountSyncWrite) -> d
             None => true,
             Some(row) => Some(normalized(row)?) != write.value,
         };
-    row_write::<Behavior>(db, profile, write, false, false)?;
+    let mut unlinked = write.clone();
+    if let Some(value) = unlinked.value.as_mut().and_then(Value::as_object_mut) {
+        if value.get("parent_behavior_id").is_some_and(|parent| !parent.is_null()) {
+            value.insert("parent_behavior_id".into(), Value::Null);
+            value.insert("inherit_parent_schedule".into(), Value::Bool(false));
+        }
+    }
+    row_write::<Behavior>(db, profile, &unlinked, false, false)?;
     if changes_behavior {
         let changed = db.execute(
             "INSERT INTO behavior_revisions(user_id,behavior_id,revision) VALUES(?1,?2,1) ON CONFLICT(behavior_id) DO UPDATE SET revision=behavior_revisions.revision+1 WHERE behavior_revisions.user_id=excluded.user_id",
@@ -395,6 +422,9 @@ fn validate_write(
                     "location_text",
                     "where_kind",
                     "is_opportunity",
+                    "parent_behavior_id",
+                    "sub_behavior_sort_order",
+                    "inherit_parent_schedule",
                 ]
                 .iter()
                     .any(|field| !value.contains_key(*field))
@@ -1101,6 +1131,9 @@ mod tests {
             pause_from_on: None,
             pause_from_time: None,
             pause_back_on: None,
+            parent_behavior_id: None,
+            sub_behavior_sort_order: 0,
+            inherit_parent_schedule: false,
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: Some("09:00:00".into()),
             is_opportunity: false,
@@ -2246,6 +2279,9 @@ mod tests {
             pause_from_on: Some("2026-08-20".into()),
             pause_from_time: None,
             pause_back_on: Some("2026-08-24".into()),
+            parent_behavior_id: None,
+            sub_behavior_sort_order: 0,
+            inherit_parent_schedule: false,
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: Some("09:00:00".into()),
             is_opportunity: false,

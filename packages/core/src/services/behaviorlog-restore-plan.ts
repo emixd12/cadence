@@ -435,6 +435,7 @@ export function buildRestorePayload(input: {
             ...(behavior.cadenceAutoArchivedAt === undefined
               ? {}
               : { auto_archived_at: behavior.cadenceAutoArchivedAt }),
+            ...restoredSubBehaviorLink(behavior, behaviorIdByExternal),
             created_at:
               action?.action === "create"
                 ? behavior.createdAtUtc ?? restoreRecordedAt
@@ -1585,4 +1586,20 @@ export function restoredOccurrenceOrigin(
   }
   if (existing?.origin === "opportunity") return { origin: "opportunity", added_by: existing.addedBy ?? null };
   return { origin: "scheduled", added_by: null };
+}
+
+/** Link fields only when the bundle carries them: the restore function then keeps the local link. */
+function restoredSubBehaviorLink(
+  behavior: BehaviorLogImportBehaviorPlan,
+  behaviorIdByExternal: ReadonlyMap<string, string>,
+): { parent_behavior_id?: string | null; sub_behavior_sort_order?: number; inherit_parent_schedule?: boolean } {
+  if (behavior.cadenceParentBehaviorExternalId === undefined) return {};
+  const parentId = behavior.cadenceParentBehaviorExternalId
+    ? behaviorIdByExternal.get(behavior.cadenceParentBehaviorExternalId) ?? null
+    : null;
+  return {
+    parent_behavior_id: parentId,
+    sub_behavior_sort_order: parentId ? behavior.cadenceSubBehaviorSortOrder ?? 0 : 0,
+    inherit_parent_schedule: parentId ? behavior.cadenceInheritParentSchedule ?? true : false,
+  };
 }

@@ -461,6 +461,16 @@ runs. A Mac schedules its Behavior reminders locally and learns of a
 connector completion only when it syncs, so a Mac reminder can still fire for a logged
 workout while Cadence for Mac is closed.
 
+## Routine reminders (Ticket 343)
+
+Sub-behaviors that follow their parent's schedule share one reminder per slot and
+channel (`resolveRoutineReminderDeliveries`). The reminder uses the parent's browser
+and email settings and is anchored on the first Unresolved step of the slot.
+Reconciliation moves it to the next Unresolved step when that step is marked, and
+cancels it when every step is resolved. A sub-behavior with its own schedule keeps its
+own reminders. The reminder text still names the anchor step's title (follow-up: the
+routine title). Desktop native reminders follow the same plan.
+
 ## Leave reminders
 
 Owner decisions D3, D12 and D15 (`docs/DECISIONS.md`). Ticket 275 sets these rules and the

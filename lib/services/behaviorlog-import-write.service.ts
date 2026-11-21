@@ -542,6 +542,7 @@ export async function applyCreateMissingBehaviorLogImportPlan(
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
           ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
+          ...importedSubBehaviorLink(behavior, behaviorIds, result),
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,
       );
@@ -1054,6 +1055,7 @@ export async function applyApprovedBehaviorLogMergePlan(
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
           ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
+          ...importedSubBehaviorLink(behavior, behaviorIds, result),
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,
       );
@@ -3265,6 +3267,31 @@ function groupBy<T>(
   }
 
   return groups;
+}
+
+/**
+ * The validated plan lists parents before their sub-behaviors, so a parent created or
+ * mapped by this import already has its local ID. Otherwise the Behavior imports on its own.
+ */
+function importedSubBehaviorLink(
+  behavior: BehaviorLogImportBehaviorPlan,
+  behaviorIds: ReadonlyMap<string, string>,
+  result: { warnings: BehaviorLogImportIssue[] },
+): Pick<NewBehavior, "parent_behavior_id" | "sub_behavior_sort_order" | "inherit_parent_schedule"> {
+  const parentExternalId = behavior.cadenceParentBehaviorExternalId ?? null;
+  const parentId = parentExternalId ? behaviorIds.get(parentExternalId) ?? null : null;
+  if (parentExternalId && !parentId) {
+    addApplyWarning(
+      result,
+      "sub_behavior_parent_not_imported",
+      `Behavior ${behavior.externalId} was imported on its own because its parent Behavior ${parentExternalId} was not imported.`,
+    );
+  }
+  return {
+    parent_behavior_id: parentId,
+    sub_behavior_sort_order: parentId ? behavior.cadenceSubBehaviorSortOrder ?? 0 : 0,
+    inherit_parent_schedule: parentId ? behavior.cadenceInheritParentSchedule ?? true : false,
+  };
 }
 
 function addApplyWarning(

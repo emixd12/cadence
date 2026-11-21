@@ -73,13 +73,20 @@ pub struct Behavior {
     #[serde(default)]
     pub is_opportunity: bool,
     #[serde(default)]
+    pub inherit_parent_schedule: bool,
+    #[serde(default)]
     pub location_text: Option<String>,
+    /// Sub-behaviors (migration 0028): the parent Behavior, one level deep.
+    #[serde(default)]
+    pub parent_behavior_id: Option<String>,
     pub pause_back_on: Option<String>,
     pub pause_from_on: Option<String>,
     pub pause_from_time: Option<String>,
     pub recurrence_rule: Value,
     pub reminder_offset_minutes: i64,
     pub scheduled_time: Option<String>,
+    #[serde(default)]
+    pub sub_behavior_sort_order: i64,
     pub timezone: String,
     pub title: String,
     pub updated_at: String,
@@ -95,6 +102,7 @@ impl StoredRow for Behavior {
         "browser_reminder_enabled",
         "email_reminder_enabled",
         "is_opportunity",
+        "inherit_parent_schedule",
     ];
 }
 

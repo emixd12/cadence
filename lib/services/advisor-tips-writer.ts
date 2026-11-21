@@ -15,7 +15,7 @@ import type { StoredTip, TipHistory, TipToWrite } from "@/lib/db/advisor-tips.re
  * model. A day with no eligible match gets no tips and no model call (D1: no filler).
  */
 
-export const TIP_PROMPT_VERSION = "coach-tips-2";
+export const TIP_PROMPT_VERSION = "coach-tips-3";
 export const TIPS_PER_DAY_DEFAULT = 3;
 /** A card is not shown again within this many days, unless one of its facts changed. */
 export const CARD_REST_DAYS = 14;
@@ -224,7 +224,7 @@ You get a list of items. Each item has a ref, the Behavior it is about (or none 
 Each tip:
 - States exactly one counted fact from that item's facts, then the action, in one or two short sentences, at most 200 characters.
 - Uses only numbers that appear in that item's facts. A rate from 0 to 1 may be written as a whole percent (0.75 is 75%). Weekday 1 is Monday, 7 is Sunday. Hour 19 is 7 PM.
-- Names the Behavior by the title given, when there is one.
+- Names the Behavior by the title given, when there is one. A title may name one step of a routine with its routine, such as "Retinol in Skin routine": use it as given, and call the routine's other parts its other steps.
 - Is calm and plain, second person. No praise, no cheering, no exclamation marks, no motivational phrases, no judgement.
 - Does not mention cards, signals, facts, data, research, or Cadence's internals. Plain text only: no Markdown, links or emoji.
 

@@ -5,6 +5,8 @@ import type { OccurrenceRecord } from "@cadence/core/data-store";
 import { resolveGenerationWindow, type OccurrenceGenerationPlan } from "@cadence/core/resolvers/occurrence.resolver";
 import { resolveNativeReminderGenerationHorizon } from "@cadence/core/resolvers/native-reminder.resolver";
 import { planPersistedOccurrences } from "@cadence/core/services/occurrence-generation";
+import { hasActiveSubBehaviors } from "@cadence/core/resolvers/sub-behavior.resolver";
+import { toSubBehaviorLinkFacts } from "@cadence/core/services/behavior.service";
 import { decideOccurrenceSyncCoverage, summarizeOccurrenceSyncPlans } from "@cadence/core/services/occurrence-sync";
 import type { Category, Profile } from "../../../lib/types/database";
 import { withLocalMoves } from "./local-moves.service";
@@ -28,7 +30,9 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
   const window = resolveGenerationWindow({ now, timezone: profile.timezone, horizonDays });
   if (decideOccurrenceSyncCoverage(state, window).covered) return;
   const plans: OccurrenceGenerationPlan[] = [];
-  for (const graph of graphs) {
+  const records = graphs.map((graph) => toLocalBehaviorGraphRecord(graph, []));
+  const linkFacts = records.map(toSubBehaviorLinkFacts);
+  for (const [index, graph] of graphs.entries()) {
     const behaviorWindow = resolveGenerationWindow({ now, timezone: graph.behavior.timezone, horizonDays, earliestStoppedLocalDate: earliestStoppedLocalDate(runFieldsFromStored(graph.behavior)) });
     const rows = await localCommand("readOccurrences", {
       profileId, behaviorId: graph.behavior.id,
@@ -39,7 +43,9 @@ async function syncLocalOccurrences(profile: Profile, now: Temporal.Instant) {
     // effective time from these in-memory copies; writes below still use the stored rows.
     const moved = await withLocalMoves(profileId, rows);
     const plan = planPersistedOccurrences({
-      behavior: toLocalBehaviorGraphRecord(graph, []), occurrences: moved,
+      behavior: records[index]!, occurrences: moved,
+      // A parent's sub-behaviors own its slots while any is active.
+      hasActiveSubBehaviors: !graph.behavior.parent_behavior_id && hasActiveSubBehaviors(graph.behavior.id, linkFacts),
       timeSessionOccurrenceIds: new Set(history.timeSessions.map((session) => session.occurrence_id)),
       now, horizonDays,
     });

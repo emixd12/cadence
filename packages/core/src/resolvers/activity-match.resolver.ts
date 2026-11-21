@@ -34,6 +34,11 @@ export type ActivityMatchLink = Readonly<{
 export type ActivityMatchBehavior = Readonly<{
   id: string;
   timezone: string;
+  /**
+   * Set on an active sub-behavior. A link on its parent reaches it: the parent's
+   * workout completes every sub-behavior Occurrence in one routine slot.
+   */
+  parentBehaviorId?: string | null;
 }>;
 
 export type ActivityMatchOccurrence = Readonly<{
@@ -154,6 +159,8 @@ export type ActivityMatchPlan = Readonly<{
   skip: ActivityMatchSkip[];
 }>;
 
+type LinkTarget = Readonly<{ behaviorId: string; occurrence: ActivityMatchOccurrence }>;
+
 type OccurrenceState = {
   occurrence: ActivityMatchOccurrence;
   status: OccurrenceStatus;
@@ -190,6 +197,20 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
   );
   const links = input.links.filter((link) => link.enabled && link.source === input.source
     && link.accountDigest === input.accountDigest && behaviors.has(link.behaviorId));
+  // Sub-behaviors (depth 1): a link on a parent reaches its active sub-behaviors.
+  const childrenByParent = new Map<string, string[]>();
+  for (const behavior of [...input.behaviors].sort((left, right) => compareText(left.id, right.id))) {
+    const parentId = behavior.parentBehaviorId;
+    if (!parentId || parentId === behavior.id || !behaviors.has(parentId)) continue;
+    childrenByParent.set(parentId, [...(childrenByParent.get(parentId) ?? []), behavior.id]);
+  }
+  const reachedBehaviorIds = (link: ActivityMatchLink) => [link.behaviorId, ...(childrenByParent.get(link.behaviorId) ?? [])];
+  const linksByReachedBehavior = new Map<string, ActivityMatchLink[]>();
+  for (const link of links) {
+    for (const behaviorId of reachedBehaviorIds(link)) {
+      linksByReachedBehavior.set(behaviorId, [...(linksByReachedBehavior.get(behaviorId) ?? []), link]);
+    }
+  }
   const activities = new Map(input.evidence.activities.map((activity) => [activity.id, activity]));
   const deleted = new Set(input.evidence.deletedActivityRefs);
   const coverageStart = Temporal.Instant.from(input.evidence.coverageStartAt);
@@ -239,14 +260,17 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     .filter((activity) => !deleted.has(activity.id))
     .sort(compareActivities);
   for (const activity of ordered) {
-    for (const behaviorId of new Set(links.map((link) => link.behaviorId))) {
+    for (const [behaviorId, reaching] of linksByReachedBehavior) {
       const existing = matchesByActivityBehavior.get(activityBehaviorKey(activity.id, behaviorId));
       if (!existing || existing.state !== "active" || removed.has(existing.id) || isHandCounted(existing)) continue;
-      const behavior = behaviors.get(behaviorId);
+      // A match is judged by the link that wrote it, when that link still reaches it.
+      const link = reaching.find((candidate) => candidate.id === existing.linkId) ?? reaching[0];
+      const behavior = behaviors.get(link.behaviorId);
       const existingState = states.get(existing.occurrenceId);
       if (!behavior || !existingState) continue;
       const localDate = localDateOf(activity.startAt, behavior.timezone);
-      const target = nearestOccurrence(occurrencesByBehaviorDate.get(behaviorDateKey(behaviorId, localDate)), activity.startAt);
+      const target = linkTargets(link, activity.startAt, localDate)
+        .find((candidate) => candidate.behaviorId === behaviorId)?.occurrence ?? null;
       if (localDate !== existingState.occurrence.localDate || (target && target.id !== existing.occurrenceId)) {
         removeMatch(existing, "moved_occurrence");
       }
@@ -257,6 +281,27 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     planActivity(activity);
   }
   return plan;
+
+  /**
+   * Rule 2 per reached Behavior. A link on a parent with sub-behavior Occurrences that day
+   * takes the sub-behavior Occurrence nearest the activity, then every sub-behavior
+   * Occurrence in that routine slot. A parent's own Occurrence counts only on a day no
+   * sub-behavior covers, so nothing is counted twice.
+   */
+  function linkTargets(link: ActivityMatchLink, activityStartAt: string, localDate: string): LinkTarget[] {
+    const children = childrenByParent.get(link.behaviorId) ?? [];
+    const onDate = (behaviorId: string) => occurrencesByBehaviorDate.get(behaviorDateKey(behaviorId, localDate)) ?? [];
+    const childOccurrences = children.flatMap(onDate);
+    if (childOccurrences.length === 0) {
+      const own = nearestOccurrence(onDate(link.behaviorId), activityStartAt);
+      return own ? [{ behaviorId: link.behaviorId, occurrence: own }] : [];
+    }
+    const slot = slotKeyOf(nearestOccurrence(childOccurrences, activityStartAt)!);
+    return children.flatMap((behaviorId) => {
+      const occurrence = nearestOccurrence(onDate(behaviorId).filter((candidate) => sameInstant(slotKeyOf(candidate), slot)), activityStartAt);
+      return occurrence ? [{ behaviorId, occurrence }] : [];
+    });
+  }
 
   function planActivity(activity: RecordedActivityV1_1): void {
     if (Temporal.Instant.compare(Temporal.Instant.from(activity.endAt), input.now) > 0) {
@@ -294,27 +339,35 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
       return;
     }
     // Rule 2: the Occurrence that day with the nearest scheduled start.
-    const occurrence = nearestOccurrence(
-      occurrencesByBehaviorDate.get(behaviorDateKey(link.behaviorId, localDate)),
-      activity.startAt,
-    );
-    if (!occurrence) {
+    const targets = linkTargets(link, activity.startAt, localDate);
+    if (targets.length === 0) {
       skip("no_occurrence");
       return;
     }
+    for (const { behaviorId, occurrence } of targets) planTarget(activity, link, behaviorId, occurrence);
+  }
+
+  function planTarget(
+    activity: RecordedActivityV1_1,
+    link: ActivityMatchLink,
+    behaviorId: string,
+    occurrence: ActivityMatchOccurrence,
+  ): void {
+    const skip = (reason: ActivityMatchSkipReason) =>
+      plan.skip.push({ activityRef: activity.id, behaviorId, reason });
     const target: MatchTarget = {
       activityRef: activity.id,
       activityStartAt: activity.startAt,
       activityEndAt: activity.endAt,
       activityRevision: activity.revision.providerUpdatedAt,
-      behaviorId: link.behaviorId,
+      behaviorId,
       linkId: link.id,
       occurrenceId: occurrence.id,
       scheduledStartAt: occurrence.scheduledStartAt,
       scheduledEndAt: occurrence.scheduledEndAt,
     };
     // Rule 4 and rule 7: one match per activity and Behavior, ever.
-    const existing = matchesByActivityBehavior.get(activityBehaviorKey(activity.id, link.behaviorId));
+    const existing = matchesByActivityBehavior.get(activityBehaviorKey(activity.id, behaviorId));
     if (existing) {
       // Stored timestamps may use another representation of the same instant (+00:00), so
       // compare instants: an unchanged workout must not spend the run's write budget.
@@ -345,6 +398,21 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     }
     if (state.status === "completed") {
       plan.attach.push({ ...target, reason: "completed_occurrence", matchId: null });
+      // A second link reaching this Behavior sees the planned match (rule 4).
+      matchesByActivityBehavior.set(activityBehaviorKey(activity.id, behaviorId), {
+        id: `planned:${activity.id}:${behaviorId}`,
+        occurrenceId: occurrence.id,
+        behaviorId,
+        linkId: link.id,
+        activityRef: activity.id,
+        activityStartAt: activity.startAt,
+        activityEndAt: activity.endAt,
+        activityRevision: activity.revision.providerUpdatedAt,
+        role: "attached",
+        state: "active",
+        appliedEventId: null,
+        revertedEventId: null,
+      });
       return;
     }
     if (state.standingCompletion !== null) {
@@ -359,9 +427,9 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
     // Later activities in this run see the planned completion.
     state.status = "completed";
     state.standingCompletion = {
-      id: `planned:${activity.id}:${link.behaviorId}`,
+      id: `planned:${activity.id}:${behaviorId}`,
       occurrenceId: occurrence.id,
-      behaviorId: link.behaviorId,
+      behaviorId,
       linkId: link.id,
       activityRef: activity.id,
       activityStartAt: activity.startAt,
@@ -372,6 +440,7 @@ export function resolveActivityMatches(input: ResolveActivityMatchesInput): Acti
       appliedEventId: null,
       revertedEventId: null,
     };
+    matchesByActivityBehavior.set(activityBehaviorKey(activity.id, behaviorId), state.standingCompletion);
   }
 }
 
@@ -400,6 +469,11 @@ function nearestOccurrence(
     distance(left) - distance(right)
     || Temporal.Instant.compare(Temporal.Instant.from(left.scheduledStartAt), Temporal.Instant.from(right.scheduledStartAt))
     || compareText(left.id, right.id))[0];
+}
+
+/** A routine slot is its sub-behaviors' shared scheduled start, as on Timeline. */
+function slotKeyOf(occurrence: ActivityMatchOccurrence): string {
+  return occurrence.scheduledStartAt;
 }
 
 function sameInstant(left: string, right: string): boolean {

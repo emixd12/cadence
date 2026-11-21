@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ChatOutcome, ChatRefusal } from "@cadence/core/types/chat";
 import {
-  describeOutcome, factsFrom, factsReadFor, moveRefusal, outcomeKind, outcomeTargets, undoPlanFor, withRevision,
+  describeOutcome, moveRefusal, outcomeKind, outcomeTargets, readWriteFacts, undoPlanFor, withRevision,
   type ChatPendingWrite, type ChatToolExecutor, type ChatUndoPlan, type ChatWriteCall, type ChatWriteFacts,
 } from "./chat-writes";
 
@@ -31,10 +31,10 @@ export async function runChatConfirm(input: Readonly<{
   resumed?: boolean;
 }>): Promise<ChatConfirmRun> {
   const newId = input.newId ?? randomUUID;
+  const read = (name: Parameters<ChatToolExecutor>[0], args: Readonly<Record<string, unknown>>) => input.executor(name, args, { idempotencyKey: null });
   const facts: ChatWriteFacts[] = [];
   for (const write of input.writes) {
-    const read = factsReadFor(write.call);
-    const current = factsFrom(write.call, read ? await input.executor(read.name, read.args, { idempotencyKey: null }) : null);
+    const current = await readWriteFacts(write.call, read);
     if (!input.resumed && write.guard && revisionOf(current, write.guard.kind) !== write.guard.revision) return { state: "expired", writes: [], refusals: [] };
     facts.push(current);
   }
@@ -44,8 +44,7 @@ export async function runChatConfirm(input: Readonly<{
     // Facts read before the first write: re-read for later writes on the same record.
     let current = facts[index]!;
     if (index > 0 && sameRecordAsEarlier(input.writes, index)) {
-      const read = factsReadFor(write.call);
-      current = factsFrom(write.call, read ? await input.executor(read.name, read.args, { idempotencyKey: null }) : null);
+      current = await readWriteFacts(write.call, read);
     }
     const call = withRevision(write.call, current);
     const done = await input.executor(call.name, call.args, { idempotencyKey: `chat:${input.confirmId}:${index}` });
@@ -88,9 +87,28 @@ export type ChatUndoRun = Readonly<{ ok: true; text: string } | { ok: false; rea
 export async function runChatUndo(input: Readonly<{
   outcome: ChatOutcome; plan: ChatUndoPlan; executor: ChatToolExecutor; idempotencyKey: string;
 }>): Promise<ChatUndoRun> {
-  const call = input.plan.call;
-  const done = await input.executor(call.name, call.args, { idempotencyKey: input.idempotencyKey });
-  if (!done.ok) return { ok: false, reason: done.error.code === "conflict" || done.error.code === "invalid_state" ? "changed" : "failed" };
-  if (moveRefusal(done.result)) return { ok: false, reason: "changed" };
+  const calls = input.plan.calls?.length ? input.plan.calls : [input.plan.call];
+  if (calls.length > 1 && !(await stepsUnchanged(calls, input.executor))) return { ok: false, reason: "changed" };
+  for (const [index, call] of calls.entries()) {
+    const key = calls.length > 1 ? `${input.idempotencyKey}:${index}` : input.idempotencyKey;
+    const done = await input.executor(call.name, call.args, { idempotencyKey: key });
+    if (!done.ok) return { ok: false, reason: done.error.code === "conflict" || done.error.code === "invalid_state" ? "changed" : "failed" };
+    if (moveRefusal(done.result)) return { ok: false, reason: "changed" };
+  }
   return { ok: true, text: `Undid: ${input.outcome.text}` };
+}
+
+/**
+ * A routine Undo sets several steps back. Every step is read first, and when any one
+ * changed since the mark, none is set back, so Undo never leaves the routine half undone.
+ */
+async function stepsUnchanged(calls: readonly ChatWriteCall[], executor: ChatToolExecutor): Promise<boolean> {
+  for (const call of calls) {
+    const expected = call.args.expected_status;
+    if (call.name !== "set_occurrence_status" || typeof expected !== "string") continue;
+    const read = await executor("get_occurrence", { occurrence_id: call.args.occurrence_id }, { idempotencyKey: null });
+    const status = read.ok ? (read.result as { occurrence?: { status?: unknown } } | null)?.occurrence?.status : null;
+    if (status !== expected) return false;
+  }
+  return true;
 }

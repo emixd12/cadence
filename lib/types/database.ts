@@ -12,7 +12,10 @@ type BehaviorPersistenceField =
   | "auto_archived_at"
   | "location_text"
   | "where_kind"
-  | "is_opportunity";
+  | "is_opportunity"
+  | "parent_behavior_id"
+  | "sub_behavior_sort_order"
+  | "inherit_parent_schedule";
 /** recurrence_rule and scheduled_time are null only on an unscheduled opportunity Behavior. */
 export type Behavior = Omit<Tables<"behaviors">, BehaviorPersistenceField> &
   Partial<Pick<Tables<"behaviors">, BehaviorPersistenceField>>;
