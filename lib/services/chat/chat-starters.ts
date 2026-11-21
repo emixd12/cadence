@@ -29,12 +29,16 @@ export async function readChatStarterFacts(context: IntegrationContext): Promise
   if (!timeline) return null;
   const today = timeline.today_local_date;
   const plain = Temporal.PlainDate.from(today);
-  const [month, week] = await Promise.all([
+  const [month, week, opportunities] = await Promise.all([
     read("get_adherence_summary", context, { start_local_date: plain.subtract({ days: 27 }).toString(), end_local_date: today }),
     read("get_adherence_summary", context, { start_local_date: plain.subtract({ days: 6 }).toString(), end_local_date: today }),
+    read("list_behaviors", context, { state: "running", is_opportunity: true }),
   ]);
   if (!month || !week) return null;
   const items = timeline.days.flatMap((day) => day.occurrences);
+  const onToday = new Set(items.map((item) => item.behavior_id));
+  const opportunity = (opportunities?.behaviors ?? []).filter((row) => !onToday.has(row.id))
+    .sort((a, b) => a.title.localeCompare(b.title))[0]?.title ?? null;
   return {
     today,
     todayTotal: items.length,
@@ -46,6 +50,7 @@ export async function readChatStarterFacts(context: IntegrationContext): Promise
     month: { decided: decided(month.overall), rate: rate(month.overall) },
     behaviors: month.behaviors.filter((row) => row.state === "active")
       .map((row) => ({ title: row.behavior_title, decided: decided(row), rate: rate(row) })),
+    opportunity,
   };
 }
 

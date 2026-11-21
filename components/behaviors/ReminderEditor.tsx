@@ -4,6 +4,8 @@ type ReminderEditorProps = Readonly<{
   reminderOffsetMinutes: number;
   error?: string;
   runtime?: "web" | "desktop";
+  /** False for a Behavior with no fixed schedule: the offset is kept but not shown. */
+  showOffset?: boolean;
 }>;
 
 const COMPACT_UNDERLINED_FIELD_CONTROL_CLASS =
@@ -15,6 +17,7 @@ export function ReminderEditor({
   reminderOffsetMinutes,
   error,
   runtime = "web",
+  showOffset = true,
 }: ReminderEditorProps) {
   return (
     <fieldset className="grid gap-3 border-0 p-0">
@@ -58,6 +61,7 @@ export function ReminderEditor({
             </label>
           )}
 
+          {showOffset ? (
           <label className="grid gap-1 text-sm lg:ml-auto lg:flex lg:min-h-11 lg:w-full lg:items-center lg:gap-3">
             <span className="shrink-0">Reminder offset</span>
             <select
@@ -72,6 +76,9 @@ export function ReminderEditor({
               <option value="4320">3 days before</option>
             </select>
           </label>
+          ) : (
+            <input type="hidden" name="reminder_offset" value={String(reminderOffsetMinutes)} />
+          )}
         </div>
 
         <p className="text-sm leading-6 text-muted-readable">

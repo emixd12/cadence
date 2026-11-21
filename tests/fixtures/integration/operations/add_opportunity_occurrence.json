@@ -1,0 +1,266 @@
+{
+  "operation": "add_opportunity_occurrence",
+  "valid_inputs": [
+    {
+      "name": "exact time",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "start_time": "15:00",
+        "idempotency_key": "add-stretch-1500"
+      }
+    },
+    {
+      "name": "custom range past midnight",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "start_time": "22:00",
+        "end_time": "00:30"
+      }
+    },
+    {
+      "name": "preset",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "preset": "evening"
+      }
+    },
+    {
+      "name": "done now",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "mark_completed": true
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "no time",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002"
+      },
+      "code": "invalid_input",
+      "path": "$.start_time",
+      "semantic": true
+    },
+    {
+      "name": "end without start",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "end_time": "16:00"
+      },
+      "code": "invalid_input",
+      "path": "$.end_time",
+      "semantic": true
+    },
+    {
+      "name": "zero-length range",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "start_time": "16:00",
+        "end_time": "16:00"
+      },
+      "code": "invalid_input",
+      "path": "$.end_time",
+      "semantic": true
+    },
+    {
+      "name": "preset with a time",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "preset": "morning",
+        "start_time": "07:00"
+      },
+      "code": "invalid_input",
+      "path": "$.preset",
+      "semantic": true
+    },
+    {
+      "name": "done now with a time",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "mark_completed": true,
+        "start_time": "15:00"
+      },
+      "code": "invalid_input",
+      "path": "$.mark_completed",
+      "semantic": true
+    },
+    {
+      "name": "a date",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "start_time": "15:00",
+        "local_date": "2026-10-19"
+      },
+      "code": "invalid_input",
+      "path": "$.local_date"
+    },
+    {
+      "name": "twelve-hour time",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "start_time": "3:00 PM"
+      },
+      "code": "invalid_input",
+      "path": "$.start_time"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "added",
+      "value": {
+        "outcome": "added",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T19:00:00Z",
+          "effective_start_at": "2026-10-18T19:00:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "15:00",
+            "end_time": null,
+            "label": "3:00 PM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "mcp",
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": null
+      }
+    },
+    {
+      "name": "logged",
+      "value": {
+        "outcome": "logged",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T18:40:00Z",
+          "effective_start_at": "2026-10-18T18:40:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "14:40",
+            "end_time": null,
+            "label": "2:40 PM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "mcp",
+          "completed_at": "2026-10-18T18:40:00Z",
+          "status_marked_at": "2026-10-18T18:40:00Z",
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": null
+      }
+    },
+    {
+      "name": "refused, time taken",
+      "value": {
+        "outcome": "refused",
+        "occurrence": null,
+        "refusal": {
+          "reason": "calendar_busy",
+          "message": "Team sync is on your calendar then.",
+          "alternatives": [
+            {
+              "start_at": "2026-10-18T20:00:00Z",
+              "start_time": "16:00"
+            },
+            {
+              "start_at": "2026-10-18T18:10:00Z",
+              "start_time": "14:10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "refused, not running",
+      "value": {
+        "outcome": "refused",
+        "occurrence": null,
+        "refusal": {
+          "reason": "not_running",
+          "message": "Stretch is not running at that time.",
+          "alternatives": []
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "unknown refusal",
+      "value": {
+        "outcome": "refused",
+        "occurrence": null,
+        "refusal": {
+          "reason": "busy",
+          "message": "x",
+          "alternatives": []
+        }
+      },
+      "code": "internal_error",
+      "path": "$.refusal"
+    },
+    {
+      "name": "scheduled outcome",
+      "value": {
+        "outcome": "scheduled",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T19:00:00Z",
+          "effective_start_at": "2026-10-18T19:00:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "15:00",
+            "end_time": null,
+            "label": "3:00 PM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "mcp",
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": null
+      },
+      "code": "internal_error",
+      "path": "$.outcome"
+    }
+  ]
+}

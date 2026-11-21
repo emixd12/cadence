@@ -43,6 +43,8 @@
           "status": "completed",
           "status_label": "Completed",
           "needs_decision": false,
+          "origin": "scheduled",
+          "added_by": null,
           "completed_at": "2026-10-18T11:41:00Z",
           "status_marked_at": "2026-10-18T11:41:00Z",
           "note": "Felt good.\nCold out.",
@@ -108,6 +110,8 @@
           "status": "completed",
           "status_label": "Completed",
           "needs_decision": false,
+          "origin": "scheduled",
+          "added_by": null,
           "completed_at": "2026-10-18T11:41:00Z",
           "status_marked_at": "2026-10-18T11:41:00Z",
           "note": "Felt good.\nCold out.",
@@ -149,6 +153,73 @@
           ]
         }
       }
+    },
+    {
+      "name": "added in chat",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "chat",
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3",
+          "status_history": [
+            {
+              "id": "0000000a-1111-4111-8111-00000000000a",
+              "previous_status": "unresolved",
+              "status": "not_completed",
+              "semantics": "explicit_user_mark",
+              "capture_method": "manual_tap",
+              "recorded_at": "2026-10-18T11:35:00Z",
+              "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            },
+            {
+              "id": "0000000b-1111-4111-8111-00000000000b",
+              "previous_status": "not_completed",
+              "status": "completed",
+              "semantics": "explicit_user_correction",
+              "capture_method": "manual_text",
+              "recorded_at": "2026-10-18T11:41:00Z",
+              "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            }
+          ],
+          "time_sessions": [
+            {
+              "id": "0000000c-1111-4111-8111-00000000000c",
+              "started_at": "2026-10-18T11:20:00Z",
+              "stopped_at": "2026-10-18T11:40:00Z",
+              "duration_seconds": 1200
+            }
+          ]
+        }
+      }
     }
   ],
   "invalid_outputs": [
@@ -175,6 +246,8 @@
           "status": "completed",
           "status_label": "Completed",
           "needs_decision": false,
+          "origin": "scheduled",
+          "added_by": null,
           "completed_at": "2026-10-18T11:41:00Z",
           "status_marked_at": "2026-10-18T11:41:00Z",
           "note": "Felt good.\nCold out.",
@@ -216,6 +289,8 @@
           "status": "completed",
           "status_label": "Completed",
           "needs_decision": false,
+          "origin": "scheduled",
+          "added_by": null,
           "completed_at": "2026-10-18T11:41:00Z",
           "status_marked_at": "2026-10-18T11:41:00Z",
           "note": "Felt good.\nCold out.",
@@ -259,6 +334,143 @@
       },
       "code": "internal_error",
       "path": "$.occurrence.time_sessions[0].duration_seconds"
+    },
+    {
+      "name": "unknown origin",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "origin": "suggested",
+          "added_by": null,
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3",
+          "status_history": [
+            {
+              "id": "0000000a-1111-4111-8111-00000000000a",
+              "previous_status": "unresolved",
+              "status": "not_completed",
+              "semantics": "explicit_user_mark",
+              "capture_method": "manual_tap",
+              "recorded_at": "2026-10-18T11:35:00Z",
+              "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            },
+            {
+              "id": "0000000b-1111-4111-8111-00000000000b",
+              "previous_status": "not_completed",
+              "status": "completed",
+              "semantics": "explicit_user_correction",
+              "capture_method": "manual_text",
+              "recorded_at": "2026-10-18T11:41:00Z",
+              "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            }
+          ],
+          "time_sessions": [
+            {
+              "id": "0000000c-1111-4111-8111-00000000000c",
+              "started_at": "2026-10-18T11:20:00Z",
+              "stopped_at": "2026-10-18T11:40:00Z",
+              "duration_seconds": 1200
+            }
+          ]
+        }
+      },
+      "code": "internal_error",
+      "path": "$.occurrence.origin"
+    },
+    {
+      "name": "missing origin",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T11:30:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "added_by": null,
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3",
+          "status_history": [
+            {
+              "id": "0000000a-1111-4111-8111-00000000000a",
+              "previous_status": "unresolved",
+              "status": "not_completed",
+              "semantics": "explicit_user_mark",
+              "capture_method": "manual_tap",
+              "recorded_at": "2026-10-18T11:35:00Z",
+              "effective_at": "2026-10-18T11:35:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            },
+            {
+              "id": "0000000b-1111-4111-8111-00000000000b",
+              "previous_status": "not_completed",
+              "status": "completed",
+              "semantics": "explicit_user_correction",
+              "capture_method": "manual_text",
+              "recorded_at": "2026-10-18T11:41:00Z",
+              "effective_at": "2026-10-18T11:41:00Z",
+              "not_done_reason": null,
+              "local_date": "2026-10-18",
+              "timezone": "America/New_York"
+            }
+          ],
+          "time_sessions": [
+            {
+              "id": "0000000c-1111-4111-8111-00000000000c",
+              "started_at": "2026-10-18T11:20:00Z",
+              "stopped_at": "2026-10-18T11:40:00Z",
+              "duration_seconds": 1200
+            }
+          ]
+        }
+      },
+      "code": "internal_error",
+      "path": "$.occurrence.origin"
     }
   ]
 }

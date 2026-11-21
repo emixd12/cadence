@@ -87,6 +87,7 @@ function toAnalyticsOccurrenceInput(
     status: normalizeOccurrenceStatus(occurrence.status),
     note: occurrence.note ?? "",
     timezone: behavior.timezone || DEFAULT_TIMEZONE,
+    origin: occurrence.origin === "opportunity" ? "opportunity" : "scheduled",
   };
 }
 

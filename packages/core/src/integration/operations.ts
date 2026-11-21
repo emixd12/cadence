@@ -24,6 +24,9 @@ import {
   localTime,
   locationTextInput,
   MOVE_REFUSAL_REASON_VALUES,
+  OPPORTUNITY_ADD_REFUSAL_VALUES,
+  OPPORTUNITY_REMOVE_REFUSAL_VALUES,
+  TIME_RANGE_PRESET_NAMES,
   occurrenceMoveRecordOutput,
   nextCursor,
   occurrenceDetailOutput,
@@ -206,6 +209,7 @@ const listBehaviors = readOperation({
       description: "Which Behaviors to include. running is active and scheduling; not_running is active but ended or paused; active is both.",
     })),
     category_id: optional(uuid("Only Behaviors in this category.")),
+    is_opportunity: optional(boolean({ description: "true: only Behaviors available as opportunities; false: only the others. Omit for both (contract 1.6.0)." })),
     updated_since: optional(updatedSince()),
     page_size: optional(pageSize()),
     cursor: optional(cursor()),
@@ -338,7 +342,7 @@ const getAdherenceSummary = readOperation({
   name: "get_adherence_summary",
   title: "Get adherence summary",
   description:
-    `Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to ${L.maxAdherenceRangeDays} days. ${ADHERENCE_DEFINITION} Use it for "how am I doing" questions. Cadence does not compute streaks.`,
+    `Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to ${L.maxAdherenceRangeDays} days. ${ADHERENCE_DEFINITION} Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. Use it for "how am I doing" questions. Cadence does not compute streaks.`,
   input: object({
     start_local_date: localDate("First local date, inclusive."),
     end_local_date: localDate("Last local date, inclusive."),
@@ -530,11 +534,80 @@ const updateDayNote = writeOperation({
     "Replaces the previous day note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same day note, so idempotentHint is true. openWorldHint is false.",
 });
 
+const REFUSED_DESCRIPTION = "Set when nothing changed because a rule refused the request. Null when the change was made.";
+
+const opportunityAddRefusal = nullable(object({
+  reason: enumOf(OPPORTUNITY_ADD_REFUSAL_VALUES),
+  message: string({ description: "Plain-language reason to show the user." }),
+  alternatives: array(object({
+    start_at: utcInstant(),
+    start_time: localTime("Local start time in the Behavior's timezone."),
+  }), { maxItems: 3, description: "Up to three free start times today, nearest the requested time first. Empty unless the time was taken." }),
+}), { description: REFUSED_DESCRIPTION });
+
+const opportunityRemoveRefusal = nullable(object({
+  reason: enumOf(OPPORTUNITY_REMOVE_REFUSAL_VALUES),
+  message: string({ description: "Plain-language reason to show the user." }),
+}), { description: REFUSED_DESCRIPTION });
+
+const addOpportunityOccurrence = writeOperation({
+  name: "add_opportunity_occurrence",
+  since: "1.6.0",
+  title: "Add opportunity to today",
+  description:
+    "Adds one of the user's opportunity Behaviors (is_opportunity true, running, not archived) to today: at an exact start_time, in a time range (start_time and end_time, or a preset), or, with mark_completed, as done now, marked Completed at the current minute. It adds a new Occurrence and changes no schedule. When a rule stops it, nothing changes and `refusal` says why. remove_opportunity_occurrence takes back an item added by mistake.",
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    behavior_id: behaviorIdInput(),
+    start_time: optional(localTime("Start today in the Behavior's timezone. Alone it is an exact time; with end_time it starts a range.")),
+    end_time: optional(localTime("End of a custom range today. Needs start_time and must differ from it; an earlier end runs past midnight.")),
+    preset: optional(enumOf(TIME_RANGE_PRESET_NAMES, {
+      description: "A time-of-day range instead of start_time: Morning 06:00-12:00, Afternoon 12:00-18:00, Evening 18:00-00:00, Night 00:00-06:00.",
+    })),
+    mark_completed: optional(boolean({ default: false, description: "Done now: add it at the current minute and mark it Completed. Send no time with it." })),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    outcome: enumOf(["added", "logged", "refused"] as const, { description: "added placed it on today; logged added it and marked it Completed; refused changed nothing." }),
+    occurrence: nullable(occurrenceOutput, { description: "The added Occurrence. Null when refused." }),
+    refusal: opportunityAddRefusal,
+  }),
+  errors: ["not_found", "idempotency_key_reused"],
+  destructiveHint: false,
+  idempotentHint: false,
+  annotationRationale:
+    "Adds a new Occurrence and changes no existing record, like create_behavior, so destructiveHint is false under both Claude's and OpenAI's guidance; readOnlyHint is false, so clients still treat it as a write. Calling it twice without an idempotency_key adds two items, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.",
+});
+
+const removeOpportunityOccurrence = writeOperation({
+  name: "remove_opportunity_occurrence",
+  since: "1.6.0",
+  title: "Remove added opportunity",
+  description:
+    "Removes an opportunity Occurrence that was added to a day, today or still in Needs decision, and cancels its pending reminders. The Behavior stays available as an opportunity. Only a clean item can be removed: Unresolved, never marked, with no note, tracked time or connected activity. A scheduled Occurrence is never removed. When a rule stops it, nothing changes and `refusal` says why.",
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    occurrence_id: occurrenceIdInput(),
+    expected_revision: optional(revision("Revision the client last read. If the Occurrence changed since, the call is refused with `revision_changed`.")),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    outcome: enumOf(["removed", "refused"] as const),
+    occurrence: occurrenceOutput,
+    refusal: opportunityRemoveRefusal,
+  }),
+  errors: ["not_found", "idempotency_key_reused"],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Deletes an added Occurrence, so destructiveHint is true under both Claude's and OpenAI's guidance; the rules allow it only for a clean, unmarked item, and add_opportunity_occurrence can add it again. Repeating it leaves the same end state, the item gone, so idempotentHint is true. openWorldHint is false.",
+});
+
 const createBehavior = writeOperation({
   name: "create_behavior",
   title: "Create Behavior",
   description:
-    "Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.",
+    "Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.",
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     title: behaviorTitleInput(),
@@ -542,6 +615,7 @@ const createBehavior = writeOperation({
     location_text: optional(locationTextInput()),
     category_id: optional(nullable(uuid("Category id from list_categories."))),
     schedules: schedulesInput,
+    is_opportunity: optional(boolean({ default: false, description: "Available as an opportunity: the person can add it to today when there is room. Required true for empty schedules (contract 1.6.0)." })),
     reminders: optional(remindersInput),
     default_duration_minutes: optional(defaultDurationInput()),
     end_on: optional(localDate("Optional last local day the Behavior runs. It stays active and moves to Not running after it.")),
@@ -569,13 +643,14 @@ const behaviorChangeFields = [
   "end_on",
   "end_time",
   "end_date",
+  "is_opportunity",
 ] as const;
 
 const updateBehavior = writeOperation({
   name: "update_behavior",
   title: "Update Behavior",
   description:
-    "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, or end. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
+    "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),
@@ -585,6 +660,7 @@ const updateBehavior = writeOperation({
     location_text: optional(nullable(locationTextInput(), { description: "New location, or null to clear it." })),
     category_id: optional(nullable(uuid(), { description: "New category id, or null for no category." })),
     schedules: optional(schedulesInput),
+    is_opportunity: optional(boolean({ description: "Available as an opportunity, or not. Turning it off needs at least one schedule (contract 1.6.0)." })),
     reminders: optional(remindersInput),
     default_duration_minutes: optional(nullable(defaultDurationInput(), { description: "New duration in minutes, or null to clear it." })),
     end_on: optional(nullable(localDate(), { description: "New last local day, or null to clear the end. It must be later than now. To stop right away, use end_behavior." })),
@@ -740,6 +816,8 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   move_occurrence_for_day: moveOccurrenceForDay,
   revert_occurrence_move: revertOccurrenceMove,
   update_day_note: updateDayNote,
+  add_opportunity_occurrence: addOpportunityOccurrence,
+  remove_opportunity_occurrence: removeOpportunityOccurrence,
   create_behavior: createBehavior,
   update_behavior: updateBehavior,
   archive_behavior: archiveBehavior,

@@ -11,7 +11,9 @@ type BehaviorPersistenceField =
   | "pause_back_on"
   | "auto_archived_at"
   | "location_text"
-  | "where_kind";
+  | "where_kind"
+  | "is_opportunity";
+/** recurrence_rule and scheduled_time are null only on an unscheduled opportunity Behavior. */
 export type Behavior = Omit<Tables<"behaviors">, BehaviorPersistenceField> &
   Partial<Pick<Tables<"behaviors">, BehaviorPersistenceField>>;
 export type BehaviorDefinitionEvent = Tables<"behavior_definition_events">;
@@ -22,11 +24,18 @@ export type BehaviorScheduleSlot = Tables<"behavior_schedule_slots">;
 /**
  * An Occurrence row. effective_start_at / effective_end_at (advisor Phase 2A) are
  * optional here so rows built in code and older fixtures stay valid; read them through
- * `effectiveStartAt` in `@cadence/core/resolvers/time.resolver`.
+ * `effectiveStartAt` in `@cadence/core/resolvers/time.resolver`. origin and added_by
+ * (Behaviors of Opportunity) are optional for the same reason; a missing origin means
+ * "scheduled".
  */
-export type Occurrence = Omit<Tables<"occurrences">, "effective_start_at" | "effective_end_at"> & {
+export type Occurrence = Omit<
+  Tables<"occurrences">,
+  "effective_start_at" | "effective_end_at" | "origin" | "added_by"
+> & {
   effective_start_at?: string | null;
   effective_end_at?: string | null;
+  origin?: string;
+  added_by?: string | null;
 };
 export type DayNote = Tables<"day_notes">;
 export type OccurrenceSyncState = Tables<"occurrence_sync_state">;

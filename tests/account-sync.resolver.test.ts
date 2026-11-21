@@ -642,7 +642,7 @@ describe("resolveAccountSync", () => {
     const revised: AccountSyncEntity = { kind: "behavior", id: "a", value: { id: "a", revision: 3, user_id: "local", metadata: { user_id: "provenance-owner" } } };
     expect(plan(empty, snapshot([revised]), empty).hostedWrites[0].value).toEqual({
       archive_notes: [], default_duration_minutes: null, end_on: null, end_time: null,
-      pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, location_text: null,
+      pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, location_text: null, is_opportunity: false,
       where_kind: null, id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
     });
   });
@@ -1212,5 +1212,72 @@ describe("per-day moves (advisor Phase 2A, contract 6)", () => {
     expect(() => plan(snapshot([behavior]), snapshot([behavior]), snapshot([behavior, leaky]))).toThrow("Update Cadence before synchronizing moved Occurrences.");
     const broken: AccountSyncEntity = { ...move, value: { ...(move.value as Record<string, Json>), chain_position: 2 } };
     expect(() => plan(snapshot([behavior]), snapshot([behavior]), snapshot([behavior, broken]))).toThrow("The synced move is invalid.");
+  });
+});
+
+describe("account sync contract 8 (Behaviors of Opportunity)", () => {
+  const unscheduled = (extra: Record<string, Json> = {}): AccountSyncEntity => ({
+    kind: "behavior", id: "b", value: { id: "b", title: "Walk", is_opportunity: true, recurrence_rule: null, scheduled_time: null, ...extra },
+  });
+  const added = (extra: Record<string, Json> = {}): AccountSyncEntity => ({
+    kind: "occurrence", id: "o", value: { id: "o", behavior_id: "b", status: "unresolved", note: null, origin: "opportunity", added_by: "user",
+      local_date: "2026-09-01", schedule_kind: "exact", schedule_start_time: "08:00:00", schedule_end_time: null, ...extra },
+  });
+  const valueOf = (entities: readonly AccountSyncEntity[], key: string) => entities.find((entity) => `${entity.kind}:${entity.id}` === key)?.value;
+
+  it("reads older baselines as scheduled Behaviors and scheduled Occurrences", () => {
+    const old = snapshot(completeRows([occurrence()]));
+    const result = plan(old, old, old);
+    expect(valueOf(result.mergedEntities, "behavior:b")).toMatchObject({ is_opportunity: false });
+    expect(valueOf(result.mergedEntities, "occurrence:o")).toMatchObject({ origin: "scheduled", added_by: null });
+    expect(result.hostedWrites).toEqual([]);
+    expect(accountSyncFingerprint(old)).toBe(accountSyncFingerprint(snapshot(completeRows([{ ...occurrence(), value: { ...(occurrence().value as Record<string, Json>), origin: "scheduled", added_by: null } }]))));
+  });
+
+  it("carries an unscheduled opportunity Behavior and its added Occurrence round trip", () => {
+    const local = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled(), added()]);
+    const result = plan(empty, local, empty);
+    expect(result.conflicts).toEqual([]);
+    expect(result.hostedWrites.map(({ kind, value }) => [kind, value])).toEqual(expect.arrayContaining([
+      ["behavior", expect.objectContaining({ is_opportunity: true, recurrence_rule: null, scheduled_time: null })],
+      ["occurrence", expect.objectContaining({ origin: "opportunity", added_by: "user" })],
+    ]));
+    const synced = { entities: result.mergedEntities };
+    expect(plan(synced, synced, synced).hostedWrites).toEqual([]);
+  });
+
+  it("refuses a scheduled Behavior without a schedule", () => {
+    const local = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled({ is_opportunity: false })]);
+    expect(() => plan(empty, local, empty)).toThrow("needs a schedule");
+  });
+
+  it("refuses an origin and added_by that do not match", () => {
+    for (const bad of [{ origin: "opportunity", added_by: null }, { origin: "scheduled", added_by: "chat" }, { origin: "opportunity", added_by: "robot" }]) {
+      const local = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled(), added(bad)]);
+      expect(() => plan(empty, local, empty)).toThrow("origin is invalid");
+    }
+  });
+
+  it("keeps origin immutable on an existing synced Occurrence", () => {
+    const base = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled(), added()]);
+    const rewritten = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled(), added({ origin: "scheduled", added_by: null })]);
+    expect(() => plan(base, rewritten, base)).toThrow("keeps its origin");
+  });
+
+  it("does not coalesce an added Occurrence with a scheduled one at the same time", () => {
+    const scheduledHosted: AccountSyncEntity = { kind: "occurrence", id: "s", value: { id: "s", behavior_id: "b", status: "unresolved", note: null,
+      local_date: "2026-09-01", schedule_kind: "exact", schedule_start_time: "08:00:00", schedule_end_time: null } };
+    const hosted = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled({ is_opportunity: true, recurrence_rule: { frequency: "daily", interval: 1 }, scheduled_time: "08:00:00" }), scheduledHosted]);
+    const local = snapshot([...hosted.entities, added()]);
+    const result = plan(hosted, local, hosted);
+    expect(result.hostedWrites.map(({ kind, id }) => `${kind}:${id}`)).toEqual(["occurrence:o"]);
+  });
+
+  it("lets a clean added Occurrence leave when the hosted side removed it", () => {
+    const base = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled(), added()]);
+    const removed = snapshot([{ kind: "profile", id: "profile", value: { timezone: "UTC" } }, unscheduled()]);
+    const result = plan(base, base, removed);
+    expect(result.conflicts).toEqual([]);
+    expect(result.localWrites).toMatchObject([{ kind: "occurrence", id: "o", operation: "delete" }]);
   });
 });

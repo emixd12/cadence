@@ -130,6 +130,7 @@ describe("createBehaviorFromFormData", () => {
             "timezone",
             "end",
             "pause",
+            "is_opportunity",
           ],
           reasonCode: "behavior_created",
           source: "manual",

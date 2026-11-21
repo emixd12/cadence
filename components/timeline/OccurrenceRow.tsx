@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { noticeText } from "@cadence/core/notices";
 import type { TimelineOccurrenceContext } from "@cadence/core/types/day-progress";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { sourceEvidenceSummary, type CountableSourceWorkout } from "@cadence/core/services/timeline-source-evidence";
@@ -9,6 +10,7 @@ import { CountWorkoutButtons } from "@/components/timeline/CountWorkoutButtons";
 import { useOccurrenceMarkDetailParts, type JustMarked } from "@/components/timeline/OccurrenceMarkDetails";
 import { OccurrenceMovedLine, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
 import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
+import { OpportunityRemoveControl } from "@/components/timeline/OpportunityBasket";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
@@ -23,6 +25,7 @@ import {
 } from "@/lib/resolvers/timeline-optimistic-status.resolver";
 import type {
   OccurrenceFormAction,
+  OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineOccurrenceView,
 } from "@/lib/types/timeline";
@@ -42,6 +45,8 @@ type OccurrenceRowProps = Readonly<{
   crowdedLine?: string | null;
   /** Ticket 324: today's workouts no link accepted, which this row may count by hand. */
   countableWorkouts?: readonly CountableSourceWorkout[];
+  /** Behaviors of Opportunity: Remove for a clean added row. Omitted where removal is unavailable. */
+  removeOpportunityAction?: OpportunityFormAction;
 }>;
 
 type KeyedOptimisticStatusState = Readonly<{
@@ -86,6 +91,7 @@ export function OccurrenceRow({
   travelDetails,
   crowdedLine = null,
   countableWorkouts = [],
+  removeOpportunityAction,
 }: OccurrenceRowProps) {
   const serverStatusKey = [
     occurrence.id,
@@ -233,6 +239,10 @@ export function OccurrenceRow({
               {sourceLine ? <p className={["timeline-occurrence-source col-start-2 min-w-0 text-xs font-normal leading-5", TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")} data-source-completion={occurrence.sourceEvidence?.source}>
                 {sourceLine}
               </p> : null}
+              {occurrence.origin === "opportunity" ? <p className={["timeline-occurrence-origin col-start-2 min-w-0 text-xs font-normal leading-5", visibleOccurrence.visualTone === "default" ? "text-muted-readable" : TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")}
+                data-notice="opportunity.added-from" data-opportunity-origin={occurrence.addedBy ?? "user"}>
+                {noticeText("opportunity.added-from", { source: occurrence.addedBy ?? "user" })}
+              </p> : null}
               {crowdedLine ? <p className="timeline-occurrence-crowded col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable group-open:hidden" data-next-trip-crowded>
                 {crowdedLine}
               </p> : null}
@@ -248,10 +258,10 @@ export function OccurrenceRow({
               value={visibleOccurrence.description || "No description."}
             />
             <DetailItem label="Category" value={visibleOccurrence.categoryName} />
-            <DetailItem
+            {visibleOccurrence.scheduleSummary ? <DetailItem
               label="Schedule"
               value={visibleOccurrence.scheduleSummary}
-            />
+            /> : null}
 
             {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Scheduling context">
               <h4 className="font-bold text-foreground">Scheduling context</h4>
@@ -318,6 +328,12 @@ export function OccurrenceRow({
             />
 
             <OccurrenceMoveMenu occurrence={visibleOccurrence} />
+
+            {removeOpportunityAction && occurrence.canRemove && !userChangedStatus ? <OpportunityRemoveControl
+              occurrenceId={visibleOccurrence.id}
+              title={visibleOccurrence.title}
+              action={removeOpportunityAction}
+            /> : null}
           </div>
         </details>
 

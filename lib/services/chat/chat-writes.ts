@@ -98,6 +98,8 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
     }
     case "move_occurrence_for_day": return `Move ${title} to ${chatClockFromLocal(str(args.start_time) ?? "")} today`;
     case "revert_occurrence_move": return `Move ${title} back to where it was`;
+    case "add_opportunity_occurrence": return `Add ${title} to today${placementText(args)}`;
+    case "remove_opportunity_occurrence": return `Take ${title} off today`;
     case "create_behavior": return `Create a new Behavior, ${str(args.title) ?? "untitled"}`;
     case "update_behavior": return `Change ${title}${changedFields(args)}`;
     case "archive_behavior": return `Archive ${title}`;
@@ -108,7 +110,7 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
 function changedFields(args: Readonly<Record<string, unknown>>): string {
   const labels: Readonly<Record<string, string>> = {
     title: "name", description: "description", location_text: "place", category_id: "category", schedules: "schedule",
-    reminders: "reminders", default_duration_minutes: "length", end_date: "end date",
+    reminders: "reminders", default_duration_minutes: "length", end_date: "end date", is_opportunity: "opportunity",
   };
   const changed = Object.keys(labels).filter((key) => key in args).map((key) => labels[key]);
   return changed.length ? ` (${changed.join(", ")})` : "";
@@ -133,11 +135,27 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
     }
     case "move_occurrence_for_day": return `Moved ${title} to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)} today.`;
     case "revert_occurrence_move": return `Moved ${title} back to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`;
+    case "add_opportunity_occurrence": return out.outcome === "logged"
+      ? `Marked ${title} done at ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`
+      : `Added ${title} to today${placementText(call.args)}.`;
+    case "remove_opportunity_occurrence": return `Took ${title} off today.`;
     case "create_behavior": return `Created ${title}.`;
     case "update_behavior": return `Changed ${title}.`;
     case "archive_behavior": return `Archived ${title}.`;
     case "restore_behavior": return `Restored ${title}.`;
   }
+}
+
+const PRESET_TEXT: Readonly<Record<string, string>> = { morning: "this morning", afternoon: "this afternoon", evening: "this evening", night: "tonight" };
+
+/** " at 3 pm", " from 3 pm to 4 pm", " this evening" or "" for Done now. */
+function placementText(args: Readonly<Record<string, unknown>>): string {
+  if (args.mark_completed === true) return ", marked done now";
+  const preset = str(args.preset);
+  if (preset) return ` ${PRESET_TEXT[preset] ?? preset}`;
+  const start = str(args.start_time), end = str(args.end_time);
+  if (start && end) return ` from ${chatClockFromLocal(start)} to ${chatClockFromLocal(end)}`;
+  return start ? ` at ${chatClockFromLocal(start)}` : "";
 }
 
 /** A move refusal from the result, when the rule stopped it. */
@@ -193,6 +211,23 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
       const local = Temporal.Instant.from(before).toZonedDateTimeISO(timezone);
       const startTime = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
       return { call: { name: "move_occurrence_for_day", args: { occurrence_id: occurrenceId, start_time: startTime, expected_revision: revision } } };
+    }
+    // Undo takes an added item back off today, and refuses once it changed. Done now has
+    // no Undo: its mark is kept in status history, so the item can no longer be removed.
+    case "add_opportunity_occurrence": {
+      const revision = str(occurrence.revision);
+      if (!occurrenceId || out.outcome !== "added" || !revision) return null;
+      return { call: { name: "remove_opportunity_occurrence", args: { occurrence_id: occurrenceId, expected_revision: revision } } };
+    }
+    // Undo of a Remove adds the same Behavior back at the same time today.
+    case "remove_opportunity_occurrence": {
+      const removed = obj(facts.occurrence);
+      const schedule = obj(removed.schedule);
+      const behaviorId = str(removed.behavior_id);
+      if (out.outcome !== "removed" || !behaviorId) return null;
+      const preset = str(schedule.preset), start = str(schedule.start_time), end = str(schedule.end_time);
+      const placement = preset ? { preset } : start && end ? { start_time: start, end_time: end } : start ? { start_time: start } : null;
+      return placement ? { call: { name: "add_opportunity_occurrence", args: { behavior_id: behaviorId, ...placement } } } : null;
     }
     case "create_behavior": {
       const id = str(obj(out.behavior).id);
@@ -261,7 +296,8 @@ export function guardFrom(facts: ChatWriteFacts, call?: ChatWriteCall): ChatPend
 export function withRevision(call: ChatWriteCall, facts: ChatWriteFacts): ChatWriteCall {
   const occurrence = facts.occurrence ? obj(facts.occurrence) : null;
   const revision = occurrence ? str(occurrence.revision) : null;
-  if (revision && (call.name === "move_occurrence_for_day" || call.name === "revert_occurrence_move") && !str(call.args.expected_revision)) {
+  if (revision && (call.name === "move_occurrence_for_day" || call.name === "revert_occurrence_move" || call.name === "remove_opportunity_occurrence")
+    && !str(call.args.expected_revision)) {
     return { ...call, args: { ...call.args, expected_revision: revision } };
   }
   if (call.name === "update_day_note" && facts.dayNoteRevision && !str(call.args.expected_revision)) {

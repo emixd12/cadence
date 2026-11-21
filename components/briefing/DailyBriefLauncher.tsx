@@ -29,6 +29,7 @@ import { DAILY_BRIEF_TRAVEL_WAIT_MS, requestDailyBriefTravel, travelConclusionsT
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { briefCalendarBusy } from "@/lib/ui/brief-calendar";
 import { DAILY_BRIEF_MOVE_FEATURES } from "@/lib/ui/daily-brief-moves";
+import { DAILY_BRIEF_OPPORTUNITY_FEATURES } from "@/lib/ui/daily-brief-opportunities";
 import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
 import { noticeText, type NoticeId, type NoticeParams } from "@cadence/core/notices";
 import { DailyBriefBubble } from "./DailyBriefBubble";
@@ -378,7 +379,9 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       error: refreshState.error,
       available: refreshAvailability(shown.briefing),
     } : null;
-    return place(<DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} refresh={refresh} embedded={embedded} />);
+    const opportunityClient = resolvedClient.opportunities;
+    const opportunities = moves && opportunityClient ? { client: opportunityClient, planningContext: moves.planningContext } : null;
+    return place(<DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} opportunities={opportunities} refresh={refresh} embedded={embedded} />);
   }
   if (shown.kind !== "notice") return null;
   const action = planControls && shown.action === "manage_usage" ? { label: "Manage usage", onClick: planControls.manageUsage }
@@ -426,7 +429,8 @@ function closedOrHidden(settings: DailyBriefSettings): View {
 function moveRequestFields(client: DailyBriefClient, travelAccountId: string | null, localDate: string) {
   if (!client.moves) return {};
   const travelTimes = travelTimesToken(travelAccountId, localDate);
-  return { features: [...DAILY_BRIEF_MOVE_FEATURES], ...(travelTimes ? { travelTimes } : {}) };
+  const features = [...DAILY_BRIEF_MOVE_FEATURES, ...(client.opportunities ? DAILY_BRIEF_OPPORTUNITY_FEATURES : [])];
+  return { features, ...(travelTimes ? { travelTimes } : {}) };
 }
 
 /** A settled stand-in attempt for a brief shown again from memory. */

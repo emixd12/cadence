@@ -28,7 +28,13 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
   const durationHistory = await localCommand("readOccurrenceHistory", { profileId,
     occurrenceIds: historyOccurrences.map(({ id }) => id) });
   const behaviors = graphs.map((graph) => toLocalBehaviorGraphRecord(graph, categories));
-  const view = resolvePersistedTimeline({ durationHistory: { occurrences: historyOccurrences, timeSessions: durationHistory.timeSessions.map(toTimeSession) }, behaviors, occurrences, timeSessions: history.timeSessions.map(toTimeSession),
+  // Behaviors of Opportunity: the same Remove facts the web reads, from the local history.
+  const removalFacts = {
+    statusHistoryOccurrenceIds: new Set(history.statusEvents.map((event) => event.occurrence_id)),
+    activeSourceMatchOccurrenceIds: new Set((history.sourceMatches ?? [])
+      .filter((match) => match.state === "active").map((match) => match.occurrence_id)),
+  };
+  const view = resolvePersistedTimeline({ removalFacts, durationHistory: { occurrences: historyOccurrences, timeSessions: durationHistory.timeSessions.map(toTimeSession) }, behaviors, occurrences, timeSessions: history.timeSessions.map(toTimeSession),
     now, timezone: profile.timezone, futureDays });
   const dayNoteRange = timelineDayNoteRange(view);
   const dayNotes = dayNoteRange ? await localCommand("readDayNotes", { profileId, startLocalDate: dayNoteRange.from, endLocalDate: dayNoteRange.to }) : [];

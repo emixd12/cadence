@@ -21,6 +21,7 @@ import {
   updateOccurrenceNoteAction,
 } from "./actions";
 import { behaviorRunAction } from "../behaviors/actions";
+import { addOpportunityOccurrenceAction, removeOpportunityOccurrenceAction } from "./opportunity-actions";
 import {
   keepMovedOccurrenceAction,
   moveOccurrenceAction,
@@ -141,6 +142,8 @@ async function TimelineContent({
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
         runAction={behaviorRunAction}
+        addOpportunityAction={addOpportunityOccurrenceAction}
+        removeOpportunityAction={removeOpportunityOccurrenceAction}
       />
       </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>

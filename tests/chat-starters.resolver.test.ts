@@ -72,6 +72,14 @@ describe("picking starters", () => {
     expect(lanes[2]).toBe("today_open");
   });
 
+  it("suggests an opportunity not on today only on a light day", () => {
+    const light: ChatStarterFacts = { ...QUIET, todayTotal: 3, todayOpen: 1, opportunity: "Stretch" };
+    expect(chatStarterLanes(light).get("opportunity_room")).toBe("Stretch");
+    expect(texts(light)[0]).toMatch(/Stretch/);
+    expect(chatStarterLanes({ ...light, todayOpen: 3 }).has("opportunity_room")).toBe(false);
+    expect(chatStarterLanes({ ...light, opportunity: null }).has("opportunity_room")).toBe(false);
+  });
+
   it("is steady within a day and needs enough marks before naming a Behavior", () => {
     expect(texts(CHAT_FIXTURE_STARTER_FACTS)).toEqual(texts(CHAT_FIXTURE_STARTER_FACTS));
     const thin: ChatStarterFacts = { ...QUIET, behaviors: [{ title: "Piano practice", decided: 3, rate: 0 }], month: { decided: 3, rate: 0 } };

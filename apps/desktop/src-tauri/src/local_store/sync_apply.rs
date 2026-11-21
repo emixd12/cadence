@@ -394,6 +394,7 @@ fn validate_write(
                     "auto_archived_at",
                     "location_text",
                     "where_kind",
+                    "is_opportunity",
                 ]
                 .iter()
                     .any(|field| !value.contains_key(*field))
@@ -423,6 +424,24 @@ fn validate_write(
         }
         AccountSyncEntityKind::Occurrence => {
             validate_row_write::<Occurrence>(db, profile, write, false, !replacement)?;
+            // Contract 8: every Occurrence write names its origin, and a row keeps it.
+            if write.operation == AccountSyncOperation::Upsert {
+                let value = write
+                    .value
+                    .as_ref()
+                    .and_then(Value::as_object)
+                    .ok_or("An account sync upsert requires a value.")?;
+                if !value.contains_key("origin") || !value.contains_key("added_by") {
+                    return Err("Update Cadence before synchronizing account data.".into());
+                }
+                if write
+                    .expected
+                    .as_ref()
+                    .is_some_and(|expected| expected.get("origin") != value.get("origin"))
+                {
+                    return Err("An Occurrence keeps its origin.".into());
+                }
+            }
             if !replacement && write.operation == AccountSyncOperation::Delete {
                 validate_occurrence_delete(db, profile, write, writes)?;
             }
@@ -1083,7 +1102,8 @@ mod tests {
             pause_from_time: None,
             pause_back_on: None,
             recurrence_rule: json!({"type":"daily","interval":1}),
-            scheduled_time: "09:00:00".into(),
+            scheduled_time: Some("09:00:00".into()),
+            is_opportunity: false,
             timezone: "America/New_York".into(),
             browser_reminder_enabled: true,
             email_reminder_enabled: false,
@@ -1126,6 +1146,8 @@ mod tests {
             schedule_preset: None,
             schedule_start_time: "09:00:00".into(),
             schedule_end_time: None,
+            origin: "scheduled".into(),
+            added_by: None,
             schedule_range_identity: None,
             status: "completed".into(),
             completed_at: Some(stamp.clone()),
@@ -2043,6 +2065,78 @@ mod tests {
         assert_eq!(foreign_key_errors, 0);
     }
 
+    /// Behaviors of Opportunity, contract 8: an unscheduled opportunity Behavior and an
+    /// added Occurrence arrive from the account, keep their fields, keep their origin, and
+    /// leave again when the account removes them. Writes without the new fields wait for
+    /// an update.
+    #[test]
+    fn contract_8_round_trips_opportunity_behaviors_and_added_occurrences() {
+        let (_directory, mut connection, profile, category) = database();
+        let behavior_id = "30000000-0000-4000-8000-000000000001";
+        let occurrence_id = "30000000-0000-4000-8000-000000000002";
+        let behavior = json!({"id":behavior_id,"category_id":category.id,"title":"Stretch","description":null,
+            "recurrence_rule":null,"scheduled_time":null,"timezone":"America/New_York","browser_reminder_enabled":true,
+            "email_reminder_enabled":false,"reminder_offset_minutes":0,"active":true,"archived_at":null,"archive_notes":[],
+            "current_configuration_event_id":null,"default_duration_minutes":20,"auto_archived_at":null,"location_text":null,
+            "where_kind":"anywhere","end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,
+            "is_opportunity":true,"created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
+        let occurrence = json!({"id":occurrence_id,"behavior_id":behavior_id,"behavior_configuration_event_id":null,
+            "behavior_schedule_slot_id":null,"scheduled_for":"2026-09-01T19:00:00.000000Z","local_date":"2026-09-01",
+            "schedule_kind":"exact","schedule_preset":null,"schedule_start_time":"15:00:00","schedule_end_time":null,
+            "status":"unresolved","completed_at":null,"status_marked_at":null,"note":null,"origin":"opportunity",
+            "added_by":"daily_brief","created_at":"2026-09-01T12:00:00.000000Z","updated_at":"2026-09-01T12:00:00.000000Z"});
+        let write = |kind, id: &str, operation, expected: Option<Value>, value: Option<Value>| AccountSyncWrite {
+            kind, id: id.into(), operation, expected, value,
+        };
+        let apply = |db: &mut Connection, writes: Vec<AccountSyncWrite>| execute(db, Request::ApplyAccountSync { profile_id: profile.clone(), writes });
+        validate_snapshot(&profile, &[
+            AccountSyncEntity { kind: AccountSyncEntityKind::Behavior, id: behavior_id.into(), value: behavior.clone() },
+            AccountSyncEntity { kind: AccountSyncEntityKind::Occurrence, id: occurrence_id.into(), value: occurrence.clone() },
+        ]).unwrap();
+
+        // A writer before contract 8 leaves the new fields out.
+        let mut old_behavior = behavior.clone();
+        old_behavior.as_object_mut().unwrap().remove("is_opportunity");
+        assert_eq!(apply(&mut connection, vec![write(AccountSyncEntityKind::Behavior, behavior_id, AccountSyncOperation::Upsert, None, Some(old_behavior))]).unwrap_err(),
+            "Update Cadence before synchronizing Behavior changes.");
+
+        apply(&mut connection, vec![
+            write(AccountSyncEntityKind::Behavior, behavior_id, AccountSyncOperation::Upsert, None, Some(behavior.clone())),
+            write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Upsert, None, Some(occurrence.clone())),
+        ]).unwrap();
+        let stored_behavior = db::by_id::<Behavior>(&connection, &profile, behavior_id).unwrap();
+        assert!(stored_behavior.is_opportunity);
+        assert_eq!((stored_behavior.recurrence_rule.clone(), stored_behavior.scheduled_time.clone()), (Value::Null, None));
+        let stored = db::by_id::<Occurrence>(&connection, &profile, occurrence_id).unwrap();
+        assert_eq!((stored.origin.as_str(), stored.added_by.as_deref()), ("opportunity", Some("daily_brief")));
+        let current = normalized(&stored).unwrap();
+        assert_eq!((current["origin"].clone(), current["added_by"].clone()), (json!("opportunity"), json!("daily_brief")));
+
+        // An Occurrence keeps its origin; an upsert must name it.
+        let mut scheduled = current.clone();
+        scheduled["origin"] = json!("scheduled");
+        scheduled["added_by"] = Value::Null;
+        assert_eq!(apply(&mut connection, vec![write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Upsert, Some(current.clone()), Some(scheduled))]).unwrap_err(),
+            "An Occurrence keeps its origin.");
+        let mut unnamed = current.clone();
+        unnamed.as_object_mut().unwrap().remove("origin");
+        assert_eq!(apply(&mut connection, vec![write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Upsert, Some(current.clone()), Some(unnamed))]).unwrap_err(),
+            "Update Cadence before synchronizing account data.");
+        let mut noted = current.clone();
+        noted["note"] = json!("after lunch");
+        apply(&mut connection, vec![write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Upsert, Some(current.clone()), Some(noted.clone()))]).unwrap();
+        noted["note"] = Value::Null;
+        let current = normalized(&db::by_id::<Occurrence>(&connection, &profile, occurrence_id).unwrap()).unwrap();
+        apply(&mut connection, vec![write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Upsert, Some(current.clone()), Some(noted))]).unwrap();
+
+        // The account removed the clean item (remove_opportunity_occurrence); the Mac follows.
+        let current = normalized(&db::by_id::<Occurrence>(&connection, &profile, occurrence_id).unwrap()).unwrap();
+        apply(&mut connection, vec![write(AccountSyncEntityKind::Occurrence, occurrence_id, AccountSyncOperation::Delete, Some(current), None)]).unwrap();
+        assert!(db::by_id::<Occurrence>(&connection, &profile, occurrence_id).is_err());
+        let foreign_key_errors: i64 = connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| row.get(0)).unwrap();
+        assert_eq!(foreign_key_errors, 0);
+    }
+
     #[test]
     fn occurrence_sync_omits_derived_identity_but_rejects_stale_user_data_atomically() {
         let (_directory, mut connection, profile, category) = database();
@@ -2153,7 +2247,8 @@ mod tests {
             pause_from_time: None,
             pause_back_on: Some("2026-08-24".into()),
             recurrence_rule: json!({"type":"daily","interval":1}),
-            scheduled_time: "09:00:00".into(),
+            scheduled_time: Some("09:00:00".into()),
+            is_opportunity: false,
             timezone: "America/New_York".into(),
             browser_reminder_enabled: true,
             email_reminder_enabled: false,

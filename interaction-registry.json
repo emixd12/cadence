@@ -3,7 +3,7 @@
   "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-20",
+  "updated": "2026-11-21",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -297,7 +297,9 @@
         "INT-BEHAVIOR-033",
         "INT-BEHAVIOR-034",
         "INT-BEHAVIOR-035",
-        "INT-BEHAVIOR-036"
+        "INT-BEHAVIOR-036",
+        "INT-BEHAVIOR-037",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -387,7 +389,12 @@
         "INT-ADVISOR-002",
         "INT-ADVISOR-003",
         "INT-ADVISOR-004",
-        "INT-ADVISOR-005"
+        "INT-ADVISOR-005",
+        "INT-TIMELINE-021",
+        "INT-TIMELINE-022",
+        "INT-TIMELINE-023",
+        "INT-TIMELINE-024",
+        "INT-BRIEF-010"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -574,7 +581,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 52,
+      "interaction_marker_count": 58,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -592,13 +599,15 @@
         "INT-BEHAVIOR-031",
         "INT-TRAVEL-005",
         "INT-PLACE-006",
-        "INT-BEHAVIOR-036"
+        "INT-BEHAVIOR-036",
+        "INT-BEHAVIOR-037",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
       "path": "components/behaviors/BehaviorList.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 28,
+      "interaction_marker_count": 29,
       "interaction_ids": [
         "INT-BEHAVIOR-001",
         "INT-BEHAVIOR-002",
@@ -622,7 +631,8 @@
         "INT-PLACE-010",
         "INT-BEHAVIOR-033",
         "INT-BEHAVIOR-034",
-        "INT-BEHAVIOR-035"
+        "INT-BEHAVIOR-035",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -636,11 +646,12 @@
     {
       "path": "components/behaviors/ReminderEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 5,
       "interaction_ids": [
         "INT-BEHAVIOR-016",
         "INT-BEHAVIOR-017",
-        "INT-BEHAVIOR-018"
+        "INT-BEHAVIOR-018",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -844,7 +855,19 @@
       "classification": "cataloged",
       "interaction_marker_count": 1,
       "interaction_ids": [
-        "INT-TIMELINE-004"
+        "INT-TIMELINE-004",
+        "INT-TIMELINE-024"
+      ]
+    },
+    {
+      "path": "components/timeline/OpportunityBasket.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 28,
+      "interaction_ids": [
+        "INT-TIMELINE-021",
+        "INT-TIMELINE-022",
+        "INT-TIMELINE-023",
+        "INT-TIMELINE-024"
       ]
     },
     {
@@ -1013,6 +1036,14 @@
       "interaction_ids": [
         "INT-BRIEF-006",
         "INT-BRIEF-007"
+      ]
+    },
+    {
+      "path": "components/briefing/BriefOpportunityLines.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 15,
+      "interaction_ids": [
+        "INT-BRIEF-010"
       ]
     },
     {
@@ -1409,7 +1440,7 @@
       "classification": "excluded",
       "interaction_marker_count": 1,
       "interaction_ids": [],
-      "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes \u00b7 No and Undo answer in memory. Excluded from product interaction counts."
+      "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes · No and Undo answer in memory. Excluded from product interaction counts."
     }
   ],
   "features": [
@@ -1502,6 +1533,12 @@
       "name": "Move for today",
       "meaning": "Moving one occurrence to another time for today only, with Undo, reasons and overlap answers.",
       "spec": "DESIGN.md#move-for-today"
+    },
+    {
+      "id": "behaviors-of-opportunity",
+      "name": "Behaviors of Opportunity",
+      "meaning": "Behaviors available to add to today when there is a chance, with or without a fixed schedule: the Opportunity Basket, Done now and Remove.",
+      "spec": "docs/RECURRENCE_RULES.md#behaviors-of-opportunity"
     },
     {
       "id": "review-and-adherence",
@@ -19773,6 +19810,109 @@
       }
     },
     {
+      "id": "INT-BRIEF-010",
+      "name": "Answer a Daily Brief Add for today line",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07",
+        "J25"
+      ],
+      "intent": "Answer one of the brief's offers to add an opportunity Behavior to today in a free window: Yes, No, Other time, Undo, or Don't suggest adding this (Behaviors of Opportunity, Task 7).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes, No or Other time under an Add for today line"
+        },
+        {
+          "kind": "activate",
+          "control": "A free time, a picked time and Add, or Re-plan under Other time"
+        },
+        {
+          "kind": "activate",
+          "control": "Undo on an added line"
+        },
+        {
+          "kind": "activate",
+          "control": "Don’t suggest adding this"
+        }
+      ],
+      "availability": "Web Timeline and a linked Mac, inside a ready Daily Brief whose client sent opportunity_lines_v1, while the line is undecided (Undo after Yes or Other time). Don’t suggest adding this after declines on 4 different days.",
+      "success_result": "Yes and Other time add an Unresolved Occurrence (origin opportunity, added by Daily Brief) at the line's time and the Timeline redraws; No keeps the Behavior off today and stops offers for it today; Undo removes the added item and counts as a No; Don’t suggest adding this stops future offers for that Behavior.",
+      "failure_result": "A time that is no longer free, a Behavior no longer available, a marked or noted item on Undo, or a failed request shows under the line in the alert style, with free times where there are some. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request",
+        "reminder_planning"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/BriefOpportunityLines.tsx#BriefOpportunityLines",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "lib/ui/daily-brief-opportunities.ts",
+        "lib/services/brief-opportunities.service.ts#answerBriefOpportunity",
+        "apps/desktop/src/daily-brief.ts",
+        "apps/desktop/src/timeline-screen.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/brief-opportunity-lines.dom.test.tsx",
+          "tests/brief-opportunities.service.test.ts",
+          "tests/brief-opportunity.resolver.test.ts",
+          "tests/desktop-daily-brief.test.ts"
+        ],
+        "notes": "DOM checks cover each answer's body with the screen's context, the added time and Undo, refusals with free times, Re-plan, re-check on open and the opt-in gate; the service test covers the slot check, added_by daily_brief, replay, Undo refusals and Re-check; the resolver test covers the free-slot rule, caps, order and Where."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/BriefOpportunityLines.tsx"
+          ],
+          "evidence": [
+            "tests/brief-opportunity-lines.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/daily-brief.ts",
+            "lib/ui/daily-brief-opportunities.ts"
+          ],
+          "evidence": [
+            "tests/desktop-daily-brief.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
       "id": "INT-ADVISOR-001",
       "name": "Open the advisor panel",
       "feature": "advisor-tips",
@@ -19796,7 +19936,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "The horse at the top centre of the Timeline (Advisor or Advisor \u00b7 1 new)"
+          "control": "The horse at the top centre of the Timeline (Advisor or Advisor · 1 new)"
         },
         {
           "kind": "activate",
@@ -20663,6 +20803,578 @@
             "tests/desktop-run-actions.test.ts"
           ],
           "reason": "Ticket 342: the Mac Timeline renders the shared notices from local run fields with the local run action."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-037",
+      "name": "Make a Behavior available as an opportunity",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Let a Behavior be added to today when there is a chance, beside or instead of its schedule.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Available as an opportunity"
+        }
+      ],
+      "availability": "In the create and edit forms. The form posts a hidden is_opportunity=false before the checkbox.",
+      "success_result": "The flag is saved with the form as is_opportunity and recorded in the configuration history. Pausing, ending or archiving keeps the Behavior out of the basket until it runs again.",
+      "failure_result": "Turning it off with no schedule is refused with Add at least one schedule; the draft stays.",
+      "effects": [
+        "form_draft",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx#BehaviorForm",
+        "lib/services/behavior-form.ts#parseOpportunityFlag",
+        "packages/core/src/services/behavior.service.ts",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-behavior.service.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-opportunity-ui.dom.test.tsx",
+          "tests/behavior-form.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test toggles the control on create and edit and checks the posted fields; server parsing and validation are covered separately."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "lib/services/behavior-form.ts"
+          ],
+          "evidence": [
+            "tests/behavior-opportunity-ui.dom.test.tsx",
+            "tests/behavior-form.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-behavior.service.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-038",
+      "name": "Save an opportunity Behavior with no fixed schedule",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Keep a Behavior that has no schedule, only for adding to a day by hand.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Create or Save changes with no schedule"
+        }
+      ],
+      "availability": "When Available as an opportunity is on. The form posts behavior_schedule_count=0.",
+      "success_result": "The Behavior is saved with no schedule and no stored recurrence. No Occurrences are generated; Behaviors shows Done N times instead of a percentage.",
+      "failure_result": "With the flag off, zero schedules is refused with Add at least one schedule; the database function refuses it as well.",
+      "effects": [
+        "database_write",
+        "behavior_mutation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx#BehaviorForm",
+        "components/behaviors/BehaviorList.tsx#BehaviorList",
+        "lib/services/behavior-form.ts#parseBehaviorSchedulesFromForm",
+        "packages/core/src/services/behavior.service.ts#storedRecurrence",
+        "apps/desktop/src/behaviors-screen.tsx",
+        "apps/desktop/src/local-behavior.service.ts",
+        "apps/desktop/src-tauri/src/local_store/behavior.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-opportunity-ui.dom.test.tsx",
+          "tests/behavior-form.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test covers No fixed schedule and back, the no-schedule notice, the Opportunity group and Done N times; parsing is covered separately."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "components/behaviors/BehaviorList.tsx",
+            "lib/services/behavior-form.ts"
+          ],
+          "evidence": [
+            "tests/behavior-opportunity-ui.dom.test.tsx",
+            "tests/behavior-form.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-behavior.service.ts",
+            "apps/desktop/src-tauri/src/local_store/behavior.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-021",
+      "name": "Open the Opportunity Basket",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "See today's opportunity Behaviors with a suggested free time.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Opportunity (n) under today's date"
+        }
+      ],
+      "availability": "On today's Timeline when one or more opportunity Behaviors are running and the surface injects the add action. Hidden when the pool is empty.",
+      "success_result": "A non-modal ledger opens: inline under today's date on wide screens, a bottom sheet on phones. It lists the pool in title order with length, Where and an On today note. Escape or Close returns focus to the trigger.",
+      "failure_result": "",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
+        "components/timeline/DayProgressTimeline.tsx",
+        "packages/core/src/services/opportunity-pool.ts#resolveOpportunityPool",
+        "lib/services/timeline.service.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-timeline.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test covers the hidden state, open, Close and Escape with focus return; the pool payload is covered by the service test."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
+            "lib/services/timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-022",
+      "name": "Add an opportunity to today",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Place an opportunity Behavior on today's Timeline at a time or in a time window.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Add to today, then Exact time or Time window (preset or custom), then Add"
+        }
+      ],
+      "availability": "In the Opportunity Basket, for today in the Behavior's timezone.",
+      "success_result": "Cadence adds an Unresolved Occurrence with origin opportunity, plans its browser reminder when one is due later today, and shows opportunity.added.",
+      "failure_result": "A Behavior no longer available, not running then, a day other than today or an invalid time is refused with an opportunity.refused notice; nothing changes.",
+      "effects": [
+        "database_write",
+        "reminder_planning",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
+        "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#addOpportunityToToday",
+        "lib/db/opportunity.repo.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test posts the exact-time default and a window preset with a fresh client_occurrence_id and shows the notice; the service test covers placements, refusals, replay and reminder planning."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-023",
+      "name": "Log an opportunity as done now",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Record in one tap that an opportunity Behavior was just done.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Done now in the basket"
+        }
+      ],
+      "availability": "In the Opportunity Basket while the Behavior is running.",
+      "success_result": "Cadence adds the Occurrence at the current minute and marks it Completed with one status event in the same write, then shows opportunity.logged. No reminder is planned.",
+      "failure_result": "Refusals as for adding; nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityBasket",
+        "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#addOpportunityToToday",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test checks that each tap posts done_now with a new client_occurrence_id and shows the logged notice or a refusal; the service test covers the call."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OpportunityBasket.tsx",
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-024",
+      "name": "Remove an added opportunity",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#review-needs-decision"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07",
+        "J09"
+      ],
+      "intent": "Take an added item off today, or out of Needs decision, back to the basket.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Remove in an added row's details"
+        }
+      ],
+      "availability": "On an added row that is Unresolved with no Note, no tracked time, no earlier mark and no connected activity, today or in Needs decision.",
+      "success_result": "Cadence cancels the item's pending reminders, deletes the Occurrence and shows opportunity.removed. The Behavior stays in the basket.",
+      "failure_result": "A marked item or one with a Note, tracked time, an earlier mark or a connected activity is refused with an opportunity.remove-refused notice; nothing changes.",
+      "effects": [
+        "database_delete",
+        "reminder_cancellation",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OpportunityBasket.tsx#OpportunityRemoveControl",
+        "components/timeline/OccurrenceRow.tsx#OccurrenceRow",
+        "app/(app)/timeline/opportunity-actions.ts#removeOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#removeOpportunityFromToday",
+        "lib/db/opportunity.repo.ts",
+        "apps/desktop/src/timeline-screen.tsx",
+        "apps/desktop/src/local-actions.ts",
+        "apps/desktop/src/local-opportunity.service.ts",
+        "apps/desktop/src-tauri/src/local_store/opportunity.rs",
+        "apps/desktop/src/local-timeline.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/timeline-opportunity-ui.dom.test.tsx",
+          "tests/opportunity.service.test.ts",
+          "tests/desktop-opportunity.dom.test.tsx",
+          "tests/desktop-opportunity-contract.test.ts"
+        ],
+        "notes": "DOM test shows Remove only when canRemove is true, on today and in Needs decision, and renders removed and refused notices; the service test covers removal and each refusal."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceRow.tsx",
+            "components/timeline/OpportunityBasket.tsx",
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/timeline-opportunity-ui.dom.test.tsx",
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-opportunity.service.ts",
+            "apps/desktop/src-tauri/src/local_store/opportunity.rs",
+            "apps/desktop/src/local-timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/desktop-opportunity.dom.test.tsx",
+            "tests/desktop-opportunity-contract.test.ts"
+          ]
         },
         "marketing": {
           "applicability": "not_applicable",

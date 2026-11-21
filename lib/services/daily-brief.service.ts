@@ -13,6 +13,8 @@ import { agentCallerConfigured, createAgentClient } from "@/lib/integrations/age
 import { modelPrice } from "./agent-model-pricing";
 import { BRIEF_OPENING_PROMPT_REVISION, prepareBriefOpening, stockBriefOpening, validateBriefOpening, type BriefOpeningLine, type BriefOpeningText } from "./brief-opening";
 import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBriefConflicts, saveBriefProposals } from "./brief-moves.service";
+import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
+import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator, type DailyBriefModelUsage } from "./daily-brief-consumer";
 import { dailyBriefModelSetting, generateBriefOpeningWithModel, generateDurationEstimatesWithModel } from "./daily-brief-model";
@@ -272,6 +274,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   const attempt = readDailyBriefAttemptInput(value);
   if (!options.generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
   const wantsMoves = attempt.features?.includes(BRIEF_MOVE_LINES_FEATURE) ?? false;
+  const wantsOpportunities = attempt.features?.includes(BRIEF_OPPORTUNITY_LINES_FEATURE) ?? false;
   const setting = dailyBriefModelSetting();
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
@@ -297,7 +300,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       installationId, retry: attempt.retry, expectedRevision: preferences.revision, refresh: attempt.refresh ?? false, moves: wantsMoves,
     }, signal));
     if (admission.state === "saved") {
-      return { state: "ready", briefing: await phase("reopen", () => reopenSavedBrief(caller, admission, { wantsMoves, refresh: (used) => refreshState(agentClient, used), signal })) };
+      return { state: "ready", briefing: await phase("reopen", () => reopenSavedBrief(caller, admission, { wantsMoves, wantsOpportunities, refresh: (used) => refreshState(agentClient, used), signal })) };
     }
     if (admission.state === "refresh_limit_reached") throw new DailyBriefError("refresh_limit_reached");
     if (admission.state === "rate_limited") throw new DailyBriefError("rate_limited", admission.retryAfterSeconds);
@@ -356,6 +359,18 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         runId: agentRun?.runId ?? "", localDate: context.localDate, refresh: refreshing,
         lines: plan.candidates.map((candidate) => ({ ...candidate, reason: words.reasons[candidate.key] ?? candidate.reason })),
       })) : [];
+      // Task 7: "Add for today" lines after the move lines, under the same free-slot rule and line cap.
+      const opportunities = wantsOpportunities ? await phase("opportunities", async () => {
+        const planned = await planBriefOpportunityDay({
+          supabase: caller.client, userId: caller.user.id, localDate: context.localDate, timezone: context.timezone,
+          now: Temporal.Instant.from(now), context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null },
+          travelSecrets: readTravelConclusionsSecrets(process.env), day: plan.day, moveCandidates: wantsMoves ? plan.candidates : [],
+        });
+        const saved = await saveBriefOpportunityProposals(agentRun?.client ?? null, {
+          runId: agentRun?.runId ?? "", localDate: context.localDate, refresh: refreshing, candidates: planned.candidates,
+        });
+        return briefOpportunitiesFor({ localDate: context.localDate, timezone: context.timezone, runId: agentRun?.runId ?? null, lines: saved, calendar: planned.calendar });
+      }) : null;
       const notices = dailyBriefNotices({ calendar: plan.calendar, words, timezone: context.timezone, lines: lines.length });
       const saved: DailyBriefing = {
         text: words.opening, localDate: context.localDate, timezone: context.timezone,
@@ -375,6 +390,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const briefing: DailyBriefing = {
         ...saved,
         ...(wantsMoves ? { moves: briefMovesFor(context, agentRun?.runId ?? null, lines, conflicts, plan.calendar) } : {}),
+        ...(opportunities ? { opportunities } : {}),
         refresh: publicRefreshState(await refreshState(agentClient, used).catch(() => ({ remaining: Math.max(0, DAILY_BRIEF_REFRESHES_PER_DAY - used), available: false, retryAfterSeconds: undefined }))),
       };
       await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context), wordsError: words.failure?.error,
@@ -462,15 +478,17 @@ export function dailyBriefNotices(input: Readonly<{ calendar: "current" | "stale
 /** Reopens today's saved brief with no model call. Move lines come back with their current answers. */
 async function reopenSavedBrief(caller: CalendarCaller, saved: Extract<DailyBriefBeginResult, { state: "saved" }>, input: Readonly<{
   wantsMoves: boolean;
+  wantsOpportunities: boolean;
   refresh: (used: number) => Promise<DailyBriefRefreshState>;
   signal: AbortSignal;
 }>): Promise<DailyBriefing> {
   const briefing = saved.briefing as unknown as DailyBriefing;
-  const [moves, refresh] = await Promise.all([
+  const [moves, opportunities, refresh] = await Promise.all([
     input.wantsMoves && saved.withMoves ? readBriefMoves(caller.client, { localDate: saved.localDate, timezone: briefing.timezone, runId: saved.runId }) : null,
+    input.wantsOpportunities ? readBriefOpportunities(caller.client, { userId: caller.user.id, localDate: saved.localDate, timezone: briefing.timezone, runId: saved.runId }) : null,
     input.refresh(saved.refreshesUsed).catch(() => ({ remaining: Math.max(0, DAILY_BRIEF_REFRESHES_PER_DAY - saved.refreshesUsed), available: false, retryAfterSeconds: undefined })),
   ]);
-  return { ...briefing, ...(moves ? { moves } : {}), refresh: publicRefreshState(refresh) };
+  return { ...briefing, ...(moves ? { moves } : {}), ...(opportunities ? { opportunities } : {}), refresh: publicRefreshState(refresh) };
 }
 
 type DailyBriefRefreshState = Readonly<{ remaining: number; available: boolean; retryAfterSeconds: number | undefined }>;

@@ -7,7 +7,8 @@ import type { TimelineOccurrenceInput } from "../types/timeline";
 import type { TimeSession } from "../types/time-tracking";
 import { resolveTimeline, resolveTimelineOccurrence } from "../resolvers/timeline.resolver";
 import { resolveOccurrenceTimeTracking } from "../resolvers/time-tracking.resolver";
-import { normalizeRecurrenceRule, normalizeScheduledTime, summarizeRecurrenceRule } from "./behavior-values";
+import { normalizeScheduledTime, storedRecurrenceRuleOrNull, summarizeRecurrenceRule } from "./behavior-values";
+import { resolveOpportunityPool } from "./opportunity-pool";
 import { formatClockTimeLabel, formatCompactOccurrenceScheduleLabel } from "./schedule";
 import { effectiveStartAt, isMoved } from "../resolvers/time.resolver";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "./occurrence-generation";
@@ -15,6 +16,7 @@ import { normalizeOccurrenceStatus } from "./occurrence.service";
 import { storedBehaviorWhere } from "./behavior-where";
 import { behaviorRunNotice, runFieldsFromStored } from "../resolvers/behavior-run.resolver";
 import type { BehaviorRunNotice } from "../types/timeline";
+import type { OpportunityAddedBy } from "../types/database";
 
 export function resolvePersistedTimeline(input: {
   behaviors: BehaviorGraphRecord[];
@@ -25,6 +27,11 @@ export function resolvePersistedTimeline(input: {
   futureDays?: number;
   startLocalDate?: string;
   durationHistory?: { occurrences: OccurrenceRecord[]; timeSessions: TimeSession[] };
+  /**
+   * Behaviors of Opportunity: which added Occurrences have status history or an active
+   * source match, for Remove. Without it, Remove stays hidden.
+   */
+  removalFacts?: OpportunityRemovalReadFacts;
 }) {
   const activeBehaviorById = new Map(input.behaviors.filter((row) => row.active).map((row) => [row.id, row]));
   const sessionsByOccurrence = new Map<string, TimeSession[]>();
@@ -34,7 +41,7 @@ export function resolvePersistedTimeline(input: {
     sessionsByOccurrence.set(session.occurrenceId, sessions);
   }
   const occurrences = input.occurrences.map((row) => toTimelineOccurrenceInput(
-    row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [],
+    row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [], input.removalFacts,
   )).filter((row): row is TimelineOccurrenceInput => row !== null);
   const timeline = resolveTimeline({ occurrences, now: input.now, timezone: input.timezone, futureDays: input.futureDays, startLocalDate: input.startLocalDate });
   if (input.durationHistory || input.behaviors.some((behavior) => behavior.default_duration_minutes != null)) {
@@ -53,8 +60,16 @@ export function resolvePersistedTimeline(input: {
     ]));
   }
   timeline.runNotices = resolveBehaviorRunNotices(input.behaviors, input.now);
+  timeline.opportunityPool = resolveOpportunityPool({
+    behaviors: input.behaviors, timeline, now: input.now, timezone: input.timezone,
+  });
   return timeline;
 }
+
+export type OpportunityRemovalReadFacts = Readonly<{
+  statusHistoryOccurrenceIds: ReadonlySet<string>;
+  activeSourceMatchOccurrenceIds: ReadonlySet<string>;
+}>;
 
 /** Today's ended, paused and back-today notices, in title order (T7). */
 export function resolveBehaviorRunNotices(behaviors: readonly BehaviorGraphRecord[], now: Temporal.Instant): BehaviorRunNotice[] {
@@ -83,6 +98,7 @@ function toTimelineOccurrenceInput(
   occurrence: OccurrenceRecord,
   activeBehaviorById: Map<string, BehaviorGraphRecord>,
   timeSessions: TimeSession[],
+  removalFacts?: OpportunityRemovalReadFacts,
 ): TimelineOccurrenceInput | null {
   const behavior = activeBehaviorById.get(occurrence.behavior_id);
 
@@ -90,7 +106,8 @@ function toTimelineOccurrenceInput(
     return null;
   }
 
-  const recurrenceRule = normalizeRecurrenceRule(behavior.recurrence_rule);
+  const recurrenceRule = storedRecurrenceRuleOrNull(behavior);
+  const origin = occurrence.origin === "opportunity" ? "opportunity" : "scheduled";
   const tracking = resolveOccurrenceTimeTracking(timeSessions);
 
   return {
@@ -99,7 +116,7 @@ function toTimelineOccurrenceInput(
     title: behavior.title,
     description: behavior.description ?? "",
     categoryName: behavior.category?.name ?? "No category",
-    scheduleSummary: summarizeRecurrenceRule(recurrenceRule),
+    scheduleSummary: recurrenceRule ? summarizeRecurrenceRule(recurrenceRule) : "",
     ...occurrenceTimeLabels(occurrence, behavior.timezone),
     revision: occurrence.updated_at,
     scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
@@ -114,7 +131,18 @@ function toTimelineOccurrenceInput(
       runningStartedAt: tracking.runningSession?.startedAt ?? null,
     },
     canStartTimeTracking: behavior.active,
+    origin,
+    addedBy: origin === "opportunity" ? toAddedBy(occurrence.added_by) : null,
+    hasTimeSessions: timeSessions.length > 0,
+    ...(removalFacts ? {
+      hasStatusHistory: removalFacts.statusHistoryOccurrenceIds.has(occurrence.id),
+      hasActiveSourceMatch: removalFacts.activeSourceMatchOccurrenceIds.has(occurrence.id),
+    } : {}),
   };
+}
+
+function toAddedBy(value: string | null | undefined): OpportunityAddedBy | null {
+  return value === "user" || value === "daily_brief" || value === "chat" || value === "mcp" ? value : null;
 }
 
 /**

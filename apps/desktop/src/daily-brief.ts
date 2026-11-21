@@ -7,6 +7,7 @@ import type {
 import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefRequestInput, DailyBriefSettingsUpdate } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch, withDailyBriefDeadline } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
+import { createBriefOpportunityClient, type BriefOpportunityClient } from "@/lib/ui/daily-brief-opportunities";
 import { ADVISOR_REQUEST_DEADLINE_MS, createAdvisorClient, type AdvisorClient } from "@/lib/ui/advisor";
 import { ChatGPTPlanError, chooseChatGPTPlanModel, generateChatGPTPlanDailyBrief } from "@/lib/services/daily-brief-chatgpt-plan";
 import { readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
@@ -54,6 +55,8 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
   readonly plan?: DailyBriefPlanControls;
   /** Advisor Phase 3 (3C): brief move answers go to the hosted API with this Mac's bearer session. */
   readonly moves: BriefMoveClient;
+  /** Behaviors of Opportunity: "Add for today" lines; an added item arrives by account sync. */
+  readonly opportunities: BriefOpportunityClient;
   /** Advisor Phase 4 (4E): tips and schedule questions from the hosted API with this Mac's bearer session. */
   readonly advisor: AdvisorClient;
   /** The latest settings read; `deviceModelAvailable` decides whether the plan path can run. */
@@ -69,6 +72,7 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     onAccountWrite: () => void = () => undefined,
   ) {
     this.moves = createBriefMoveClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
+    this.opportunities = createBriefOpportunityClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
     // A schedule answer changes a hosted Behavior; the Mac pulls it through account sync.
     this.advisor = createAdvisorClient((path, init, signal) => this.request(path, init, ADVISOR_REQUEST_DEADLINE_MS, signal), onAccountWrite);
     if (planPath) {

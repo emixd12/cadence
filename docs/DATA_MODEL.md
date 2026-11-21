@@ -359,9 +359,10 @@ create table behaviors (
   location_text text,
   where_kind text check (where_kind is null or where_kind in ('anywhere', 'home', 'place')),
 
-  recurrence_rule jsonb not null,
-  scheduled_time time not null,
+  recurrence_rule jsonb,
+  scheduled_time time,
   timezone text not null default 'America/New_York',
+  is_opportunity boolean not null default false,
 
   browser_reminder_enabled boolean not null default true,
   email_reminder_enabled boolean not null default false,
@@ -371,9 +372,17 @@ create table behaviors (
   current_configuration_event_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  archived_at timestamptz
+  archived_at timestamptz,
+
+  constraint behaviors_schedule_or_opportunity check (
+    is_opportunity or (recurrence_rule is not null and scheduled_time is not null)
+  )
 );
 ```
+
+`is_opportunity` puts the Behavior in the opportunity pool. `recurrence_rule` and
+`scheduled_time` are null only on an opportunity Behavior with no schedules. See
+"Behaviors of Opportunity" below.
 
 `where_kind` is the optional Behavior Where. Not set and Anywhere request no
 route. Home routes to the saved Home when the user is elsewhere and requests no
@@ -900,21 +909,23 @@ create table occurrences (
   status_marked_at timestamptz,
   note text,
 
+  origin text not null default 'scheduled' check (origin in ('scheduled', 'opportunity')),
+  added_by text check (added_by is null or added_by in ('user', 'daily_brief', 'chat', 'mcp')),
+  check ((origin = 'opportunity') = (added_by is not null)),
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  unique (
-    behavior_id,
-    local_date,
-    schedule_start_time,
-    schedule_range_identity
-  ),
   unique (user_id, id, behavior_id),
   foreign key (user_id, behavior_id, behavior_configuration_event_id)
     references behavior_configuration_events(user_id, behavior_id, id)
     deferrable initially deferred
 );
 ```
+
+The schedule identity is a partial unique index over scheduled rows only (see
+"Occurrence uniqueness"). `origin` and `added_by` are described in "Behaviors of
+Opportunity".
 
 `status` is the current-status snapshot for fast Timeline, Analytics, and
 app-native export reads. Status history is stored separately in
@@ -1938,14 +1949,18 @@ When a behavior changes:
 Use:
 
 ```sql
-unique (
+create unique index occurrences_schedule_identity_key on occurrences (
   behavior_id,
   local_date,
   schedule_start_time,
   schedule_range_identity
-)
+) where origin = 'scheduled';
 unique (user_id, id, behavior_id)
 ```
+
+The schedule identity covers scheduled rows only, so an opportunity Occurrence never
+blocks a planned one. Generation names the index with
+`on conflict (...) where origin = 'scheduled'`.
 
 `schedule_range_identity` is a stored generated integer. Exact entries use
 `-1`; ranges use the end time expressed as microseconds after midnight. This
@@ -2291,6 +2306,120 @@ moment. The advisor snapshot carries the five fields and drops
 BehaviorLog reads a legacy `end_date` the same way.
 
 Migration: `20261120120000_behavior_end_and_pause.sql`.
+
+## Behaviors of Opportunity (November 2026)
+
+A Behavior can be available as an opportunity: the person adds it to today when a
+chance comes, instead of, or as well as, its schedule.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `behaviors.is_opportunity` | `boolean not null default false` | The Behavior is in the opportunity pool. It is a capability, not a run state: running, Ended, Paused and archived compose with it. |
+| `behaviors.recurrence_rule`, `behaviors.scheduled_time` | now nullable | Null only when the Behavior is an opportunity with no schedules (`behaviors_schedule_or_opportunity`). |
+| `occurrences.origin` | `text not null default 'scheduled'` | `scheduled`: made by generation. `opportunity`: added from the pool. |
+| `occurrences.added_by` | `text` | `user`, `daily_brief`, `chat` or `mcp` on an opportunity row; null on a scheduled row (`occurrences_origin_added_by_pair`). |
+
+Schedules. `cadence_private.validate_behavior_schedule_graph(jsonb, allow_empty
+boolean default false)` replaces the one-argument form. `replace_behavior_schedule_graph`
+checks the graph against the saved flag after the Behavior row is written, so an
+opportunity Behavior may have no schedules and any other Behavior keeps one to six.
+Turning the flag off with no schedule is refused ("A behavior needs between one and six
+schedules."). `create_behavior_with_schedule_graph` and
+`update_behavior_with_schedule_graph` read `is_opportunity` from the payload; an update
+payload without the key keeps the stored value. A JSON null `recurrence_rule` stores SQL
+null. BehaviorLog restore carries `is_opportunity`, `origin` and `added_by` when the
+restored record has them.
+
+Configuration history. The snapshot gains `is_opportunity`. `changed_fields` accepts
+`is_opportunity`, listed last, and baselines list it. A plan whose snapshots have no
+`is_opportunity` key (an older writer) reads as keeping the stored flag and need not list
+the field (`cadence_private.behavior_configuration_with_run` and
+`cadence_private.behavior_configuration_planned_fields`). The `updated_at` trigger
+watches `is_opportunity`.
+
+Generation. `apply_occurrence_generation_plan` refuses a plan that updates or deletes an
+opportunity row ("Occurrence generation cannot change an opportunity Occurrence.", 22023)
+and scopes its update and delete to `origin = 'scheduled'`. Schedule edits, pauses and
+ends therefore never remove an opportunity row.
+
+Functions (both `security definer`, `authenticated` only, owner from `auth.uid()`, one
+per-account advisory lock):
+
+```sql
+public.add_opportunity_occurrence(
+  target_behavior_id uuid,
+  planned_local_date date,
+  planned_start_time time,
+  planned_end_time time default null,     -- null: exact time; set: time range
+  planned_preset text default null,       -- range only: morning, afternoon, evening, night
+  planned_added_by text default 'user',   -- user, daily_brief, chat, mcp
+  mark_completed boolean default false,   -- "Done now"
+  planned_occurrence_id uuid default null -- idempotent replay key
+) returns jsonb  -- {created, occurrence, status_event}
+
+public.remove_opportunity_occurrence(target_occurrence_id uuid)
+  returns jsonb  -- {removed, occurrence, cancelled_reminder_count}
+```
+
+`add_opportunity_occurrence` requires the Behavior to be the caller's, an opportunity,
+active and not archived, and running both now and at the planned time
+(`behavior_stops_occurrence`). The day must be today in the Behavior's timezone. Times
+are whole minutes; a range whose end is at or before its start ends the next day, as a
+planned range does. The row has no schedule slot and carries the Behavior's current
+configuration event. With `mark_completed` it is stored Completed with `completed_at` and
+`status_marked_at` at the call time, and one `occurrence_status_events` row
+(`unresolved` to `completed`, `explicit_user_mark`, `manual_tap` for `user`,
+`manual_text` for `chat` and `mcp`, `high`) in the same transaction. A Daily Brief
+cannot mark Completed. A repeat call with the same `planned_occurrence_id` and fields
+returns the stored row with `created: false`; a different row with that ID is refused.
+
+`remove_opportunity_occurrence` deletes the caller's opportunity row only when it is
+Unresolved, has no Note, no tracked time, no status history and no active source match.
+Status history makes it permanent because removing it would delete append-only events;
+the account sync delete guard applies the same rule. Pending reminders are cancelled,
+then the row is deleted with its reminders. Account sync has no hosted tombstone: the
+row leaves the next hosted snapshot and linked devices remove it on apply.
+
+Account synchronization moves to contract 8, and the minimum writer contract is 8 (no
+contract 7 fallback). Contract 8 adds `behavior.is_opportunity` (default `false`),
+`occurrence.origin` (default `"scheduled"`) and `occurrence.added_by` (default null).
+Behavior writes must carry `is_opportunity` and Occurrence writes `origin` and
+`added_by` ("Update Cadence before synchronizing Occurrence changes.").
+
+Migration: `20261121100000_behaviors_of_opportunity.sql`. Fixture:
+`tests/sql/behaviors-of-opportunity-smoke.sql`.
+
+`get_export_page_read_bundle` adds `is_opportunity` to each Behavior and `origin` and
+`added_by` to each Occurrence, so the hosted Full JSON, JSONL and BehaviorLog exports
+carry them. Migration: `20261121110000_opportunity_export_read.sql` (function body only;
+signature, security and grants unchanged).
+
+MCP contract 1.6.0 and Cadence chat (Task 6): the MCP write receipt source
+(`cadence_private.integration_write_source`) keeps `is_opportunity` in a Behavior
+receipt, and `chat_actions.kind` accepts `opportunity` for chat's adds and removals.
+The two MCP tools call `add_opportunity_occurrence` and `remove_opportunity_occurrence`
+as the user; no new table or column. Migration:
+`20261121120000_opportunity_mcp_and_chat.sql` (function body and one check constraint).
+
+Daily Brief "Add for today" lines (Task 7). Server only, never synced, owner-read RLS,
+writes only through security-definer functions, as `move_proposals`:
+
+| Table or column | Meaning |
+| --- | --- |
+| `opportunity_proposals` | One offered line: `behavior_id`, `local_date`, `agent_run_id`, `status` (`proposed`, `accepted`, `declined`, `other_time`, `superseded`, `withdrawn`, `undone`), `proposed_start_at`/`proposed_end_at`, stock `reason` code, `line` (what the shown line needs, no model or calendar text), `replaces_proposal_id`, and `occurrence_id`, the Occurrence Yes or Other time added (kept as a record after Undo, so not a foreign key). Rows are deleted 30 days after their day by `record_brief_opportunity_proposals`. |
+| `opportunity_proposal_answers` | One append-only row per answer: `kind` (`yes`, `no`, `other_time`, `undo`, `never_add`), `outcome` (`applied`, `refused`), `refusal_reason`, `occurrence_id`, `source` (`person`, `daily_brief`), `idempotency_key`. Deleted with its proposal. |
+| `behavior_move_preferences.never_suggest_add` | "Don't suggest adding this", per Behavior. `boolean not null default false`. |
+
+Functions: `record_brief_opportunity_proposals(uuid, date, jsonb, boolean)` and
+`withdraw_brief_opportunity_proposal(uuid)` (the Daily Brief agent token only);
+`answer_opportunity_proposal(uuid, text, text, text, uuid, text)` (the person or the Daily
+Brief agent; Yes and Other time must name an added Occurrence of the same Behavior and
+day); `set_behavior_opportunity_preference(uuid, boolean)` (the person only; switching it
+on closes the Behavior's undecided lines). Yes and Other time add the Occurrence through
+`add_opportunity_occurrence` as the person with `added_by = 'daily_brief'`; Undo removes it
+through `remove_opportunity_occurrence`. `cadence_advisor_private.coach_signals.kind`
+accepts `opportunity_ready_to_schedule`. Migration:
+`20261121130000_brief_opportunity_proposals.sql` (additive).
 
 ## Note shortcut state (Tickets 126–128)
 
@@ -3376,7 +3505,9 @@ them; nothing else expires them.
   (`streaming` or `complete`), `agent_run_id`, and `stop_requested_at` (set by
   Stop on a streaming reply; the running turn checks it every second, ends at its
   next safe point, keeps what it already did and drops changes waiting for a Yes).
-- `chat_actions`: one row per change chat made. `id` is the outcome id the
+- `chat_actions`: one row per change chat made. `kind` is `status`,
+  `occurrence_note`, `day_note`, `move`, `create_behavior`, `update_behavior`,
+  `archive_behavior`, `restore_behavior` or `opportunity`. `id` is the outcome id the
   client sends to Undo. `undo_plan` holds the exact write that reverses it;
   `undo_state` is `available`, `undoing`, `done` or `unavailable`.
 - `chat_confirms`: the writes waiting for one Yes. `state` is `pending`,

@@ -41,6 +41,7 @@ export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_workouts", "search
 export const WRITE_OPERATIONS: ReadonlySet<string> = new Set([
   "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
   "create_behavior", "update_behavior", "archive_behavior", "restore_behavior",
+  "add_opportunity_occurrence", "remove_opportunity_occurrence",
 ]);
 
 export type FakeExecutor = Readonly<{
@@ -121,12 +122,12 @@ function behaviorOutput(world: ChatWorld, item: WorldBehavior) {
   return {
     id: item.id, title: item.title, description: item.description, location_text: null, category: item.category,
     state: item.state, archived_at: item.state === "archived" ? nowInstant(world) : null, auto_archived_at: null,
-    run_state: item.state === "archived" ? "archived" : "running", end_on: null, end_time: null, pause: null, end_date: null,
+    run_state: item.state === "archived" ? "archived" : "running", is_opportunity: item.isOpportunity === true, end_on: null, end_time: null, pause: null, end_date: null,
     default_duration_minutes: item.durationMinutes, timezone: world.timezone,
-    schedules: [{ id: derivedId(item.id, "00000001"), recurrence, recurrence_summary: recurrenceSummary,
+    schedules: item.unscheduled ? [] : [{ id: derivedId(item.id, "00000001"), recurrence, recurrence_summary: recurrenceSummary,
       time_entries: [{ id: derivedId(item.id, "00000002"), kind: "exact", preset: null, start_time: item.time, end_time: null, label: clockLabel(item.time) }],
       time_summary: clockLabel(item.time) }],
-    schedule_summary: `${recurrenceSummary} at ${clockLabel(item.time)}`,
+    schedule_summary: item.unscheduled ? "" : `${recurrenceSummary} at ${clockLabel(item.time)}`,
     reminders: { browser_enabled: true, email_enabled: false, offset_minutes: 0, summary: "Browser reminder at the scheduled time" },
     archive_notes: item.archiveNote ? [{ id: derivedId(item.id, "00000003"), archived_at: nowInstant(world), note: item.archiveNote, updated_at: nowInstant(world) }] : [],
     external_ref: null, created_at: created, updated_at: created, revision: `r${item.revision}`,
@@ -143,9 +144,12 @@ function occurrenceOutput(world: ChatWorld, item: WorldOccurrence) {
     id: item.id, behavior_id: behavior.id, behavior_title: behavior.title, category_name: behavior.category?.name ?? null,
     local_date: item.localDate, timezone: world.timezone, scheduled_for: planned, effective_start_at: effective,
     move: item.moves.length ? { planned_start_at: planned, start_at: effective, end_at: toInstant(world, item.localDate, timeOf(Math.min(minutesOf(at) + minutes, 1439))) } : null,
-    schedule: { kind: "exact", preset: null, start_time: item.time, end_time: null, label: clockLabel(item.time) },
+    schedule: item.rangeEnd
+      ? { kind: "range", preset: item.preset ?? null, start_time: item.time, end_time: item.rangeEnd, label: `${clockLabel(item.time)} to ${clockLabel(item.rangeEnd)}` }
+      : { kind: "exact", preset: null, start_time: item.time, end_time: null, label: clockLabel(item.time) },
     status: item.status, status_label: item.status === "completed" ? "Completed" : item.status === "not_completed" ? "Not Completed" : "Unresolved",
     needs_decision: item.status === "unresolved" && item.localDate < world.today,
+    origin: item.origin ?? "scheduled", added_by: item.origin === "opportunity" ? item.addedBy ?? "chat" : null,
     completed_at: item.status === "completed" && item.markedAt ? toInstant(world, item.localDate, item.markedAt) : null,
     status_marked_at: item.markedAt && item.status !== "unresolved" ? toInstant(world, item.localDate, item.markedAt) : null,
     note: item.note, updated_at: planned, revision: `r${item.revision}`,
@@ -200,7 +204,11 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
 
   list_behaviors: (world, input) => {
     const state = (input.state as string | undefined) ?? "all";
-    return ok({ behaviors: world.behaviors.filter((item) => state === "all" || item.state === state).map((item) => behaviorOutput(world, item)), next_cursor: null });
+    // The eval world has no end or pause: every active Behavior is running.
+    const inState = (item: WorldBehavior) => state === "all" || item.state === (state === "running" ? "active" : state === "not_running" ? "none" : state);
+    const opportunity = input.is_opportunity as boolean | undefined;
+    return ok({ behaviors: world.behaviors.filter((item) => inState(item) && (opportunity === undefined || (item.isOpportunity === true) === opportunity))
+      .map((item) => behaviorOutput(world, item)), next_cursor: null });
   },
 
   get_behavior: (world, input) => {
@@ -254,12 +262,15 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
   get_adherence_summary: (world, input) => {
     const inRange = world.occurrences.filter((item) => item.localDate >= (input.start_local_date as string) && item.localDate <= (input.end_local_date as string));
     const filter = input.behavior_ids as string[] | undefined;
-    const counts = (items: readonly WorldOccurrence[]) => {
+    const counts = (all: readonly WorldOccurrence[]) => {
+      // Adherence covers scheduled items; added opportunities are counted apart.
+      const items = all.filter((item) => item.origin !== "opportunity");
       const completed = items.filter((item) => item.status === "completed").length;
       const notCompleted = items.filter((item) => item.status === "not_completed").length;
       return { completed, not_completed: notCompleted, unresolved: items.filter((item) => item.status === "unresolved").length,
         needs_decision: items.filter((item) => item.status === "unresolved" && item.localDate < world.today).length,
-        adherence_rate: completed + notCompleted ? completed / (completed + notCompleted) : null };
+        adherence_rate: completed + notCompleted ? completed / (completed + notCompleted) : null,
+        opportunity_completed_count: all.filter((item) => item.origin === "opportunity" && item.status === "completed").length };
     };
     const behaviors = world.behaviors.filter((item) => !filter || filter.includes(item.id));
     const scoped = inRange.filter((item) => behaviors.some((row) => row.id === item.behaviorId));
@@ -328,6 +339,22 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
 
   move_occurrence_for_day: (world, input) => move(world, input),
 
+  add_opportunity_occurrence: (world, input) => addOpportunity(world, input),
+
+  remove_opportunity_occurrence: (world, input) => {
+    const item = findOccurrence(world, input.occurrence_id);
+    if (!item) return fail("not_found", "No Occurrence with this id.");
+    const title = findBehavior(world, item.behaviorId)!.title;
+    const refuse = (reason: string, message: string) => ok({ outcome: "refused", occurrence: occurrenceOutput(world, item), refusal: { reason, message } });
+    if (item.origin !== "opportunity") return refuse("scheduled", `${title} is on its schedule. Only an added item can be removed.`);
+    if (input.expected_revision !== undefined && input.expected_revision !== `r${item.revision}`) return refuse("revision_changed", `${title} changed since it was read.`);
+    if (item.status !== "unresolved") return refuse("marked", `${title} is already marked, so it stays.`);
+    if (item.note) return refuse("kept", `${title} has a Note, so it stays.`);
+    const output = occurrenceOutput(world, item);
+    world.occurrences.splice(world.occurrences.indexOf(item), 1);
+    return ok({ outcome: "removed", occurrence: output, refusal: null });
+  },
+
   revert_occurrence_move: (world, input) => {
     const item = findOccurrence(world, input.occurrence_id);
     if (!item) return fail("not_found", "No Occurrence with this id.");
@@ -353,13 +380,14 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
   },
 
   create_behavior: (world, input) => {
-    const schedule = (input.schedules as Record<string, unknown>[])[0];
-    const entry = (schedule.time_entries as Record<string, unknown>[])[0];
-    const recurrence = schedule.recurrence as Record<string, unknown>;
+    const schedule = (input.schedules as Record<string, unknown>[])[0] as Record<string, unknown> | undefined;
+    const entry = schedule ? (schedule.time_entries as Record<string, unknown>[])[0] : undefined;
+    const recurrence = (schedule?.recurrence ?? {}) as Record<string, unknown>;
     const item: WorldBehavior = { id: newId(world),
       title: input.title as string, description: (input.description as string | undefined) ?? null, category: null, state: "active",
       weekdays: recurrence.frequency === "weekly" ? recurrence.days_of_week as Weekday[] : null,
-      time: (entry.start_time as string | undefined) ?? "09:00", durationMinutes: (input.default_duration_minutes as number | undefined) ?? null, revision: 1, archiveNote: null };
+      time: (entry?.start_time as string | undefined) ?? "09:00", durationMinutes: (input.default_duration_minutes as number | undefined) ?? null, revision: 1, archiveNote: null,
+      isOpportunity: input.is_opportunity === true, unscheduled: !schedule };
     world.behaviors.push(item);
     return ok({ behavior: behaviorOutput(world, item) });
   },
@@ -372,7 +400,12 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     if (typeof input.title === "string") item.title = input.title;
     if ("description" in input) item.description = (input.description as string | null) ?? null;
     if ("default_duration_minutes" in input) item.durationMinutes = (input.default_duration_minutes as number | null) ?? null;
-    if (Array.isArray(input.schedules)) {
+    if (typeof input.is_opportunity === "boolean") item.isOpportunity = input.is_opportunity;
+    if (Array.isArray(input.schedules) && input.schedules.length === 0) {
+      if (!item.isOpportunity) return fail("invalid_input", "Add at least one schedule.");
+      item.unscheduled = true;
+    } else if (Array.isArray(input.schedules)) {
+      item.unscheduled = false;
       const schedule = input.schedules[0] as Record<string, unknown>;
       const recurrence = schedule.recurrence as Record<string, unknown>;
       const entry = (schedule.time_entries as Record<string, unknown>[])[0];
@@ -425,10 +458,10 @@ function moveRecord(world: ChatWorld, item: WorldOccurrence, from: string, kind:
 }
 
 /** Busy minutes today: calendar events (when calendars are on) and other timed Cadence items. */
-function busyIntervals(world: ChatWorld, except: WorldOccurrence): { start: number; end: number; kind: "calendar_busy" | "slot_taken"; label: string }[] {
+function busyIntervals(world: ChatWorld, except: WorldOccurrence | null): { start: number; end: number; kind: "calendar_busy" | "slot_taken"; label: string }[] {
   const events = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today)
     .map((item) => ({ start: minutesOf(item.start), end: minutesOf(item.end), kind: "calendar_busy" as const, label: item.title }));
-  const items = world.occurrences.filter((item) => item.localDate === world.today && item.id !== except.id && item.status === "unresolved").flatMap((item) => {
+  const items = world.occurrences.filter((item) => item.localDate === world.today && item.id !== except?.id && item.status === "unresolved").flatMap((item) => {
     const minutes = findBehavior(world, item.behaviorId)!.durationMinutes;
     return minutes ? [{ start: minutesOf(effectiveTime(item)), end: minutesOf(effectiveTime(item)) + minutes, kind: "slot_taken" as const,
       label: findBehavior(world, item.behaviorId)!.title }] : [];
@@ -467,6 +500,40 @@ function move(world: ChatWorld, input: Record<string, unknown>): ChatToolResult 
   item.moves.push(input.start_time as string);
   item.revision += 1;
   return ok({ outcome: "moved", occurrence: occurrenceOutput(world, item), move: moveRecord(world, item, from, "move"), refusal: null });
+}
+
+const PRESET_TIMES: Readonly<Record<string, readonly [string, string]>> = {
+  morning: ["06:00", "12:00"], afternoon: ["12:00", "18:00"], evening: ["18:00", "00:00"], night: ["00:00", "06:00"],
+};
+
+/** Adds an opportunity Behavior to today; an exact time is checked against the day like a move. */
+function addOpportunity(world: ChatWorld, input: Record<string, unknown>): ChatToolResult {
+  const behavior = findBehavior(world, input.behavior_id);
+  if (!behavior) return fail("not_found", "No Behavior with this id.");
+  const refuse = (reason: string, message: string, alternatives: unknown[] = []) => ok({ outcome: "refused", occurrence: null, refusal: { reason, message, alternatives } });
+  if (!behavior.isOpportunity || behavior.state !== "active") return refuse("not_available", `${behavior.title} is no longer available as an opportunity.`);
+  const preset = typeof input.preset === "string" ? input.preset as NonNullable<WorldOccurrence["preset"]> : null;
+  const start = input.mark_completed === true ? world.now : preset ? PRESET_TIMES[preset]![0] : input.start_time as string;
+  const end = preset ? PRESET_TIMES[preset]![1] : typeof input.end_time === "string" ? input.end_time : null;
+  if (input.mark_completed !== true && !end) {
+    const length = behavior.durationMinutes ?? 30;
+    const target = minutesOf(start);
+    const clash = (at: number) => busyIntervals(world, null).find((row) => at < row.end && at + length > row.start) ?? null;
+    const blocker = clash(target);
+    if (blocker) {
+      const found: { start_at: string; start_time: string }[] = [];
+      for (let step = 15; step <= 24 * 60 && found.length < 3; step += 15) {
+        for (const at of [target + step, target - step]) {
+          if (found.length < 3 && at > minutesOf(world.now) && at + length <= 24 * 60 && !clash(at)) found.push({ start_at: toInstant(world, world.today, timeOf(at)), start_time: timeOf(at) });
+        }
+      }
+      return refuse(blocker.kind, blocker.kind === "calendar_busy" ? `${blocker.label} is on your calendar then.` : `${blocker.label} is already at that time.`, found);
+    }
+  }
+  const item: WorldOccurrence = { id: newId(world), behaviorId: behavior.id, localDate: world.today, time: start, status: input.mark_completed === true ? "completed" : "unresolved",
+    moves: [], note: null, markedAt: input.mark_completed === true ? world.now : null, revision: 1, origin: "opportunity", addedBy: "chat", rangeEnd: end, preset };
+  world.occurrences.push(item);
+  return ok({ outcome: input.mark_completed === true ? "logged" : "added", occurrence: occurrenceOutput(world, item), refusal: null });
 }
 
 // ----------------------------------------------------------------- chat-only tools (5A step 3)

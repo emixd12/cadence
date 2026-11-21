@@ -1,6 +1,6 @@
 {
-  "version": "chat-starters-2",
-  "notes": "Advisor plan Phase 5B. Starter questions for an empty Chat conversation. Each lane names the account fact that makes a question worth asking (packages/core/src/resolvers/chat-starters.resolver.ts). {behavior} is filled with one of the person's own Behavior titles, so templates keep the person as the subject and work for verb-phrase titles too. min_behaviors hides a question until the account has that many active Behaviors. advice_card names the advice card a question draws on, when there is one. Copy rules (Emi's review, Nov 20): Behavior for the recurring habit, items for one day's instances, Needs decision for older items without a mark; no scorekeeping, guilt or cheerleading; every question answerable from the person's own record. Revision 2 applies that review.",
+  "version": "chat-starters-3",
+  "notes": "Advisor plan Phase 5B. Starter questions for an empty Chat conversation. Each lane names the account fact that makes a question worth asking (packages/core/src/resolvers/chat-starters.resolver.ts). {behavior} is filled with one of the person's own Behavior titles, so templates keep the person as the subject and work for verb-phrase titles too. min_behaviors hides a question until the account has that many active Behaviors. advice_card names the advice card a question draws on, when there is one. Copy rules (Emi's review, Nov 20): Behavior for the recurring habit, items for one day's instances, Needs decision for older items without a mark; no scorekeeping, guilt or cheerleading; every question answerable from the person's own record. Revision 2 applies that review. Revision 3 adds the opportunity_room lane: a running opportunity Behavior not on today, on a light day.",
   "starters": [
     { "id": "today-whats-on", "lane": "general", "text": "What is on today?" },
     { "id": "week-how-going", "lane": "general", "text": "How is my week going?" },
@@ -14,6 +14,8 @@
     { "id": "today-rearrange", "lane": "today_open", "text": "Help me rearrange the rest of today." },
     { "id": "today-tomorrow", "lane": "today_done", "text": "How does tomorrow look?" },
     { "id": "today-week-review", "lane": "today_done", "text": "How did my week go?" },
+    { "id": "opportunity-room", "lane": "opportunity_room", "text": "Is there room today for {behavior}?" },
+    { "id": "opportunity-when", "lane": "opportunity_room", "text": "When could I fit {behavior} in today?" },
     { "id": "today-moved", "lane": "moved_today", "text": "Have I been moving {behavior} a lot lately?", "advice_card": "set-it-where-you-keep-moving-it" },
 
     { "id": "decision-which", "lane": "unmarked", "text": "What still needs a decision?", "advice_card": "unmarked-is-not-missed" },

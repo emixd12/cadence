@@ -344,7 +344,8 @@ begin
   -- Contract 5 adds the read-only connector completion kinds (Ticket 320).
   -- Contract 6 adds the read-only occurrence_move kind (advisor Phase 2A).
   -- Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
-  if cadence_private.account_sync_current_contract() <> 7 then
+  -- Contract 8 adds behaviors.is_opportunity and occurrences.origin and added_by.
+  if cadence_private.account_sync_current_contract() <> 8 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -380,6 +381,13 @@ begin
         'end_time', null, 'pause_from_on', null, 'pause_from_time', null, 'pause_back_on', null))
     )), 6) -> 'entities' -> 0 -> 'value' <> '{"id": "b"}'::jsonb then
     raise exception 'Contract 6 projection no longer hides the contract 7 end and pause fields.';
+  end if;
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'behavior', 'id', 'b', 'value', jsonb_build_object('id', 'b', 'is_opportunity', true)),
+      jsonb_build_object('kind', 'occurrence', 'id', 'o', 'value', jsonb_build_object('id', 'o', 'origin', 'opportunity', 'added_by', 'user'))
+    )), 7) -> 'entities' <> '[{"id": "b", "kind": "behavior", "value": {"id": "b"}}, {"id": "o", "kind": "occurrence", "value": {"id": "o"}}]'::jsonb then
+    raise exception 'Contract 7 projection no longer hides the contract 8 opportunity fields.';
   end if;
 end;
 $$;

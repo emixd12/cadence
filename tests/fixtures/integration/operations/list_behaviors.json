@@ -14,6 +14,13 @@
         "page_size": 100,
         "cursor": "eyJvIjo1MH0"
       }
+    },
+    {
+      "name": "opportunities only",
+      "value": {
+        "state": "running",
+        "is_opportunity": true
+      }
     }
   ],
   "invalid_inputs": [
@@ -48,6 +55,14 @@
       },
       "code": "invalid_input",
       "path": "$.updated_since"
+    },
+    {
+      "name": "opportunity filter as text",
+      "value": {
+        "is_opportunity": "yes"
+      },
+      "code": "invalid_input",
+      "path": "$.is_opportunity"
     }
   ],
   "valid_outputs": [
@@ -68,6 +83,7 @@
             "archived_at": null,
             "auto_archived_at": null,
             "run_state": "running",
+            "is_opportunity": false,
             "end_on": null,
             "end_time": null,
             "pause": null,
@@ -130,6 +146,7 @@
             "archived_at": "2026-10-01T14:00:00Z",
             "auto_archived_at": null,
             "run_state": "archived",
+            "is_opportunity": false,
             "end_on": null,
             "end_time": null,
             "pause": null,
@@ -200,6 +217,7 @@
             "archived_at": null,
             "auto_archived_at": null,
             "run_state": "running",
+            "is_opportunity": false,
             "end_on": null,
             "end_time": null,
             "pause": null,
@@ -274,6 +292,7 @@
             "archived_at": null,
             "auto_archived_at": null,
             "run_state": "running",
+            "is_opportunity": false,
             "end_on": null,
             "end_time": null,
             "pause": null,

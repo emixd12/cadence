@@ -94,8 +94,9 @@ export function parseBehaviorFormData(
     fieldErrors.category_id = "Choose one of your categories.";
   }
 
+  const isOpportunity = parseOpportunityFlag(formData);
   const { recurrenceRule, schedules, scheduleSlots } =
-    parseSchedulesAndLegacyFieldsFromForm(formData, fieldErrors);
+    parseSchedulesAndLegacyFieldsFromForm(formData, fieldErrors, isOpportunity === true);
   const reminderOffsetMinutes = parseReminderOffset(formData, fieldErrors);
 
   if (Object.keys(fieldErrors).length > 0) {
@@ -121,7 +122,18 @@ export function parseBehaviorFormData(
     reminderOffsetMinutes,
     active:
       options.mode === "create" ? true : getCheckboxValue(formData, "active"),
+    ...(isOpportunity === undefined ? {} : { isOpportunity }),
   };
+}
+
+/**
+ * Behaviors of Opportunity. The form posts a hidden `is_opportunity=false` before the
+ * checkbox, so an unticked box reads as false. A form without the field (an older
+ * caller) keeps the stored flag.
+ */
+function parseOpportunityFlag(formData: FormData): boolean | undefined {
+  if (!formData.has("is_opportunity")) return undefined;
+  return formData.getAll("is_opportunity").some((value) => value === "on" || value === "true");
 }
 
 /**
@@ -227,13 +239,14 @@ function getErrorMessage(error: unknown): string | null {
 function parseSchedulesAndLegacyFieldsFromForm(
   formData: FormData,
   fieldErrors: Partial<Record<BehaviorFormField, string>>,
+  allowNoSchedule: boolean,
 ): {
   recurrenceRule: RecurrenceRule;
   schedules: BehaviorScheduleInput[];
   scheduleSlots: ScheduleSlotInput[];
 } {
   if (getOptionalString(formData, "behavior_schedule_count")) {
-    const schedules = parseBehaviorSchedulesFromForm(formData, fieldErrors);
+    const schedules = parseBehaviorSchedulesFromForm(formData, fieldErrors, allowNoSchedule);
     const recurrenceRule = schedules[0]?.recurrenceRule ?? {
       frequency: "daily",
       interval: 1,
@@ -267,9 +280,13 @@ function parseSchedulesAndLegacyFieldsFromForm(
 function parseBehaviorSchedulesFromForm(
   formData: FormData,
   fieldErrors: Partial<Record<BehaviorFormField, string>>,
+  allowNoSchedule: boolean,
 ): BehaviorScheduleInput[] {
   const rawCount = getOptionalString(formData, "behavior_schedule_count");
   const count = Number(rawCount);
+
+  // An opportunity Behavior may have no schedule; the core service stores no recurrence.
+  if (allowNoSchedule && count === 0) return [];
 
   if (!Number.isInteger(count) || count < 1) {
     fieldErrors.schedule = "Add at least one schedule.";

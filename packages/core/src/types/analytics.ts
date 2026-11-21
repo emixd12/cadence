@@ -1,3 +1,4 @@
+import type { OccurrenceOrigin } from "./database";
 export type AnalyticsStatus = "unresolved" | "completed" | "not_completed";
 
 export type AnalyticsRangeDays = 7 | 30 | 90;
@@ -15,6 +16,8 @@ export type AnalyticsOccurrenceInput = {
   status: AnalyticsStatus;
   note: string;
   timezone: string;
+  /** Behaviors of Opportunity. Missing means "scheduled". Adherence reads scheduled rows only. */
+  origin?: OccurrenceOrigin;
 };
 
 export type AnalyticsTimeSessionInput = {
@@ -53,7 +56,19 @@ export type AnalyticsAdherence = {
   detailLabel: string;
 };
 
-export type AnalyticsSummary = AnalyticsStatusCounts & AnalyticsAdherence;
+/**
+ * Behaviors of Opportunity: added Occurrences, counted apart from adherence. The label
+ * is "Done N times" when any was Completed, otherwise null.
+ */
+export type AnalyticsOpportunityCounts = {
+  /** The resolver always sets these; optional so hand-built summaries stay valid. */
+  opportunityCompletedCount?: number;
+  opportunityNotCompletedCount?: number;
+  opportunityDoneLabel?: string | null;
+};
+
+/** Status counts and adherence cover scheduled Occurrences; the unresolved count also holds added ones in Needs decision. */
+export type AnalyticsSummary = AnalyticsStatusCounts & AnalyticsAdherence & AnalyticsOpportunityCounts;
 
 export type AnalyticsOverallDayState =
   | "empty"
@@ -95,8 +110,9 @@ export type AnalyticsBehaviorDayCell = {
   ariaLabel: string;
 };
 
+/** Counts and adherence cover scheduled Occurrences; day cells show every Occurrence. */
 export type AnalyticsBehaviorSummary = AnalyticsStatusCounts &
-  AnalyticsAdherence & {
+  AnalyticsAdherence & AnalyticsOpportunityCounts & {
     behaviorId: string;
     title: string;
     categoryName: string;
@@ -117,7 +133,7 @@ export type AnalyticsConnectorTiming = Readonly<{
 }>;
 
 export type AnalyticsCategorySummary = AnalyticsStatusCounts &
-  AnalyticsAdherence & {
+  AnalyticsAdherence & AnalyticsOpportunityCounts & {
     categoryName: string;
   };
 

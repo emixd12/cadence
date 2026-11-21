@@ -69,6 +69,8 @@ export const COACH_SIGNAL_KINDS = [
   "reminder_response",
   "session_length",
   "moved_vs_unmoved",
+  // Behaviors of Opportunity (Task 7, ./coach-signals-v2.ts).
+  "opportunity_ready_to_schedule",
 ] as const;
 
 export type CoachSignalKind = (typeof COACH_SIGNAL_KINDS)[number];
@@ -95,6 +97,10 @@ export type CoachSignalBehavior = Readonly<{
   lengthMinutes?: number | null;
   /** Version 2: has a Where set (anywhere, home or a place). Undefined when not read. */
   hasPlace?: boolean;
+  /** Behaviors of Opportunity: available as an opportunity. Undefined when not read. */
+  isOpportunity?: boolean;
+  /** Behaviors of Opportunity: has a recurring schedule. False for an unscheduled opportunity Behavior. */
+  hasSchedule?: boolean;
 }>;
 
 export type CoachSignalOccurrence = Readonly<{
@@ -109,6 +115,8 @@ export type CoachSignalOccurrence = Readonly<{
   startTime?: string;
   /** The planned start instant (ISO), before any move. */
   plannedStartAt?: string;
+  /** Behaviors of Opportunity: "opportunity" for an added Occurrence. Missing means scheduled. */
+  origin?: "scheduled" | "opportunity";
 }>;
 
 /** The first explicit decision on an Occurrence (not a correction, not an import). */

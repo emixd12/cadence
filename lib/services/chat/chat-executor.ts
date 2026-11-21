@@ -131,9 +131,9 @@ export function calendarBusyFrom(events: readonly ChatCalendarEvent[]): MoveCale
 }
 
 /**
- * The executor for one turn. Moves load today's events first and pass their busy
- * times to the same slot check the brief's apply path uses; a clash is refused with
- * `calendar_busy` and up to three other times (5A step 4).
+ * The executor for one turn. Moves, and opportunity adds at an exact time, load today's
+ * events first and pass their busy times to the same slot check the brief's apply path
+ * uses; a clash is refused with `calendar_busy` and up to three other times (5A step 4).
  */
 export function createLiveChatExecutor(input: Readonly<{
   context: IntegrationContext;
@@ -157,7 +157,10 @@ export function createLiveChatExecutor(input: Readonly<{
       return { ok: false, error: { code: "source_off", message: "Notes are off in Settings." } };
     }
     const operationInput = options.idempotencyKey ? { ...args, idempotency_key: options.idempotencyKey } : { ...args };
-    const calendarBusy = name === "move_occurrence_for_day" ? await busyToday() : undefined;
+    // Adding an opportunity at an exact time passes the same busy times: the handler then
+    // checks today's items and events with the shared free-slot rule, as a move does.
+    const exactAdd = name === "add_opportunity_occurrence" && typeof args.start_time === "string" && args.end_time === undefined && args.mark_completed !== true;
+    const calendarBusy = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
     const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, calendarBusy ? { calendarBusy } : {});
     if (!result.ok) return { ok: false, error: { code: result.error.code, message: result.error.message } };
     return { ok: true, result: input.sources.notes ? result.value : withoutNotes(result.value) };

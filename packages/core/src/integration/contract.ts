@@ -42,6 +42,8 @@ export function validateOperationInput<N extends IntegrationOperationName>(
   const record = value as Record<string, unknown>;
   const issues: ValidationIssue[] = [];
   checkTimeRanges(record.schedules, issues);
+  if (name === "create_behavior" || name === "update_behavior") checkEmptySchedules(name, record, issues);
+  if (name === "add_opportunity_occurrence") checkOpportunityPlacement(record, issues);
   if (issues.length) return { ok: false, error: invalidInputError(issues), issues };
 
   const maxRange = name === "list_occurrences"
@@ -147,6 +149,34 @@ function checkTimeRanges(schedules: unknown, issues: ValidationIssue[]): void {
       }
     });
   });
+}
+
+/**
+ * Empty schedules are allowed only for a Behavior available as an opportunity. An
+ * update that leaves out is_opportunity is checked against the stored flag later.
+ */
+function checkEmptySchedules(name: "create_behavior" | "update_behavior", record: Record<string, unknown>, issues: ValidationIssue[]): void {
+  if (!Array.isArray(record.schedules) || record.schedules.length > 0) return;
+  const refused = name === "create_behavior" ? record.is_opportunity !== true : record.is_opportunity === false;
+  if (refused) issues.push({ path: "$.schedules", keyword: "minItems", message: "must contain at least 1 item unless is_opportunity is true" });
+}
+
+/** One placement: start_time (with an optional end_time), a preset, or mark_completed alone. */
+function checkOpportunityPlacement(record: Record<string, unknown>, issues: ValidationIssue[]): void {
+  const start = typeof record.start_time === "string" ? record.start_time : null;
+  const end = typeof record.end_time === "string" ? record.end_time : null;
+  const preset = typeof record.preset === "string";
+  if (record.mark_completed === true) {
+    if (start || end || preset) issues.push({ path: "$.mark_completed", keyword: "placement", message: "takes no start_time, end_time or preset" });
+    return;
+  }
+  if (preset && (start || end)) {
+    issues.push({ path: "$.preset", keyword: "placement", message: "cannot be sent with start_time or end_time" });
+    return;
+  }
+  if (end && !start) issues.push({ path: "$.end_time", keyword: "placement", message: "needs start_time" });
+  else if (end && end === start) issues.push({ path: "$.end_time", keyword: "timeRange", message: "must differ from start_time" });
+  else if (!start && !preset) issues.push({ path: "$.start_time", keyword: "placement", message: "send start_time, preset or mark_completed" });
 }
 
 function utf8Length(value: string): number {

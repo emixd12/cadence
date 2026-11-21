@@ -60,6 +60,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": {
@@ -135,6 +136,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "paused",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": {
@@ -212,6 +214,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": {

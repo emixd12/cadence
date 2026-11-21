@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
   answer: vi.fn(),
   replan: vi.fn(),
+  recheck: vi.fn(),
+  recheckOpportunities: vi.fn(),
   rpc: vi.fn(),
 }));
 
@@ -15,10 +17,16 @@ vi.mock("@/lib/services/brief-moves.service", async (load) => ({
   ...(await load<typeof import("@/lib/services/brief-moves.service")>()),
   answerBriefMove: mocks.answer,
   replanBriefMove: mocks.replan,
+  recheckBriefMoves: mocks.recheck,
+}));
+vi.mock("@/lib/services/brief-opportunities.service", async (load) => ({
+  ...(await load<typeof import("@/lib/services/brief-opportunities.service")>()),
+  recheckBriefOpportunities: mocks.recheckOpportunities,
 }));
 
 import { POST as answerRoute } from "@/app/api/advisor/brief/answer/route";
 import { POST as replanRoute } from "@/app/api/advisor/brief/replan/route";
+import { POST as recheckRoute } from "@/app/api/advisor/brief/recheck/route";
 import { BriefMoveError } from "@/lib/services/brief-moves.service";
 import { parseBriefMoveAnswer, parseBriefMoveLength, parsePlanningContext } from "@/lib/services/brief-move-request";
 
@@ -113,5 +121,46 @@ describe("brief move recheck request (3A1 follow-up)", () => {
       { localDate: "2026-11-19", extra: 1 }, { localDate: "2026-11-19", proposalIds: Array.from({ length: 65 }, () => PROPOSAL) }]) {
       expect(() => parseBriefMoveRecheck(bad)).toThrow(BriefMoveError);
     }
+  });
+});
+
+describe("Task 7: opportunity bodies on the brief routes", () => {
+  it("parses an opportunity answer only with target opportunity, and keeps move answers unchanged", async () => {
+    const { parseBriefAnswer, parseBriefMoveRecheck } = await import("@/lib/services/brief-move-request");
+    expect(parseBriefAnswer({ target: "opportunity", kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL })).toEqual({
+      target: "opportunity", answer: { target: "opportunity", kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL, context: { calendarBusy: [] } },
+    });
+    expect(parseBriefAnswer({ target: "opportunity", kind: "other_time", idempotencyKey: "k2", proposalId: PROPOSAL, startAt: "2026-11-18T20:00:00Z" }).answer)
+      .toMatchObject({ kind: "other_time", startAt: "2026-11-18T20:00:00Z" });
+    expect(parseBriefAnswer({ kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL })).toEqual({ target: "move", answer: { kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL } });
+    expect(() => parseBriefAnswer({ target: "move", kind: "no", idempotencyKey: "k3", proposalId: PROPOSAL })).toThrow(BriefMoveError);
+    expect(() => parseBriefAnswer({ target: "opportunity", kind: "already_done", idempotencyKey: "k4", proposalId: PROPOSAL })).toThrow(BriefMoveError);
+    expect(() => parseBriefAnswer({ target: "opportunity", kind: "never_add", idempotencyKey: "k5", proposalId: PROPOSAL, expectedRevision: REVISION })).toThrow(BriefMoveError);
+    // A re-check body without opportunity ids is the move re-check exactly as before.
+    expect(parseBriefMoveRecheck({ localDate: "2026-11-18" })).toEqual({ localDate: "2026-11-18", context: { calendarBusy: [] }, proposalIds: [] });
+    expect(parseBriefMoveRecheck({ localDate: "2026-11-18", opportunityProposalIds: [PROPOSAL, PROPOSAL] }).opportunityProposalIds).toEqual([PROPOSAL]);
+  });
+});
+
+describe("Task 7 follow-up: the opportunity re-check runs alone", () => {
+  beforeEach(() => {
+    mocks.recheck.mockResolvedValue({ replaced: [{ proposalId: PROPOSAL, line: null }] });
+    mocks.recheckOpportunities.mockResolvedValue({ replaced: [] });
+  });
+
+  it("skips the move re-check when the body names opportunity lines and no move lines", async () => {
+    const response = await recheckRoute(post("/api/advisor/brief/recheck", { localDate: "2026-11-18", proposalIds: [], opportunityProposalIds: [PROPOSAL] }));
+    expect(await response.json()).toEqual({ replaced: [], opportunities: { replaced: [] } });
+    expect(mocks.recheck).not.toHaveBeenCalled();
+    expect(mocks.recheckOpportunities).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ proposalIds: [PROPOSAL] }));
+  });
+
+  it("still re-checks moves for a move-only body or a body with both", async () => {
+    await recheckRoute(post("/api/advisor/brief/recheck", { localDate: "2026-11-18" }));
+    expect(mocks.recheck).toHaveBeenCalledTimes(1);
+    expect(mocks.recheckOpportunities).not.toHaveBeenCalled();
+    const both = await recheckRoute(post("/api/advisor/brief/recheck", { localDate: "2026-11-18", proposalIds: [PROPOSAL], opportunityProposalIds: [PROPOSAL] }));
+    expect(mocks.recheck).toHaveBeenCalledTimes(2);
+    expect(await both.json()).toMatchObject({ replaced: [{ proposalId: PROPOSAL }], opportunities: { replaced: [] } });
   });
 });

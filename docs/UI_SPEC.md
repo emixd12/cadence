@@ -603,6 +603,38 @@ label "Day note", the placeholder "Add a note about this day", accepted day-note
 shortcut chips, and Save note. Saving refreshes the Timeline; a conflict keeps the
 draft and shows the factual conflict message. No modal and no status controls.
 
+### Opportunity Basket (Behaviors of Opportunity)
+
+Under today's date, after the day note control, a quiet underlined text action reads
+"Opportunity (n)", where n is the number of running opportunity Behaviors. It is absent
+when the pool is empty and on surfaces that do not inject the add action (Cadence for
+Mac until its parity task). It opens a non-modal ledger titled "Opportunities": an
+inline square panel with a 1px Ash Line border on wide screens, and a bottom sheet on
+phones (`max-height: min(24rem, 55dvh)`, internal scroll, 16px padding). Escape and the
+Close icon close it and return focus to the trigger. No focus trap, no overlay.
+
+Each item shows its title, a muted `text-xs` line "{length} min · {Where}" and, when the
+Behavior already has an Occurrence today, a muted "On today". Two underlined actions sit
+on the right (44px touch targets on phones):
+
+- **Add to today** opens an inline selector under the item. "Exact time" is the default
+  and starts at the suggested time: now rounded up to 5 minutes, or the nearest free
+  start among today's open items and, when the device holds them, today's busy Calendar
+  events. "Time window" offers Morning, Afternoon, Evening, Night (the preset that holds
+  the suggested time is selected) or Custom with From and To. Add posts once; Cancel
+  closes the selector.
+- **Done now** adds the Occurrence at the current minute and marks it Completed in one
+  tap. Each tap posts a new client id, so two taps make two items.
+
+The outcome or refusal shows under the item as its `opportunity.*` notice.
+
+An added row shows one muted line under its title from `opportunity.added-from`:
+"Added", "Added from Daily Brief", "Added in Chat" or "Added by a connected app". A
+clean added row (Unresolved, no Note, no tracked time, no earlier mark, no connected
+activity) offers an underlined **Remove** at the end of its expanded details, on today
+and in Needs decision. The result shows below it as `opportunity.removed` or an
+`opportunity.remove-refused.*` notice. Scheduled rows never show either.
+
 ## Disclosure controls
 
 Use native `details` and `summary` for hide/show sections and drawer-like
@@ -736,6 +768,15 @@ Preset time ranges:
 - Afternoon: Noon-6:00 PM
 - Evening: 6:00 PM-Midnight
 - Night: Midnight-6:00 AM
+
+Behaviors of Opportunity (`docs/RECURRENCE_RULES.md#behaviors-of-opportunity`): the
+Schedule section has an "Available as an opportunity" checkbox. While it is on, the
+user can choose "No fixed schedule", which removes every schedule row and posts
+`behavior_schedule_count=0`, or keep one or more schedules (scheduled and available
+any time). Add schedule brings a row back. Turning the flag off while no schedule is
+left restores one default row, so the form stays valid. With no schedule the form
+shows the `opportunity.no-schedule` note and hides Reminder offset, which applies
+only to scheduled Occurrences; the stored offset is kept.
 
 Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.
@@ -889,6 +930,16 @@ Separate behavior settings edits from behavior date review:
 - Date of behavior and Time of behavior are display-only in date review.
 - Status and note correction controls stay hidden behind a per-occurrence
   Review disclosure until the user chooses to review that occurrence.
+
+Behaviors of Opportunity: running Behaviors that are available as an opportunity
+and have no fixed schedule sit in an Opportunity group directly below the running
+list, open by default and hidden when empty, like Not running. Paused or ended ones
+go to Not running. Their records show "Done N times" for the selected range, the
+per-behavior calendar and average tracked time, and never an adherence percentage.
+A scheduled Behavior that is also an opportunity stays in the running list with a
+muted "Opportunity" word beside its title. Overall adherence counts scheduled
+Occurrences only; when added Occurrences were Completed in the range, a muted
+"+N opportunity Completed" line follows the counts.
 
 Archived behaviors should not appear in the main active behavior feed or on the
 timeline. They should sit at the bottom of the Behaviors screen behind a

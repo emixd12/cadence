@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-078` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-081` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2196,4 +2196,91 @@ cite has not changed.
 - **Conflicting current text:** none.
 - **Update needed:** none. The trial warnings (plan R3) come with the AI helpers workstream.
 - **Related:** P-074, P-075, P-076.
+- **Status:** logged.
+
+## P-078: Behaviors of Opportunity
+
+- **Change:** logged November 21, 2026 (Behaviors of Opportunity, Wave 2A). A Behavior can be
+  marked available as an opportunity, with or without a fixed schedule, and added to today
+  from the Timeline's Opportunity Basket, logged with Done now, or removed again while
+  Unresolved and clean. Overall adherence stays scheduled-only; opportunity completions show
+  separately and an unscheduled Behavior shows "Done N times". New in-app copy, all in the
+  notices library (`packages/core/src/notices/catalog/opportunity.json`, `docs/NOTICES.md`):
+  - Outcomes: "{title} added to today: {time}.", "{title} marked Completed at {time}.",
+    "{title} removed. It stays in your opportunities."
+  - Row and form notes: "Added", "Added from Daily Brief", "Added in Chat", "Added by a
+    connected app"; "No fixed schedule. Add it to today when there is a chance."
+  - Refusals ("Not added" / "Not removed"): "{title} is no longer available as an
+    opportunity.", "{title} is not running at that time.", "Opportunities can be added to today
+    only.", "Choose a time, or a range that ends at a different time.", "{title} is already
+    marked, so it stays.", "{title} has a Note, tracked time, an earlier mark or a connected
+    activity, so it stays.", "This item is no longer on today's Timeline.", and "Cadence could
+    not change today's items. Try again."
+  - Labels still to come with the UI (Tasks 4 and 5): "Available as an opportunity", the
+    basket trigger, "Done now", "Remove".
+- **Affected:** `lib/services/opportunity.service.ts`, `app/(app)/timeline/opportunity-actions.ts`,
+  `lib/services/behavior-form.ts`, `components/behaviors/BehaviorForm.tsx` and
+  `components/timeline/Timeline.tsx` (Tasks 4 and 5); interactions `INT-BEHAVIOR-037`,
+  `INT-BEHAVIOR-038`, `INT-TIMELINE-021` to `INT-TIMELINE-024`. MCP 1.6.0, Chat and Daily Brief
+  opportunity lines (later tasks) add their own wording to this entry. The Mac renders the same
+  shared components when its workstream lands.
+- **Surfaces:** in-app copy (new); user guide (`docs/user-guide/behaviors-and-review.md`, "Build
+  schedules and times", and `docs/user-guide/timeline.md`, "Record an Occurrence status" and
+  "Review Needs decision", need a short section on opportunities, the basket, Done now and
+  Remove; the interactions point at those sections until then); marketing FAQ and feature copy
+  may describe it once it ships (`docs/NARRATIVE.md` claims first); developer docs for MCP 1.6.0.
+- **Conflicting current text:** `docs/user-guide/behaviors-and-review.md`, "Build schedules and
+  times", says "at least one of each is required" for schedules and times; that stays true only
+  for Behaviors that are not opportunities.
+- **Update needed:** user guide sections above; marketing claims only after a `docs/NARRATIVE.md`
+  Claims row.
+- **Related:** P-077.
+- **Status:** logged.
+
+## P-079: Outside AI clients and Cadence chat add opportunities (MCP contract 1.6.0)
+
+- **Change:** implemented November 21, 2026 (Behaviors of Opportunity, Task 6). MCP contract
+  1.6.0 shows `is_opportunity` on Behaviors, `origin` and `added_by` on Occurrences and
+  `opportunity_completed_count` in the adherence summary, and adds two tools under
+  `cadence.occurrences.write`: `add_opportunity_occurrence` (add to today at a time, in a range,
+  or done now) and `remove_opportunity_occurrence` (take a clean added item back off).
+  `create_behavior` and `update_behavior` accept `is_opportunity` and empty schedules for it.
+  Cadence chat (prompt `chat-1.5`) suggests and adds opportunities, refuses a taken time with
+  other free times, and offers a new starter question: "Is there room today for {behavior}?" /
+  "When could I fit {behavior} in today?". New notices: "{title} is on its schedule. Only an
+  added item can be removed." and "{title} changed since it was read. Look at it again before
+  removing it." Chat outcome lines: "Added {title} to today at 3 pm.", "Marked {title} done at
+  3 pm.", "Took {title} off today."
+- **Affected:** `packages/core/src/integration/`, `lib/services/opportunity-integration.service.ts`,
+  `lib/services/chat/`, `packages/core/src/data/chat-starters.json`; `docs/MCP_CONTRACT.md` and
+  `apps/marketing/src/data/developer-reference.json` (generated).
+- **Surfaces:** developer docs (generated tool pages are current; the developer overview and
+  the plugin listings name the tool count and what writes exist); Claude and ChatGPT plugin
+  submissions (the write list grows, and one new tool is destructive); Privacy and Trust,
+  where they list what connected apps can change.
+- **Conflicting current text:** any developer or listing copy that says connected apps cannot
+  add items to a day, or lists the writes without these two.
+- **Update needed:** plugin listing and submission copy before the next submission; developer
+  overview tool count.
+- **Related:** P-078, P-072.
+- **Status:** logged.
+
+## P-080: The Daily Brief offers to add opportunities to today
+
+- **Change:** implemented November 21, 2026 (Behaviors of Opportunity, Task 7). On the web, the
+  Daily Brief can offer up to two "Add for today" lines for opportunity Behaviors when a real
+  free window exists: "{title} 2:10 PM: 20 min free, last done 4 days ago." with Yes · No ·
+  Other time, Undo after Yes, and "Don’t suggest adding this" after declines on 4 different
+  days. Yes adds an Unresolved item marked "Added from Daily Brief"; the brief never marks it
+  Completed. New notices: "Added for today at {time}.", "Not adding it today.", "Removed from
+  today.", "The brief won’t suggest adding {title} again.", "Travel not checked.", "{time} is not
+  free now.", "{time} has passed.", "{time} is too late for today.", "No other time fits today."
+- **Affected:** `components/briefing/BriefOpportunityLines.tsx`,
+  `lib/services/brief-opportunities.service.ts`, `packages/core/src/notices/catalog/opportunity.json`.
+- **Surfaces:** the user guide's Daily Brief section; Privacy and Trust where they say what the
+  Daily Brief can change (it now adds items to today, not only moves them); in-app Daily Brief
+  disclosure.
+- **Conflicting current text:** any copy that says the Daily Brief only moves today's items.
+- **Update needed:** user guide Daily Brief section; Privacy/Trust Daily Brief write list.
+- **Related:** P-078, P-079.
 - **Status:** logged.

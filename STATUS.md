@@ -94,6 +94,30 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
+
+- **In review (branch `feature-add`, not pushed).** A Behavior can be available as an
+  opportunity, with or without a schedule; the person adds it to today from the Timeline's
+  Opportunity Basket (a time, a window or Done now) and removes a clean added item.
+  Adherence stays scheduled-only; unscheduled ones show Done N times. Five waves:
+  Postgres, core rules and sync contract 8; web form, list, basket and rows; MCP 1.6.0
+  and Chat; Daily Brief "Add for today" lines and the `opportunity_ready_to_schedule`
+  coach signal; Cadence for Mac (SQLite schema 27 rebuilds `behaviors` and `occurrences`,
+  local add and Remove, contract 8 sync, the brief lines on a linked Mac).
+- **Migrations (local only; hosted push needs the owner's OK before merge):**
+  `20261121100000`, `20261121110000`, `20261121120000`, `20261121130000`.
+- **Verification (Node 24):** `cargo test` (Rust store, incl. 26 → 27 upgrade, add, Done
+  now, Remove, generation guard, contract 8 round trip); real-SQLite
+  `tests/desktop-opportunity-contract.test.ts`; DOM and service tests for each wave;
+  typecheck (web and Mac), interactions, map, resolvers, core and agents checks. Not run:
+  full `npm run test`, SQL replay (CI "Local Supabase rehearsal").
+- **Next:** hosted migration push, then CI and merge; a Mac release with schema 27 is
+  needed before linked Macs sync again (contract 8 has no contract 7 fallback).
+
+Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
+`apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
+not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.
+
 ## Product map, features and journeys — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the

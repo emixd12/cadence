@@ -46,7 +46,10 @@ export const ADVICE_SIGNAL_KINDS_V2 = [
  * (`AdviceAccountFacts`), which the matcher always has, so first-two-weeks cards can
  * match from setup alone.
  */
-export const ADVICE_SIGNAL_KINDS = [...ADVICE_SIGNAL_KINDS_V1, ...ADVICE_SIGNAL_KINDS_V2, "account"] as const;
+/** Behaviors of Opportunity (Task 7): no card uses it yet; it is ready for schedule-promotion tips. */
+export const ADVICE_SIGNAL_KINDS_OPPORTUNITY = ["opportunity_ready_to_schedule"] as const;
+
+export const ADVICE_SIGNAL_KINDS = [...ADVICE_SIGNAL_KINDS_V1, ...ADVICE_SIGNAL_KINDS_V2, ...ADVICE_SIGNAL_KINDS_OPPORTUNITY, "account"] as const;
 export type AdviceSignalKind = (typeof ADVICE_SIGNAL_KINDS)[number];
 
 /** Setup facts for one account, computed by code on each coach visit and at sign-up. */
@@ -113,6 +116,7 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   reminder_response: ["reminded_marked", "within_30_min", "later", "quick_share", "median_minutes_after"],
   session_length: ["sessions", "planned_minutes", "median_minutes", "shorter", "longer", "on_target", "pattern"],
   moved_vs_unmoved: ["moved_rate", "moved_resolved", "unmoved_rate", "unmoved_resolved", "gap", "pattern"],
+  opportunity_ready_to_schedule: ["weekday", "completed_count", "usual_time", "earliest_time", "latest_time", "window_minutes"],
   account: ADVICE_ACCOUNT_FACT_NAMES,
 });
 
