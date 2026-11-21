@@ -52,14 +52,14 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
           : await getIcloudCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true });
-      if (!read.result.ok) logConnectorRead("chat_connector_read_partial", source, read.result.error.code, null);
+      if (!read.result.ok) logConnectorRead("chat_source_read_partial", source, read.result.error.code, null);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
       const events = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
       return { events, report: { source, state: read.result.ok ? "read" : "partial" } };
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
       const notConnected = code === "reconnect_required" || code === "not_connected" || code === "same_account_required" || code === "not_configured";
-      logConnectorRead("chat_connector_read_failed", source, code, error);
+      logConnectorRead("chat_source_read_failed", source, code, error);
       return { events: [], report: { source, state: notConnected ? "not_connected" : "failed" } };
     }
   };
@@ -80,7 +80,7 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
         return { workouts, sources: [{ source: "hevy", state: snapshot.completeness === "complete" ? "read" : "partial" }] };
       } catch (error) {
         const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
-        logConnectorRead("chat_connector_read_failed", "hevy", code, error);
+        logConnectorRead("chat_source_read_failed", "hevy", code, error);
         return { workouts: [], sources: [{ source: "hevy", state: code === "reconnect_required" || code === "not_connected" ? "not_connected" : "failed" }] };
       }
     },

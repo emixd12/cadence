@@ -23,7 +23,7 @@ describe("chat connector read logs", () => {
     expect(read.sources).toEqual([{ source: "googleCalendar", state: "off" }, { source: "outlookCalendar", state: "failed" }, { source: "icloudCalendar", state: "off" }]);
     expect(warn).toHaveBeenCalledTimes(1);
     const logged = JSON.parse(String(warn.mock.calls[0]![0]));
-    expect(logged).toMatchObject({ name: "chat_connector_read_failed", context: { source: "outlookCalendar", code: "provider_unavailable", error_name: "Error" } });
+    expect(logged).toMatchObject({ name: "chat_source_read_failed", context: { source: "outlookCalendar", code: "provider_unavailable", error_name: "Error" } });
     expect(JSON.stringify(logged)).not.toContain("secret");
   });
 
