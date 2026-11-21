@@ -2799,6 +2799,46 @@ presses (update buttons, conflict review, Settings) fail until Cadence is in fro
 Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
 Messaging impact: none.
 
+## 2026-11-21: Merge queue; the repository moves to an organization
+
+The owner decided this on November 21, 2026 ("I think we should do this, guide me through
+the setup"), after a CI audit. Branch protection requires an up-to-date branch, so every
+merge sends each other open pull request through an update and a second full `CI` run. A
+merge queue tests each pull request on top of the ones ahead of it and removes that loop.
+GitHub offers a queue on a public repository only when an organization owns it (GitHub
+docs, read November 21, 2026), and `emixd12/cadence` is user-owned.
+
+- **Move.** The owner creates a free organization and transfers the repository to it
+  under the name `cadence`. Expected cost: $0. The repository stays public.
+- **Queue.** After the transfer, `main` requires a merge queue with the merge-commit
+  method. `verify` stays the one required check. `CI` already runs on `merge_group`.
+- **Desktop update feeds.** Installed Macs read `github.com/emixd12/cadence/releases/...`.
+  GitHub redirects those URLs after a transfer. Never create a repository named `cadence`
+  under `emixd12`: it would end the redirects, as the 2026-10-08 rename entry says for
+  `habit-tracking-app`.
+- **Trust evidence.** GitHub does not redirect Pages. `emixd12.github.io/cadence/trust/`
+  stops serving at the transfer unless the `emixd12.github.io` archive holds a copy first,
+  as it does for the `/habit-tracking-app/trust/` files. New evidence then publishes under
+  the organization's Pages origin, and `TRUST_PAGES_ORIGIN` (repository variable and both
+  `public-trust-*` environments) and the feed URL in
+  `lib/services/public-trust-evidence.service.ts` change with it.
+- **GitHub Apps.** Vercel and the Codex review app are installed for the user account and
+  need installing for the organization.
+- **Source links.** Code and docs that name `emixd12/cadence` change after the transfer.
+  Privacy and Terms name the URL too; that text gets a `docs/MESSAGING_CHANGES.md` entry,
+  not an edit. The old links keep redirecting.
+
+Declined the same day: Blacksmith runners (about $110 to $120 a month, estimated, for a
+gain in 95th-percentile waiting only) and moving lint, typecheck, tests and install to
+Bun ("skip this for now"; it conflicts with the npm check commands in `AGENTS.md` and
+with the Dagger module).
+
+Not decided: running `Desktop native`, `Local Supabase rehearsal` and `Web client runner`
+as required checks inside the queue.
+
+Platform impact: none on web, desktop, marketing or future mobile until the transfer.
+Messaging impact: none yet; the transfer adds one entry for the source URL.
+
 ## 2026-11-21: Advisor avatar track
 
 The owner asked on November 21, 2026 for the advisor's avatar to be finished in three
