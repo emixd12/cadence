@@ -119,7 +119,7 @@
     "@js-temporal/polyfill": "^0.5.1",
     "@modelcontextprotocol/server": "2.4.0",
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.107.0",
+    "@supabase/supabase-js": "^2.119.0",
     "ai": "7.0.173",
     "lucide-react": "^1.59.0",
     "next": "16.4.6",
