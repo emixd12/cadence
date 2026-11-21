@@ -111,8 +111,9 @@ localDescribe("sub-behavior MCP writes on isolated local Supabase", () => {
     expect(marked.value.parent_groups).toMatchObject([{ derived_status: "completed", progress_label: "2/2" }]);
     expect(marked.value.occurrences.map((row) => row.behavior_title)).toEqual(["Cleanser", "Moisturizer"]);
     expect(await writeOperationHandlers.set_parent_occurrence_status(a, input)).toEqual(marked);
-    const again = await writeOperationHandlers.set_parent_occurrence_status(a, { ...input, idempotency_key: undefined });
-    expect(again).toMatchObject({ ok: true, value: { changed: false, changed_occurrence_ids: [] } });
+    const { idempotency_key: _key, ...withoutKey } = input;
+    const again = await writeOperationHandlers.set_parent_occurrence_status(a, withoutKey);
+    expect(again, JSON.stringify(again)).toMatchObject({ ok: true, value: { changed: false, changed_occurrence_ids: [] } });
   });
 
   it("adds a following step, moves it first, and filters by hierarchy", async () => {
