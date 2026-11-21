@@ -1047,6 +1047,7 @@ function toBehaviorPlan(
     errors,
   );
   const cadenceRun = readExtensionRun(cadence, row, errors);
+  const cadenceIsOpportunity = readExtensionBoolean(cadence, "is_opportunity");
   const cadenceAutoArchivedAt = readExtensionInstant(
     cadence,
     "auto_archived_at",
@@ -1108,6 +1109,7 @@ function toBehaviorPlan(
       : {}),
     ...(cadenceRun === undefined ? {} : { cadenceRun }),
     ...(cadenceAutoArchivedAt === undefined ? {} : { cadenceAutoArchivedAt }),
+    ...(cadenceIsOpportunity === null ? {} : { cadenceIsOpportunity }),
     active: archivedAtUtc === null,
     cadenceActive,
     cadenceBrowserReminderEnabled: readExtensionBoolean(
@@ -1503,6 +1505,7 @@ function toOccurrencePlan(
   const currentStatus = readRequiredStatus(row, "current_status", errors);
   const generatedAtUtc = readOptionalInstant(row, "generated_at_utc", errors);
   const source = readSource(row, errors, false);
+  const cadenceProvenance = readExtensionOccurrenceOrigin(readCadenceExtension(row.record), row, errors);
 
   if (scheduledForUtc && localDate && timezone) {
     const derivedLocalDate = Temporal.Instant.from(scheduledForUtc)
@@ -1546,9 +1549,33 @@ function toOccurrencePlan(
     localTime: readOptionalLocalTime(row, "local_time", errors),
     generatedAtUtc,
     currentStatus,
+    ...cadenceProvenance,
     sourceOriginalId: source.originalId,
     sourceConfidence: source.confidence,
   };
+}
+
+/**
+ * Behaviors of Opportunity: `origin` and `added_by` under `extensions.app.cadence`. An
+ * added Occurrence names who added it; a scheduled one names nobody. Returns nothing when
+ * the bundle carries no origin, so restore keeps the stored value.
+ */
+function readExtensionOccurrenceOrigin(
+  extension: JsonRecord | null,
+  row: ParsedJsonlRecord,
+  errors: BehaviorLogImportIssue[],
+): Pick<BehaviorLogImportOccurrencePlan, "cadenceOrigin" | "cadenceAddedBy"> {
+  if (!extension || !Object.hasOwn(extension, "origin")) return {};
+  const origin = extension.origin;
+  const addedBy = extension.added_by ?? null;
+  if (origin === "scheduled" && addedBy === null) return { cadenceOrigin: "scheduled", cadenceAddedBy: null };
+  if (origin === "opportunity" && (addedBy === "user" || addedBy === "daily_brief" || addedBy === "chat" || addedBy === "mcp")) {
+    return { cadenceOrigin: "opportunity", cadenceAddedBy: addedBy };
+  }
+  errors.push({ severity: "error", code: "cadence_occurrence_origin_invalid",
+    message: `${row.file} row ${row.row}: extensions.app.cadence origin and added_by do not match.`,
+    file: row.file, row: row.row, path: "extensions.app.cadence.origin" });
+  return {};
 }
 
 function toStatusEventPlan(

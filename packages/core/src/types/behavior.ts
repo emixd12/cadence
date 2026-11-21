@@ -72,6 +72,8 @@ export type BehaviorView = {
   archiveNotes: ArchiveNote[];
   createdAt: string;
   updatedAt: string;
+  /** Behaviors of Opportunity. An unscheduled one has no schedules and an empty time. */
+  isOpportunity?: boolean;
 };
 
 export type BehaviorPageData = {

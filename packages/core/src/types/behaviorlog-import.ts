@@ -1,4 +1,4 @@
-import type { OccurrenceStatus } from "./database";
+import type { OccurrenceOrigin, OccurrenceStatus, OpportunityAddedBy } from "./database";
 import type { BehaviorConfigurationSnapshot } from "./behavior-configuration-event";
 import type { Json } from "./json";
 import type { ArchiveNote } from "./behavior";
@@ -137,6 +137,8 @@ export type BehaviorLogExistingBehavior = {
   defaultDurationMinutes?: number | null;
   run?: BehaviorLogImportBehaviorRun;
   autoArchivedAt?: string | null;
+  /** Behaviors of Opportunity. Absent means not an opportunity Behavior. */
+  isOpportunity?: boolean;
   sourceOriginalId?: string | null;
   schedules?: BehaviorLogExistingSchedule[];
   configurationSnapshot?: BehaviorConfigurationSnapshot;
@@ -172,6 +174,9 @@ export type BehaviorLogExistingOccurrence = {
   timezone: string;
   status: OccurrenceStatus;
   note?: string | null;
+  /** Behaviors of Opportunity. Missing means "scheduled". */
+  origin?: OccurrenceOrigin;
+  addedBy?: OpportunityAddedBy | null;
   sourceOriginalId?: string | null;
   scheduleSnapshot?: {
     kind: "exact" | "range";
@@ -282,6 +287,8 @@ export type BehaviorLogImportBehaviorPlan = {
   /** End and pause from `extensions.app.cadence`. Absent when the bundle carries none. */
   cadenceRun?: BehaviorLogImportBehaviorRun;
   cadenceAutoArchivedAt?: string | null;
+  /** Behaviors of Opportunity, from `extensions.app.cadence.is_opportunity`. Absent when the bundle carries none. */
+  cadenceIsOpportunity?: boolean;
   active?: boolean;
   cadenceActive: boolean | null;
   cadenceBrowserReminderEnabled: boolean | null;
@@ -381,6 +388,9 @@ export type BehaviorLogImportOccurrencePlan = {
   localTime: string | null;
   generatedAtUtc: string | null;
   currentStatus: OccurrenceStatus;
+  /** Behaviors of Opportunity, from `extensions.app.cadence`. Absent when the bundle carries none. */
+  cadenceOrigin?: OccurrenceOrigin;
+  cadenceAddedBy?: OpportunityAddedBy | null;
   sourceOriginalId?: string | null;
   sourceConfidence: BehaviorLogSourceConfidence;
 };

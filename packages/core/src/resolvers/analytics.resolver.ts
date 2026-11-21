@@ -10,12 +10,12 @@ import type {
   AnalyticsCategorySummary,
   AnalyticsDayCell,
   AnalyticsOccurrenceInput,
+  AnalyticsOpportunityCounts,
   AnalyticsOverallDayState,
   AnalyticsRangeDays,
   AnalyticsSelectedBehaviorDay,
   AnalyticsStatus,
   AnalyticsStatusCounts,
-  AnalyticsSummary,
   AnalyticsTimeSessionInput,
   AnalyticsTrackedTime,
   AnalyticsView,
@@ -66,13 +66,16 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
       ),
     )
     .sort(compareOccurrences);
-  const summary = toAnalyticsSummary(
-    countSummaryOccurrences({
-      rangeOccurrences,
-      needsDecisionOccurrences: input.needsDecisionOccurrences ?? rangeOccurrences,
-      todayLocalDate: dateRange.endLocalDate,
-    }),
-  );
+  const summary = {
+    ...toAnalyticsSummary(
+      countSummaryOccurrences({
+        rangeOccurrences,
+        needsDecisionOccurrences: input.needsDecisionOccurrences ?? rangeOccurrences,
+        todayLocalDate: dateRange.endLocalDate,
+      }),
+    ),
+    ...countOpportunityOccurrences(rangeOccurrences),
+  };
   const trackedTimeByOccurrenceId = resolveTrackedTimeByOccurrenceId(
     input.timeSessions ?? [],
   );
@@ -87,7 +90,7 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
     summary,
     overallHeatmap: resolveOverallHeatmap({
       dates,
-      occurrences: rangeOccurrences,
+      occurrences: rangeOccurrences.filter(isScheduledAnalyticsOccurrence),
     }),
     behaviorSummaries: resolveBehaviorSummaries({
       dates,
@@ -108,12 +111,13 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
 
 /** Counts a caller-selected range without the web page's range presets or backlog summary. */
 export function resolveAdherenceCounts(input: {
-  occurrences: Array<Pick<AnalyticsOccurrenceInput, "status" | "localDate">>;
+  occurrences: Array<Pick<AnalyticsOccurrenceInput, "status" | "localDate" | "origin">>;
   todayLocalDate: string;
 }) {
-  const counts = countOccurrences(input.occurrences);
+  const counts = countOccurrences(input.occurrences.filter(isScheduledAnalyticsOccurrence));
   return {
     ...toAnalyticsSummary(counts),
+    ...countOpportunityOccurrences(input.occurrences),
     needsDecisionCount: input.occurrences.filter((row) =>
       row.status === "unresolved" && compareLocalDate(row.localDate, input.todayLocalDate) < 0,
     ).length,
@@ -200,7 +204,7 @@ function resolveBehaviorSummaries(input: {
   return Array.from(behaviorGroups.entries())
     .map(([behaviorId, occurrences]) => {
       const firstOccurrence = occurrences[0];
-      const counts = countOccurrences(occurrences);
+      const counts = countOccurrences(occurrences.filter(isScheduledAnalyticsOccurrence));
       const adherence = calculateAdherence(counts);
       const trackingStart = resolveBehaviorTrackingStart(occurrences);
       const averageTrackedTime = calculateAverageTrackedTime(
@@ -217,6 +221,7 @@ function resolveBehaviorSummaries(input: {
         averageTrackedTime,
         ...counts,
         ...adherence,
+        ...countOpportunityOccurrences(occurrences),
         dailyCells: input.dates.map((date) =>
           resolveBehaviorDayCell({
             date,
@@ -315,12 +320,13 @@ function resolveCategorySummaries(
 
   return Array.from(categoryGroups.entries())
     .map(([categoryName, categoryOccurrences]) => {
-      const counts = countOccurrences(categoryOccurrences);
+      const counts = countOccurrences(categoryOccurrences.filter(isScheduledAnalyticsOccurrence));
 
       return {
         categoryName,
         ...counts,
         ...calculateAdherence(counts),
+        ...countOpportunityOccurrences(categoryOccurrences),
       };
     })
     .sort((left, right) => left.categoryName.localeCompare(right.categoryName));
@@ -461,7 +467,7 @@ function countSummaryOccurrences(input: {
   const counts = emptyCounts();
 
   for (const occurrence of input.rangeOccurrences) {
-    if (occurrence.status === "unresolved") {
+    if (occurrence.status === "unresolved" || !isScheduledAnalyticsOccurrence(occurrence)) {
       continue;
     }
 
@@ -479,6 +485,22 @@ function countSummaryOccurrences(input: {
   }
 
   return counts;
+}
+
+function isScheduledAnalyticsOccurrence(occurrence: { origin?: string | null }): boolean {
+  return (occurrence.origin ?? "scheduled") !== "opportunity";
+}
+
+function countOpportunityOccurrences(
+  occurrences: ReadonlyArray<Pick<AnalyticsOccurrenceInput, "status" | "origin">>,
+): AnalyticsOpportunityCounts {
+  const added = occurrences.filter((occurrence) => !isScheduledAnalyticsOccurrence(occurrence));
+  const completed = added.filter((occurrence) => occurrence.status === "completed").length;
+  return {
+    opportunityCompletedCount: completed,
+    opportunityNotCompletedCount: added.filter((occurrence) => occurrence.status === "not_completed").length,
+    opportunityDoneLabel: completed === 0 ? null : `Done ${completed} ${completed === 1 ? "time" : "times"}`,
+  };
 }
 
 function isActiveBehaviorOccurrence(
@@ -518,7 +540,7 @@ function incrementCounts(
   }
 }
 
-function toAnalyticsSummary(counts: AnalyticsStatusCounts): AnalyticsSummary {
+function toAnalyticsSummary(counts: AnalyticsStatusCounts): AnalyticsStatusCounts & AnalyticsAdherence {
   return {
     ...counts,
     ...calculateAdherence(counts),

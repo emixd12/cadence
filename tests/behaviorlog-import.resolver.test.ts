@@ -8,6 +8,9 @@ import {
   resolveBehaviorLogImportPreview,
 } from "../lib/resolvers/behaviorlog-import.resolver";
 import { resolveExportBundle } from "../lib/resolvers/export.resolver";
+import { resolveBehaviorLogRestorePreview } from "../lib/resolvers/behaviorlog-restore.resolver";
+import { buildRestorePayload, restoredOccurrenceOrigin } from "@cadence/core/services/behaviorlog-restore-plan";
+import type { BehaviorLogExistingRecords } from "@cadence/core/types/behaviorlog-import";
 import { previewBehaviorLogImportFromZip } from "../lib/services/behaviorlog-import.service";
 import { createStoredZip } from "../lib/services/zip";
 import type { BehaviorLogFile } from "../lib/types/export";
@@ -871,3 +874,91 @@ function parseJsonl(content: string): Array<Record<string, unknown>> {
 function sha256(content: string): string {
   return createHash("sha256").update(content, "utf8").digest("hex");
 }
+
+describe("BehaviorLog round trip for Behaviors of Opportunity", () => {
+  const walk = behavior({
+    id: "behavior-walk", title: "Walk", recurrenceRule: null, scheduledTime: null,
+    schedules: [], scheduleSlots: [], isOpportunity: true,
+  });
+  const addedWalk = occurrence({
+    id: "occurrence-walk", behaviorId: "behavior-walk", behaviorScheduleSlotId: null,
+    status: "unresolved", completedAt: null, statusMarkedAt: null, note: null,
+    origin: "opportunity", addedBy: "chat",
+  });
+  const files = () => bundleFiles({
+    behaviors: [behavior(), walk],
+    occurrences: [occurrence({ origin: "scheduled", addedBy: null }), addedWalk],
+    statusEvents: statusEvents(),
+  });
+
+  it("exports the flag, no schedule, and the Occurrence provenance", () => {
+    const read = (path: string) => files().find((file) => file.path === path)!.content.trim().split("\n").map((line) => JSON.parse(line));
+    const behaviorRow = read("data/behaviors.jsonl").find((row) => row.behavior_id === "behavior-walk");
+    expect(behaviorRow.extensions["app.cadence"].is_opportunity).toBe(true);
+    const occurrenceRow = read("data/occurrences.jsonl").find((row) => row.occurrence_id === "occurrence-walk");
+    expect(occurrenceRow.extensions["app.cadence"]).toMatchObject({ origin: "opportunity", added_by: "chat" });
+    const schedule = read("data/schedules.jsonl").find((row) => row.schedule_id === occurrenceRow.schedule_id);
+    expect(schedule.schedule_role).toBe("historical_reference");
+  });
+
+  it("imports the flag and provenance back, and keeps the Behavior without a schedule", () => {
+    const preview = resolveBehaviorLogImportPreview({ files: files() });
+    expect(preview.errors).toEqual([]);
+    const plannedWalk = preview.plan.behaviors.find((row) => row.externalId === "behavior-walk");
+    expect(plannedWalk).toMatchObject({ action: "create", cadenceIsOpportunity: true });
+    expect(preview.plan.occurrences.find((row) => row.externalId === "occurrence-walk"))
+      .toMatchObject({ cadenceOrigin: "opportunity", cadenceAddedBy: "chat", importWithDetachedScheduleSnapshot: true });
+    expect(preview.plan.occurrences.find((row) => row.externalId === "occurrence-1"))
+      .toMatchObject({ cadenceOrigin: "scheduled", cadenceAddedBy: null });
+  });
+
+  it("reports an origin that does not name who added it", () => {
+    const source = files();
+    const occurrences = source.find((file) => file.path === "data/occurrences.jsonl")!.content;
+    const broken = replaceFileContent(source, "data/occurrences.jsonl", occurrences.replace('"added_by":"chat"', '"added_by":null'));
+    expect(resolveBehaviorLogImportPreview({ files: broken }).errors.map(({ code }) => code))
+      .toContain("cadence_occurrence_origin_invalid");
+  });
+});
+
+describe("BehaviorLog restore payload for Behaviors of Opportunity", () => {
+  const walk = behavior({
+    id: "behavior-walk", title: "Walk", recurrenceRule: null, scheduledTime: null,
+    schedules: [], scheduleSlots: [], isOpportunity: true,
+  });
+  const addedWalk = (extra: Partial<ExportOccurrenceInput> = {}) => occurrence({
+    id: "occurrence-walk", behaviorId: "behavior-walk", behaviorScheduleSlotId: null,
+    status: "unresolved", completedAt: null, statusMarkedAt: null, note: null, ...extra,
+  });
+  const payloadFor = (occurrences: ExportOccurrenceInput[], existing: BehaviorLogExistingRecords = {}) => {
+    const importPreview = resolveBehaviorLogImportPreview({ files: bundleFiles({ behaviors: [walk], occurrences, statusEvents: [] }) });
+    const preview = resolveBehaviorLogRestorePreview({ importPreview, existing });
+    return buildRestorePayload({ userId: "11111111-1111-4111-8111-111111111111", importRunId: "run-1",
+      importPreview, preview, existing, now: "2026-06-08T16:00:00Z" }).payload;
+  };
+
+  it("sends the flag, no schedule, and the added Occurrence's origin", () => {
+    const payload = payloadFor([addedWalk({ origin: "opportunity", addedBy: "daily_brief" })]);
+    expect(payload.behaviors[0]).toMatchObject({ is_opportunity: true, recurrence_rule: null, scheduled_time: null });
+    expect(payload.occurrences[0]).toMatchObject({ origin: "opportunity", added_by: "daily_brief" });
+  });
+
+  it("keeps an existing added Occurrence added when an older bundle carries no origin", () => {
+    const planned = resolveBehaviorLogImportPreview({ files: bundleFiles({ behaviors: [walk], occurrences: [addedWalk()], statusEvents: [] }) })
+      .plan.occurrences[0]!;
+    const existingRow = { id: "o", behaviorId: "behavior-walk", scheduledForUtc: "2026-06-08T13:00:00Z", localDate: "2026-06-08",
+      timezone: DEFAULT_TIMEZONE, status: "unresolved" as const };
+    expect(planned.cadenceOrigin).toBeUndefined();
+    expect(restoredOccurrenceOrigin(planned, { ...existingRow, origin: "opportunity", addedBy: "mcp" }))
+      .toEqual({ origin: "opportunity", added_by: "mcp" });
+    expect(restoredOccurrenceOrigin(planned, { ...existingRow, origin: "scheduled", addedBy: null }))
+      .toEqual({ origin: "scheduled", added_by: null });
+    expect(restoredOccurrenceOrigin({ ...planned, cadenceOrigin: "opportunity", cadenceAddedBy: "user" }, { ...existingRow, origin: "opportunity", addedBy: "mcp" }))
+      .toEqual({ origin: "opportunity", added_by: "user" });
+  });
+
+  it("sends scheduled with nobody for a bundle that predates origin", () => {
+    const payload = payloadFor([addedWalk()]);
+    expect(payload.occurrences[0]).toMatchObject({ origin: "scheduled", added_by: null });
+  });
+});

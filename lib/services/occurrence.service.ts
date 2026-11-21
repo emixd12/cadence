@@ -45,6 +45,7 @@ import {
   normalizeRecurrenceRule,
   normalizeScheduledTime,
 } from "@/lib/services/behavior-form";
+import { storedRecurrenceRuleOrNull } from "@cadence/core/services/behavior-values";
 import {
   compareScheduleSlots,
   toScheduleSlotView,
@@ -231,9 +232,8 @@ export async function syncUserOccurrences(
                   userId,
                   configurationEventId:
                     requireCurrentConfigurationEventId(behavior),
-                  recurrenceRule: normalizeRecurrenceRule(
-                    behavior.recurrence_rule,
-                  ),
+                  recurrenceRule: storedRecurrenceRuleOrNull(behavior),
+                  isOpportunity: behavior.is_opportunity === true,
                   schedules,
                   scheduleSlots: schedules.flatMap(
                     (schedule) => schedule.timeEntries,
@@ -917,7 +917,7 @@ async function resolveBehaviorScheduleSlots(
         scheduleId: null,
         kind: "exact",
         preset: null,
-        startTime: normalizeScheduledTime(behavior.scheduled_time),
+        startTime: normalizeScheduledTime(behavior.scheduled_time ?? ""),
         endTime: null,
         sortOrder: 0,
       },
@@ -997,19 +997,25 @@ async function resolveBehaviorSchedulesForGeneration(
     return persistedSchedules;
   }
 
-  const compatibilitySchedule: OccurrenceGenerationSchedule = {
-    id: null,
-    recurrenceRule: normalizeRecurrenceRule(behavior.recurrence_rule),
-    timeEntries: await resolveBehaviorScheduleSlots(
-      supabase,
-      userId,
-      behavior,
-    ),
-    sortOrder: 0,
-  };
+  // An unscheduled opportunity Behavior stores no recurrence and needs no schedule.
+  const compatibilityRule = storedRecurrenceRuleOrNull(behavior);
+  const compatibilitySchedule: OccurrenceGenerationSchedule | null =
+    compatibilityRule === null || behavior.scheduled_time === null
+      ? null
+      : {
+          id: null,
+          recurrenceRule: compatibilityRule,
+          timeEntries: await resolveBehaviorScheduleSlots(
+            supabase,
+            userId,
+            behavior,
+          ),
+          sortOrder: 0,
+        };
   const normalization = normalizeOccurrenceScheduleGraph({
     schedules: persistedSchedules,
     compatibilitySchedule,
+    isOpportunity: behavior.is_opportunity === true,
   });
 
   if (normalization.status !== "valid") {

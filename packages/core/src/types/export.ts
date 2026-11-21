@@ -1,3 +1,4 @@
+import type { OccurrenceOrigin, OpportunityAddedBy } from "./database";
 import type { RecurrenceRule } from "./recurrence";
 import type { ArchiveNote, BehaviorWhereKind } from "./behavior";
 import type { PortabilityNoteRow, PortabilityInterventionRow, PortabilityImportRunRow, PortabilityMappingRow } from "./portability-rows";
@@ -121,8 +122,11 @@ export type ExportBehaviorInput = {
   description: string | null;
   whereKind?: BehaviorWhereKind | null;
   locationText?: string | null;
-  recurrenceRule: RecurrenceRule;
-  scheduledTime: string;
+  /** Null only on an unscheduled opportunity Behavior. */
+  recurrenceRule: RecurrenceRule | null;
+  scheduledTime: string | null;
+  /** Behaviors of Opportunity. Absent on inputs that predate it; read as false. */
+  isOpportunity?: boolean;
   schedules?: BehaviorScheduleView[];
   scheduleSlots: ScheduleSlotView[];
   timezone: string;
@@ -220,6 +224,9 @@ export type ExportOccurrenceInput = {
   completedAt: string | null;
   statusMarkedAt: string | null;
   note: string | null;
+  /** Behaviors of Opportunity. Missing means "scheduled". */
+  origin?: OccurrenceOrigin;
+  addedBy?: OpportunityAddedBy | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -335,8 +342,10 @@ export type ExportJsonBehavior = {
   description: string | null;
   where_kind: BehaviorWhereKind | null;
   location_text: string | null;
-  recurrence_rule: RecurrenceRule;
-  scheduled_time: string;
+  recurrence_rule: RecurrenceRule | null;
+  scheduled_time: string | null;
+  /** Behaviors of Opportunity. Present when the source carries it. */
+  is_opportunity?: boolean;
   schedules: BehaviorScheduleView[];
   schedule_slots: ScheduleSlotView[];
   timezone: string;
@@ -381,6 +390,9 @@ export type ExportJsonOccurrence = {
   completed_at: string | null;
   status_marked_at: string | null;
   note: string | null;
+  /** Behaviors of Opportunity. Present when the source carries it. */
+  origin?: OccurrenceOrigin;
+  added_by?: OpportunityAddedBy | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

@@ -43,7 +43,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
         ...runColumns(input.behavior, null), auto_archived_at: input.behavior.auto_archived_at ?? null,
         where_kind: input.behavior.where_kind ?? null, location_text: input.behavior.location_text ?? null,
         current_configuration_event_id: configurationEvent.id,
-        scheduled_time: canonicalTime(input.behavior.scheduled_time),
+        scheduled_time: input.behavior.scheduled_time === null ? null : canonicalTime(input.behavior.scheduled_time),
         created_at: input.definitionEventPlan.recordedAt, updated_at: timestamp };
       const graph = projectGraph(behavior, input.schedules, timestamp);
       const result = await localCommand("createBehaviorGraph", {
@@ -70,7 +70,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
         auto_archived_at: input.behavior.auto_archived_at === undefined
           ? previous.behavior.auto_archived_at ?? null : input.behavior.auto_archived_at,
         where_kind: input.behavior.where_kind === undefined ? previous.behavior.where_kind ?? null : input.behavior.where_kind,
-        scheduled_time: canonicalTime(input.behavior.scheduled_time),
+        scheduled_time: input.behavior.scheduled_time === null ? null : canonicalTime(input.behavior.scheduled_time),
         current_configuration_event_id: configurationEvent?.id ?? previous.behavior.current_configuration_event_id,
         updated_at: timestamp };
       try {

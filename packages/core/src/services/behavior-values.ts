@@ -30,6 +30,14 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
   sunday: "Sunday",
 };
 
+/** Null only for an unscheduled opportunity Behavior, which stores no recurrence. */
+export function storedRecurrenceRuleOrNull(behavior: {
+  recurrence_rule: unknown; is_opportunity?: boolean | null;
+}): RecurrenceRule | null {
+  if (behavior.is_opportunity === true && behavior.recurrence_rule == null) return null;
+  return normalizeRecurrenceRule(behavior.recurrence_rule);
+}
+
 export function normalizeRecurrenceRule(value: unknown): RecurrenceRule {
   if (!isRecord(value)) {
     throw new BehaviorValidationError("Stored recurrence is invalid.", {

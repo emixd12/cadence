@@ -4,7 +4,8 @@ import { sha256 } from "../hash";
 import { normalizeBehaviorDefinition, planBehaviorDefinitionChangeEvent, planInitialBehaviorDefinitionEvent } from "../resolvers/behavior-definition.resolver";
 import { planBehaviorConfigurationChangeEvent, planInitialBehaviorConfigurationEvent } from "../resolvers/behavior-configuration.resolver";
 import { toBehaviorConfigurationEventPlanPayload } from "./configuration-payload";
-import type { BehaviorLogImportBehaviorPlan, BehaviorLogImportDefinitionEventPlan, BehaviorLogExistingRecords, BehaviorLogImportNotePlan, BehaviorLogImportPreview, BehaviorLogImportRecordMappingInput, BehaviorLogImportSchedulePlan, BehaviorLogImportInterventionRulePlan } from "../types/behaviorlog-import";
+import type { OccurrenceOrigin, OpportunityAddedBy } from "../types/database";
+import type { BehaviorLogExistingOccurrence, BehaviorLogImportOccurrencePlan, BehaviorLogImportBehaviorPlan, BehaviorLogImportDefinitionEventPlan, BehaviorLogExistingRecords, BehaviorLogImportNotePlan, BehaviorLogImportPreview, BehaviorLogImportRecordMappingInput, BehaviorLogImportSchedulePlan, BehaviorLogImportInterventionRulePlan } from "../types/behaviorlog-import";
 import { serializeArchiveNotes } from "../resolvers/archive-note.resolver";
 import type { BehaviorDefinition, BehaviorDefinitionEventPlan } from "../types/behavior-definition-event";
 import type { BehaviorConfigurationSchedule } from "../types/behavior-configuration-event";
@@ -283,6 +284,9 @@ export function buildRestorePayload(input: {
   const behaviorDefinitionEventByBehaviorId = latestDefinitionEventByBehavior(
     behaviorDefinitionEvents,
   );
+  const existingOccurrenceById = new Map(
+    (input.existing.occurrences ?? []).map((occurrence) => [occurrence.id, occurrence]),
+  );
   const existingBehaviorById = new Map(
     (input.existing.behaviors ?? []).map((behavior) => [behavior.id, behavior]),
   );
@@ -311,6 +315,8 @@ export function buildRestorePayload(input: {
       scheduleIdByExternal,
       existingBehaviors: input.existing.behaviors ?? [],
       restoreRecordedAt,
+      behaviorTimezones: new Map(input.importPreview.plan.occurrences
+        .map((occurrence) => [occurrence.behaviorExternalId, occurrence.timezone] as const)),
     });
 
   return {
@@ -347,8 +353,12 @@ export function buildRestorePayload(input: {
               shouldUpsert(actionIndex.schedule.get(schedule.externalId)),
           );
           const primarySchedule = schedules[0];
+          const opportunityBehaviorId = behaviorIdByExternal.get(behavior.externalId);
+          // Behaviors of Opportunity: an opportunity Behavior may have no schedule.
+          const isOpportunity = behavior.cadenceIsOpportunity
+            ?? (opportunityBehaviorId ? existingBehaviorById.get(opportunityBehaviorId)?.isOpportunity : undefined);
 
-          if (!primarySchedule) {
+          if (!primarySchedule && isOpportunity !== true) {
             throw new BehaviorLogRestoreUserError(
               `Behavior ${behavior.externalId} cannot be restored without a supported schedule.`,
             );
@@ -394,10 +404,17 @@ export function buildRestorePayload(input: {
               definitionEvent?.next_description ??
               existingBehavior?.description ??
               definition.description,
-            recurrence_rule: toCadenceRecurrenceRule(primarySchedule),
-            scheduled_time:
-              primarySchedule.localTime ?? primarySchedule.windowStartLocal,
-            timezone: primarySchedule.timezone || DEFAULT_TIMEZONE,
+            recurrence_rule: primarySchedule ? toCadenceRecurrenceRule(primarySchedule) : null,
+            scheduled_time: primarySchedule
+              ? primarySchedule.localTime ?? primarySchedule.windowStartLocal
+              : null,
+            timezone: primarySchedule?.timezone
+              || input.importPreview.plan.occurrences.find((occurrence) =>
+                occurrence.behaviorExternalId === behavior.externalId)?.timezone
+              || DEFAULT_TIMEZONE,
+            ...(behavior.cadenceIsOpportunity === undefined
+              ? {}
+              : { is_opportunity: behavior.cadenceIsOpportunity }),
             browser_reminder_enabled:
               reminderConfiguration.browserReminderEnabled,
             email_reminder_enabled:
@@ -522,6 +539,12 @@ export function buildRestorePayload(input: {
                 ? null
                 : latestEvent?.recordedAtUtc ?? null,
             note: inlineNoteByOccurrence.get(occurrence.externalId) ?? null,
+            // The restore update writes origin, so it must never fall back to "scheduled"
+            // for a row the bundle does not describe: keep the stored provenance.
+            ...restoredOccurrenceOrigin(
+              occurrence,
+              existingOccurrenceById.get(occurrenceIdByExternal.get(occurrence.externalId) ?? ""),
+            ),
             created_at: occurrence.generatedAtUtc,
           };
         }),
@@ -991,6 +1014,8 @@ function buildRestoreBehaviorConfigurationPayloads(input: {
   scheduleIdByExternal: Map<string, string>;
   existingBehaviors: NonNullable<BehaviorLogExistingRecords["behaviors"]>;
   restoreRecordedAt: string;
+  /** An unscheduled Behavior's timezone, read from its Occurrences. */
+  behaviorTimezones: ReadonlyMap<string, string>;
 }): {
   events: Array<Record<string, unknown>>;
 } {
@@ -1023,8 +1048,10 @@ function buildRestoreBehaviorConfigurationPayloads(input: {
         shouldUpsert(input.scheduleActionIndex.get(schedule.externalId)),
     );
     const primarySchedule = schedules[0];
+    const isOpportunity = behavior.cadenceIsOpportunity
+      ?? existingById.get(behaviorId)?.isOpportunity ?? false;
 
-    if (!primarySchedule) {
+    if (!primarySchedule && !isOpportunity) {
       throw new BehaviorLogRestoreUserError(
         `Behavior ${behavior.externalId} cannot restore configuration history without a schedule.`,
       );
@@ -1058,7 +1085,8 @@ function buildRestoreBehaviorConfigurationPayloads(input: {
       emailReminderEnabled: reminderConfiguration.emailReminderEnabled,
       reminderOffsetMinutes: reminderConfiguration.reminderOffsetMinutes,
       active: behavior.archivedAtUtc === null,
-      timezone: primarySchedule.timezone || DEFAULT_TIMEZONE,
+      timezone: primarySchedule?.timezone || input.behaviorTimezones.get(behavior.externalId) || DEFAULT_TIMEZONE,
+      isOpportunity,
     };
     const previousConfiguration =
       existingById.get(behaviorId)?.configurationSnapshot ?? null;
@@ -1542,4 +1570,19 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+/** The restore update writes origin, so a bundle without one keeps the stored provenance. */
+export function restoredOccurrenceOrigin(
+  occurrence: BehaviorLogImportOccurrencePlan,
+  existing: BehaviorLogExistingOccurrence | undefined,
+): { origin: OccurrenceOrigin; added_by: OpportunityAddedBy | null } {
+  if (occurrence.cadenceOrigin) {
+    return {
+      origin: occurrence.cadenceOrigin,
+      added_by: occurrence.cadenceOrigin === "opportunity" ? occurrence.cadenceAddedBy ?? null : null,
+    };
+  }
+  if (existing?.origin === "opportunity") return { origin: "opportunity", added_by: existing.addedBy ?? null };
+  return { origin: "scheduled", added_by: null };
 }

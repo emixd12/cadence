@@ -1165,6 +1165,25 @@ snapshots carry `end` and `pause`. Import reads a bundle that has only the old
 of these keys keeps the stored values during restore. Restore keeps the end, so
 an archived Behavior with a passed end comes back as ended.
 `BEHAVIORLOG_SCHEMA_VERSION` is unchanged: the new keys are Cadence extensions.
+
+## Behaviors of Opportunity (November 2026)
+
+Full JSON Behavior records carry `is_opportunity`. An unscheduled opportunity
+Behavior has `recurrence_rule: null`, `scheduled_time: null` and no schedules.
+Full JSON and app-native JSONL Occurrence records carry `origin` (`scheduled` or
+`opportunity`) and `added_by` (`user`, `daily_brief`, `chat`, `mcp`, or null on a
+scheduled row). Configuration snapshots carry `is_opportunity`; a snapshot without
+it was not an opportunity Behavior.
+
+BehaviorLog stores `is_opportunity` on the Behavior and `origin` and `added_by` on
+the Occurrence under `extensions.app.cadence`. An added Occurrence points at a
+one-occurrence `historical_reference` schedule, so import keeps it as a detached
+snapshot and never builds a schedule from it. Import accepts an opportunity
+Behavior with no schedule and refuses an `origin` without a matching `added_by`.
+A bundle without these keys keeps the stored values during restore: an existing
+added Occurrence stays added. CSV is unchanged. `BEHAVIORLOG_SCHEMA_VERSION` is
+unchanged: the new keys are Cadence extensions.
+
 ## Note shortcut privacy (Tickets 126–128)
 
 Shortcut records, proposals, dismissed keys, evidence hashes, exclusions, and

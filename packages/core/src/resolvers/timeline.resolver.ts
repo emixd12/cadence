@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import { canRemoveOpportunityOccurrence } from "./opportunity.resolver";
 import { canStartOccurrenceTimeTracking } from "./time-tracking.resolver";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import type {
@@ -210,9 +211,22 @@ function toOccurrenceView(
     compareLocalDate(occurrence.localDate, todayLocalDate) <= 0;
   const showDecisionActions =
     occurrence.status === "unresolved" && canShowDecisionActionsWhenUnresolved;
+  const origin = occurrence.origin === "opportunity" ? "opportunity" : "scheduled";
+  const hasTimeSessions = occurrence.timeTracking.recordedSeconds > 0
+    || occurrence.timeTracking.runningStartedAt !== null;
 
   return {
     ...occurrence,
+    origin,
+    addedBy: origin === "opportunity" ? occurrence.addedBy ?? null : null,
+    canRemove: canRemoveOpportunityOccurrence({
+      origin,
+      status: occurrence.status,
+      note: occurrence.note,
+      hasTimeSessions,
+      hasStatusHistory: occurrence.hasStatusHistory,
+      hasActiveSourceMatch: occurrence.hasActiveSourceMatch,
+    }),
     statusLabel: statusLabel(occurrence.status),
     statusDetail: statusDetail(occurrence.status),
     expandedStatusActionLabel: expandedStatusActionLabel(occurrence.status),

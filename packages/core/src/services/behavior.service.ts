@@ -41,6 +41,7 @@ export async function createBehavior(
     ...planBehaviorWhere(values),
     recurrence_rule: values.recurrenceRule as Json,
     scheduled_time: values.scheduledTime,
+    is_opportunity: values.isOpportunity === true,
     timezone: input.timezone,
     browser_reminder_enabled: values.browserReminderEnabled,
     email_reminder_enabled: values.emailReminderEnabled,
@@ -118,6 +119,7 @@ export async function updateBehavior(
     ...planBehaviorWhere(values, existing),
     recurrence_rule: values.recurrenceRule as Json,
     scheduled_time: values.scheduledTime,
+    is_opportunity: values.isOpportunity ?? existing.is_opportunity === true,
     browser_reminder_enabled: values.browserReminderEnabled,
     email_reminder_enabled: values.emailReminderEnabled,
     reminder_offset_minutes: values.reminderOffsetMinutes,
@@ -411,6 +413,7 @@ export function toBehaviorConfigurationSnapshot(behavior: BehaviorFields, schedu
     active: behavior.active,
     timezone: behavior.timezone,
     ...configurationRun(behavior),
+    isOpportunity: behavior.is_opportunity === true,
   };
 }
 
@@ -436,6 +439,7 @@ export function storedBehaviorFields(existing: BehaviorGraphRecord): BehaviorFie
     ...storedBehaviorWhere(existing),
     recurrence_rule: existing.recurrence_rule,
     scheduled_time: existing.scheduled_time,
+    is_opportunity: existing.is_opportunity === true,
     timezone: existing.timezone,
     browser_reminder_enabled: existing.browser_reminder_enabled,
     email_reminder_enabled: existing.email_reminder_enabled,

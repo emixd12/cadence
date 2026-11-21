@@ -1,4 +1,4 @@
-import type { Json, Tables, TablesInsert, TablesUpdate } from "@/lib/db/database.types";
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/db/database.types";
 
 export type Profile = Tables<"profiles">;
 export type Category = Tables<"categories">;
@@ -13,20 +13,9 @@ type BehaviorPersistenceField =
   | "location_text"
   | "where_kind"
   | "is_opportunity";
-/**
- * recurrence_rule and scheduled_time are null only on an unscheduled opportunity
- * Behavior. They stay typed non-null here until the core Behavior record and resolvers
- * accept unscheduled Behaviors (Behaviors of Opportunity, Task 2); no web path creates
- * one before then.
- */
-export type Behavior = Omit<
-  Tables<"behaviors">,
-  BehaviorPersistenceField | "recurrence_rule" | "scheduled_time"
-> &
-  Partial<Pick<Tables<"behaviors">, BehaviorPersistenceField>> & {
-    recurrence_rule: Json;
-    scheduled_time: string;
-  };
+/** recurrence_rule and scheduled_time are null only on an unscheduled opportunity Behavior. */
+export type Behavior = Omit<Tables<"behaviors">, BehaviorPersistenceField> &
+  Partial<Pick<Tables<"behaviors">, BehaviorPersistenceField>>;
 export type BehaviorDefinitionEvent = Tables<"behavior_definition_events">;
 export type BehaviorConfigurationEvent =
   Tables<"behavior_configuration_events">;

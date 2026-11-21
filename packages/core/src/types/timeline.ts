@@ -1,3 +1,4 @@
+import type { OccurrenceOrigin, OpportunityAddedBy } from "./database";
 import type { BehaviorDurationEstimate } from "./day-progress";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
@@ -41,6 +42,12 @@ export type TimelineOccurrenceInput = {
   note: string;
   timeTracking: TimelineTimeTrackingView;
   canStartTimeTracking: boolean;
+  /** Behaviors of Opportunity. Missing means "scheduled". */
+  origin?: OccurrenceOrigin;
+  addedBy?: OpportunityAddedBy | null;
+  /** Remove facts. Unknown status history counts as history, so Remove stays hidden. */
+  hasStatusHistory?: boolean;
+  hasActiveSourceMatch?: boolean;
 };
 
 export type TimelineTimeTrackingView = Readonly<{
@@ -103,6 +110,14 @@ export type TimelineOccurrenceView = {
    * while no any-workout link exists for it. Absent otherwise.
    */
   sourceCountable?: readonly string[];
+  /**
+   * Behaviors of Opportunity: "scheduled" unless the row was added from the pool. The
+   * resolver always sets these three; they are optional so hand-built views stay valid.
+   */
+  origin?: OccurrenceOrigin;
+  addedBy?: OpportunityAddedBy | null;
+  /** A clean added row can be removed, from Today or from Needs decision. */
+  canRemove?: boolean;
 };
 
 export type TimelineSourceEvidence = Readonly<{

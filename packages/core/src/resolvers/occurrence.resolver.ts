@@ -5,7 +5,7 @@ import {
   type BehaviorRunFields,
 } from "./behavior-run.resolver";
 import { resolveOccurrenceSchedule } from "./recurrence.resolver";
-import type { OccurrenceStatus } from "../types/database";
+import type { OccurrenceOrigin, OccurrenceStatus } from "../types/database";
 import { DEFAULT_TIMEZONE, type RecurrenceRule } from "../types/recurrence";
 import type {
   ScheduleKind,
@@ -18,7 +18,10 @@ export type OccurrenceGenerationBehavior = {
   id: string;
   userId: string;
   configurationEventId: string;
-  recurrenceRule: RecurrenceRule;
+  /** Null only on an unscheduled opportunity Behavior. */
+  recurrenceRule: RecurrenceRule | null;
+  /** Behaviors of Opportunity: zero schedules is valid and generates nothing. */
+  isOpportunity?: boolean;
   schedules?: OccurrenceGenerationSchedule[];
   scheduleSlots: OccurrenceGenerationScheduleSlot[];
   timezone?: string;
@@ -73,6 +76,8 @@ export type ExistingOccurrenceForGeneration = {
   /** The moved time, when `moved`. An end or a pause compares against it (rule T4). */
   effectiveStartAt?: string | null;
   effectiveEndAt?: string | null;
+  /** Missing means "scheduled". Generation never reads, updates or deletes an opportunity row. */
+  origin?: OccurrenceOrigin;
 };
 
 export type PlannedOccurrenceInsert = {
@@ -191,10 +196,16 @@ export function planOccurrenceRepair(
 
 export function normalizeOccurrenceScheduleGraph(input: {
   schedules: OccurrenceGenerationSchedule[];
-  compatibilitySchedule: OccurrenceGenerationSchedule;
+  /** Null when the Behavior has no legacy recurrence (an unscheduled opportunity Behavior). */
+  compatibilitySchedule: OccurrenceGenerationSchedule | null;
+  isOpportunity?: boolean;
 }): OccurrenceScheduleNormalizationResult {
+  if (input.schedules.length === 0 && input.isOpportunity === true) {
+    return { status: "valid", source: "persisted", schedules: [] };
+  }
+
   if (input.schedules.length === 0) {
-    return isWellFormedSchedule(input.compatibilitySchedule)
+    return input.compatibilitySchedule && isWellFormedSchedule(input.compatibilitySchedule)
       ? {
           status: "valid",
           source: "legacy_compatibility",
@@ -218,17 +229,19 @@ export function normalizeOccurrenceScheduleGraph(input: {
     if (
       input.schedules.length === 1 &&
       emptySchedules.length === 1 &&
+      input.compatibilitySchedule &&
       input.compatibilitySchedule.timeEntries.length === 1 &&
       isWellFormedSchedule(input.compatibilitySchedule)
     ) {
       const emptySchedule = emptySchedules[0];
+      const compatibilitySchedule = input.compatibilitySchedule;
 
       return {
         status: "repairable",
         reason: "single_empty_schedule",
         repairedSchedule: {
           ...emptySchedule,
-          timeEntries: input.compatibilitySchedule.timeEntries.map((entry) => ({
+          timeEntries: compatibilitySchedule.timeEntries.map((entry) => ({
             ...entry,
             scheduleId: emptySchedule.id,
           })),
@@ -254,9 +267,14 @@ export function normalizeOccurrenceScheduleGraph(input: {
 }
 
 function planOccurrenceGenerationForWindow(
-  input: PlanOccurrenceGenerationInput,
+  rawInput: PlanOccurrenceGenerationInput,
   generationWindow: OccurrenceGenerationWindow,
 ): OccurrenceGenerationPlan {
+  // Opportunity rows stay outside the schedule: no plan names them (Behaviors of Opportunity).
+  const input: PlanOccurrenceGenerationInput = {
+    ...rawInput,
+    existingOccurrences: rawInput.existingOccurrences.filter(isScheduledOrigin),
+  };
   const timezone = input.behavior.timezone || DEFAULT_TIMEZONE;
   const runFields = runFieldsOf(input.behavior, timezone);
   const stoppedByRun = (occurrence: ExistingOccurrenceForGeneration) =>
@@ -506,6 +524,10 @@ function resolveDesiredOccurrences(input: {
 function resolveGenerationSchedules(
   behavior: OccurrenceGenerationBehavior,
 ): OccurrenceGenerationSchedule[] {
+  if (behavior.isOpportunity === true && (behavior.schedules?.length ?? 0) === 0 && behavior.scheduleSlots.length === 0) {
+    return [];
+  }
+
   if (behavior.schedules && behavior.schedules.length > 0) {
     return [...behavior.schedules]
       .sort((left, right) => {
@@ -521,6 +543,10 @@ function resolveGenerationSchedules(
         ...schedule,
         timeEntries: sortGenerationScheduleSlots(schedule.timeEntries),
       }));
+  }
+
+  if (!behavior.recurrenceRule) {
+    return [];
   }
 
   return [
@@ -752,6 +778,10 @@ function isAfter(
   floor: Temporal.Instant,
 ): boolean {
   return Temporal.Instant.compare(candidate, floor) > 0;
+}
+
+export function isScheduledOrigin(occurrence: { origin?: string | null }): boolean {
+  return (occurrence.origin ?? "scheduled") === "scheduled";
 }
 
 function hasNonEmptyNote(note: string | null): boolean {

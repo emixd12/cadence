@@ -1,3 +1,4 @@
+import type { OpportunityAddedBy } from "../types/database";
 import { Temporal } from "@js-temporal/polyfill";
 import { isBehaviorLogScheduleBoundary } from "../resolvers/behavior-configuration.resolver";
 import { BEHAVIORLOG_INTERVENTION_CHANNELS, BEHAVIORLOG_INTERVENTION_DELIVERY_STATUSES,
@@ -115,6 +116,7 @@ function toExistingBehavior(behavior: BehaviorGraphRecord, schedules: BehaviorLo
       pauseBackOn: behavior.pause_back_on ?? null,
     },
     autoArchivedAt: behavior.auto_archived_at ?? null,
+    ...(behavior.is_opportunity === undefined ? {} : { isOpportunity: behavior.is_opportunity }),
     sourceOriginalId: behavior.id,
     schedules,
     configurationSnapshot: toExistingBehaviorConfiguration(behavior),
@@ -212,6 +214,8 @@ function toExistingOccurrence(
     timezone: behavior?.timezone ?? DEFAULT_TIMEZONE,
     status: normalizeOccurrenceStatus(occurrence.status),
     note: occurrence.note,
+    origin: occurrence.origin === "opportunity" ? "opportunity" : "scheduled",
+    addedBy: occurrence.origin === "opportunity" ? existingAddedBy(occurrence.added_by) : null,
     sourceOriginalId: occurrence.id,
     scheduleSnapshot: {
       kind: occurrence.schedule_kind === "range" ? "range" : "exact",
@@ -220,6 +224,10 @@ function toExistingOccurrence(
       endTime: occurrence.schedule_end_time ? normalizeTime(occurrence.schedule_end_time) : null,
     },
   };
+}
+
+function existingAddedBy(value: string | null | undefined): OpportunityAddedBy | null {
+  return value === "user" || value === "daily_brief" || value === "chat" || value === "mcp" ? value : null;
 }
 
 function toExistingStatusEvent(event: OccurrenceStatusEventRecord) {

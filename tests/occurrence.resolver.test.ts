@@ -1075,3 +1075,58 @@ describe("planOccurrenceRepair", () => {
     expect(replay.create).toEqual([]);
   });
 });
+
+describe("planOccurrenceGeneration with Behaviors of Opportunity", () => {
+  const added = (id: string, scheduledFor: string, localDate: string, status: ExistingOccurrenceForGeneration["status"] = "unresolved"): ExistingOccurrenceForGeneration => ({
+    ...existingOccurrence(id, scheduledFor, localDate, status), origin: "opportunity",
+  });
+  const unscheduled: OccurrenceGenerationBehavior = {
+    ...BASE_BEHAVIOR, isOpportunity: true, recurrenceRule: null, schedules: [], scheduleSlots: [],
+  };
+
+  it("generates nothing for an opportunity Behavior with no schedule", () => {
+    const plan = planOccurrenceGeneration({ behavior: unscheduled, existingOccurrences: [], now: NOW, horizonDays: 3 });
+    expect(plan.create).toEqual([]);
+    expect(plan.updateUnresolved).toEqual([]);
+    expect(plan.deleteUnresolved).toEqual([]);
+  });
+
+  it("never deletes or updates an added Occurrence of an unscheduled Behavior", () => {
+    const rows = [added("today", "2026-01-02T17:00:00Z", "2026-01-02"), added("later", "2026-01-03T14:00:00Z", "2026-01-03")];
+    const plan = planOccurrenceGeneration({ behavior: unscheduled, existingOccurrences: rows, now: NOW, horizonDays: 3 });
+    expect(plan.deleteUnresolved).toEqual([]);
+    expect(plan.updateUnresolved).toEqual([]);
+  });
+
+  it("keeps an added Occurrence through a schedule edit and still creates the scheduled one at the same time", () => {
+    const sameTime = added("added-9am", "2026-01-03T14:00:00Z", "2026-01-03");
+    const atTen = { ...BASE_BEHAVIOR, isOpportunity: true, scheduleSlots: [{ ...BASE_BEHAVIOR.scheduleSlots[0]!, startTime: "10:00" }] };
+    const plan = planOccurrenceGeneration({ behavior: atTen, existingOccurrences: [sameTime], now: NOW, horizonDays: 1 });
+    expect(deleteIds(plan)).toEqual([]);
+    expect(plan.updateUnresolved.map(({ id }) => id)).toEqual([]);
+    const sameIdentity = planOccurrenceGeneration({ behavior: { ...BASE_BEHAVIOR, isOpportunity: true }, existingOccurrences: [sameTime], now: NOW, horizonDays: 1 });
+    expect(summarizeCreate(sameIdentity)).toContainEqual({ scheduledFor: "2026-01-03T14:00:00Z", localDate: "2026-01-03" });
+  });
+
+  it("keeps added Occurrences when the Behavior ends, pauses or is archived", () => {
+    const rows = [added("a", "2026-01-03T14:00:00Z", "2026-01-03"), added("b", "2026-01-04T14:00:00Z", "2026-01-04")];
+    for (const change of [{ endOn: "2026-01-02" }, { pauseFromOn: "2026-01-03", pauseBackOn: "2026-01-10" }, { active: false }]) {
+      const plan = planOccurrenceGeneration({ behavior: { ...unscheduled, ...change }, existingOccurrences: rows, now: NOW, horizonDays: 3 });
+      expect(deleteIds(plan)).toEqual([]);
+    }
+  });
+
+  it("still removes the scheduled row an end stops, beside a kept added row", () => {
+    const scheduled = existingOccurrence("scheduled", "2026-01-03T14:00:00Z", "2026-01-03");
+    const addedRow = added("added", "2026-01-03T14:00:00Z", "2026-01-03");
+    const plan = planOccurrenceGeneration({ behavior: { ...BASE_BEHAVIOR, isOpportunity: true, endOn: "2026-01-02" }, existingOccurrences: [scheduled, addedRow], now: NOW, horizonDays: 3 });
+    expect(deleteIds(plan)).toEqual(["scheduled"]);
+  });
+
+  it("accepts zero schedules only for an opportunity Behavior", () => {
+    expect(normalizeOccurrenceScheduleGraph({ schedules: [], compatibilitySchedule: null, isOpportunity: true }))
+      .toEqual({ status: "valid", source: "persisted", schedules: [] });
+    expect(normalizeOccurrenceScheduleGraph({ schedules: [], compatibilitySchedule: null }))
+      .toEqual({ status: "invalid", reason: "missing_schedule" });
+  });
+});
