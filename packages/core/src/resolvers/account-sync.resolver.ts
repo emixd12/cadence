@@ -15,8 +15,11 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * Contract 5 adds the read-only connector completion kinds (Ticket 320).
  * Contract 7 replaces the Behavior `end_date` with end and pause fields (Ended and
  * Paused). It is breaking, so the server's minimum writer contract is 7 as well.
+ * Contract 8 adds Behaviors of Opportunity: `behavior.is_opportunity` (false), nullable
+ * `recurrence_rule` and `scheduled_time` on an opportunity Behavior, `occurrence.origin`
+ * ("scheduled") and `occurrence.added_by` (null). The minimum writer contract is 8.
  */
-export const ACCOUNT_SYNC_CONTRACT = 7;
+export const ACCOUNT_SYNC_CONTRACT = 8;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -61,6 +64,7 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
   const accountLinkId = input.accountLinkId ?? "account-link";
   const baseline = prepare(input.baseline), local = prepare(input.local), hosted = prepare(input.hosted);
   validateInputGraphs(input.firstLink === true, baseline, local, hosted);
+  validateOccurrenceOrigins(baseline, local, hosted);
   const compatibleMarks = compatibleInitialMarks(baseline, local, hosted);
   const baselineProtectedOccurrences = protectedOccurrenceIds(baseline);
   const protectedOccurrences = protectedOccurrenceIds(baseline, local, hosted);
@@ -122,8 +126,8 @@ export function resolveReviewedAccountSync(input: Readonly<{
     throw new Error("The synchronization conflict review is stale. Review the current changes again.");
   }
   const decisions = new Map(input.decisions.map((decision) => [`${decision.kind}:${decision.id}`, decision]));
-  const local = prepare(input.local), hosted = prepare(input.hosted);
-  const protectedOccurrences = protectedOccurrenceIds(prepare(input.baseline), local, hosted);
+  const baseline = prepare(input.baseline), local = prepare(input.local), hosted = prepare(input.hosted);
+  const protectedOccurrences = protectedOccurrenceIds(baseline, local, hosted);
   for (const conflict of initial.conflicts) {
     const key = `${conflict.kind}:${conflict.id}`, decision = decisions.get(key);
     if (!decision) throw new Error("Every synchronization conflict requires a decision.");
@@ -132,8 +136,8 @@ export function resolveReviewedAccountSync(input: Readonly<{
       && ((decision.choice === "local" && conflict.local === null) || (decision.choice === "hosted" && conflict.hosted === null))) {
       throw new Error("An Occurrence with a Note, status history, tracked time, or resolved status cannot be deleted during synchronization.");
     }
-    if (decision.choice === "hosted") replace(local, key, hosted.get(key) ?? null);
-    else if (decision.choice === "local") replace(hosted, key, local.get(key) ?? null);
+    if (decision.choice === "hosted") { replace(local, key, hosted.get(key) ?? null); carryParents(local, hosted, key); }
+    else if (decision.choice === "local") { replace(hosted, key, local.get(key) ?? null); carryParents(hosted, local, key); }
     else {
       if (!canKeepBothAccountSyncConflict(conflict) || !decision.duplicateId) throw new Error("Keep both is unavailable for this synchronization conflict.");
       throw new Error("Keep both is unavailable for this synchronization conflict.");
@@ -186,7 +190,8 @@ function coalesceGeneratedOccurrences(rows: readonly AccountSyncEntity[], baseli
 }
 
 function occurrenceScheduleIdentity(entity: AccountSyncEntity): string | null {
-  if (entity.kind !== "occurrence") return null;
+  // Only scheduled rows hold a schedule identity; an added row may share a planned time.
+  if (entity.kind !== "occurrence" || field(entity.value, "origin") !== "scheduled") return null;
   const behavior = field(entity.value, "behavior_id"), date = field(entity.value, "local_date");
   const start = field(entity.value, "schedule_start_time"), kind = field(entity.value, "schedule_kind"), end = field(entity.value, "schedule_end_time");
   if (!behavior || !date || !start || (kind !== "exact" && kind !== "range") || (kind === "range" && !end)) return null;
@@ -262,6 +267,26 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 }
 
 function replace(target: Map<string, AccountSyncEntity>, key: string, value: AccountSyncEntity | null) { if (value) target.set(key, value); else target.delete(key); }
+// A reviewed winner can reference rows the other side lacks: a configuration event its own
+// Behavior edit appended, or a Category the other side deleted. Copy those rows, and their own
+// parents, from the winner's side so the winner's graph stays complete. A deleted parent comes
+// back (decision 2026-11-21): restoring it is safer than losing the winner's reference.
+function carryParents(target: Map<string, AccountSyncEntity>, source: Map<string, AccountSyncEntity>, key: string): void {
+  const pending = [key];
+  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+    const entity = target.get(next);
+    if (!entity) continue;
+    for (const [fieldName, parentKind] of dependencies(entity)) {
+      const parentId = field(entity.value, fieldName);
+      const parentKey = parentId ? `${parentKind}:${parentId}` : null;
+      if (!parentKey || target.has(parentKey)) continue;
+      const parent = source.get(parentKey);
+      if (!parent) continue;
+      target.set(parentKey, parent);
+      pending.push(parentKey);
+    }
+  }
+}
 function writesBetween(previous: Map<string, AccountSyncEntity>, next: Map<string, AccountSyncEntity>): AccountSyncWrite[] {
   return [...new Set([...previous.keys(), ...next.keys()])].sort().flatMap((key) => same(previous.get(key) ?? null, next.get(key) ?? null) ? [] : [writeFor(previous.get(key) ?? null, next.get(key) ?? null)])
     .sort((left, right) => writeOrder(left) - writeOrder(right) || compareText(`${left.kind}:${left.id}`, `${right.kind}:${right.id}`));
@@ -459,6 +484,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       pause_back_on: null,
       auto_archived_at: null,
       location_text: null,
+      // Contract 8: a Behavior saved before it was never an opportunity Behavior.
+      is_opportunity: false,
       ...value,
     };
     // A baseline saved before contract 7 holds end_date; it reads as the new fields.
@@ -471,6 +498,11 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     if (!("where_kind" in value)) value = { ...value, where_kind: typeof value.location_text === "string" ? "place" : null };
     parseArchiveNotes(value.archive_notes);
     validateBehaviorPersistenceFields(value);
+  }
+  if (entity.kind === "occurrence" && value && !Array.isArray(value) && typeof value === "object") {
+    // Contract 8: an Occurrence saved before it was scheduled.
+    value = { origin: "scheduled", added_by: null, ...value };
+    validateOccurrenceOrigin(value);
   }
   if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
   if (entity.kind === "day_note") validateDayNoteRow(entity.id, value);
@@ -671,7 +703,34 @@ function validateProfileSyncValue(value: Json): void {
   }
 }
 
+const OPPORTUNITY_ADDED_BY = new Set(["user", "daily_brief", "chat", "mcp"]);
+
+/** Mirrors the hosted occurrences checks: an added row names who added it, a scheduled row nobody. */
+function validateOccurrenceOrigin(value: Record<string, Json | undefined>): void {
+  const origin = value.origin, addedBy = value.added_by;
+  const valid = (origin === "scheduled" && addedBy === null)
+    || (origin === "opportunity" && typeof addedBy === "string" && OPPORTUNITY_ADDED_BY.has(addedBy));
+  if (!valid) throw new Error("The account Occurrence origin is invalid.");
+}
+
+/** An Occurrence keeps the origin it was created with on every side (contract 8). */
+function validateOccurrenceOrigins(...graphs: readonly Map<string, AccountSyncEntity>[]): void {
+  const origins = new Map<string, string | null>();
+  for (const graph of graphs) for (const entity of graph.values()) {
+    if (entity.kind !== "occurrence") continue;
+    const origin = field(entity.value, "origin");
+    if (origins.has(entity.id) && origins.get(entity.id) !== origin) {
+      throw new Error("The account snapshot changes where an Occurrence came from; an Occurrence keeps its origin.");
+    }
+    origins.set(entity.id, origin);
+  }
+}
+
 function validateBehaviorPersistenceFields(value: Record<string, Json | undefined>): void {
+  if (typeof value.is_opportunity !== "boolean") throw new Error("The account Behavior opportunity flag is invalid.");
+  if (!value.is_opportunity && (value.recurrence_rule === null || value.scheduled_time === null)) {
+    throw new Error("The account Behavior needs a schedule unless it is an opportunity Behavior.");
+  }
   const duration = value.default_duration_minutes;
   if (duration !== null
     && (typeof duration !== "number" || !Number.isInteger(duration) || duration < 1 || duration > 1_440)) {

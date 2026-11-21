@@ -85,6 +85,26 @@ function fakeExecutor() {
         if (args.expected_revision && args.expected_revision !== state[id]!.revision) return { ok: false, error: { code: "conflict", message: "changed" } };
         state[id] = { ...state[id]!, effective_start_at: state[id]!.scheduled_for, revision: `r${++revision}` };
         return { ok: true, result: { outcome: "undone", occurrence: state[id], move: { id: "m2" }, refusal: null } };
+      case "get_behavior": return { ok: true, result: { behavior: { id: args.behavior_id, title: "Stretch", revision: "b1" } } };
+      case "add_opportunity_occurrence": {
+        if (args.start_time === "19:00") {
+          return { ok: true, result: { outcome: "refused", occurrence: null, refusal: { reason: "calendar_busy", message: "Your calendar is busy at that time.",
+            alternatives: [{ start_at: "2026-11-20T01:30:00Z", start_time: "20:30" }] } } };
+        }
+        const done = args.mark_completed === true;
+        state.o3 = { ...OCC("o3"), behavior_id: args.behavior_id as string, behavior_title: "Stretch", effective_start_at: "2026-11-19T20:00:00Z",
+          status: done ? "completed" : "unresolved", note: null as unknown as string, revision: `r${++revision}` };
+        return { ok: true, result: { outcome: done ? "logged" : "added", occurrence: state.o3, refusal: null } };
+      }
+      case "remove_opportunity_occurrence": {
+        const item = state[id];
+        if (!item) return { ok: false, error: { code: "not_found", message: "no" } };
+        if (args.expected_revision && args.expected_revision !== item.revision) {
+          return { ok: true, result: { outcome: "refused", occurrence: item, refusal: { reason: "revision_changed", message: "Stretch changed since it was read." } } };
+        }
+        delete state[id];
+        return { ok: true, result: { outcome: "removed", occurrence: item, refusal: null } };
+      }
       case "list_day_notes": return { ok: true, result: { day_notes: dayNote.note === null ? [] : [{ local_date: "2026-11-19", ...dayNote }] } };
       case "update_day_note":
         if (args.expected_revision && args.expected_revision !== dayNote.revision) return { ok: false, error: { code: "conflict", message: "changed" } };
@@ -297,6 +317,37 @@ describe("chat confirm and Undo (5A)", () => {
     ] });
     expect(run.state).toBe("expired");
     expect(fake.calls.some((call) => call.name === "set_occurrence_status")).toBe(false);
+  });
+
+  it("adds an opportunity at once, and Undo takes it back off today", async () => {
+    const { promise, fake } = turn([{ calls: [{ name: "add_opportunity_occurrence", input: { behavior_id: "b-stretch", start_time: "15:00" } }] }, { text: "Added." }]);
+    const result = await promise;
+    const write = result.writes[0]!;
+    expect(write.outcome).toMatchObject({ kind: "opportunity", text: "Added Stretch to today at 3 pm.", undo: "available" });
+    expect(write.undo?.call).toEqual({ name: "remove_opportunity_occurrence", args: { occurrence_id: "o3", expected_revision: fake.state.o3!.revision } });
+    expect(await runChatUndo({ outcome: write.outcome, plan: write.undo!, executor: fake.executor, idempotencyKey: "chat:undo:o1" })).toMatchObject({ ok: true });
+    expect(fake.state.o3).toBeUndefined();
+  });
+
+  it("offers no Undo for Done now, and shows a taken time as a refusal with other times", async () => {
+    const logged = await turn([{ calls: [{ name: "add_opportunity_occurrence", input: { behavior_id: "b-stretch", mark_completed: true } }] }, { text: "ok" }]).promise;
+    expect(logged.writes[0]!.outcome).toMatchObject({ kind: "opportunity", undo: "unavailable" });
+    expect(logged.writes[0]!.undo).toBeNull();
+    const busy = turn([{ calls: [{ name: "add_opportunity_occurrence", input: { behavior_id: "b-stretch", start_time: "19:00" } }] }, { text: "ok" }]);
+    const refused = await busy.promise;
+    expect(refused.writes).toHaveLength(0);
+    expect(busy.events.find((event) => event.type === "refusal")).toMatchObject({
+      refusal: { kind: "opportunity", reason: "calendar_busy", alternatives: [{ startTime: "20:30" }] },
+    });
+  });
+
+  it("waits for a Yes before a second opportunity in the same question", async () => {
+    const result = await turn([{ calls: [
+      { name: "add_opportunity_occurrence", input: { behavior_id: "b-stretch", start_time: "15:00" } },
+      { name: "add_opportunity_occurrence", input: { behavior_id: "b-read", preset: "evening" } },
+    ] }, { text: "ok" }]).promise;
+    expect(result.writes).toHaveLength(1);
+    expect(result.pending?.writes.map((write) => write.item)).toEqual([{ text: "Add Stretch to today this evening", kind: "opportunity" }]);
   });
 
   it("Undo after a note edit restores the old text (T11)", async () => {

@@ -23,6 +23,8 @@ type BehaviorCreateSectionProps = Readonly<{
    * uses its own route by default; a Mac passes one only while linked (Ticket 330).
    */
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
+  /** Behaviors of Opportunity: show Available as an opportunity in the form. */
+  allowOpportunity?: boolean;
 }>;
 
 export function BehaviorCreateSection({
@@ -32,6 +34,7 @@ export function BehaviorCreateSection({
   defaultOpen,
   reminderRuntime = "web",
   sourceLinkCoordinator,
+  allowOpportunity = true,
 }: BehaviorCreateSectionProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -100,6 +103,7 @@ export function BehaviorCreateSection({
             categories={categories}
             defaultTimezone={defaultTimezone}
             onSuccess={handleSuccess}
+            allowOpportunity={allowOpportunity}
             extraFields={linkCoordinator
               ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={linkCoordinator} />
               : null}

@@ -894,6 +894,7 @@ describe("BehaviorLog restore apply service", () => {
           "timezone",
           "end",
           "pause",
+          "is_opportunity",
         ],
         recorded_at: expect.any(String),
         effective_at: expect.any(String),

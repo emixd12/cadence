@@ -1,10 +1,11 @@
+import type { OpportunityAddedBy } from "../types/database";
 import { Temporal } from "@js-temporal/polyfill";
 import { sha256 } from "../hash";
 import type { BehaviorGraphRecord } from "../behavior-store";
 import type { Json } from "../types/json";
 import { resolveExportBundle } from "../resolvers/export.resolver";
 import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
-import { normalizeRecurrenceRule, recurrenceDefaultsFromRule, summarizeRecurrenceRule } from "./behavior-values";
+import { normalizeRecurrenceRule, recurrenceDefaultsFromRule, storedRecurrenceRuleOrNull, summarizeRecurrenceRule } from "./behavior-values";
 import { isBehaviorWhereKind, storedBehaviorWhere } from "./behavior-where";
 import { toStoredConfigurationSnapshot } from "./configuration-payload";
 import type { BehaviorWhereKind } from "../types/behavior";
@@ -442,13 +443,13 @@ function toExportCategoryInput(
 function toExportBehaviorInput(
   behavior: BehaviorGraphRecord,
 ): ExportBehaviorInput {
-  const recurrenceRule = normalizeRecurrenceRule(behavior.recurrence_rule);
-  const scheduledTime = normalizeExportTime(behavior.scheduled_time);
-  const schedules = toExportBehaviorSchedules(
-    behavior,
-    recurrenceRule,
-    scheduledTime,
-  );
+  // Null only on an unscheduled opportunity Behavior (Behaviors of Opportunity).
+  const recurrenceRule = storedRecurrenceRuleOrNull(behavior);
+  const scheduledTime = behavior.scheduled_time === null ? null : normalizeExportTime(behavior.scheduled_time);
+  const schedules = recurrenceRule === null || scheduledTime === null
+    || (behavior.is_opportunity === true && (behavior.schedules ?? []).length === 0 && behavior.schedule_slots.length === 0)
+    ? toExportBehaviorSchedules(behavior, null, null)
+    : toExportBehaviorSchedules(behavior, recurrenceRule, scheduledTime);
 
   return {
     id: behavior.id,
@@ -460,6 +461,7 @@ function toExportBehaviorInput(
     locationText: behavior.location_text ?? null,
     recurrenceRule,
     scheduledTime,
+    ...(behavior.is_opportunity === undefined ? {} : { isOpportunity: behavior.is_opportunity }),
     schedules,
     scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
     timezone: behavior.timezone || DEFAULT_TIMEZONE,
@@ -480,7 +482,7 @@ function toExportBehaviorInput(
 function toExportBehaviorSchedules(
   behavior: BehaviorGraphRecord,
   fallbackRecurrenceRule: ExportBehaviorInput["recurrenceRule"],
-  fallbackScheduledTime: string,
+  fallbackScheduledTime: string | null,
 ): BehaviorScheduleView[] {
   const schedules = behavior.schedules ?? [];
 
@@ -515,6 +517,10 @@ function toExportBehaviorSchedules(
         };
       })
       .sort((left, right) => left.sortOrder - right.sortOrder);
+  }
+
+  if (fallbackRecurrenceRule === null || fallbackScheduledTime === null) {
+    return [];
   }
 
   const timeEntries =
@@ -601,9 +607,17 @@ function toExportOccurrenceInput(
     completedAt: occurrence.completed_at,
     statusMarkedAt: occurrence.status_marked_at,
     note: occurrence.note,
+    ...(occurrence.origin === undefined ? {} : {
+      origin: occurrence.origin === "opportunity" ? "opportunity" as const : "scheduled" as const,
+      addedBy: occurrence.origin === "opportunity" ? toOpportunityAddedBy(occurrence.added_by) : null,
+    }),
     createdAt: occurrence.created_at,
     updatedAt: occurrence.updated_at,
   };
+}
+
+function toOpportunityAddedBy(value: string | null | undefined): OpportunityAddedBy | null {
+  return value === "user" || value === "daily_brief" || value === "chat" || value === "mcp" ? value : null;
 }
 
 function toExportStatusEventInput(

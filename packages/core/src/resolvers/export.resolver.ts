@@ -37,7 +37,7 @@ import type {
   ExportDayNoteInput,
   ExportJsonDayNote,
 } from "../types/export";
-import { DEFAULT_TIMEZONE } from "../types/recurrence";
+import { DEFAULT_TIMEZONE, type RecurrenceRule } from "../types/recurrence";
 import type { BehaviorWhereKind } from "../types/behavior";
 import { BEHAVIOR_CONFIGURATION_CHANGED_FIELDS } from "../types/behavior-configuration-event";
 import { isBehaviorLogScheduleBoundary } from "./behavior-configuration.resolver";
@@ -457,6 +457,7 @@ function toJsonBehavior(
     location_text: behavior.locationText ?? null,
     recurrence_rule: behavior.recurrenceRule,
     scheduled_time: behavior.scheduledTime,
+    ...(behavior.isOpportunity === undefined ? {} : { is_opportunity: behavior.isOpportunity }),
     schedules: normalizeExportInputSchedules(behavior),
     schedule_slots: behavior.scheduleSlots,
     timezone: behavior.timezone,
@@ -633,6 +634,10 @@ function toJsonOccurrence(input: {
       timezone,
     ),
     note: includeNotes ? occurrence.note : null,
+    ...(occurrence.origin === undefined ? {} : {
+      origin: occurrence.origin,
+      added_by: occurrence.origin === "opportunity" ? occurrence.addedBy ?? null : null,
+    }),
     created_at: occurrence.createdAt,
     updated_at: occurrence.updatedAt,
   };
@@ -801,6 +806,7 @@ function toJsonl(input: {
         description: behavior.description,
         recurrence_rule: behavior.recurrence_rule,
         scheduled_time: behavior.scheduled_time,
+        is_opportunity: behavior.is_opportunity,
         schedules: behavior.schedules,
         schedule_slots: behavior.schedule_slots,
         timezone: behavior.timezone,
@@ -829,6 +835,8 @@ function toJsonl(input: {
         status: occurrence.status,
         status_marked_at: occurrence.status_marked_at,
         note: occurrence.note,
+        origin: occurrence.origin,
+        added_by: occurrence.added_by,
       }),
     ),
     ...input.timeSessions.map((session) =>
@@ -1408,6 +1416,9 @@ function toBehaviorLogBehavior(
         ...(behavior.auto_archived_at !== undefined
           ? { auto_archived_at: behavior.auto_archived_at }
           : {}),
+        ...(behavior.is_opportunity !== undefined
+          ? { is_opportunity: behavior.is_opportunity }
+          : {}),
       },
     },
   });
@@ -1561,7 +1572,7 @@ function toHistoricalBehaviorLogSchedules(input: {
     const periodEvent = configurationEventId
       ? periodEventByConfigurationEventId.get(configurationEventId)
       : null;
-    const matchedScheduleId = periodEvent
+    const matchedScheduleId = periodEvent && !isOpportunityOccurrence(occurrence)
       ? findHistoricalScheduleId({
           occurrence,
           periodEvent,
@@ -1642,6 +1653,17 @@ function toLegacyBehaviorLogSchedules(
       continue;
     }
 
+    // An added Occurrence has no schedule of its own: it gets a one-occurrence placeholder.
+    const occurrenceRule = recurrenceRuleForOccurrence(behavior, occurrence);
+    if (isOpportunityOccurrence(occurrence) || !occurrenceRule) {
+      const placeholderId = scheduleIdForLegacyOccurrence(occurrence.id);
+      scheduleIdByOccurrenceId.set(occurrence.id, placeholderId);
+      recordsById.set(placeholderId, createBehaviorLogLegacyOccurrenceSchedule({
+        scheduleId: placeholderId, behavior, occurrence,
+      }));
+      continue;
+    }
+
     const scheduleId = occurrence.behavior_schedule_slot_id
       ? scheduleIdForSlot(behavior.id, occurrence.behavior_schedule_slot_id)
       : scheduleIdForOccurrenceSnapshot(occurrence);
@@ -1653,7 +1675,7 @@ function toLegacyBehaviorLogSchedules(
         createBehaviorLogSchedule({
           scheduleId,
           behavior,
-          recurrenceRule: recurrenceRuleForOccurrence(behavior, occurrence),
+          recurrenceRule: occurrenceRule,
           localTime: occurrence.schedule_start_time,
           windowStartLocal:
             occurrence.schedule_kind === "range"
@@ -1687,11 +1709,19 @@ function toLegacyBehaviorLogSchedules(
   };
 }
 
+function isOpportunityOccurrence(occurrence: ExportJsonOccurrence): boolean {
+  return occurrence.origin === "opportunity";
+}
+
 function normalizeExportSchedules(
   behavior: ExportJsonBehavior,
 ): ExportJsonBehavior["schedules"] {
   if (behavior.schedules.length > 0) {
     return behavior.schedules;
+  }
+
+  if (behavior.recurrence_rule === null) {
+    return [];
   }
 
   return [
@@ -1720,6 +1750,10 @@ function normalizeExportInputSchedules(
 ): ExportJsonBehavior["schedules"] {
   if (behavior.schedules && behavior.schedules.length > 0) {
     return behavior.schedules;
+  }
+
+  if (behavior.recurrenceRule === null || (behavior.isOpportunity === true && behavior.scheduleSlots.length === 0)) {
+    return [];
   }
 
   return [
@@ -1835,7 +1869,7 @@ function createBehaviorLogLegacyOccurrenceSchedule(input: {
 function createBehaviorLogSchedule(input: {
   scheduleId: string;
   behavior: ExportJsonBehavior;
-  recurrenceRule: ExportJsonBehavior["recurrence_rule"];
+  recurrenceRule: RecurrenceRule;
   localTime: string;
   windowStartLocal: string | null;
   windowEndLocal: string | null;
@@ -1959,6 +1993,8 @@ function toBehaviorLogOccurrence(
         lineage_confidence: occurrence.behavior_configuration_event_id
           ? "high"
           : "medium",
+        origin: occurrence.origin,
+        added_by: occurrence.origin === "opportunity" ? occurrence.added_by : undefined,
       },
     },
   });
@@ -2443,7 +2479,7 @@ function createBehaviorLogAgentsMd(
   ].join("\n");
 }
 
-function toBehaviorLogRecurrence(rule: ExportJsonBehavior["recurrence_rule"]) {
+function toBehaviorLogRecurrence(rule: RecurrenceRule) {
   switch (rule.frequency) {
     case "daily":
       return rule.interval === 1

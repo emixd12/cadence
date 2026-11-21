@@ -2,6 +2,7 @@ import dailyBrief from "./catalog/daily-brief.json";
 import dailyBriefMoves from "./catalog/daily-brief-moves.json";
 import endingPausingArchiving from "./catalog/ending-pausing-archiving.json";
 import moveForToday from "./catalog/move-for-today.json";
+import opportunity from "./catalog/opportunity.json";
 import timeline from "./catalog/timeline.json";
 import { formatNoticeTemplate, type NoticeParams } from "./format";
 
@@ -57,7 +58,7 @@ export type NoticeEntry = Readonly<{
 type Catalog = Readonly<{ feature: string; notices: Readonly<Record<string, NoticeEntry>> }>;
 
 // JSON types widen `style` to string; the notices test and `npm run map:check` validate every entry.
-const CATALOGS = [dailyBrief, dailyBriefMoves, endingPausingArchiving, moveForToday, timeline] as const;
+const CATALOGS = [dailyBrief, dailyBriefMoves, endingPausingArchiving, moveForToday, opportunity, timeline] as const;
 
 type CatalogIds<C> = C extends { notices: infer N } ? keyof N & string : never;
 export type NoticeId = CatalogIds<(typeof CATALOGS)[number]>;

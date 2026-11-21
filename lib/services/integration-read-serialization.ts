@@ -1,12 +1,16 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
-import { OCCURRENCE_STATUS_LABELS, type BehaviorOutput, type OccurrenceOutput } from "@cadence/core/integration";
+import { OCCURRENCE_STATUS_LABELS, OPPORTUNITY_ADDED_BY_VALUES, type BehaviorOutput, type OccurrenceOutput } from "@cadence/core/integration";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
 import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
 import { resolvePersistedTimelineOccurrence } from "@cadence/core/services/timeline.service";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "@cadence/core/services/occurrence-generation";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 import type { Occurrence } from "@/lib/types/database";
+
+const ADDED_BY: ReadonlySet<string> = new Set(OPPORTUNITY_ADDED_BY_VALUES);
+const addedByOf = (value: string | null | undefined): OccurrenceOutput["added_by"] =>
+  value && ADDED_BY.has(value) ? value as OccurrenceOutput["added_by"] : null;
 
 export const integrationInstant = (value: string): string => Temporal.Instant.from(value).toString();
 const nullableInstant = (value: string | null): string | null => value === null ? null : integrationInstant(value);
@@ -44,6 +48,7 @@ export function serializeIntegrationBehavior(
     archived_at: nullableInstant(behavior.archived_at),
     auto_archived_at: nullableInstant(behavior.auto_archived_at ?? null),
     ...integrationRunFields(behavior, now),
+    is_opportunity: behavior.is_opportunity === true,
     default_duration_minutes: behavior.default_duration_minutes ?? null,
     timezone: behavior.timezone,
     schedules: (view.schedules ?? []).map((schedule) => {
@@ -108,6 +113,8 @@ export function serializeIntegrationOccurrence(
     status: view.status,
     status_label: OCCURRENCE_STATUS_LABELS[view.status],
     needs_decision: view.visualTone === "needs_decision",
+    origin: occurrence.origin === "opportunity" ? "opportunity" : "scheduled",
+    added_by: occurrence.origin === "opportunity" ? addedByOf(occurrence.added_by) : null,
     completed_at: nullableInstant(occurrence.completed_at),
     status_marked_at: nullableInstant(occurrence.status_marked_at),
     note: occurrence.note,

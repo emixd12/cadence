@@ -39,8 +39,8 @@ export async function createBehavior(
     title: values.title,
     description: values.description,
     ...planBehaviorWhere(values),
-    recurrence_rule: values.recurrenceRule as Json,
-    scheduled_time: values.scheduledTime,
+    ...storedRecurrence(values, values.isOpportunity === true),
+    is_opportunity: values.isOpportunity === true,
     timezone: input.timezone,
     browser_reminder_enabled: values.browserReminderEnabled,
     email_reminder_enabled: values.emailReminderEnabled,
@@ -116,8 +116,8 @@ export async function updateBehavior(
     title: definitionEventPlan?.nextTitle ?? existing.title,
     description: definitionEventPlan ? definitionEventPlan.nextDescription : existing.description,
     ...planBehaviorWhere(values, existing),
-    recurrence_rule: values.recurrenceRule as Json,
-    scheduled_time: values.scheduledTime,
+    ...storedRecurrence(values, values.isOpportunity ?? existing.is_opportunity === true),
+    is_opportunity: values.isOpportunity ?? existing.is_opportunity === true,
     browser_reminder_enabled: values.browserReminderEnabled,
     email_reminder_enabled: values.emailReminderEnabled,
     reminder_offset_minutes: values.reminderOffsetMinutes,
@@ -393,6 +393,12 @@ export function toStoredBehaviorScheduleGraph(behavior: BehaviorGraphRecord): Be
   }));
 }
 
+/** An opportunity Behavior with no schedule stores no recurrence (Behaviors of Opportunity). */
+function storedRecurrence(values: BehaviorInput, isOpportunity: boolean): Pick<BehaviorFields, "recurrence_rule" | "scheduled_time"> {
+  if (isOpportunity && values.schedules.length === 0) return { recurrence_rule: null, scheduled_time: null };
+  return { recurrence_rule: values.recurrenceRule as Json, scheduled_time: values.scheduledTime };
+}
+
 export function toBehaviorConfigurationSnapshot(behavior: BehaviorFields, schedules: BehaviorScheduleGraphMutation[]) {
   return {
     categoryId: behavior.category_id,
@@ -411,6 +417,7 @@ export function toBehaviorConfigurationSnapshot(behavior: BehaviorFields, schedu
     active: behavior.active,
     timezone: behavior.timezone,
     ...configurationRun(behavior),
+    isOpportunity: behavior.is_opportunity === true,
   };
 }
 
@@ -436,6 +443,7 @@ export function storedBehaviorFields(existing: BehaviorGraphRecord): BehaviorFie
     ...storedBehaviorWhere(existing),
     recurrence_rule: existing.recurrence_rule,
     scheduled_time: existing.scheduled_time,
+    is_opportunity: existing.is_opportunity === true,
     timezone: existing.timezone,
     browser_reminder_enabled: existing.browser_reminder_enabled,
     email_reminder_enabled: existing.email_reminder_enabled,

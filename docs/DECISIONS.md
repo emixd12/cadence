@@ -2760,3 +2760,41 @@ suggestion should rarely be refused, and when it is, the person should see why.
 Platform impact: `POST /api/advisor/brief/recheck` and `refusal.cause` serve web (3B)
 and Mac (3C) alike; a future phone app inherits them. Marketing: none. Messaging
 impact: none (in-app refusal wording only).
+
+## 2026-11-21: Agents may quit Cadence for Mac
+
+The owner approved this in chat during the 0.1.13 release ("let claude quit Cadence"). It
+replaces "quitting Cadence" as an owner-only step (2026-10-23 and the installed-acceptance
+list in `AGENTS.md`).
+
+- **Who and where.** An agent may quit Cadence for Mac on the owner's Mac and on test
+  devices, for an install, a restore or an updater check.
+- **How.** Only a normal quit event: `osascript -e 'tell application id
+  "app.cadence.desktop" to quit'`, locally or through `scripts/test-device.mjs exec`.
+  Read first that no writes are pending. Never force quit, and never quit while a
+  sign-in, consent or permission prompt is open.
+- **Permission rule.** The agent session allows those exact quit commands in its
+  `.claude/settings.local.json`; the auto-mode classifier refused them without it.
+- **Unchanged.** Restoring a protected database, notarizing, uploading and publishing
+  still need the owner's instruction each time. Sign-ins, consent and permission prompts
+  stay as `AGENTS.md` lists them.
+
+Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
+Messaging impact: none.
+
+## 2026-11-21: Agents may bring Cadence to the front on test devices
+
+The owner approved this during the 0.1.13 release and asked that it stand from now on. macOS
+suspends Cadence's page while its window sits behind another app, so accessibility reads and
+presses (update buttons, conflict review, Settings) fail until Cadence is in front.
+
+- An agent may bring Cadence for Mac to the front on a test device with `osascript -e 'tell
+  application id "app.cadence.desktop" to activate'` through `scripts/test-device.mjs exec`,
+  without asking first, even when the owner is using that Mac.
+- Keep it as short as the step needs and say so in the run report. Type nothing into another
+  app, and never close or hide the owner's windows.
+- Clicking a notification banner and answering permission or consent prompts stay with the
+  owner.
+
+Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
+Messaging impact: none.

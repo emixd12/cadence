@@ -88,23 +88,25 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
   return {
     async behaviors() {
       const { data, error } = await client.from("behaviors")
-        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind").eq("user_id", userId);
+        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind,is_opportunity,recurrence_rule").eq("user_id", userId);
       if (error) throw new CoachSignalsError("read_behaviors_failed");
       return (data ?? []).map((row) => ({
         id: row.id, createdAt: row.created_at, timezone: row.timezone, active: row.active && row.archived_at === null,
         hasLength: row.default_duration_minutes !== null, lengthMinutes: row.default_duration_minutes,
         hasPlace: row.where_kind !== null,
+        isOpportunity: row.is_opportunity === true, hasSchedule: row.recurrence_rule !== null,
       }));
     },
     async occurrences(since, before) {
       const rows = await pages("read_occurrences_failed", (from, to) => client.from("occurrences")
-        .select("id,behavior_id,local_date,status,schedule_kind,schedule_start_time,scheduled_for").eq("user_id", userId)
+        .select("id,behavior_id,local_date,status,schedule_kind,schedule_start_time,scheduled_for,origin").eq("user_id", userId)
         .gte("local_date", since).lt("local_date", before).order("id").range(from, to));
       return rows.flatMap((row) => isStatus(row.status)
         ? [{
           id: row.id, behaviorId: row.behavior_id, localDate: row.local_date, status: row.status,
           scheduleKind: row.schedule_kind === "range" ? "range" as const : "exact" as const,
           startTime: row.schedule_start_time, plannedStartAt: row.scheduled_for,
+          origin: row.origin === "opportunity" ? "opportunity" as const : "scheduled" as const,
         }] : []);
     },
     async decisions(since, before) {

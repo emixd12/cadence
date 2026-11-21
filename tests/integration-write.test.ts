@@ -26,7 +26,7 @@ describe("integration write boundary", () => {
       const result = await handler({ ...context, actor: { ...context.actor, grantedScopes: ["cadence.read"] } }, {});
       expect(result).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });
     }
-    expect(recordIntegrationActivity).toHaveBeenCalledTimes(12);
+    expect(recordIntegrationActivity).toHaveBeenCalledTimes(14);
     expect(beginIdempotentWrite).not.toHaveBeenCalled();
     expect(getBehaviorById).not.toHaveBeenCalled();
   });

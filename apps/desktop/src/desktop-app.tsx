@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CalendarDays,
   Download,
   ListChecks,
   Menu,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -13,8 +14,28 @@ import { getAccountInitials } from "@/lib/ui/account";
 import type { DesktopAccountState } from "./account/auth";
 import { getAppNavItems } from "@/lib/navigation";
 import { getFocusableElements } from "@/components/timeline/NeedsDecisionDialog";
+import {
+  ChatRecentsList,
+  ChatRecentsToggle,
+  useChatRecentsOpen,
+  type ChatRecentsLinkProps,
+  type ChatRecentsLoader,
+  type ChatRecentsTarget,
+} from "@/components/chat/ChatRecents";
 
-export type DesktopScreen = "timeline" | "behaviors" | "export" | "settings";
+export type DesktopScreen = "timeline" | "chat" | "behaviors" | "export" | "settings";
+
+/**
+ * Advisor plan Phase 5C: Chat in the Mac menu. Present only on a linked Mac while
+ * Chat is available (`isChatPageAvailable`); a local-only Mac never shows the item.
+ */
+export type DesktopChatNav = Readonly<{
+  load: ChatRecentsLoader;
+  /** A recent chat or "All conversations" in the menu. */
+  onOpen: (target: ChatRecentsTarget) => void;
+  /** The conversation on the Chat screen, marked in the menu. */
+  activeId: string | null;
+}>;
 export type DesktopAppProps = Readonly<{
   activeScreen: DesktopScreen;
   onNavigate: (screen: DesktopScreen, anchor?: string) => void;
@@ -22,10 +43,12 @@ export type DesktopAppProps = Readonly<{
   availableScreens?: readonly DesktopScreen[];
   conflictCount?: number;
   account?: DesktopAccountState;
+  chat?: DesktopChatNav | null;
 }>;
 const INITIAL_SCREENS: readonly DesktopScreen[] = ["timeline", "behaviors"];
 const ICONS = {
   timeline: CalendarDays,
+  chat: MessageSquare,
   behaviors: ListChecks,
   export: Download,
   settings: Settings,
@@ -38,6 +61,7 @@ export function DesktopApp({
   availableScreens = INITIAL_SCREENS,
   conflictCount = 0,
   account = { status: "local" },
+  chat = null,
 }: DesktopAppProps) {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
@@ -96,6 +120,11 @@ export function DesktopApp({
     if (!availableScreens.includes(screen)) return;
     setMobileOpen(false);
     onNavigate(screen, anchor);
+  }
+
+  function openChat(target: ChatRecentsTarget) {
+    setMobileOpen(false);
+    chat?.onOpen(target);
   }
 
   function toggleSidebar() {
@@ -178,6 +207,8 @@ export function DesktopApp({
           availableScreens={availableScreens}
           onNavigate={navigate}
           collapsed={false}
+          chat={chat}
+          onOpenChat={openChat}
         />
         <AccountFooter account={account} collapsed={false} onNavigate={() => navigate("settings")} />
       </aside>
@@ -232,6 +263,8 @@ export function DesktopApp({
           availableScreens={availableScreens}
           onNavigate={navigate}
           collapsed={!sidebarOpen}
+          chat={chat}
+          onOpenChat={openChat}
         />
         <AccountFooter account={account} collapsed={!sidebarOpen} onNavigate={() => navigate("settings")} />
       </aside>
@@ -258,20 +291,29 @@ function PrimaryNav({
   availableScreens,
   onNavigate,
   collapsed,
+  chat,
+  onOpenChat,
 }: Readonly<{
   activeScreen: DesktopScreen;
   availableScreens: readonly DesktopScreen[];
   onNavigate: (screen: DesktopScreen) => void;
   collapsed: boolean;
+  chat: DesktopChatNav | null;
+  onOpenChat: (target: ChatRecentsTarget) => void;
 }>) {
+  const [recentsOpen, toggleRecents] = useChatRecentsOpen();
+  // Development builds always show Chat; release and dev-signed builds follow CHAT_PAGE_LIVE.
+  const items = getAppNavItems("desktop", !import.meta.env.DEV).filter((item) => item.href !== "/chat" || chat);
   return (
-    <nav aria-label="Primary" className="flex flex-1 flex-col py-3">
-      {getAppNavItems("desktop").map((item) => {
+    <nav aria-label="Primary" className="flex flex-1 flex-col overflow-y-auto py-3">
+      {items.map((item) => {
         const screen = item.href.slice(1) as DesktopScreen;
         const Icon = ICONS[screen];
         const active = activeScreen === screen;
         const available = availableScreens.includes(screen);
-        return (
+        // Chat carries a small arrow that opens its recent chats underneath (as on web).
+        const withRecents = screen === "chat" && chat && !collapsed && available;
+        const button = (
           <button
             key={screen}
             type="button"
@@ -287,7 +329,8 @@ function PrimaryNav({
             aria-current={active ? "page" : undefined}
             onClick={() => onNavigate(screen)}
             className={[
-              "group flex min-h-10 w-full items-center overflow-hidden text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "group flex min-h-10 items-center overflow-hidden text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              withRecents ? "min-w-0 flex-1" : "w-full",
               active && !collapsed
                 ? "bg-timeline-row-hover text-foreground"
                 : "text-muted-foreground enabled:hover:bg-surface enabled:hover:text-foreground",
@@ -312,9 +355,43 @@ function PrimaryNav({
             </span>
           </button>
         );
+        if (!withRecents) return button;
+        return (
+          <div key={screen} data-nav-chat>
+            <div className={["flex items-center", active ? "bg-timeline-row-hover" : ""].join(" ")}>
+              {button}
+              <ChatRecentsToggle open={recentsOpen} onToggle={toggleRecents} />
+            </div>
+            {recentsOpen ? <DesktopChatRecents chat={chat} active={active} onOpen={onOpenChat} /> : null}
+          </div>
+        );
       })}
     </nav>
   );
+}
+
+function DesktopChatRecents({
+  chat,
+  active,
+  onOpen,
+}: Readonly<{ chat: DesktopChatNav; active: boolean; onOpen: (target: ChatRecentsTarget) => void }>) {
+  const activeId = active ? chat.activeId : null;
+  const renderLink = useCallback(
+    ({ target, className, title, current, children }: ChatRecentsLinkProps) => (
+      <button
+        type="button"
+        aria-current={current ? "page" : undefined}
+        title={title}
+        onClick={() => onOpen(target)}
+        data-chat-recent={target.kind === "conversation" ? target.id : undefined}
+        className={className}
+      >
+        {children}
+      </button>
+    ),
+    [onOpen],
+  );
+  return <ChatRecentsList load={chat.load} renderLink={renderLink} activeId={activeId} refreshKey={activeId ?? ""} />;
 }
 
 function BrandMark({

@@ -56,6 +56,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         whereKind: null,
         end: null,
         pause: null,
+        isOpportunity: false,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -84,6 +85,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         "timezone",
         "end",
         "pause",
+        "is_opportunity",
       ],
       recordedAt: RECORDED_AT,
       effectiveAt: RECORDED_AT,
@@ -261,5 +263,37 @@ describe("planBehaviorConfigurationChangeEvent", () => {
       previousConfiguration: { timezone: "US/Eastern" },
       nextConfiguration: { timezone: "America/New_York" },
     });
+  });
+});
+
+describe("Behaviors of Opportunity configuration", () => {
+  const plan = (previous: Partial<BehaviorConfigurationSnapshot>, next: Partial<BehaviorConfigurationSnapshot>) =>
+    planBehaviorConfigurationChangeEvent({
+      previousConfiguration: dailyConfiguration(previous),
+      nextConfiguration: dailyConfiguration(next),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_updated",
+    });
+
+  it("reads a snapshot without the flag as not an opportunity Behavior", () => {
+    expect(normalizeBehaviorConfiguration(dailyConfiguration()).isOpportunity).toBe(false);
+    expect(plan({}, { isOpportunity: false })).toBeNull();
+  });
+
+  it("lists is_opportunity last, after pause, as the hosted snapshot builder does", () => {
+    const event = plan({ pause: null }, {
+      isOpportunity: true, pause: { fromOn: "2026-08-20", fromTime: null, backOn: "2026-08-25" },
+    });
+    expect(event?.changedFields).toEqual(["pause", "is_opportunity"]);
+    expect(event?.nextConfiguration.isOpportunity).toBe(true);
+  });
+
+  it("puts is_opportunity last in a baseline", () => {
+    const baseline = planInitialBehaviorConfigurationEvent({
+      configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [] }),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
+    });
+    expect(baseline.changedFields.at(-1)).toBe("is_opportunity");
+    expect(baseline.changedFields.at(-2)).toBe("pause");
+    expect(baseline.nextConfiguration).toMatchObject({ isOpportunity: true, scheduleGraph: [] });
   });
 });

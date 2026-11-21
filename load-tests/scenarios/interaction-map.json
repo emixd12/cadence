@@ -1524,6 +1524,11 @@
       "reason": "Brief move answers need a stored proposal, today's clock in the account's timezone, the Occurrence's revision and idempotency verification; run serially on a synthetic account."
     },
     {
+      "id": "INT-BRIEF-010",
+      "classification": "destructive_serial_only",
+      "reason": "Add for today answers need a stored opportunity proposal, today's clock in the account's timezone and idempotency verification; run serially on a synthetic account."
+    },
+    {
       "id": "INT-BRIEF-007",
       "classification": "destructive_serial_only",
       "reason": "Accept all and Undo all write several moves as one batch and need stored proposals from the same serial run."
@@ -1812,6 +1817,36 @@
       "id": "INT-TIMELINE-020",
       "classification": "destructive_serial_only",
       "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-037",
+      "classification": "browser_only",
+      "reason": "Available as an opportunity only changes the form draft; the save is the existing Behavior create or update."
+    },
+    {
+      "id": "INT-BEHAVIOR-038",
+      "classification": "browser_only",
+      "reason": "Saving with no schedule is the existing Behavior create or update with an empty schedule graph."
+    },
+    {
+      "id": "INT-TIMELINE-021",
+      "classification": "browser_only",
+      "reason": "Opening the basket reads the pool the Timeline page already loads."
+    },
+    {
+      "id": "INT-TIMELINE-022",
+      "classification": "destructive_serial_only",
+      "reason": "Adding needs today's clock in the account's timezone, a running opportunity Behavior and replay verification; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-023",
+      "classification": "destructive_serial_only",
+      "reason": "Done now writes an Occurrence and a status event at the current minute; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-024",
+      "classification": "destructive_serial_only",
+      "reason": "Remove deletes a seeded clean added Occurrence; run serially on a synthetic account."
     },
     {
       "id": "INT-ADVISOR-005",

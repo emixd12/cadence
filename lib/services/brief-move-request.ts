@@ -8,6 +8,7 @@ import type {
   BriefMoveReplanRequest,
   BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
+import type { BriefOpportunityAnswerRequest, BriefOpportunityReplanRequest } from "@cadence/core/types/brief-opportunities";
 import { agentCallerConfigured, createAgentContext } from "@/lib/integrations/agent-caller";
 import { authenticateCalendarRequest, calendarPreflight, calendarResponse, readCalendarRequestBody } from "./google-calendar-request";
 import { CalendarConnectionError } from "./google-calendar-oauth";
@@ -168,6 +169,51 @@ export function parseBriefMoveAnswer(value: unknown): BriefMoveAnswerRequest {
   }
 }
 
+/** Behaviors of Opportunity (Task 7): an answer to an "Add for today" line (`target: "opportunity"`). */
+export function parseBriefOpportunityAnswer(value: unknown): BriefOpportunityAnswerRequest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) invalid();
+  const kind = (value as { kind?: unknown }).kind;
+  const base = ["target", "kind", "idempotencyKey", "proposalId"];
+  switch (kind) {
+    case "yes": {
+      const item = record(value, base, ["context"]);
+      return { target: "opportunity", kind, idempotencyKey: text(item.idempotencyKey, KEY), proposalId: text(item.proposalId, UUID), context: parsePlanningContext(item.context) };
+    }
+    case "other_time": {
+      const item = record(value, [...base, "startAt"], ["context"]);
+      return { target: "opportunity", kind, idempotencyKey: text(item.idempotencyKey, KEY), proposalId: text(item.proposalId, UUID),
+        startAt: instant(item.startAt), context: parsePlanningContext(item.context) };
+    }
+    case "no":
+    case "undo":
+    case "never_add": {
+      const item = record(value, base);
+      return { target: "opportunity", kind, idempotencyKey: text(item.idempotencyKey, KEY), proposalId: text(item.proposalId, UUID) };
+    }
+    default:
+      invalid();
+  }
+}
+
+/** The answer route's body: an opportunity answer when `target` is "opportunity", else a move answer. */
+export function parseBriefAnswer(value: unknown): Readonly<{ target: "move"; answer: BriefMoveAnswerRequest }> | Readonly<{ target: "opportunity"; answer: BriefOpportunityAnswerRequest }> {
+  if (value && typeof value === "object" && !Array.isArray(value) && "target" in value) {
+    if ((value as { target?: unknown }).target !== "opportunity") invalid();
+    return { target: "opportunity", answer: parseBriefOpportunityAnswer(value) };
+  }
+  return { target: "move", answer: parseBriefMoveAnswer(value) };
+}
+
+export function parseBriefOpportunityReplan(value: unknown): BriefOpportunityReplanRequest {
+  const item = record(value, ["opportunityProposalId"], ["context"]);
+  return { opportunityProposalId: text(item.opportunityProposalId, UUID), context: parsePlanningContext(item.context) };
+}
+
+/** The Re-plan route's body: an opportunity line when it names `opportunityProposalId`. */
+export function isOpportunityReplan(value: unknown): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) && "opportunityProposalId" in value;
+}
+
 export function parseBriefMoveReplan(value: unknown): BriefMoveReplanRequest {
   const item = record(value, ["proposalId"], ["context"]);
   return { proposalId: text(item.proposalId, UUID), context: parsePlanningContext(item.context) };
@@ -175,13 +221,22 @@ export function parseBriefMoveReplan(value: unknown): BriefMoveReplanRequest {
 
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export function parseBriefMoveRecheck(value: unknown): BriefMoveRecheckRequest {
-  const item = record(value, ["localDate"], ["context", "proposalIds"]);
+/**
+ * `opportunityProposalIds` (Task 7) asks for the opportunity lines' re-check too. A body
+ * without it gets the move re-check only, as before.
+ */
+export function parseBriefMoveRecheck(value: unknown): BriefMoveRecheckRequest & Readonly<{ opportunityProposalIds?: readonly string[] }> {
+  const item = record(value, ["localDate"], ["context", "proposalIds", "opportunityProposalIds"]);
   const localDate = text(item.localDate, LOCAL_DATE);
   try { Temporal.PlainDate.from(localDate); } catch { invalid(); }
   const ids = item.proposalIds ?? [];
   if (!Array.isArray(ids) || ids.length > 64) invalid();
-  return { localDate, context: parsePlanningContext(item.context), proposalIds: [...new Set(ids.map((id) => text(id, UUID)))] };
+  const opportunityIds = item.opportunityProposalIds;
+  if (opportunityIds !== undefined && (!Array.isArray(opportunityIds) || opportunityIds.length > 32)) invalid();
+  return {
+    localDate, context: parsePlanningContext(item.context), proposalIds: [...new Set(ids.map((id) => text(id, UUID)))],
+    ...(Array.isArray(opportunityIds) ? { opportunityProposalIds: [...new Set(opportunityIds.map((id) => text(id, UUID)))] } : {}),
+  };
 }
 
 export function parseBriefMoveLength(value: unknown): BriefMoveLengthRequest {
@@ -194,6 +249,19 @@ export function parseMovePreference(value: unknown): Readonly<{ behaviorId: stri
   const item = record(value, ["behaviorId", "neverSuggestMove"]);
   if (typeof item.neverSuggestMove !== "boolean") invalid();
   return { behaviorId: text(item.behaviorId, UUID), neverSuggestMove: item.neverSuggestMove };
+}
+
+/** "Don't suggest adding this" (Task 7): `{ behaviorId, neverSuggestAdd }`. */
+export function parseOpportunityPreference(value: unknown): Readonly<{ behaviorId: string; neverSuggestAdd: boolean }> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !("neverSuggestAdd" in value)) return null;
+  const item = record(value, ["behaviorId", "neverSuggestAdd"]);
+  if (typeof item.neverSuggestAdd !== "boolean") invalid();
+  return { behaviorId: text(item.behaviorId, UUID), neverSuggestAdd: item.neverSuggestAdd };
+}
+
+/** GET `?kind=opportunity` reads the "Don't suggest adding this" switch. */
+export function isOpportunityPreferenceQuery(request: Request): boolean {
+  return new URL(request.url).searchParams.get("kind") === "opportunity";
 }
 
 export function parseBehaviorIdQuery(request: Request): string {

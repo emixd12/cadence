@@ -10,6 +10,7 @@ import { BehaviorRunNotices } from "@/components/timeline/BehaviorRunNotices";
 import type { BehaviorFormAction } from "@/lib/types/behavior";
 import type {
   OccurrenceFormAction,
+  OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineView,
 } from "@/lib/types/timeline";
@@ -31,6 +32,9 @@ type TimelineProps = Readonly<{
   leaveReminderDigest?: string | null;
   /** Start again and Resume now on the ended and paused notices (Ended and Paused). */
   runAction?: BehaviorFormAction;
+  /** Behaviors of Opportunity: the basket's add and Done now, and a row's Remove. Omitted where unavailable. */
+  addOpportunityAction?: OpportunityFormAction;
+  removeOpportunityAction?: OpportunityFormAction;
 }>;
 
 export function Timeline({
@@ -48,6 +52,8 @@ export function Timeline({
   travelAccountId,
   leaveReminderDigest = null,
   runAction,
+  addOpportunityAction,
+  removeOpportunityAction,
 }: TimelineProps) {
   return (
     <MobileTimelinePullToRefresh>
@@ -80,6 +86,7 @@ export function Timeline({
                   variant="needsDecisionDialog"
                   dayNoteAction={dayNoteAction}
                   dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
+                  removeOpportunityAction={removeOpportunityAction}
                 />
               ))}
             </div>
@@ -100,6 +107,8 @@ export function Timeline({
           liveCalendar={liveCalendar}
           travelAccountId={travelAccountId}
           leaveReminderDigest={leaveReminderDigest}
+          addOpportunityAction={addOpportunityAction}
+          removeOpportunityAction={removeOpportunityAction}
         />
 
         {timeline.nextFutureDays ? (

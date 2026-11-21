@@ -94,6 +94,30 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
+
+- **In review (branch `feature-add`, not pushed).** A Behavior can be available as an
+  opportunity, with or without a schedule; the person adds it to today from the Timeline's
+  Opportunity Basket (a time, a window or Done now) and removes a clean added item.
+  Adherence stays scheduled-only; unscheduled ones show Done N times. Five waves:
+  Postgres, core rules and sync contract 8; web form, list, basket and rows; MCP 1.6.0
+  and Chat; Daily Brief "Add for today" lines and the `opportunity_ready_to_schedule`
+  coach signal; Cadence for Mac (SQLite schema 27 rebuilds `behaviors` and `occurrences`,
+  local add and Remove, contract 8 sync, the brief lines on a linked Mac).
+- **Migrations (local only; hosted push needs the owner's OK before merge):**
+  `20261121100000`, `20261121110000`, `20261121120000`, `20261121130000`.
+- **Verification (Node 24):** `cargo test` (Rust store, incl. 26 → 27 upgrade, add, Done
+  now, Remove, generation guard, contract 8 round trip); real-SQLite
+  `tests/desktop-opportunity-contract.test.ts`; DOM and service tests for each wave;
+  typecheck (web and Mac), interactions, map, resolvers, core and agents checks. Not run:
+  full `npm run test`, SQL replay (CI "Local Supabase rehearsal").
+- **Next:** hosted migration push, then CI and merge; a Mac release with schema 27 is
+  needed before linked Macs sync again (contract 8 has no contract 7 fallback).
+
+Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
+`apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
+not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.
+
 ## Product map, features and journeys — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the
@@ -137,6 +161,37 @@ Check the cited entry before acting on a row.
   copy). Lint, typecheck (web and Mac), `interactions:check`, `resolvers:check` and build
   pass. `npm run test`: only the 4 files that fail the same way on main in this container
   (Node 22, no Preview access).
+
+## Cadence for Mac 0.1.13 published — November 21, 2026
+
+- **Published 01:59Z** on the owner's instruction of 01:13Z. Version bump PR #347 (`5c7490b6`);
+  notarized (DMG `503b6287…`), 14 artifact checks, quarantined download passes, public readback
+  passes. The test Mac went back to published 0.1.12 (owner's yes) and updated through the real
+  updater; the 7-conflict review applied on the published build and the 11 old writes synced.
+  The upgrade checker flagged 5 Occurrences that sync removed (archived on the web); classified
+  in `docs/qa/2026-11-21-desktop-0.1.13-release-packet.md`.
+- **Release check on dev builds, November 20–21.** Dev-signed 0.1.13-dev.1 (main
+  `6d0f6834`) installed on the owner's Mac (schema 24 → 26, counts unchanged) and the test
+  Mac (schema 25 → 26; 30 `end_date` rows backfilled as `end_on = end_date - 1`; 11 pending
+  writes kept). Migration 26 passes on both.
+- **Finding, fixed on this branch:** the test Mac's sync stopped at "Review 7 sync
+  conflicts". Both sides had archived the same Behaviors and each appended its own
+  configuration event. Applying either choice failed with "references missing
+  configuration_event". `resolveReviewedAccountSync` now copies the rows a reviewed winner
+  newly references from its own side. The bug dates from Tickets 116–122, not Ticket 342.
+- **Verified with 0.1.13-dev.2 (PR #342) on the test Mac, November 21, 00:20–00:58Z:**
+  "Use account version" for all 7 applied; sync completed with 0 pending and the 11 writes
+  reached hosted (71 Behaviors, Occurrences 244 → 247). On a throwaway Behavior, End now
+  (ends at the next minute, today's later row removed, "Not running (1)", "Ended Nov 20,
+  7:38 PM"), Start again from the Timeline notice, Pause with back-on Nov 24 ("Paused, back
+  Nov 24", no Occurrences Nov 20–23) and Resume now from the Timeline notice each synced
+  and read back in hosted data. The throwaway Behavior is archived. The web page itself was
+  not read: the QA Chrome profile refused a debugger attach.
+- **Open:** a reviewed winner that references a Category the other side deleted still
+  fails the same way (needs a product decision).
+
+Platform impact: web and desktop share the resolver (desktop runs reviewed sync); marketing
+and future mobile not applicable. Messaging impact: none.
 
 ## Ended and Paused Behaviors, Mac (Ticket 342) — November 20, 2026
 
@@ -208,16 +263,32 @@ Check the cited entry before acting on a row.
   cascades). Lint, typecheck and `agents:check` pass. `npm run test`: only the 4 files that
   fail the same way on main in this container. No live run against a real model yet.
 - **Production:** migration `20261119230000_chat_conversations.sql` applied November 19 with the owner's OK;
-  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.3` (research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
+  RLS checked there. Chat model: `openai/gpt-6.1-terra`, effort low (owner's pick from 5D's eval); prompt `chat-1.4` (a source problem is said once per conversation; Outlook or iCloud connected with no calendars chosen points to Settings; research claims only from `search_advice` cards; history no longer carries read lines; the medical notice no longer ends the turn).
 - **November 20:** chat reads 4F's AI features setting (`readAiSettings`): it answers only after the
   approval while chat is on, and reads only the sources left on.
 - Nov 20: `search_advice` added. It searches reviewed (active) advice cards only, so it returns nothing until the owner reviews the 28 draft cards.
+
+## Advisor plan Phase 5C: Mac Chat screen — November 20, 2026
+
+- **In review (branch `claude/project-thread-csiyb8`).** Cadence for Mac gets the Chat
+  screen (`apps/desktop/src/chat-screen.tsx`) on 5B's shared `ChatPage`, and recent chats
+  under Chat in the Mac menu (shared list `components/chat/ChatRecents.tsx`). Only a linked
+  Mac shows Chat. The Mac calls the hosted chat routes with its bearer session
+  (`apps/desktop/src/chat.ts`); a turn, Yes or Undo that changed records asks account
+  sync to run, so the Timeline redraws after one sync round. One switch,
+  `CHAT_PAGE_LIVE` in `lib/navigation.ts`, now covers production web and Mac release
+  builds; development builds always show Chat. Bench `?bench=chat&state=…` in the
+  desktop dev server. Tests `tests/desktop-chat.dom.test.tsx`.
+- **Merged Nov 20 (#341).** `CHAT_PAGE_LIVE` set true the same day (owner decision), so
+  Chat is live on production web and in the next Mac build.
+- **Next:** the installed Mac check (desktop-acceptance) and
+  the usual Mac release with the owner's written go-ahead.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
 - **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
   primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
   set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
 - **Chat page (second change):** `components/chat/ChatPage.tsx` and `ChatMessages.tsx` on
   5A's `@cadence/core/types/chat` events (`lib/ui/chat.ts` folds the stream), past
@@ -228,13 +299,13 @@ Check the cited entry before acting on a row.
   line is on screen plus Jump to latest, failed sends back in the field with the same
   message id, a polite status line for run states, `?c=` reopens after a reload, and
   stream validation with a plain-text fallback. Waiting on Emi's UI review.
-- **Next:** set `CHAT_PAGE_LIVE_ON_WEB` once 5A's route is on main; 5C adds the Mac screen.
+- **Next:** set `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) once 5A's route is on main; 5C adds the Mac screen.
 
 ## Advisor plan Phase 5B: web Chat page — November 19, 2026
 
 - **In progress (branch `claude/project-thread-0hjpnu`).** First change: "Chat" joins the
   primary navigation after Timeline (`lib/navigation.ts`), with a `/chat` route. Production
-  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE_ON_WEB` is
+  web hides it until the chat server (Phase 5A) is on main and `CHAT_PAGE_LIVE` (was `CHAT_PAGE_LIVE_ON_WEB`) is
   set; Cadence for Mac filters it out until Phase 5C. Phase 4E rebases onto this item.
 - **Next:** the Chat page on 5A's `@cadence/core/types/chat` events, past conversations,
   mobile layout and a `/design-system` bench with fixture conversations.

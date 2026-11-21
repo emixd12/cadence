@@ -1,6 +1,7 @@
 import type { BriefingReference } from "../services/briefing-references";
 import type { BriefingPlanOption } from "./briefing-plan";
 import type { BriefMoves } from "./brief-moves";
+import type { BriefOpportunities } from "./brief-opportunities";
 
 /** Daily Brief interprets practical constraints; it does not recap the ledger. */
 export const DAILY_BRIEF_POLICY_VERSION = "3.0" as const;
@@ -36,6 +37,11 @@ export type DailyBriefing = Readonly<{
    * opening and travel and see no move lines.
    */
   moves?: BriefMoves;
+  /**
+   * Behaviors of Opportunity (Task 7): "Add for today" lines. Present only for a client that
+   * sent `opportunity_lines_v1` (packages/core/src/types/brief-opportunities.ts).
+   */
+  opportunities?: BriefOpportunities;
   /**
    * Advisor Phase 3: refreshes left today (one morning brief plus up to two refreshes
    * per account). `available` is false when none are left or a refresh would leave the

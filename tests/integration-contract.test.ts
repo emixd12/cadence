@@ -122,6 +122,8 @@ describe("integration operation registry", () => {
       "move_occurrence_for_day",
       "revert_occurrence_move",
       "update_day_note",
+      "add_opportunity_occurrence",
+      "remove_opportunity_occurrence",
       "create_behavior",
       "update_behavior",
       "archive_behavior",
@@ -132,12 +134,13 @@ describe("integration operation registry", () => {
     ]);
   });
 
-  it("uses contract version 1.5.0 and records when each tool arrived", () => {
-    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.5.0");
+  it("uses contract version 1.6.0 and records when each tool arrived", () => {
+    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.6.0");
     for (const [name, operation] of operations) {
       const since = name === "list_day_notes" || name === "update_day_note" ? "1.1.0"
         : name === "move_occurrence_for_day" || name === "revert_occurrence_move" ? "1.3.0"
-          : name === "end_behavior" || name === "pause_behavior" || name === "resume_behavior" ? "1.4.0" : "1.0.0";
+          : name === "end_behavior" || name === "pause_behavior" || name === "resume_behavior" ? "1.4.0"
+            : name === "add_opportunity_occurrence" || name === "remove_opportunity_occurrence" ? "1.6.0" : "1.0.0";
       expect(operation.since, name).toBe(since);
     }
   });
@@ -147,6 +150,7 @@ describe("integration operation registry", () => {
     const byScope = (scope: string) => operations.filter(([, operation]) => operation.scope === scope).map(([name]) => name);
     expect(byScope(INTEGRATION_SCOPES.occurrencesWrite)).toEqual([
       "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
+      "add_opportunity_occurrence", "remove_opportunity_occurrence",
     ]);
     expect(byScope(INTEGRATION_SCOPES.behaviorsWrite)).toEqual([
       "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "end_behavior", "pause_behavior", "resume_behavior",
@@ -180,10 +184,12 @@ describe("integration operation registry", () => {
     const destructive = operations.filter(([, operation]) => operation.annotations.destructiveHint).map(([name]) => name);
     expect(destructive).toEqual([
       "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move",
-      "update_day_note", "update_behavior", "archive_behavior", "restore_behavior",
+      "update_day_note", "remove_opportunity_occurrence", "update_behavior", "archive_behavior", "restore_behavior",
       "end_behavior", "pause_behavior", "resume_behavior",
     ]);
     expect(INTEGRATION_OPERATIONS.create_behavior.annotations.idempotentHint).toBe(false);
+    expect(INTEGRATION_OPERATIONS.add_opportunity_occurrence.annotations.idempotentHint).toBe(false);
+    expect(INTEGRATION_OPERATIONS.remove_opportunity_occurrence.annotations.idempotentHint).toBe(true);
     expect(INTEGRATION_OPERATIONS.move_occurrence_for_day.annotations.idempotentHint).toBe(false);
   });
 
@@ -280,7 +286,8 @@ describe("integration schemas", () => {
       const required = operation.input.schema.required as string[];
       expect(properties.idempotency_key, name).toBeDefined();
       expect(required, name).not.toContain("idempotency_key");
-      if (name !== "create_behavior") expect(properties.expected_status ?? properties.expected_revision, name).toBeDefined();
+      // Adds create a new record, so there is nothing to have read first.
+      if (name !== "create_behavior" && name !== "add_opportunity_occurrence") expect(properties.expected_status ?? properties.expected_revision, name).toBeDefined();
     }
     expect(INTEGRATION_OPERATIONS.update_behavior.input.schema.required).toContain("expected_revision");
     expect(Object.keys(INTEGRATION_OPERATIONS.create_behavior.input.schema.properties as object)).toContain("external_ref");
@@ -376,7 +383,7 @@ describe("integration errors", () => {
     for (const code of INTEGRATION_ERROR_CODES) {
       const error = createIntegrationError(code, `Example ${code}.`, { retryAfterSeconds: code === "rate_limited" ? 30 : undefined });
       expect(validateAgainstSchema(integrationErrorSchema.schema, error).ok, code).toBe(true);
-      expect(error.contract_version).toBe("1.5.0");
+      expect(error.contract_version).toBe("1.6.0");
     }
   });
 

@@ -460,3 +460,35 @@ describe("Behavior planning fields", () => {
       .toThrow(BehaviorValidationError);
   });
 });
+
+describe("parseBehaviorFormData for Behaviors of Opportunity", () => {
+  const opportunityForm = (flags: string[], scheduleCount: string) => formData([
+    ["title", "Stretch"],
+    ...flags.map((value): [string, string] => ["is_opportunity", value]),
+    ["behavior_schedule_count", scheduleCount],
+    ["reminder_offset", "0"],
+  ]);
+
+  it("saves an opportunity Behavior with no schedule", () => {
+    const result = parseBehaviorFormData(opportunityForm(["false", "true"], "0"), { mode: "create" });
+    expect(result.isOpportunity).toBe(true);
+    expect(result.schedules).toEqual([]);
+  });
+
+  it("reads the hidden false alone as an unticked box and then requires a schedule", () => {
+    expect(() => parseBehaviorFormData(opportunityForm(["false"], "0"), { mode: "create" }))
+      .toThrow(BehaviorValidationError);
+  });
+
+  it("leaves the stored flag alone when the form has no field", () => {
+    const result = parseBehaviorFormData(formData([
+      ["behavior_id", BEHAVIOR_ID],
+      ["title", "Stretch"],
+      ["recurrence_kind", "daily"],
+      ["daily_interval", "1"],
+      ["scheduled_time", "09:00"],
+      ["reminder_offset", "0"],
+    ]), { mode: "update" });
+    expect(result).not.toHaveProperty("isOpportunity");
+  });
+});

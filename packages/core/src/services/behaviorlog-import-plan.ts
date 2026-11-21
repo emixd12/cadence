@@ -39,14 +39,18 @@ export function planBehaviorLogImportWrite(context: PortabilityPlanContext & {
       continue;
     }
     const schedules = preview.plan.schedules.filter((schedule) => schedule.behaviorExternalId === row.externalId && schedule.action === "create" && schedule.cadenceImportRole !== "historical_reference_only" && scheduleShape(schedule)).sort(byExternal);
-    if (!creates("behaviors", row) || !schedules.length) { result.skipped.behaviors++; continue; }
+    // An opportunity Behavior may have no schedule (Behaviors of Opportunity).
+    const unscheduled = !schedules.length && row.cadenceIsOpportunity === true;
+    if (!creates("behaviors", row) || (!schedules.length && !unscheduled)) { result.skipped.behaviors++; continue; }
     const behaviorId = context.newId();
     const rules = (preview.plan.interventionRules ?? []).filter((rule) => rule.behaviorExternalId === row.externalId && rule.action === "create" && rule.enabled && rule.interventionType === "reminder");
-    const primary = scheduleShape(schedules[0])!;
+    const primary = unscheduled ? null : scheduleShape(schedules[0])!;
     const categoryNames = [row.cadenceCategoryName, row.category].filter((name): name is string => name !== null).map(normalizedName);
     const category = [...snapshot.categories].sort((left, right) => categoryNames.indexOf(normalizedName(left.name)) - categoryNames.indexOf(normalizedName(right.name)) || left.id.localeCompare(right.id)).find(({ name }) => categoryNames.includes(normalizedName(name)));
     const graph: PortabilityGraph = { behavior: { id: behaviorId, user_id, category_id: category?.id ?? null, title: row.title, description: row.description,
-      recurrence_rule: primary.recurrence_rule, scheduled_time: primary.start_time, timezone: schedules[0].timezone,
+      recurrence_rule: primary?.recurrence_rule ?? null, scheduled_time: primary?.start_time ?? null,
+      timezone: schedules[0]?.timezone ?? preview.plan.occurrences.find((occurrence) => occurrence.behaviorExternalId === row.externalId)?.timezone ?? snapshot.profile.timezone,
+      is_opportunity: row.cadenceIsOpportunity === true,
       browser_reminder_enabled: context.interventionRulesPresent ? rules.some((rule) => rule.channel === "browser_push") : row.cadenceBrowserReminderEnabled ?? true,
       email_reminder_enabled: context.interventionRulesPresent ? rules.some((rule) => rule.channel === "email") : row.cadenceEmailReminderEnabled ?? false,
       reminder_offset_minutes: context.interventionRulesPresent ? Math.max(0, -(rules.filter((rule) => ["browser_push", "email"].includes(rule.channel) && rule.offsetMinutes !== null).sort(byExternal)[0]?.offsetMinutes ?? 0)) : row.cadenceReminderOffsetMinutes ?? 0,
@@ -113,7 +117,9 @@ export function planBehaviorLogImportWrite(context: PortabilityPlanContext & {
     if (!graph || !shape || (!row.importWithDetachedScheduleSnapshot && !slotId)) throw new Error("Imported occurrence parent is missing.");
     const id = context.newId(); writeOccurrence(plan, context, { id, user_id, behavior_id: graph.behavior.id, behavior_schedule_slot_id: slotId, behavior_configuration_event_id: null,
       scheduled_for: row.scheduledForUtc, local_date: row.localDate, schedule_kind: shape.kind, schedule_preset: shape.preset, schedule_start_time: shape.start_time, schedule_end_time: shape.end_time, schedule_range_identity: null,
-      status: "unresolved", completed_at: null, status_marked_at: null, note: null, created_at: row.generatedAtUtc ?? now, updated_at: row.generatedAtUtc ?? now });
+      status: "unresolved", completed_at: null, status_marked_at: null, note: null,
+      origin: row.cadenceOrigin ?? "scheduled", added_by: row.cadenceOrigin === "opportunity" ? row.cadenceAddedBy ?? null : null,
+      created_at: row.generatedAtUtc ?? now, updated_at: row.generatedAtUtc ?? now });
     ids.occurrences.set(row.externalId, id); mapping("occurrences", "occurrence", row.externalId, id, "created");
   }
   for (const row of [...preview.plan.statusEvents].sort((left, right) => compareInstants(left.recordedAtUtc, right.recordedAtUtc) || byExternal(left, right))) {

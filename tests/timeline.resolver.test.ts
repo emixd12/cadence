@@ -371,3 +371,39 @@ describe("resolveTimeline", () => {
     });
   });
 });
+
+describe("resolveTimeline with Behaviors of Opportunity", () => {
+  const now = Temporal.Instant.from("2026-06-08T16:00:00Z");
+  const resolve = (occurrences: TimelineOccurrenceInput[]) =>
+    resolveTimeline({ now, timezone: DEFAULT_TIMEZONE, futureDays: 0, occurrences });
+  const todayRow = (overrides: Partial<TimelineOccurrenceInput> & Pick<TimelineOccurrenceInput, "id">) =>
+    occurrence({ localDate: "2026-06-08", scheduledFor: "2026-06-08T17:00:00Z", ...overrides });
+
+  it("marks rows without an origin as scheduled and not removable", () => {
+    const [row] = resolve([todayRow({ id: "scheduled" })]).daySections[0]!.occurrences;
+    expect(row).toMatchObject({ origin: "scheduled", addedBy: null, canRemove: false });
+  });
+
+  it("offers Remove for a clean added row on Today and in Needs decision", () => {
+    const timeline = resolve([
+      todayRow({ id: "today", origin: "opportunity", addedBy: "chat", hasStatusHistory: false }),
+      occurrence({ id: "prior", localDate: "2026-06-07", origin: "opportunity", addedBy: "user", hasStatusHistory: false }),
+    ]);
+    expect(timeline.daySections[0]!.occurrences[0]).toMatchObject({ origin: "opportunity", addedBy: "chat", canRemove: true });
+    expect(timeline.needsDecision.occurrenceCount).toBe(1);
+    expect(timeline.needsDecision.daySections[0]!.occurrences[0]).toMatchObject({ id: "prior", canRemove: true });
+  });
+
+  it("hides Remove for an added row with a note, time, mark, match or unknown history", () => {
+    const rows = [
+      todayRow({ id: "noted", origin: "opportunity", addedBy: "user", hasStatusHistory: false, note: "ok" }),
+      todayRow({ id: "timed", origin: "opportunity", addedBy: "user", hasStatusHistory: false, timeTracking: { recordedSeconds: 60, runningStartedAt: null } }),
+      todayRow({ id: "running", origin: "opportunity", addedBy: "user", hasStatusHistory: false, timeTracking: { recordedSeconds: 0, runningStartedAt: "2026-06-08T15:00:00Z" } }),
+      todayRow({ id: "marked", origin: "opportunity", addedBy: "user", hasStatusHistory: true, status: "completed", statusMarkedAt: "2026-06-08T15:00:00Z" }),
+      todayRow({ id: "matched", origin: "opportunity", addedBy: "user", hasStatusHistory: false, hasActiveSourceMatch: true }),
+      todayRow({ id: "unknown", origin: "opportunity", addedBy: "user" }),
+    ];
+    expect(resolve(rows).daySections[0]!.occurrences.map(({ id, canRemove }) => [id, canRemove]).sort())
+      .toEqual(rows.map(({ id }) => [id, false]).sort());
+  });
+});

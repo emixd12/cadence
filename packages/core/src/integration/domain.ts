@@ -48,6 +48,10 @@ export const BEHAVIOR_STATES = ["active", "archived"] as const;
 export const BEHAVIOR_RUN_STATES = ["running", "ended", "paused", "archived"] as const;
 export const SCHEDULE_KINDS = ["exact", "range"] as const;
 export const TIME_RANGE_PRESET_NAMES = ["morning", "afternoon", "evening", "night"] as const;
+/** Where an Occurrence came from (contract 1.6.0): a schedule, or an opportunity Behavior added to a day. */
+export const OCCURRENCE_ORIGINS = ["scheduled", "opportunity"] as const;
+/** Who added an opportunity Occurrence: the person, the Daily Brief, Cadence's chat, or an outside client. */
+export const OPPORTUNITY_ADDED_BY_VALUES = ["user", "daily_brief", "chat", "mcp"] as const;
 export const STATUS_SEMANTICS = [
   "explicit_user_mark",
   "explicit_user_correction",
@@ -205,9 +209,8 @@ export const scheduleInput = object({
 });
 
 export const schedulesInput = array(scheduleInput, {
-  minItems: 1,
   maxItems: L.maxSchedulesPerBehavior,
-  description: "Complete list of schedules. Each schedule has one recurrence rule and one or more time entries.",
+  description: "Complete list of schedules. Each schedule has one recurrence rule and one or more time entries. It may be empty only for a Behavior available as an opportunity.",
 });
 
 export const scheduleOutput = object({
@@ -294,6 +297,7 @@ export const behaviorOutput = object({
   archived_at: nullable(utcInstant()),
   auto_archived_at: nullable(utcInstant(), { description: "Set on Behaviors that an end date archived automatically before Cadence stopped archiving on an end. New ends never set it." }),
   run_state: enumOf(BEHAVIOR_RUN_STATES, { description: "running schedules Occurrences; ended has passed its end and paused is inside a pause, both still active and shown under Not running; archived is archived." }),
+  is_opportunity: boolean({ description: "True when the Behavior is available as an opportunity: the person can add it to today when there is room, with or without a schedule (contract 1.6.0)." }),
   end_on: nullable(localDate("Last local day the Behavior runs. Null when it has no end.")),
   end_time: nullable(localTime("Local time on end_on when it stops. Null means it stops at the end of that day.")),
   pause: nullable(behaviorPauseOutput, { description: "The current or upcoming pause. Null when none is set or the pause is over." }),
@@ -326,6 +330,13 @@ export const MOVE_REFUSAL_REASON_VALUES = [
   "occurrence_resolved", "not_today", "revision_changed", "range_behavior", "start_not_on_day", "time_passed",
   "no_change", "nothing_to_undo", "not_latest_move", "slot_taken", "calendar_busy",
 ] as const;
+
+/** Why an opportunity add was refused (contract 1.6.0). */
+export const OPPORTUNITY_ADD_REFUSAL_VALUES = [
+  "not_available", "not_running", "not_today", "invalid_time", "slot_taken", "calendar_busy",
+] as const;
+/** Why an opportunity Remove was refused (contract 1.6.0). */
+export const OPPORTUNITY_REMOVE_REFUSAL_VALUES = ["scheduled", "marked", "kept", "revision_changed"] as const;
 
 export const MOVE_SOURCE_VALUES = ["daily_brief", "coach", "chat", "mcp", "person"] as const;
 
@@ -363,6 +374,8 @@ export const occurrenceShape = {
   status: occurrenceStatus("Stored status."),
   status_label: enumOf(STATUS_LABEL_VALUES),
   needs_decision: boolean({ description: "Derived: true when the status is unresolved and local_date is before today. Never stored." }),
+  origin: enumOf(OCCURRENCE_ORIGINS, { description: "scheduled comes from the Behavior's schedule; opportunity was added to its day from the person's opportunities (contract 1.6.0)." }),
+  added_by: nullable(enumOf(OPPORTUNITY_ADDED_BY_VALUES), { description: "Who added an opportunity Occurrence: user, daily_brief, chat or mcp. Null for scheduled Occurrences." }),
   completed_at: nullable(utcInstant()),
   status_marked_at: nullable(utcInstant()),
   note: nullable(string()),
@@ -411,6 +424,7 @@ export const adherenceCounts = {
   unresolved: integer({ minimum: 0, description: "Includes Needs decision. Excluded from adherence." }),
   needs_decision: integer({ minimum: 0, description: "Unresolved Occurrences before today." }),
   adherence_rate: nullable(number({ minimum: 0, maximum: 1 }), { description: ADHERENCE_DEFINITION }),
+  opportunity_completed_count: integer({ minimum: 0, description: "Completed opportunity Occurrences, the ones added to a day. Counted apart: the other counts and adherence_rate cover scheduled Occurrences only (contract 1.6.0)." }),
 } as const;
 
 export type BehaviorOutput = Infer<typeof behaviorOutput>;

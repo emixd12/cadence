@@ -601,6 +601,46 @@ Generation refuses a stale plan that creates a row on a day the end or pause sto
 entirely, and lets an end or pause delete elapsed bare rows from the day before the
 stop onward; marked, noted and timed rows stay. The local archive job is removed.
 
+## Behaviors of Opportunity (Task 8)
+
+SQLite schema 27 (`0027_behaviors_of_opportunity.sql`) mirrors the hosted
+migration `20261121100000_behaviors_of_opportunity` (docs/DATA_MODEL.md,
+"Behaviors of Opportunity"):
+
+1. `behaviors.is_opportunity` (0 or 1, default 0). `recurrence_rule` and
+   `scheduled_time` may be null, but only on an opportunity Behavior. Such a
+   Behavior may have no schedules; every other Behavior keeps one or more.
+2. `occurrences.origin` (`scheduled` or `opportunity`, default `scheduled`) and
+   `occurrences.added_by` (`user`, `daily_brief`, `chat` or `mcp`). An opportunity
+   row names who added it; a scheduled row has none. A trigger keeps both fixed
+   after insert.
+3. `occurrences_schedule_identity_key` is a partial unique index over scheduled
+   rows only, so an added row never blocks a planned one or a second added row at
+   the same time.
+
+SQLite cannot drop NOT NULL or replace a table UNIQUE, so the migration rebuilds
+both tables with every column, check, trigger and index, and copies each row
+(Behaviors not opportunities, Occurrences scheduled). The runner turns foreign keys
+off before the transaction for this version only, uses legacy renames while the old
+table is gone, and runs `pragma_foreign_key_check` before commit. Children such as
+status history, time sessions and reminders stay in place.
+
+The configuration snapshot carries `isOpportunity` (older snapshots read false), and
+`is_opportunity` is an allowed changed field. Generation refuses a plan that creates,
+updates or deletes an opportunity row. `addOpportunityOccurrence` inserts one added
+row, and for Done now its Completed status event, in one transaction; the same planned
+ID and fields replay. `removeOpportunityOccurrence` deletes a clean added row (Unresolved,
+blank Note, no time sessions, no status history, no active source match), cancels its
+pending reminders and writes tombstones. Both use the hosted functions' refusal words.
+TypeScript (`apps/desktop/src/local-opportunity.service.ts`) plans the row: today in
+the Behavior timezone, the run check and the instant.
+
+Account sync contract 8 carries `behavior.is_opportunity`, `occurrence.origin` and
+`occurrence.added_by`. A Behavior write without `is_opportunity` and an Occurrence
+write without `origin` and `added_by` ask for an update; a write that changes an
+existing Occurrence's origin is refused. A removed added row leaves the hosted
+snapshot, and the planner sends the delete either way.
+
 ## Note shortcut state (Tickets 126–128)
 
 Schema 13 mirrors the owned `note_shortcut_states` contract in DATA_MODEL with

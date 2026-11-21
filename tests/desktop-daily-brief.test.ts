@@ -92,3 +92,27 @@ it("sends brief move answers to the hosted API with the Mac session and syncs on
   expect(fetcher).toHaveBeenLastCalledWith("https://cadence.invalid/api/advisor/brief/move-preference?behaviorId=b%201", expect.not.objectContaining({ method: expect.anything() }));
   expect(onAccountWrite).toHaveBeenCalledOnce();
 });
+
+it("opts a linked Mac into Add for today lines and syncs after an added item (Behaviors of Opportunity)", async () => {
+  const client = { auth: { getSession: async () => ({ data: { session: { access_token: "synthetic-session" } } }) } } as unknown as SupabaseClient;
+  const onAccountWrite = vi.fn();
+  const adapter = createDesktopDailyBriefClient(client, "https://cadence.invalid", null, onAccountWrite)!;
+  const applied = { target: "opportunity", kind: "yes", proposalId: "p1", outcome: "applied", line: null, refusal: null, occurrenceId: "o1", replayed: false };
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(applied))
+    .mockResolvedValueOnce(Response.json({ ...applied, kind: "no", occurrenceId: null }))
+    .mockResolvedValueOnce(Response.json({ replaced: [], opportunities: { replaced: [] } }));
+  vi.stubGlobal("fetch", fetcher);
+  const yes = { target: "opportunity", kind: "yes", idempotencyKey: "k1", proposalId: "p1", context: { calendarBusy: [] } } as const;
+  expect(await adapter.opportunities!.answer(yes)).toEqual(applied);
+  expect(fetcher).toHaveBeenLastCalledWith("https://cadence.invalid/api/advisor/brief/answer", expect.objectContaining({
+    method: "POST", body: JSON.stringify(yes), headers: { Authorization: "Bearer synthetic-session", "Content-Type": "application/json" },
+  }));
+  // The added item reaches this Mac by account sync; a No changes nothing.
+  expect(onAccountWrite).toHaveBeenCalledOnce();
+  await adapter.opportunities!.answer({ target: "opportunity", kind: "no", idempotencyKey: "k2", proposalId: "p1" });
+  expect(onAccountWrite).toHaveBeenCalledOnce();
+  // The opportunity re-check names no move lines, so the server re-checks only these.
+  await adapter.opportunities!.recheck({ localDate: "2026-11-20", context: { calendarBusy: [] }, proposalIds: ["p1"] });
+  expect(JSON.parse(String(fetcher.mock.lastCall![1]!.body))).toMatchObject({ proposalIds: [], opportunityProposalIds: ["p1"] });
+});

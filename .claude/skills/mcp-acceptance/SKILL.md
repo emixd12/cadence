@@ -207,6 +207,14 @@ its `supabase-go` sibling into one folder outside the repository, run
 the worktree root. Each command loads the stack's `runner.env` itself, so it works
 in a fresh shell (Bash-tool agents get one per call); there is nothing to source.
 
+In a Linux cloud container (November 20, 2026): start `dockerd` first, then set
+`CADENCE_DOCKER_SOCK=/var/run/docker.sock`,
+`CADENCE_SUPABASE_CLI=$PWD/node_modules/.bin/supabase` and
+`SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io` (the default ECR registry can refuse
+pulls). Don't set `NODE_USE_ENV_PROXY` for `up`: it sends the discovery check to the
+outbound proxy. The workdir config drops the auth email templates, because their host
+bind is refused by the stack's Docker proxy and test login sends no email.
+
 ```bash
 S=.claude/skills/mcp-acceptance/local-stack.mjs; N=cadence-accept-<you>
 node $S up --name $N [--db-base 56150] [--app-port 4450]   # a few minutes

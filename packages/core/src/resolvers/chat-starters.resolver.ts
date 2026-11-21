@@ -11,7 +11,7 @@ import type { ChatStarter } from "../types/chat";
  * when a caller passes those signal kinds; until then their questions stay unused.
  */
 
-export const CHAT_STARTERS_VERSION = "chat-starters-2";
+export const CHAT_STARTERS_VERSION = "chat-starters-3";
 export const CHAT_STARTER_COUNT = 3;
 /** At most this many questions about patterns; the rest are about today or general. */
 export const CHAT_STARTER_MAX_INSIGHTS = 2;
@@ -26,6 +26,8 @@ export const CHAT_STARTER_THRESHOLDS = Object.freeze({
   weekShift: { minChange: 0.2, minDecidedThisWeek: 4, minDecidedMonth: 10 },
   /** Fewer marks than this in four weeks means the account is still new. */
   early: { maxDecidedMonth: 10 },
+  /** A light day: at most this many open items today leaves room for an opportunity. */
+  lightDay: { maxOpen: 2 },
 });
 
 export const CHAT_STARTER_SIGNAL_LANES = [
@@ -35,7 +37,7 @@ export type ChatStarterSignalLane = (typeof CHAT_STARTER_SIGNAL_LANES)[number];
 
 export type ChatStarterLane =
   | "general" | "today_open" | "today_done" | "moved_today" | "unmarked"
-  | "low_behavior" | "steady_behavior" | "week_down" | "week_up" | "early"
+  | "low_behavior" | "steady_behavior" | "week_down" | "week_up" | "early" | "opportunity_room"
   | ChatStarterSignalLane;
 
 export type ChatStarterEntry = Readonly<{
@@ -73,10 +75,12 @@ export type ChatStarterFacts = Readonly<{
   behaviors: readonly ChatStarterBehaviorFacts[];
   /** Coach signal kinds stored for this account today. */
   signals?: readonly string[];
+  /** Title of a running opportunity Behavior that is not on today yet, if any. */
+  opportunity?: string | null;
 }>;
 
 const INSIGHT_ORDER: readonly ChatStarterLane[] = [
-  "moved_today", "low_behavior", "week_down", "unmarked", "steady_behavior", "week_up", "early", ...CHAT_STARTER_SIGNAL_LANES,
+  "moved_today", "low_behavior", "opportunity_room", "week_down", "unmarked", "steady_behavior", "week_up", "early", ...CHAT_STARTER_SIGNAL_LANES,
 ];
 const DAILY_ORDER: readonly ChatStarterLane[] = ["today_done", "today_open", "general"];
 
@@ -130,6 +134,9 @@ export function chatStarterLanes(facts: ChatStarterFacts): ReadonlyMap<ChatStart
   if (facts.movedToday) lanes.set("moved_today", shortTitle(facts.movedToday));
   const low = lowest(facts.behaviors);
   if (low) lanes.set("low_behavior", shortTitle(low.title));
+  if (facts.opportunity && facts.todayOpen <= CHAT_STARTER_THRESHOLDS.lightDay.maxOpen) {
+    lanes.set("opportunity_room", shortTitle(facts.opportunity));
+  }
   const shift = weekShift(facts);
   if (shift === "down") lanes.set("week_down", null);
   if (facts.unmarked > 0) lanes.set("unmarked", null);

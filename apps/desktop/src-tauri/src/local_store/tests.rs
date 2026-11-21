@@ -157,6 +157,8 @@ const HABIT_NOW: &str = "2026-08-30T12:00:00.000000Z";
 fn id(value: u32) -> String {
     format!("00000000-0000-4000-a000-{value:012}")
 }
+const OPPORTUNITY_COLUMNS_ADD: &str = "ALTER TABLE behaviors ADD COLUMN is_opportunity INTEGER NOT NULL DEFAULT 0; ALTER TABLE occurrences ADD COLUMN origin TEXT NOT NULL DEFAULT 'scheduled'; ALTER TABLE occurrences ADD COLUMN added_by TEXT;";
+const OPPORTUNITY_COLUMNS_DROP: &str = "ALTER TABLE behaviors DROP COLUMN is_opportunity; ALTER TABLE occurrences DROP COLUMN origin; ALTER TABLE occurrences DROP COLUMN added_by;";
 const RUN_COLUMNS: [&str; 5] = ["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"];
 
 struct Fixture {
@@ -207,7 +209,15 @@ impl Fixture {
                 self.db.execute_batch("ALTER TABLE behaviors DROP COLUMN end_date;").unwrap();
             }
         }
+        // A schema before 0027 has no opportunity columns; add and drop them the same way.
+        let before_opportunity = self.db.prepare("SELECT is_opportunity FROM behaviors").is_err();
+        if before_opportunity {
+            self.db.execute_batch(OPPORTUNITY_COLUMNS_ADD).unwrap();
+        }
         let result = execute(&mut self.db, serde_json::from_value(request).unwrap());
+        if before_opportunity {
+            self.db.execute_batch(OPPORTUNITY_COLUMNS_DROP).unwrap();
+        }
         if before_run_columns {
             self.db.execute_batch(&RUN_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors DROP COLUMN {column};")).collect::<String>()).unwrap();
             if has_end_date {
@@ -2759,4 +2769,170 @@ fn day_note_shortcut_pool_migration_keeps_existing_shortcut_states() {
     let foreign_keys: Vec<(String, i64)> = fixture.db.prepare("PRAGMA foreign_key_check").unwrap()
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?))).unwrap().collect::<std::result::Result<_, _>>().unwrap();
     assert!(foreign_keys.is_empty());
+}
+
+// ------------------------------------------------------------------ Behaviors of Opportunity
+
+/// An unscheduled opportunity Behavior: no schedules, null legacy rule and time.
+fn opportunity_create_request(profile: &str) -> Value {
+    let mut request = create_request(profile);
+    let graph = &mut request["graph"];
+    graph["behavior"]["is_opportunity"] = json!(true);
+    graph["behavior"]["recurrence_rule"] = Value::Null;
+    graph["behavior"]["scheduled_time"] = Value::Null;
+    graph["schedules"] = json!([]);
+    graph["slots"] = json!([]);
+    let mut configuration = configuration();
+    configuration["scheduleGraph"] = json!([]);
+    configuration["isOpportunity"] = json!(true);
+    request["configurationEvent"]["next_configuration"] = configuration;
+    request["configurationEvent"]["changed_fields"] = json!(["category_id","schedule_graph","browser_reminder_enabled","email_reminder_enabled","reminder_offset_minutes","active","timezone","is_opportunity"]);
+    request
+}
+
+fn added_row(profile: &str, number: u32, start: &str, status: &str, added_by: &str) -> Value {
+    let marked = if status == "completed" { json!(NOW) } else { Value::Null };
+    json!({"id":id(number),"user_id":profile,"behavior_id":id(1),"behavior_configuration_event_id":id(5),"behavior_schedule_slot_id":null,
+        "scheduled_for":"2026-08-30T19:00:00Z","local_date":"2026-08-30","schedule_kind":"exact","schedule_preset":null,
+        "schedule_start_time":start,"schedule_end_time":null,"schedule_range_identity":null,"status":status,"completed_at":marked,
+        "status_marked_at":marked,"note":null,"origin":"opportunity","added_by":added_by,"created_at":NOW,"updated_at":NOW})
+}
+
+fn add_request(occurrence: Value, status_event: Value) -> Value {
+    json!({"operation":"addOpportunityOccurrence","occurrence":occurrence,"statusEvent":status_event})
+}
+
+fn done_now_event(profile: &str, occurrence: u32, method: &str) -> Value {
+    json!({"id":id(occurrence + 100),"user_id":profile,"occurrence_id":id(occurrence),"behavior_id":id(1),"previous_status":"unresolved",
+        "status":"completed","status_semantics":"explicit_user_mark","recorded_at":NOW,"effective_at":NOW,"local_date":"2026-08-30",
+        "timezone":"America/New_York","source_capture_method":method,"source_confidence":"high","revises_event_id":null,
+        "reason_code":null,"created_at":NOW,"updated_at":NOW})
+}
+
+#[test]
+fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
+    let mut fixture = Fixture::at_schema(26);
+    fixture.create();
+    fixture.occurrence();
+    fixture.run(status_request(&fixture.profile, "unresolved", None, "completed", 20, NOW), 102).unwrap();
+    let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
+        .map(|table| (table, fixture.count(table)));
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 27);
+    for (table, count) in before {
+        assert_eq!(fixture.count(table), count, "{table}");
+    }
+    let (is_opportunity, origin, added_by): (i64, String, Option<String>) = fixture.db.query_row(
+        "SELECT behaviors.is_opportunity, occurrences.origin, occurrences.added_by FROM occurrences JOIN behaviors ON behaviors.id=occurrences.behavior_id",
+        [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap();
+    assert_eq!((is_opportunity, origin.as_str(), added_by), (0, "scheduled", None));
+    let foreign_keys: (i64, i64) = fixture.db.query_row(
+        "SELECT (SELECT count(*) FROM pragma_foreign_key_check), (SELECT foreign_keys FROM pragma_foreign_keys)", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(foreign_keys, (0, 1));
+    // The new checks hold on the rebuilt tables, and the identity covers scheduled rows only.
+    assert!(fixture.db.execute("UPDATE behaviors SET scheduled_time=NULL", []).is_err());
+    assert!(fixture.db.execute("UPDATE occurrences SET added_by='user'", []).is_err());
+    let index: String = fixture.db.query_row("SELECT sql FROM sqlite_schema WHERE name='occurrences_schedule_identity_key'", [], |row| row.get(0)).unwrap();
+    assert!(index.ends_with("WHERE origin = 'scheduled'"));
+    // A reopened database matches a fresh one built from the same migrations.
+    fixture.db = db::open(&fixture.directory.join("data.sqlite3")).unwrap();
+    db::validate_backup(&fixture.db).unwrap();
+    assert_eq!(fixture.count("occurrence_status_events"), 1);
+}
+
+#[test]
+fn unscheduled_opportunity_behavior_saves_and_edits_with_no_schedule() {
+    let mut fixture = Fixture::new();
+    let mut scheduled = create_request(&fixture.profile);
+    scheduled["graph"]["schedules"] = json!([]);
+    scheduled["graph"]["slots"] = json!([]);
+    assert_eq!(fixture.run(scheduled, 99).unwrap_err(), "A Behavior requires a bounded, nonempty schedule graph.");
+    let created = fixture.run(opportunity_create_request(&fixture.profile), 100).unwrap();
+    assert_eq!(created["behavior"]["is_opportunity"], true);
+    assert_eq!(created["behavior"]["scheduled_time"], Value::Null);
+    let graph = behavior::graph(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert!(graph.schedules.is_empty());
+
+    // Turning the flag off with no schedule is refused by the row rule.
+    let mut off = json!({"operation":"updateBehaviorGraph","graph":created.clone(),"expectedRevision":1,
+        "expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":null});
+    off["graph"].as_object_mut().unwrap().remove("revision");
+    off["graph"]["behavior"]["is_opportunity"] = json!(false);
+    assert!(fixture.run(off.clone(), 101).is_err());
+
+    // A title edit keeps the flag; the configuration snapshot carries isOpportunity.
+    let mut edit = off;
+    edit["graph"]["behavior"]["is_opportunity"] = json!(true);
+    edit["graph"]["behavior"]["title"] = json!("Stretch");
+    edit["definitionEvent"] = json!({"id":id(40),"user_id":fixture.profile,"behavior_id":id(1),"previous_title":"Walk","previous_description":null,
+        "next_title":"Stretch","next_description":null,"changed_fields":["title"],"recorded_at":NOW,"source":"manual","reason":null,"created_at":NOW,"updated_at":NOW});
+    let edited = fixture.run(edit, 102).unwrap();
+    assert_eq!((edited["behavior"]["title"].clone(), edited["revision"].clone()), (json!("Stretch"), json!(2)));
+}
+
+#[test]
+fn opportunity_add_done_now_and_remove_follow_the_hosted_rules() {
+    let mut fixture = Fixture::new();
+    let profile = fixture.profile.clone();
+    fixture.run(opportunity_create_request(&profile), 100).unwrap();
+
+    let added = fixture.run(add_request(added_row(&profile, 30, "15:00:00", "unresolved", "user"), Value::Null), 101).unwrap();
+    assert_eq!((added["created"].clone(), added["occurrence"]["origin"].clone()), (json!(true), json!("opportunity")));
+    // The same planned ID replays the row it made, under a new mutation too.
+    let replay = fixture.run(add_request(added_row(&profile, 30, "15:00:00", "unresolved", "user"), Value::Null), 102).unwrap();
+    assert_eq!(replay["created"], false);
+    assert_eq!(fixture.run(add_request(added_row(&profile, 30, "16:00:00", "unresolved", "user"), Value::Null), 103).unwrap_err(),
+        "The Occurrence ID is already in use.");
+    // A second item at the same time is allowed: the schedule identity covers scheduled rows only.
+    fixture.run(add_request(added_row(&profile, 31, "15:00:00", "unresolved", "chat"), Value::Null), 104).unwrap();
+
+    // Done now stores Completed with its one status event, atomically.
+    let logged = fixture.run(add_request(added_row(&profile, 32, "12:00:00", "completed", "user"), done_now_event(&profile, 32, "manual_tap")), 105).unwrap();
+    assert_eq!(logged["statusEvent"]["status"], "completed");
+    assert_eq!(fixture.run(add_request(added_row(&profile, 33, "12:00:00", "completed", "user"), done_now_event(&profile, 33, "manual_text")), 106).unwrap_err(),
+        "Done now must store Completed now with its status event.");
+    assert_eq!(fixture.run(add_request(added_row(&profile, 34, "12:00:00", "completed", "daily_brief"), done_now_event(&profile, 34, "manual_text")), 107).unwrap_err(),
+        "A Daily Brief suggestion cannot mark an Occurrence Completed.");
+    let mut seconds = added_row(&profile, 35, "15:00:30", "unresolved", "user");
+    seconds["schedule_start_time"] = json!("15:00:30");
+    assert_eq!(fixture.run(add_request(seconds, Value::Null), 108).unwrap_err(), "Opportunity times must be whole minutes.");
+    assert_eq!(fixture.count("occurrences"), 3);
+
+    // Generation never changes or removes an added row.
+    let added_row_stored: Occurrence = db::by_id(&fixture.db, &profile, &id(30)).unwrap();
+    assert_eq!(fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),
+        "create":[],"update":[],"delete":[added_row_stored]}), 109).unwrap_err(), "Occurrence generation cannot change an opportunity Occurrence.");
+    let mut generated = occurrence_row(&profile, 36, "exact", None);
+    generated.origin = "opportunity".into();
+    generated.added_by = Some("user".into());
+    assert!(fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(1),"expectedConfigurationEventId":id(5),
+        "create":[generated],"update":[],"delete":[]}), 110).is_err());
+
+    // Remove: a clean item leaves with a tombstone; a marked, noted or scheduled one stays.
+    assert_eq!(fixture.run(json!({"operation":"removeOpportunityOccurrence","occurrenceId":id(32)}), 111).unwrap_err(),
+        "Only an Unresolved opportunity can be removed.");
+    fixture.run(json!({"operation":"updateOccurrenceNote","occurrenceId":id(31),"expectedNote":null,"note":"later"}), 112).unwrap();
+    assert_eq!(fixture.run(json!({"operation":"removeOpportunityOccurrence","occurrenceId":id(31)}), 113).unwrap_err(),
+        "An opportunity with a Note cannot be removed.");
+    let removed = fixture.run(json!({"operation":"removeOpportunityOccurrence","occurrenceId":id(30)}), 114).unwrap();
+    assert_eq!(removed["removed"], true);
+    assert!(db::by_id::<Occurrence>(&fixture.db, &profile, &id(30)).is_err());
+    let tombstones: i64 = fixture.db.query_row("SELECT count(*) FROM tombstones WHERE entity_type='occurrences' AND entity_id=?1", [id(30)], |row| row.get(0)).unwrap();
+    assert_eq!(tombstones, 1);
+    assert_eq!(fixture.run(json!({"operation":"removeOpportunityOccurrence","occurrenceId":id(30)}), 115).unwrap_err(), "Occurrence not found.");
+}
+
+#[test]
+fn opportunity_add_refuses_a_behavior_that_is_not_available() {
+    let mut fixture = Fixture::new();
+    let profile = fixture.profile.clone();
+    fixture.create();
+    assert_eq!(fixture.run(add_request(added_row(&profile, 30, "15:00:00", "unresolved", "user"), Value::Null), 101).unwrap_err(),
+        "This Behavior is not available as an opportunity.");
+    fixture.occurrence();
+    assert_eq!(fixture.run(json!({"operation":"removeOpportunityOccurrence","occurrenceId":id(10)}), 102).unwrap_err(),
+        "Only an added opportunity can be removed.");
+    let mut missing = added_row(&profile, 31, "15:00:00", "unresolved", "user");
+    missing["behavior_id"] = json!(id(77));
+    assert_eq!(fixture.run(add_request(missing, Value::Null), 103).unwrap_err(), "Behavior not found.");
 }

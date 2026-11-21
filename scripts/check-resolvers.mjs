@@ -144,6 +144,20 @@ const resolverRegistry = [
     source: "docs/DATA_MODEL.md",
   },
   {
+    domain: "Behaviors of Opportunity",
+    resolver: "packages/core/src/resolvers/opportunity.resolver.ts",
+    compatibility: "lib/resolvers/opportunity.resolver.ts",
+    test: "tests/opportunity.resolver.test.ts",
+    source: "docs/RECURRENCE_RULES.md",
+  },
+  {
+    domain: "Daily Brief opportunity lines",
+    resolver: "packages/core/src/resolvers/brief-opportunity.resolver.ts",
+    compatibility: "lib/resolvers/brief-opportunity.resolver.ts",
+    test: "tests/brief-opportunity.resolver.test.ts",
+    source: "docs/DATETIME_STRATEGY.md",
+  },
+  {
     domain: "timeline",
     resolver: "packages/core/src/resolvers/timeline.resolver.ts",
     compatibility: "lib/resolvers/timeline.resolver.ts",

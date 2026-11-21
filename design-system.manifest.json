@@ -552,6 +552,21 @@
       "notes": "Advisor plan Phase 4G. Right after a mark, one optional text line under the row: a late Completed mark offers Done at 9:00 AM \u00b7 Just now \u00b7 Other time; Not Completed offers Why? No time \u00b7 Forgot \u00b7 Low energy \u00b7 Away \u00b7 Chose not to. Outcome in italic; refusals start with Not changed."
     },
     {
+      "id": "module.opportunity-basket",
+      "name": "OpportunityBasket",
+      "kind": "module",
+      "source": "components/timeline/OpportunityBasket.tsx",
+      "exportName": "OpportunityBasket",
+      "usageNames": [
+        "OpportunityBasket",
+        "OpportunityRemoveControl"
+      ],
+      "benchAnchor": "design-system#ds-module-opportunity-basket",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Behaviors of Opportunity. Under today's date, an underlined Opportunity (n) opens a non-modal ledger of today's pool: an inline square panel on wide screens, a bottom sheet on phones (max min(24rem, 55dvh), internal scroll, Escape closes and returns focus). Each item: Add to today (Exact time or Time window) and Done now. Rows added from the pool show a muted Added line; a clean added row offers Remove."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",

@@ -787,3 +787,42 @@ function timeSession(overrides: Partial<TimeSession> = {}): TimeSession {
     ...overrides,
   };
 }
+
+describe("resolveAnalytics with Behaviors of Opportunity", () => {
+  const rows = [
+    occurrence({ id: "s-done", status: "completed" }),
+    occurrence({ id: "s-not", status: "not_completed", scheduledFor: "2026-06-07T13:00:00Z", localDate: "2026-06-07" }),
+    occurrence({ id: "o-done", status: "completed", origin: "opportunity" }),
+    occurrence({ id: "o-done-2", status: "completed", origin: "opportunity", scheduledFor: "2026-06-06T13:00:00Z", localDate: "2026-06-06" }),
+    occurrence({ id: "o-not", status: "not_completed", origin: "opportunity", scheduledFor: "2026-06-05T13:00:00Z", localDate: "2026-06-05" }),
+    occurrence({ id: "o-open", status: "unresolved", origin: "opportunity", scheduledFor: "2026-06-07T13:00:00Z", localDate: "2026-06-07" }),
+  ];
+
+  it("keeps overall adherence scheduled-only and counts added completions apart", () => {
+    const { summary } = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE });
+    expect(summary).toMatchObject({
+      completedCount: 1, notCompletedCount: 1, resolvedCount: 2, rate: 0.5, percentLabel: "50%",
+      opportunityCompletedCount: 2, opportunityNotCompletedCount: 1, opportunityDoneLabel: "Done 2 times",
+    });
+  });
+
+  it("keeps an unresolved prior-day added Occurrence in the Needs decision count", () => {
+    const { summary } = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE });
+    expect(summary.unresolvedCount).toBe(1);
+  });
+
+  it("shows Done N times without a percentage for an unscheduled Behavior", () => {
+    const unscheduled = [
+      occurrence({ id: "u1", behaviorId: "walk", behaviorTitle: "Walk", status: "completed", origin: "opportunity" }),
+      occurrence({ id: "u2", behaviorId: "walk", behaviorTitle: "Walk", status: "unresolved", origin: "opportunity" }),
+    ];
+    const [summary] = resolveAnalytics({ occurrences: unscheduled, now: NOW, timezone: DEFAULT_TIMEZONE }).behaviorSummaries;
+    expect(summary).toMatchObject({ rate: null, resolvedCount: 0, opportunityCompletedCount: 1, opportunityDoneLabel: "Done 1 time" });
+    expect(summary!.dailyCells.find(({ localDate }) => localDate === "2026-06-08")?.counts.completedCount).toBe(1);
+  });
+
+  it("leaves the overall heatmap to scheduled Occurrences", () => {
+    const { overallHeatmap } = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE });
+    expect(overallHeatmap.find(({ localDate }) => localDate === "2026-06-06")?.state).toBe("empty");
+  });
+});

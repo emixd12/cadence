@@ -93,7 +93,7 @@ import type {
   OccurrenceStatusEvent,
   OccurrenceStatus,
 } from "@/lib/types/database";
-import type { RecurrenceRule, Weekday } from "@/lib/types/recurrence";
+import { DEFAULT_TIMEZONE, type RecurrenceRule, type Weekday } from "@/lib/types/recurrence";
 
 const BEHAVIORLOG_FORMAT = "behaviorlog.bundle";
 const SUPPORTED_RECURRENCE_PROFILE = "behaviorlog.calendar_simple.v1";
@@ -506,7 +506,9 @@ export async function applyCreateMissingBehaviorLogImportPlan(
       const behaviorSchedules = schedulesByBehavior.get(behavior.externalId) ?? [];
       const primarySchedule = behaviorSchedules[0];
 
-      if (!primarySchedule) {
+      const unscheduledOpportunity = !primarySchedule && behavior.cadenceIsOpportunity === true;
+
+      if (!primarySchedule && !unscheduledOpportunity) {
         addApplyWarning(
           result,
           "behavior_without_supported_schedule",
@@ -526,9 +528,7 @@ export async function applyCreateMissingBehaviorLogImportPlan(
           category_id: resolveCategoryId(categories, behavior),
           title: behavior.title,
           description: behavior.description,
-          recurrence_rule: primarySchedule.recurrenceRule,
-          scheduled_time: primarySchedule.slot.startTime,
-          timezone: primarySchedule.plan.timezone,
+          ...importedBehaviorSchedule(behavior, primarySchedule, input.preview.plan.occurrences),
           browser_reminder_enabled:
             behavior.cadenceBrowserReminderEnabled ?? true,
           email_reminder_enabled:
@@ -649,7 +649,8 @@ export async function applyCreateMissingBehaviorLogImportPlan(
         continue;
       }
 
-      const existingOccurrence = await getOccurrenceByScheduleIdentity(
+      // Schedule identity covers scheduled rows only; an added row is matched by its mapping.
+      const existingOccurrence = occurrence.cadenceOrigin === "opportunity" ? null : await getOccurrenceByScheduleIdentity(
         supabase,
         {
           userId: input.userId,
@@ -1017,7 +1018,9 @@ export async function applyApprovedBehaviorLogMergePlan(
       const behaviorSchedules = schedulesByBehavior.get(behavior.externalId) ?? [];
       const primarySchedule = behaviorSchedules[0];
 
-      if (!primarySchedule) {
+      const unscheduledOpportunity = !primarySchedule && behavior.cadenceIsOpportunity === true;
+
+      if (!primarySchedule && !unscheduledOpportunity) {
         addApplyWarning(
           result,
           "behavior_without_supported_schedule",
@@ -1037,9 +1040,7 @@ export async function applyApprovedBehaviorLogMergePlan(
           category_id: resolveCategoryId(categories, behavior),
           title: behavior.title,
           description: behavior.description,
-          recurrence_rule: primarySchedule.recurrenceRule,
-          scheduled_time: primarySchedule.slot.startTime,
-          timezone: primarySchedule.plan.timezone,
+          ...importedBehaviorSchedule(behavior, primarySchedule, input.preview.plan.occurrences),
           browser_reminder_enabled:
             behavior.cadenceBrowserReminderEnabled ?? true,
           email_reminder_enabled:
@@ -1281,7 +1282,8 @@ export async function applyApprovedBehaviorLogMergePlan(
         continue;
       }
 
-      const existingOccurrence = await getOccurrenceByScheduleIdentity(
+      // Schedule identity covers scheduled rows only; an added row is matched by its mapping.
+      const existingOccurrence = occurrence.cadenceOrigin === "opportunity" ? null : await getOccurrenceByScheduleIdentity(
         supabase,
         {
           userId: input.userId,
@@ -2184,10 +2186,12 @@ function toImportedBehaviorConfiguration(
     | "reminder_offset_minutes"
     | "active"
     | "timezone"
+    | "is_opportunity"
   >,
   schedules: BehaviorScheduleGraphMutation[],
 ) {
   return normalizeBehaviorConfiguration({
+    isOpportunity: behavior.is_opportunity === true,
     categoryId: behavior.category_id ?? null,
     scheduleGraph: schedules.map((schedule) => ({
       recurrenceRule: schedule.recurrence_rule,
@@ -2956,7 +2960,37 @@ function toNewOccurrence(input: {
     status: "unresolved",
     completed_at: null,
     status_marked_at: null,
+    origin: input.occurrence.cadenceOrigin ?? "scheduled",
+    added_by: input.occurrence.cadenceOrigin === "opportunity" ? input.occurrence.cadenceAddedBy ?? null : null,
     created_at: input.occurrence.generatedAtUtc ?? undefined,
+  };
+}
+
+/**
+ * The Behavior's legacy schedule columns from its first supported schedule. An
+ * unscheduled opportunity Behavior stores none and takes its timezone from its first
+ * Occurrence, else the profile default (Behaviors of Opportunity).
+ */
+function importedBehaviorSchedule(
+  behavior: BehaviorLogImportBehaviorPlan,
+  primarySchedule: SupportedScheduleImport | undefined,
+  occurrences: readonly BehaviorLogImportOccurrencePlan[],
+): Pick<NewBehavior, "recurrence_rule" | "scheduled_time" | "timezone" | "is_opportunity"> {
+  const isOpportunity = behavior.cadenceIsOpportunity === true;
+  if (primarySchedule) {
+    return {
+      recurrence_rule: primarySchedule.recurrenceRule,
+      scheduled_time: primarySchedule.slot.startTime,
+      timezone: primarySchedule.plan.timezone,
+      ...(behavior.cadenceIsOpportunity === undefined ? {} : { is_opportunity: isOpportunity }),
+    };
+  }
+  return {
+    recurrence_rule: null,
+    scheduled_time: null,
+    timezone: occurrences.find((occurrence) => occurrence.behaviorExternalId === behavior.externalId)?.timezone
+      ?? DEFAULT_TIMEZONE,
+    is_opportunity: true,
   };
 }
 

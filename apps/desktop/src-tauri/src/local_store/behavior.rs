@@ -50,7 +50,11 @@ pub(super) fn graph(db: &Connection, profile_id: &str, behavior_id: &str) -> Res
 
 pub(super) fn validate_graph(profile_id: &str, graph: &GraphRows) -> Result<()> {
     db::validate_row(profile_id, &graph.behavior)?;
-    if graph.schedules.is_empty() || graph.schedules.len() > 1000 || graph.slots.len() > 10_000 {
+    // Behaviors of Opportunity: an opportunity Behavior may have no schedules.
+    if (graph.schedules.is_empty() && !graph.behavior.is_opportunity)
+        || graph.schedules.len() > 1000
+        || graph.slots.len() > 10_000
+    {
         return Err("A Behavior requires a bounded, nonempty schedule graph.".into());
     }
     let mut ids = HashSet::new();
@@ -129,7 +133,7 @@ fn snapshot(graph: &GraphRows) -> Value {
             schedule.to_string(),
         )
     });
-    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior)})
+    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior),"isOpportunity":behavior.is_opportunity})
 }
 
 /// Ended and Paused: the snapshot's `end`, as core's toBehaviorConfigurationSnapshot writes it.
@@ -166,6 +170,10 @@ fn normalize_configuration_snapshot(value: &Value) -> Value {
         // Snapshots written before Ended and Paused carry no end or pause.
         object.entry("end".to_string()).or_insert(Value::Null);
         object.entry("pause".to_string()).or_insert(Value::Null);
+        // Snapshots written before Behaviors of Opportunity were not opportunities.
+        object
+            .entry("isOpportunity".to_string())
+            .or_insert(Value::Bool(false));
     }
     normalized
 }
@@ -242,6 +250,7 @@ fn validate_history(
             "timezone",
             "end",
             "pause",
+            "is_opportunity",
         ];
         if event.changed_fields.is_empty()
             || event

@@ -1,0 +1,204 @@
+{
+  "operation": "remove_opportunity_occurrence",
+  "valid_inputs": [
+    {
+      "name": "with revision and key",
+      "value": {
+        "occurrence_id": "00000006-1111-4111-8111-000000000006",
+        "expected_revision": "2026-10-18T18:40:00Z",
+        "idempotency_key": "remove-stretch-1"
+      }
+    },
+    {
+      "name": "id only",
+      "value": {
+        "occurrence_id": "00000006-1111-4111-8111-000000000006"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "missing id",
+      "value": {},
+      "code": "invalid_input",
+      "path": "$.occurrence_id"
+    },
+    {
+      "name": "behavior id instead",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002"
+      },
+      "code": "invalid_input",
+      "path": "$.behavior_id"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "removed",
+      "value": {
+        "outcome": "removed",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T19:00:00Z",
+          "effective_start_at": "2026-10-18T19:00:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "15:00",
+            "end_time": null,
+            "label": "3:00 PM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "user",
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": null
+      }
+    },
+    {
+      "name": "refused, marked",
+      "value": {
+        "outcome": "refused",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T18:40:00Z",
+          "effective_start_at": "2026-10-18T18:40:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "14:40",
+            "end_time": null,
+            "label": "2:40 PM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "mcp",
+          "completed_at": "2026-10-18T18:40:00Z",
+          "status_marked_at": "2026-10-18T18:40:00Z",
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": {
+          "reason": "marked",
+          "message": "Stretch is already marked, so it stays."
+        }
+      }
+    },
+    {
+      "name": "refused, scheduled",
+      "value": {
+        "outcome": "refused",
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "effective_start_at": "2026-10-18T13:00:00Z",
+          "move": {
+            "planned_start_at": "2026-10-18T11:30:00Z",
+            "start_at": "2026-10-18T13:00:00Z",
+            "end_at": "2026-10-18T13:30:00Z"
+          },
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "origin": "scheduled",
+          "added_by": null,
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T12:00:00.000001Z",
+          "revision": "2026-10-18T12:00:00.000001Z"
+        },
+        "refusal": {
+          "reason": "scheduled",
+          "message": "Morning walk is on its schedule. Only an added item can be removed."
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "unknown refusal",
+      "value": {
+        "outcome": "refused",
+        "occurrence": {
+          "id": "00000006-1111-4111-8111-000000000006",
+          "behavior_id": "00000002-1111-4111-8111-000000000002",
+          "behavior_title": "Stretch",
+          "category_name": null,
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T19:00:00Z",
+          "effective_start_at": "2026-10-18T19:00:00Z",
+          "move": null,
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "15:00",
+            "end_time": null,
+            "label": "3:00 PM"
+          },
+          "status": "unresolved",
+          "status_label": "Unresolved",
+          "needs_decision": false,
+          "origin": "opportunity",
+          "added_by": "user",
+          "completed_at": null,
+          "status_marked_at": null,
+          "note": null,
+          "updated_at": "2026-10-18T18:40:00Z",
+          "revision": "2026-10-18T18:40:00Z"
+        },
+        "refusal": {
+          "reason": "deleted",
+          "message": "x"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.refusal"
+    },
+    {
+      "name": "no occurrence",
+      "value": {
+        "outcome": "removed",
+        "occurrence": null,
+        "refusal": null
+      },
+      "code": "internal_error",
+      "path": "$.occurrence"
+    }
+  ]
+}

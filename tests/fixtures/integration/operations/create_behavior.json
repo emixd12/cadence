@@ -98,6 +98,15 @@
           }
         ]
       }
+    },
+    {
+      "name": "opportunity without schedules",
+      "value": {
+        "title": "Stretch",
+        "schedules": [],
+        "is_opportunity": true,
+        "default_duration_minutes": 10
+      }
     }
   ],
   "invalid_inputs": [
@@ -172,7 +181,8 @@
         "schedules": []
       },
       "code": "invalid_input",
-      "path": "$.schedules"
+      "path": "$.schedules",
+      "semantic": true
     },
     {
       "name": "natural-language recurrence",
@@ -574,6 +584,17 @@
       },
       "code": "invalid_input",
       "path": "$.external_ref"
+    },
+    {
+      "name": "no schedules, not an opportunity",
+      "value": {
+        "title": "Stretch",
+        "schedules": [],
+        "is_opportunity": false
+      },
+      "code": "invalid_input",
+      "path": "$.schedules",
+      "semantic": true
     }
   ],
   "valid_outputs": [
@@ -593,6 +614,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,

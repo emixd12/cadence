@@ -26,6 +26,9 @@ export function integrationBehaviorInput(
   set("browser_reminder", reminders.browser_enabled);
   set("email_reminder", reminders.email_enabled);
   set("reminder_offset", reminders.offset_minutes);
+  // Empty schedules are valid only with the flag on, so an update always sends the flag it keeps.
+  const isOpportunity = input.is_opportunity ?? current?.is_opportunity;
+  if (isOpportunity !== undefined) set("is_opportunity", isOpportunity);
   const schedules = input.schedules ?? current?.schedules ?? [];
   set("behavior_schedule_count", schedules.length);
   schedules.forEach((schedule, i) => {

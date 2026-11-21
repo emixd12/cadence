@@ -8,6 +8,7 @@ mod import;
 mod import_write;
 mod note_shortcut;
 mod occurrence;
+mod opportunity;
 mod place_labels;
 mod recovery;
 mod reminder;
@@ -472,6 +473,21 @@ pub enum Request {
         completed_at: Option<String>,
         event: OccurrenceStatusEvent,
     },
+    /// Behaviors of Opportunity: add an opportunity Behavior to today, or Done now.
+    AddOpportunityOccurrence {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        occurrence: Occurrence,
+        status_event: Option<OccurrenceStatusEvent>,
+    },
+    /// Behaviors of Opportunity: remove a clean added Occurrence.
+    RemoveOpportunityOccurrence {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        occurrence_id: String,
+    },
     UpdateOccurrenceNote {
         profile_id: String,
         mutation_id: String,
@@ -907,6 +923,19 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
         Request::ApplyOccurrenceGeneration { .. } => occurrence::generate(db, request),
         Request::ApplyStatusTransition { .. } => occurrence::status(db, request),
         Request::ApplyMarkDetail { .. } => occurrence::mark_detail(db, request),
+        Request::AddOpportunityOccurrence {
+            profile_id,
+            now,
+            occurrence,
+            status_event,
+            ..
+        } => opportunity::add(db, profile_id, now, occurrence, status_event.as_ref()),
+        Request::RemoveOpportunityOccurrence {
+            profile_id,
+            mutation_id,
+            now,
+            occurrence_id,
+        } => opportunity::remove(db, profile_id, mutation_id, now, occurrence_id),
         Request::UpdateOccurrenceNote {
             profile_id,
             now,
@@ -1071,6 +1100,18 @@ impl Request {
                 ..
             }
             | Self::ApplyMarkDetail {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::AddOpportunityOccurrence {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::RemoveOpportunityOccurrence {
                 profile_id,
                 mutation_id,
                 now,

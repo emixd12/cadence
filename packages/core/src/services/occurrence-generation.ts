@@ -7,7 +7,7 @@ import {
 } from "../resolvers/occurrence.resolver";
 import type { ScheduleKind, TimeRangePreset } from "../types/schedule";
 import { normalizeOccurrenceStatus } from "./occurrence.service";
-import { normalizeRecurrenceRule } from "./behavior-values";
+import { normalizeRecurrenceRule, storedRecurrenceRuleOrNull } from "./behavior-values";
 import { compareScheduleSlots, normalizeTime, toScheduleSlotView } from "./schedule";
 
 export function planPersistedOccurrences(input: {
@@ -26,7 +26,8 @@ export function planPersistedOccurrences(input: {
     behavior: {
       id: behavior.id, userId: behavior.user_id,
       configurationEventId: behavior.current_configuration_event_id,
-      recurrenceRule: normalizeRecurrenceRule(behavior.recurrence_rule),
+      recurrenceRule: storedRecurrenceRuleOrNull(behavior),
+      isOpportunity: behavior.is_opportunity === true,
       schedules, scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
       timezone: behavior.timezone, active: behavior.active, ...generationRunFields(behavior),
       createdAt: behavior.created_at,
@@ -51,8 +52,10 @@ export function toExistingOccurrenceForGeneration(
     moved: Boolean(row.effective_start_at),
     effectiveStartAt: row.effective_start_at ?? null,
     effectiveEndAt: row.effective_end_at ?? null,
+    origin: row.origin === "opportunity" ? "opportunity" : "scheduled",
   };
 }
+
 
 /** The end and pause fields generation reads from a stored Behavior row. */
 export function generationRunFields(behavior: {
@@ -83,12 +86,14 @@ export function storedSchedulesForGeneration(behavior: BehaviorGraphRecord): Occ
     timeEntries: slots(schedule.schedule_slots, schedule.id), sortOrder: schedule.sort_order,
   }));
   if (!behavior.active) return persisted;
+  const compatibilityRule = storedRecurrenceRuleOrNull(behavior);
   const normalization = normalizeOccurrenceScheduleGraph({
     schedules: persisted,
-    compatibilitySchedule: {
-      id: null, recurrenceRule: normalizeRecurrenceRule(behavior.recurrence_rule),
+    isOpportunity: behavior.is_opportunity === true,
+    compatibilitySchedule: compatibilityRule ? {
+      id: null, recurrenceRule: compatibilityRule,
       timeEntries: slots(behavior.schedule_slots), sortOrder: 0,
-    },
+    } : null,
   });
   if (normalization.status !== "valid") {
     throw new Error("This behavior schedule needs repair before occurrences can be generated.");

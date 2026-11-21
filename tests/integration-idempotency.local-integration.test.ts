@@ -13,9 +13,17 @@ const wireLimit = INTEGRATION_LIMITS.maxResponseBytes;
 function statusOutput(bytes: number, seed: string) {
   const output = structuredClone(statusFixture.valid_outputs[0].value);
   output.occurrence.note = seed;
-  output.occurrence.note += "x".repeat(bytes - Buffer.byteLength(JSON.stringify(output)));
+  const padding = bytes - Buffer.byteLength(JSON.stringify(output));
+  if (padding < 0) throw new Error(`Status fixture with this seed is ${-padding} byte(s) over ${bytes}`);
+  output.occurrence.note += "x".repeat(padding);
   return output;
 }
+
+const longNote = "x".repeat(70_000);
+const statusFixtureBytes = (note: string) => Buffer.byteLength(JSON.stringify({
+  ...statusFixture.valid_outputs[0].value,
+  occurrence: { ...statusFixture.valid_outputs[0].value.occurrence, note },
+}));
 
 const schedule = {
   id: "00000006-1111-4111-8111-000000000006",
@@ -36,7 +44,7 @@ const scheduleCount = Math.floor(
 expandedBehavior.behavior.schedules = Array.from({ length: scheduleCount }, () => schedule);
 
 const cases = [
-  { name: "existing 70,000-character note", operation: "set_occurrence_status", output: statusOutput(70_680, "x".repeat(70_000)) },
+  { name: "existing 70,000-character note", operation: "set_occurrence_status", output: statusOutput(statusFixtureBytes(longNote) + 680, longNote) },
   { name: "one byte below the wire limit", operation: "set_occurrence_status", output: statusOutput(wireLimit - 1, "") },
   { name: "exact wire limit with Unicode and JSON escapes", operation: "set_occurrence_status", output: statusOutput(wireLimit, "é🐴\n\t\"\\'".repeat(2000)) },
   { name: "JSONB numeric expansion in Behavior schedules", operation: "update_behavior", output: expandedBehavior },

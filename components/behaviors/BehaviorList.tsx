@@ -9,6 +9,7 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom";
 
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
+import { Notice } from "@/components/feedback/Notice";
 import { BehaviorRunControls } from "@/components/behaviors/BehaviorRunControls";
 import { isNotRunning, localDateIn, notRunningLabel, upcomingRunNote } from "@/lib/ui/behavior-run";
 import { BehaviorPlaceAssist, type WhereDraft } from "@/components/travel/PlaceLabels";
@@ -18,6 +19,7 @@ import {
   isBehaviorCreatedEvent,
 } from "@/components/behaviors/behavior-events";
 import {
+  isUnscheduledOpportunity,
   projectBehaviorList,
   type BehaviorSort,
   reconcileCreatedBehaviorViews,
@@ -77,6 +79,8 @@ type BehaviorListProps = Readonly<{
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
   /** A tip's link: open this Behavior's Details and Settings and focus the named field. */
   editTarget?: BehaviorEditTarget | null;
+  /** Behaviors of Opportunity: show the opportunity choices in each edit form. */
+  allowOpportunity?: boolean;
 }>;
 
 /** The first control of each field a tip's link can open. */
@@ -148,6 +152,7 @@ export function BehaviorList({
   reminderRuntime = "web",
   sourceLinkCoordinator,
   editTarget = null,
+  allowOpportunity = true,
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -219,13 +224,38 @@ export function BehaviorList({
     activeBehaviors,
   );
   // Ended and paused Behaviors are still active; they get their own Not running group.
-  const runningRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior));
+  // Running Behaviors with no fixed schedule get the Opportunity group.
+  const runningRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior) && !isUnscheduledOpportunity(behavior));
+  const opportunityRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior) && isUnscheduledOpportunity(behavior));
   const notRunningRows = activeBehaviorRows.filter(isNotRunning);
   const activeList = projectBehaviorList(runningRows, categories, effectiveCategory, sort);
+  const opportunityList = projectBehaviorList(opportunityRows, categories, effectiveCategory, sort);
   const notRunningList = projectBehaviorList(notRunningRows, categories, effectiveCategory, sort);
   const archivedList = projectBehaviorList(archivedBehaviors, categories, effectiveCategory, sort);
   const behaviorAnalyticsById = new Map(
     analytics.behaviorSummaries.map((summary) => [summary.behaviorId, summary]),
+  );
+  const renderRecord = (behavior: BehaviorView, withEditRequest: boolean) => (
+    <BehaviorRecord
+      behavior={behavior}
+      reminderRuntime={reminderRuntime}
+      categories={categories}
+      analytics={analytics}
+      behaviorAnalytics={behaviorAnalyticsById.get(behavior.id) ?? null}
+      updateAction={announcedUpdateAction}
+      lifecycleFormAction={lifecycleFormAction}
+      lifecycleResult={lifecycleState}
+      runAction={listRunAction}
+      statusAction={statusAction}
+      noteAction={noteAction}
+      stopTimeTrackingAction={stopTimeTrackingAction}
+      resetTimeTrackingAction={resetTimeTrackingAction}
+      noteShortcutView={noteShortcutViews[behavior.id]}
+      noteShortcutAction={noteShortcutAction}
+      sourceLinkCoordinator={linkCoordinator}
+      allowOpportunity={allowOpportunity}
+      editRequest={withEditRequest && editTarget?.behaviorId === behavior.id ? editTarget : null}
+    />
   );
 
   useEffect(() => {
@@ -279,6 +309,7 @@ export function BehaviorList({
       </div>
       <p role="status" className="text-sm text-muted-readable">
         {filterNotice} {activeList.visibleIds.size} of {runningRows.length} active behaviors;
+        {opportunityRows.length ? ` ${opportunityList.visibleIds.size} of ${opportunityRows.length} opportunity;` : ""}
         {notRunningRows.length ? ` ${notRunningList.visibleIds.size} of ${notRunningRows.length} not running;` : ""}
         {" "}{archivedList.visibleIds.size} of {archivedBehaviors.length} archived behaviors.
         {effectiveCategory !== "all" ? " Overall adherence and category counts include all categories." : ""}
@@ -294,37 +325,41 @@ export function BehaviorList({
 
         {runningRows.length === 0 ? (
           <p className="border-t border-line pt-4 text-base leading-7 text-muted-readable">
-            No active behaviors.
+            {opportunityRows.length ? "No scheduled behaviors." : "No active behaviors."}
           </p>
         ) : (
           <div className="divide-y divide-line">
             {activeList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
             {activeList.rows.map((behavior) => (
               <div key={behavior.id} hidden={!activeList.visibleIds.has(behavior.id)}>
-              <BehaviorRecord
-                behavior={behavior}
-                reminderRuntime={reminderRuntime}
-                categories={categories}
-                analytics={analytics}
-                behaviorAnalytics={behaviorAnalyticsById.get(behavior.id) ?? null}
-                updateAction={announcedUpdateAction}
-                lifecycleFormAction={lifecycleFormAction}
-                lifecycleResult={lifecycleState}
-                runAction={listRunAction}
-                statusAction={statusAction}
-                noteAction={noteAction}
-                stopTimeTrackingAction={stopTimeTrackingAction}
-                resetTimeTrackingAction={resetTimeTrackingAction}
-                noteShortcutView={noteShortcutViews[behavior.id]}
-                noteShortcutAction={noteShortcutAction}
-                sourceLinkCoordinator={linkCoordinator}
-                editRequest={editTarget?.behaviorId === behavior.id ? editTarget : null}
-              />
+                {renderRecord(behavior, true)}
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {opportunityRows.length > 0 ? (
+        <section className="grid gap-4 border-t border-line pt-4" aria-labelledby="opportunity-behaviors-title">
+          <details open>
+            <summary id="opportunity-behaviors-title"
+              className="product-disclosure-trigger flex min-h-11 items-center py-3 text-xl leading-tight text-foreground">
+              <span aria-hidden="true" className="product-disclosure-indicator" />
+              <span className="product-disclosure-trigger-label">
+                Opportunity ({opportunityList.visibleIds.size === opportunityRows.length ? opportunityRows.length : `${opportunityList.visibleIds.size} of ${opportunityRows.length}`})
+              </span>
+            </summary>
+            <div className="mt-4 divide-y divide-line border-t border-line">
+              {opportunityList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
+              {opportunityList.rows.map((behavior) => (
+                <div key={behavior.id} hidden={!opportunityList.visibleIds.has(behavior.id)}>
+                  {renderRecord(behavior, true)}
+                </div>
+              ))}
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       {notRunningRows.length > 0 ? (
         <section className="grid gap-4 border-t border-line pt-4" aria-labelledby="not-running-behaviors-title">
@@ -340,24 +375,7 @@ export function BehaviorList({
               {notRunningList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
               {notRunningList.rows.map((behavior) => (
                 <div key={behavior.id} hidden={!notRunningList.visibleIds.has(behavior.id)}>
-                <BehaviorRecord
-                  behavior={behavior}
-                  reminderRuntime={reminderRuntime}
-                  categories={categories}
-                  analytics={analytics}
-                  behaviorAnalytics={behaviorAnalyticsById.get(behavior.id) ?? null}
-                  updateAction={announcedUpdateAction}
-                  lifecycleFormAction={lifecycleFormAction}
-                  lifecycleResult={lifecycleState}
-                  runAction={listRunAction}
-                  statusAction={statusAction}
-                  noteAction={noteAction}
-                  stopTimeTrackingAction={stopTimeTrackingAction}
-                  resetTimeTrackingAction={resetTimeTrackingAction}
-                  noteShortcutView={noteShortcutViews[behavior.id]}
-                  noteShortcutAction={noteShortcutAction}
-                  sourceLinkCoordinator={linkCoordinator}
-                />
+                  {renderRecord(behavior, false)}
                 </div>
               ))}
             </div>
@@ -431,6 +449,11 @@ function OverallAdherence({
           </div>
 
           <StatusCountGrid counts={analytics.summary} />
+          {analytics.summary.opportunityCompletedCount ? (
+            <p className="-mt-3 text-sm text-muted-readable" data-testid="opportunity-completed-count">
+              +{analytics.summary.opportunityCompletedCount} opportunity Completed
+            </p>
+          ) : null}
         </div>
 
         <div className="grid w-full gap-3 md:w-fit md:justify-self-end">
@@ -525,6 +548,7 @@ function BehaviorRecord({
   noteShortcutAction,
   sourceLinkCoordinator = null,
   editRequest = null,
+  allowOpportunity = true,
 }: Readonly<{
   behavior: BehaviorView;
   categories: CategoryOption[];
@@ -543,6 +567,7 @@ function BehaviorRecord({
   noteShortcutAction?: NoteShortcutAction;
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
   editRequest?: BehaviorEditTarget | null;
+  allowOpportunity?: boolean;
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -588,6 +613,9 @@ function BehaviorRecord({
                 Archived
               </span>
             ) : null}
+            {behavior.isOpportunity && (behavior.schedules?.length ?? 0) > 0 ? (
+              <span className="text-xs text-muted-readable">Opportunity</span>
+            ) : null}
           </div>
 
           {upcoming ? <p className="-mt-3 text-xs text-muted-readable">{upcoming}</p> : null}
@@ -612,7 +640,8 @@ function BehaviorRecord({
           ) : null}
 
           {behavior.active ? (
-            <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null} />
+            <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null}
+              unscheduled={isUnscheduledOpportunity(behavior)} />
           ) : null}
 
           {behavior.active ? (
@@ -686,6 +715,7 @@ function BehaviorRecord({
                     behavior={behavior}
                     showActiveToggle={false}
                     whereDraft={whereDraft}
+                    allowOpportunity={allowOpportunity}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
@@ -719,6 +749,7 @@ function BehaviorRecord({
                     categories={categories}
                     behavior={behavior}
                     showActiveToggle={false}
+                    allowOpportunity={allowOpportunity}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   <ArchiveNoteHistory
@@ -757,8 +788,17 @@ function BehaviorMetadata({
   return (
     <dl className="grid gap-1 text-sm leading-5 text-muted-readable">
       <SummaryItem label="Category" value={behavior.categoryName} />
-      <SummaryItem label="Scheduled" value={behavior.scheduleSummary} />
-      <SummaryItem label="Recurrence" value={behavior.recurrenceSummary} />
+      {isUnscheduledOpportunity(behavior) ? (
+        <div className="grid min-w-0 gap-x-4 gap-y-1 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+          <dt className="text-foreground">Scheduled</dt>
+          <dd className="min-w-0"><Notice id="opportunity.no-schedule" as="span" /></dd>
+        </div>
+      ) : (
+        <>
+          <SummaryItem label="Scheduled" value={behavior.scheduleSummary} />
+          <SummaryItem label="Recurrence" value={behavior.recurrenceSummary} />
+        </>
+      )}
       <SummaryItem label="Reminders" value={behavior.reminderSummary} />
       {behavior.description ? (
         <SummaryItem label="Description" value={behavior.description} />
@@ -769,9 +809,26 @@ function BehaviorMetadata({
 
 function BehaviorOutcomeStats({
   behaviorAnalytics,
+  unscheduled = false,
 }: Readonly<{
   behaviorAnalytics: AnalyticsBehaviorSummary | null;
+  unscheduled?: boolean;
 }>) {
+  // With no fixed schedule there is no adherence; the record is how often it was done.
+  if (unscheduled) {
+    return (
+      <dl className="grid max-w-sm gap-1 text-sm leading-5 text-muted-readable">
+        <SummaryItem label="Added" value={behaviorAnalytics?.opportunityDoneLabel ?? "Done 0 times"} />
+        {behaviorAnalytics?.averageTrackedTime ? (
+          <SummaryItem label="Average tracked time" value={behaviorAnalytics.averageTrackedTime.durationLabel} />
+        ) : null}
+        {behaviorAnalytics ? (
+          <SummaryItem label="Tracking since" value={formatCompactLocalDate(behaviorAnalytics.trackingStartLocalDate)} />
+        ) : null}
+      </dl>
+    );
+  }
+
   if (!behaviorAnalytics) {
     return (
       <p className="text-sm leading-6 text-muted-readable">
@@ -791,6 +848,9 @@ function BehaviorOutcomeStats({
         label="Not Completed"
         value={String(behaviorAnalytics.notCompletedCount)}
       />
+      {behaviorAnalytics.opportunityDoneLabel ? (
+        <SummaryItem label="Added" value={behaviorAnalytics.opportunityDoneLabel} />
+      ) : null}
       {behaviorAnalytics.averageTrackedTime ? (
         <SummaryItem
           label="Average tracked time"

@@ -58,7 +58,7 @@ type LineUi = Readonly<{
   neverMoved?: boolean;
 }>;
 
-const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:cursor-default disabled:opacity-60";
+export const LINK = "-my-2 inline-block py-2 underline underline-offset-2 hover:text-foreground disabled:cursor-default disabled:opacity-60";
 const OPEN_STATUSES = new Set(["proposed"]);
 
 /**
@@ -458,11 +458,11 @@ function ConflictLine({ conflict, timezone, onKeep, onMove }: Readonly<{
  * `button {font: inherit}` ignores font utilities on the button itself.
  */
 const OUTCOME_TEXT = "italic";
-function BriefOutcome({ children, ...rest }: Readonly<{ children: ReactNode; "data-brief-move-actions"?: boolean }>) {
+export function BriefOutcome({ children, ...rest }: Readonly<{ children: ReactNode; "data-brief-move-actions"?: boolean }>) {
   return <p className={OUTCOME_TEXT} data-brief-outcome {...rest}>{children}</p>;
 }
 
-function ActionLink({ label, onClick, disabled, strong = false, expanded }: Readonly<{ label: string; onClick: () => void; disabled?: boolean; strong?: boolean; expanded?: boolean }>) {
+export function ActionLink({ label, onClick, disabled, strong = false, expanded }: Readonly<{ label: string; onClick: () => void; disabled?: boolean; strong?: boolean; expanded?: boolean }>) {
   return <button type="button" className={`${strong ? "font-bold text-foreground " : ""}${LINK}`} disabled={disabled} onClick={onClick}
     {...(expanded === undefined ? {} : { "aria-expanded": expanded })}>{label}</button>;
 }
@@ -477,12 +477,12 @@ function movedToLabel(line: BriefMoveLine, movedTo: string | null | undefined, s
   return at ? moveTimeLabel(at, line.timezone) : suggested;
 }
 
-function Dot() {
+export function Dot() {
   return <span aria-hidden="true"> · </span>;
 }
 
 /** The time picker's wall time on the line's day, as a UTC instant; null when it does not exist that day. */
-function pickedInstant(line: BriefMoveLine, time: string): string | null {
+export function pickedInstant(line: Pick<BriefMoveLine, "localDate" | "timezone">, time: string): string | null {
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
   try {
     return Temporal.PlainDate.from(line.localDate)
@@ -512,7 +512,7 @@ function firstUseExplainer(kind: BriefMoveAnswerKind): string | null {
   }
 }
 
-function requestRefusal(error: unknown): BriefMoveRefusal {
+export function requestRefusal(error: unknown): BriefMoveRefusal {
   const code = error instanceof DailyBriefRequestError ? error.code : "advisor_unavailable";
   const message = noticeText(code === "offline" ? "brief-moves.request.offline"
     : code === "proposal_closed" ? "brief-moves.request.proposal-closed"
@@ -524,6 +524,6 @@ function requestRefusal(error: unknown): BriefMoveRefusal {
   return { reason: code, message, alternatives: [], revision: null };
 }
 
-function newKey(): string {
+export function newKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }

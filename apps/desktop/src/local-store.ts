@@ -156,6 +156,16 @@ export type LocalCommandMap = {
     input: Mutation & { occurrenceId: string; expectedLatestEventId: string; completedAt: string | null; event: OccurrenceStatusEventRecord };
     result: MarkDetailResult;
   };
+  /** Behaviors of Opportunity: add an opportunity Behavior to today, or Done now. */
+  addOpportunityOccurrence: {
+    input: Mutation & { occurrence: OccurrenceRecord; statusEvent: OccurrenceStatusEventRecord | null };
+    result: { created: boolean; occurrence: OccurrenceRecord; statusEvent: OccurrenceStatusEventRecord | null };
+  };
+  /** Behaviors of Opportunity: remove a clean added Occurrence. */
+  removeOpportunityOccurrence: {
+    input: Mutation & { occurrenceId: string };
+    result: { removed: true; occurrence: OccurrenceRecord; cancelledReminderCount: number };
+  };
   updateOccurrenceNote: {
     input: Mutation & { occurrenceId: string; expectedNote: string | null; note: string | null; usedShortcut?: boolean };
     result: OccurrenceRecord | null;

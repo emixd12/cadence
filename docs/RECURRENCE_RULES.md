@@ -49,8 +49,9 @@ export type RecurrenceRule =
 
 ## Schedules and time entries
 
-Each behavior must have at least one schedule, and each schedule must have at
-least one time entry. A schedule owns exactly one recurrence rule.
+Each behavior must have one to six schedules, and each schedule must have at
+least one time entry. A schedule owns exactly one recurrence rule. An opportunity
+Behavior may have no schedules (see "Behaviors of Opportunity").
 
 Use local times in the user's timezone.
 
@@ -198,6 +199,48 @@ with the new timezone.
 Timeline notices are derived from the fields, with no stored record: "ended" on
 the day the end arrives, "paused" on the day a pause starts, and "back" on the
 back-on day. Archived Behaviors show none.
+
+## Behaviors of Opportunity
+
+A Behavior with `is_opportunity` is in the opportunity pool: the person can add it to
+today when a chance comes. The flag is a capability, not a run state. A Behavior can be
+scheduled only, scheduled and an opportunity, or an opportunity with no schedules.
+
+### Schedules
+
+- An opportunity Behavior may have zero to six schedules. Any other Behavior has one to
+  six.
+- With no schedules, the legacy `recurrence_rule` and `scheduled_time` are null and
+  generation plans nothing for it.
+- Turning the flag off needs at least one schedule.
+- Turning the flag on or off is a configuration revision with changed field
+  `is_opportunity`.
+
+### Run state
+
+The pool holds Behaviors that are active, not archived and running now. Ending or
+pausing a Behavior takes it out of the pool; Resume now and Start again bring it back.
+An opportunity can be added only at a time the Behavior is running, by the stop rule in
+"Which Occurrences stop".
+
+### Opportunity Occurrences
+
+- `add_opportunity_occurrence` adds one Occurrence with `origin = 'opportunity'` for
+  today, at an exact time or in a time range (an optional preset names the range). The
+  row has no schedule slot.
+- Done now adds the row and marks it Completed in the same call, with its status event.
+  A Daily Brief suggestion only places a row; it never marks one Completed.
+- `added_by` records who added it: `user`, `daily_brief`, `chat` or `mcp`.
+- Generation never updates or deletes an opportunity row. Schedule edits, pauses and
+  ends leave it in place. The schedule identity covers scheduled rows only, so an
+  opportunity row at a scheduled time does not block the scheduled row.
+- An opportunity row starts Unresolved. Past local midnight it joins Needs decision like
+  any other Unresolved row. Nothing marks it missed.
+- `remove_opportunity_occurrence` removes it while it is Unresolved with no Note, no
+  tracked time, no status history and no active source match. Its pending reminders are
+  cancelled. Any other opportunity row stays.
+
+Database details: docs/DATA_MODEL.md, "Behaviors of Opportunity".
 
 ## Idempotence
 

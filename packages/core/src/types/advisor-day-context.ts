@@ -327,3 +327,24 @@ export type AdvisorDayContextV1_1 = Omit<AdvisorDayContextV1, "version" | "conne
   }>;
 
 export type AdvisorDayContext = AdvisorDayContextV1 | AdvisorDayContextV1_1;
+
+/**
+ * Behaviors of Opportunity (Task 7): one Behavior in today's opportunity pool, as the
+ * Daily Brief planner reads it. Read beside the day context, never inside it, so the
+ * versioned context and its fixtures do not change. No note or description text.
+ */
+export type AdvisorOpportunityPoolItem = Readonly<{
+  behaviorId: string;
+  title: string;
+  /** The Behavior's revision (`updated_at`). */
+  behaviorRevision: string;
+  timezone: string;
+  defaultDurationMinutes: number | null;
+  /** Average of the last finished time sessions, or null with fewer than two. */
+  loggedAverageSeconds: number | null;
+  whereKind: "anywhere" | "home" | "place" | null;
+  /** Whole days from the last Completed Occurrence to today; null when never Completed. */
+  daysSinceLastCompleted: number | null;
+  /** The Behavior already has an Occurrence today. */
+  onToday: boolean;
+}>;

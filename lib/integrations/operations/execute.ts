@@ -14,7 +14,8 @@ const handlers = { ...readOperationHandlers, ...writeOperationHandlers };
 /**
  * Server-side extras a first-party caller may pass; never part of an operation's input.
  * Chat (advisor Phase 5) passes today's calendar busy times so a move onto an event is
- * refused with `calendar_busy`, as the brief's apply path does. MCP passes none.
+ * refused with `calendar_busy`, as the brief's apply path does, and an opportunity added at
+ * a taken time is refused the same way. MCP passes none.
  */
 export type McpOperationOptions = Readonly<{ calendarBusy?: readonly MoveCalendarBusy[] }>;
 

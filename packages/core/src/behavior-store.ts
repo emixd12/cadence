@@ -26,6 +26,8 @@ export type BehaviorInput = {
   emailReminderEnabled: boolean;
   reminderOffsetMinutes: number;
   active: boolean;
+  /** Behaviors of Opportunity. Undefined keeps the stored flag (false on create). */
+  isOpportunity?: boolean;
 };
 
 export type BehaviorFields = {
@@ -41,8 +43,11 @@ export type BehaviorFields = {
   description: string | null;
   where_kind?: string | null;
   location_text?: string | null;
+  /** Null only on an unscheduled opportunity Behavior (Behaviors of Opportunity). */
   recurrence_rule: Json;
-  scheduled_time: string;
+  scheduled_time: string | null;
+  /** Behaviors of Opportunity. Absent on rows that predate the column; read as false. */
+  is_opportunity?: boolean;
   timezone: string;
   browser_reminder_enabled: boolean;
   email_reminder_enabled: boolean;

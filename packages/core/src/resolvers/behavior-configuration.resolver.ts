@@ -99,6 +99,7 @@ export function normalizeBehaviorConfiguration(
           backOn: configuration.pause.backOn,
         }
       : null,
+    isOpportunity: configuration.isOpportunity === true,
   };
 }
 
@@ -170,6 +171,9 @@ function findChangedFields(
   }
   if (!jsonEqual(previous.pause ?? null, next.pause ?? null)) {
     changedFields.push("pause");
+  }
+  if ((previous.isOpportunity === true) !== (next.isOpportunity === true)) {
+    changedFields.push("is_opportunity");
   }
 
   return changedFields;

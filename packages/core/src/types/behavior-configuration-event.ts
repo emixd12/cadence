@@ -13,6 +13,7 @@ export const BEHAVIOR_CONFIGURATION_CHANGED_FIELDS = [
   "timezone",
   "end",
   "pause",
+  "is_opportunity",
 ] as const;
 
 export type BehaviorConfigurationChangedField =
@@ -51,6 +52,8 @@ export type BehaviorConfigurationSnapshot = {
   end?: BehaviorConfigurationEnd | null;
   /** The one pause. Absent in older snapshots; read as none. */
   pause?: BehaviorConfigurationPause | null;
+  /** Behaviors of Opportunity. Absent in older snapshots; read as false. */
+  isOpportunity?: boolean;
 };
 
 export type BehaviorConfigurationEnd = { on: string; time: string | null };

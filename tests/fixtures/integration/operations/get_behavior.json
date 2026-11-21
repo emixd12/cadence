@@ -38,6 +38,7 @@
           "archived_at": "2026-10-01T14:00:00Z",
           "auto_archived_at": null,
           "run_state": "archived",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,
@@ -86,6 +87,49 @@
           "revision": "b1.2026-10-18T13:00:00Z"
         }
       }
+    },
+    {
+      "name": "opportunity with no fixed schedule",
+      "value": {
+        "behavior": {
+          "id": "00000002-1111-4111-8111-000000000002",
+          "title": "Vitamin D",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": null,
+          "state": "archived",
+          "archived_at": "2026-10-01T14:00:00Z",
+          "auto_archived_at": null,
+          "run_state": "archived",
+          "is_opportunity": true,
+          "end_on": null,
+          "end_time": null,
+          "pause": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [],
+          "schedule_summary": "",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [
+            {
+              "id": "00000009-1111-4111-8111-000000000009",
+              "archived_at": "2026-10-01T14:00:00Z",
+              "note": "Doctor said to stop.",
+              "updated_at": "2026-10-01T14:00:00Z"
+            }
+          ],
+          "external_ref": "facets:rec_42",
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        }
+      }
     }
   ],
   "invalid_outputs": [
@@ -105,6 +149,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,
@@ -173,6 +218,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,

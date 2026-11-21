@@ -352,6 +352,9 @@ function toBehaviorPayload(
     ...("auto_archived_at" in behavior
       ? { auto_archived_at: behavior.auto_archived_at ?? null }
       : {}),
+    ...("is_opportunity" in behavior && behavior.is_opportunity !== undefined
+      ? { is_opportunity: behavior.is_opportunity }
+      : {}),
     created_at: "created_at" in behavior ? behavior.created_at ?? null : null,
   };
 }

@@ -35,6 +35,23 @@
         ],
         "idempotency_key": "upd-0000-0001"
       }
+    },
+    {
+      "name": "opportunity with no fixed schedule",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "expected_revision": "b1.2026-10-18T13:00:00Z",
+        "is_opportunity": true,
+        "schedules": []
+      }
+    },
+    {
+      "name": "only the opportunity flag",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "expected_revision": "b1.2026-10-18T13:00:00Z",
+        "is_opportunity": false
+      }
     }
   ],
   "invalid_inputs": [
@@ -75,6 +92,18 @@
       },
       "code": "invalid_input",
       "path": "$.active"
+    },
+    {
+      "name": "turn off opportunity with no schedules",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "expected_revision": "b1.2026-10-18T13:00:00Z",
+        "is_opportunity": false,
+        "schedules": []
+      },
+      "code": "invalid_input",
+      "path": "$.schedules",
+      "semantic": true
     }
   ],
   "valid_outputs": [
@@ -94,6 +123,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,
@@ -167,6 +197,7 @@
           "archived_at": null,
           "auto_archived_at": null,
           "run_state": "running",
+          "is_opportunity": false,
           "end_on": null,
           "end_time": null,
           "pause": null,

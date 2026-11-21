@@ -115,8 +115,13 @@ in the release packet that first uses it.
 
 - The agent never changes TCC, Location Services, Gatekeeper or sharing settings,
   and never answers a permission or consent prompt. Those stay with the owner.
-- Quit Cadence only with a normal quit event (`osascript -e 'tell application
-  "Cadence" to quit'`), after reading that no writes are pending. Never force quit,
+- Quit Cadence only with a normal quit event (`osascript -e 'tell application id
+  "app.cadence.desktop" to quit'`), after reading that no writes are pending. Agents
+  quit it themselves (`docs/DECISIONS.md`, 2026-11-21).
+- Bring Cadence to the front with `osascript -e 'tell application id
+  "app.cadence.desktop" to activate'` when accessibility finds an empty window: macOS
+  suspends a hidden Cadence page. Agents do it without asking, even while the owner uses
+  the Mac, and keep it short (`docs/DECISIONS.md`, 2026-11-21). Never force quit,
   and never launch a second copy while one runs.
 - Sign-ins stay with the owner, except that the agent may pick the designated test
   account when Google's chooser already lists it.

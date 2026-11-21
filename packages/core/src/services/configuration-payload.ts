@@ -49,6 +49,7 @@ export function toBehaviorConfigurationSnapshotPayload(
     pause: snapshot.pause
       ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn }
       : null,
+    is_opportunity: snapshot.isOpportunity === true,
   };
 }
 
@@ -87,6 +88,7 @@ export function toStoredConfigurationSnapshot(value: Json): Json {
     // Ended and Paused: the Mac's camelCase pause becomes the hosted snake_case one.
     ...(snapshot.end === undefined ? {} : { end: snapshot.end ?? null }),
     ...(snapshot.pause === undefined ? {} : { pause: storedPause(snapshot.pause) }),
+    ...(snapshot.isOpportunity === undefined ? {} : { is_opportunity: snapshot.isOpportunity ?? false }),
   };
 }
 

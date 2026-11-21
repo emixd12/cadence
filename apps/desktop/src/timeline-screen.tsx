@@ -23,6 +23,7 @@ import type { NotificationTarget } from "./notification-activation";
 import type { DesktopScreen } from "./desktop-app";
 import type {
   OccurrenceFormAction,
+  OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineView,
 } from "@/lib/types/timeline";
@@ -51,6 +52,9 @@ export type TimelineScreenProps = Readonly<{
   runAction?: BehaviorFormAction;
   /** Advisor plan 4G: the "Done at" and "Why?" lines after a mark. */
   markDetailActions?: OccurrenceMarkDetailActions;
+  /** Behaviors of Opportunity: the basket's add and Done now, and a row's Remove (local store). */
+  addOpportunityAction?: OpportunityFormAction;
+  removeOpportunityAction?: OpportunityFormAction;
 }>;
 
 type NavigateScreen = (screen: DesktopScreen, anchor?: string) => void;

@@ -44,20 +44,21 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
 ];
 
 /**
- * Chat lands in steps (advisor plan, Phase 5). The page stays out of
- * production web until the chat server is on main; the final 5B change sets
- * this to true. Cadence for Mac hides Chat until Phase 5C adds its screen.
+ * Chat lands in steps (advisor plan, Phase 5). One switch covers web and
+ * Cadence for Mac: production web returns 404 for /chat and a release or
+ * dev-signed Mac build shows no Chat item until this is true. Development
+ * builds of both always show it. The Mac also needs a linked account
+ * (Phase 5C): a local-only Mac never shows Chat.
  */
-export const CHAT_PAGE_LIVE_ON_WEB = false;
+export const CHAT_PAGE_LIVE = true;
 
 export type AppNavSurface = "web" | "desktop";
 
 export function isChatPageAvailable(
-  surface: AppNavSurface,
+  _surface: AppNavSurface,
   production = process.env.NODE_ENV === "production",
 ) {
-  if (surface === "desktop") return false;
-  return CHAT_PAGE_LIVE_ON_WEB || !production;
+  return CHAT_PAGE_LIVE || !production;
 }
 
 export function getAppNavItems(

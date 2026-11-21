@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
+import { fixtureBriefOpportunityClient } from "@/app/design-system/brief-opportunity-fixtures";
 import { resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelRoutesView } from "@/lib/ui/travel";
 import { DailyBriefRequestError, createWebDailyBriefClient, dailyBriefInstallationId, type DailyBriefClient } from "@/lib/ui/daily-brief";
 import type { DailyBriefResponse } from "@cadence/core/types/daily-brief";
@@ -182,6 +183,12 @@ describe("advisor Phase 3: reopen, Refresh and move lines", () => {
     const plain = vi.fn<DailyBriefClient["requestBrief"]>(async () => ready("Without moves"));
     await act(() => root.render(<DailyBriefLauncher client={client("other", plain)} />));
     expect(plain.mock.calls[0]![0]).not.toHaveProperty("features");
+  });
+
+  it("asks for opportunity lines only when the client can answer them (Task 7)", async () => {
+    const request = vi.fn(async () => ready("With opportunities"));
+    await act(() => root.render(<DailyBriefLauncher client={{ ...client("owner", request), moves: moveClient(), opportunities: fixtureBriefOpportunityClient() }} />));
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ features: ["move_lines_v1", "opportunity_lines_v1"] }), expect.any(AbortSignal));
   });
 
   it("refreshes in place and keeps the brief when a refresh is refused", async () => {

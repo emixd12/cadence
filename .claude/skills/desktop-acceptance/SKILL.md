@@ -26,11 +26,13 @@ theirs.
    visible window needs no click. On a test device, `node scripts/test-device.mjs
    screenshot <device> <file>.png` shows what accessibility cannot (for example the
    next-trip marker); keep the file outside the repository and delete it after reading.
-   Clicking a notification banner still needs the owner (`docs/TEST_DEVICES.md`).
-5. Never quit Cadence, restore a protected database, notarize, upload or publish
-   without the owner's instruction (`docs/DECISIONS.md`, 2026-10-23).
+   Clicking a notification banner still needs the owner (`docs/TEST_DEVICES.md`). When
+   the window reads empty, bring Cadence to the front yourself (`docs/DECISIONS.md`,
+   2026-11-21).
+5. Never restore a protected database, notarize, upload or publish without the
+   owner's instruction (`docs/DECISIONS.md`, 2026-10-23). Quit Cadence yourself, only
+   with a normal quit event and no pending writes (`docs/DECISIONS.md`, 2026-11-21).
 6. Sign-in, credential, consent and permission asks come only from the preflight's
    list. Agents sign Cadence for Mac in as test account A on test devices
-   (`docs/DECISIONS.md`, 2026-11-07). Send any other owner ask, such as quitting
-   Cadence, as one numbered list. If a tool is missing, name it and ask the owner to
+   (`docs/DECISIONS.md`, 2026-11-07). Send any other owner ask as one numbered list. If a tool is missing, name it and ask the owner to
    enable it.

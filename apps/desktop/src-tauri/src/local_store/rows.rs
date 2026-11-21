@@ -69,6 +69,9 @@ pub struct Behavior {
     pub end_on: Option<String>,
     pub end_time: Option<String>,
     pub id: String,
+    /// Behaviors of Opportunity: in the opportunity pool; may then have no schedules.
+    #[serde(default)]
+    pub is_opportunity: bool,
     #[serde(default)]
     pub location_text: Option<String>,
     pub pause_back_on: Option<String>,
@@ -76,7 +79,7 @@ pub struct Behavior {
     pub pause_from_time: Option<String>,
     pub recurrence_rule: Value,
     pub reminder_offset_minutes: i64,
-    pub scheduled_time: String,
+    pub scheduled_time: Option<String>,
     pub timezone: String,
     pub title: String,
     pub updated_at: String,
@@ -91,6 +94,7 @@ impl StoredRow for Behavior {
         "active",
         "browser_reminder_enabled",
         "email_reminder_enabled",
+        "is_opportunity",
     ];
 }
 
@@ -210,6 +214,9 @@ impl StoredRow for BehaviorConfigurationEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Occurrence {
+    /// Behaviors of Opportunity: who added an opportunity row; null for scheduled rows.
+    #[serde(default)]
+    pub added_by: Option<String>,
     pub behavior_configuration_event_id: Option<String>,
     pub behavior_id: String,
     pub behavior_schedule_slot_id: Option<String>,
@@ -218,6 +225,9 @@ pub struct Occurrence {
     pub id: String,
     pub local_date: String,
     pub note: Option<String>,
+    /// `scheduled` (made by generation) or `opportunity` (added to a day).
+    #[serde(default = "scheduled_origin")]
+    pub origin: String,
     pub schedule_end_time: Option<String>,
     pub schedule_kind: String,
     pub schedule_preset: Option<String>,
@@ -229,6 +239,16 @@ pub struct Occurrence {
     pub updated_at: String,
     pub user_id: String,
 }
+fn scheduled_origin() -> String {
+    "scheduled".into()
+}
+
+impl Occurrence {
+    pub fn is_opportunity(&self) -> bool {
+        self.origin == "opportunity"
+    }
+}
+
 impl StoredRow for Occurrence {
     const TABLE: &'static str = "occurrences";
     const JSON_COLUMNS: &'static [&'static str] = &[];

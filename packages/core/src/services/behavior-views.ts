@@ -4,7 +4,7 @@ import type { BehaviorScheduleView, ScheduleKind, TimeRangePreset } from "../typ
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
 import { formatScheduledTimeLabel, normalizeRecurrenceRule, normalizeScheduledTime,
-  recurrenceDefaultsFromRule, summarizeRecurrenceRule, summarizeReminders } from "./behavior-values";
+  recurrenceDefaultsFromRule, storedRecurrenceRuleOrNull, summarizeRecurrenceRule, summarizeReminders } from "./behavior-values";
 import { compareScheduleSlots, formatScheduleSlotsSummary, toScheduleSlotView } from "./schedule";
 import { storedBehaviorWhere } from "./behavior-where";
 import type { Temporal } from "@js-temporal/polyfill";
@@ -25,10 +25,14 @@ export function assembleBehaviorPageData(input: {
 }
 
 export function toBehaviorView(behavior: BehaviorGraphRecord, now?: Temporal.Instant): BehaviorView {
-  const recurrenceRule = normalizeRecurrenceRule(behavior.recurrence_rule);
-  const scheduledTime = normalizeScheduledTime(behavior.scheduled_time);
-  const scheduledTimeLabel = formatScheduledTimeLabel(scheduledTime);
-  const schedules = toBehaviorScheduleViews(behavior, recurrenceRule, scheduledTime);
+  const storedRule = storedRecurrenceRuleOrNull(behavior);
+  const unscheduled = storedRule === null || behavior.scheduled_time === null;
+  // An unscheduled opportunity Behavior has no schedule; the form defaults to Daily.
+  const recurrenceRule = storedRule ?? UNSCHEDULED_FORM_RULE;
+  const scheduledTime = behavior.scheduled_time === null ? "" : normalizeScheduledTime(behavior.scheduled_time);
+  const scheduledTimeLabel = scheduledTime ? formatScheduledTimeLabel(scheduledTime) : "";
+  const schedules = unscheduled && (behavior.schedules ?? []).length === 0
+    ? [] : toBehaviorScheduleViews(behavior, recurrenceRule, scheduledTime);
   const scheduleSlots = schedules.flatMap((schedule) => schedule.timeEntries);
 
   return {
@@ -43,7 +47,7 @@ export function toBehaviorView(behavior: BehaviorGraphRecord, now?: Temporal.Ins
     categoryId: behavior.category_id ?? "",
     categoryName: behavior.category?.name ?? "No category",
     recurrenceSummary:
-      schedules.length === 1
+      schedules.length === 0 ? "" : schedules.length === 1
         ? schedules[0]?.recurrenceSummary ?? summarizeRecurrenceRule(recurrenceRule)
         : `${schedules.length} schedules`,
     recurrenceDefaults: recurrenceDefaultsFromRule(recurrenceRule),
@@ -67,10 +71,13 @@ export function toBehaviorView(behavior: BehaviorGraphRecord, now?: Temporal.Ins
     active: behavior.active,
     archivedAt: behavior.archived_at,
     archiveNotes: parseArchiveNotes(behavior.archive_notes),
+    ...(behavior.is_opportunity === undefined ? {} : { isOpportunity: behavior.is_opportunity }),
     createdAt: behavior.created_at,
     updatedAt: behavior.updated_at,
   };
 }
+
+const UNSCHEDULED_FORM_RULE = { frequency: "daily", interval: 1 } as const;
 
 function behaviorRunView(behavior: BehaviorGraphRecord, now?: Temporal.Instant) {
   const fields = runFieldsFromStored(behavior);
