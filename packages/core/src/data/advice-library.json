@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-21.1",
+  "version": "2026-11-21.2",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -887,7 +887,7 @@
     {
       "id": "smaller-step-in-the-routine",
       "revision": 1,
-      "status": "draft",
+      "status": "active",
       "advice": "When one step of a routine rarely gets done while the others do, a smaller version of that step can be easier to repeat.",
       "applies_when": [
         {
@@ -916,8 +916,8 @@
         "kind": "open",
         "target": "behavior"
       },
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-21",
+      "reviewer": "Emi"
     }
   ]
 }

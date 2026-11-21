@@ -443,6 +443,16 @@ Cadence for Mac has tracking parity for sub-behaviors in local and linked mode:
   `INT-TIMELINE-027` are implemented for desktop.
 - Evidence: `tests/desktop-sub-behaviors.test.ts`, shared DOM tests and `cargo test`.
   Installed acceptance on a dev-signed build is still open.
-- Not on the Mac yet: Daily Brief routine moves (follow-up). The Mac Daily Brief keeps
-  its existing per-item move path.
+- Daily Brief routine moves: the Mac renders the shared `BriefMoveLines`, so a routine
+  line reads with the routine's title and Yes, Other time, Undo, Accept all and Undo all
+  go to the hosted answer route with the Mac session (`apps/desktop/src/daily-brief.ts`).
+  The server reads `routine` from its stored line; the request carries only the
+  proposal. Each applied answer asks account sync to pull every moved step, and the
+  local Timeline groups the steps at the moved time again. A routine line offers no
+  "set length", because its length is the steps' sum. Evidence:
+  `tests/desktop-brief-routine-moves.dom.test.tsx`, `tests/desktop-occurrence-moves.test.tsx`.
+- SQLite 0028 keeps opportunities out of routines: triggers refuse a child of an
+  opportunity parent and turning a Behavior with children (or a child) into an
+  opportunity, as hosted `20261122020000` does. Sync apply writes stored children
+  first, so a batch that detaches a step and flags its old parent applies cleanly.
 

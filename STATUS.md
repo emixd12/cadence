@@ -130,24 +130,27 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
   0028, account sync contract 9; the minimum writer contract stays 8, so Mac 0.1.14
   keeps syncing). Docs: TICKETS, Ticket 343; DECISIONS, 2026-11-21.
 - An opportunity Behavior is never part of a routine: it cannot be a parent or a
-  sub-behavior (resolver, database trigger, MCP and form).
+  sub-behavior (resolver, database trigger, SQLite 0028 triggers, MCP and form).
+- Mac Daily Brief routine moves: Yes, Other time, Undo, Accept all and Undo all on a
+  routine line, through the hosted route and account sync. Advice card
+  `smaller-step-in-the-routine` is active (owner review 2026-11-21; library
+  `2026-11-21.2`).
 - Registry: `INT-BEHAVIOR-039`–`045` and `INT-TIMELINE-025`–`027`, implemented on web
   and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-081–P-083.
 - Hosted migrations (additive, not pushed): `20261122010000_sub_behaviors`,
   `20261122020000_sub_behavior_portability_connectors`,
   `20261122030000_coach_signal_sub_behavior_dropoff`.
 - Verification (after the rebase): `dagger check --cadence` 11/11; `core:check`,
-  `desktop:typecheck`, `marketing:build`, `marketing:check`; `cargo test` 178;
+  `desktop:typecheck`, `marketing:build`, `marketing:check`; `cargo test` 180;
   `desktop:contract:test` 24; SQL: PR #351's four migrations plus ours and ten smokes
   (sub-behaviors, portability, opportunity, account sync, end and pause, tickets 060,
   314, 321) pass in one rolled-back transaction. Not run: local-integration tests and
   installed Mac acceptance.
 - Phone width: the routine title keeps the row's width; the two marks wrap below it.
 - Open:
-  1. Owner: push the three hosted migrations before the code reaches production;
-     review the draft advice card `smaller-step-in-the-routine`.
-  2. Mac: Daily Brief routine moves (follow-up); routine reminder text names the
-     anchor step, not the routine. Installed Mac acceptance not run.
+  1. Owner: push the three hosted migrations before the code reaches production.
+  2. Mac: routine reminder text names the anchor step, not the routine. Installed Mac
+     acceptance not run.
 
 ## Product map, features and journeys — November 20, 2026
 

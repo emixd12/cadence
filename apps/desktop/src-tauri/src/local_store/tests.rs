@@ -3040,6 +3040,29 @@ fn sub_behavior_depth_one_is_enforced_by_row_checks_and_triggers() {
 }
 
 #[test]
+fn sub_behavior_triggers_keep_opportunities_out_of_routines() {
+    let mut fixture = Fixture::new();
+    create_routine(&mut fixture);
+    let profile = fixture.profile.clone();
+    let refused = |error: String| assert!(error.contains("opportunity Behavior can't be part of a routine"), "{error}");
+    // A child cannot attach to an opportunity parent, on create or by a link update.
+    fixture.run(sub_behavior_create(&profile, 80, "Stretch", None), 402).unwrap();
+    fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(80)]).unwrap();
+    refused(fixture.run(sub_behavior_create(&profile, 70, "Calves", Some(80)), 403).unwrap_err());
+    fixture.run(sub_behavior_create(&profile, 90, "Walk", None), 404).unwrap();
+    refused(fixture.db.execute("UPDATE behaviors SET parent_behavior_id=?1 WHERE id=?2", params![id(80), id(90)]).unwrap_err().to_string());
+    assert_eq!(link(&fixture, 90), (None, 0, false));
+    // A Behavior that already has children, or is a child, cannot become an opportunity.
+    refused(fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(60)]).unwrap_err().to_string());
+    refused(fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(40)]).unwrap_err().to_string());
+    let flags: i64 = fixture.db.query_row("SELECT count(*) FROM behaviors WHERE is_opportunity=1", [], |row| row.get(0)).unwrap();
+    assert_eq!(flags, 1);
+    // Once its steps leave, the former parent may become an opportunity.
+    fixture.db.execute("UPDATE behaviors SET parent_behavior_id=NULL,inherit_parent_schedule=0 WHERE parent_behavior_id=?1", [id(60)]).unwrap();
+    fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(60)]).unwrap();
+}
+
+#[test]
 fn behavior_groups_commit_atomically_and_reorder_densely() {
     let mut fixture = Fixture::new();
     let profile = fixture.profile.clone();

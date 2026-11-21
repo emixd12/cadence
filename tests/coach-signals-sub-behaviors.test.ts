@@ -15,6 +15,7 @@ import { advisorTipLink } from "@cadence/core/types/advisor-tips";
 import { checkTipText, seedTipText, tipItems } from "@/lib/services/advisor-tips-writer";
 import { tipTitles, withOffers } from "@/lib/services/advisor-tips-job.service";
 import { advisorLinkAction, behaviorEditHref } from "@/lib/ui/advisor";
+import { searchAdviceCards } from "@/lib/services/chat/chat-advice";
 
 // Coach signals version 3 and Advisor Tips for routines (sub-behaviors). Every expected
 // number is counted by hand from the fixture. Today is Thursday 2026-11-19; the 28-day
@@ -129,13 +130,15 @@ describe("Advisor Tips for a dropped routine step", () => {
     behaviors_without_place: 0, morning_items: 3, afternoon_items: 0, evening_items: 0, max_items_same_hour: 3, behaviors_created_last_14_days: 0,
   };
 
-  it("waits for the owner's review before it reaches anyone", () => {
-    expect(card).toMatchObject({ status: "draft", reviewer: null, offer: { kind: "open", target: "behavior" } });
-    expect(matchAdviceCards({ cards: [card], signals: [signal], account, today: TODAY })).toEqual([]);
+  it("is reviewed and active, so Tips and search_advice can reach it", () => {
+    expect(card).toMatchObject({ status: "active", reviewer: "Emi", reviewed_at: "2026-11-21", offer: { kind: "open", target: "behavior" } });
+    expect(matchAdviceCards({ cards: [card], signals: [signal], account, today: TODAY }).map((m) => m.card.id)).toEqual([card.id]);
+    expect(matchAdviceCards({ cards: [{ ...card, status: "draft" }], signals: [signal], account, today: TODAY })).toEqual([]);
+    expect(searchAdviceCards("a smaller step in my routine", [card]).cards.map((c) => c.id)).toEqual([card.id]);
   });
 
   it("names the step with its routine, states counted facts, and links to that step's editor", async () => {
-    const [match] = matchAdviceCards({ cards: [card], signals: [signal], account, today: TODAY, statuses: ["draft"] });
+    const [match] = matchAdviceCards({ cards: [card], signals: [signal], account, today: TODAY });
     expect(match).toMatchObject({ behaviorId: RETINOL, card: { id: card.id } });
     const titles = tipTitles([
       { id: SKIN, title: "Skin routine", parent_behavior_id: null },

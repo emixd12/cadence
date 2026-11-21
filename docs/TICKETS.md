@@ -19463,8 +19463,8 @@ Scope and acceptance:
 - Timeline: routine rows, bulk marks and Semantic Zoom (`INT-TIMELINE-025` to
   `INT-TIMELINE-027`).
 - MCP contract 1.7.0 and plugin skills; Chat `chat-1.6`; Daily Brief routine moves;
-  `coach-signals-3`; `coach-tips-3`; a draft advice card `smaller-step-in-the-routine`
-  that the owner reviews before it is active.
+  `coach-signals-3`; `coach-tips-3`; advice card `smaller-step-in-the-routine`
+  (owner-reviewed and active since 2026-11-21).
 - Portability (Full JSON, BehaviorLog, Markdown) and Hevy completion on routines.
 - Mac: SQLite schema 28, Rust store, account sync contract 9 (minimum writer stays 8)
   and the shared UI.
@@ -19478,7 +19478,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | This ticket: `components/behaviors/SubBehaviorEditor.tsx`, `components/timeline/ParentOccurrenceRow.tsx`, `app/(app)/behaviors/actions.ts`, `app/(app)/timeline/actions.ts`. |
-| Desktop | This ticket: `apps/desktop/src-tauri/migrations/0028_sub_behaviors.sql`, `apps/desktop/src/local-actions.ts`, `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/timeline-screen.tsx`. Follow-up (unticketed): Daily Brief routine moves on the Mac. |
+| Desktop | This ticket: `apps/desktop/src-tauri/migrations/0028_sub_behaviors.sql`, `apps/desktop/src/local-actions.ts`, `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/timeline-screen.tsx`. Daily Brief routine moves on the Mac: `apps/desktop/src/daily-brief.ts` with the shared `BriefMoveLines`. |
 | Marketing | Not applicable: no public claim changes; P-083 records copy that may mention routines later. |
 | Future mobile | Not applicable until a mobile app is ticketed; it inherits the model and the two-layer zoom. |
 

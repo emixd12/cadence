@@ -1314,7 +1314,9 @@ pub fn error(error: rusqlite::Error) -> String {
         // Migration 0028's depth-1 triggers explain the refusal in product words.
         rusqlite::Error::SqliteFailure(code, Some(message))
             if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER
-                && (message.contains("sub-behavior") || message.contains("own parent")) =>
+                && (message.contains("sub-behavior")
+                    || message.contains("own parent")
+                    || message.contains("part of a routine")) =>
         {
             message
         }

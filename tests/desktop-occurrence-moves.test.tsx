@@ -71,6 +71,31 @@ describe("synced moves on the Mac", () => {
     expect(html).toContain("11:00 AM");
   });
 
+  it("keeps a Daily Brief routine move together: synced step moves group at the new time, and Undo groups them back", () => {
+    const parent = { ...behavior, id: "60000000-0000-4000-8000-000000000001", title: "Skin routine", parent_behavior_id: null };
+    const step = (id: string, title: string, order: number) => ({ ...behavior, id, title, parent_behavior_id: parent.id,
+      inherit_parent_schedule: true, sub_behavior_sort_order: order });
+    const cerave = step("60000000-0000-4000-8000-000000000002", "CeraVe", 0);
+    const retinol = step("60000000-0000-4000-8000-000000000003", "Retinol", 1);
+    const rows = [row({ behavior_id: cerave.id }), row({ id: OTHER_ID, behavior_id: retinol.id })];
+    const moves = rows.flatMap((occurrence, index) => [move({ id: `5000000${index}-0000-4000-8000-000000000011`, occurrence_id: occurrence.id, behavior_id: occurrence.behavior_id })]);
+    const undos = rows.map((occurrence, index) => ({ ...undo, id: `5000000${index}-0000-4000-8000-000000000012`, occurrence_id: occurrence.id, behavior_id: occurrence.behavior_id }));
+    const groups = (occurrences: OccurrenceRecord[]) => resolvePersistedTimeline({
+      behaviors: [parent, cerave, retinol].map((item) => ({ ...item, category: null, schedule_slots: [] })),
+      occurrences, timeSessions: [], now: NOW, timezone: "America/New_York",
+    }).daySections.flatMap((section) => section.parentGroups);
+
+    const moved = groups(applyOccurrenceMoves(rows, moves));
+    expect(moved).toHaveLength(1);
+    expect(moved[0]).toMatchObject({ title: "Skin routine", scheduledFor: "2026-08-30T15:00:00Z", scheduledTimeLabel: "11:00 AM" });
+    expect(moved[0]!.children.map((child) => child.title)).toEqual(["CeraVe", "Retinol"]);
+
+    const back = groups(applyOccurrenceMoves(rows, [...moves, ...undos]));
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ scheduledFor: "2026-08-30T13:00:00Z" });
+    expect(back[0]!.children.every((child) => child.movedFromLabel === undefined)).toBe(true);
+  });
+
   it("reminds at the moved time, including after the planned time has passed", () => {
     const plan = (occurrences: OccurrenceRecord[]) => planNativeReminderRequests({ behaviors: [behavior], occurrences,
       now: NOW, targetThrough: NOW.add({ hours: 24 }) });

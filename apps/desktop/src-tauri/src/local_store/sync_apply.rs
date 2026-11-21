@@ -158,6 +158,7 @@ fn apply_mode(
         |write| matches!(write.kind, AccountSyncEntityKind::ImportRun),
         "accepted_preview_run_id",
     )?;
+    let linked_children = locally_linked_children(db, profile)?;
     let mut ordered: Vec<&AccountSyncWrite> = writes.iter().collect();
     ordered.sort_by_key(|write| {
         let depth = match write.kind {
@@ -167,6 +168,9 @@ fn apply_mode(
             AccountSyncEntityKind::ImportRun => {
                 import_depths.get(write.id.as_str()).copied().unwrap_or(0)
             }
+            // Sub-behaviors: a stored child is rewritten unlinked before any other Behavior,
+            // so a parent that turns into an opportunity in the same batch has no child left.
+            AccountSyncEntityKind::Behavior => usize::from(!linked_children.contains(write.id.as_str())),
             _ => 0,
         };
         (
@@ -255,6 +259,17 @@ fn apply_mode(
         }
     }
     link_sub_behaviors(db, profile, writes)
+}
+
+/// The stored sub-behaviors of this profile.
+fn locally_linked_children(db: &Connection, profile: &str) -> db::Result<HashSet<String>> {
+    let mut statement = db
+        .prepare("SELECT id FROM behaviors WHERE user_id=?1 AND parent_behavior_id IS NOT NULL")
+        .map_err(db::error)?;
+    let rows = statement
+        .query_map(params![profile], |row| row.get::<_, String>(0))
+        .map_err(db::error)?;
+    rows.collect::<std::result::Result<HashSet<_>, _>>().map_err(db::error)
 }
 
 /// Sub-behaviors: `behavior_write` stores every Behavior unlinked, so the depth-1
@@ -2168,6 +2183,54 @@ mod tests {
         assert!(db::by_id::<Occurrence>(&connection, &profile, occurrence_id).is_err());
         let foreign_key_errors: i64 = connection.query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| row.get(0)).unwrap();
         assert_eq!(foreign_key_errors, 0);
+    }
+
+    /// Sub-behaviors × opportunities: one hosted batch can detach a step and turn its old
+    /// parent into an opportunity. The step is rewritten first, so migration 0028's guard
+    /// sees no child left; linking a step to an opportunity still fails.
+    #[test]
+    fn account_sync_detaches_a_step_before_its_parent_becomes_an_opportunity() {
+        let (_directory, mut connection, profile, category) = database();
+        let parent_id = "31000000-0000-4000-8000-000000000001";
+        let child_id = "31000000-0000-4000-8000-000000000002";
+        let row = |id: &str, title: &str, parent: Option<&str>| json!({"id":id,"category_id":category.id,"title":title,"description":null,
+            "recurrence_rule":{"type":"daily","interval":1},"scheduled_time":"09:00:00","timezone":"America/New_York","browser_reminder_enabled":true,
+            "email_reminder_enabled":false,"reminder_offset_minutes":0,"active":true,"archived_at":null,"archive_notes":[],
+            "current_configuration_event_id":null,"default_duration_minutes":20,"auto_archived_at":null,"location_text":null,
+            "where_kind":"anywhere","end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,
+            "is_opportunity":false,"parent_behavior_id":parent,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,
+            "created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
+        let upsert = |id: &str, expected: Option<Value>, value: Value| AccountSyncWrite {
+            kind: AccountSyncEntityKind::Behavior, id: id.into(), operation: AccountSyncOperation::Upsert, expected, value: Some(value),
+        };
+        let apply = |db: &mut Connection, writes: Vec<AccountSyncWrite>| execute(db, Request::ApplyAccountSync { profile_id: profile.clone(), writes });
+        let current = |db: &Connection, id: &str| normalized(&db::by_id::<Behavior>(db, &profile, id).unwrap()).unwrap();
+        apply(&mut connection, vec![
+            upsert(parent_id, None, row(parent_id, "Skin routine", None)),
+            upsert(child_id, None, row(child_id, "Retinol", Some(parent_id))),
+        ]).unwrap();
+        assert_eq!(db::by_id::<Behavior>(&connection, &profile, child_id).unwrap().parent_behavior_id.as_deref(), Some(parent_id));
+
+        // The parent's id sorts first, yet the stored step is detached before the flag turns on.
+        let mut opportunity = current(&connection, parent_id);
+        opportunity["is_opportunity"] = json!(true);
+        let mut detached = current(&connection, child_id);
+        detached["parent_behavior_id"] = Value::Null;
+        let writes = vec![
+            upsert(parent_id, Some(current(&connection, parent_id)), opportunity),
+            upsert(child_id, Some(current(&connection, child_id)), detached),
+        ];
+        apply(&mut connection, writes).unwrap();
+        assert!(db::by_id::<Behavior>(&connection, &profile, parent_id).unwrap().is_opportunity);
+        assert_eq!(db::by_id::<Behavior>(&connection, &profile, child_id).unwrap().parent_behavior_id, None);
+
+        // A step cannot join an opportunity, and the failed batch changes nothing.
+        let mut rejoin = current(&connection, child_id);
+        rejoin["parent_behavior_id"] = json!(parent_id);
+        let writes = vec![upsert(child_id, Some(current(&connection, child_id)), rejoin)];
+        let error = apply(&mut connection, writes).unwrap_err();
+        assert!(error.contains("opportunity Behavior can't be part of a routine"), "{error}");
+        assert_eq!(db::by_id::<Behavior>(&connection, &profile, child_id).unwrap().parent_behavior_id, None);
     }
 
     #[test]
