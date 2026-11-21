@@ -4,7 +4,7 @@
 -- 2. Chat actions accept the `opportunity` kind for add_opportunity_occurrence and
 --    remove_opportunity_occurrence.
 
-create function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
+create or replace function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
 returns text
 language plpgsql
 as $$
@@ -35,3 +35,5 @@ alter table public.chat_actions add constraint chat_actions_kind_check check (ki
   'status', 'occurrence_note', 'day_note', 'move', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
   'opportunity'
 ));
+
+drop function pg_temp.patch_definition(text, text, text, text);

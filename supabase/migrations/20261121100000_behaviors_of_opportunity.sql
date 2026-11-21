@@ -156,7 +156,7 @@ alter function cadence_private.validate_behavior_schedule_graph(jsonb)
   rename to validate_behavior_schedule_graph_v1;
 
 -- A small text patcher for the function rewrites below: each anchor must occur once.
-create function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
+create or replace function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
 returns text
 language plpgsql
 as $$
@@ -689,5 +689,7 @@ language sql
 immutable
 set search_path = ''
 as $$ select 8 $$;
+
+drop function pg_temp.patch_definition(text, text, text, text);
 
 commit;

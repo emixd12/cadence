@@ -3,7 +3,7 @@
 -- keep them (docs/EXPORT_FORMATS.md, "Behaviors of Opportunity"). Additive: the
 -- function keeps its signature, security and grants.
 
-create function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
+create or replace function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
 returns text
 language plpgsql
 as $$
@@ -33,3 +33,5 @@ begin
   execute definition;
 end;
 $migration$;
+
+drop function pg_temp.patch_definition(text, text, text, text);
