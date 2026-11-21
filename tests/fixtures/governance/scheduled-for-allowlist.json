@@ -1,21 +1,23 @@
 {
   "description": "Files that mention scheduled_for or scheduledFor on 2026-11-16, with line counts. tests/scheduled-for-drift.test.ts fails when a file exceeds its count. Lower counts as readers move to the time helper; never raise one without a reason in the pull request. See docs/DATETIME_STRATEGY.md, Time helper.",
   "files": {
-    "app/design-system/CalendarBench.tsx": 1,
-    "app/design-system/AdvisorPlacementBench.tsx": 1,
     "app/design-system/AdvisorBench.tsx": 1,
+    "app/design-system/AdvisorPlacementBench.tsx": 1,
+    "app/design-system/CalendarBench.tsx": 1,
     "app/design-system/DayProgressBench.tsx": 5,
     "app/design-system/DepartureStatesBench.tsx": 2,
     "app/design-system/MarkDetailsBench.tsx": 1,
     "app/design-system/OccurrenceMoveBench.tsx": 5,
+    "app/design-system/OpportunityBasketBench.tsx": 2,
     "app/design-system/page.tsx": 9,
     "apps/desktop/src-tauri/src/local_store/db.rs": 2,
     "apps/desktop/src-tauri/src/local_store/export.rs": 1,
     "apps/desktop/src-tauri/src/local_store/note_shortcut.rs": 3,
     "apps/desktop/src-tauri/src/local_store/occurrence.rs": 2,
     "apps/desktop/src-tauri/src/local_store/rows.rs": 1,
-    "apps/desktop/src-tauri/src/local_store/sync_apply.rs": 8,
+    "apps/desktop/src-tauri/src/local_store/sync_apply.rs": 9,
     "apps/desktop/src/local-generation.service.ts": 1,
+    "apps/desktop/src/local-opportunity.service.ts": 1,
     "apps/desktop/src/local-place-labels.service.ts": 1,
     "apps/desktop/src/notification-activation.ts": 2,
     "apps/marketing/scripts/build-example-bundle.mjs": 2,
@@ -37,6 +39,7 @@
     "lib/services/advisor-eval/fixtures.ts": 2,
     "lib/services/behaviorlog-import-write.service.ts": 1,
     "lib/services/brief-opening.ts": 1,
+    "lib/services/brief-opportunities.service.ts": 1,
     "lib/services/briefing-analysis-fixtures.ts": 2,
     "lib/services/briefing-analysis-source.ts": 1,
     "lib/services/briefing-fixtures.ts": 3,
@@ -81,6 +84,7 @@
     "packages/core/src/services/departure-stops.ts": 6,
     "packages/core/src/services/export-assembly.ts": 1,
     "packages/core/src/services/occurrence-generation.ts": 1,
+    "packages/core/src/services/opportunity-pool.ts": 1,
     "packages/core/src/services/timeline.service.ts": 1,
     "packages/core/src/services/travel-habits.ts": 2,
     "packages/core/src/types/advisor-day-context.ts": 1,
@@ -91,5 +95,12 @@
     "packages/core/src/types/export.ts": 2,
     "packages/core/src/types/note-shortcut.ts": 2,
     "packages/core/src/types/timeline.ts": 2
+  },
+  "reasons": {
+    "app/design-system/OpportunityBasketBench.tsx": "Bench fixture rows set TimelineOccurrenceView.scheduledFor, which already holds the effective time.",
+    "apps/desktop/src-tauri/src/local_store/sync_apply.rs": "The ninth line is a contract 8 sync fixture for an added opportunity Occurrence; scheduled_for is a synced field.",
+    "apps/desktop/src/local-opportunity.service.ts": "Writes the planned time of a new opportunity Occurrence.",
+    "lib/services/brief-opportunities.service.ts": "Selects the column for effectiveStartInstant; the read goes through the time helper.",
+    "packages/core/src/services/opportunity-pool.ts": "Reads TimelineOccurrenceView.scheduledFor, which timeline.service sets from effectiveStartAt."
   }
 }

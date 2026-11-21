@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { noticeText } from "@cadence/core/notices";
-import { localDateAt } from "@cadence/core/resolvers/time.resolver";
+import { effectiveStartInstant, localDateAt } from "@cadence/core/resolvers/time.resolver";
 import {
   BRIEF_MOVE_OTHER_TIMES,
   briefMoveStartAllowed,
@@ -232,7 +232,7 @@ async function appliedSpans(supabase: AppSupabaseClient, userId: string, rows: r
     const occurrence = byId.get(row.occurrence_id!);
     if (!occurrence) return [];
     const minutes = (row.line as { length?: { minutes?: number } } | null)?.length?.minutes ?? 30;
-    const start = Temporal.Instant.from(occurrence.effective_start_at ?? occurrence.scheduled_for);
+    const start = effectiveStartInstant(occurrence);
     const end = occurrence.effective_end_at ? Temporal.Instant.from(occurrence.effective_end_at) : start.add({ minutes });
     return [[row.id, { startAt: start.toString(), endAt: end.toString() }] as const];
   }));
