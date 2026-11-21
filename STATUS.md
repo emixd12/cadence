@@ -140,7 +140,7 @@ Check the cited entry before acting on a row.
 
 ## Cadence for Mac 0.1.13 release check — November 20, 2026
 
-- **In progress (branch `claude/project-thread-0btsqa`).** Dev-signed 0.1.13-dev.1 (main
+- **Release check passed on dev builds; 0.1.13 not yet notarized or published.** Dev-signed 0.1.13-dev.1 (main
   `6d0f6834`) installed on the owner's Mac (schema 24 → 26, counts unchanged) and the test
   Mac (schema 25 → 26; 30 `end_date` rows backfilled as `end_on = end_date - 1`; 11 pending
   writes kept). Migration 26 passes on both.
@@ -149,7 +149,7 @@ Check the cited entry before acting on a row.
   configuration event. Applying either choice failed with "references missing
   configuration_event". `resolveReviewedAccountSync` now copies the rows a reviewed winner
   newly references from its own side. The bug dates from Tickets 116–122, not Ticket 342.
-- **Verified with 0.1.13-dev.2 (this branch) on the test Mac, November 21, 00:20–00:58Z:**
+- **Verified with 0.1.13-dev.2 (PR #342) on the test Mac, November 21, 00:20–00:58Z:**
   "Use account version" for all 7 applied; sync completed with 0 pending and the 11 writes
   reached hosted (71 Behaviors, Occurrences 244 → 247). On a throwaway Behavior, End now
   (ends at the next minute, today's later row removed, "Not running (1)", "Ended Nov 20,
