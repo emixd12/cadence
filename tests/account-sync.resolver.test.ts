@@ -164,6 +164,16 @@ describe("connector and manual first marks (Ticket 319)", () => {
         .toThrow("branched status history");
     });
 
+    it("still refuses a local root mark already in the baseline beside the hosted pair", () => {
+      const localMark = mark("local", "completed", later, "manual");
+      const local = snapshot([projection(localMark), localMark]);
+      for (const resolve of [
+        () => resolveAccountSync({ accountLinkId: "link", baseline: local, local, hosted, firstLink: true, firstHostedHydration: true }),
+        () => resolveAccountSync({ accountLinkId: "link", baseline: local, local, hosted, firstLink: true, noteShortcutExclusionPolicy: "preserve" }),
+        () => plan(local, local, hosted),
+      ]) expect(resolve).toThrow("branched status history");
+    });
+
     it("still refuses two hosted manual roots with different statuses, two connector roots, and a third root", () => {
       const done = mark("user-a", "completed", earlier, "manual"), notDone = mark("user-b", "not_completed", later, "manual");
       const manualPair = snapshot([projection(notDone), done, notDone]);

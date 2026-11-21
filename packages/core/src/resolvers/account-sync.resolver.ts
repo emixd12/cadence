@@ -937,6 +937,12 @@ function hostedConnectorAndManualRoots(rows: readonly AccountSyncEntity[]): bool
   return true;
 }
 
+// Every copy, baseline included, holds no root mark for the Occurrence beyond the hosted pair.
+function onlyRoots(occurrenceId: string, allowed: ReadonlySet<string>, graphs: readonly Map<string, AccountSyncEntity>[]): boolean {
+  return graphs.every((graph) => [...graph.values()].every((row) => row.kind !== "status_event"
+    || field(row.value, "occurrence_id") !== occurrenceId || field(row.value, "revises_event_id") !== null || allowed.has(row.id)));
+}
+
 function withoutFields(value: Json, excluded: readonly string[]): string {
   return canonical(Object.fromEntries(Object.entries(value as Record<string, Json>).filter(([key]) => !excluded.includes(key))));
 }
@@ -961,7 +967,8 @@ function historyBranches(baseline: Map<string, AccountSyncEntity>, local: Map<st
     if (firstHostedHydration && !hasStatusBaseline && hostedRows.length > 1 && status !== null
       && hostedRows.every((row) => field(row.value, "status") === status) && localRows.every(({ id }) => hostedIds.has(id))) continue;
     if ([...localRows, ...hostedRows].every((row) => compatibleMarks.has(field(row.value, "occurrence_id") ?? ""))) continue;
-    if (predecessor.startsWith("root:") && localRows.every(({ id }) => hostedIds.has(id)) && hostedConnectorAndManualRoots(hostedRows)) continue;
+    if (predecessor.startsWith("root:") && localRows.every(({ id }) => hostedIds.has(id)) && hostedConnectorAndManualRoots(hostedRows)
+      && onlyRoots(predecessor.slice("root:".length), hostedIds, [baseline, local, hosted])) continue;
     if (localRows.length > 1) throw new Error("The local account snapshot contains branched status history.");
     if (hostedRows.length > 1) throw new Error("The hosted account snapshot contains branched status history.");
     if (localRows[0] && hostedRows[0] && localRows[0].id !== hostedRows[0].id) throw new Error("The account snapshot contains branched status history.");
