@@ -116,10 +116,11 @@ can answer the question:
 2. Use the web app in the in-app browser. Desktop Settings and Behaviors use the
    same components and the same hosted server.
 3. Drive the Mac app window with Computer Use or the apple-automation skill.
-4. Ask the owner only for steps that stay the owner's: quitting Cadence, sign-ins
-   and credentials, consent or permission prompts, provider revocation, settings
+4. Ask the owner only for steps that stay the owner's: sign-ins and credentials, consent or permission prompts, provider revocation, settings
    that change synced data or send data to a provider, and creating macOS users.
    Sign-in, credential, consent and permission asks come only from the preflight's list.
+   Agents may quit Cadence for Mac with a normal quit event (`docs/DECISIONS.md`,
+   2026-11-21).
 
 For test accounts A and B, sign-ins, consent, provider-sending settings, test Calendar
 fixtures and permission grants in the Cadence QA Chrome profile are agent steps, using

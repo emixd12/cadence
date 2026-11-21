@@ -2760,3 +2760,24 @@ suggestion should rarely be refused, and when it is, the person should see why.
 Platform impact: `POST /api/advisor/brief/recheck` and `refusal.cause` serve web (3B)
 and Mac (3C) alike; a future phone app inherits them. Marketing: none. Messaging
 impact: none (in-app refusal wording only).
+
+## 2026-11-21: Agents may quit Cadence for Mac
+
+The owner approved this in chat during the 0.1.13 release ("let claude quit Cadence"). It
+replaces "quitting Cadence" as an owner-only step (2026-10-23 and the installed-acceptance
+list in `AGENTS.md`).
+
+- **Who and where.** An agent may quit Cadence for Mac on the owner's Mac and on test
+  devices, for an install, a restore or an updater check.
+- **How.** Only a normal quit event: `osascript -e 'tell application id
+  "app.cadence.desktop" to quit'`, locally or through `scripts/test-device.mjs exec`.
+  Read first that no writes are pending. Never force quit, and never quit while a
+  sign-in, consent or permission prompt is open.
+- **Permission rule.** The agent session allows those exact quit commands in its
+  `.claude/settings.local.json`; the auto-mode classifier refused them without it.
+- **Unchanged.** Restoring a protected database, notarizing, uploading and publishing
+  still need the owner's instruction each time. Sign-ins, consent and permission prompts
+  stay as `AGENTS.md` lists them.
+
+Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
+Messaging impact: none.

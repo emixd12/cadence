@@ -625,8 +625,8 @@ Agents sign Cadence for Mac in as test account A on test devices (`docs/DECISION
 
 ### Install and readback
 
-1. Build with `dev-build` (above). When it passes, ask the owner to quit Cadence,
-   then run `node apps/desktop/scripts/install-dev-build.mjs <version>`.
+1. Build with `dev-build` (above). When it passes, quit Cadence with a normal quit
+   event (`docs/DECISIONS.md`, 2026-11-21), then run `node apps/desktop/scripts/install-dev-build.mjs <version>`.
 2. Confirm the install: the installed `CFBundleShortVersionString`, the executable's
    SHA-256 against `binarySha256` in `dev-verification.json`, `codesign --verify
    --strict /Applications/Cadence.app`, and the before/after counts in the protected
