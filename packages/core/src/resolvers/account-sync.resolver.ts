@@ -136,8 +136,8 @@ export function resolveReviewedAccountSync(input: Readonly<{
       && ((decision.choice === "local" && conflict.local === null) || (decision.choice === "hosted" && conflict.hosted === null))) {
       throw new Error("An Occurrence with a Note, status history, tracked time, or resolved status cannot be deleted during synchronization.");
     }
-    if (decision.choice === "hosted") { replace(local, key, hosted.get(key) ?? null); carryNewParents(local, hosted, baseline, key); }
-    else if (decision.choice === "local") { replace(hosted, key, local.get(key) ?? null); carryNewParents(hosted, local, baseline, key); }
+    if (decision.choice === "hosted") { replace(local, key, hosted.get(key) ?? null); carryParents(local, hosted, key); }
+    else if (decision.choice === "local") { replace(hosted, key, local.get(key) ?? null); carryParents(hosted, local, key); }
     else {
       if (!canKeepBothAccountSyncConflict(conflict) || !decision.duplicateId) throw new Error("Keep both is unavailable for this synchronization conflict.");
       throw new Error("Keep both is unavailable for this synchronization conflict.");
@@ -267,11 +267,11 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 }
 
 function replace(target: Map<string, AccountSyncEntity>, key: string, value: AccountSyncEntity | null) { if (value) target.set(key, value); else target.delete(key); }
-// A reviewed winner can reference rows that only its own side has created, such as the
-// configuration event a Behavior edit appended. Copy those rows, and their own new parents,
-// to the other side so the winner's graph stays complete. Rows the baseline already had are
-// left alone: a missing one there is a real deletion, and validation reports it.
-function carryNewParents(target: Map<string, AccountSyncEntity>, source: Map<string, AccountSyncEntity>, baseline: Map<string, AccountSyncEntity>, key: string): void {
+// A reviewed winner can reference rows the other side lacks: a configuration event its own
+// Behavior edit appended, or a Category the other side deleted. Copy those rows, and their own
+// parents, from the winner's side so the winner's graph stays complete. A deleted parent comes
+// back (decision 2026-11-21): restoring it is safer than losing the winner's reference.
+function carryParents(target: Map<string, AccountSyncEntity>, source: Map<string, AccountSyncEntity>, key: string): void {
   const pending = [key];
   for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
     const entity = target.get(next);
@@ -279,7 +279,7 @@ function carryNewParents(target: Map<string, AccountSyncEntity>, source: Map<str
     for (const [fieldName, parentKind] of dependencies(entity)) {
       const parentId = field(entity.value, fieldName);
       const parentKey = parentId ? `${parentKind}:${parentId}` : null;
-      if (!parentKey || target.has(parentKey) || baseline.has(parentKey)) continue;
+      if (!parentKey || target.has(parentKey)) continue;
       const parent = source.get(parentKey);
       if (!parent) continue;
       target.set(parentKey, parent);

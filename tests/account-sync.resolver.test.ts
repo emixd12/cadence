@@ -694,6 +694,27 @@ describe("resolveAccountSync", () => {
     expect(writes(mac.hostedWrites)).toEqual(["behavior:a", "configuration_event:config-mac"]);
   });
 
+  it("brings back a Category the other side deleted when a reviewed Behavior winner still uses it", () => {
+    const category: AccountSyncEntity = { kind: "category", id: "c", value: { id: "c", name: "Health", user_id: "owner" } };
+    const behavior = (title: string, categoryId: string | null): AccountSyncEntity => ({ kind: "behavior", id: "a", value: { id: "a", title, category_id: categoryId, user_id: "owner" } });
+    const base = snapshot([category, behavior("Running", "c")]);
+    const kept = snapshot([category, behavior("Running on the Mac", "c")]);
+    const deleted = snapshot([behavior("Running on the web", null)]);
+    const keys = (list: readonly { kind: string; id: string }[]) => list.map(({ kind, id }) => `${kind}:${id}`).sort();
+    for (const [local, hosted, choice] of [[kept, deleted, "local"], [deleted, kept, "hosted"]] as const) {
+      const review = plan(base, local, hosted);
+      expect(review.conflicts.map(({ kind, id }) => `${kind}:${id}`)).toContain("behavior:a");
+      const resolved = resolveReviewedAccountSync({ accountLinkId: "link", baseline: base, local, hosted, reviewedFingerprints: review.fingerprints,
+        decisions: review.conflicts.map(({ kind, id }) => ({ kind, id, choice })) });
+      expect(resolved.mergedEntities).toContainEqual(expect.objectContaining({ kind: "category", id: "c", value: expect.objectContaining({ name: "Health" }) }));
+      expect(resolved.mergedEntities).toContainEqual(expect.objectContaining({ kind: "behavior", id: "a", value: expect.objectContaining({ title: "Running on the Mac", category_id: "c" }) }));
+      const restored = choice === "local" ? resolved.hostedWrites : resolved.localWrites;
+      expect(keys(restored)).toEqual(["behavior:a", "category:c"]);
+      const merged = { entities: resolved.mergedEntities };
+      expect(plan(merged, merged, merged).hostedWrites).toEqual([]);
+    }
+  });
+
   it("retains processing claims when a reviewed reminder winner has no claim", () => {
     const claim = "2026-09-11T03:00:39.179039Z";
     const delivery = (status: string, processing_started_at: string | null): AccountSyncEntity => ({
