@@ -136,7 +136,13 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
 - Hosted migrations (additive, not pushed): `20261122010000_sub_behaviors`,
   `20261122020000_sub_behavior_portability_connectors`,
   `20261122030000_coach_signal_sub_behavior_dropoff`.
-- Verification: VERIFICATION_PLACEHOLDER
+- Verification (after the rebase): `dagger check --cadence` 11/11; `core:check`,
+  `desktop:typecheck`, `marketing:build`, `marketing:check`; `cargo test` 178;
+  `desktop:contract:test` 24; SQL: PR #351's four migrations plus ours and ten smokes
+  (sub-behaviors, portability, opportunity, account sync, end and pause, tickets 060,
+  314, 321) pass in one rolled-back transaction. Not run: local-integration tests and
+  installed Mac acceptance.
+- Phone width: the routine title keeps the row's width; the two marks wrap below it.
 - Open:
   1. Owner: push the three hosted migrations before the code reaches production;
      review the draft advice card `smaller-step-in-the-routine`.
