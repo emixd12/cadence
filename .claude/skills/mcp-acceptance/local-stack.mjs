@@ -42,7 +42,7 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const SUPABASE = process.env.CADENCE_SUPABASE_CLI ?? '/opt/homebrew/bin/supabase';
-const DOCKER_SOCK = join(homedir(), '.docker', 'run', 'docker.sock');
+const DOCKER_SOCK = process.env.CADENCE_DOCKER_SOCK ?? join(homedir(), '.docker', 'run', 'docker.sock');
 const NAME = /^cadence-accept-[a-z0-9-]{1,40}$/;
 const EXCLUDE = 'imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor,realtime,storage-api';
 // Files `next dev` rewrites; restored on `down`.
@@ -309,7 +309,7 @@ async function up({ name, dbBase, appPort, repo }) {
   for (const file of REWRITTEN) if (existsSync(join(repo, file))) copyFileSync(join(repo, file), join(work, 'snapshot', file));
   copyFileSync(join(repo, 'supabase', 'seed.sql'), join(work, 'supabase', 'seed.sql'));
   symlinkSync(join(repo, 'supabase', 'migrations'), join(work, 'supabase', 'migrations'));
-  writeFileSync(join(work, 'supabase', 'config.toml'), rewriteConfig(readFileSync(join(repo, 'supabase', 'config.toml'), 'utf8'), { name, ports }));
+  writeFileSync(join(work, 'supabase', 'config.toml'), rewriteConfig(readFileSync(join(repo, 'supabase', 'config.toml'), 'utf8'), { name, ports }).replace(/^content_path = .*\n/gm, ''));
   writeFileSync(join(work, 'supabase', 'signing_keys.json'), '[]', { mode: 0o600 });
   execFileSync(SUPABASE, ['gen', 'signing-key', '--algorithm', 'ES256', '--append', '--workdir', work], { stdio: 'ignore' });
   say(`workdir ${work}`);
