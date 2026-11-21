@@ -3,7 +3,7 @@
   "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-20",
+  "updated": "2026-11-21",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -592,7 +592,9 @@
         "INT-BEHAVIOR-031",
         "INT-TRAVEL-005",
         "INT-PLACE-006",
-        "INT-BEHAVIOR-036"
+        "INT-BEHAVIOR-036",
+        "INT-BEHAVIOR-037",
+        "INT-BEHAVIOR-038"
       ]
     },
     {
@@ -916,7 +918,11 @@
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-TIMELINE-001",
-        "INT-TIMELINE-020"
+        "INT-TIMELINE-020",
+        "INT-TIMELINE-021",
+        "INT-TIMELINE-022",
+        "INT-TIMELINE-023",
+        "INT-TIMELINE-024"
       ]
     },
     {
@@ -1409,7 +1415,7 @@
       "classification": "excluded",
       "interaction_marker_count": 1,
       "interaction_ids": [],
-      "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes \u00b7 No and Undo answer in memory. Excluded from product interaction counts."
+      "reason": "Development-only Chat page bench (advisor plan Phase 5B): synthetic conversations in the app shell with a state switcher; sending, Yes · No and Undo answer in memory. Excluded from product interaction counts."
     }
   ],
   "features": [
@@ -1502,6 +1508,12 @@
       "name": "Move for today",
       "meaning": "Moving one occurrence to another time for today only, with Undo, reasons and overlap answers.",
       "spec": "DESIGN.md#move-for-today"
+    },
+    {
+      "id": "behaviors-of-opportunity",
+      "name": "Behaviors of Opportunity",
+      "meaning": "Behaviors available to add to today when there is a chance, with or without a fixed schedule: the Opportunity Basket, Done now and Remove.",
+      "spec": "docs/RECURRENCE_RULES.md#behaviors-of-opportunity"
     },
     {
       "id": "review-and-adherence",
@@ -19796,7 +19808,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "The horse at the top centre of the Timeline (Advisor or Advisor \u00b7 1 new)"
+          "control": "The horse at the top centre of the Timeline (Advisor or Advisor · 1 new)"
         },
         {
           "kind": "activate",
@@ -20663,6 +20675,465 @@
             "tests/desktop-run-actions.test.ts"
           ],
           "reason": "Ticket 342: the Mac Timeline renders the shared notices from local run fields with the local run action."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-037",
+      "name": "Make a Behavior available as an opportunity",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Let a Behavior be added to today when there is a chance, beside or instead of its schedule.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Available as an opportunity"
+        }
+      ],
+      "availability": "In the create and edit forms. The form posts a hidden is_opportunity=false before the checkbox.",
+      "success_result": "The flag is saved with the form as is_opportunity and recorded in the configuration history. Pausing, ending or archiving keeps the Behavior out of the basket until it runs again.",
+      "failure_result": "Turning it off with no schedule is refused with Add at least one schedule; the draft stays.",
+      "effects": [
+        "form_draft",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "lib/services/behavior-form.ts#parseOpportunityFlag",
+        "packages/core/src/services/behavior.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-form.test.ts"
+        ],
+        "notes": "Server parsing and validation are covered; Task 4 adds the form control and its DOM test."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "lib/services/behavior-form.ts"
+          ],
+          "evidence": [
+            "tests/behavior-form.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-038",
+      "name": "Save an opportunity Behavior with no fixed schedule",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#build-schedules-and-times"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Keep a Behavior that has no schedule, only for adding to a day by hand.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Create or Save changes with no schedule"
+        }
+      ],
+      "availability": "When Available as an opportunity is on. The form posts behavior_schedule_count=0.",
+      "success_result": "The Behavior is saved with no schedule and no stored recurrence. No Occurrences are generated; Behaviors shows Done N times instead of a percentage.",
+      "failure_result": "With the flag off, zero schedules is refused with Add at least one schedule; the database function refuses it as well.",
+      "effects": [
+        "database_write",
+        "behavior_mutation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "lib/services/behavior-form.ts#parseBehaviorSchedulesFromForm",
+        "packages/core/src/services/behavior.service.ts#storedRecurrence"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-form.test.ts"
+        ],
+        "notes": "Parsing covered; Task 4 adds the editor's no-schedule state."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "lib/services/behavior-form.ts"
+          ],
+          "evidence": [
+            "tests/behavior-form.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-021",
+      "name": "Open the Opportunity Basket",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "See today's opportunity Behaviors with a suggested free time.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Opportunity basket trigger on today's Timeline"
+        }
+      ],
+      "availability": "On today's Timeline when one or more opportunity Behaviors are running.",
+      "success_result": "The basket lists the pool in title order with each Behavior's suggested start (now rounded up, or the nearest free start among today's items).",
+      "failure_result": "",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "lib/services/timeline.service.ts",
+        "packages/core/src/services/opportunity-pool.ts#resolveOpportunityPool"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/opportunity.service.test.ts"
+        ],
+        "notes": "The pool payload is covered by the service test; Task 5 adds the basket UI."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "lib/services/timeline.service.ts"
+          ],
+          "evidence": [
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-022",
+      "name": "Add an opportunity to today",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Place an opportunity Behavior on today's Timeline at a time or in a time window.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Add at a time, a preset window or a custom range in the basket"
+        }
+      ],
+      "availability": "In the Opportunity Basket, for today in the Behavior's timezone.",
+      "success_result": "Cadence adds an Unresolved Occurrence with origin opportunity, plans its browser reminder when one is due later today, and shows opportunity.added.",
+      "failure_result": "A Behavior no longer available, not running then, a day other than today or an invalid time is refused with an opportunity.refused notice; nothing changes.",
+      "effects": [
+        "database_write",
+        "reminder_planning",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#addOpportunityToToday",
+        "lib/db/opportunity.repo.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/opportunity.service.test.ts"
+        ],
+        "notes": "Service test covers placements, refusals, replay and reminder planning; Task 5 adds the basket."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-023",
+      "name": "Log an opportunity as done now",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#record-an-occurrence-status"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Record in one tap that an opportunity Behavior was just done.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Done now in the basket"
+        }
+      ],
+      "availability": "In the Opportunity Basket while the Behavior is running.",
+      "success_result": "Cadence adds the Occurrence at the current minute and marks it Completed with one status event in the same write, then shows opportunity.logged. No reminder is planned.",
+      "failure_result": "Refusals as for adding; nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "app/(app)/timeline/opportunity-actions.ts#addOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#addOpportunityToToday"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/opportunity.service.test.ts"
+        ],
+        "notes": "Service test covers the Done now call and notice."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-TIMELINE-024",
+      "name": "Remove an added opportunity",
+      "feature": "behaviors-of-opportunity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#review-needs-decision"
+        ]
+      },
+      "status": "planned",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07",
+        "J09"
+      ],
+      "intent": "Take an added item off today, or out of Needs decision, back to the basket.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Remove on an added row"
+        }
+      ],
+      "availability": "On an added row that is Unresolved with no Note, no tracked time, no earlier mark and no connected activity, today or in Needs decision.",
+      "success_result": "Cadence cancels the item's pending reminders, deletes the Occurrence and shows opportunity.removed. The Behavior stays in the basket.",
+      "failure_result": "A marked item or one with a Note, tracked time, an earlier mark or a connected activity is refused with an opportunity.remove-refused notice; nothing changes.",
+      "effects": [
+        "database_delete",
+        "reminder_cancellation",
+        "network_request"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "app/(app)/timeline/opportunity-actions.ts#removeOpportunityOccurrenceAction",
+        "lib/services/opportunity.service.ts#removeOpportunityFromToday",
+        "lib/db/opportunity.repo.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/opportunity.service.test.ts"
+        ],
+        "notes": "Service test covers removal and each refusal; canRemove facts are covered by the timeline service test."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "app/(app)/timeline/opportunity-actions.ts",
+            "lib/services/opportunity.service.ts"
+          ],
+          "evidence": [
+            "tests/opportunity.service.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Behaviors of Opportunity, Task 8: Cadence for Mac parity (SQLite schema 27, Sync Contract 8) wires the shared form and Timeline."
         },
         "marketing": {
           "applicability": "not_applicable",

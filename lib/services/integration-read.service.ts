@@ -254,7 +254,8 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
     .filter((row) => !input.behavior_ids || input.behavior_ids.includes(row.behavior_id));
   const counts = (occurrences: Occurrence[]) => {
     const summary = resolveAdherenceCounts({ todayLocalDate: account.today,
-      occurrences: occurrences.map((row) => ({ status: normalizeOccurrenceStatus(row.status), localDate: row.local_date })),
+      occurrences: occurrences.map((row) => ({ status: normalizeOccurrenceStatus(row.status), localDate: row.local_date,
+        origin: row.origin === "opportunity" ? "opportunity" as const : "scheduled" as const })),
     });
     return { completed: summary.completedCount, not_completed: summary.notCompletedCount,
       unresolved: summary.unresolvedCount, needs_decision: summary.needsDecisionCount, adherence_rate: summary.rate };

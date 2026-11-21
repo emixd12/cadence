@@ -1,4 +1,5 @@
 import type { OccurrenceOrigin, OpportunityAddedBy } from "./database";
+import type { BehaviorWhereKind } from "./behavior";
 import type { BehaviorDurationEstimate } from "./day-progress";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
@@ -48,6 +49,11 @@ export type TimelineOccurrenceInput = {
   /** Remove facts. Unknown status history counts as history, so Remove stays hidden. */
   hasStatusHistory?: boolean;
   hasActiveSourceMatch?: boolean;
+  /**
+   * True when any time session row exists, even a zero-length one. Missing falls back to
+   * the recorded time, which misses zero-length sessions.
+   */
+  hasTimeSessions?: boolean;
 };
 
 export type TimelineTimeTrackingView = Readonly<{
@@ -169,7 +175,25 @@ export type BehaviorRunNotice = {
   updatedAt: string;
 };
 
+/** One Behavior in today's opportunity pool, for the Timeline's Opportunity Basket. */
+export type TimelineOpportunityPoolItem = Readonly<{
+  behaviorId: string;
+  title: string;
+  categoryName: string;
+  defaultDurationMinutes: number | null;
+  whereKind: BehaviorWhereKind | null;
+  locationText: string | null;
+  /** True when the Behavior already has an Occurrence on today's Timeline. */
+  onToday: boolean;
+  /** The default start: now rounded up to 5 minutes, or the nearest free start among today's items. */
+  suggestedStart: Readonly<{ startsAt: string; localTime: string; source: "now" | "free_slot" }>;
+  /** The length used for the suggestion, in minutes. */
+  lengthMinutes: number;
+}>;
+
 export type TimelineView = {
+  /** Behaviors of Opportunity: today's pool, in title order. Absent where not resolved. */
+  opportunityPool?: TimelineOpportunityPoolItem[];
   /** Ended, paused and back-today notices for today (T7). Derived from fields; nothing is stored. */
   runNotices?: BehaviorRunNotice[];
   durationEstimates?: Record<string, BehaviorDurationEstimate>;
@@ -193,6 +217,26 @@ export type OccurrenceActionState = {
   fieldErrors?: Partial<Record<OccurrenceActionField, string>>;
 };
 
+
+/**
+ * Behaviors of Opportunity: the result of adding, logging Done now or removing an added
+ * item. `noticeId` names an `opportunity.*` notice; show it with its params.
+ */
+export type OpportunityActionState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{
+    status: "added" | "logged" | "removed";
+    occurrenceId: string;
+    noticeId: string;
+    noticeParams: Readonly<Record<string, string | number>>;
+  }>
+  | Readonly<{
+    status: "refused";
+    reason: "not_available" | "not_running" | "not_today" | "invalid_time" | "marked" | "kept" | "not_found";
+    noticeId: string;
+    noticeParams: Readonly<Record<string, string | number>>;
+  }>
+  | Readonly<{ status: "error"; noticeId: "opportunity.failed" }>;
 
 export type TimeTrackingActionState = Readonly<{
   status: "idle" | "success" | "error";

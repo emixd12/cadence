@@ -2389,6 +2389,11 @@ Behavior writes must carry `is_opportunity` and Occurrence writes `origin` and
 Migration: `20261121100000_behaviors_of_opportunity.sql`. Fixture:
 `tests/sql/behaviors-of-opportunity-smoke.sql`.
 
+`get_export_page_read_bundle` adds `is_opportunity` to each Behavior and `origin` and
+`added_by` to each Occurrence, so the hosted Full JSON, JSONL and BehaviorLog exports
+carry them. Migration: `20261121110000_opportunity_export_read.sql` (function body only;
+signature, security and grants unchanged).
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its

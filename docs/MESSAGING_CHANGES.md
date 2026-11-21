@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-078` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-079` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2196,4 +2196,43 @@ cite has not changed.
 - **Conflicting current text:** none.
 - **Update needed:** none. The trial warnings (plan R3) come with the AI helpers workstream.
 - **Related:** P-074, P-075, P-076.
+- **Status:** logged.
+
+## P-078: Behaviors of Opportunity
+
+- **Change:** logged November 21, 2026 (Behaviors of Opportunity, Wave 2A). A Behavior can be
+  marked available as an opportunity, with or without a fixed schedule, and added to today
+  from the Timeline's Opportunity Basket, logged with Done now, or removed again while
+  Unresolved and clean. Overall adherence stays scheduled-only; opportunity completions show
+  separately and an unscheduled Behavior shows "Done N times". New in-app copy, all in the
+  notices library (`packages/core/src/notices/catalog/opportunity.json`, `docs/NOTICES.md`):
+  - Outcomes: "{title} added to today: {time}.", "{title} marked Completed at {time}.",
+    "{title} removed. It stays in your opportunities."
+  - Row and form notes: "Added", "Added from Daily Brief", "Added in Chat", "Added by a
+    connected app"; "No fixed schedule. Add it to today when there is a chance."
+  - Refusals ("Not added" / "Not removed"): "{title} is no longer available as an
+    opportunity.", "{title} is not running at that time.", "Opportunities can be added to today
+    only.", "Choose a time, or a range that ends at a different time.", "{title} is already
+    marked, so it stays.", "{title} has a Note, tracked time, an earlier mark or a connected
+    activity, so it stays.", "This item is no longer on today's Timeline.", and "Cadence could
+    not change today's items. Try again."
+  - Labels still to come with the UI (Tasks 4 and 5): "Available as an opportunity", the
+    basket trigger, "Done now", "Remove".
+- **Affected:** `lib/services/opportunity.service.ts`, `app/(app)/timeline/opportunity-actions.ts`,
+  `lib/services/behavior-form.ts`, `components/behaviors/BehaviorForm.tsx` and
+  `components/timeline/Timeline.tsx` (Tasks 4 and 5); interactions `INT-BEHAVIOR-037`,
+  `INT-BEHAVIOR-038`, `INT-TIMELINE-021` to `INT-TIMELINE-024`. MCP 1.6.0, Chat and Daily Brief
+  opportunity lines (later tasks) add their own wording to this entry. The Mac renders the same
+  shared components when its workstream lands.
+- **Surfaces:** in-app copy (new); user guide (`docs/user-guide/behaviors-and-review.md`, "Build
+  schedules and times", and `docs/user-guide/timeline.md`, "Record an Occurrence status" and
+  "Review Needs decision", need a short section on opportunities, the basket, Done now and
+  Remove; the interactions point at those sections until then); marketing FAQ and feature copy
+  may describe it once it ships (`docs/NARRATIVE.md` claims first); developer docs for MCP 1.6.0.
+- **Conflicting current text:** `docs/user-guide/behaviors-and-review.md`, "Build schedules and
+  times", says "at least one of each is required" for schedules and times; that stays true only
+  for Behaviors that are not opportunities.
+- **Update needed:** user guide sections above; marketing claims only after a `docs/NARRATIVE.md`
+  Claims row.
+- **Related:** P-077.
 - **Status:** logged.

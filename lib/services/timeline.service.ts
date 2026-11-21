@@ -26,7 +26,7 @@ import { resolveGenerationWindow } from "@/lib/resolvers/occurrence.resolver";
 import {
   TIMELINE_MAX_FUTURE_DAYS,
 } from "@/lib/resolvers/timeline.resolver";
-import { resolvePersistedTimeline } from "@cadence/core/services/timeline.service";
+import { resolvePersistedTimeline, type OpportunityRemovalReadFacts } from "@cadence/core/services/timeline.service";
 import { toTimeSession } from "@/lib/services/time-tracking.service";
 import {
   createFirstRunOnboardingState,
@@ -201,7 +201,9 @@ async function getTimelineViewForUser(input: {
     listTimeSessionHistory(supabase, { userId, startLocalDate: historyStart, endLocalDate: historyEnd,
       includeArchived: false, throughStartedAt: now.toString() }),
   ]);
+  const removalFacts = await readOpportunityRemovalFacts(supabase, userId, occurrenceRows);
   const view = resolvePersistedTimeline({
+    removalFacts,
     durationHistory: { occurrences: historyOccurrences, timeSessions: historySessions.map(toTimeSession) },
     behaviors,
     occurrences: occurrenceRows,
@@ -215,6 +217,33 @@ async function getTimelineViewForUser(input: {
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
   ]);
   return attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable);
+}
+
+/**
+ * Behaviors of Opportunity: status history and active source matches for the added
+ * Unresolved rows, so Remove matches `remove_opportunity_occurrence`. Reads nothing when
+ * no added row could be removed.
+ */
+async function readOpportunityRemovalFacts(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly Occurrence[],
+): Promise<OpportunityRemovalReadFacts> {
+  const ids = occurrences
+    .filter((occurrence) => occurrence.origin === "opportunity" && occurrence.status === "unresolved")
+    .map((occurrence) => occurrence.id);
+  if (ids.length === 0) {
+    return { statusHistoryOccurrenceIds: new Set(), activeSourceMatchOccurrenceIds: new Set() };
+  }
+  const [events, matches] = await Promise.all([
+    listOccurrenceStatusEventsByOccurrenceIds(supabase, userId, ids),
+    listSourceMatchesForOccurrences(supabase, userId, ids),
+  ]);
+  return {
+    statusHistoryOccurrenceIds: new Set(events.map((event) => event.occurrence_id)),
+    activeSourceMatchOccurrenceIds: new Set(matches
+      .filter((match) => match.state === "active").map((match) => match.occurrence_id)),
+  };
 }
 
 /**

@@ -212,8 +212,8 @@ function toOccurrenceView(
   const showDecisionActions =
     occurrence.status === "unresolved" && canShowDecisionActionsWhenUnresolved;
   const origin = occurrence.origin === "opportunity" ? "opportunity" : "scheduled";
-  const hasTimeSessions = occurrence.timeTracking.recordedSeconds > 0
-    || occurrence.timeTracking.runningStartedAt !== null;
+  const hasTimeSessions = occurrence.hasTimeSessions ?? (occurrence.timeTracking.recordedSeconds > 0
+    || occurrence.timeTracking.runningStartedAt !== null);
 
   return {
     ...occurrence,

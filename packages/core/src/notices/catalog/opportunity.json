@@ -1,0 +1,99 @@
+{
+  "feature": "behaviors-of-opportunity",
+  "notices": {
+    "opportunity.added": {
+      "meaning": "Confirms that the person added an opportunity Behavior to today at a time or in a time range.",
+      "text": "{title} added to today: {time}.",
+      "style": "outcome",
+      "interactions": ["INT-TIMELINE-022"]
+    },
+    "opportunity.logged": {
+      "meaning": "Confirms that Done now added an opportunity Behavior to today and marked it Completed at the current time.",
+      "text": "{title} marked Completed at {time}.",
+      "style": "outcome",
+      "interactions": ["INT-TIMELINE-023"]
+    },
+    "opportunity.removed": {
+      "meaning": "Confirms that the person removed an added item from today, or from Needs decision, back to the opportunity basket.",
+      "text": "{title} removed. It stays in your opportunities.",
+      "style": "outcome",
+      "interactions": ["INT-TIMELINE-024"]
+    },
+    "opportunity.added-from": {
+      "meaning": "Marks a Timeline row that was added from the opportunity basket, and who added it.",
+      "text": "{source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}}",
+      "style": "note",
+      "status": "planned",
+      "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-024"]
+    },
+    "opportunity.no-schedule": {
+      "meaning": "Says on the Behavior form and list that an opportunity Behavior has no fixed schedule and is added to a day by hand.",
+      "text": "No fixed schedule. Add it to today when there is a chance.",
+      "style": "note",
+      "status": "planned",
+      "interactions": ["INT-BEHAVIOR-037", "INT-BEHAVIOR-038"]
+    },
+    "opportunity.refused.not-available": {
+      "meaning": "Refuses an add because the Behavior is no longer available as an opportunity, or it is archived or gone.",
+      "text": "{title} is no longer available as an opportunity.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-023"]
+    },
+    "opportunity.refused.not-running": {
+      "meaning": "Refuses an add because the Behavior has ended or is paused at the chosen time.",
+      "text": "{title} is not running at that time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-023"]
+    },
+    "opportunity.refused.not-today": {
+      "meaning": "Refuses an add for a day other than today in the Behavior's timezone, such as a basket left open past midnight.",
+      "text": "Opportunities can be added to today only.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-023"]
+    },
+    "opportunity.refused.time": {
+      "meaning": "Refuses an add whose time is not a whole minute, or whose range starts and ends at the same time.",
+      "text": "Choose a time, or a range that ends at a different time.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not added",
+      "interactions": ["INT-TIMELINE-022"]
+    },
+    "opportunity.remove-refused.marked": {
+      "meaning": "Refuses Remove because the added item is already marked Completed or Not Completed.",
+      "text": "{title} is already marked, so it stays.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not removed",
+      "interactions": ["INT-TIMELINE-024"]
+    },
+    "opportunity.remove-refused.kept": {
+      "meaning": "Refuses Remove because the added item has a Note, tracked time, an earlier mark or a connected activity.",
+      "text": "{title} has a Note, tracked time, an earlier mark or a connected activity, so it stays.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not removed",
+      "interactions": ["INT-TIMELINE-024"]
+    },
+    "opportunity.remove-refused.not-found": {
+      "meaning": "Refuses Remove because the item is not an added opportunity in the person's account, for example after another device removed it.",
+      "text": "This item is no longer on today's Timeline.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not removed",
+      "interactions": ["INT-TIMELINE-024"]
+    },
+    "opportunity.failed": {
+      "meaning": "Says an add, Done now or Remove did not reach Cadence, so nothing changed.",
+      "text": "Cadence could not change today's items. Try again.",
+      "style": "error",
+      "interactions": ["INT-TIMELINE-022", "INT-TIMELINE-023", "INT-TIMELINE-024"]
+    }
+  }
+}

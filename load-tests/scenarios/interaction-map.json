@@ -1814,6 +1814,36 @@
       "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
     },
     {
+      "id": "INT-BEHAVIOR-037",
+      "classification": "browser_only",
+      "reason": "Available as an opportunity only changes the form draft; the save is the existing Behavior create or update."
+    },
+    {
+      "id": "INT-BEHAVIOR-038",
+      "classification": "browser_only",
+      "reason": "Saving with no schedule is the existing Behavior create or update with an empty schedule graph."
+    },
+    {
+      "id": "INT-TIMELINE-021",
+      "classification": "browser_only",
+      "reason": "Opening the basket reads the pool the Timeline page already loads."
+    },
+    {
+      "id": "INT-TIMELINE-022",
+      "classification": "destructive_serial_only",
+      "reason": "Adding needs today's clock in the account's timezone, a running opportunity Behavior and replay verification; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-023",
+      "classification": "destructive_serial_only",
+      "reason": "Done now writes an Occurrence and a status event at the current minute; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-024",
+      "classification": "destructive_serial_only",
+      "reason": "Remove deletes a seeded clean added Occurrence; run serially on a synthetic account."
+    },
+    {
       "id": "INT-ADVISOR-005",
       "classification": "browser_only",
       "reason": "Following a tip's link is navigation; the Behaviors editor reads what the page already loads."
