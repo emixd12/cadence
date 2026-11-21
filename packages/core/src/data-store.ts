@@ -24,6 +24,9 @@ export type OccurrenceRecord = {
   /** Derived from the latest per-day move; null when at the planned time. Server rows only. */
   effective_start_at?: string | null;
   effective_end_at?: string | null;
+  /** Behaviors of Opportunity. A missing origin means "scheduled". */
+  origin?: string;
+  added_by?: string | null;
 };
 
 export type OccurrenceStatusEventRecord = {

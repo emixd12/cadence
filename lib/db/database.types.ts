@@ -546,13 +546,14 @@ export type Database = {
           end_on: string | null
           end_time: string | null
           id: string
+          is_opportunity: boolean
           location_text: string | null
           pause_back_on: string | null
           pause_from_on: string | null
           pause_from_time: string | null
-          recurrence_rule: Json
+          recurrence_rule: Json | null
           reminder_offset_minutes: number
-          scheduled_time: string
+          scheduled_time: string | null
           timezone: string
           title: string
           updated_at: string
@@ -574,13 +575,14 @@ export type Database = {
           end_on?: string | null
           end_time?: string | null
           id?: string
+          is_opportunity?: boolean
           location_text?: string | null
           pause_back_on?: string | null
           pause_from_on?: string | null
           pause_from_time?: string | null
-          recurrence_rule: Json
+          recurrence_rule: Json | null
           reminder_offset_minutes?: number
-          scheduled_time: string
+          scheduled_time: string | null
           timezone?: string
           title: string
           updated_at?: string
@@ -602,13 +604,14 @@ export type Database = {
           end_on?: string | null
           end_time?: string | null
           id?: string
+          is_opportunity?: boolean
           location_text?: string | null
           pause_back_on?: string | null
           pause_from_on?: string | null
           pause_from_time?: string | null
-          recurrence_rule?: Json
+          recurrence_rule?: Json | null
           reminder_offset_minutes?: number
-          scheduled_time?: string
+          scheduled_time?: string | null
           timezone?: string
           title?: string
           updated_at?: string
@@ -2012,6 +2015,7 @@ export type Database = {
       }
       occurrences: {
         Row: {
+          added_by: string | null
           behavior_configuration_event_id: string | null
           behavior_id: string
           behavior_schedule_slot_id: string | null
@@ -2022,6 +2026,7 @@ export type Database = {
           id: string
           local_date: string
           note: string | null
+          origin: string
           schedule_end_time: string | null
           schedule_kind: string
           schedule_preset: string | null
@@ -2034,6 +2039,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          added_by?: string | null
           behavior_configuration_event_id?: string | null
           behavior_id: string
           behavior_schedule_slot_id?: string | null
@@ -2044,6 +2050,7 @@ export type Database = {
           id?: string
           local_date: string
           note?: string | null
+          origin?: string
           schedule_end_time?: string | null
           schedule_kind?: string
           schedule_preset?: string | null
@@ -2056,6 +2063,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          added_by?: string | null
           behavior_configuration_event_id?: string | null
           behavior_id?: string
           behavior_schedule_slot_id?: string | null
@@ -2066,6 +2074,7 @@ export type Database = {
           id?: string
           local_date?: string
           note?: string | null
+          origin?: string
           schedule_end_time?: string | null
           schedule_kind?: string
           schedule_preset?: string | null
@@ -2649,6 +2658,19 @@ export type Database = {
           p_tool_calls?: string[]
         }
         Returns: boolean
+      }
+      add_opportunity_occurrence: {
+        Args: {
+          mark_completed?: boolean
+          planned_added_by?: string
+          planned_end_time?: string
+          planned_local_date: string
+          planned_occurrence_id?: string
+          planned_preset?: string
+          planned_start_time: string
+          target_behavior_id: string
+        }
+        Returns: Json
       }
       advisor_next_tip: {
         Args: { p_spacing_minutes?: number }
@@ -3478,6 +3500,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      remove_opportunity_occurrence: {
+        Args: { target_occurrence_id: string }
+        Returns: Json
+      }
       remove_source_match: {
         Args: {
           p_match_id: string
@@ -3724,6 +3750,7 @@ export type Database = {
           used_shortcut: boolean
         }
         Returns: {
+          added_by: string | null
           behavior_configuration_event_id: string | null
           behavior_id: string
           behavior_schedule_slot_id: string | null
@@ -3734,6 +3761,7 @@ export type Database = {
           id: string
           local_date: string
           note: string | null
+          origin: string
           schedule_end_time: string | null
           schedule_kind: string
           schedule_preset: string | null

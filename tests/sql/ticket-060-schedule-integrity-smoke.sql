@@ -676,7 +676,7 @@ on conflict (
   local_date,
   schedule_start_time,
   schedule_range_identity
-) do nothing;
+) where origin = 'scheduled' do nothing;
 
 do $$
 begin

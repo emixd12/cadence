@@ -2,8 +2,8 @@
 -- including a synthetic later column so preserving writes are not profile-only.
 begin;
 
--- The account sync writer floor is 7 since Ended and Paused (contracts 1-6 wrote
--- end_date). This file checks how older contracts behave, so it lowers the floor
+-- The account sync writer floor is 8 since Behaviors of Opportunity (contracts 1-6
+-- wrote end_date; contract 7 cannot carry opportunity fields). This file checks how older contracts behave, so it lowers the floor
 -- inside its rolled-back transaction.
 create or replace function cadence_private.account_sync_min_writer_contract()
 returns integer language sql immutable set search_path = '' as $floor$ select 1 $floor$;
@@ -72,7 +72,7 @@ begin
       where entity ->> 'kind' in ('place_label_settings', 'place_marker', 'completion_place_label', 'where_suggestion_dismissal')) then
     raise exception 'The legacy projection contains a newer entity kind';
   end if;
-  foreach invalid_contract in array array[null::integer, 0, 8] loop
+  foreach invalid_contract in array array[null::integer, 0, 9] loop
     begin
       perform public.read_account_sync_snapshot(invalid_contract);
       raise exception 'An invalid read contract was accepted: %', invalid_contract;
@@ -138,11 +138,11 @@ end;
 $$;
 reset role;
 
--- Contract 8 exists only inside this rolled-back test transaction. A prior build
+-- Contract 9 exists only inside this rolled-back test transaction. A prior build
 -- must be able to insert, edit and delete a Category without seeing its new field.
 alter table public.categories add column contract_probe text not null default 'new-row default';
 insert into cadence_private.account_sync_contract_additions (contract, kind, field, default_value)
-values (8, 'category', 'contract_probe', '"new-row default"');
+values (9, 'category', 'contract_probe', '"new-row default"');
 
 set local role authenticated;
 do $$

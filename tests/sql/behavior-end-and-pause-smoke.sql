@@ -47,8 +47,8 @@ begin
   )) then
     raise exception 'The end-date archive job still exists.';
   end if;
-  if cadence_private.account_sync_min_writer_contract() <> 7 or cadence_private.account_sync_current_contract() <> 7 then
-    raise exception 'Account sync contract 7 is not the current and minimum writer contract.';
+  if cadence_private.account_sync_min_writer_contract() < 7 or cadence_private.account_sync_current_contract() < 7 then
+    raise exception 'Account sync contract 7 is not in force.';
   end if;
 end;
 $$;

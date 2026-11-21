@@ -16,7 +16,7 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * Contract 7 replaces the Behavior `end_date` with end and pause fields (Ended and
  * Paused). It is breaking, so the server's minimum writer contract is 7 as well.
  */
-export const ACCOUNT_SYNC_CONTRACT = 7;
+export const ACCOUNT_SYNC_CONTRACT = 8;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
