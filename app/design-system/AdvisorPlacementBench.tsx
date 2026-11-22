@@ -97,7 +97,7 @@ function HorseMark({ size = 28, dot = false }: Readonly<{ size?: number; dot?: b
     <span aria-hidden="true" className="relative inline-block shrink-0" style={{ width: size, height: size }}>
       <span className="absolute inset-0 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--primary)_9%,var(--background))] ring-1 ring-line">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={size > 72 ? "/brand/advisor/advisor-768.webp" : "/brand/advisor/advisor-256.webp"} alt="" className="h-full w-full mix-blend-multiply" />
+        <img src="/brand/advisor/advisor-768.webp" alt="" className="h-full w-full mix-blend-multiply" />
       </span>
       {dot ? <span className="absolute right-0 top-0 rounded-full bg-primary ring-2 ring-background" style={{ width: dotSize, height: dotSize }} /> : null}
     </span>

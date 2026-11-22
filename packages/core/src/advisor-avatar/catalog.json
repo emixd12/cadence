@@ -2,29 +2,209 @@
   "feature": "advisor-tips",
   "art": {
     "status": "approved",
-    "meaning": "The advisor's drawing. One vector master is the baseline; every size is made from it by scripts/build-advisor-avatar.mjs.",
+    "meaning": "The advisor's drawing. One vector master is the baseline; scripts/build-advisor-avatar.mjs makes a file for each product size and screen density, so the browser draws it without scaling. Each file covers the round window plus whole pixels of margin; `area` is where it sits in the drawing. The last rendition serves any other size.",
     "master": "assets/advisor-avatar/master.svg",
     "approved": "2026-11-22",
     "renditions": [
       {
-        "maxSize": 72,
-        "pixels": 256,
-        "file": "public/brand/advisor/advisor-256.webp",
+        "size": 40,
+        "density": 1,
+        "file": "public/brand/advisor/advisor-40-1x.webp",
         "tones": [
           0.35,
           0.43,
           0.75
-        ]
+        ],
+        "pixels": {
+          "width": 45,
+          "height": 45
+        },
+        "area": {
+          "x": 4.5,
+          "y": 10,
+          "width": 1012.5,
+          "height": 1012.5
+        }
       },
       {
-        "maxSize": null,
-        "pixels": 768,
+        "size": 40,
+        "density": 2,
+        "file": "public/brand/advisor/advisor-40-2x.webp",
+        "tones": [
+          0.35,
+          0.43,
+          0.75
+        ],
+        "pixels": {
+          "width": 90,
+          "height": 90
+        },
+        "area": {
+          "x": 4.5,
+          "y": 10,
+          "width": 1012.5,
+          "height": 1012.5
+        }
+      },
+      {
+        "size": 40,
+        "density": 3,
+        "file": "public/brand/advisor/advisor-40-3x.webp",
+        "tones": [
+          0.35,
+          0.43,
+          0.75
+        ],
+        "pixels": {
+          "width": 135,
+          "height": 136
+        },
+        "area": {
+          "x": 4.5,
+          "y": 2.5,
+          "width": 1012.5,
+          "height": 1020
+        }
+      },
+      {
+        "size": 48,
+        "density": 1,
+        "file": "public/brand/advisor/advisor-48-1x.webp",
+        "tones": [
+          0.35,
+          0.43,
+          0.75
+        ],
+        "pixels": {
+          "width": 53,
+          "height": 54
+        },
+        "area": {
+          "x": 15.75,
+          "y": 10,
+          "width": 993.75,
+          "height": 1012.5
+        }
+      },
+      {
+        "size": 48,
+        "density": 2,
+        "file": "public/brand/advisor/advisor-48-2x.webp",
+        "tones": [
+          0.35,
+          0.43,
+          0.75
+        ],
+        "pixels": {
+          "width": 108,
+          "height": 109
+        },
+        "area": {
+          "x": 6.375,
+          "y": 0.625,
+          "width": 1012.5,
+          "height": 1021.875
+        }
+      },
+      {
+        "size": 48,
+        "density": 3,
+        "file": "public/brand/advisor/advisor-48-3x.webp",
+        "tones": [
+          0.35,
+          0.43,
+          0.75
+        ],
+        "pixels": {
+          "width": 163,
+          "height": 163
+        },
+        "area": {
+          "x": 3.25,
+          "y": 3.75,
+          "width": 1018.75,
+          "height": 1018.75
+        }
+      },
+      {
+        "size": 120,
+        "density": 1,
+        "file": "public/brand/advisor/advisor-120-1x.webp",
+        "tones": [
+          0.24,
+          0.34,
+          0.6
+        ],
+        "pixels": {
+          "width": 135,
+          "height": 136
+        },
+        "area": {
+          "x": 4.5,
+          "y": 2.5,
+          "width": 1012.5,
+          "height": 1020
+        }
+      },
+      {
+        "size": 120,
+        "density": 2,
+        "file": "public/brand/advisor/advisor-120-2x.webp",
+        "tones": [
+          0.24,
+          0.34,
+          0.6
+        ],
+        "pixels": {
+          "width": 272,
+          "height": 272
+        },
+        "area": {
+          "x": 0.75,
+          "y": 2.5,
+          "width": 1020,
+          "height": 1020
+        }
+      },
+      {
+        "size": 120,
+        "density": 3,
+        "file": "public/brand/advisor/advisor-120-3x.webp",
+        "tones": [
+          0.24,
+          0.34,
+          0.6
+        ],
+        "pixels": {
+          "width": 408,
+          "height": 409
+        },
+        "area": {
+          "x": 2,
+          "y": 0,
+          "width": 1020,
+          "height": 1022.5
+        }
+      },
+      {
+        "size": null,
+        "density": null,
         "file": "public/brand/advisor/advisor-768.webp",
         "tones": [
           0.24,
           0.34,
           0.6
-        ]
+        ],
+        "pixels": {
+          "width": 768,
+          "height": 768
+        },
+        "area": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 1024
+        }
       }
     ],
     "sizes": [

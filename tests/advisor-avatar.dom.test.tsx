@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { advisorAvatarCatalog, advisorAvatarFile } from "@cadence/core/advisor-avatar";
+import { advisorAvatarCatalog, advisorAvatarFile, advisorAvatarRendition } from "@cadence/core/advisor-avatar";
 import { AdvisorAvatar } from "@/components/advisor/AdvisorAvatar";
 
 // Tickets 343 to 346: the avatar draws the state it is given, from the catalog's files.
@@ -43,13 +43,42 @@ describe("AdvisorAvatar", () => {
     expect(avatar().querySelectorAll("circle")).toHaveLength(1); // the preparing arc only
   });
 
-  it("uses the small file up to 72px and the large file above", () => {
-    const [small, large] = advisorAvatarCatalog.art.renditions;
-    expect(advisorAvatarFile(40)).toBe(small.file.replace(/^public/, ""));
-    expect(advisorAvatarFile(72)).toBe(small.file.replace(/^public/, ""));
-    expect(advisorAvatarFile(120)).toBe(large.file.replace(/^public/, ""));
+  it("has a file at exactly its pixels for each product size and screen density", () => {
+    const { window: view } = advisorAvatarCatalog.art.anchors;
+    for (const size of [40, 48, 120]) {
+      for (const density of [1, 2, 3]) {
+        const rendition = advisorAvatarRendition(size, density);
+        expect(rendition.file).toBe(`public/brand/advisor/advisor-${size}-${density}x.webp`);
+        // One file pixel is one screen pixel: the window spans size x density pixels.
+        const unitsPerPixel = view.size / (size * density);
+        expect(rendition.area.width / rendition.pixels.width).toBeCloseTo(unitsPerPixel, 6);
+        expect(rendition.area.height / rendition.pixels.height).toBeCloseTo(unitsPerPixel, 6);
+        // The file starts on a whole pixel of the window and covers all of it.
+        expect((view.x - rendition.area.x) / unitsPerPixel).toBeCloseTo(Math.round((view.x - rendition.area.x) / unitsPerPixel), 6);
+        expect((view.y - rendition.area.y) / unitsPerPixel).toBeCloseTo(Math.round((view.y - rendition.area.y) / unitsPerPixel), 6);
+        expect(rendition.area.x).toBeLessThanOrEqual(view.x);
+        expect(rendition.area.y).toBeLessThanOrEqual(view.y);
+        expect(rendition.area.x + rendition.area.width).toBeGreaterThanOrEqual(view.x + view.size);
+        expect(rendition.area.y + rendition.area.height).toBeGreaterThanOrEqual(view.y + view.size);
+      }
+    }
+  });
+
+  it("serves denser screens the densest file and other sizes the general file", () => {
+    expect(advisorAvatarFile(48, 4)).toBe("/brand/advisor/advisor-48-3x.webp");
+    expect(advisorAvatarFile(48, 1.5)).toBe("/brand/advisor/advisor-48-2x.webp");
+    expect(advisorAvatarFile(64, 2)).toBe("/brand/advisor/advisor-768.webp");
+    expect(advisorAvatarRendition(64, 2).area).toEqual({ x: 0, y: 0, width: 1024, height: 1024 });
+  });
+
+  it("places the file where the catalog says it sits in the drawing", () => {
     act(() => root.render(<AdvisorAvatar size={120} />));
-    expect(avatar().querySelector("image")?.getAttribute("href")).toBe("/brand/advisor/advisor-768.webp");
+    const density = Math.min(3, Math.max(1, Math.ceil((window.devicePixelRatio || 1) - 0.01)));
+    const rendition = advisorAvatarRendition(120, density);
+    const image = avatar().querySelector("image")!;
+    expect(image.getAttribute("href")).toBe(rendition.file.replace(/^public/, ""));
+    expect(Number(image.getAttribute("x"))).toBe(rendition.area.x);
+    expect(Number(image.getAttribute("width"))).toBe(rendition.area.width);
   });
 
   it("ripples the mane only above 72px", () => {

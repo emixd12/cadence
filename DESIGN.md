@@ -966,8 +966,12 @@ no advisor.
   round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
   so it never looks cropped. The drawing has one vector master
   (`assets/advisor-avatar/master.svg`, approved November 22, 2026). `npm run avatar:build`
-  makes the shipped files: `public/brand/advisor/advisor-256.webp` up to 72px, with ink
-  ×1.25 so it stays readable while faint, and `advisor-768.webp` above.
+  makes the shipped files under `public/brand/advisor/`: one for each product size (40,
+  48 and 120px) and screen density (1×, 2×, 3×), each at exactly its pixels, so the
+  browser draws the still avatar without scaling it (owner, November 22, 2026, round 5).
+  The 40px and 48px files use ink ×1.25 so they stay readable while faint.
+  `advisor-768.webp` serves any other size. `AdvisorAvatar` picks the file from the
+  screen's density.
 - **It moves by state.** `AdvisorAvatar` (`components/advisor/AdvisorAvatar.tsx`) draws
   the state and gesture that `advisor-avatar.resolver` picks; the catalog
   (`packages/core/src/advisor-avatar/catalog.json`) lists them. Motion is small: slow
