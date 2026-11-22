@@ -1,0 +1,285 @@
+/* The advisor's avatar (Tickets 343 to 346). States and gestures: packages/core/src/advisor-avatar/catalog.json. */
+
+.avatar {
+  --size: 48px;
+  --avatar-bg: color-mix(in srgb, var(--primary) 9%, var(--background));
+  --lid-rest: 0;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--size);
+  height: var(--size);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--avatar-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.nod {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.horse {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 90%;
+  animation: breathe 5.2s ease-in-out infinite;
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Mane: rotates around its root behind the near ear. Positive angles lift the tips. */
+.mane {
+  --lift: 2.2deg;
+  animation: sway 5s ease-in-out infinite;
+}
+
+.ear {
+  transition: transform 300ms ease;
+}
+
+/* Eyelids */
+.lid {
+  fill: var(--avatar-bg);
+}
+
+.lash {
+  fill: none;
+  stroke: #47668f;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.lidRest {
+  transform: translateY(calc(var(--close) * var(--lid-rest)));
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lidBlink {
+  --travel: calc(var(--close) * (1 - var(--lid-rest)));
+  animation: blink 5.5s linear 1.6s infinite;
+}
+
+/* The arc that spins while the brief is prepared. */
+.ring {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease;
+}
+
+.ringArc {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 38 264;
+  transform-origin: 50% 50%;
+  animation: spin 1.1s linear infinite;
+}
+
+/* ---- States ---- */
+
+.avatar[data-advisor-avatar="state.waiting"] .earNear {
+  transform: rotate(3deg);
+}
+
+.avatar[data-advisor-avatar="state.waiting"] .earFar {
+  transform: rotate(-3deg);
+}
+
+.avatar[data-advisor-avatar="state.trouble"] .horse {
+  animation: none;
+  transform: translateY(2.5%) rotate(2deg);
+}
+
+.avatar[data-advisor-avatar="state.trouble"] :is(.mane, .lidBlink) {
+  animation: none;
+}
+
+.avatar[data-advisor-avatar="state.attending"] .horse {
+  animation: none;
+  transform: scale(1.04) rotate(-2deg);
+}
+
+.avatar[data-advisor-avatar="state.attending"] .mane {
+  --lift: 1.2deg;
+  animation-duration: 8s;
+}
+
+.avatar[data-advisor-avatar="state.attending"] .lidBlink {
+  animation-duration: 6.5s;
+}
+
+.avatar:is([data-advisor-avatar="state.preparing"], [data-advisor-avatar="state.working"], [data-advisor-avatar="state.replying"]) {
+  --lid-rest: 0.38;
+}
+
+.avatar[data-advisor-avatar="state.preparing"] .ring {
+  opacity: 1;
+}
+
+.avatar[data-advisor-avatar="state.preparing"] .mane {
+  --lift: 3.6deg;
+  animation-duration: 1.6s;
+}
+
+.avatar[data-advisor-avatar="state.preparing"] .horse {
+  animation-duration: 2.6s;
+}
+
+.avatar[data-advisor-avatar="state.preparing"] .lidBlink {
+  animation-duration: 3.2s;
+}
+
+.avatar[data-advisor-avatar="state.working"] .mane {
+  --lift: 3deg;
+  animation-duration: 1.1s;
+}
+
+.avatar[data-advisor-avatar="state.replying"] .mane {
+  --lift: 2.6deg;
+  animation-duration: 2.4s;
+}
+
+/* ---- Gestures: one-shot animations on the inner .gesture wrappers, so the loops keep running ---- */
+
+.avatar[data-gesture="gesture.arrive"] .face {
+  animation: arrive 700ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.avatar[data-gesture="gesture.arrive"] .lid,
+.avatar[data-gesture="gesture.arrive"] .lash {
+  animation: wake 900ms cubic-bezier(0.3, 0.7, 0.3, 1) 0.5s backwards;
+}
+
+.avatar[data-gesture="gesture.notice"] .ear .gesture {
+  animation: flick 620ms ease-out;
+}
+
+.avatar[data-gesture="gesture.notice"] .mane .gesture {
+  animation: gust 1.4s ease-out;
+}
+
+.avatar[data-gesture="gesture.notice"] .lidBlink .gesture {
+  animation: blink-twice 900ms linear 0.2s;
+}
+
+.avatar[data-gesture="gesture.acknowledge"] .nod {
+  animation: nod 720ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.avatar[data-gesture="gesture.refused"] .ear .gesture {
+  animation: tip-back 900ms ease-in-out;
+}
+
+.avatar[data-gesture="gesture.refused"] .earFar .gesture {
+  animation-name: tip-back-far;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.015) rotate(-0.8deg); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(var(--lift)); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blink {
+  0%, 93% { transform: translateY(0); }
+  95.5% { transform: translateY(var(--travel)); }
+  98%, 100% { transform: translateY(0); }
+}
+
+@keyframes blink-twice {
+  0%, 100% { transform: translateY(0); }
+  20% { transform: translateY(var(--close)); }
+  45% { transform: translateY(0); }
+  65% { transform: translateY(var(--close)); }
+  90% { transform: translateY(0); }
+}
+
+@keyframes wake {
+  0% { transform: translateY(var(--close)); }
+  55% { transform: translateY(calc(var(--close) * 0.1)); }
+  70% { transform: translateY(calc(var(--close) * 0.45)); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(8px) scale(0.7); }
+  70% { opacity: 1; transform: translateY(0) scale(1.04); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes flick {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-9deg); }
+  60% { transform: rotate(4deg); }
+}
+
+@keyframes gust {
+  0%, 100% { transform: rotate(0deg); }
+  18% { transform: rotate(6deg); }
+  40% { transform: rotate(1.5deg); }
+  58% { transform: rotate(3.4deg); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(5%); }
+  70% { transform: translateY(-1%); }
+}
+
+@keyframes tip-back {
+  0%, 100% { transform: rotate(0deg); }
+  35%, 65% { transform: rotate(-11deg); }
+}
+
+@keyframes tip-back-far {
+  0%, 100% { transform: rotate(0deg); }
+  35%, 65% { transform: rotate(11deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horse,
+  .mane,
+  .lidBlink,
+  .ringArc,
+  .face,
+  .nod,
+  .lid,
+  .lash,
+  .gesture {
+    animation: none !important;
+  }
+
+  .horse,
+  .ear {
+    transform: none !important;
+  }
+
+  .avatar {
+    --lid-rest: 0 !important;
+  }
+
+  .avatar[data-advisor-avatar="state.preparing"] .ring {
+    opacity: 0.6;
+  }
+}

@@ -41,6 +41,8 @@
     "agent:secret": "node scripts/acceptance/agent-secret.mjs",
     "qa:preflight": "node .agentic/scripts/test-access-preflight.mjs",
     "interactions:check": "node scripts/check-interactions.mjs",
+    "avatar:build": "node scripts/build-advisor-avatar.mjs",
+    "avatar:check": "node scripts/build-advisor-avatar.mjs --check",
     "map:check": "node scripts/build-product-map.mjs check",
     "map:build": "node scripts/build-product-map.mjs build",
     "map": "node scripts/build-product-map.mjs show",

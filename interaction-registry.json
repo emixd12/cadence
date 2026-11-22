@@ -478,6 +478,13 @@
       "reason": "Advisor plan 4D development-only placement bench with synthetic tips. Not a product surface; no account or provider access."
     },
     {
+      "path": "app/design-system/AdvisorAvatarBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 2,
+      "interaction_ids": [],
+      "reason": "Development-only bench of the advisor avatar's states and gestures (Tickets 343 to 346). Its links replay a gesture. Not a product surface; no account or provider access."
+    },
+    {
       "path": "app/design-system/HorseAvatarTrial.tsx",
       "classification": "excluded",
       "interaction_marker_count": 9,

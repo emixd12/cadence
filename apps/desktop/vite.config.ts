@@ -15,9 +15,9 @@ const productAssets = [
   "brand/cadence-page-banner-lines-dots.png",
   "brand/cadence-timeline-horse-lines-dots-clear-background.png",
   "brand/cadence-timeline-horse-lines-dots-mobile-right-18.png",
-  // Advisor Phase 4 (4E): the window horse (draft art).
-  "brand/cadence-advisor-window-draft.webp",
-  "brand/cadence-advisor-window-draft-small.webp",
+  // The advisor's avatar (Ticket 343): made by scripts/build-advisor-avatar.mjs.
+  "brand/advisor/advisor-256.webp",
+  "brand/advisor/advisor-768.webp",
   "sounds/completion-chime.mp3",
 ];
 const publicRoot = new URL("../../public/", import.meta.url);

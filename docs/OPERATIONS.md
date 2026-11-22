@@ -427,7 +427,7 @@ session. Every command in the session can read an environment variable.
 | Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments and logs; the Trust refresh at launch |
 | Sequenzy | `api.sequenzy.com` | `Authorization: Bearer` | Template inspection; real sends follow `docs/SEQUENZY_WORKFLOW.md` |
 | Cloudflare | `api.cloudflare.com` | `Authorization: Bearer` | DNS reads and verification |
-| OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes |
+| OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes; advisor avatar image rounds (Ticket 343; `docs/DECISIONS.md`, 2026-11-21) |
 
 The proxy replaces any `Authorization` header a request already carries. A CLI
 that refuses to start without a local token therefore works with a

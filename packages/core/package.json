@@ -13,6 +13,7 @@
     "./behaviorlog.schema.json": "./src/behaviorlog.schema.json",
     "./export-prompts": "./src/export-prompts.ts",
     "./notices": "./src/notices/index.ts",
+    "./advisor-avatar": "./src/advisor-avatar/index.ts",
     "./integration": "./src/integration/index.ts",
     "./integration/*": "./src/integration/*.ts"
   },

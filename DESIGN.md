@@ -962,9 +962,18 @@ no advisor.
 
 - **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
   round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
-  so it never looks cropped. The artwork is a draft
-  (`public/brand/cadence-advisor-window-draft.webp`, plus a heavier-line `-small` version for
-  sizes up to 72px).
+  so it never looks cropped. The drawing has one vector master
+  (`assets/advisor-avatar/master.svg`, approved November 22, 2026). `npm run avatar:build`
+  makes the shipped files: `public/brand/advisor/advisor-256.webp` up to 72px, with ink
+  ×1.25 so it stays readable while faint, and `advisor-768.webp` above.
+- **It moves by state.** `AdvisorAvatar` (`components/advisor/AdvisorAvatar.tsx`) draws
+  the state and gesture that `advisor-avatar.resolver` picks; the catalog
+  (`packages/core/src/advisor-avatar/catalog.json`) lists them. Motion is small: slow
+  breathing, a blink, the mane swaying from its root, the ears, and a thin arc around the
+  circle while the brief is prepared. There is no dot, badge or count. Reduced motion
+  shows the still drawing in every state. Bench: `/design-system?preview=advisor-avatar`.
+- **On Chat.** The Chat page shows the avatar at 48px to the left of its links. It shows
+  it is working while a reply arrives.
 - **Where it sits.** Top centre of the page, and it stays there when you scroll. It is 48px on
   desktop and the Mac. On phones it is 40px and sits in the middle of the top bar. It is never
   smaller than 40px.

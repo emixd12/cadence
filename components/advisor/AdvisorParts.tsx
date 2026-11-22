@@ -13,6 +13,7 @@ import {
   proposalShortLine,
 } from "@/lib/ui/advisor";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
+import { AdvisorAvatar } from "./AdvisorAvatar";
 import { useAdvisor, useAdvisorBriefTarget } from "./AdvisorProvider";
 
 /**
@@ -24,19 +25,14 @@ import { useAdvisor, useAdvisorBriefTarget } from "./AdvisorProvider";
 const LINK = "underline underline-offset-2 disabled:no-underline disabled:opacity-60";
 /** Global anchor styles win over utility classes, so links set their underline inline. */
 const ANCHOR_STYLE = { textDecoration: "underline", textUnderlineOffset: 2 } as const;
-const SMALL_ART = "/brand/cadence-advisor-window-draft-small.webp";
-const LARGE_ART = "/brand/cadence-advisor-window-draft.webp";
 
-/** The round "window" avatar: the whole head shows and the neck runs out of the bottom, so it never looks cropped. */
+/**
+ * The round "window" avatar: the whole head shows and the neck runs out of the bottom, so it never looks cropped.
+ * Its state and gesture come from the advisor (`advisor-avatar.resolver`); outside an advisor it rests.
+ */
 export function AdvisorHorse({ size }: Readonly<{ size: number }>) {
-  return (
-    <span aria-hidden="true" className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      <span className="absolute inset-0 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--primary)_9%,var(--background))] ring-1 ring-line">
-        {/* eslint-disable-next-line @next/next/no-img-element -- the Mac has no Next image loader. */}
-        <img src={size > 72 ? LARGE_ART : SMALL_ART} alt="" width={size} height={size} className="h-full w-full mix-blend-multiply" />
-      </span>
-    </span>
-  );
+  const avatar = useAdvisor()?.avatar;
+  return <AdvisorAvatar size={size} state={avatar?.state} gesture={avatar?.gesture} />;
 }
 
 /**
