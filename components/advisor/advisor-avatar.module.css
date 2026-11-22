@@ -2,7 +2,8 @@
 
 .avatar {
   --size: 48px;
-  --avatar-bg: color-mix(in srgb, var(--primary) 9%, var(--background));
+  /* The circle is the page's own background (owner, November 22, 2026); the eyelids are filled with it. */
+  --avatar-bg: var(--background);
   --lid-rest: 0;
   position: relative;
   display: inline-block;
@@ -43,6 +44,11 @@
 
 .ear {
   transition: transform 300ms ease;
+}
+
+/* Head: turns on the neck around the poll. It rests still; nothing in the product moves it yet. */
+.head {
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* Eyelids */
@@ -271,7 +277,8 @@
   }
 
   .horse,
-  .ear {
+  .ear,
+  .head {
     transform: none !important;
   }
 

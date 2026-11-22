@@ -12,3 +12,63 @@
 .panelOnly [data-bench-size="48"] :global([data-advisor-avatar]) > span svg {
   animation: none;
 }
+
+/*
+ * Head and neck movement trials (owner's request, November 22, 2026). Each plays once when the
+ * bench bumps the avatar's gesture key, so nothing is attached to the drawing between plays.
+ * The head is the layer marked data-avatar-part="head"; it turns around the poll.
+ * Positive angles lower the muzzle.
+ */
+
+.moves :global([data-advisor-avatar]) > span svg {
+  animation: none;
+  transform-origin: 45% 100%;
+}
+
+.moves :global([data-gesture="trial.nod"]) [data-avatar-part="head"] {
+  animation: trial-nod 1.5s ease-in-out;
+}
+
+.moves :global([data-gesture="trial.lift"]) [data-avatar-part="head"] {
+  animation: trial-lift 2.4s ease-in-out;
+}
+
+.moves :global([data-gesture="trial.lean"]) > span svg {
+  animation: trial-lean 2.6s ease-in-out;
+}
+
+.moves :global([data-gesture="trial.lean-and-turn"]) > span svg {
+  animation: trial-lean 2.6s ease-in-out;
+}
+
+.moves :global([data-gesture="trial.lean-and-turn"]) [data-avatar-part="head"] {
+  animation: trial-turn-late 2.6s ease-in-out;
+}
+
+@keyframes trial-nod {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(5deg); }
+  70% { transform: rotate(-1deg); }
+}
+
+@keyframes trial-lift {
+  0%, 100% { transform: rotate(0deg); }
+  30%, 65% { transform: rotate(-4deg); }
+}
+
+@keyframes trial-lean {
+  0%, 100% { transform: rotate(0deg); }
+  35%, 60% { transform: rotate(3deg); }
+}
+
+@keyframes trial-turn-late {
+  0%, 20%, 100% { transform: rotate(0deg); }
+  50%, 65% { transform: rotate(-3.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moves :global([data-advisor-avatar]) [data-avatar-part="head"],
+  .moves :global([data-advisor-avatar]) > span svg {
+    animation: none !important;
+  }
+}

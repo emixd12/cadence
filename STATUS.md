@@ -102,8 +102,11 @@ Check the cited entry before acting on a row.
 - **In review (draft PR, branch `claude/avatar-motion-review`).** The owner returned to the
   animation step. Measured in the bench: the whole-drawing breathing leaves the avatar at
   56 to 69% of the still drawing's sharpness; without it, 78 to 94%.
-- **Bench only:** `/design-system?preview=advisor-avatar`, "Breathing options", rows A
-  (as shipped), B (no breathing), C (panel only). No product behaviour changed.
+- **Bench:** `/design-system?preview=advisor-avatar`, "Breathing options", rows A (as
+  shipped), B (no breathing), C (panel only), and "Head and neck movement", four trials.
+- **Product changes in the same PR:** the circle is the page background, not light blue
+  (owner's request); the rig gains a head layer that nothing moves yet; the mane is
+  painted last, which keeps the face sharp while the mane sways.
 - **Waits for the owner's choice.** Findings: `docs/plans/2026-11-21-advisor-avatar.md`,
   "Step 2 review".
 

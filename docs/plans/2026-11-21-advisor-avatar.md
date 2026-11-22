@@ -261,6 +261,34 @@ neighbouring pixels, as a share of the still drawing's.
   tilt in `state.trouble` and `state.attending`, and the installed Mac.
 - Owner's answer: pending.
 
+#### Step 2 review 2, November 22, 2026
+
+The owner asked for two things: the avatar on a white or transparent background instead
+of the light blue circle, and a head and neck movement to think about.
+
+- **The circle.** It is now the page's own background with its thin edge line; the eyelids
+  are filled with the same colour. No tint.
+- **A head layer in the rig.** The catalog's `art.anchors.head` holds the head's area and
+  its pivot at the poll. `AdvisorAvatar` draws the head as its own layer, carrying the ears
+  and the eyelids, so it can turn on the neck. Nothing in the product moves it yet, and
+  the still drawing is unchanged.
+- **The mane is painted last.** Chrome redraws, softly, whatever is painted after a moving
+  layer. With the swaying mane last, the face stays sharp while the mane moves. Without
+  breathing the avatar now keeps 89 to 94% at 40 and 48px and 83 to 88% at 120px (review 1
+  measured 78 to 80% at 120px). The loss that remains is in the mane itself; at 120px the
+  ripple smears it visibly.
+- **Head and neck trials on the bench** ("Head and neck movement"), not in the product:
+  Nod (the head dips on the neck), Lift (the head lifts and holds), Lean (head and neck
+  lean from the base of the neck), and Lean, then lift. Each plays once every 6 seconds
+  with no breathing. Between plays the drawing is as sharp as with no breathing; during
+  the 1.5 to 2.6 seconds of a play it drops to 53 to 77%.
+- **Limits of the head layer.** The drawing is lines with no fill, so a turned head shows
+  the neck's lines through it near the jaw. At the trial angles (3 to 5 degrees) this is
+  slight. Larger turns would need a filled head.
+- **Open for the owner:** which breathing option (A, B or C); whether a head and neck
+  movement replaces breathing as the resting movement, joins the gestures, or neither;
+  and which trial. Not checked: the installed Mac, where WebKit draws this.
+
 ### Step 3: tests on real accounts (Tickets 347 and 348)
 
 Goal: compare animation variants on real use and keep a record of each change.

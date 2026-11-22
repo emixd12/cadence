@@ -963,7 +963,8 @@ Bench with synthetic data: `/design-system?preview=advisor&state=tip|brief|propo
 no advisor.
 
 - **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
-  round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
+  round "window" avatar on the page's own background, with a thin line for its edge and no
+  tint (owner, November 22, 2026): the whole head shows and the neck runs out of the bottom of the circle,
   so it never looks cropped. The drawing has one vector master
   (`assets/advisor-avatar/master.svg`, approved November 22, 2026). `npm run avatar:build`
   makes the shipped files under `public/brand/advisor/`: one for each product size (40,
