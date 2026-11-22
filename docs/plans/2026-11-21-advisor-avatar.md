@@ -93,7 +93,12 @@ Goal: one approved master drawing. Every size on every surface is made from it.
      circle's width. A tighter crop would give the eyes and muzzle more pixels at 40px.
   6. **Not reviewed here:** motion, the Mac, and the Timeline bar in place. They belong to
      step 2.
-  Owner's answer: pending.
+  Owner's answer (November 22): "go with A". The owner compared three options in the
+  viewer, each whole on white: A the shipped vector master, B the Sunburst render, C round
+  2's candidate 1. A stays the master, now chosen without hurry. That settles findings 1
+  and 3: the drawing is lines only, with the trace's strokes. Findings 2, 4 and 5 concern
+  the sized files and the crop, which code makes from the master; the owner has not
+  answered them.
 - **Review viewer, from round 4.** The owner marks candidates in the render-review
   viewer of the `design-render-rounds` skill, as on the Cadent page's images. It runs on
   the owner's Mac from the launch config `avatar-review` (port 4398) and reads
