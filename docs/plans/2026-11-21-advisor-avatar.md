@@ -72,6 +72,29 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   Owner's answer (November 22): the vector trace is the master. Adapt the animations
   now; the updated avatar goes to production quickly.
 
+- **Round 4, November 22:** review of the shipped master. The owner approved round 3 in
+  a hurry and asked to return to the review rounds, with the shipped master as the
+  baseline. This round adds no candidate. Sheet:
+  `docs/design-exploration/advisor-avatar/round-4-baseline-review.png`, captured from the
+  product's own component in Chrome at 1× and 2×, with the Sunburst render beside the
+  master. Findings:
+  1. **The horse lost its white body.** The Sunburst render is white inside the outline.
+     The trace kept only the lines, so the circle's colour shows through the horse and the
+     horse and its background are one tone. The outline alone separates them.
+  2. **At 40px and 48px on a 1× screen the drawing does not hold.** The mane becomes a
+     grey patch as dark as the face outline, the far eye disappears, and the ears and
+     forelock merge. On a 2× screen both sizes read, with a faint far eye.
+  3. **The trace thickened the fine strokes.** Hatching that tapers in the render became
+     short blunt marks in the lightest tone. The eye's iris lines and lashes merged. The
+     contour lost its thick-to-thin change. This shows at 120px on a 2× screen and above.
+  4. **The 120px avatar is soft on a 1× screen.** It is drawn from the 768px file through
+     blurred masks, and thin lines land between pixels.
+  5. **The framing spends the circle on the mane and neck.** The head fills about half the
+     circle's width. A tighter crop would give the eyes and muzzle more pixels at 40px.
+  6. **Not reviewed here:** motion, the Mac, and the Timeline bar in place. They belong to
+     step 2.
+  Owner's answer: pending.
+
 ## What shipped on November 22, 2026 (Tickets 343 to 346)
 
 - **Master:** `assets/advisor-avatar/master.svg` (three tone layers). `npm run avatar:build`

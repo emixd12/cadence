@@ -19499,7 +19499,7 @@ then 347 and 348. Each of 343 and 346 ends with the owner's approval.
 
 ## Ticket 343: Advisor avatar base image
 
-Status: complete on web (November 22, 2026): the owner approved the three-tone vector trace as the master. Mac: next release.
+Status: reopened for review on November 22, 2026. The owner asked to return to the review rounds from the shipped master, because round 3 was approved in a hurry. Round 4 reviews that master; its findings wait for the owner's answers (plan, "Round 4"). The shipped master stays in production meanwhile.
 
 Goal: one approved master drawing of the advisor, with every size made from it.
 
