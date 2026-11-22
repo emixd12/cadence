@@ -1,7 +1,7 @@
 name: Set up Node.js and dependencies
 description: >-
   Installs Node.js 24 and the npm dependencies. Restores node_modules from the
-  Actions cache when no package manifest or lockfile changed, and runs npm ci
+  Actions cache when nothing that npm ci reads has changed, and runs npm ci
   otherwise. Check out the repository before calling this action.
 
 runs:
@@ -11,12 +11,24 @@ runs:
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24.x
-    - name: Record the Node.js version
-      id: node
+    # The key names the Node.js major version, not the patch. Runner images
+    # with 24.22.2 and 24.22.3 served jobs of the same run on November 21, 2026,
+    # and each patch saved and missed its own copy. Add-ons built for one
+    # Node.js 24 release load in every other.
+    #
+    # dependency-key.mjs hashes the lockfile, .npmrc and every package manifest
+    # except the npm scripts that npm ci never runs. A manifest that no longer
+    # matches the lockfile still misses the cache and fails in npm ci.
+    - name: Compute the node_modules cache key
+      id: key
       shell: bash
-      run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
-    # The key covers every manifest npm ci reads, so a manifest that no longer
-    # matches the lockfile misses the cache and fails in npm ci, as before.
+      run: |
+        # Assign first: a failed command inside echo "$(...)" would not stop the step.
+        node_major="$(node --print 'process.versions.node.split(".")[0]')"
+        dependencies="$(node "$GITHUB_ACTION_PATH/dependency-key.mjs")"
+        [[ "$node_major" =~ ^[0-9]+$ && "$dependencies" =~ ^[0-9a-f]{64}$ ]]
+        echo "node=$node_major" >> "$GITHUB_OUTPUT"
+        echo "dependencies=$dependencies" >> "$GITHUB_OUTPUT"
     - name: Restore node_modules
       id: modules
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -25,7 +37,7 @@ runs:
           node_modules
           apps/*/node_modules
           packages/*/node_modules
-        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json', 'package.json', 'apps/*/package.json', 'packages/*/package.json') }}
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.key.outputs.node }}-${{ steps.key.outputs.dependencies }}
     - name: Install dependencies
       if: steps.modules.outputs.cache-hit != 'true'
       shell: bash
