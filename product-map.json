@@ -9,6 +9,7 @@
     "docs/UX_JOURNEY_INVENTORY.md",
     "docs/ontology/briefing-workbench.json",
     "interaction-registry.json",
+    "packages/core/src/advisor-avatar/catalog.json",
     "packages/core/src/integration/operations.ts",
     "packages/core/src/notices/catalog/daily-brief-moves.json",
     "packages/core/src/notices/catalog/daily-brief.json",
@@ -23,6 +24,7 @@
   "counts": {
     "nodes": {
       "api": 62,
+      "avatar": 11,
       "component": 71,
       "family": 16,
       "feature": 36,
@@ -42,11 +44,12 @@
     },
     "links": {
       "aliases (asserted)": 28,
-      "belongs-to (asserted)": 195,
+      "belongs-to (asserted)": 206,
       "calls (derived)": 679,
       "contains (asserted)": 588,
       "defined-in (asserted)": 630,
       "explained-in (asserted)": 251,
+      "follows (asserted)": 17,
       "implemented-in (asserted)": 1013,
       "implemented-in (derived)": 52,
       "on (asserted)": 629,
@@ -494,6 +497,151 @@
       "name": "/api/travel/settings",
       "path": "app/api/travel/settings/route.ts",
       "source": "repository file"
+    },
+    {
+      "id": "avatar:gesture.acknowledge",
+      "kind": "avatar",
+      "name": "gesture.acknowledge",
+      "type": "gesture",
+      "meaning": "Cadence applied what the person answered.",
+      "when": "An answer's outcome arrives: a move applied, a schedule change made, a tip saved as helpful.",
+      "motion": "One small nod.",
+      "still": "No movement; the italic outcome line confirms it.",
+      "status": "active",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge"
+    },
+    {
+      "id": "avatar:gesture.arrive",
+      "kind": "avatar",
+      "name": "gesture.arrive",
+      "type": "gesture",
+      "meaning": "The advisor wakes when the person first opens the Timeline on a local day.",
+      "when": "First Timeline open of the local day on this device.",
+      "motion": "The eye opens and the avatar settles into place. The trial's enlarged entrance from the page centre is kept only as a test variant.",
+      "still": "No movement.",
+      "status": "active",
+      "fromTrial": "entrance top, wake",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.arrive"
+    },
+    {
+      "id": "avatar:gesture.notice",
+      "kind": "avatar",
+      "name": "gesture.notice",
+      "type": "gesture",
+      "meaning": "Something new arrived for the person while the Timeline was open.",
+      "when": "hasNew changes from false to true.",
+      "motion": "One ear flick, a double blink and one gust through the mane. It plays once.",
+      "still": "No movement; the label changes to \"Advisor · 1 new\".",
+      "status": "active",
+      "fromTrial": "advice (gust and double blink, played once instead of looping)",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.notice"
+    },
+    {
+      "id": "avatar:gesture.refused",
+      "kind": "avatar",
+      "name": "gesture.refused",
+      "type": "gesture",
+      "meaning": "Cadence could not apply the person's answer.",
+      "when": "An answer returns the \"Not changed.\" line.",
+      "motion": "The ears tip back once and return.",
+      "still": "No movement; the red line explains it.",
+      "status": "active",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.refused"
+    },
+    {
+      "id": "avatar:state.attending",
+      "kind": "avatar",
+      "name": "state.attending",
+      "type": "state",
+      "meaning": "The advisor panel is open and the person is reading or answering.",
+      "when": "The panel is open.",
+      "motion": "A slight lean toward the panel, slower blinks, the mane settles.",
+      "still": "The plain drawing.",
+      "status": "active",
+      "priority": 3,
+      "fromTrial": "open",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.attending"
+    },
+    {
+      "id": "avatar:state.preparing",
+      "kind": "avatar",
+      "name": "state.preparing",
+      "type": "state",
+      "meaning": "Cadence is preparing or refreshing today's Daily Brief.",
+      "when": "The brief is loading.",
+      "motion": "The eye narrows in focus, the mane moves faster and a thin arc spins around the circle (kept from the trial by the owner, November 21, 2026).",
+      "still": "The plain drawing; the brief's own \"preparing\" words show progress.",
+      "status": "active",
+      "priority": 2,
+      "fromTrial": "thinking",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.preparing"
+    },
+    {
+      "id": "avatar:state.replying",
+      "kind": "avatar",
+      "name": "state.replying",
+      "type": "state",
+      "meaning": "Chat is reading the schedule or writing a reply.",
+      "when": "A chat reply is streaming.",
+      "motion": "Focused eye and a steady mane movement while the reply arrives.",
+      "still": "The plain drawing; Chat's own waiting line shows progress.",
+      "status": "active",
+      "priority": 0,
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.replying"
+    },
+    {
+      "id": "avatar:state.resting",
+      "kind": "avatar",
+      "name": "state.resting",
+      "type": "state",
+      "meaning": "Nothing waits for the person. The advisor is present and calm.",
+      "when": "No unopened brief, no unanswered question, check-in or tip, and the panel is closed.",
+      "motion": "Slow breathing, one blink every few seconds, a light drift in the mane.",
+      "still": "The plain drawing.",
+      "status": "active",
+      "priority": 6,
+      "fromTrial": "idle",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.resting"
+    },
+    {
+      "id": "avatar:state.trouble",
+      "kind": "avatar",
+      "name": "state.trouble",
+      "type": "state",
+      "meaning": "The Daily Brief could not be prepared, or it hit a limit.",
+      "when": "The brief shows a notice instead of advice.",
+      "motion": "None. The head sits slightly lower and stays still. The notice's words explain what happened.",
+      "still": "The plain drawing.",
+      "status": "active",
+      "priority": 4,
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.trouble"
+    },
+    {
+      "id": "avatar:state.waiting",
+      "kind": "avatar",
+      "name": "state.waiting",
+      "type": "state",
+      "meaning": "Something waits for the person: an unopened brief, an unanswered question, a check-in or a tip.",
+      "when": "The label reads \"Advisor · 1 new\".",
+      "motion": "Eye open wide, ears forward, calm between gestures. No dot, badge or pulsing ring: the label carries the count.",
+      "still": "The plain drawing; the label reads \"Advisor · 1 new\".",
+      "status": "active",
+      "priority": 5,
+      "fromTrial": "advice",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.waiting"
+    },
+    {
+      "id": "avatar:state.working",
+      "kind": "avatar",
+      "name": "state.working",
+      "type": "state",
+      "meaning": "Cadence is applying the person's answer: a brief move, a schedule answer or a tip reaction.",
+      "when": "An answer was sent and its result has not come back.",
+      "motion": "Focused eye and a short, quick mane movement until the result arrives.",
+      "still": "The plain drawing; the answer links are disabled.",
+      "status": "active",
+      "priority": 1,
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working"
     },
     {
       "id": "component:composite.behavior-form",
@@ -17370,6 +17518,202 @@
       "to": "service:lib/services/travel-settings.service.ts",
       "grade": "derived",
       "source": "scan:app/api/travel/settings/route.ts#lib/services/travel-settings.service.ts"
+    },
+    {
+      "from": "avatar:gesture.acknowledge",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge/feature"
+    },
+    {
+      "from": "avatar:gesture.acknowledge",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-002",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge/interactions/INT-ADVISOR-002"
+    },
+    {
+      "from": "avatar:gesture.acknowledge",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-004",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge/interactions/INT-ADVISOR-004"
+    },
+    {
+      "from": "avatar:gesture.acknowledge",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-006",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge/interactions/INT-BRIEF-006"
+    },
+    {
+      "from": "avatar:gesture.acknowledge",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-007",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.acknowledge/interactions/INT-BRIEF-007"
+    },
+    {
+      "from": "avatar:gesture.arrive",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.arrive/feature"
+    },
+    {
+      "from": "avatar:gesture.arrive",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-001",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.arrive/interactions/INT-BRIEF-001"
+    },
+    {
+      "from": "avatar:gesture.notice",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.notice/feature"
+    },
+    {
+      "from": "avatar:gesture.refused",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.refused/feature"
+    },
+    {
+      "from": "avatar:gesture.refused",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-004",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.refused/interactions/INT-ADVISOR-004"
+    },
+    {
+      "from": "avatar:gesture.refused",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-006",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#gesture.refused/interactions/INT-BRIEF-006"
+    },
+    {
+      "from": "avatar:state.attending",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.attending/feature"
+    },
+    {
+      "from": "avatar:state.attending",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-001",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.attending/interactions/INT-ADVISOR-001"
+    },
+    {
+      "from": "avatar:state.preparing",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.preparing/feature"
+    },
+    {
+      "from": "avatar:state.preparing",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-001",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.preparing/interactions/INT-BRIEF-001"
+    },
+    {
+      "from": "avatar:state.preparing",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-003",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.preparing/interactions/INT-BRIEF-003"
+    },
+    {
+      "from": "avatar:state.preparing",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-008",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.preparing/interactions/INT-BRIEF-008"
+    },
+    {
+      "from": "avatar:state.replying",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.replying/feature"
+    },
+    {
+      "from": "avatar:state.replying",
+      "type": "follows",
+      "to": "interaction:INT-CHAT-001",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.replying/interactions/INT-CHAT-001"
+    },
+    {
+      "from": "avatar:state.resting",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.resting/feature"
+    },
+    {
+      "from": "avatar:state.trouble",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.trouble/feature"
+    },
+    {
+      "from": "avatar:state.trouble",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-003",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.trouble/interactions/INT-BRIEF-003"
+    },
+    {
+      "from": "avatar:state.waiting",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.waiting/feature"
+    },
+    {
+      "from": "avatar:state.working",
+      "type": "belongs-to",
+      "to": "feature:advisor-tips",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working/feature"
+    },
+    {
+      "from": "avatar:state.working",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-002",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working/interactions/INT-ADVISOR-002"
+    },
+    {
+      "from": "avatar:state.working",
+      "type": "follows",
+      "to": "interaction:INT-ADVISOR-004",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working/interactions/INT-ADVISOR-004"
+    },
+    {
+      "from": "avatar:state.working",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-006",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working/interactions/INT-BRIEF-006"
+    },
+    {
+      "from": "avatar:state.working",
+      "type": "follows",
+      "to": "interaction:INT-BRIEF-007",
+      "grade": "asserted",
+      "source": "packages/core/src/advisor-avatar/catalog.json#state.working/interactions/INT-BRIEF-007"
     },
     {
       "from": "component:composite.behavior-form",

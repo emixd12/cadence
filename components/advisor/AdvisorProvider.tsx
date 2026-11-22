@@ -17,6 +17,14 @@ import {
   type AdvisorLineItem,
 } from "@/lib/ui/advisor";
 import { DailyBriefRequestError } from "@/lib/ui/daily-brief";
+import {
+  isFirstAdvisorOpenToday,
+  resolveAdvisorAvatarGesture,
+  resolveAdvisorAvatarState,
+  type AdvisorAvatarInput,
+  type AdvisorAvatarState,
+} from "@/lib/resolvers/advisor-avatar.resolver";
+import type { AdvisorAvatarGestureEvent } from "./AdvisorAvatar";
 
 /**
  * Advisor plan Phase 4, workstream 4E (placement K, DESIGN.md "Advisor placement").
@@ -65,6 +73,8 @@ type AdvisorContextValue = Readonly<{
   recent: readonly AdvisorTip[] | null;
   /** The panel's last section links here when the Chat page exists (5B/5C pass it). */
   chatHref: string | null;
+  /** What the avatar shows: one state, and the latest one-shot gesture. */
+  avatar: Readonly<{ state: AdvisorAvatarState | null; gesture: AdvisorAvatarGestureEvent | null }>;
 }>;
 
 type BriefSlot = Readonly<{
@@ -120,6 +130,9 @@ function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
   const [researchOpen, setResearchOpen] = useState(false);
   const [proposal, setProposal] = useState<AdvisorProposalState | null>(null);
   const [recent, setRecent] = useState<readonly AdvisorTip[] | null>(null);
+  const [results, setResults] = useState({ applied: 0, refused: 0 });
+  const [gesture, setGesture] = useState<AdvisorAvatarGestureEvent | null>(null);
+  const avatarInputRef = useRef<AdvisorAvatarInput | null>(null);
   const pending = useRef<Pending>(null);
   const tipRef = useRef(tip);
   const proposalRef = useRef(proposal);
@@ -191,7 +204,9 @@ function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
     void client.react(current.tip.id, reaction).then((next) => {
       setTip({ tip: next, answeredHere: true, pending: null, error: null });
       if (reaction !== "helpful") setResearchOpen(false);
+      else setResults((counts) => ({ ...counts, applied: counts.applied + 1 }));
     }, (error: unknown) => {
+      setResults((counts) => ({ ...counts, refused: counts.refused + 1 }));
       setTip({ ...current, pending: null, error: advisorErrorText(errorCode(error)) });
     }).finally(() => { pending.current = null; });
   }, [client]);
@@ -207,8 +222,12 @@ function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
     setProposal({ ...current, pending: choice, error: null });
     void client.answerProposal(view.proposalId, choice).then((result) => {
       setProposal({ view, outcome: result.message, pending: null, error: null, undoable: choice !== "undo" && result.undoable === true });
-      if (result.applied) refresh();
+      if (result.applied) {
+        setResults((counts) => ({ ...counts, applied: counts.applied + 1 }));
+        refresh();
+      }
     }, (error: unknown) => {
+      setResults((counts) => ({ ...counts, refused: counts.refused + 1 }));
       setProposal({ ...current, pending: null, error: advisorErrorText(errorCode(error)) });
     }).finally(() => { pending.current = null; });
   }, [client, refresh]);
@@ -223,11 +242,24 @@ function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
     : item?.kind === "proposal" || item?.kind === "check_in" ? !!proposal?.outcome : false;
   const hasNew = advisorHasNew(item, answeredHere);
 
+  // The avatar: the resolver picks the state, and a change picks at most one gesture.
+  const answering = !!(tip?.pending || proposal?.pending);
+  const avatarInput = useMemo<AdvisorAvatarInput>(() => ({
+    hasNew, panelOpen, brief: brief.kind, answering, replying: false, applied: results.applied, refused: results.refused,
+  }), [hasNew, panelOpen, brief.kind, answering, results]);
+  useEffect(() => {
+    const previous = avatarInputRef.current;
+    avatarInputRef.current = avatarInput;
+    const next = resolveAdvisorAvatarGesture(previous, avatarInput, previous === null && firstOpenToday(safeStorage()));
+    if (next) setGesture((current) => ({ id: next, key: (current?.key ?? 0) + 1 }));
+  }, [avatarInput]);
+  const avatar = useMemo(() => ({ state: resolveAdvisorAvatarState(avatarInput), gesture }), [avatarInput, gesture]);
+
   const value = useMemo<AdvisorContextValue>(() => ({
     item, hasNew, panelOpen, openPanel, closePanel, brief, tip,
     researchOpen, toggleResearch: () => setResearchOpen((open) => !open),
-    react, proposal, answer, openLink, recent, chatHref,
-  }), [item, hasNew, panelOpen, openPanel, closePanel, brief, tip, researchOpen, react, proposal, answer, openLink, recent, chatHref]);
+    react, proposal, answer, openLink, recent, chatHref, avatar,
+  }), [item, hasNew, panelOpen, openPanel, closePanel, brief, tip, researchOpen, react, proposal, answer, openLink, recent, chatHref, avatar]);
   const slot = useMemo<BriefSlot>(() => ({ publish: setBrief, target: panelOpen ? briefTarget : null }), [panelOpen, briefTarget]);
 
   return (
@@ -243,6 +275,19 @@ function AdvisorState({ client, chatHref, onOpenLink, children }: Readonly<{
 
 function errorCode(error: unknown): string | undefined {
   return error instanceof DailyBriefRequestError ? error.code : undefined;
+}
+
+/** Whether this is the first Timeline open of the local day on this device; records today. */
+const AVATAR_DAY_KEY = "cadence.advisor.avatar-day.v1";
+
+function firstOpenToday(storage: Storage | null): boolean {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  try {
+    const first = isFirstAdvisorOpenToday(storage?.getItem(AVATAR_DAY_KEY) ?? null, today);
+    storage?.setItem(AVATAR_DAY_KEY, today);
+    return first;
+  } catch { return false; }
 }
 
 function safeStorage(): Storage | null {

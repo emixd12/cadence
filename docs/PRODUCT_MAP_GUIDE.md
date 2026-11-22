@@ -41,6 +41,7 @@ Edit the source, never the map.
 | Database table | `table:occurrences` | `create table` in `supabase/migrations/*.sql`, minus dropped tables |
 | MCP tool | `mcp-tool:list_behaviors` | `packages/core/src/integration/operations.ts` |
 | Notice | `notice:move.moved` | `packages/core/src/notices/catalog/*.json` (see [Notices](#notices)) |
+| Advisor avatar state or gesture | `avatar:state.waiting`, `avatar:gesture.notice` | `packages/core/src/advisor-avatar/catalog.json` (see [Advisor avatar](#advisor-avatar)) |
 | File, test, service, repository, API route | `file:…`, `test:…`, `service:lib/services/…`, `repository:lib/db/…`, `api:/api/…` | Repository files that a registry or the scan names |
 
 Journeys, features, interactions, components, families, terms, MCP tools and
@@ -71,8 +72,9 @@ for example `interaction-registry.json#INT-AUTH-003/journeys/J02`.
 | `shows` | A file shows a notice (it names the notice's id) |
 | `uses`, `calls` | A file imports a service, or a service reads a table; a file fetches an API route |
 | `styled-by`, `aliases` | A component or notice uses a token (a notice's comes from its style); a token is another token's alias |
-| `belongs-to` | A component belongs to a family; a notice belongs to a feature |
+| `belongs-to` | A component belongs to a family; a notice or an avatar item belongs to a feature |
 | `shown-by` | A notice is shown by an interaction |
+| `follows` | An avatar state or gesture follows an interaction |
 | `relates-to` | An ontology term relates to another term |
 
 A feature's architecture follows the links: its interactions' files, the
@@ -83,6 +85,24 @@ or more features (such as `apps/desktop/src/product.tsx`) is a shared screen: it
 is listed but not followed, unless the feature has no other files. Each MCP tool
 links to the services its handler calls; linking tools to features needs a
 function-level call graph and is a follow-up (`docs/FUTURE_UPDATES.md`).
+
+## Advisor avatar
+
+`packages/core/src/advisor-avatar/catalog.json` holds what the advisor's drawing can
+show. `npm run map -- avatar:` lists every item.
+
+- `art` names the master drawing and the files made from it for each size.
+- `states` last as long as their condition; one shows at a time and the lowest
+  `priority` wins. `gestures` play once.
+- Each item carries `meaning`, `when` (the trigger), `motion`, `still` (what reduced
+  motion shows), `status` (`planned`, `undecided`, `active` or `retired`) and the
+  `interactions` it follows.
+- `experiments` name one state or gesture, at least two variants (one is `still`) and
+  the measures.
+
+`map:check` fails on a missing art file, a repeated priority, a missing field or an
+experiment without a `still` variant. Plan and tickets:
+`docs/plans/2026-11-21-advisor-avatar.md`, Tickets 343–348.
 
 ## Notices
 

@@ -2801,7 +2801,7 @@ Messaging impact: none.
 
 ## 2026-11-21: Sub-behaviors and Timeline Semantic Zoom
 
-The owner decided the sub-behaviors design in chat on November 21, 2026 (Ticket 343). A
+The owner decided the sub-behaviors design in chat on November 21, 2026 (Ticket 349). A
 routine, such as a Skin routine with Cerave, Facewash and Retinol, is a Behavior with
 sub-behaviors.
 
@@ -2833,9 +2833,9 @@ sub-behaviors.
 - **Rollout.** Only the owner's dogfooding account exists, so no compatibility shims
   for older Mac builds or legacy data are added beyond the default column values.
 
-Platform impact: web and Mac (Ticket 343); marketing not applicable (no public claim
-changes; P-083); future mobile inherits the model when a mobile ticket exists.
-Messaging impact: P-081, P-082, P-083.
+Platform impact: web and Mac (Ticket 349); marketing not applicable (no public claim
+changes; P-084); future mobile inherits the model when a mobile ticket exists.
+Messaging impact: P-082, P-083, P-084.
 
 ## 2026-11-21: Merge queue; the repository moves to an organization
 
@@ -2876,3 +2876,78 @@ as required checks inside the queue.
 
 Platform impact: none on web, desktop, marketing or future mobile until the transfer.
 Messaging impact: none yet; the transfer adds one entry for the source URL.
+
+## 2026-11-21: Advisor avatar track
+
+The owner asked on November 21, 2026 for the advisor's avatar to be finished in three
+steps, and for the whole track to be scoped and mapped before work starts.
+
+1. **Base image first.** The large drawing (`public/brand/cadence-advisor-window-draft.webp`)
+   is the baseline. The small avatar must read as the same drawing. The image is refined in
+   review rounds, with an image model or in code, until the owner approves it.
+2. **Then the animations.** The trial's animations (`app/design-system/HorseAvatarTrial.tsx`)
+   were built for the earlier side-profile drawing and are rebuilt on the approved one.
+3. **Then scope and tests.** Each animation is tied to something the advisor does, and
+   Cadence gains a way to compare animation variants on real accounts and refine them.
+
+What this entry settles:
+
+- The states and gestures live in one catalog,
+  `packages/core/src/advisor-avatar/catalog.json`, read by the product map
+  (`avatar:` items). One pure resolver decides the state.
+- The trial's badge and orbiting dots do not carry over: placement K says the advisor has
+  no dot. The label "Advisor · 1 new" stays the signal.
+- The animated avatar ships behind a flag that is off in production until the owner
+  accepts it.
+
+What stays open, for the owner (`docs/plans/2026-11-21-advisor-avatar.md`, "Open owner
+decisions"): the line weight at small sizes, image model spend, the preparing arc, the
+advisor on the Chat page, and recording interface use. The last one touches the
+`AGENTS.md` rule "Do not add analytics/tracking scripts unrelated to this app's internal
+behavior tracking". The plan uses first-party rows in Cadence's own database and no
+third-party script. Tickets 347 and 348 wait for the owner's confirmation, and `AGENTS.md`
+changes then, not now.
+
+Platform impact: web and Mac share the catalog, resolver and component (Tickets 343–346);
+marketing not applicable; future mobile reads the same catalog when ticketed. Messaging
+impact: P-081 (logged; applies only if Ticket 347 is confirmed).
+
+## 2026-11-21: Advisor avatar: owner answers after round 1
+
+The owner answered the avatar plan's open decisions on November 21, 2026.
+
+1. **Style.** The old side-profile drawing (`public/brand/cadence-horse-avatar.png`) is the
+   primary style reference. The other horse drawings on the site are secondary. Every
+   horse should read as one style. At small sizes the avatar stays "elegant and faint",
+   between the round 1 candidates A and B.
+2. **Image model.** The cloud session's OpenAI key may be used for avatar image rounds.
+   `docs/OPERATIONS.md`, "Claude cloud sessions", listed it for briefing bench runs only.
+3. **The preparing arc** stays for now, on top of the eye and mane motion. A thin arc is
+   not the dot or badge that placement K rules out.
+4. **Chat.** The advisor appears on the Chat page too.
+5. **Recording interface use** is set aside ("think about this later"). Tickets 347 and
+   348 are deferred. The `AGENTS.md` tracking-scripts rule is unchanged and P-081 stays
+   logged as planned.
+
+Platform impact: web and Mac, through Tickets 343–346; marketing not applicable; future
+mobile reads the same catalog. Messaging impact: none new.
+
+## 2026-11-22: Advisor avatar master approved; motion ships without a flag
+
+The owner approved the three-tone vector trace as the avatar's master on November 22,
+2026 ("Lets go with the vector trace as the master"), asked for the earlier animations to
+be adapted right away, and asked for a quick production deployment of the updated avatar.
+
+- **Master.** `assets/advisor-avatar/master.svg`. Shipped sizes are made from it by
+  `npm run avatar:build`. The drawing is candidate 1 of round 2, re-rendered by
+  `gpt-image-2.6-sunburst` at quality `max` and traced in code.
+- **No flag.** The 2026-11-21 entry said the animated avatar ships behind a flag that is
+  off in production until the owner accepts it. This entry replaces that: the motion is on
+  for every account with an advisor when the pull request merges. Reduced motion still
+  shows the still drawing.
+- **Chat.** The Chat page shows the avatar at 48px beside its links.
+- **Unchanged.** Tickets 347 and 348 (tests on real accounts) stay deferred.
+
+Platform impact: web on merge; Mac in its next release (shared components and files, not
+checked on an installed Mac); marketing not applicable; future mobile reads the same
+catalog. Messaging impact: none.

@@ -944,6 +944,33 @@ function connectorAndManualMark(
   return ordered[ordered.length - 1] === connector ? connectorSide : manualSide;
 }
 
+// Ticket 341 (D28): the Ticket 319 convergence pushes both root marks to the hosted
+// account, and the hosted occurrence already shows the user's mark. A copy that later
+// reads that account (first link, re-link, Import or another linked Mac) adopts the
+// hosted pair as settled history, provided it adds no root mark of its own. Two manual
+// roots, two connector roots and any local root mark still fail.
+function hostedConnectorAndManualRoots(rows: readonly AccountSyncEntity[]): boolean {
+  if (rows.length !== 2) return false;
+  const connector = rows.find(isConnectorRootMark), manual = rows.find(isManualRootMark);
+  if (!connector || !manual || connector === manual) return false;
+  for (const row of rows) {
+    if (field(row.value, "id") !== row.id || field(row.value, "previous_status") !== "unresolved" || field(row.value, "revises_event_id") !== null) return false;
+  }
+  for (const key of ["occurrence_id", "behavior_id", "local_date", "timezone"]) {
+    if (!field(connector.value, key) || field(connector.value, key) !== field(manual.value, key)) return false;
+  }
+  try {
+    for (const row of rows) for (const key of ["recorded_at", "effective_at", "created_at"]) Temporal.Instant.from(field(row.value, key) ?? "");
+  } catch { return false; }
+  return true;
+}
+
+// Every copy, baseline included, holds no root mark for the Occurrence beyond the hosted pair.
+function onlyRoots(occurrenceId: string, allowed: ReadonlySet<string>, graphs: readonly Map<string, AccountSyncEntity>[]): boolean {
+  return graphs.every((graph) => [...graph.values()].every((row) => row.kind !== "status_event"
+    || field(row.value, "occurrence_id") !== occurrenceId || field(row.value, "revises_event_id") !== null || allowed.has(row.id)));
+}
+
 function withoutFields(value: Json, excluded: readonly string[]): string {
   return canonical(Object.fromEntries(Object.entries(value as Record<string, Json>).filter(([key]) => !excluded.includes(key))));
 }
@@ -968,6 +995,8 @@ function historyBranches(baseline: Map<string, AccountSyncEntity>, local: Map<st
     if (firstHostedHydration && !hasStatusBaseline && hostedRows.length > 1 && status !== null
       && hostedRows.every((row) => field(row.value, "status") === status) && localRows.every(({ id }) => hostedIds.has(id))) continue;
     if ([...localRows, ...hostedRows].every((row) => compatibleMarks.has(field(row.value, "occurrence_id") ?? ""))) continue;
+    if (predecessor.startsWith("root:") && localRows.every(({ id }) => hostedIds.has(id)) && hostedConnectorAndManualRoots(hostedRows)
+      && onlyRoots(predecessor.slice("root:".length), hostedIds, [baseline, local, hosted])) continue;
     if (localRows.length > 1) throw new Error("The local account snapshot contains branched status history.");
     if (hostedRows.length > 1) throw new Error("The hosted account snapshot contains branched status history.");
     if (localRows[0] && hostedRows[0] && localRows[0].id !== hostedRows[0].id) throw new Error("The account snapshot contains branched status history.");

@@ -635,7 +635,7 @@ activity) offers an underlined **Remove** at the end of its expanded details, on
 and in Needs decision. The result shows below it as `opportunity.removed` or an
 `opportunity.remove-refused.*` notice. Scheduled rows never show either.
 
-### Routine rows and Semantic Zoom (Ticket 343)
+### Routine rows and Semantic Zoom (Ticket 349)
 
 - A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine
   title, slot time, derived state (progress "2/3", or Completed / Not Completed with
@@ -1003,7 +1003,7 @@ counts and Clear filters. Keep overall analytics scope explicit and unchanged.
 Preserve drafts and selections through in-screen updates. Stack controls on
 narrow screens. Detailed lifecycle and empty-state criteria live in Ticket 124.
 
-### Sub-behaviors on Behaviors (Ticket 343)
+### Sub-behaviors on Behaviors (Ticket 349)
 
 - Behavior form: **Part of** (`parent_behavior_id`; None, or an active top-level
   Behavior other than itself) and **Follow parent schedule** (on by default). While a

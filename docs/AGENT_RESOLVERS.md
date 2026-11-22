@@ -359,6 +359,18 @@ tests: `tests/advice-matcher.resolver.test.ts` and `tests/advice-library.test.ts
 caller: the coach's daily quip run (4B). Forbidden bypasses: routes, components or the
 model choosing cards.
 
+## Advisor avatar (Ticket 344)
+
+`packages/core/src/resolvers/advisor-avatar.resolver.ts` decides which state and gesture
+the advisor's avatar shows. Its input is what the advisor already knows: whether something
+waits, whether the panel is open, the brief's kind, whether an answer is in flight, whether
+Chat is replying, and counts of applied and refused answers. It reads no clock, storage or
+UI; the caller passes whether this is the first open of the local day. The catalog
+(`packages/core/src/advisor-avatar/catalog.json`) holds each item's meaning and priority.
+Paired test: `tests/advisor-avatar.resolver.test.ts`. Allowed callers:
+`components/advisor/AdvisorProvider.tsx` and `components/chat/ChatPage.tsx`. Forbidden
+bypass: a component choosing a state or gesture itself.
+
 ## Chat starters (advisor plan Phase 5B)
 
 `packages/core/src/resolvers/chat-starters.resolver.ts` picks up to three starter

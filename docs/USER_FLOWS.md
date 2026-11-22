@@ -568,7 +568,7 @@ The Behaviors screen distinguishes two edit modes:
   It shows Date of behavior, Time of behavior, Status, and Note as plain rows.
   Date and time are display-only in this review path.
 
-## Routines and sub-behaviors (Ticket 343)
+## Routines and sub-behaviors (Ticket 349)
 
 1. **Create a routine.** On Behaviors, open Create behavior, enter the routine's title
    and schedule, choose Add sub-behavior for each step, order them with Up and Down and

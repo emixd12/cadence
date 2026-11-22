@@ -641,7 +641,7 @@ write without `origin` and `added_by` ask for an update; a write that changes an
 existing Occurrence's origin is refused. A removed added row leaves the hosted
 snapshot, and the planner sends the delete either way.
 
-## Sub-behaviors (Ticket 343)
+## Sub-behaviors (Ticket 349)
 
 SQLite schema 28 (`apps/desktop/src-tauri/migrations/0028_sub_behaviors.sql`) adds
 the hosted link columns (`docs/DATA_MODEL.md`, "Sub-behaviors"):

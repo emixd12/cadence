@@ -48,9 +48,11 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 343–348: advisor avatar | 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
-| Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Done November 14: reminder email sender renamed from "Identity Scaffolding" to "Cadence" (next entry). (2) Done November 14: replies to `hello@`, `login@` and `support@cadence-me.com` reach a Microsoft 365 shared mailbox (next entry). (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history (`account-sync.resolver.ts:821`; proposed workspace). (8) After a refused CAPTCHA the email form clears the typed address. (9) Shared per-IP OTP and verify limits: fixed and live under Ticket 338 (next row). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production. (11) Token refresh in `proxy.ts` shared one per-address limit and a refused refresh signed people out: fixed and live under Ticket 339 (next row) | `docs/qa/2026-11-13-sign-in-final-verification.md` |
+| Sign-in follow-ups (from the November 13 final check) | Open, none blocks users today | (1) Done November 14: reminder email sender renamed from "Identity Scaffolding" to "Cadence" (next entry). (2) Done November 14: replies to `hello@`, `login@` and `support@cadence-me.com` reach a Microsoft 365 shared mailbox (next entry). (3) Sequenzy open tracking on (pixel in sign-in email). (4) SMTP key is full access; a `transactional_sender` key would do. (5) Turnstile widget allows `localhost` and `127.0.0.1`. (6) Test login host check passes from the LAN under `next dev`. (7) First link refused for branched status history: Ticket 341 (row below). (8) After a refused CAPTCHA the email form clears the typed address. (9) Shared per-IP OTP and verify limits: fixed and live under Ticket 338 (next row). (10) 32 acceptance OAuth clients and the `localhost` redirect entries remain on production. (11) Token refresh in `proxy.ts` shared one per-address limit and a refused refresh signed people out: fixed and live under Ticket 339 (next row) | `docs/qa/2026-11-13-sign-in-final-verification.md` |
 | Tickets 338–340: sign-in limits per person | **Live in production since November 14, 2026, 01:44Z.** Hosted `security_sb_forwarded_for_enabled` on; Vercel Production `CADENCE_TURNSTILE_SECRET_KEY` and `SUPABASE_SECRET_KEY` (existing `default` key) set, owner-approved 01:34Z. Two-network checks passed for wrong codes, refresh and the sign-in callback | Follow-up ticket needed: forward Change address (`PUT /user`); hosted measurement shows it works. Remove-a-method check not run (no spare provider account) | TICKETS, Tickets 338–340; `docs/qa/2026-11-13-ticket-338-email-rate-limit.md`, section G |
+| Ticket 341: account link accepts a hosted connector and manual mark pair | Resolver fix and tests rebuilt on current main (replaces PR #283) | Installed check: a dev-signed build on the test Mac re-links account A without restoring its database; ships with the next Mac release | TICKETS, Ticket 341 |
 | Sign in with Apple client-secret rotation (Ticket 333), row dated November 13, 2026 | Current secret made November 13, 2026, 18:58Z; **expires May 12, 2027**; **rotate by April 12, 2027**. Held by the Supabase Apple provider and Vercel Production `APPLE_SIGN_IN_CLIENT_SECRET` | Rotate with `docs/OPERATIONS.md`, "Sign in with Apple (Ticket 333)" (owner approves the key read); the same section covers a missed rotation. Update this row with the new dates | OPERATIONS, "Sign in with Apple (Ticket 333)" |
 | Tickets 310–324: connector completion (D28) | 310–324 complete; `CADENCE_CONNECTOR_COMPLETION` on in Production since November 13, 2026, 04:30 UTC. Ticket 323 matrix passed on a local stack, deployed web and the installed Mac 0.1.10 (`docs/qa/2026-11-12-connector-completion-acceptance.md`) | Owner deletes the Hevy test workouts and routines, then an agent records the `deleted`-event rows. One-day Vercel usage measurement due after November 14, 04:30 UTC (US$5/month ceiling, `docs/COSTS.md`). Mac count control is a follow-up | TICKETS, Tickets 310–324; DECISIONS, 2026-11-12 |
 | First account link times out for a large account | Fixed: PR #247 merged as `7e829202` with hosted migration `20261112120000`; the owner's Mac first link passed November 12 at 05:52Z | The Mac error-text fix shipped in 0.1.11 | STATUS, "Owner's Mac first link after the hosted fix — November 12, 2026" |
@@ -94,6 +96,54 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor avatar: approved master and motion on web (Tickets 343–346) — November 22, 2026
+
+- **In review (PR #357, branch `claude/eloquent-turing-ua4q6s`), merging on green.** The
+  owner approved the three-tone vector trace as the master and asked for the animations
+  and a quick production deployment.
+- **Shipped:** `assets/advisor-avatar/master.svg`; `npm run avatar:build` and the two
+  files under `public/brand/advisor/`; anchors in the catalog; the resolver
+  (`advisor-avatar.resolver.ts`); `AdvisorAvatar` with 7 states and 4 gestures on the
+  Timeline, the panel and the Chat page; bench `/design-system?preview=advisor-avatar`.
+- **No flag** (DECISIONS, 2026-11-22). Reverting the pull request turns the motion off.
+- **Not done:** brief moves do not reach the avatar; installed Mac not checked; the old
+  trial bench stays.
+- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`,
+  `resolvers:check`, lint (0 errors), typecheck, build and `avatar:check` pass.
+  `npm run test`: 6,844 pass; 1 file fails (`tests/mcp-hosted-fixtures.test.mjs`, shallow
+  clone). Bench screenshots of every state, a blink, two gestures, the Timeline, the panel
+  and Chat.
+
+Platform impact: web implemented; desktop shares the components and files, next release;
+marketing not applicable; future mobile deferred. Messaging impact: none.
+
+## Advisor avatar track scoped (Tickets 343–348) — November 21, 2026
+
+- **In review (draft PR, branch `claude/eloquent-turing-ua4q6s`).** The owner asked for
+  the avatar in three steps: base image, animations on it, then scope and tests. Plan:
+  `docs/plans/2026-11-21-advisor-avatar.md`.
+- **Finding.** The trial's animations target the old side-profile drawing by fixed
+  coordinates, so none apply to the placement K drawing. The small avatar's file is the
+  same drawing with much heavier lines, which is why it reads as a different horse.
+- **Landed.** `packages/core/src/advisor-avatar/catalog.json` (7 states, 4 gestures, all
+  planned; the art block); the product map reads it as `avatar:` items and `map:check`
+  validates it. No product screen changed.
+- **Ticket 343 round 1.** Comparison sheet of four line weights made from the large
+  drawing, beside the current small file. Owner: between A and B.
+- **Owner answers, same day.** The side-profile drawing is the style reference; image
+  model allowed; the preparing arc stays; the advisor appears on Chat; recording interface
+  use is deferred (Tickets 347 and 348).
+- **Ticket 343 round 2.** Three candidates from `gpt-image-2` (one request), the placement
+  K pose in the profile's style, at ink ×1.25 for small sizes. Owner chose candidate 1.
+- **Ticket 343 round 3, November 22.** Candidate 1 re-rendered by `gpt-image-2.6-sunburst`
+  at quality `max` (2048px), and a three-tone vector trace of it. Awaiting the owner.
+- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`,
+  `resolvers:check`, lint (0 errors), typecheck and build pass. `npm run test`: 6,801
+  pass; 1 file fails (`tests/mcp-hosted-fixtures.test.mjs` needs full git history; the
+  cloud clone is shallow).
+
+Platform impact: none yet (docs, catalog and map only). Messaging impact: P-081 (planned).
+
 ## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
 
 - **Merged (PR #351, `07fb29ea`) and live; the Mac part shipped in Cadence for Mac 0.1.14
@@ -118,7 +168,7 @@ Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
 `apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
 not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.
 
-## Sub-behaviors and Timeline Semantic Zoom (Ticket 343) — November 21, 2026
+## Sub-behaviors and Timeline Semantic Zoom (Ticket 349) — November 21, 2026
 
 State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911a`
 (after PR #351 Behaviors of Opportunity and Mac 0.1.14); not merged, not deployed.
@@ -128,7 +178,7 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
   Daily Brief routine moves, `coach-signals-3` (`sub_behavior_dropoff`),
   `coach-tips-3`, portability, Hevy completion on routines, and Mac parity (SQLite
   0028, account sync contract 9; the minimum writer contract stays 8, so Mac 0.1.14
-  keeps syncing). Docs: TICKETS, Ticket 343; DECISIONS, 2026-11-21.
+  keeps syncing). Docs: TICKETS, Ticket 349; DECISIONS, 2026-11-21.
 - An opportunity Behavior is never part of a routine: it cannot be a parent or a
   sub-behavior (resolver, database trigger, SQLite 0028 triggers, MCP and form).
 - Mac Daily Brief routine moves: Yes, Other time, Undo, Accept all and Undo all on a
@@ -136,7 +186,7 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
   `smaller-step-in-the-routine` is active (owner review 2026-11-21; library
   `2026-11-21.2`).
 - Registry: `INT-BEHAVIOR-039`–`045` and `INT-TIMELINE-025`–`027`, implemented on web
-  and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-081–P-083.
+  and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-082–P-084.
 - Hosted migrations pushed November 21, 2026 (owner-authorized): `20261122010000_sub_behaviors`,
   `20261122020000_sub_behavior_portability_connectors`,
   `20261122030000_coach_signal_sub_behavior_dropoff`. `migration list`: 151 local, 151

@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-084` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-085` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2284,9 +2284,25 @@ cite has not changed.
 - **Update needed:** user guide Daily Brief section; Privacy/Trust Daily Brief write list.
 - **Related:** P-078, P-079.
 
-## P-081: Routines and sub-behaviors in the app
+## P-081: Cadence may record how the advisor's avatar is used
 
-- **Change:** implemented November 21, 2026 (Ticket 343). New in-app copy:
+- **Change:** planned, not built (Ticket 347, blocked on the owner's confirmation). Cadence
+  would show different avatar animations to different accounts and record, per account and
+  day: the surface, the animation variant, the avatar's state, and whether the panel was
+  opened or a question answered afterwards. No tip text, Behavior names or positions. Rows
+  kept 90 days. No third-party provider.
+- **Affected:** `packages/core/src/advisor-avatar/catalog.json`,
+  `docs/plans/2026-11-21-advisor-avatar.md`.
+- **Surfaces:** Privacy (what Cadence records); Trust; the full JSON export if the owner
+  includes these rows.
+- **Conflicting current text:** any copy that says Cadence records no usage of its interface.
+- **Update needed:** Privacy wording before the first experiment runs on real accounts.
+- **Related:** P-070.
+- **Status:** logged.
+
+## P-082: Routines and sub-behaviors in the app
+
+- **Change:** implemented November 21, 2026 (Ticket 349). New in-app copy:
   - Behaviors: "Part of", "Follow parent schedule", "Uses the schedule of {parent}.",
     "Add sub-behavior", "Sub-behaviors (n)", "Detach", "New sub-behavior", "Add an
     existing behavior", "Full routines x of y", "Order saved.", "{title} created with n
@@ -2306,9 +2322,9 @@ cite has not changed.
 - **Update needed:** the messaging pass (Ticket 246) reviews the user guide wording.
 - **Status:** logged.
 
-## P-082: Outside AI clients read and write routines (MCP contract 1.7.0)
+## P-083: Outside AI clients read and write routines (MCP contract 1.7.0)
 
-- **Change:** implemented November 21, 2026 (Ticket 343). MCP contract 1.7.0 adds the
+- **Change:** implemented November 21, 2026 (Ticket 349). MCP contract 1.7.0 adds the
   Behavior hierarchy fields, `parent_groups` on `get_timeline`, hierarchy filters on
   `list_behaviors`, `sub_behaviors` on `create_behavior`, grouping on `update_behavior`
   and the tool `set_parent_occurrence_status`.
@@ -2322,9 +2338,9 @@ cite has not changed.
   tool list and descriptions.
 - **Status:** logged.
 
-## P-083: Hevy completion and disclosures on routines
+## P-084: Hevy completion and disclosures on routines
 
-- **Change:** implemented November 21, 2026 (Ticket 343). A Hevy source link on a routine
+- **Change:** implemented November 21, 2026 (Ticket 349). A Hevy source link on a routine
   marks each Unresolved step of the matched slot Completed (D28 rules per step).
 - **Affected:** `components/behaviors/SourceLinkSettings.tsx` (unchanged text).
 - **Surfaces:** in-app disclosure, user guide (`docs/user-guide/timeline.md`, connected

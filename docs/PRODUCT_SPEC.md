@@ -246,7 +246,7 @@ date, start time, and end-time/range identity. Partial completion for multi-time
 behaviors is derived only from mixed occurrence statuses; it is not a stored
 status.
 
-## Sub-behaviors and routines (Ticket 343)
+## Sub-behaviors and routines (Ticket 349)
 
 Owner decision 2026-11-21 (`docs/DECISIONS.md`). A **routine** is a Behavior with
 sub-behaviors, such as a Skin routine with Cerave, Facewash and Retinol. Each
@@ -301,7 +301,7 @@ sub-behavior is a real Behavior row with `parent_behavior_id`.
     import as standalone Behaviors.
 
 Data: `docs/DATA_MODEL.md`, "Sub-behaviors (depth 1, November 2026)". Mac:
-`docs/DESKTOP_DATA_MODEL.md`, "Sub-behaviors (Ticket 343)".
+`docs/DESKTOP_DATA_MODEL.md`, "Sub-behaviors (Ticket 349)".
 
 ## Notes
 

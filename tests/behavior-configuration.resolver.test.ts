@@ -296,7 +296,7 @@ describe("Behaviors of Opportunity configuration", () => {
       configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [] }),
       recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
     });
-    // Sub-behavior link fields (Ticket 343) follow is_opportunity.
+    // Sub-behavior link fields (Ticket 349) follow is_opportunity.
     expect(baseline.changedFields.slice(-4)).toEqual(["pause", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule"]);
     expect(baseline.nextConfiguration).toMatchObject({ isOpportunity: true, scheduleGraph: [] });
   });

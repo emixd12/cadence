@@ -1184,7 +1184,7 @@ A bundle without these keys keeps the stored values during restore: an existing
 added Occurrence stays added. CSV is unchanged. `BEHAVIORLOG_SCHEMA_VERSION` is
 unchanged: the new keys are Cadence extensions.
 
-## Sub-behaviors (Ticket 343)
+## Sub-behaviors (Ticket 349)
 
 - **Full JSON:** every Behavior record carries `parent_behavior_id` (uuid or null),
   `sub_behavior_sort_order` (integer, default 0) and `inherit_parent_schedule`

@@ -426,7 +426,7 @@ account-free local data never reaches this server. Marketing and future mobile
 are not applicable to this ticket. The interaction registry and design-system
 surface catalog carry the same platform decision.
 
-## Sub-behaviors (Ticket 343)
+## Sub-behaviors (Ticket 349)
 
 Cadence for Mac has tracking parity for sub-behaviors in local and linked mode:
 
@@ -438,7 +438,7 @@ Cadence for Mac has tracking parity for sub-behaviors in local and linked mode:
   decision, so routine rows, bulk marks and Semantic Zoom work as on the web
   (`apps/desktop/src/timeline-screen.tsx`).
 - Data: SQLite schema 28 and account sync contract 9 (`docs/DESKTOP_DATA_MODEL.md`,
-  "Sub-behaviors (Ticket 343)").
+  "Sub-behaviors (Ticket 349)").
 - Registry: `INT-BEHAVIOR-039` to `INT-BEHAVIOR-045` and `INT-TIMELINE-025` to
   `INT-TIMELINE-027` are implemented for desktop.
 - Evidence: `tests/desktop-sub-behaviors.test.ts`, shared DOM tests and `cargo test`.

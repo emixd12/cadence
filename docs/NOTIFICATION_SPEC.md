@@ -461,7 +461,7 @@ runs. A Mac schedules its Behavior reminders locally and learns of a
 connector completion only when it syncs, so a Mac reminder can still fire for a logged
 workout while Cadence for Mac is closed.
 
-## Routine reminders (Ticket 343)
+## Routine reminders (Ticket 349)
 
 Sub-behaviors that follow their parent's schedule share one reminder per slot and
 channel (`resolveRoutineReminderDeliveries`). The reminder uses the parent's browser

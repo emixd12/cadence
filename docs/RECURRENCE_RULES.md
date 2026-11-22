@@ -242,7 +242,7 @@ An opportunity can be added only at a time the Behavior is running, by the stop 
 
 Database details: docs/DATA_MODEL.md, "Behaviors of Opportunity".
 
-## Sub-behavior schedules (Ticket 343)
+## Sub-behavior schedules (Ticket 349)
 
 1. A sub-behavior with `inherit_parent_schedule = true` stores a copy of its parent's
    schedules, time entries, timezone, end and pause on its own rows. The resolver

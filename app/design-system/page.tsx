@@ -9,6 +9,7 @@ import { ChatBench, ChatBenchPage } from "./ChatBench";
 import { parseChatBenchState } from "./chat-fixtures";
 import { ChatGptPlanCardBench, DailyBriefBubbleBench, DailyBriefPlanStatesBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
+import { AdvisorAvatarBench } from "./AdvisorAvatarBench";
 import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
 import { AdvisorBench, type AdvisorBenchState } from "./AdvisorBench";
 import type { Metadata } from "next";
@@ -426,6 +427,9 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
 
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
+
+  // Tickets 343 to 346: the advisor avatar on the approved drawing, every state and gesture.
+  if (selectedPreviewId === "advisor-avatar") return <AdvisorAvatarBench />;
 
   // Advisor plan Phase 5B: the Chat page in the app shell, one fixture state per page.
   if (selectedPreviewId === "chat") {
