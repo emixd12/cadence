@@ -1,0 +1,14 @@
+/*
+ * Bench-only options for the advisor avatar's breathing (step 2 review, November 22, 2026).
+ * Each rule overrides the whole-drawing animation of `AdvisorAvatar` for one row of the bench.
+ * The drawing is the first svg inside the avatar's round face. Nothing here ships in the product.
+ */
+
+.none :global([data-advisor-avatar]) > span svg {
+  animation: none;
+}
+
+.panelOnly [data-bench-size="40"] :global([data-advisor-avatar]) > span svg,
+.panelOnly [data-bench-size="48"] :global([data-advisor-avatar]) > span svg {
+  animation: none;
+}

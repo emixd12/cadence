@@ -236,6 +236,31 @@ does today.
 - **Shipping.** The animated avatar lands behind `CADENCE_ADVISOR_AVATAR_MOTION`, off in
   production until the owner accepts it on web and on the installed Mac (Ticket 346).
 
+#### Step 2 review, November 22, 2026
+
+The owner returned to this step after the hurried run. Review 1 measures the shipped
+motion in the bench, in Chrome at 1× and 2×. Sharpness is the mean difference between
+neighbouring pixels, as a share of the still drawing's.
+
+- **Breathing softens the whole drawing, all the time.** It turns and scales the drawing
+  without pause, so the browser redraws it between pixels. With every movement on, the
+  avatar keeps 62 to 69% of its sharpness at 40 and 48px and 56 to 58% at 120px. With
+  breathing off it keeps 89 to 94% at 40 and 48px and 78 to 80% at 120px.
+- **The mane costs the rest.** Its sway and, at 120px, its ripple redraw the mane. The
+  blink costs nothing measurable.
+- **Breathing at 40 and 48px breaks this plan's own rule,** "only the motions that read
+  at that size run (blink, mane, one gesture)".
+- **A state with a fixed tilt is soft too.** `state.trouble` and `state.attending` turn
+  the drawing by 2 degrees and hold it; they keep 67 to 84%.
+- **Round 5's gain needs this.** The exact-size files are sharper only when the drawing
+  is not turned or scaled.
+- **Options on the bench** (`/design-system?preview=advisor-avatar`, "Breathing options"):
+  A as shipped; B no breathing; C breathing in the 120px panel only. Tried and dropped:
+  one breath every 9 seconds, which stayed as soft as A between breaths.
+- **Not reviewed yet:** each gesture, the state-to-state differences, the Chat page, the
+  tilt in `state.trouble` and `state.attending`, and the installed Mac.
+- Owner's answer: pending.
+
 ### Step 3: tests on real accounts (Tickets 347 and 348)
 
 Goal: compare animation variants on real use and keep a record of each change.

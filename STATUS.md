@@ -96,6 +96,19 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor avatar: step 2 review 1, breathing softens the drawing — November 22, 2026
+
+- **In review (draft PR, branch `claude/avatar-motion-review`).** The owner returned to the
+  animation step. Measured in the bench: the whole-drawing breathing leaves the avatar at
+  56 to 69% of the still drawing's sharpness; without it, 78 to 94%.
+- **Bench only:** `/design-system?preview=advisor-avatar`, "Breathing options", rows A
+  (as shipped), B (no breathing), C (panel only). No product behaviour changed.
+- **Waits for the owner's choice.** Findings: `docs/plans/2026-11-21-advisor-avatar.md`,
+  "Step 2 review".
+
+Platform impact: none yet (bench only; the choice will change the shared component on web
+and desktop). Marketing not applicable; future mobile deferred. Messaging impact: none.
+
 ## Advisor avatar: exact-size files (Ticket 343, round 5) — November 22, 2026
 
 - **Owner's choice:** option B of round 5, "Go with B". Same drawing, tone strengths and
