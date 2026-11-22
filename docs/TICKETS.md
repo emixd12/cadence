@@ -19759,3 +19759,75 @@ Verification: resolver, service, DOM, desktop and Rust tests; SQL smokes
 `tests/sql/sub-behaviors-smoke.sql` and
 `tests/sql/sub-behavior-portability-connectors-smoke.sql`; the local integration file
 `tests/integration-sub-behaviors.local-integration.test.ts` on a migrated stack.
+
+## Ticket 350: Move the repository to the cadence-me organization and require a merge queue
+
+Status: in progress since November 22, 2026. Preparation is done; the transfer waits on
+the owner.
+Owner decision: `docs/DECISIONS.md`, 2026-11-21, "Merge queue; the repository moves to an
+organization". The owner chose the name `cadence-me` on November 22, 2026.
+Precedent: Ticket 186 and `docs/plans/2026-10-07-cadence-project-rename.md`. This ticket
+reuses its archive design and its gates; it moves no local folder and no tool state.
+
+Goal: `github.com/cadence-me/cadence` owns the same repository (ID `1261353608`), and
+`main` merges through a queue. Nothing an installed Mac, a public link or a Trust evidence
+URL depends on stops working.
+
+Fixed decisions:
+
+- Transfer the existing repository. Keep the name `cadence`, the history, releases,
+  settings, Vercel projects and production domains.
+- Never create a repository named `cadence` under `emixd12`. Installed Macs read
+  `github.com/emixd12/cadence/releases/...` through GitHub's redirect.
+- Evidence published under `https://emixd12.github.io/cadence/trust/` keeps its URLs and
+  bytes through the `emixd12/emixd12.github.io` archive. New evidence publishes under
+  `https://cadence-me.github.io/cadence/trust/`.
+- Privacy and Terms name the old source URL. That text gets a
+  `docs/MESSAGING_CHANGES.md` entry, not an edit.
+
+Steps, in order. "Owner" steps are sign-ins, the transfer and organization settings.
+
+1. Done, November 21: `CI` runs on `merge_group` (PR #356).
+2. Done, November 22: `scripts/download-public-trust-history.mjs` accepts both older
+   roots when the Pages root is exactly `https://cadence-me.github.io/cadence/`.
+3. Done, November 22: the archive holds a staged copy of all 112 files under
+   `cadence/trust/` (archive commit `e33d350`), with `tools/capture-trust.mjs` to refresh it.
+4. Owner: create the free organization `cadence-me`.
+5. Agent, on the day of the transfer: disable the `Public Trust evidence` workflow, wait
+   for a running publication, refresh the archive copy and push it.
+6. Owner: transfer the repository to `cadence-me`, then install the Vercel and Codex
+   review GitHub Apps for the organization.
+7. Agent, before anything else changes: read back the repository ID; check every archived
+   `emixd12.github.io/cadence/trust/` URL against `SHA256SUMS`; check both desktop update
+   feeds and their assets through the old URLs; check that both Vercel projects build from
+   the new location. Stop on any failure.
+8. Agent: set `origin` to the new URL; set `TRUST_PAGES_ORIGIN` at repository scope and in
+   both `public-trust-*` environments; merge the pull request that changes the feed URL,
+   the release, marketing and plugin links and the docs; log the messaging entry.
+9. Agent: enable the Trust workflow again and confirm two publications keep the whole
+   history. If the new Pages site serves no index after the transfer, stop: seeding it is
+   a separate, reviewed step, never `initialize_empty_history`.
+10. Owner or agent on the owner's word: require a merge queue on `main` (merge commit).
+11. Agent: send one pull request through the queue and record the times.
+
+Not verified before the transfer: that GitHub serves the existing Pages site at the new
+origin, that Vercel's Git connection follows the repository, and that `gh` needs no
+approval under the organization's application policy.
+
+Rollback before step 8: transfer the repository back to `emixd12`; its Pages site takes
+`/cadence/` back from the archive. After new evidence exists under the new origin, prefer
+fixing forward, as Ticket 186's plan explains.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Trust feed URL in `lib/services/public-trust-evidence.service.ts` and source links, in step 8. No tracking or sign-in change. |
+| Desktop | Release URL constants in `apps/desktop/scripts/release-config.mjs`, in step 8. Installed builds keep the old feed URL through the redirect. |
+| Marketing | Source and download links in `apps/marketing/src/data/site.ts` and `developers.ts`, in step 8. |
+| Future mobile | Not applicable: no mobile code or identifier exists. |
+
+Messaging impact: one `docs/MESSAGING_CHANGES.md` entry at step 8, for the source URL in
+Privacy and Terms.
+
+Execution evidence: a dated record under `docs/qa/`, written at the transfer.

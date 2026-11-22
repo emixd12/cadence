@@ -55,7 +55,48 @@ describe("public Trust publication", () => {
     }
   });
 
+  it("restores history from both older roots after the move to the cadence-me organization", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "cadence-trust-transfer-"));
+    const origin = "https://cadence-me.github.io/cadence/";
+    const { input, snapshot: renamed } = await validSubject();
+    const details = { schema: "cadence.public-trust-details", source_commit: input.source_commit, application_deployment_id: input.application_deployment.id, marketing_deployment_id: input.marketing_deployment.id };
+    const id = `20261122T000000Z-${input.source_commit.slice(0, 12)}`;
+    const userOwned = buildSnapshot({ ...input, pages_origin: "https://emixd12.github.io/cadence/", snapshot_id: id, details_filename: `${id}.details.json` });
+    expect(new URL(renamed.snapshot_url).pathname.startsWith("/habit-tracking-app/trust/")).toBe(true);
+    const bytes = new Map([
+      [renamed.snapshot_url, JSON.stringify(renamed, null, "\t")],
+      [renamed.checks[0].evidence_url, JSON.stringify(details)],
+      [userOwned.snapshot_url, JSON.stringify(userOwned)],
+      [userOwned.checks[0].evidence_url, `${JSON.stringify(details)}\n`],
+    ]);
+    const requested: string[] = [];
+    const fetcher = async (url: URL) => {
+      requested.push(url.href);
+      if (url.href === `${origin}trust/snapshots.json`) return new Response(JSON.stringify([renamed.snapshot_url, userOwned.snapshot_url]));
+      const body = bytes.get(url.href);
+      return body === undefined ? new Response("missing", { status: 404 }) : new Response(body);
+    };
+    const history = path.join(root, "history");
+    expect(await downloadPublicTrustHistory({ origin, outputDirectory: history, fetcher })).toBe(2);
+    const relative = (url: string) => new URL(url).pathname.split("/trust/")[1];
+    for (const [url, body] of bytes) expect(await readFile(path.join(history, "trust", relative(url)), "utf8")).toBe(body);
+    expect(requested.filter((url) => url.startsWith("https://emixd12.github.io/"))).toHaveLength(4);
+
+    const nextId = `20261123T000000Z-${input.source_commit.slice(0, 12)}`;
+    const next = buildSnapshot({ ...input, pages_origin: origin, snapshot_id: nextId, details_filename: `${nextId}.details.json` });
+    const output = path.join(root, "publication");
+    await stagePublicTrustSite({ snapshot: next, details, outputDirectory: output, previousDirectory: history });
+    expect(next.snapshot_url.startsWith(`${origin}trust/`)).toBe(true);
+    expect(JSON.parse(await readFile(path.join(output, "trust/snapshots.json"), "utf8")))
+      .toEqual([renamed.snapshot_url, userOwned.snapshot_url, next.snapshot_url].sort());
+  });
+
   it.each([
+    ["https://cadence-me.github.io/cadence/", "https://emixd12.github.io/other/trust/a.json"],
+    ["https://cadence-me.github.io/cadence/", "https://foreign.github.io/cadence/trust/a.json"],
+    ["https://cadence-me.github.io/cadence/", "https://cadence-me.github.io/other/trust/a.json"],
+    ["https://cadence-me.github.io/other/", "https://emixd12.github.io/cadence/trust/a.json"],
+    ["https://emixd12.github.io/cadence/", "https://cadence-me.github.io/cadence/trust/a.json"],
     ["https://emixd12.github.io/cadence/", "https://foreign.example/trust/a.json"],
     ["https://emixd12.github.io/cadence/", "https://emixd12.github.io/other/trust/a.json"],
     ["https://emixd12.github.io/cadence/", "https://emixd12.github.io/cadence/trust/%2e%2e/a.json"],
@@ -78,6 +119,26 @@ describe("public Trust publication", () => {
       "https://emixd12.github.io/habit-tracking-app/trust/same.json",
     ]));
     await expect(downloadPublicTrustHistory({ origin: "https://emixd12.github.io/cadence/", outputDirectory, fetcher })).rejects.toThrow(/duplicate/);
+  });
+
+  it("rejects URLs on two hosts that collide in the archive directory", async () => {
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "cadence-trust-"));
+    const fetcher = async () => new Response(JSON.stringify([
+      "https://cadence-me.github.io/cadence/trust/same.json",
+      "https://emixd12.github.io/cadence/trust/same.json",
+    ]));
+    await expect(downloadPublicTrustHistory({ origin: "https://cadence-me.github.io/cadence/", outputDirectory, fetcher })).rejects.toThrow(/duplicate/);
+  });
+
+  it("refuses a cross-host redirect from an archived snapshot", async () => {
+    const { input } = await validSubject();
+    const id = `20261122T000000Z-${input.source_commit.slice(0, 12)}`;
+    const snapshot = buildSnapshot({ ...input, pages_origin: "https://emixd12.github.io/cadence/", snapshot_id: id, details_filename: `${id}.details.json` });
+    const outputDirectory = await mkdtemp(path.join(os.tmpdir(), "cadence-trust-"));
+    const fetcher = async (url: URL) => url.pathname.endsWith("snapshots.json")
+      ? new Response(JSON.stringify([snapshot.snapshot_url]))
+      : new Response(null, { status: 302, headers: { location: "https://cadence-me.github.io/cadence/trust/elsewhere.json" } });
+    await expect(downloadPublicTrustHistory({ origin: "https://cadence-me.github.io/cadence/", outputDirectory, fetcher })).rejects.toThrow(/missing/);
   });
 
   it.each(["missing snapshot", "redirect", "identity mismatch", "missing details"])("refuses incomplete history: %s", async (failure) => {

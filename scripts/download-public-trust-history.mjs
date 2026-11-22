@@ -6,10 +6,20 @@ import { validatePublicTrustEvidence } from "../lib/resolvers/public-trust-evide
 import { boundedFetch } from "./public-trust-http.mjs";
 import { validatePublicTrustDetails } from "./publish-public-trust-evidence.mjs";
 
+// Evidence published before a rename or a transfer keeps its original URL, and the
+// `emixd12.github.io` archive serves it. Each Pages root names the exact older roots
+// its index may still point at. Any other root gets no exception.
+const LEGACY_ROOTS = new Map([
+  ["https://emixd12.github.io/cadence/", ["https://emixd12.github.io/habit-tracking-app/trust/"]],
+  ["https://cadence-me.github.io/cadence/", [
+    "https://emixd12.github.io/cadence/trust/",
+    "https://emixd12.github.io/habit-tracking-app/trust/",
+  ]],
+]);
+
 export async function downloadPublicTrustHistory({ origin, outputDirectory, fetcher = fetch, allowEmpty = false }) {
   const base = origin.endsWith("/") ? origin : `${origin}/`;
-  const roots = [new URL("trust/", base)];
-  if (base === "https://emixd12.github.io/cadence/") roots.push(new URL("https://emixd12.github.io/habit-tracking-app/trust/"));
+  const roots = [new URL("trust/", base), ...(LEGACY_ROOTS.get(base) ?? []).map((root) => new URL(root))];
   function historyPath(value) {
     const url = new URL(value);
     if (typeof value !== "string" || url.href !== value || url.search || url.hash || url.username || url.password
@@ -31,7 +41,8 @@ export async function downloadPublicTrustHistory({ origin, outputDirectory, fetc
   const paths = urls.map(historyPath);
   if (new Set(paths).size !== paths.length) throw new Error("Existing snapshot index contains duplicate archive paths.");
   for (const value of urls) {
-    const result = await boundedFetch(origin, value, { fetcher, followRedirects: false });
+    // historyPath confined each URL to one root above, so its own origin is the allowlist.
+    const result = await boundedFetch(new URL(value).origin, value, { fetcher, followRedirects: false });
     if (result.response.status !== 200) throw new Error("Existing immutable Trust snapshot is missing.");
     const snapshot = JSON.parse(result.body.toString("utf8"));
     const validation = validatePublicTrustEvidence(snapshot);
@@ -42,7 +53,7 @@ export async function downloadPublicTrustHistory({ origin, outputDirectory, fetc
     for (const detailsUrl of new Set(snapshot.checks.map((check) => check.evidence_url))) {
       if (detailsUrl === snapshot.snapshot_url) continue;
       const detailsTarget = path.join(outputDirectory, historyPath(detailsUrl));
-      const detailsResult = await boundedFetch(origin, detailsUrl, { fetcher, followRedirects: false });
+      const detailsResult = await boundedFetch(new URL(detailsUrl).origin, detailsUrl, { fetcher, followRedirects: false });
       if (detailsResult.response.status !== 200) throw new Error("Existing immutable Trust details are missing.");
       const details = JSON.parse(detailsResult.body.toString("utf8"));
       validatePublicTrustDetails(details, snapshot);
