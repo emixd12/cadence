@@ -2351,3 +2351,23 @@ cite has not changed.
 - **Update needed:** the messaging track words the disclosure for routines. No public
   claim changes now.
 - **Status:** logged.
+
+## P-086: The public source moves to github.com/cadence-me/cadence
+
+- **Change:** decided November 21, 2026 (Ticket 350; `docs/DECISIONS.md`, 2026-11-21).
+  The repository moves from `emixd12/cadence` to the `cadence-me` organization. The
+  entry takes effect at the transfer. The old address keeps redirecting, so no link
+  breaks.
+- **Affected:** `components/settings/LegalContent.tsx` and
+  `integrations/*/plugin.json` (both unchanged).
+- **Surfaces:** Privacy and Terms; the Claude and ChatGPT directory listings (the
+  plugins' `repository` and `supportURL` fields); the approved legal text in
+  `.intent/artifacts/legal232/approved.json`.
+- **Conflicting current text:** "available under the MIT license in the public
+  repository at github.com/emixd12/cadence" and "Cadence source code is public at
+  github.com/emixd12/cadence under the repository's MIT license."
+- **Update needed:** the messaging track names `github.com/cadence-me/cadence` in that
+  text and in the plugin manifests, with whatever version or resubmission step a
+  listing needs. Marketing links, the README and the Trust panel's source link already
+  changed under Ticket 350.
+- **Status:** logged.

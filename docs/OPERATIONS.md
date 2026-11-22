@@ -413,7 +413,7 @@ any interactive provider sign-in stay on the owner's Mac.
 
 The GitHub proxy authenticates git and REST requests for the attached
 repository. It refuses GraphQL, so `gh pr` and `gh issue` fail; use Claude's
-GitHub tools or `gh api repos/emixd12/cadence/...`. It also refuses branch
+GitHub tools or `gh api repos/cadence-me/cadence/...`. It also refuses branch
 deletion and tag pushes. Branch protection on `main` limits every other push.
 
 Provider API keys go into the environment's **Network secrets**, never its
@@ -1732,7 +1732,7 @@ credentials, and provider tokens remain server-only.
 ## Public repository publication
 
 Ticket 100 uses the canonical repository at
-`https://github.com/emixd12/cadence`. Every GitHub and production
+`https://github.com/cadence-me/cadence`. Every GitHub and production
 mutation needs explicit owner approval for that exact action.
 
 Use this order:

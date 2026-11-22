@@ -272,7 +272,7 @@ wording locally; it does not verify physical cleanup timing or authorize publica
 ## Marketing content and legal contract
 
 Cadence's public source is
-`https://github.com/emixd12/cadence` under the repository MIT
+`https://github.com/cadence-me/cadence` under the repository MIT
 license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
@@ -397,7 +397,7 @@ preview milestone within Ticket 113. Preserve Cadence, `app.cadence.desktop`,
 and existing local data. Apple enrollment, Developer ID signing, notarization,
 and final-release acceptance remain deferred; they do not block preview work.
 Prepare artifacts and a dedicated HTTPS preview feed locally for the existing
-`emixd12/cadence` repository. Candidate-building checks must not depend
+`cadence-me/cadence` repository. Candidate-building checks must not depend
 on updater evidence that requires those candidates. Final production checks
 remain strict, and updater signing remains distinct from Apple signing.
 

@@ -35,7 +35,7 @@ Cadence runs no autonomous agent through MCP. The outside client chooses tool ca
 
 ## Support
 
-Report reproducible technical problems in [Cadence GitHub issues](https://github.com/emixd12/cadence/issues). Include the tool name, stable error code and client version. Omit tokens, account identifiers, notes and other personal data.
+Report reproducible technical problems in [Cadence GitHub issues](https://github.com/cadence-me/cadence/issues). Include the tool name, stable error code and client version. Omit tokens, account identifiers, notes and other personal data.
 
 For private reports, email [privacy@identityscaffolding.com](mailto:privacy@identityscaffolding.com). The canonical [Privacy notice](https://app.cadence-me.com/privacy) and [Terms](https://app.cadence-me.com/terms) remain on the app site. MCP disclosure wording is approved for local implementation; publication and hosted launch remain pending.`,
   },
@@ -308,7 +308,7 @@ Skills never skip host confirmations or grant permissions. They use the same 16 
 
 ## Source and local packaging
 
-The source lives in [integrations/claude-plugin](https://github.com/emixd12/cadence/tree/mcp-create/integrations/claude-plugin) and [integrations/chatgpt-plugin](https://github.com/emixd12/cadence/tree/mcp-create/integrations/chatgpt-plugin). These branch links become available when the reviewed branch is published.
+The source lives in [integrations/claude-plugin](https://github.com/cadence-me/cadence/tree/mcp-create/integrations/claude-plugin) and [integrations/chatgpt-plugin](https://github.com/cadence-me/cadence/tree/mcp-create/integrations/chatgpt-plugin). These branch links become available when the reviewed branch is published.
 
 From a checkout containing these packages:
 ${fence("bash", "node scripts/check-plugins.mjs\nnode scripts/package-plugins.mjs")}
@@ -319,7 +319,7 @@ The packaging script writes versioned ZIP archives under integrations/.artifacts
 See [quickstarts](/developers/quickstarts) for connecting the MCP endpoint. Load the local Claude package:
 ${fence("bash", "claude --plugin-dir ./integrations/claude-plugin")}
 After the reviewed package reaches the default branch, the marketplace commands are:
-${fence("bash", "claude plugin marketplace add emixd12/cadence\nclaude plugin install cadence@cadence-plugins")}
+${fence("bash", "claude plugin marketplace add cadence-me/cadence\nclaude plugin install cadence@cadence-plugins")}
 These installation commands have not been exercised against a live Cadence deployment. ChatGPT package installation follows [OpenAI's local plugin testing guide](https://developers.openai.com/plugins/deploy/connect-chatgpt).
 
 After installation, connect the account through Cadence consent. Test a read before enabling writes. Disconnect in Cadence Settings when finished. Directory submission, publication and live installation acceptance remain pending.`, },

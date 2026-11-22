@@ -204,7 +204,7 @@ type Cadence {
   The .git directory of a depth-1 checkout of fixtureCommit.
   """
   let fixtureGit: Directory! {
-    git("https://github.com/emixd12/cadence.git")
+    git("https://github.com/cadence-me/cadence.git")
       .commit(fixtureCommit)
       .tree(discardGitDir: false)
       .directory(".git")

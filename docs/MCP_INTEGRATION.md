@@ -554,12 +554,12 @@ sources produces identical bytes; tests inspect every archived file.
 
 ### Installation handoff (not executed)
 
-The default marketplace is this public repository, `emixd12/cadence`, with its
+The default marketplace is this public repository, `cadence-me/cadence`, with its
 manifest at `.claude-plugin/marketplace.json`. These commands become useful
 once the reviewed files are available on the repository's default branch:
 
 ```sh
-claude plugin marketplace add emixd12/cadence
+claude plugin marketplace add cadence-me/cadence
 claude plugin install cadence@cadence-plugins
 ```
 

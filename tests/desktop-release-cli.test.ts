@@ -66,7 +66,7 @@ if(tool==='npm') {
     environment = { NODE_ENV: process.env.NODE_ENV, ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("APPLE_") && !key.startsWith("TAURI_") && !key.startsWith("CADENCE_UPDATER_") && !key.startsWith("VITE_"))) };
     Object.assign(environment, { PATH: `${path.join(directory, "bin")}:${process.env.PATH}`, TEST_COMMAND_LOG: log,
       CADENCE_APPLE_PROVISIONING_PROFILE: path.join(directory, "Cadence.provisionprofile"),
-      CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json",
+      CADENCE_UPDATER_ENDPOINT: "https://github.com/cadence-me/cadence/releases/download/desktop-preview/latest.json",
       CADENCE_UPDATER_PUBLIC_KEY: Buffer.from("untrusted comment: test public key\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\n").toString("base64") });
     writeFileSync(environment.CADENCE_APPLE_PROVISIONING_PROFILE!, "synthetic profile");
   });
@@ -317,7 +317,7 @@ if(tool==='npm') {
   });
 
   const devEnvironment = (overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv => ({ ...environment,
-    CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json",
+    CADENCE_UPDATER_ENDPOINT: "https://github.com/cadence-me/cadence/releases/download/desktop-stable/latest.json",
     CADENCE_RELEASE_STORE: path.join(directory, "store"), APPLE_SIGNING_IDENTITY: "Developer ID Application: Test (ABCDEFGHIJ)",
     VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
     VITE_CALENDAR_BROKER_ORIGIN: "https://app.cadence-me.com", TEST_PRODUCTION_SIGNING: "1", ...overrides });
@@ -375,7 +375,7 @@ if(tool==='npm') {
     expect(existsSync(devPath())).toBe(false);
     expect(existsSync(builtApp())).toBe(true);
     const unreviewed = run(["dev-build", "0.1.1-dev.2"], devEnvironment({ APPLE_SIGNING_IDENTITY: "",
-      CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json" }));
+      CADENCE_UPDATER_ENDPOINT: "https://github.com/cadence-me/cadence/releases/download/desktop-preview/latest.json" }));
     expect(unreviewed.status).toBe(1);
     expect(unreviewed.stderr).toMatch(/stable feed[\s\S]*APPLE_SIGNING_IDENTITY/);
     expect(run(["dev-build", "0.1.0-dev.1"], devEnvironment()).stderr).toContain("above the source version 0.1.0");
