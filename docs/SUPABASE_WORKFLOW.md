@@ -16,19 +16,27 @@ npm run supabase -- --version
 npm run supabase -- <command>
 ```
 
-Known local issue (November 11, 2026, owner's Mac): after `npm ci`, the binary
-`node_modules/@supabase/cli-darwin-arm64/bin/supabase` fails macOS code-signature
-validation (`codesign -v`: "invalid signature"), and macOS kills it, so
-`npm run supabase -- ...` exits 137 (SIGKILL). The Homebrew CLI 3.1.0 rejects this repo's
-config. Local `db reset` therefore did not run there, even though Docker Desktop was
-running (CLI at `~/.docker/bin/docker`, context `desktop-linux`; that directory may be
-missing from an agent shell's PATH). Agents replayed the migrations in a throwaway
-`supabase/postgres` container under Docker Desktop instead, and CI runs the real CLI.
-The registry tarball for 2.105.0 has the same bytes and the same invalid signature. For
-hosted read-only commands, an agent ran an ad-hoc signed copy outside the repository:
-`npm pack @supabase/cli-darwin-arm64@2.105.0` into the scratchpad, `codesign --force -s -`
-on that copy, then `npm run agent:secret -- --env SUPABASE_ACCESS_TOKEN=supabase-access-token
--- <copy> migration list`. A new worktree also needs the gitignored link files in
+`npm run supabase` runs `scripts/supabase-cli.mjs`, a small wrapper around the pinned
+`supabase` launcher. It exists because `@supabase/cli-darwin-arm64@2.105.0` ships
+`bin/supabase` with an invalid code signature (`Identifier=a.out`, linker-signed), so
+macOS kills it and the command exits 137 (SIGKILL). The same package also ships
+`bin/supabase-go`, the 2.105.0 Go CLI, with a valid signature.
+
+- On Apple Silicon macOS, when `SUPABASE_CLI_BINARY_OVERRIDE` is unset or empty, the
+  wrapper sets it to `node_modules/@supabase/cli-darwin-arm64/bin/supabase-go`. The
+  upstream launcher already honors that variable.
+- A caller-supplied `SUPABASE_CLI_BINARY_OVERRIDE` stays unchanged. The CI rehearsal
+  (`scripts/supabase-rehearsal.sh`) sets it to the Linux `supabase-go` binary.
+- Other platforms run the upstream launcher unchanged.
+- The wrapper passes arguments, stdio, exit codes and signals through. The CLI prints its
+  update notice on stderr, so `npm run --silent supabase -- --version` prints exactly
+  `2.105.0`.
+
+No manual `codesign` or `npm pack` step is needed after `npm ci`. Do not run
+`node_modules/.bin/supabase` directly on Apple Silicon; it starts the broken binary. The
+Homebrew CLI 3.1.0 rejects this repo's config. Docker Desktop's CLI lives at
+`~/.docker/bin/docker` (context `desktop-linux`); that directory may be missing from an
+agent shell's PATH. A new worktree also needs the gitignored link files in
 `supabase/.temp/` (copy them from a linked checkout).
 
 Examples:
