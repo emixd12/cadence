@@ -56,7 +56,20 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   `docs/design-exploration/advisor-avatar/round-2-style.png`, with ink ×1.25 at 40px and
   48px. Candidates: `round-2-candidate-1.webp` to `-3.webp` beside it. Finding: with less
   hatching the candidates are fainter than the round 1 drawing at the same ink setting,
-  and the eye and nostril carry most of the 40px reading. Owner's answer: pending.
+  and the eye and nostril carry most of the 40px reading. Owner's answer (November 22):
+  candidate 1; try `gpt-image-2.6` at its highest setting; code may make the master.
+- **Round 3, November 22:** the final master. Two versions of candidate 1, on
+  `docs/design-exploration/advisor-avatar/round-3-master.png`:
+  - `round-3-sunburst-max.webp`: one `gpt-image-2.6-sunburst` edit at quality `max`,
+    2048 × 2048, transparent outside the horse. Sunburst is the 2.6 model OpenAI
+    recommends for detail and edit accuracy; Flare is the faster one. The lines are
+    crisper. The model also firmed the contour and added some hatching, so it is a little
+    less faint than the pick. The horse's body is opaque white, not see-through.
+  - `round-3-vector-3tone.svg`: a code trace of that render (`vtracer`) into three tone
+    layers. A one-tone trace turned every faint stroke solid and lost the style, so three
+    tones is the least that keeps it. It is 2.1 MB and its strokes are slightly blunter
+    than the render's, but it scales to any size and each tone can be reweighted in code.
+  Owner's answer: pending.
 - **How a master gets made.** Two routes, both allowed by the owner:
   - An image model, for changes to the drawing itself (pose, line style, a higher
     resolution master, a transparent background). The owner allowed the cloud session's

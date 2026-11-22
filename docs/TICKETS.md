@@ -19448,7 +19448,7 @@ then 347 and 348. Each of 343 and 346 ends with the owner's approval.
 
 ## Ticket 343: Advisor avatar base image
 
-Status: in progress (round 2 sent to the owner November 21, 2026).
+Status: in progress (round 3 sent to the owner November 22, 2026; the owner chose round 2 candidate 1).
 
 Goal: one approved master drawing of the advisor, with every size made from it.
 
