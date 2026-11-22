@@ -55,6 +55,7 @@ const resolverRegistry = [
   { domain: "coach signals", resolver: "packages/core/src/resolvers/coach-signals.resolver.ts", test: "tests/coach-signals.resolver.test.ts", source: "docs/DATA_MODEL.md" },
   { domain: "coach signals version 2", resolver: "packages/core/src/resolvers/coach-signals-v2.resolver.ts", test: "tests/coach-signals-v2.resolver.test.ts", source: "docs/DATA_MODEL.md" },
   { domain: "advice matcher", resolver: "packages/core/src/resolvers/advice-matcher.resolver.ts", test: "tests/advice-matcher.resolver.test.ts", source: "packages/core/src/types/advice-cards.ts" },
+  { domain: "advisor avatar state and gesture", resolver: "packages/core/src/resolvers/advisor-avatar.resolver.ts", test: "tests/advisor-avatar.resolver.test.ts", source: "packages/core/src/advisor-avatar/catalog.json" },
   { domain: "chat starters", resolver: "packages/core/src/resolvers/chat-starters.resolver.ts", test: "tests/chat-starters.resolver.test.ts", source: "packages/core/src/data/chat-starters.json" },
   {
     domain: "day-progress layout",

@@ -872,6 +872,12 @@ function addAvatar() {
     }
   }
   const known = new Set([...Object.keys(catalog.states ?? {}), ...Object.keys(catalog.gestures ?? {})]);
+  const resolverPath = "packages/core/src/resolvers/advisor-avatar.resolver.ts";
+  const resolverText = exists(resolverPath) ? read(resolverPath) : "";
+  for (const avatarId of known) {
+    const entry = catalog.states?.[avatarId] ?? catalog.gestures?.[avatarId];
+    if (entry.status === "active" && !resolverText.includes(`"${avatarId}"`)) errors.push(`${AVATAR_CATALOG}#${avatarId}: an active item must be returned by ${resolverPath}`);
+  }
   for (const [experimentId, experiment] of Object.entries(catalog.experiments ?? {})) {
     const at = `${AVATAR_CATALOG}#experiments/${experimentId}`;
     if (!known.has(experiment.subject)) errors.push(`${at}: subject must be a state or gesture id`);

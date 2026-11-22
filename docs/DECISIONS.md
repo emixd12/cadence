@@ -2893,3 +2893,23 @@ The owner answered the avatar plan's open decisions on November 21, 2026.
 
 Platform impact: web and Mac, through Tickets 343–346; marketing not applicable; future
 mobile reads the same catalog. Messaging impact: none new.
+
+## 2026-11-22: Advisor avatar master approved; motion ships without a flag
+
+The owner approved the three-tone vector trace as the avatar's master on November 22,
+2026 ("Lets go with the vector trace as the master"), asked for the earlier animations to
+be adapted right away, and asked for a quick production deployment of the updated avatar.
+
+- **Master.** `assets/advisor-avatar/master.svg`. Shipped sizes are made from it by
+  `npm run avatar:build`. The drawing is candidate 1 of round 2, re-rendered by
+  `gpt-image-2.6-sunburst` at quality `max` and traced in code.
+- **No flag.** The 2026-11-21 entry said the animated avatar ships behind a flag that is
+  off in production until the owner accepts it. This entry replaces that: the motion is on
+  for every account with an advisor when the pull request merges. Reduced motion still
+  shows the still drawing.
+- **Chat.** The Chat page shows the avatar at 48px beside its links.
+- **Unchanged.** Tickets 347 and 348 (tests on real accounts) stay deferred.
+
+Platform impact: web on merge; Mac in its next release (shared components and files, not
+checked on an installed Mac); marketing not applicable; future mobile reads the same
+catalog. Messaging impact: none.

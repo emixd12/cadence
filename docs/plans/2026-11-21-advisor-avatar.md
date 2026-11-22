@@ -69,7 +69,39 @@ Goal: one approved master drawing. Every size on every surface is made from it.
     layers. A one-tone trace turned every faint stroke solid and lost the style, so three
     tones is the least that keeps it. It is 2.1 MB and its strokes are slightly blunter
     than the render's, but it scales to any size and each tone can be reweighted in code.
-  Owner's answer: pending.
+  Owner's answer (November 22): the vector trace is the master. Adapt the animations
+  now; the updated avatar goes to production quickly.
+
+## What shipped on November 22, 2026 (Tickets 343 to 346)
+
+- **Master:** `assets/advisor-avatar/master.svg` (three tone layers). `npm run avatar:build`
+  (`scripts/build-advisor-avatar.mjs`) makes `public/brand/advisor/advisor-256.webp` for
+  sizes up to 72px and `advisor-768.webp` above. Each file sets its own tone strengths:
+  the small one is ×1.25 (between round 1's A and B), the large one turns the lightest
+  tone down. `npm run avatar:check` fails when the files are stale. The draft files are gone.
+- **Anchors:** the catalog's `art.anchors` holds the window, both eyes, the mane and its
+  root, and both ears, in the master's coordinates.
+- **Resolver:** `packages/core/src/resolvers/advisor-avatar.resolver.ts`, with
+  `tests/advisor-avatar.resolver.test.ts`. `map:check` fails when an active catalog item
+  is not in the resolver.
+- **Component:** `components/advisor/AdvisorAvatar.tsx` and `advisor-avatar.module.css`,
+  shared by web and the Mac. It uses the trial's technique on the new drawing: the still
+  drawing, a masked mane that sways from its root (and ripples above 72px), masked ears,
+  and eyelids over both eyes. The preparing arc stays. No dot or badge.
+- **Wiring:** the Timeline avatar and the panel avatar read the state and gesture from
+  `AdvisorProvider`. The Chat page shows a 48px avatar beside its links; it rests, and
+  shows `state.replying` while a reply arrives.
+- **Bench:** `/design-system?preview=advisor-avatar`.
+- **No flag.** The plan called for `CADENCE_ADVISOR_AVATAR_MOTION`, off in production
+  until acceptance. The owner asked for a quick production deployment instead, so the
+  motion is on when this merges. Reverting the pull request turns it off.
+- **Not done:**
+  - A brief move in flight does not set `state.working`, and a brief move's result plays
+    no gesture: the Daily Brief launcher owns that state and does not publish it yet.
+  - The old `horse-avatar` trial bench and `public/brand/cadence-horse-avatar.png` stay;
+    the PNG is the style reference.
+  - The Mac gets all of this in its next release. Not checked on an installed Mac.
+  - Browsers stop CSS animation in hidden tabs; no extra pause code was added.
 - **How a master gets made.** Two routes, both allowed by the owner:
   - An image model, for changes to the drawing itself (pose, line style, a higher
     resolution master, a transparent background). The owner allowed the cloud session's
@@ -194,6 +226,4 @@ Answered November 21, 2026:
   the owner returns to them; nothing else waits on them. The `AGENTS.md` rule against
   tracking scripts is unchanged.
 
-Open:
-
-1. **The round 2 drawing:** pick a candidate, or give notes for round 3.
+Open: none for Tickets 343 to 346. Tickets 347 and 348 stay deferred.

@@ -19499,7 +19499,7 @@ then 347 and 348. Each of 343 and 346 ends with the owner's approval.
 
 ## Ticket 343: Advisor avatar base image
 
-Status: in progress (round 3 sent to the owner November 22, 2026; the owner chose round 2 candidate 1).
+Status: complete on web (November 22, 2026): the owner approved the three-tone vector trace as the master. Mac: next release.
 
 Goal: one approved master drawing of the advisor, with every size made from it.
 
@@ -19537,7 +19537,7 @@ Verification: screenshots of the Timeline and the panel at 1× and 2×; `map:che
 
 ## Ticket 344: Avatar state catalog and resolver
 
-Status: in progress (catalog and product-map link landed November 21, 2026; resolver not started).
+Status: complete (November 22, 2026). Follow-up: a brief move in flight does not reach the resolver yet.
 
 Goal: one tested place decides which state and gesture the avatar shows.
 
@@ -19572,7 +19572,7 @@ Verification: resolver tests; `resolvers:check`; `map:check`.
 
 ## Ticket 345: Avatar animation rig on the approved drawing
 
-Status: not started. Depends on Tickets 343 and 344.
+Status: complete on web (November 22, 2026), except that the old `horse-avatar` trial bench and its PNG stay (the PNG is the style reference). Frame-time check on the test Mac not run.
 
 Goal: the trial's motion rebuilt on the approved drawing, for every catalog state and gesture.
 
@@ -19611,7 +19611,7 @@ frame-time check at 48px on the test Mac.
 
 ## Ticket 346: Animated avatar on the Timeline and in the panel
 
-Status: not started. Depends on Tickets 344 and 345.
+Status: complete on web (November 22, 2026), shipped without the flag on the owner's instruction for a quick production deployment (`docs/DECISIONS.md`, 2026-11-22). Open: installed Mac acceptance with the next Mac release.
 
 Goal: the advisor's avatar on the Timeline and in the panel shows the resolver's state.
 

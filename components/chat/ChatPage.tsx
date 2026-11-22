@@ -1,5 +1,7 @@
 "use client";
 
+import { AdvisorAvatar } from "@/components/advisor/AdvisorAvatar";
+import { chatAdvisorAvatarInput, resolveAdvisorAvatarState } from "@/lib/resolvers/advisor-avatar.resolver";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import {
   CHAT_MESSAGE_MAX_CHARS,
@@ -378,6 +380,9 @@ export function ChatPage({
 
   return (
     <div className="flex min-h-[calc(100dvh-12rem)] w-full flex-col">
+      {/* The advisor is on Chat too: it rests, and shows it is working while a reply arrives. */}
+      <div className="flex items-center gap-3">
+      <AdvisorAvatar size={48} state={resolveAdvisorAvatarState(chatAdvisorAvatarInput(sending))} />
       <nav aria-label="Chat" className="flex items-center gap-4 text-sm leading-5 text-muted-readable">
         {view === "thread" && !empty ? (
           <button type="button" className={LINK} onClick={startNew}>
@@ -394,6 +399,7 @@ export function ChatPage({
           </button>
         )}
       </nav>
+      </div>
 
       <p className="sr-only" role="status" aria-live="polite" data-chat-run-state={runState}>
         {announcement}

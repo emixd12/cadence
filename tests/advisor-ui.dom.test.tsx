@@ -90,6 +90,14 @@ describe("advisor placement K", () => {
     expect(line()).toBeNull();
   });
 
+  it("gives the avatar the resolver's state: waiting with a tip, attending with the panel open", async () => {
+    await render(fixtureAdvisorClient());
+    const state = () => document.querySelector<HTMLElement>("[data-advisor-window] [data-advisor-avatar]")?.dataset.advisorAvatar;
+    expect(state()).toBe("state.waiting");
+    await act(async () => { document.querySelector<HTMLButtonElement>("[data-advisor-window]")!.click(); });
+    expect(state()).toBe("state.attending");
+  });
+
   it("shows today's tip under the date and saves Helpful as an italic outcome", async () => {
     const client = fixtureAdvisorClient();
     const react = vi.spyOn(client, "react");
