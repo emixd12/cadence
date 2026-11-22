@@ -113,6 +113,10 @@
           },
           "archive_notes": [],
           "external_ref": null,
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [],
           "created_at": "2026-09-01T12:00:00Z",
           "updated_at": "2026-10-18T13:00:00Z",
           "revision": "b1.2026-10-18T13:00:00Z"
@@ -189,6 +193,10 @@
           },
           "archive_notes": [],
           "external_ref": null,
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [],
           "created_at": "2026-09-01T12:00:00Z",
           "updated_at": "2026-10-18T13:00:00Z",
           "revision": "b1.2026-10-18T13:00:00Z"
@@ -266,6 +274,10 @@
           },
           "archive_notes": [],
           "external_ref": null,
+          "parent_behavior_id": null,
+          "sub_behavior_sort_order": 0,
+          "inherit_parent_schedule": false,
+          "sub_behaviors": [],
           "created_at": "2026-09-01T12:00:00Z",
           "updated_at": "2026-10-18T13:00:00Z",
           "revision": "b1.2026-10-18T13:00:00Z"

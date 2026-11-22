@@ -57,6 +57,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         end: null,
         pause: null,
         isOpportunity: false,
+        parentBehaviorId: null,
+        inheritParentSchedule: false,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -86,6 +88,8 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         "end",
         "pause",
         "is_opportunity",
+        "parent_behavior_id",
+        "inherit_parent_schedule",
       ],
       recordedAt: RECORDED_AT,
       effectiveAt: RECORDED_AT,
@@ -287,13 +291,13 @@ describe("Behaviors of Opportunity configuration", () => {
     expect(event?.nextConfiguration.isOpportunity).toBe(true);
   });
 
-  it("puts is_opportunity last in a baseline", () => {
+  it("puts is_opportunity after pause in a baseline", () => {
     const baseline = planInitialBehaviorConfigurationEvent({
       configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [] }),
       recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
     });
-    expect(baseline.changedFields.at(-1)).toBe("is_opportunity");
-    expect(baseline.changedFields.at(-2)).toBe("pause");
+    // Sub-behavior link fields (Ticket 349) follow is_opportunity.
+    expect(baseline.changedFields.slice(-4)).toEqual(["pause", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule"]);
     expect(baseline.nextConfiguration).toMatchObject({ isOpportunity: true, scheduleGraph: [] });
   });
 });

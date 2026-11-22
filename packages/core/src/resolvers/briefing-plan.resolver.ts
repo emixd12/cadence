@@ -56,6 +56,49 @@ type Candidate = Readonly<{
   latestStart: Temporal.Instant;
 }>;
 
+/**
+ * A routine slot: steps of one routine that follow its time and share a start. They
+ * are done together, so they never conflict with each other, and the brief plans the
+ * slot as one block led by its first step.
+ */
+function routineSlotKey(occurrence: AdvisorOccurrence): string | null {
+  const routine = occurrence.routine;
+  if (!routine?.inheritParentSchedule || occurrence.schedule.kind !== "exact") return null;
+  return `${routine.parentBehaviorRef}@${occurrence.localDate}@${instant(occurrence.scheduledFor, "occurrence.scheduledFor").toString()}`;
+}
+
+function sameRoutineSlot(left: AdvisorOccurrence, right: AdvisorOccurrence): boolean {
+  const key = routineSlotKey(left);
+  return key !== null && key === routineSlotKey(right);
+}
+
+/** Unresolved steps of each routine slot with two or more, keyed by every member's ref, lead first. */
+function routineSlots(occurrences: readonly AdvisorOccurrence[], localDate: string): ReadonlyMap<string, readonly AdvisorOccurrence[]> {
+  const groups = new Map<string, AdvisorOccurrence[]>();
+  for (const occurrence of occurrences) {
+    if (occurrence.status !== "unresolved" || occurrence.localDate !== localDate) continue;
+    const key = routineSlotKey(occurrence);
+    if (key) groups.set(key, [...(groups.get(key) ?? []), occurrence]);
+  }
+  const byRef = new Map<string, readonly AdvisorOccurrence[]>();
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    const ordered = [...members].sort((left, right) => left.routine!.stepOrder - right.routine!.stepOrder || left.ref.localeCompare(right.ref));
+    for (const member of ordered) byRef.set(member.ref, ordered);
+  }
+  return byRef;
+}
+
+/** The slot's summed known length, or null when any step's length is unknown. */
+function routineSeconds(members: readonly AdvisorOccurrence[]): number | null {
+  let total = 0;
+  for (const member of members) {
+    if (member.duration.kind !== "known") return null;
+    total += member.duration.seconds;
+  }
+  return total;
+}
+
 export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
   const now = instant(input.now, "now");
   validateInput(input);
@@ -147,6 +190,7 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
   }
 
   const occurrences = new Map(context.cadence.occurrences.map((item) => [item.ref, item]));
+  const slots = routineSlots(context.cadence.occurrences, context.localDate);
   const calendarBlocks = calendars.flatMap((calendarSource) => calendarSource.events.flatMap((event) => calendarBlock(event, context)));
   const calendarEventRefs = [...new Set(calendarBlocks.flatMap((block) => block.calendarEventRef ?? []))].sort();
   const rejections: BriefingPlanRejection[] = [...dayEvidenceRejections(dayEvidence)];
@@ -166,7 +210,16 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
       rejections.push(rejection(movable.occurrenceRef, "occurrence_not_unresolved", "Only unresolved occurrences can receive scheduling options."));
       continue;
     }
-    const duration = occurrence.duration.kind === "known"
+    const slot = slots.get(occurrence.ref);
+    if (slot && slot[0]!.ref !== occurrence.ref) {
+      noChangeCount += 1;
+      rejections.push(rejection(movable.occurrenceRef, "routine_moves_together", "This routine step moves with its routine's first step."));
+      continue;
+    }
+    const slotSeconds = slot ? routineSeconds(slot) : null;
+    const duration = slotSeconds !== null
+      ? { seconds: slotSeconds, source: "context_estimate" as const, reason: "routine_steps_sum" }
+      : occurrence.duration.kind === "known"
       ? { seconds: occurrence.duration.seconds, source: "context_estimate" as const, reason: occurrence.duration.source }
       : movable.durationAssumption
         ? { seconds: movable.durationAssumption.seconds, source: "explicit_input" as const, reason: movable.durationAssumption.reason }
@@ -329,6 +382,8 @@ function resolveDayEvidence(
     if (!known) continue;
     for (let peerIndex = index + 1; peerIndex < remaining.length; peerIndex += 1) {
       const peer = remaining[peerIndex]!;
+      // Steps of one routine at one time are done together, not a clash.
+      if (sameRoutineSlot(occurrence, peer)) continue;
       const peerKnown = flexibleRange(peer) ? null : knownOccurrenceInterval(peer, context.timezone);
       if (!peerKnown) continue;
       addPairEvidence(drafts, { ...known, ref: occurrence.ref, source: "occurrence" }, { ...peerKnown, ref: peer.ref, source: "occurrence" }, {
@@ -648,9 +703,12 @@ function fixedOccurrenceBlocks(
   flexible = false,
   packing?: Readonly<{ calendarBlocks: readonly Block[]; bufferSeconds: number; now: Temporal.Instant }>,
 ): Block[] {
-  if (flexible) return flexibleOccurrenceBlocks(occurrences, movingRef, context, packing);
+  // The moving item's own routine slot moves with it, so it never blocks the move.
+  const moving = occurrences.find((occurrence) => occurrence.ref === movingRef);
+  const others = moving ? occurrences.filter((occurrence) => occurrence.ref === movingRef || !sameRoutineSlot(occurrence, moving)) : occurrences;
+  if (flexible) return flexibleOccurrenceBlocks(others, movingRef, context, packing);
   const dayEnd = instant(context.dayEndAt, "context.dayEndAt");
-  return occurrences.flatMap((occurrence): Block[] => {
+  return others.flatMap((occurrence): Block[] => {
     if (occurrence.ref === movingRef || occurrence.status !== "unresolved" || occurrence.localDate !== context.localDate) return [];
     const start = instant(occurrence.scheduledFor, "occurrence.scheduledFor");
     const known = knownOccurrenceInterval(occurrence, context.timezone);

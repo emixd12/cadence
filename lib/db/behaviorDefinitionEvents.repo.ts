@@ -70,43 +70,63 @@ export async function createBehaviorWithAtomicScheduleGraph(
   return data as unknown as Behavior;
 }
 
+export type BehaviorCreateGraphInput = {
+  behavior: NewBehavior;
+  definitionEventPlan: BehaviorDefinitionEventPlan;
+  configurationEventPlan: BehaviorConfigurationEventPlan;
+  schedules: BehaviorScheduleGraphMutation[];
+};
+
+/** A parent and its sub-behaviors in one transaction; the first item is the parent. */
+export async function createBehaviorGroupWithAtomicScheduleGraphs(
+  supabase: AppSupabaseClient,
+  items: BehaviorCreateGraphInput[],
+): Promise<Behavior[]> {
+  const { data, error } = await supabase.rpc("create_behavior_group_with_schedule_graphs", {
+    items: items.map((item) => ({
+      behavior_payload: toBehaviorPayload(item.behavior),
+      definition_event_plan: toDefinitionEventPlanPayload(item.definitionEventPlan),
+      configuration_event_plan: toBehaviorConfigurationEventPlanPayload(item.configurationEventPlan),
+      schedule_graph: toScheduleGraphPayload(item.schedules),
+    })),
+  });
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length !== items.length) throw new Error("Behavior group was not created.");
+  return data as unknown as Behavior[];
+}
+
+/** Dense sibling order for one parent's live sub-behaviors. */
+export async function reorderSubBehaviors(
+  supabase: AppSupabaseClient,
+  input: { parentBehaviorId: string; orderedBehaviorIds: string[] },
+): Promise<number> {
+  const { data, error } = await supabase.rpc("reorder_sub_behaviors", {
+    target_parent_behavior_id: input.parentBehaviorId,
+    ordered_behavior_ids: input.orderedBehaviorIds,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+export type BehaviorUpdateGraphInput = {
+  behaviorId: string;
+  behavior: BehaviorUpdate;
+  expectedDefinition: BehaviorDefinition;
+  expectedNormalizedDefinition: BehaviorDefinition;
+  expectedScheduleGraph: BehaviorScheduleGraphMutation[];
+  expectedUpdatedAt: string;
+  definitionEventPlan: BehaviorDefinitionEventPlan | null;
+  configurationEventPlan: BehaviorConfigurationEventPlan | null;
+  schedules: BehaviorScheduleGraphMutation[];
+};
+
 export async function updateBehaviorWithAtomicScheduleGraph(
   supabase: AppSupabaseClient,
-  input: {
-    behaviorId: string;
-    behavior: BehaviorUpdate;
-    expectedDefinition: BehaviorDefinition;
-    expectedNormalizedDefinition: BehaviorDefinition;
-    expectedScheduleGraph: BehaviorScheduleGraphMutation[];
-    expectedUpdatedAt: string;
-    definitionEventPlan: BehaviorDefinitionEventPlan | null;
-    configurationEventPlan: BehaviorConfigurationEventPlan | null;
-    schedules: BehaviorScheduleGraphMutation[];
-  },
+  input: BehaviorUpdateGraphInput,
 ): Promise<Behavior | null> {
   const { data, error } = await supabase.rpc(
     "update_behavior_with_schedule_graph",
-    {
-      target_behavior_id: input.behaviorId,
-      behavior_payload: toBehaviorPayload(input.behavior),
-      expected_definition: {
-        stored_title: input.expectedDefinition.title,
-        stored_description: input.expectedDefinition.description,
-        normalized_title: input.expectedNormalizedDefinition.title,
-        normalized_description: input.expectedNormalizedDefinition.description,
-      },
-      expected_schedule_graph: toScheduleGraphPayload(
-        input.expectedScheduleGraph,
-      ),
-      expected_updated_at: input.expectedUpdatedAt,
-      definition_event_plan: input.definitionEventPlan
-        ? toDefinitionEventPlanPayload(input.definitionEventPlan)
-        : null,
-      configuration_event_plan: input.configurationEventPlan
-        ? toBehaviorConfigurationEventPlanPayload(input.configurationEventPlan)
-        : null,
-      schedule_graph: toScheduleGraphPayload(input.schedules),
-    },
+    toUpdateGraphPayload(input),
   );
 
   if (error) {
@@ -114,6 +134,43 @@ export async function updateBehaviorWithAtomicScheduleGraph(
   }
 
   return data ? (data as unknown as Behavior) : null;
+}
+
+/** Several Behavior updates in one transaction (a parent with its sub-behaviors). */
+export async function updateBehaviorGroupWithAtomicScheduleGraphs(
+  supabase: AppSupabaseClient,
+  items: BehaviorUpdateGraphInput[],
+): Promise<Array<Behavior | null>> {
+  const { data, error } = await supabase.rpc("update_behavior_group_with_schedule_graphs", {
+    items: items.map(toUpdateGraphPayload),
+  });
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length !== items.length) throw new Error("Behavior group was not updated.");
+  return data as unknown as Array<Behavior | null>;
+}
+
+function toUpdateGraphPayload(input: BehaviorUpdateGraphInput) {
+  return {
+    target_behavior_id: input.behaviorId,
+    behavior_payload: toBehaviorPayload(input.behavior),
+    expected_definition: {
+      stored_title: input.expectedDefinition.title,
+      stored_description: input.expectedDefinition.description,
+      normalized_title: input.expectedNormalizedDefinition.title,
+      normalized_description: input.expectedNormalizedDefinition.description,
+    },
+    expected_schedule_graph: toScheduleGraphPayload(
+      input.expectedScheduleGraph,
+    ),
+    expected_updated_at: input.expectedUpdatedAt,
+    definition_event_plan: input.definitionEventPlan
+      ? toDefinitionEventPlanPayload(input.definitionEventPlan)
+      : null,
+    configuration_event_plan: input.configurationEventPlan
+      ? toBehaviorConfigurationEventPlanPayload(input.configurationEventPlan)
+      : null,
+    schedule_graph: toScheduleGraphPayload(input.schedules),
+  };
 }
 
 export async function createBehaviorWithDefinitionEvent(
@@ -355,6 +412,11 @@ function toBehaviorPayload(
     ...("is_opportunity" in behavior && behavior.is_opportunity !== undefined
       ? { is_opportunity: behavior.is_opportunity }
       : {}),
+    // Sub-behaviors: each link column changes only when the payload carries it.
+    ...("parent_behavior_id" in behavior ? { parent_behavior_id: behavior.parent_behavior_id ?? null } : {}),
+    ...("sub_behavior_sort_order" in behavior ? { sub_behavior_sort_order: behavior.sub_behavior_sort_order ?? 0 } : {}),
+    ...("inherit_parent_schedule" in behavior ? { inherit_parent_schedule: behavior.inherit_parent_schedule ?? false } : {}),
+    ...("id" in behavior && behavior.id ? { id: behavior.id } : {}),
     created_at: "created_at" in behavior ? behavior.created_at ?? null : null,
   };
 }

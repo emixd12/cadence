@@ -381,7 +381,10 @@ pub fn apply(
         db::insert(db, profile, category)?;
     }
     let mut written_definitions = HashSet::new();
-    for write in &plan.graph_writes {
+    // Sub-behaviors: parents and standalone Behaviors exist before any row names a parent.
+    let mut graph_writes: Vec<_> = plan.graph_writes.iter().collect();
+    graph_writes.sort_by_key(|write| write.graph.behavior.parent_behavior_id.is_some());
+    for write in graph_writes {
         let definitions: Vec<_> = plan
             .definition_events
             .iter()

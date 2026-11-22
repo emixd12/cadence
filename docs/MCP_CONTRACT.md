@@ -94,7 +94,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.6.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.7.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -112,6 +112,7 @@ Contract version: `1.6.0`. Generated from `packages/core/src/integration/`.
 | `search` | Search Cadence | `cadence.read` | yes | no | yes |
 | `fetch` | Fetch Cadence record | `cadence.read` | yes | no | yes |
 | `set_occurrence_status` | Set Occurrence status | `cadence.occurrences.write` | no | yes | yes |
+| `set_parent_occurrence_status` | Set parent Behavior slot status | `cadence.occurrences.write` | no | yes | yes |
 | `update_occurrence_note` | Update Occurrence note | `cadence.occurrences.write` | no | yes | yes |
 | `move_occurrence_for_day` | Move Occurrence for today | `cadence.occurrences.write` | no | yes | no |
 | `revert_occurrence_move` | Undo Occurrence move | `cadence.occurrences.write` | no | yes | no |
@@ -133,7 +134,7 @@ Every tool sets `openWorldHint: false`.
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
 | `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `set_parent_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior`, `end_behavior`, `pause_behavior`, `resume_behavior` |
 
 ## Error catalog
@@ -173,6 +174,9 @@ Every tool sets `openWorldHint: false`.
 | Time entries per schedule | 8 |
 | Recurrence interval (input) | 999 |
 | Default duration (minutes) | 1440 |
+| Sub-behaviors per `create_behavior` call | 25 |
+| Largest `sub_behavior_sort_order` | 9999 |
+| Occurrences per `set_parent_occurrence_status` call | 50 |
 | Occurrence note length | 2000 |
 | Day note length | 2000 |
 | `list_day_notes` maximum date range (days, inclusive) | 92 |
@@ -191,6 +195,7 @@ Every tool sets `openWorldHint: false`.
 Included:
 
 - Behaviors, including archived Behaviors
+- Parent and sub-behavior links, and derived parent slot rollups (never stored)
 - Schedules and time entries
 - Categories
 - Occurrences, stored statuses, and status history
@@ -254,12 +259,12 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.6.0"` |
+| `contract_version` | yes | `"1.7.0"` |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
 
-**List Behaviors.** Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.
+**List Behaviors.** Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, archive notes, and sub-behavior links. A parent Behavior lists its sub-behaviors (one level deep). Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -274,6 +279,8 @@ Input:
 | `state` | no | `active`, `archived`, `running`, `not_running`, `all` |
 | `category_id` | no | string (uuid) |
 | `is_opportunity` | no | boolean |
+| `parent_behavior_id` | no | string (uuid) |
+| `hierarchy` | no | `all`, `top_level`, `sub_behaviors` |
 | `updated_since` | no | string (date-time) |
 | `page_size` | no | integer |
 | `cursor` | no | string |
@@ -287,7 +294,7 @@ Output:
 
 ### `get_behavior`
 
-**Get Behavior.** Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, and revision. Use it before editing a Behavior.
+**Get Behavior.** Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, parent link, sub-behaviors, and revision. Use it before editing a Behavior.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -334,7 +341,7 @@ Output:
 
 ### `get_timeline`
 
-**Get Timeline.** Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to 14 days from the start date.
+**Get Timeline.** Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in `parent_groups`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to 14 days from the start date.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -542,6 +549,41 @@ Output:
 | `previous_status` | yes | `unresolved`, `completed`, `not_completed` |
 | `changed` | yes | boolean |
 
+### `set_parent_occurrence_status`
+
+**Set parent Behavior slot status.** Marks every sub-behavior Occurrence in one parent Behavior slot Completed or Not Completed in one change, such as a whole skin routine one morning. Name the slot with `local_date`, plus `slot_key` from get_timeline `parent_groups` when the parent has several times that day, or list `occurrence_ids`. Occurrences that already have the status do not change. To mark one step, use set_occurrence_status.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Changes stored statuses of several Occurrences at once, so readOnlyHint is false and destructiveHint is true under Claude's review criteria, which ask for it on tools that modify data; each status can be set back, so the hint is conservative for ChatGPT. The same arguments always leave the same statuses, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
+- Since: 1.7.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `parent_behavior_id` | yes | string (uuid) |
+| `status` | yes | `completed`, `not_completed` |
+| `local_date` | no | string (date) |
+| `slot_key` | no | string (date-time) |
+| `occurrence_ids` | no | array of string (uuid) |
+| `expected_statuses` | no | array of object |
+| `idempotency_key` | no | string |
+
+At least one of `local_date`, `occurrence_ids` is required.
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `parent_behavior_id` | yes | string (uuid) |
+| `status` | yes | `completed`, `not_completed` |
+| `occurrences` | yes | array of object |
+| `changed_occurrence_ids` | yes | array of string (uuid) |
+| `parent_groups` | yes | array of object |
+| `changed` | yes | boolean |
+
 ### `update_occurrence_note`
 
 **Update Occurrence note.** Adds, replaces, or clears the note on one Occurrence. Use it when the user wants to record context about a specific scheduled instance, such as how a workout went.
@@ -707,12 +749,12 @@ Output:
 
 ### `create_behavior`
 
-**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.
+**Create Behavior.** Creates a Behavior, a recurring thing the user wants to track (a habit, routine or recurring task), with schedules (daily, every N days, weekly or every N weeks on chosen weekdays, monthly on day N) and reminders. With is_opportunity true it can be added to today when there is room, and schedules may be empty. `sub_behaviors` creates a parent and up to 25 sub-behaviors in one change; `parent_behavior_id` adds one sub-behavior to an existing parent, and one that follows the parent's schedule needs no `schedules`. An opportunity Behavior is never in a routine. list_categories lists categories.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint false, idempotentHint false, openWorldHint false
 - Annotation rationale: Adds a new Behavior and changes no existing record, so destructiveHint is false under both Claude's and OpenAI's guidance; readOnlyHint is false, so clients still treat it as a write. Calling it twice without an idempotency_key creates two Behaviors, so idempotentHint is false. openWorldHint is false.
-- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `idempotency_key_reused`, `invalid_state`
 - Since: 1.0.0
 
 Input:
@@ -723,25 +765,32 @@ Input:
 | `description` | no | string |
 | `location_text` | no | string |
 | `category_id` | no | string (uuid) or null |
-| `schedules` | yes | array of object |
+| `schedules` | no | array of object |
 | `is_opportunity` | no | boolean |
 | `reminders` | no | object |
 | `default_duration_minutes` | no | integer |
+| `parent_behavior_id` | no | string (uuid) |
+| `inherit_parent_schedule` | no | boolean |
+| `sub_behavior_sort_order` | no | integer |
+| `sub_behaviors` | no | array of object |
 | `end_on` | no | string (date) |
 | `end_time` | no | string |
 | `end_date` | no | string (date) |
 | `external_ref` | no | string |
 | `idempotency_key` | no | string |
 
+At least one of `schedules`, `parent_behavior_id` is required.
+
 Output:
 
 | Field | Required | Type |
 |---|---|---|
 | `behavior` | yes | object |
+| `sub_behaviors` | no | array of object |
 
 ### `update_behavior`
 
-**Update Behavior.** Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.
+**Update Behavior.** Edits a Behavior's title, description, place, category, schedules, reminders, length, end, opportunity flag or sub-behavior link. Only the fields sent change; `schedules` replaces the whole list and may be empty only for an opportunity Behavior. `parent_behavior_id` groups it under a parent, or null makes it top-level; `sub_behavior_sort_order` moves it among its siblings. An opportunity Behavior is never part of a routine. A parent's schedule change also reaches the sub-behaviors that follow it. Past and resolved Occurrences are kept. Read get_behavior first for the revision.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
@@ -766,9 +815,12 @@ Input:
 | `end_on` | no | string (date) or null |
 | `end_time` | no | string or null |
 | `end_date` | no | string (date) or null |
+| `parent_behavior_id` | no | string (uuid) or null |
+| `inherit_parent_schedule` | no | boolean |
+| `sub_behavior_sort_order` | no | integer |
 | `idempotency_key` | no | string |
 
-At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date`, `is_opportunity` is required.
+At least one of `title`, `description`, `location_text`, `category_id`, `schedules`, `reminders`, `default_duration_minutes`, `end_on`, `end_time`, `end_date`, `is_opportunity`, `parent_behavior_id`, `inherit_parent_schedule`, `sub_behavior_sort_order` is required.
 
 Output:
 
@@ -779,7 +831,7 @@ Output:
 
 ### `archive_behavior`
 
-**Archive Behavior.** Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Nothing is deleted. Archiving an archived Behavior changes nothing.
+**Archive Behavior.** Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Archiving a parent Behavior also archives its active sub-behaviors. Nothing is deleted. Archiving an archived Behavior changes nothing.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
@@ -805,7 +857,7 @@ Output:
 
 ### `restore_behavior`
 
-**Restore Behavior.** Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring an active Behavior changes nothing.
+**Restore Behavior.** Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring a parent Behavior also restores the sub-behaviors archived with it; a sub-behavior of an archived parent can't be restored on its own. Restoring an active Behavior changes nothing.
 
 - Scope: `cadence.behaviors.write`
 - Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false

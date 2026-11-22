@@ -333,6 +333,7 @@ function lineFromRow(row: ProposalRow): BriefMoveLine | null {
     status: row.status as BriefMoveProposalStatus,
     moveId: row.move_id,
     appliedTo: null,
+    ...(line.routine ? { routine: line.routine } : {}),
   };
 }
 
@@ -537,6 +538,7 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     calendarBusy: requestBusy(request.context),
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
+    routine: !!line?.routine,
   }).catch(rethrowKeyReused);
   return settleMove(callers, proposal, moved, { kind: request.kind, key: request.idempotencyKey, batchId: request.batchId,
     asked: { startAt: proposal.proposed_start_at, context: request.context } });
@@ -560,6 +562,7 @@ async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
     calendarBusy: requestBusy(request.context),
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
+    routine: !!line?.routine,
   }).catch(rethrowKeyReused);
   return settleMove(callers, proposal, moved, { kind: "other_time", key: request.idempotencyKey, batchId: null,
     asked: { startAt: start.toString(), context: request.context } });
@@ -579,6 +582,7 @@ async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key:
   if (!occurrence.data) throw new BriefMoveError("proposal_not_found");
   const reverted = await revertOccurrenceMove(await agentCaller(callers), {
     occurrenceId: proposal.occurrence_id, expectedRevision: occurrence.data.updated_at, moveId: proposal.move_id, idempotencyKey: key,
+    routine: !!lineFromRow(proposal)?.routine,
   }).catch(rethrowKeyReused);
   return settleMove(callers, proposal, reverted, { kind, key, batchId });
 }

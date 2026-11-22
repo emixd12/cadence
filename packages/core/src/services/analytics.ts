@@ -88,6 +88,11 @@ function toAnalyticsOccurrenceInput(
     note: occurrence.note ?? "",
     timezone: behavior.timezone || DEFAULT_TIMEZONE,
     origin: occurrence.origin === "opportunity" ? "opportunity" : "scheduled",
+    ...(behavior.parent_behavior_id ? {
+      parentBehaviorId: behavior.parent_behavior_id,
+      parentBehaviorTitle: behaviorById.get(behavior.parent_behavior_id)?.title,
+      subBehaviorSortOrder: behavior.sub_behavior_sort_order ?? 0,
+    } : {}),
   };
 }
 

@@ -170,7 +170,9 @@ export type BriefingPlanRejectionCode =
   | "no_change_needed"
   | "no_feasible_window"
   | "occurrence_not_found"
-  | "occurrence_not_unresolved";
+  | "occurrence_not_unresolved"
+  /** A routine step that is not the slot's lead: the lead's option moves the whole routine. */
+  | "routine_moves_together";
 
 export type BriefingPlanRejection = Readonly<{
   occurrenceRef: string | null;

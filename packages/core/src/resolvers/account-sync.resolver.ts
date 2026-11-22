@@ -18,8 +18,11 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * Contract 8 adds Behaviors of Opportunity: `behavior.is_opportunity` (false), nullable
  * `recurrence_rule` and `scheduled_time` on an opportunity Behavior, `occurrence.origin`
  * ("scheduled") and `occurrence.added_by` (null). The minimum writer contract is 8.
+ * Contract 9 adds the sub-behavior link fields (`parent_behavior_id`,
+ * `sub_behavior_sort_order`, `inherit_parent_schedule`), depth 1. It is additive: the
+ * server keeps the minimum writer contract at 8.
  */
-export const ACCOUNT_SYNC_CONTRACT = 8;
+export const ACCOUNT_SYNC_CONTRACT = 9;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -391,12 +394,26 @@ function validateInputGraphs(allowEmptyBaseline: boolean, ...graphs: readonly Ma
         throw new Error(`The account ${entity.kind} ${entity.id} references missing ${parentKind} ${parentId}; read a complete graph before synchronizing.`);
       }
     }
+    validateSubBehaviorDepth(graph);
+  }
+}
+
+/** Sub-behaviors are one level deep: a parent is never itself a sub-behavior. */
+function validateSubBehaviorDepth(graph: ReadonlyMap<string, AccountSyncEntity>): void {
+  for (const entity of graph.values()) {
+    if (entity.kind !== "behavior") continue;
+    const parentId = field(entity.value, "parent_behavior_id");
+    if (!parentId) continue;
+    const parent = graph.get(`behavior:${parentId}`);
+    if (parent && field(parent.value, "parent_behavior_id")) {
+      throw new Error(`The account behavior ${entity.id} nests sub-behaviors more than one level deep; review the Behavior groups before synchronizing.`);
+    }
   }
 }
 
 function requiredDependency(kind: AccountSyncEntityKind, fieldName: string): boolean {
   return !(
-    (kind === "behavior" && (fieldName === "category_id" || fieldName === "current_configuration_event_id"))
+    (kind === "behavior" && (fieldName === "category_id" || fieldName === "current_configuration_event_id" || fieldName === "parent_behavior_id"))
     || (kind === "schedule_slot" && fieldName === "behavior_schedule_id")
     || (kind === "occurrence" && (fieldName === "behavior_configuration_event_id" || fieldName === "behavior_schedule_slot_id"))
     || (kind === "status_event" && fieldName === "revises_event_id")
@@ -409,7 +426,7 @@ function requiredDependency(kind: AccountSyncEntityKind, fieldName: string): boo
 
 function dependencies(entity: AccountSyncEntity): readonly (readonly [string, AccountSyncEntityKind])[] {
   switch (entity.kind) {
-    case "behavior": return [["category_id", "category"], ["current_configuration_event_id", "configuration_event"]];
+    case "behavior": return [["category_id", "category"], ["current_configuration_event_id", "configuration_event"], ["parent_behavior_id", "behavior"]];
     case "schedule":
     case "definition_event":
     case "configuration_event": return [["behavior_id", "behavior"]];
@@ -486,6 +503,10 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       location_text: null,
       // Contract 8: a Behavior saved before it was never an opportunity Behavior.
       is_opportunity: false,
+      // Contract 9: rows written before sub-behaviors are standalone.
+      parent_behavior_id: null,
+      sub_behavior_sort_order: 0,
+      inherit_parent_schedule: false,
       ...value,
     };
     // A baseline saved before contract 7 holds end_date; it reads as the new fields.
@@ -757,6 +778,13 @@ function validateBehaviorPersistenceFields(value: Record<string, Json | undefine
     || (typeof value.pause_from_on === "string" && typeof value.pause_back_on === "string"
       && value.pause_back_on <= value.pause_from_on)) {
     throw new Error("The account Behavior end or pause is invalid.");
+  }
+  const parentId = value.parent_behavior_id, sortOrder = value.sub_behavior_sort_order;
+  if (!(parentId === null || (typeof parentId === "string" && parentId.length > 0 && parentId !== value.id))
+    || typeof sortOrder !== "number" || !Number.isInteger(sortOrder) || sortOrder < 0
+    || typeof value.inherit_parent_schedule !== "boolean"
+    || (parentId === null && value.inherit_parent_schedule)) {
+    throw new Error("The account Behavior sub-behavior link is invalid.");
   }
   const autoArchivedAt = value.auto_archived_at;
   if (autoArchivedAt !== null) {

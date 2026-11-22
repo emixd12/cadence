@@ -6,7 +6,7 @@ import type {
   AppSupabaseClient,
   BehaviorWithCategory,
 } from "@/lib/db/behaviors.repo";
-import { getBehaviorById } from "@/lib/db/behaviors.repo";
+import { getBehaviorById, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import {
   cancelPendingReminderDeliveryById,
   cancelPendingReminderDeliveriesForOccurrence,
@@ -35,6 +35,7 @@ import {
   resolveReminderDeliveries,
   resolveReminderDeliveryCancellation,
   resolveReminderDeliveryReconciliation,
+  resolveRoutineReminderDeliveries,
   type ResolvedReminderDelivery,
   type ReminderResolverBehavior,
   type ReminderResolverOccurrence,
@@ -125,6 +126,23 @@ export async function syncReminderDeliveriesForBehavior(
 ): Promise<void> {
   const now = options.now ?? Temporal.Now.instant();
 
+  // An inheriting sub-behavior shares one routine reminder with its siblings, so the
+  // whole routine is reconciled together.
+  if (behavior.parent_behavior_id && behavior.inherit_parent_schedule) {
+    const behaviors = await listUserBehaviors(supabase, userId);
+    const parent = behaviors.find((candidate) => candidate.id === behavior.parent_behavior_id);
+    if (parent) {
+      const siblings = behaviors.filter((candidate) =>
+        candidate.parent_behavior_id === parent.id && candidate.inherit_parent_schedule);
+      const inputs = await Promise.all(siblings.map(async (sibling) => ({
+        behavior: sibling,
+        occurrences: await listBehaviorOccurrencesFrom(supabase, userId, sibling.id, options.scheduledFrom),
+      })));
+      await syncReminderDeliveriesForBehaviors(supabase, userId, [{ behavior: parent, occurrences: [] }, ...inputs], { now });
+      return;
+    }
+  }
+
   await measurePerformanceSpan(
     {
       span: "service.sync_reminder_deliveries_for_behavior",
@@ -183,11 +201,20 @@ export async function syncReminderDeliveriesForBehaviors(
     async () => {
       const occurrences: Occurrence[] = [];
       const deliveries: ResolvedReminderDelivery[] = [];
+      const inputsById = new Map(inputs.map((input) => [input.behavior.id, input]));
+      const routines = new Map<string, SyncReminderDeliveriesForBehaviorsInput[]>();
 
       for (const input of inputs) {
         occurrences.push(...input.occurrences);
 
         if (!input.behavior.active) {
+          continue;
+        }
+
+        // Inheriting sub-behaviors of an active parent share one routine reminder per slot.
+        const parentId = input.behavior.parent_behavior_id;
+        if (parentId && input.behavior.inherit_parent_schedule && inputsById.get(parentId)?.behavior.active) {
+          routines.set(parentId, [...(routines.get(parentId) ?? []), input]);
           continue;
         }
 
@@ -198,6 +225,19 @@ export async function syncReminderDeliveriesForBehaviors(
             input.occurrences,
           ),
         );
+      }
+
+      for (const [parentId, children] of routines) {
+        deliveries.push(...resolveRoutineReminderDeliveries({
+          parent: toReminderResolverBehavior(inputsById.get(parentId)!.behavior, userId),
+          children: children.map((child) => ({
+            behavior: toReminderResolverBehavior(child.behavior, userId),
+            inheritParentSchedule: true,
+            title: child.behavior.title,
+            subBehaviorSortOrder: child.behavior.sub_behavior_sort_order,
+            occurrences: child.occurrences.map(toReminderResolverOccurrence),
+          })),
+        }).deliveries);
       }
 
       await measurePerformanceSpan(
@@ -489,6 +529,23 @@ function behaviorHasEnded(behavior: Behavior, processedAt: string): boolean {
   return state === "ended" || state === "paused";
 }
 
+/**
+ * The Behavior whose reminder settings planned this delivery. An inheriting sub-behavior
+ * shares its parent's routine reminder (`resolveRoutineReminderDeliveries`), so the
+ * parent's settings apply. Null when that parent is missing, archived, ended or paused.
+ */
+async function loadReminderSettingsBehavior(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behavior: BehaviorWithCategory,
+  processedAt: string,
+): Promise<Behavior | BehaviorWithCategory | null> {
+  if (!behavior.parent_behavior_id || !behavior.inherit_parent_schedule) return behavior;
+  const parent = await getBehaviorById(supabase, userId, behavior.parent_behavior_id);
+  if (!parent || parent.user_id !== userId || !parent.active || behaviorHasEnded(parent, processedAt)) return null;
+  return parent;
+}
+
 async function processClaimedEmailReminder(input: {
   supabase: AppSupabaseClient;
   delivery: ReminderDelivery;
@@ -515,11 +572,16 @@ async function processClaimedEmailReminder(input: {
     getProfileSettings(input.supabase, input.delivery.user_id),
   ]);
 
+  const settings = behavior
+    ? await loadReminderSettingsBehavior(input.supabase, input.delivery.user_id, behavior, input.processedAt)
+    : null;
+
   if (
     !behavior ||
+    !settings ||
     !behavior.active ||
     behaviorHasEnded(behavior, input.processedAt) ||
-    !isCurrentExpectedEmailDelivery(input.delivery, behavior, occurrence)
+    !isCurrentExpectedEmailDelivery(input.delivery, settings, occurrence)
   ) {
     await cancelPendingReminderDeliveryById(input.supabase, {
       id: input.delivery.id,
@@ -600,11 +662,16 @@ async function processClaimedBrowserPushReminder(input: {
     occurrence.behavior_id,
   );
 
+  const settings = behavior
+    ? await loadReminderSettingsBehavior(input.supabase, input.delivery.user_id, behavior, input.processedAt)
+    : null;
+
   if (
     !behavior ||
+    !settings ||
     !behavior.active ||
     behaviorHasEnded(behavior, input.processedAt) ||
-    !isCurrentExpectedBrowserPushDelivery(input.delivery, behavior, occurrence)
+    !isCurrentExpectedBrowserPushDelivery(input.delivery, settings, occurrence)
   ) {
     await cancelPendingReminderDeliveryById(input.supabase, {
       id: input.delivery.id,

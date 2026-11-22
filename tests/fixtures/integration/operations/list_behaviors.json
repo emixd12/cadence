@@ -21,6 +21,19 @@
         "state": "running",
         "is_opportunity": true
       }
+    },
+    {
+      "name": "top-level only",
+      "value": {
+        "hierarchy": "top_level"
+      }
+    },
+    {
+      "name": "one parent's sub-behaviors",
+      "value": {
+        "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+        "hierarchy": "sub_behaviors"
+      }
     }
   ],
   "invalid_inputs": [
@@ -63,6 +76,14 @@
       },
       "code": "invalid_input",
       "path": "$.is_opportunity"
+    },
+    {
+      "name": "unknown hierarchy",
+      "value": {
+        "hierarchy": "children"
+      },
+      "code": "invalid_input",
+      "path": "$.hierarchy"
     }
   ],
   "valid_outputs": [
@@ -132,6 +153,10 @@
             },
             "archive_notes": [],
             "external_ref": null,
+            "parent_behavior_id": null,
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [],
             "created_at": "2026-09-01T12:00:00Z",
             "updated_at": "2026-10-18T13:00:00Z",
             "revision": "b1.2026-10-18T13:00:00Z"
@@ -190,6 +215,175 @@
               }
             ],
             "external_ref": "facets:rec_42",
+            "parent_behavior_id": null,
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [],
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "name": "parent and sub-behavior",
+      "value": {
+        "behaviors": [
+          {
+            "id": "00000009-1111-4111-8111-000000000009",
+            "title": "Skin routine",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "run_state": "running",
+            "end_on": null,
+            "end_time": null,
+            "pause": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "is_opportunity": false,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": "app-routine-1",
+            "parent_behavior_id": null,
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [
+              {
+                "id": "0000000a-1111-4111-8111-00000000000a",
+                "title": "Cleanser",
+                "sub_behavior_sort_order": 0,
+                "inherit_parent_schedule": true,
+                "active": true,
+                "run_state": "running"
+              },
+              {
+                "id": "0000000b-1111-4111-8111-00000000000b",
+                "title": "Retinol",
+                "sub_behavior_sort_order": 1,
+                "inherit_parent_schedule": false,
+                "active": true,
+                "run_state": "running"
+              }
+            ],
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          },
+          {
+            "id": "0000000a-1111-4111-8111-00000000000a",
+            "title": "Cleanser",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "run_state": "running",
+            "end_on": null,
+            "end_time": null,
+            "pause": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "is_opportunity": false,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "parent_behavior_id": "00000009-1111-4111-8111-000000000009",
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": true,
+            "sub_behaviors": [],
             "created_at": "2026-09-01T12:00:00Z",
             "updated_at": "2026-10-18T13:00:00Z",
             "revision": "b1.2026-10-18T13:00:00Z"
@@ -266,6 +460,10 @@
             },
             "archive_notes": [],
             "external_ref": null,
+            "parent_behavior_id": null,
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [],
             "created_at": "2026-09-01T12:00:00Z",
             "updated_at": "2026-10-18T13:00:00Z"
           }
@@ -341,6 +539,10 @@
             },
             "archive_notes": [],
             "external_ref": null,
+            "parent_behavior_id": null,
+            "sub_behavior_sort_order": 0,
+            "inherit_parent_schedule": false,
+            "sub_behaviors": [],
             "created_at": "2026-09-01T12:00:00Z",
             "updated_at": "2026-10-18T13:00:00Z",
             "revision": "b1.2026-10-18T13:00:00Z"

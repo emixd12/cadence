@@ -1814,6 +1814,41 @@
       "reason": "Set a time only reveals a form field; the save is the existing Behavior update."
     },
     {
+      "id": "INT-BEHAVIOR-039",
+      "classification": "destructive_serial_only",
+      "reason": "Linking a Behavior to a routine changes Occurrence generation for both Behaviors; it needs a seeded parent and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-040",
+      "classification": "destructive_serial_only",
+      "reason": "Turning Follow parent schedule on or off rewrites the step's schedule rows; it needs a seeded routine and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-041",
+      "classification": "destructive_serial_only",
+      "reason": "Creating a routine writes a parent and several sub-behavior graphs in one transaction; it needs serial verification and cascade cleanup."
+    },
+    {
+      "id": "INT-BEHAVIOR-042",
+      "classification": "destructive_serial_only",
+      "reason": "Reorder rewrites every sibling's order in one write; it needs a seeded routine and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-043",
+      "classification": "destructive_serial_only",
+      "reason": "Detach changes the step's link and Occurrence generation; it needs a seeded routine and serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-044",
+      "classification": "destructive_serial_only",
+      "reason": "Adding a step creates or relinks a Behavior under a seeded routine; it needs serial verification."
+    },
+    {
+      "id": "INT-BEHAVIOR-045",
+      "classification": "browser_only",
+      "reason": "Opening the nested rows changes client UI state only."
+    },
+    {
       "id": "INT-TIMELINE-020",
       "classification": "destructive_serial_only",
       "reason": "Run notices exist only on the day a Behavior ends, pauses or comes back; Start again and Resume now need a seeded ended or paused Behavior and serial verification."
@@ -1847,6 +1882,21 @@
       "id": "INT-TIMELINE-024",
       "classification": "destructive_serial_only",
       "reason": "Remove deletes a seeded clean added Occurrence; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-TIMELINE-025",
+      "classification": "destructive_serial_only",
+      "reason": "A routine mark writes several Occurrence statuses in one transaction; it needs a seeded routine slot and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-026",
+      "classification": "browser_only",
+      "reason": "Opening or closing one routine changes client UI state only."
+    },
+    {
+      "id": "INT-TIMELINE-027",
+      "classification": "browser_only",
+      "reason": "The zoom layer changes client UI state and one local preference only."
     },
     {
       "id": "INT-ADVISOR-005",

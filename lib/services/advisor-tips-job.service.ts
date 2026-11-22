@@ -412,9 +412,21 @@ export function createHostedTipVisitPort(userId: string, options: Readonly<{ cli
 }
 
 async function readBehaviorTitles(client: AppSupabaseClient, userId: string): Promise<Map<string, string>> {
-  const { data, error } = await client.from("behaviors").select("id,title").eq("user_id", userId).is("archived_at", null);
+  const { data, error } = await client.from("behaviors").select("id,title,parent_behavior_id").eq("user_id", userId).is("archived_at", null);
   if (error) throw new AdvisorTipsError("read_titles_failed");
-  return new Map((data ?? []).map((row) => [row.id, row.title]));
+  return tipTitles(data ?? []);
+}
+
+/**
+ * The title a tip names a Behavior by. A routine's step is named with its routine
+ * ("Retinol in Skin routine"), so a tip about one step reads plainly.
+ */
+export function tipTitles(rows: readonly Readonly<{ id: string; title: string; parent_behavior_id?: string | null }>[]): Map<string, string> {
+  const own = new Map(rows.map((row) => [row.id, row.title]));
+  return new Map(rows.map((row) => {
+    const parent = row.parent_behavior_id ? own.get(row.parent_behavior_id) : undefined;
+    return [row.id, parent ? `${row.title} in ${parent}` : row.title];
+  }));
 }
 
 async function readDayNotes(client: AppSupabaseClient, userId: string, since: string, before: string): Promise<DayNote[]> {

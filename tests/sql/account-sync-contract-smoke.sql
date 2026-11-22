@@ -345,7 +345,8 @@ begin
   -- Contract 6 adds the read-only occurrence_move kind (advisor Phase 2A).
   -- Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
   -- Contract 8 adds behaviors.is_opportunity and occurrences.origin and added_by.
-  if cadence_private.account_sync_current_contract() <> 8 then
+  -- Contract 9 adds the sub-behavior link fields on Behaviors.
+  if cadence_private.account_sync_current_contract() <> 9 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(

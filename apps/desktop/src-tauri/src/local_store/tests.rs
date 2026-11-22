@@ -159,6 +159,7 @@ fn id(value: u32) -> String {
 }
 const OPPORTUNITY_COLUMNS_ADD: &str = "ALTER TABLE behaviors ADD COLUMN is_opportunity INTEGER NOT NULL DEFAULT 0; ALTER TABLE occurrences ADD COLUMN origin TEXT NOT NULL DEFAULT 'scheduled'; ALTER TABLE occurrences ADD COLUMN added_by TEXT;";
 const OPPORTUNITY_COLUMNS_DROP: &str = "ALTER TABLE behaviors DROP COLUMN is_opportunity; ALTER TABLE occurrences DROP COLUMN origin; ALTER TABLE occurrences DROP COLUMN added_by;";
+const LINK_COLUMNS: [&str; 3] = ["parent_behavior_id TEXT", "sub_behavior_sort_order INTEGER NOT NULL DEFAULT 0", "inherit_parent_schedule INTEGER NOT NULL DEFAULT 0"];
 const RUN_COLUMNS: [&str; 5] = ["end_on", "end_time", "pause_from_on", "pause_from_time", "pause_back_on"];
 
 struct Fixture {
@@ -214,9 +215,17 @@ impl Fixture {
         if before_opportunity {
             self.db.execute_batch(OPPORTUNITY_COLUMNS_ADD).unwrap();
         }
+        // A schema before 0028 has no sub-behavior link columns; they come and go the same way.
+        let before_links = self.db.prepare("SELECT parent_behavior_id FROM behaviors").is_err();
+        if before_links {
+            self.db.execute_batch(&LINK_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors ADD COLUMN {column};")).collect::<String>()).unwrap();
+        }
         let result = execute(&mut self.db, serde_json::from_value(request).unwrap());
         if before_opportunity {
             self.db.execute_batch(OPPORTUNITY_COLUMNS_DROP).unwrap();
+        }
+        if before_links {
+            self.db.execute_batch(&LINK_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors DROP COLUMN {};", column.split(' ').next().unwrap())).collect::<String>()).unwrap();
         }
         if before_run_columns {
             self.db.execute_batch(&RUN_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors DROP COLUMN {column};")).collect::<String>()).unwrap();
@@ -2818,7 +2827,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 27);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 28);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }
@@ -2935,4 +2944,234 @@ fn opportunity_add_refuses_a_behavior_that_is_not_available() {
     let mut missing = added_row(&profile, 31, "15:00:00", "unresolved", "user");
     missing["behavior_id"] = json!(id(77));
     assert_eq!(fixture.run(add_request(missing, Value::Null), 103).unwrap_err(), "Behavior not found.");
+}
+
+/// Sub-behaviors: a create plan for one Behavior whose ids start at `base`. A sub-behavior
+/// names `parent` and copies the parent's daily 09:00 schedule.
+fn sub_behavior_create(profile: &str, base: u32, title: &str, parent: Option<u32>) -> Value {
+    let mut request = create_request(profile);
+    let behavior_id = id(base);
+    let graph = &mut request["graph"];
+    graph["behavior"]["id"] = json!(behavior_id);
+    graph["behavior"]["title"] = json!(title);
+    graph["behavior"]["current_configuration_event_id"] = json!(id(base + 4));
+    graph["behavior"]["parent_behavior_id"] = json!(parent.map(id));
+    graph["behavior"]["inherit_parent_schedule"] = json!(parent.is_some());
+    graph["behavior"]["sub_behavior_sort_order"] = json!(0);
+    graph["schedules"][0]["id"] = json!(id(base + 1));
+    graph["schedules"][0]["behavior_id"] = json!(behavior_id);
+    graph["slots"][0]["id"] = json!(id(base + 2));
+    graph["slots"][0]["behavior_id"] = json!(behavior_id);
+    graph["slots"][0]["behavior_schedule_id"] = json!(id(base + 1));
+    request["definitionEvent"]["id"] = json!(id(base + 3));
+    request["definitionEvent"]["behavior_id"] = json!(behavior_id);
+    request["definitionEvent"]["next_title"] = json!(title);
+    let configuration = &mut request["configurationEvent"];
+    configuration["id"] = json!(id(base + 4));
+    configuration["behavior_id"] = json!(behavior_id);
+    configuration["next_configuration"]["parentBehaviorId"] = json!(parent.map(id));
+    configuration["next_configuration"]["inheritParentSchedule"] = json!(parent.is_some());
+    request
+}
+
+fn group_item(request: Value) -> Value {
+    json!({"graph":request["graph"],"definitionEvent":request["definitionEvent"],"configurationEvent":request["configurationEvent"]})
+}
+
+/// A parent (ids from 60) with two sub-behaviors (ids from 40 and 50), in one write.
+fn create_routine(fixture: &mut Fixture) -> Value {
+    let profile = fixture.profile.clone();
+    let items = json!([
+        group_item(sub_behavior_create(&profile, 60, "Skin routine", None)),
+        group_item(sub_behavior_create(&profile, 40, "Cerave", Some(60))),
+        group_item(sub_behavior_create(&profile, 50, "Retinol", Some(60))),
+    ]);
+    let mut items = items;
+    items[2]["graph"]["behavior"]["sub_behavior_sort_order"] = json!(1);
+    fixture.run(json!({"operation":"createBehaviorGroup","items":items}), 400).unwrap()
+}
+
+fn link(fixture: &Fixture, behavior: u32) -> (Option<String>, i64, bool) {
+    fixture.db.query_row(
+        "SELECT parent_behavior_id,sub_behavior_sort_order,inherit_parent_schedule FROM behaviors WHERE id=?1",
+        [id(behavior)],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get::<_, i64>(2)? == 1)),
+    ).unwrap()
+}
+
+#[test]
+fn migration_0028_keeps_every_schema_27_row_standalone() {
+    let mut fixture = Fixture::at_schema(27);
+    let profile = fixture.profile.clone();
+    for number in [1, 2] {
+        fixture.db.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,NULL,'Legacy',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,?3,?3,NULL,NULL)", params![id(number), profile, NOW]).unwrap();
+    }
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(fixture.count("behaviors"), 2);
+    assert_eq!(link(&fixture, 1), (None, 0, false));
+    let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
+    assert!(rows.iter().all(|row| row.parent_behavior_id.is_none() && !row.inherit_parent_schedule));
+}
+
+#[test]
+fn sub_behavior_depth_one_is_enforced_by_row_checks_and_triggers() {
+    let mut fixture = Fixture::new();
+    create_routine(&mut fixture);
+    let profile = fixture.profile.clone();
+    // A sub-behavior cannot have sub-behaviors.
+    let grandchild = fixture.run(sub_behavior_create(&profile, 70, "Nested", Some(40)), 401).unwrap_err();
+    assert!(grandchild.contains("cannot have sub-behaviors"), "{grandchild}");
+    // A parent with sub-behaviors cannot become a sub-behavior.
+    fixture.run(sub_behavior_create(&profile, 80, "Evening", None), 402).unwrap();
+    let parent_moves = fixture.db.execute("UPDATE behaviors SET parent_behavior_id=?1 WHERE id=?2", params![id(80), id(60)]).unwrap_err();
+    assert!(parent_moves.to_string().contains("cannot become a sub-behavior"));
+    // No Behavior is its own parent; following a schedule needs a parent.
+    assert!(fixture.db.execute("UPDATE behaviors SET parent_behavior_id=id WHERE id=?1", [id(80)]).is_err());
+    assert!(fixture.db.execute("UPDATE behaviors SET inherit_parent_schedule=1 WHERE id=?1", [id(80)]).is_err());
+    let mut self_parent = sub_behavior_create(&profile, 90, "Self", Some(90));
+    self_parent["configurationEvent"]["next_configuration"]["parentBehaviorId"] = json!(id(90));
+    assert!(fixture.run(self_parent, 403).unwrap_err().contains("own parent"));
+    // Deleting a parent leaves its sub-behaviors standalone.
+    fixture.db.execute_batch("PRAGMA defer_foreign_keys=ON; BEGIN;").unwrap();
+    fixture.db.execute("DELETE FROM behaviors WHERE id=?1", [id(60)]).unwrap();
+    assert_eq!(link(&fixture, 40), (None, 0, false));
+    fixture.db.execute_batch("ROLLBACK;").unwrap();
+    assert_eq!(link(&fixture, 40), (Some(id(60)), 0, true));
+}
+
+#[test]
+fn sub_behavior_triggers_keep_opportunities_out_of_routines() {
+    let mut fixture = Fixture::new();
+    create_routine(&mut fixture);
+    let profile = fixture.profile.clone();
+    let refused = |error: String| assert!(error.contains("opportunity Behavior can't be part of a routine"), "{error}");
+    // A child cannot attach to an opportunity parent, on create or by a link update.
+    fixture.run(sub_behavior_create(&profile, 80, "Stretch", None), 402).unwrap();
+    fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(80)]).unwrap();
+    refused(fixture.run(sub_behavior_create(&profile, 70, "Calves", Some(80)), 403).unwrap_err());
+    fixture.run(sub_behavior_create(&profile, 90, "Walk", None), 404).unwrap();
+    refused(fixture.db.execute("UPDATE behaviors SET parent_behavior_id=?1 WHERE id=?2", params![id(80), id(90)]).unwrap_err().to_string());
+    assert_eq!(link(&fixture, 90), (None, 0, false));
+    // A Behavior that already has children, or is a child, cannot become an opportunity.
+    refused(fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(60)]).unwrap_err().to_string());
+    refused(fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(40)]).unwrap_err().to_string());
+    let flags: i64 = fixture.db.query_row("SELECT count(*) FROM behaviors WHERE is_opportunity=1", [], |row| row.get(0)).unwrap();
+    assert_eq!(flags, 1);
+    // Once its steps leave, the former parent may become an opportunity.
+    fixture.db.execute("UPDATE behaviors SET parent_behavior_id=NULL,inherit_parent_schedule=0 WHERE parent_behavior_id=?1", [id(60)]).unwrap();
+    fixture.db.execute("UPDATE behaviors SET is_opportunity=1 WHERE id=?1", [id(60)]).unwrap();
+}
+
+#[test]
+fn behavior_groups_commit_atomically_and_reorder_densely() {
+    let mut fixture = Fixture::new();
+    let profile = fixture.profile.clone();
+    // A sub-behavior naming another parent rolls back the whole group.
+    let stray = json!([
+        group_item(sub_behavior_create(&profile, 60, "Skin routine", None)),
+        group_item(sub_behavior_create(&profile, 40, "Cerave", Some(60))),
+        group_item(sub_behavior_create(&profile, 50, "Retinol", Some(1))),
+    ]);
+    assert!(fixture.run(json!({"operation":"createBehaviorGroup","items":stray}), 399).unwrap_err().contains("new parent"));
+    assert_eq!(fixture.count("behaviors"), 0);
+    let created = create_routine(&mut fixture);
+    assert_eq!(created.as_array().unwrap().len(), 3);
+    assert_eq!(fixture.count("behaviors"), 3);
+    assert_eq!(link(&fixture, 50), (Some(id(60)), 1, true));
+    // Reorder lists each live sub-behavior once and writes only the rows that move.
+    let reorder = |ids: Vec<String>| json!({"operation":"reorderSubBehaviors","parentBehaviorId":id(60),"orderedBehaviorIds":ids});
+    assert!(fixture.run(reorder(vec![id(50)]), 404).unwrap_err().contains("each sub-behavior once"));
+    assert_eq!(fixture.run(reorder(vec![id(50), id(40)]), 405).unwrap(), json!(2));
+    assert_eq!(link(&fixture, 50).1, 0);
+    assert_eq!(link(&fixture, 40).1, 1);
+    assert_eq!(behavior::revision(&fixture.db, &profile, &id(40)).unwrap(), 2);
+    assert_eq!(fixture.run(reorder(vec![id(50), id(40)]), 406).unwrap(), json!(0));
+    // A group update writes every Behavior or none.
+    let graphs = behavior::read_graphs(&fixture.db, &profile).unwrap();
+    let item = |behavior: u32, title: &str| {
+        let mut graph = graphs.as_array().unwrap().iter().find(|graph| graph["behavior"]["id"] == id(behavior)).unwrap().clone();
+        let revision = graph["revision"].clone();
+        graph.as_object_mut().unwrap().remove("revision");
+        let previous = graph["behavior"]["title"].clone();
+        graph["behavior"]["title"] = json!(title);
+        json!({"graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":previous,"description":null},
+            "definitionEvent":{"id":id(behavior + 7),"user_id":profile,"behavior_id":id(behavior),"previous_title":previous,"previous_description":null,"next_title":title,"next_description":null,"changed_fields":["title"],"recorded_at":NOW,"source":"manual","reason":null,"created_at":NOW,"updated_at":NOW},
+            "configurationEvent":null})
+    };
+    let mut stale = item(40, "Cleanser");
+    stale["expectedRevision"] = json!(1);
+    let update = |items: Value| json!({"operation":"updateBehaviorGroup","items":items});
+    assert!(fixture.run(update(json!([item(60, "Morning skin"), stale])), 407).is_err());
+    assert_eq!(fixture.count("behavior_definition_events"), 3);
+    let updated = fixture.run(update(json!([item(60, "Morning skin"), item(40, "Cleanser")])), 408).unwrap();
+    assert_eq!(updated[1]["behavior"]["title"], "Cleanser");
+}
+
+#[test]
+fn parent_slot_marks_every_step_or_nothing() {
+    let mut fixture = Fixture::new();
+    create_routine(&mut fixture);
+    fixture.create();
+    let profile = fixture.profile.clone();
+    for (behavior, occurrence) in [(40, 41), (50, 51), (1, 10)] {
+        let mut row = serde_json::to_value(occurrence_row(&profile, occurrence, "exact", None)).unwrap();
+        row["behavior_id"] = json!(id(behavior));
+        let (event, slot) = if behavior == 1 { (5, 3) } else { (behavior + 4, behavior + 2) };
+        row["behavior_configuration_event_id"] = json!(id(event));
+        row["behavior_schedule_slot_id"] = json!(id(slot));
+        fixture.run(json!({"operation":"applyOccurrenceGeneration","behaviorId":id(behavior),"expectedConfigurationEventId":id(event),"create":[row],"update":[],"delete":[]}), 410 + behavior).unwrap();
+    }
+    let transition = |occurrence: u32, behavior: u32, event: u32, expected: &str| {
+        let mut plan = status_request(&profile, "unresolved", None, "completed", event, "2026-08-31T14:00:00Z");
+        plan["occurrenceId"] = json!(id(occurrence));
+        plan["expectedStatus"] = json!(expected);
+        plan["event"]["occurrence_id"] = json!(id(occurrence));
+        plan["event"]["behavior_id"] = json!(id(behavior));
+        let object = plan.as_object_mut().unwrap();
+        object.remove("operation");
+        plan
+    };
+    let mark = |transitions: Value| json!({"operation":"applyParentSlotStatusTransition","parentBehaviorId":id(60),"transitions":transitions});
+    // A standalone Behavior's Occurrence is not part of the routine.
+    assert!(fixture.run(mark(json!([transition(41, 40, 120, "unresolved"), transition(10, 1, 121, "unresolved")])), 420).unwrap_err().contains("sub-behaviors"));
+    // One stale step rolls back the whole mark.
+    assert!(fixture.run(mark(json!([transition(41, 40, 122, "unresolved"), transition(51, 50, 123, "completed")])), 421).is_err());
+    assert_eq!(fixture.count("occurrence_status_events"), 0);
+    let results = fixture.run(mark(json!([transition(41, 40, 124, "unresolved"), transition(51, 50, 125, "unresolved")])), 422).unwrap();
+    assert_eq!(results.as_array().unwrap().len(), 2);
+    assert!(results.as_array().unwrap().iter().all(|result| result["occurrence"]["status"] == "completed"));
+    assert_eq!(fixture.count("occurrence_status_events"), 2);
+}
+
+#[test]
+fn account_sync_round_trips_a_routine_child_first() {
+    use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
+    let mut source = Fixture::new();
+    create_routine(&mut source);
+    let mut target = Fixture::new();
+    let profile = source.profile.clone();
+    let value = |row: Value| { let mut row = row; row.as_object_mut().unwrap().remove("user_id"); row };
+    let write = |kind: Kind, row: Value| AccountSyncWrite { kind, id: row["id"].as_str().unwrap().into(), operation: Op::Upsert, expected: None, value: Some(value(row)) };
+    let mut writes = Vec::new();
+    // Sub-behaviors sort before their parent here, so the store must not depend on order.
+    let mut behaviors = db::owned::<Behavior>(&source.db, &profile).unwrap();
+    behaviors.sort_by_key(|row| row.parent_behavior_id.is_none());
+    writes.extend(behaviors.iter().map(|row| write(Kind::Behavior, serde_json::to_value(row).unwrap())));
+    writes.extend(db::owned::<BehaviorSchedule>(&source.db, &profile).unwrap().iter().map(|row| write(Kind::Schedule, serde_json::to_value(row).unwrap())));
+    writes.extend(db::owned::<BehaviorScheduleSlot>(&source.db, &profile).unwrap().iter().map(|row| write(Kind::ScheduleSlot, serde_json::to_value(row).unwrap())));
+    writes.extend(db::owned::<BehaviorDefinitionEvent>(&source.db, &profile).unwrap().iter().map(|row| write(Kind::DefinitionEvent, serde_json::to_value(row).unwrap())));
+    writes.extend(db::owned::<BehaviorConfigurationEvent>(&source.db, &profile).unwrap().iter().map(|row| write(Kind::ConfigurationEvent, serde_json::to_value(row).unwrap())));
+    let entities: Vec<sync_apply::AccountSyncEntity> = writes.iter().map(|write| serde_json::from_value(json!({"kind":write.kind,"id":write.id,"value":write.value}))).collect::<std::result::Result<_, _>>().unwrap();
+    sync_apply::validate_snapshot(&target.profile, &entities).unwrap();
+    let target_profile = target.profile.clone();
+    execute(&mut target.db, Request::ApplyAccountSync { profile_id: target_profile.clone(), writes }).unwrap();
+    assert_eq!(link(&target, 40), (Some(id(60)), 0, true));
+    assert_eq!(link(&target, 50), (Some(id(60)), 1, true));
+    assert_eq!(link(&target, 60), (None, 0, false));
+    // A contract 7 Behavior write without the link fields asks for an update.
+    let mut legacy = value(serde_json::to_value(&behaviors[0]).unwrap());
+    legacy.as_object_mut().unwrap().remove("parent_behavior_id");
+    let current = value(serde_json::to_value(db::by_id::<Behavior>(&target.db, &target_profile, &behaviors[0].id).unwrap()).unwrap());
+    let stale = AccountSyncWrite { kind: Kind::Behavior, id: behaviors[0].id.clone(), operation: Op::Upsert, expected: Some(current), value: Some(legacy) };
+    assert!(execute(&mut target.db, Request::ApplyAccountSync { profile_id: target_profile, writes: vec![stale] }).unwrap_err().contains("Update Cadence"));
 }

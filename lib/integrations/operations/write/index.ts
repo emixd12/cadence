@@ -26,6 +26,7 @@ function opportunityHandler<N extends OpportunityOperationName>(name: N) {
 
 export const writeOperationHandlers = {
   set_occurrence_status: handler("set_occurrence_status"),
+  set_parent_occurrence_status: handler("set_parent_occurrence_status"),
   update_occurrence_note: handler("update_occurrence_note"),
   move_occurrence_for_day: moveHandler("move_occurrence_for_day"),
   revert_occurrence_move: moveHandler("revert_occurrence_move"),

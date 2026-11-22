@@ -36,7 +36,7 @@ export const OPERATION_ACCESS = Object.freeze({
   get_account_context: 'read', list_behaviors: 'read', get_behavior: 'read', list_categories: 'read',
   get_timeline: 'read', list_occurrences: 'read', get_occurrence: 'read', list_day_notes: 'read', get_adherence_summary: 'read',
   search: 'read', fetch: 'read',
-  set_occurrence_status: 'write', update_occurrence_note: 'write',
+  set_occurrence_status: 'write', set_parent_occurrence_status: 'write', update_occurrence_note: 'write',
   move_occurrence_for_day: 'write', revert_occurrence_move: 'write', update_day_note: 'write',
   add_opportunity_occurrence: 'write', remove_opportunity_occurrence: 'write',
   create_behavior: 'write',

@@ -106,6 +106,8 @@ describe("Timeline time tracking", () => {
       emptyMessage: "No behaviors on this day",
       occurrences: [occurrence],
       unresolvedOccurrenceCount: 1,
+      parentGroups: [],
+      rows: [],
       occurrenceGroups: [
         {
           key: "behavior-1-2026-08-02",

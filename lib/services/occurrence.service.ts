@@ -17,9 +17,12 @@ import {
   listBehaviorOccurrencesFrom,
   updateOccurrenceNoteIfExpected,
 } from "@/lib/db/occurrences.repo";
+import { hasActiveSubBehaviors } from "@cadence/core/resolvers/sub-behavior.resolver";
+import { toSubBehaviorLinkFacts } from "@cadence/core/services/behavior.service";
 import {
   applyOccurrenceMarkDetailRpc,
   applyOccurrenceStatusTransitionRpc,
+  applyParentSlotStatusTransitionRpc,
   getLatestOccurrenceStatusEventForOccurrence,
   type ApplyOccurrenceStatusTransitionRpcResult,
 } from "@/lib/db/occurrenceStatusEvents.repo";
@@ -36,6 +39,7 @@ import { listProfileOccurrenceSyncTargets } from "@/lib/db/profiles.repo";
 import { listOccurrenceIdsWithTimeSessions } from "@/lib/db/timeSessions.repo";
 import {
   applyOccurrenceStatusTransition as applySharedStatusTransition,
+  applyParentSlotStatusTransition as applySharedParentSlotStatusTransition,
   recordOccurrenceDoneAt as recordSharedDoneAt,
   recordOccurrenceNotDoneReason as recordSharedNotDoneReason,
   updateOccurrenceNote as updateSharedOccurrenceNote,
@@ -212,6 +216,7 @@ export async function syncUserOccurrences(
           ),
         }),
       );
+      const linkFacts = behaviors.map(toSubBehaviorLinkFacts);
       const plans = await measurePerformanceSpan(
         {
           span: "occurrence_sync.generation_planning",
@@ -242,6 +247,8 @@ export async function syncUserOccurrences(
                   active: behavior.active,
                   ...generationRunFields(behavior),
                   createdAt: behavior.created_at,
+                  // A parent's sub-behaviors own its slots while any is active.
+                  hasActiveSubBehaviors: !behavior.parent_behavior_id && hasActiveSubBehaviors(behavior.id, linkFacts),
                 },
                 existingOccurrences: behaviorOccurrences.map(
                   (occurrence) =>
@@ -653,6 +660,67 @@ export async function applyOccurrenceStatusTransition(
   }
 
   return result;
+}
+
+/**
+ * Sub-behaviors: marks every listed sub-behavior Occurrence of one parent slot Completed,
+ * Not Completed or back to Unresolved, in one transaction. Each child gets its own status
+ * event; the RPC cancels pending reminders, including the routine reminder, for resolved
+ * rows. A cleared slot gets its reminders back.
+ */
+export async function applyParentSlotStatusTransition(
+  supabase: AppSupabaseClient,
+  userId: string,
+  input: {
+    parentBehaviorId: string;
+    occurrenceIds: string[];
+    nextStatus: OccurrenceStatus;
+    now: Temporal.Instant;
+    expectedStatuses?: Record<string, OccurrenceStatus>;
+    sourceCaptureMethod?: "manual_tap" | "manual_text";
+  },
+): Promise<ApplyOccurrenceStatusTransitionRpcResult[]> {
+  const { results, timezone } = await applySharedParentSlotStatusTransition({
+    async readStatusContext(occurrenceId) {
+      const [occurrence, latestStatusEvent] = await Promise.all([
+        getOccurrenceWithBehaviorTimezoneById(supabase, userId, occurrenceId),
+        getLatestOccurrenceStatusEventForOccurrence(supabase, userId, occurrenceId),
+      ]);
+      return occurrence ? {
+        occurrence,
+        latestStatusEventId: latestStatusEvent?.id ?? null,
+        timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE,
+      } : null;
+    },
+    applyParentSlotStatusTransition: ({ parentBehaviorId, commits }) => applyParentSlotStatusTransitionRpc(supabase, {
+      parentBehaviorId,
+      transitions: commits.map((commit) => ({
+        ...commit,
+        event: commit.event ? { ...commit.event, sourceCaptureMethod: input.sourceCaptureMethod ?? "manual_tap" } : null,
+      })),
+    }),
+  }, input);
+  const typed = results as ApplyOccurrenceStatusTransitionRpcResult[];
+  if (input.nextStatus === "unresolved") {
+    for (const result of typed) {
+      await repairClearedDecisionReminderCoverage(supabase, userId, { occurrence: result.occurrence, timezone, now: input.now });
+    }
+  }
+  return typed;
+}
+
+/** Form fields: parent_behavior_id, status, one occurrence_id per sub-behavior row. */
+export async function markParentSlotStatusFromFormData(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const userId = await requireUserId(supabase);
+  const parentBehaviorId = formData.get("parent_behavior_id");
+  if (typeof parentBehaviorId !== "string" || !parentBehaviorId) throw new Error("Choose a routine to mark.");
+  await applyParentSlotStatusTransition(supabase, userId, {
+    parentBehaviorId,
+    occurrenceIds: formData.getAll("occurrence_id").map((value) => parseOccurrenceId(value)),
+    nextStatus: getStatusFromFormData(formData),
+    now: Temporal.Now.instant(),
+  });
 }
 
 /**

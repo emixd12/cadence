@@ -25,6 +25,10 @@ export const INTEGRATION_LIMITS = Object.freeze({
   maxTimeEntriesPerSchedule: 8,
   maxRecurrenceInterval: 999,
   maxDefaultDurationMinutes: 1440,
+  /** Sub-behaviors (contract 1.7.0): children one create_behavior call may add, the largest sibling position, and Occurrences one parent slot mark may change. */
+  maxInlineSubBehaviors: 25,
+  maxSubBehaviorSortOrder: 9999,
+  maxParentSlotOccurrences: 50,
   /** Note limits. Archive notes match the web limit. */
   maxOccurrenceNoteLength: 2000,
   /** Day notes (Ticket 292): note length and the longest inclusive `list_day_notes` range. */

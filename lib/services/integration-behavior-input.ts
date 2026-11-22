@@ -1,10 +1,18 @@
-import type { BehaviorOutput, IntegrationOperationInput } from "@cadence/core/integration";
+import type { BehaviorOutput, IntegrationOperationInput, ScheduleInput } from "@cadence/core/integration";
 import { parseBehaviorFormData } from "@/lib/services/behavior-form";
 
-// Feed structured input through the web form validator, including duplicate times and normalization.
+type BehaviorWriteInput = Omit<IntegrationOperationInput<"create_behavior">, "sub_behaviors"> | IntegrationOperationInput<"update_behavior">;
+
+/**
+ * Feed structured input through the web form validator, including duplicate times and normalization.
+ * `scheduleFallback` stands in for omitted schedules of a sub-behavior that follows its parent:
+ * the service stores the parent's schedule over it. `sub_behavior_sort_order` on an update is
+ * applied as a sibling reorder, not here.
+ */
 export function integrationBehaviorInput(
-  input: IntegrationOperationInput<"create_behavior"> | IntegrationOperationInput<"update_behavior">,
+  input: BehaviorWriteInput,
   current?: BehaviorOutput,
+  scheduleFallback: readonly (ScheduleInput | BehaviorOutput["schedules"][number])[] = [],
 ) {
   const form = new FormData();
   const set = (key: string, value: unknown) => form.set(key, value == null ? "" : String(value));
@@ -22,6 +30,16 @@ export function integrationBehaviorInput(
   set("category_id", input.category_id === undefined ? current?.category?.id : input.category_id);
   set("behavior_id", current?.id);
   set("active", current?.state === "archived" ? "false" : "true");
+  const parentId = input.parent_behavior_id !== undefined ? input.parent_behavior_id : current?.parent_behavior_id ?? null;
+  const linkChanged = parentId !== (current?.parent_behavior_id ?? null);
+  if (input.parent_behavior_id !== undefined || current) {
+    set("parent_behavior_id", parentId);
+    const inherit = input.inherit_parent_schedule ?? (current && !linkChanged ? current.inherit_parent_schedule : undefined);
+    if (parentId && inherit !== undefined) set("inherit_parent_schedule", inherit);
+    if (parentId && !current && "sub_behavior_sort_order" in input && input.sub_behavior_sort_order !== undefined) {
+      set("sub_behavior_sort_order", input.sub_behavior_sort_order);
+    }
+  }
   const reminders = { browser_enabled: true, email_enabled: false, offset_minutes: 0, ...current?.reminders, ...input.reminders };
   set("browser_reminder", reminders.browser_enabled);
   set("email_reminder", reminders.email_enabled);
@@ -29,7 +47,10 @@ export function integrationBehaviorInput(
   // Empty schedules are valid only with the flag on, so an update always sends the flag it keeps.
   const isOpportunity = input.is_opportunity ?? current?.is_opportunity;
   if (isOpportunity !== undefined) set("is_opportunity", isOpportunity);
-  const schedules = input.schedules ?? current?.schedules ?? [];
+  const withoutId = <T extends object>(value: T) => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "id"));
+  const schedules = input.schedules ?? current?.schedules ?? scheduleFallback.map((schedule) => ({
+    recurrence: schedule.recurrence, time_entries: schedule.time_entries.map(withoutId),
+  })) as unknown as readonly ScheduleInput[];
   set("behavior_schedule_count", schedules.length);
   schedules.forEach((schedule, i) => {
     set(`behavior_schedule_id_${i}`, schedule.id);

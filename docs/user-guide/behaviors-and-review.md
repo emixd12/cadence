@@ -311,3 +311,31 @@ A paused Behavior comes back by itself at the start of its back-on day. A pause 
 **Recovery or undo:** every run action is undone by another tap: **Start again** after **End now**, **Resume now** after **Pause**. None asks to confirm.
 
 **Keyboard and mobile:** the calendar's days are buttons with full date labels; past days can't be picked. Use the arrows beside the month to change month.
+
+## Group Behaviors into a routine
+
+A routine is a Behavior with sub-behaviors, such as a Skin routine with Cerave,
+Facewash and Retinol. A routine has one level: a sub-behavior cannot have its own
+sub-behaviors.
+
+1. In **Create behavior**, choose **Add sub-behavior** to draft steps. Use **Up**
+   and **Down** to order them and **Remove** to drop one. Each step follows the
+   routine's schedule unless you turn **Follow parent schedule** off and give it its
+   own days and time. **Save behavior** saves the routine and its steps together.
+2. To put an existing Behavior into a routine, open its **Details and Settings** and
+   choose the routine under **Part of**. Choose **None** to make it its own Behavior
+   again. A Behavior that already has sub-behaviors shows no **Part of** field.
+3. In a saved routine's **Details and Settings**, use **Up** and **Down** to reorder
+   its steps (saved at once), **Detach** to take a step out, **New sub-behavior** to
+   add a step by title, or **Add an existing behavior** to move one in.
+4. In the Behaviors list, a routine shows **Sub-behaviors (n)** with its steps nested
+   under it. The routine row shows rolled-up adherence and full routines done; each
+   step keeps its own adherence and calendar.
+
+**Result and persistence:** while a step follows the routine, its schedule fields are
+hidden and it changes when the routine's schedule changes. Archiving a routine
+archives its steps; restoring it restores them. On the Timeline, the steps appear
+under the routine row (see "Mark a routine or its steps" in the Timeline guide).
+
+**Recovery or undo:** **Detach** or **Part of: None** turns a step back into its own
+Behavior with its history kept. If saving a new order fails, the old order comes back.

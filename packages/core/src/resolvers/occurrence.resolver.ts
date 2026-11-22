@@ -34,6 +34,13 @@ export type OccurrenceGenerationBehavior = {
   pauseBackOn?: string | null;
   createdAt: string;
   anchorDate?: string;
+  /**
+   * True while the Behavior is a parent with live, active sub-behaviors
+   * (`parentOwnsOccurrenceGeneration` in sub-behavior.resolver). Its sub-behaviors own the
+   * slot, so the plan adds no rows and removes its untouched future Unresolved rows.
+   * Past, marked, noted, timed and moved rows stay.
+   */
+  hasActiveSubBehaviors?: boolean;
 };
 
 export type OccurrenceGenerationSchedule = {
@@ -289,7 +296,7 @@ function planOccurrenceGenerationForWindow(
   // Once a stop starts today or earlier, generation adds no row that already started,
   // so a removed moved row does not come back at its planned time.
   const stopStartedByToday = stopStartsOnOrBefore(runFields, input.now.toZonedDateTimeISO(timezone).toPlainDate().toString());
-  const desiredOccurrences = input.behavior.active
+  const desiredOccurrences = input.behavior.active && !input.behavior.hasActiveSubBehaviors
     ? resolveDesiredOccurrences({
         behavior: input.behavior,
         timezone,

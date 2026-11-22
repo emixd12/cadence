@@ -168,6 +168,56 @@ Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
 `apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
 not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.
 
+## Sub-behaviors and Timeline Semantic Zoom (Ticket 349) — November 21, 2026
+
+State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911a`
+(after PR #351 Behaviors of Opportunity and Mac 0.1.14); not merged, not deployed.
+
+- Scope: routines (depth-1 sub-behaviors), schedule inheritance, leaf Occurrences,
+  routine slot marks, Timeline Semantic Zoom, MCP contract 1.7.0, Chat `chat-1.6`,
+  Daily Brief routine moves, `coach-signals-3` (`sub_behavior_dropoff`),
+  `coach-tips-3`, portability, Hevy completion on routines, and Mac parity (SQLite
+  0028, account sync contract 9; the minimum writer contract stays 8, so Mac 0.1.14
+  keeps syncing). Docs: TICKETS, Ticket 349; DECISIONS, 2026-11-21.
+- An opportunity Behavior is never part of a routine: it cannot be a parent or a
+  sub-behavior (resolver, database trigger, SQLite 0028 triggers, MCP and form).
+- Mac Daily Brief routine moves: Yes, Other time, Undo, Accept all and Undo all on a
+  routine line, through the hosted route and account sync. Advice card
+  `smaller-step-in-the-routine` is active (owner review 2026-11-21; library
+  `2026-11-21.2`).
+- Registry: `INT-BEHAVIOR-039`–`045` and `INT-TIMELINE-025`–`027`, implemented on web
+  and desktop. Notice `sub-behaviors.routine-marked`. Messaging: P-082–P-084.
+- Hosted migrations pushed November 21, 2026 (owner-authorized): `20261122010000_sub_behaviors`,
+  `20261122020000_sub_behavior_portability_connectors`,
+  `20261122030000_coach_signal_sub_behavior_dropoff`. `migration list`: 151 local, 151
+  hosted, identical.
+- Verification (after the rebase): `dagger check --cadence` 11/11; `core:check`,
+  `desktop:typecheck`, `marketing:build`, `marketing:check`; `cargo test` 180;
+  `desktop:contract:test` 24; SQL: PR #351's four migrations plus ours and ten smokes
+  (sub-behaviors, portability, opportunity, account sync, end and pause, tickets 060,
+  314, 321) pass in one rolled-back transaction. Local-integration on a migrated local
+  stack: 9 files, 73 of 74 tests pass (sub-behaviors MCP, brief moves, occurrence move,
+  integration read, write, idempotency and request context, tips one-tap, coach
+  signals); `smoke:rls` 92 checks and the account sync smoke (now checks contract 9)
+  pass. The one failure is pre-existing on `main`: the coach-signals test expects
+  `brief_answers` signals and gets `setup_gaps`. Fixed here: the coach reminders read
+  named two foreign keys (PGRST201 on every call since #315).
+- Installed Mac acceptance passed November 22 on dev-signed `0.1.15-dev.1` (owner's Mac;
+  owner approved `--allow-unmerged-migrations`): schema 27 → 28 with every row kept; a
+  routine with an inheriting step and an own-schedule step, draft and saved reorder, the
+  Routines / All steps layers, a step edit, bulk Completed and archive, each synced under
+  contract 9 and read back from the hosted snapshot. It found a defect: hosted sync apply
+  refused a Mac reorder ("requires append-only configuration history"), which stopped
+  that Mac's sync. Fixed by `20261122040000_account_sync_sub_behavior_order`, pushed to
+  hosted at 04:21Z under the additive-migration approval (151/151); a new account sync
+  smoke case covers it. `docs/qa/2026-11-21-ticket-349-sub-behaviors-mac-acceptance.md`.
+- Phone width: the routine title keeps the row's width; the two marks wrap below it.
+- Open:
+  1. Coach-signals local test: `brief_answers` expectation is stale on `main`.
+  2. Mac: routine reminder text names the anchor step, not the routine.
+  3. Tooling: the pinned Supabase CLI binary fails its code signature and macOS kills it;
+     the shared local stack's API port differs from this worktree's `supabase status`.
+
 ## Product map, features and journeys — November 20, 2026
 
 - **In review (draft PR, branch `claude/project-thread-t00ue8`).** Build step 1 of the

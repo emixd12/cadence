@@ -350,6 +350,8 @@ function needsDecisionSection(
     emptyMessage: "No behaviors on this day",
     occurrences: [],
     unresolvedOccurrenceCount: 0,
+    parentGroups: [],
+    rows: [],
     occurrenceGroups: [],
     ...overrides,
   };

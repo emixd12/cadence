@@ -92,6 +92,9 @@ function section(kind: TimelineDaySection["kind"], localDate: string, occurrence
     key: `${kind}-${localDate}`, kind, localDate, label: localDate, relativeLabel: kind === "today" ? "Today" : "", emptyMessage: "Nothing.",
     unresolvedOccurrenceCount: occurrences.filter((item) => item.status === "unresolved").length, occurrences,
     occurrenceGroups: occurrences.map((item) => ({ key: item.id, behaviorId: item.behaviorId, title: item.title, occurrences: [item], isGroupedStack: false })),
+    parentGroups: [],
+    rows: occurrences.map((item) => ({ kind: "behavior" as const, key: item.id,
+      group: { key: item.id, behaviorId: item.behaviorId, title: item.title, occurrences: [item], isGroupedStack: false } })),
   };
 }
 

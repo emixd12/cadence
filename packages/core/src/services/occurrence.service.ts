@@ -1,6 +1,7 @@
 import type { Temporal } from "@js-temporal/polyfill";
 
-import type { OccurrenceDataStore } from "../data-store";
+import type { OccurrenceDataStore, StatusTransitionCommit } from "../data-store";
+import { planParentSlotStatusChange } from "../resolvers/sub-behavior.resolver";
 import type { OccurrenceStatus } from "../types/database";
 import { resolveReminderDeliveryCancellation } from "../resolvers/reminder.resolver";
 import {
@@ -50,6 +51,67 @@ export async function applyOccurrenceStatusTransition(
     event,
   });
   return { result, timezone: context.timezone };
+}
+
+/**
+ * Sub-behaviors: marks every sub-behavior Occurrence in one parent slot with one status, in
+ * one transaction, one status event each. Rows already at the status are left alone.
+ * Returns the committed results; an empty list when nothing changed.
+ */
+export async function applyParentSlotStatusTransition(
+  store: Pick<OccurrenceDataStore, "readStatusContext" | "applyParentSlotStatusTransition">,
+  input: {
+    parentBehaviorId: string;
+    occurrenceIds: readonly string[];
+    nextStatus: OccurrenceStatus;
+    now: Temporal.Instant;
+    /** Optional per-Occurrence status the caller last saw. */
+    expectedStatuses?: Readonly<Record<string, OccurrenceStatus>>;
+  },
+) {
+  if (!store.applyParentSlotStatusTransition) throw new Error("Parent slot marking is not available here.");
+  const ids = [...new Set(input.occurrenceIds)];
+  if (ids.length === 0) throw new Error("Choose the sub-behaviors to mark.");
+  const contexts = await Promise.all(ids.map(async (occurrenceId) => {
+    const context = await store.readStatusContext(occurrenceId);
+    if (!context) throw new Error("Occurrence not found.");
+    return context;
+  }));
+  const rows = contexts.map((context) => ({
+    id: context.occurrence.id,
+    status: normalizeOccurrenceStatus(context.occurrence.status),
+    context,
+  }));
+  for (const row of rows) {
+    const expected = input.expectedStatuses?.[row.id];
+    if (expected !== undefined && expected !== row.status) {
+      throw new Error("Occurrence status changed. Review the latest status and try again.");
+    }
+  }
+  const changing = planParentSlotStatusChange({ occurrences: rows, nextStatus: input.nextStatus });
+  if (changing.length === 0) return { results: [], timezone: contexts[0]!.timezone };
+  const commits: StatusTransitionCommit[] = changing.map(({ context, status }) => {
+    const occurrence = {
+      status,
+      completedAt: context.occurrence.completed_at,
+      statusMarkedAt: context.occurrence.status_marked_at,
+      note: context.occurrence.note,
+    };
+    const update = resolveStatusTransition({ occurrence, nextStatus: input.nextStatus, now: input.now });
+    return {
+      occurrenceId: context.occurrence.id,
+      expectedStatus: status,
+      expectedLatestEventId: context.latestStatusEventId,
+      ...update,
+      cancelPendingReminders: resolveReminderDeliveryCancellation({ occurrence: update }).cancelPending,
+      event: resolveStatusEvent({
+        occurrence, nextStatus: input.nextStatus, now: input.now,
+        hasPriorStatusEvent: context.latestStatusEventId !== null, update,
+      }),
+    };
+  });
+  const results = await store.applyParentSlotStatusTransition({ parentBehaviorId: input.parentBehaviorId, commits });
+  return { results, timezone: contexts[0]!.timezone };
 }
 
 /**

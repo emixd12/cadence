@@ -43,7 +43,8 @@ export type CountWorkoutResult =
 export type CountWorkoutDeps = Readonly<{
   env?: Readonly<Record<string, string | undefined>>;
   now?: () => Temporal.Instant;
-  readOccurrence(occurrenceId: string): Promise<Readonly<{ id: string; behaviorId: string; status: string; localDate: string; timezone: string }> | null>;
+  /** `parentBehaviorId` is set on a sub-behavior's Occurrence: a link on its parent covers it. */
+  readOccurrence(occurrenceId: string): Promise<Readonly<{ id: string; behaviorId: string; parentBehaviorId?: string | null; status: string; localDate: string; timezone: string }> | null>;
   listLinks(source: RecordedActivitySourceV1_1): Promise<SourceLinkRow[]>;
   readDay(localDate: string): Promise<Readonly<{ connected: boolean; activities: readonly RecordedActivityV1_1[]; accountDigest: string | null }>>;
   markCompleted(occurrenceId: string, now: Temporal.Instant): Promise<void>;
@@ -82,7 +83,8 @@ export async function countUnlinkedWorkout(caller: ConnectorCaller, body: unknow
   if (occurrence.localDate !== today) return refuse("not_today");
 
   const links = (await store.listLinks(request.source)).filter((link) => link.enabled);
-  if (links.some((link) => link.behavior_id === occurrence.behaviorId)) return refuse("linked");
+  if (links.some((link) => link.behavior_id === occurrence.behaviorId
+    || (occurrence.parentBehaviorId && link.behavior_id === occurrence.parentBehaviorId))) return refuse("linked");
 
   const day = await store.readDay(today);
   if (!day.connected) return refuse("not_connected");
@@ -112,13 +114,18 @@ export function createCountWorkoutDeps(caller: ConnectorCaller, client: AppSupab
   return {
     async readOccurrence(occurrenceId) {
       const occurrence = await getOccurrenceWithBehaviorTimezoneById(client, userId, occurrenceId);
-      return occurrence ? {
+      if (!occurrence) return null;
+      const { data: behavior, error } = await client.from("behaviors").select("parent_behavior_id")
+        .eq("user_id", userId).eq("id", occurrence.behavior_id).maybeSingle();
+      if (error) throw new ConnectorError("provider_unavailable");
+      return {
         id: occurrence.id,
         behaviorId: occurrence.behavior_id,
+        parentBehaviorId: behavior?.parent_behavior_id ?? null,
         status: occurrence.status,
         localDate: occurrence.local_date,
         timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE,
-      } : null;
+      };
     },
     listLinks: (source) => listSourceLinks(client, userId, source),
     async readDay(localDate) {

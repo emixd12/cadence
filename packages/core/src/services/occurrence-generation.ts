@@ -16,6 +16,8 @@ export function planPersistedOccurrences(input: {
   timeSessionOccurrenceIds: ReadonlySet<string>;
   now: Temporal.Instant;
   horizonDays?: number;
+  /** Sub-behaviors: a parent's active sub-behaviors own its slots. */
+  hasActiveSubBehaviors?: boolean;
 }) {
   const behavior = input.behavior;
   if (!behavior.current_configuration_event_id) {
@@ -31,6 +33,7 @@ export function planPersistedOccurrences(input: {
       schedules, scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
       timezone: behavior.timezone, active: behavior.active, ...generationRunFields(behavior),
       createdAt: behavior.created_at,
+      hasActiveSubBehaviors: input.hasActiveSubBehaviors === true,
     },
     existingOccurrences: input.occurrences.map((row) =>
       toExistingOccurrenceForGeneration(row, input.timeSessionOccurrenceIds)),

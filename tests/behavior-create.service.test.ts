@@ -131,6 +131,8 @@ describe("createBehaviorFromFormData", () => {
             "end",
             "pause",
             "is_opportunity",
+            "parent_behavior_id",
+            "inherit_parent_schedule",
           ],
           reasonCode: "behavior_created",
           source: "manual",

@@ -152,6 +152,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "behaviors_of_opportunity",
         include_str!("../../migrations/0027_behaviors_of_opportunity.sql"),
     ),
+    (
+        28,
+        "sub_behaviors",
+        include_str!("../../migrations/0028_sub_behaviors.sql"),
+    ),
 ];
 
 /// Migrations that rebuild a table other tables reference. SQLite ignores the foreign-key
@@ -854,6 +859,7 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
         {
             return Err("A Behavior that is not an opportunity needs a schedule.".into());
         }
+        validate_sub_behavior_link(&value)?;
         if !value["auto_archived_at"].is_null()
             && (value["active"] != false || value["archived_at"].is_null())
         {
@@ -936,6 +942,31 @@ fn validate_run_fields(value: &Value) -> Result<()> {
             .is_some_and(|(from, back)| back <= from)
     {
         return Err("A Behavior pause needs a first paused day before its back-on day.".into());
+    }
+    Ok(())
+}
+
+/// Sub-behaviors: the row checks of migration 0028. Depth 1 is a trigger there.
+fn validate_sub_behavior_link(value: &Value) -> Result<()> {
+    let parent = match &value["parent_behavior_id"] {
+        Value::Null => None,
+        Value::String(id) => {
+            valid_id(id)?;
+            Some(id.as_str())
+        }
+        _ => return Err("A sub-behavior parent is invalid.".into()),
+    };
+    if parent.is_some() && parent == value["id"].as_str() {
+        return Err("A Behavior cannot be its own parent.".into());
+    }
+    if value["sub_behavior_sort_order"].as_i64().is_none_or(|order| order < 0) {
+        return Err("A sub-behavior order must be zero or more.".into());
+    }
+    if value["inherit_parent_schedule"] == true && parent.is_none() {
+        return Err("Only a sub-behavior can follow a parent schedule.".into());
+    }
+    if value["is_opportunity"] == true && parent.is_some() {
+        return Err("An opportunity Behavior can't be part of a routine.".into());
     }
     Ok(())
 }
@@ -1280,6 +1311,15 @@ pub fn instant_key(value: &str) -> Result<String> {
 
 pub fn error(error: rusqlite::Error) -> String {
     match error {
+        // Migration 0028's depth-1 triggers explain the refusal in product words.
+        rusqlite::Error::SqliteFailure(code, Some(message))
+            if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER
+                && (message.contains("sub-behavior")
+                    || message.contains("own parent")
+                    || message.contains("part of a routine")) =>
+        {
+            message
+        }
         rusqlite::Error::SqliteFailure(code, _)
             if code.code == rusqlite::ErrorCode::ConstraintViolation =>
         {

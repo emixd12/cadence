@@ -641,6 +641,51 @@ write without `origin` and `added_by` ask for an update; a write that changes an
 existing Occurrence's origin is refused. A removed added row leaves the hosted
 snapshot, and the planner sends the delete either way.
 
+## Sub-behaviors (Ticket 349)
+
+SQLite schema 28 (`apps/desktop/src-tauri/migrations/0028_sub_behaviors.sql`) adds
+the hosted link columns (`docs/DATA_MODEL.md`, "Sub-behaviors"):
+
+1. `parent_behavior_id` (FK to `behaviors.id`, on delete set null, never itself),
+   `sub_behavior_sort_order` (`>= 0`) and `inherit_parent_schedule` (0 or 1, needs a
+   parent). Existing rows become standalone; no row is lost from schema 27.
+2. Triggers enforce depth 1 on insert and update: no self link, the parent has no
+   parent, a Behavior with sub-behaviors cannot gain a parent, and both rows share the
+   profile. An opportunity Behavior is never a parent or a sub-behavior: the insert and
+   link-update triggers refuse an opportunity row or parent, and
+   `behaviors_sub_behavior_opportunity_update` refuses turning a Behavior with children
+   (or a child) into an opportunity (hosted `20261122020000`). A BEFORE DELETE trigger clears the children's link and inherit flag so the
+   FK set-null passes the row check. `db::error` maps trigger messages to product words.
+3. The configuration snapshot carries `parentBehaviorId` and `inheritParentSchedule`;
+   older snapshots read as null and false. Allowed changed fields add
+   `parent_behavior_id` and `inherit_parent_schedule`.
+
+Native commands (`local_store/sub_behavior.rs`), each one transaction:
+`createBehaviorGroup` (a parent, then 1 to 50 children naming it),
+`updateBehaviorGroup` (1 to 51 graph updates), `reorderSubBehaviors` (dense order,
+every live child listed once, bumps revision and `updated_at`) and
+`applyParentSlotStatusTransition` (every Occurrence a child of the parent on one local
+day, one status event each, all or nothing).
+
+**Account sync contract 9.** `ACCOUNT_SYNC_CONTRACT = 9`. Behavior upserts must carry
+the three fields; a write without them is refused with "Update Cadence". A reorder changes only
+`sub_behavior_sort_order`, which hosted apply keeps out of configuration history
+(`20261122040000`), so `reorderSubBehaviors` writes no configuration event. The planner
+treats `parent_behavior_id` as an optional Behavior-to-Behavior dependency and checks
+depth 1 on every input and on the merged graph. Apply writes Behaviors unlinked first,
+then restores the links once every row exists, so a regroup never trips the depth
+triggers. Stored children are written before other Behaviors, so a batch that detaches
+a step and turns its old parent into an opportunity passes the opportunity trigger. Import apply also writes unlinked graphs first. The minimum writer contract
+stays 8, so Cadence for Mac 0.1.14 (contract 8) keeps syncing. A Behavior row with
+`is_opportunity` and a parent is refused locally, as on the server.
+
+Generation passes `hasActiveSubBehaviors`, so a parent with active sub-behaviors
+generates no new Occurrences on the Mac either.
+
+Daily Brief routine moves need no local write: the hosted brief moves a routine's steps
+together (`docs/PRODUCT_SPEC.md`, "Sub-behaviors and routines"), and their
+`occurrence_moves` rows arrive by account sync like any other move.
+
 ## Note shortcut state (Tickets 126–128)
 
 Schema 13 mirrors the owned `note_shortcut_states` contract in DATA_MODEL with

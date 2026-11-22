@@ -169,6 +169,8 @@ function timelineView(
         emptyMessage: "No behaviors today.",
         occurrences,
         unresolvedOccurrenceCount: 1,
+        parentGroups: [],
+        rows: [],
         occurrenceGroups: occurrences.map((item) => ({
           key: item.id,
           behaviorId: item.behaviorId,

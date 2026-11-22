@@ -287,6 +287,22 @@ export const behaviorPauseOutput = object({
   back_on: localDate("Local day the Behavior runs again by itself, from the start of the day."),
 }, { description: "A pause: no Occurrences from from_on (at from_time) until the start of back_on." });
 
+export const subBehaviorSortOrder = (description: string) =>
+  integer({ minimum: 0, maximum: L.maxSubBehaviorSortOrder, description });
+
+/** One sub-behavior as its parent Behavior lists it (contract 1.7.0). */
+export const subBehaviorSummaryOutput = object({
+  id: uuid(),
+  title: string(),
+  sub_behavior_sort_order: subBehaviorSortOrder("Position among the parent's sub-behaviors, 0 first."),
+  inherit_parent_schedule: boolean({ description: "True when the sub-behavior follows its parent's schedule." }),
+  active: boolean({ description: "False when the sub-behavior is archived." }),
+  run_state: enumOf(BEHAVIOR_RUN_STATES),
+});
+
+export const SUB_BEHAVIOR_MEANING =
+  "Sub-behaviors are one level deep: a parent such as \"Skin routine\" groups steps such as \"Retinol\". A sub-behavior follows its parent's schedule unless it has its own, and while a parent has sub-behaviors they own its Occurrences.";
+
 export const behaviorOutput = object({
   id: uuid(),
   title: string(),
@@ -309,10 +325,33 @@ export const behaviorOutput = object({
   reminders: remindersOutput,
   archive_notes: array(archiveNoteOutput),
   external_ref: nullable(string(), { description: "This client's external record id, when it set one at creation." }),
+  parent_behavior_id: nullable(uuid("Parent Behavior id when this is a sub-behavior. Null for a top-level Behavior (contract 1.7.0).")),
+  sub_behavior_sort_order: subBehaviorSortOrder("Position among the parent's sub-behaviors, 0 first. 0 for a top-level Behavior."),
+  inherit_parent_schedule: boolean({ description: "True when this sub-behavior follows its parent's schedule; its schedules then mirror the parent's. Always false for a top-level Behavior." }),
+  sub_behaviors: array(subBehaviorSummaryOutput, { description: "This Behavior's sub-behaviors in display order, archived ones included. Empty for a sub-behavior or a Behavior without any." }),
   created_at: utcInstant(),
   updated_at: utcInstant(),
   revision: revision(),
 }, { description: "A Behavior: a recurring thing the user tracks (a habit, routine, or recurring task)." });
+
+export const PARENT_SLOT_STATUSES = ["unresolved", "completed", "not_completed", "partial"] as const;
+
+/** A parent Behavior's sub-behavior Occurrences at one time on one day (contract 1.7.0). */
+export const parentGroupOutput = object({
+  parent_behavior_id: uuid(),
+  title: string({ description: "Parent Behavior title." }),
+  local_date: localDate(),
+  slot_key: utcInstant("Start of the slot: the earliest effective start among its Occurrences. Send it to set_parent_occurrence_status."),
+  scheduled_time_label: string({ description: "Display time, for example `7:30 AM` or `Morning`." }),
+  derived_status: enumOf(PARENT_SLOT_STATUSES, { description: "Derived and never stored: the shared status when every Occurrence has it, otherwise partial." }),
+  progress_label: string({ description: "Completed over scheduled, for example `2/3`." }),
+  completed_count: integer({ minimum: 0 }),
+  not_completed_count: integer({ minimum: 0 }),
+  unresolved_count: integer({ minimum: 0 }),
+  total_count: integer({ minimum: 1 }),
+  needs_decision: boolean({ description: "Derived: true when an Occurrence in the slot is Unresolved and before today." }),
+  occurrence_ids: array(uuid(), { minItems: 1, description: "The sub-behavior Occurrences in this slot, in sub-behavior order." }),
+}, { description: "A parent Behavior's slot: its sub-behaviors' Occurrences at one time on one day, with a derived rollup." });
 
 export const occurrenceScheduleOutput = object({
   kind: enumOf(SCHEDULE_KINDS),
@@ -379,6 +418,8 @@ export const occurrenceShape = {
   completed_at: nullable(utcInstant()),
   status_marked_at: nullable(utcInstant()),
   note: nullable(string()),
+  parent_behavior_id: optional(nullable(uuid("Parent Behavior id when the Occurrence belongs to a sub-behavior, otherwise null. Present on reads and on set_parent_occurrence_status (contract 1.7.0)."))),
+  parent_title: optional(nullable(string({ description: "Parent Behavior title when the Occurrence belongs to a sub-behavior, otherwise null." }))),
   updated_at: utcInstant(),
   revision: revision(),
 } as const;
@@ -428,6 +469,8 @@ export const adherenceCounts = {
 } as const;
 
 export type BehaviorOutput = Infer<typeof behaviorOutput>;
+export type SubBehaviorSummaryOutput = Infer<typeof subBehaviorSummaryOutput>;
+export type ParentGroupOutput = Infer<typeof parentGroupOutput>;
 export type OccurrenceOutput = Infer<typeof occurrenceOutput>;
 export type OccurrenceDetailOutput = Infer<typeof occurrenceDetailOutput>;
 export type CategoryOutput = Infer<typeof categoryOutput>;

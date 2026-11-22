@@ -20,11 +20,16 @@ import {
 } from "@/components/behaviors/behavior-events";
 import {
   isUnscheduledOpportunity,
+  attachCandidates,
+  groupSubBehaviors,
+  parentChoices,
   projectBehaviorList,
   type BehaviorSort,
   reconcileCreatedBehaviorViews,
   upsertBehaviorView,
 } from "@/components/behaviors/behavior-list-state";
+import { SubBehaviorManager, type SubBehaviorManageActions } from "@/components/behaviors/SubBehaviorEditor";
+import { behaviorViewFormData, newSubBehaviorFormData } from "@/components/behaviors/sub-behavior-form-data";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
 import {
@@ -38,6 +43,7 @@ import type {
   AnalyticsBehaviorDayState,
   AnalyticsBehaviorSummary,
   AnalyticsOverallDayState,
+  AnalyticsParentSummary,
   AnalyticsRangeDays,
   AnalyticsStatusCounts,
   AnalyticsView,
@@ -81,6 +87,18 @@ type BehaviorListProps = Readonly<{
   editTarget?: BehaviorEditTarget | null;
   /** Behaviors of Opportunity: show the opportunity choices in each edit form. */
   allowOpportunity?: boolean;
+  /**
+   * Sub-behaviors (depth 1). Saves sibling order. FormData: parent_behavior_id and one
+   * sub_behavior_id per live sub-behavior, in the new order. Without it there is no reorder.
+   */
+  reorderAction?: BehaviorFormAction;
+  /**
+   * Creates a sub-behavior under a saved parent from the parent's settings (the Behavior
+   * form fields plus parent_behavior_id). Without it there is no inline add.
+   */
+  createAction?: BehaviorFormAction;
+  /** Shows the parent field in edit forms and the sub-behavior manager. Default on for web. */
+  subBehaviorsEnabled?: boolean;
 }>;
 
 /** The first control of each field a tip's link can open. */
@@ -153,6 +171,9 @@ export function BehaviorList({
   sourceLinkCoordinator,
   editTarget = null,
   allowOpportunity = true,
+  reorderAction,
+  createAction,
+  subBehaviorsEnabled = reminderRuntime === "web",
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -223,40 +244,111 @@ export function BehaviorList({
     (current, behavior) => upsertBehaviorView(current, behavior),
     activeBehaviors,
   );
+  // Sub-behaviors sit under their parent, so only top-level rows enter the lists.
+  const activeGroups = groupSubBehaviors(activeBehaviorRows);
+  const archivedGroups = groupSubBehaviors(archivedBehaviors);
+  const [orderOverride, setOrderOverride] = useState<{ parentId: string; basis: string; ids: string[] } | null>(null);
+  const subBehaviorsOf = (parentId: string, groups: Map<string, BehaviorView[]>): BehaviorView[] => {
+    const children = groups.get(parentId) ?? [];
+    if (orderOverride?.parentId !== parentId || orderOverride.basis !== children.map((child) => child.id).join()) return children;
+    const byId = new Map(children.map((child) => [child.id, child]));
+    return orderOverride.ids.flatMap((id) => byId.get(id) ?? []);
+  };
+  const isNested = (behavior: BehaviorView, groups: Map<string, BehaviorView[]>) =>
+    Boolean(behavior.parentBehaviorId && groups.get(behavior.parentBehaviorId)?.some((child) => child.id === behavior.id));
+  const topLevelActive = activeBehaviorRows.filter((behavior) => !isNested(behavior, activeGroups));
+  const topLevelArchived = archivedBehaviors.filter((behavior) => !isNested(behavior, archivedGroups));
   // Ended and paused Behaviors are still active; they get their own Not running group.
-  // Running Behaviors with no fixed schedule get the Opportunity group.
-  const runningRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior) && !isUnscheduledOpportunity(behavior));
-  const opportunityRows = activeBehaviorRows.filter((behavior) => !isNotRunning(behavior) && isUnscheduledOpportunity(behavior));
-  const notRunningRows = activeBehaviorRows.filter(isNotRunning);
-  const activeList = projectBehaviorList(runningRows, categories, effectiveCategory, sort);
+  // Running Behaviors with no fixed schedule get the Opportunity group. An opportunity
+  // Behavior is never part of a routine, so every one of them is top-level.
+  const runningRows = topLevelActive.filter((behavior) => !isNotRunning(behavior) && !isUnscheduledOpportunity(behavior));
+  const opportunityRows = topLevelActive.filter((behavior) => !isNotRunning(behavior) && isUnscheduledOpportunity(behavior));
+  const notRunningRows = topLevelActive.filter(isNotRunning);
+  const activeList = withSubBehaviorMatches(projectBehaviorList(runningRows, categories, effectiveCategory, sort), activeGroups, effectiveCategory);
   const opportunityList = projectBehaviorList(opportunityRows, categories, effectiveCategory, sort);
-  const notRunningList = projectBehaviorList(notRunningRows, categories, effectiveCategory, sort);
-  const archivedList = projectBehaviorList(archivedBehaviors, categories, effectiveCategory, sort);
+  const notRunningList = withSubBehaviorMatches(projectBehaviorList(notRunningRows, categories, effectiveCategory, sort), activeGroups, effectiveCategory);
+  const archivedList = withSubBehaviorMatches(projectBehaviorList(topLevelArchived, categories, effectiveCategory, sort), archivedGroups, effectiveCategory);
   const behaviorAnalyticsById = new Map(
     analytics.behaviorSummaries.map((summary) => [summary.behaviorId, summary]),
   );
-  const renderRecord = (behavior: BehaviorView, withEditRequest: boolean) => (
-    <BehaviorRecord
-      behavior={behavior}
-      reminderRuntime={reminderRuntime}
-      categories={categories}
-      analytics={analytics}
-      behaviorAnalytics={behaviorAnalyticsById.get(behavior.id) ?? null}
-      updateAction={announcedUpdateAction}
-      lifecycleFormAction={lifecycleFormAction}
-      lifecycleResult={lifecycleState}
-      runAction={listRunAction}
-      statusAction={statusAction}
-      noteAction={noteAction}
-      stopTimeTrackingAction={stopTimeTrackingAction}
-      resetTimeTrackingAction={resetTimeTrackingAction}
-      noteShortcutView={noteShortcutViews[behavior.id]}
-      noteShortcutAction={noteShortcutAction}
-      sourceLinkCoordinator={linkCoordinator}
-      allowOpportunity={allowOpportunity}
-      editRequest={withEditRequest && editTarget?.behaviorId === behavior.id ? editTarget : null}
-    />
+  const parentSummaryById = new Map(
+    (analytics.parentSummaries ?? []).map((summary) => [summary.parentBehaviorId, summary]),
   );
+  const allBehaviorRows = [...activeBehaviorRows, ...archivedBehaviors];
+
+  const subBehaviorActionsFor = (parent: BehaviorView, children: readonly BehaviorView[]): SubBehaviorManageActions => ({
+    onReorder: reorderAction ? async (orderedIds) => {
+      const form = new FormData();
+      form.set("parent_behavior_id", parent.id);
+      for (const id of orderedIds) form.append("sub_behavior_id", id);
+      const basis = children.map((child) => child.id).join();
+      setOrderOverride({ parentId: parent.id, basis, ids: orderedIds });
+      const result = await reorderAction(EMPTY_ACTION_STATE, form);
+      if (result.status === "error") setOrderOverride(null);
+      return result;
+    } : undefined,
+    onDetach: (child) => updateAction(EMPTY_ACTION_STATE, behaviorViewFormData(child, { parentBehaviorId: null })),
+    onAttach: async (behaviorId) => {
+      const behavior = allBehaviorRows.find((row) => row.id === behaviorId);
+      if (!behavior) return { status: "error", message: "Reload this page and try again." };
+      return updateAction(EMPTY_ACTION_STATE, behaviorViewFormData(behavior, { parentBehaviorId: parent.id, inheritParentSchedule: true }));
+    },
+    onCreate: createAction ? async (title) => {
+      const result = await createAction(EMPTY_ACTION_STATE, newSubBehaviorFormData(parent, title));
+      const created = result.behavior;
+      if (result.status === "success" && created) setCreatedBehaviorRows((current) => upsertBehaviorView(current, created));
+      return result;
+    } : undefined,
+  });
+
+  const renderRecord = (behavior: BehaviorView, options: { archived?: boolean; nested?: boolean }) => {
+    const groups = options.archived ? archivedGroups : activeGroups;
+    const children = options.nested ? [] : subBehaviorsOf(behavior.id, groups);
+    const choices = subBehaviorsEnabled && !options.archived ? parentChoices(behavior.id, allBehaviorRows) : null;
+    const parentSummary = children.length > 0 ? parentSummaryById.get(behavior.id) ?? null : null;
+    const inheritsParent = Boolean(behavior.parentBehaviorId && behavior.inheritParentSchedule);
+    return (
+      <BehaviorRecord
+        behavior={behavior}
+        nested={options.nested}
+        reminderRuntime={reminderRuntime}
+        categories={categories}
+        analytics={options.archived ? undefined : analytics}
+        behaviorAnalytics={options.archived ? undefined : behaviorAnalyticsById.get(behavior.id) ?? null}
+        parentSummary={parentSummary}
+        updateAction={announcedUpdateAction}
+        lifecycleFormAction={lifecycleFormAction}
+        lifecycleResult={lifecycleState}
+        runAction={options.archived || inheritsParent ? undefined : listRunAction}
+        statusAction={options.archived ? undefined : statusAction}
+        noteAction={options.archived ? undefined : noteAction}
+        stopTimeTrackingAction={options.archived ? undefined : stopTimeTrackingAction}
+        resetTimeTrackingAction={options.archived ? undefined : resetTimeTrackingAction}
+        noteShortcutView={noteShortcutViews[behavior.id]}
+        noteShortcutAction={noteShortcutAction}
+        sourceLinkCoordinator={linkCoordinator}
+        allowOpportunity={allowOpportunity}
+        editRequest={!options.archived && editTarget?.behaviorId === behavior.id ? editTarget : null}
+        parentOptions={choices?.options}
+        parentLocked={choices?.locked}
+        subBehaviorManager={subBehaviorsEnabled && !options.archived && !behavior.parentBehaviorId ? (
+          <SubBehaviorManager
+            parent={behavior}
+            subBehaviors={children}
+            candidates={attachCandidates(behavior.id, allBehaviorRows)}
+            actions={subBehaviorActionsFor(behavior, children)}
+          />
+        ) : null}
+        subBehaviors={children.length > 0 ? (
+          <SubBehaviorRows parentTitle={behavior.title} count={children.length}>
+            {children.map((child) => (
+              <div key={child.id}>{renderRecord(child, { ...options, nested: true })}</div>
+            ))}
+          </SubBehaviorRows>
+        ) : null}
+      />
+    );
+  };
 
   useEffect(() => {
     function handleBehaviorCreated(event: Event) {
@@ -332,7 +424,7 @@ export function BehaviorList({
             {activeList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
             {activeList.rows.map((behavior) => (
               <div key={behavior.id} hidden={!activeList.visibleIds.has(behavior.id)}>
-                {renderRecord(behavior, true)}
+                {renderRecord(behavior, {})}
               </div>
             ))}
           </div>
@@ -353,7 +445,7 @@ export function BehaviorList({
               {opportunityList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
               {opportunityList.rows.map((behavior) => (
                 <div key={behavior.id} hidden={!opportunityList.visibleIds.has(behavior.id)}>
-                  {renderRecord(behavior, true)}
+                  {renderRecord(behavior, {})}
                 </div>
               ))}
             </div>
@@ -375,7 +467,7 @@ export function BehaviorList({
               {notRunningList.visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching behaviors.</p> : null}
               {notRunningList.rows.map((behavior) => (
                 <div key={behavior.id} hidden={!notRunningList.visibleIds.has(behavior.id)}>
-                  {renderRecord(behavior, false)}
+                  {renderRecord(behavior, {})}
                 </div>
               ))}
             </div>
@@ -386,16 +478,9 @@ export function BehaviorList({
       <CategoryCounts analytics={analytics} />
 
       <ArchivedBehaviorDisclosure
-        reminderRuntime={reminderRuntime}
-        linkCoordinator={linkCoordinator}
         archivedBehaviors={archivedList.rows}
         visibleIds={archivedList.visibleIds}
-        categories={categories}
-        updateAction={announcedUpdateAction}
-        lifecycleFormAction={lifecycleFormAction}
-        lifecycleResult={lifecycleState}
-        noteShortcutViews={noteShortcutViews}
-        noteShortcutAction={noteShortcutAction}
+        renderRecord={(behavior) => renderRecord(behavior, { archived: true })}
       />
     </div>
   );
@@ -549,8 +634,22 @@ function BehaviorRecord({
   sourceLinkCoordinator = null,
   editRequest = null,
   allowOpportunity = true,
+  nested = false,
+  parentSummary = null,
+  parentOptions,
+  parentLocked = false,
+  subBehaviorManager = null,
+  subBehaviors = null,
 }: Readonly<{
   behavior: BehaviorView;
+  /** Drawn inside its parent's Sub-behaviors list. */
+  nested?: boolean;
+  /** Rolled-up adherence of a parent with sub-behaviors. */
+  parentSummary?: AnalyticsParentSummary | null;
+  parentOptions?: readonly { id: string; title: string }[];
+  parentLocked?: boolean;
+  subBehaviorManager?: ReactNode;
+  subBehaviors?: ReactNode;
   categories: CategoryOption[];
   analytics?: AnalyticsView;
   behaviorAnalytics?: AnalyticsBehaviorSummary | null;
@@ -603,11 +702,13 @@ function BehaviorRecord({
       : null;
 
   return (
-    <article className="bg-background">
+    <article className="bg-background" data-behavior-id={behavior.id} data-sub-behavior={nested ? "true" : undefined}>
       <div className="grid gap-6 pb-0 pt-4 md:grid-cols-[minmax(0,1fr)_minmax(16rem,19rem)] md:items-start">
         <div className="grid min-w-0 gap-5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="break-words text-xl leading-tight">{behavior.title}</h3>
+            {nested
+              ? <h4 className="break-words text-lg leading-tight">{behavior.title}</h4>
+              : <h3 className="break-words text-xl leading-tight">{behavior.title}</h3>}
             {!behavior.active ? (
               <span className="border border-line bg-surface px-2 py-1 text-xs">
                 Archived
@@ -640,8 +741,10 @@ function BehaviorRecord({
           ) : null}
 
           {behavior.active ? (
-            <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null}
-              unscheduled={isUnscheduledOpportunity(behavior)} />
+            parentSummary
+              ? <ParentOutcomeStats summary={parentSummary} />
+              : <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null}
+                unscheduled={isUnscheduledOpportunity(behavior)} />
           ) : null}
 
           {behavior.active ? (
@@ -668,7 +771,7 @@ function BehaviorRecord({
         {behavior.active ? (
           <BehaviorCalendarPanel
             behavior={behavior}
-            behaviorAnalytics={behaviorAnalytics ?? null}
+            dailyCells={parentSummary?.dailyCells ?? behaviorAnalytics?.dailyCells ?? null}
             rangeDays={analytics?.rangeDays ?? 30}
           />
         ) : null}
@@ -716,7 +819,10 @@ function BehaviorRecord({
                     showActiveToggle={false}
                     whereDraft={whereDraft}
                     allowOpportunity={allowOpportunity}
+                    parentOptions={parentOptions}
+                    parentLocked={parentLocked}
                   />
+                  {subBehaviorManager}
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
                   {runAction && !notRunning ? (
@@ -776,6 +882,7 @@ function BehaviorRecord({
             : []}
         />
       ) : null}
+      {subBehaviors}
     </article>
   );
 }
@@ -868,16 +975,70 @@ function BehaviorOutcomeStats({
   );
 }
 
+function ParentOutcomeStats({
+  summary,
+}: Readonly<{
+  summary: AnalyticsParentSummary;
+}>) {
+  return (
+    <dl className="grid max-w-sm gap-1 text-sm leading-5 text-muted-readable" data-parent-summary={summary.parentBehaviorId}>
+      <SummaryItem label="Adherence" value={summary.percentLabel} />
+      <SummaryItem label="Completed" value={String(summary.completedCount)} />
+      <SummaryItem label="Not Completed" value={String(summary.notCompletedCount)} />
+      {summary.slotCounts.totalSlots > 0 ? (
+        <SummaryItem label="Full routines" value={`${summary.slotCounts.completedSlots} of ${summary.slotCounts.totalSlots}`} />
+      ) : null}
+    </dl>
+  );
+}
+
+function SubBehaviorRows({
+  parentTitle,
+  count,
+  children,
+}: Readonly<{
+  parentTitle: string;
+  count: number;
+  children: ReactNode;
+}>) {
+  return (
+    <details open className="pb-4 pl-4 sm:pl-6" data-sub-behavior-rows="">
+      <summary className="product-disclosure-trigger flex min-h-10 items-center py-2 text-sm text-foreground"
+        aria-label={`${parentTitle} sub-behaviors`}>
+        <span aria-hidden="true" className="product-disclosure-indicator" />
+        <span className="product-disclosure-trigger-label">Sub-behaviors ({count})</span>
+      </summary>
+      <div className="divide-y divide-line">{children}</div>
+    </details>
+  );
+}
+
+/** A parent stays visible while any of its sub-behaviors matches the category filter. */
+function withSubBehaviorMatches(
+  list: { rows: BehaviorView[]; visibleIds: Set<string> },
+  groups: Map<string, BehaviorView[]>,
+  categoryId: string,
+): { rows: BehaviorView[]; visibleIds: Set<string> } {
+  if (categoryId === "all") return list;
+  const visibleIds = new Set(list.visibleIds);
+  for (const row of list.rows) {
+    const matches = (groups.get(row.id) ?? []).some((child) =>
+      categoryId === "none" ? !child.categoryId : child.categoryId === categoryId);
+    if (matches) visibleIds.add(row.id);
+  }
+  return { rows: list.rows, visibleIds };
+}
+
 function BehaviorCalendarPanel({
   behavior,
-  behaviorAnalytics,
+  dailyCells,
   rangeDays,
 }: Readonly<{
   behavior: BehaviorView;
-  behaviorAnalytics: AnalyticsBehaviorSummary | null;
+  dailyCells: readonly AnalyticsBehaviorDayCell[] | null;
   rangeDays: AnalyticsRangeDays;
 }>) {
-  if (!behaviorAnalytics) {
+  if (!dailyCells) {
     return null;
   }
 
@@ -887,7 +1048,7 @@ function BehaviorCalendarPanel({
         className="grid w-full grid-cols-7 gap-1"
         aria-label={`${behavior.title} calendar`}
       >
-        {behaviorAnalytics.dailyCells.map((cell) => (
+        {dailyCells.map((cell) => (
           <BehaviorHeatmapCell
             key={cell.key}
             cell={cell}
@@ -995,6 +1156,7 @@ function BehaviorDateReview({
               occurrence={occurrence}
               dateLabel={selectedBehaviorDay.label}
               localDate={selectedBehaviorDay.localDate}
+              showTitle={occurrence.behaviorId !== selectedBehaviorDay.behaviorId}
             />
 
             <details className="min-w-0 [&[open]]:w-full lg:justify-self-end lg:[&[open]]:w-[32rem] lg:[&[open]]:max-w-full">
@@ -1042,7 +1204,9 @@ function BehaviorDateOccurrenceSummary({
   occurrence,
   dateLabel,
   localDate,
+  showTitle = false,
 }: Readonly<{
+  showTitle?: boolean;
   occurrence: NonNullable<
     AnalyticsView["selectedBehaviorDay"]
   >["occurrences"][number];
@@ -1053,6 +1217,9 @@ function BehaviorDateOccurrenceSummary({
 
   return (
     <dl className="grid min-w-0 gap-1 text-sm leading-6">
+      {showTitle ? (
+        <BehaviorDateOccurrenceDetail label="Sub-behavior">{occurrence.title}</BehaviorDateOccurrenceDetail>
+      ) : null}
       <BehaviorDateOccurrenceDetail label="Date of behavior">
         <time dateTime={localDate}>
           {dateLabel} · {localDate}
@@ -1150,25 +1317,11 @@ function CategoryCounts({
 function ArchivedBehaviorDisclosure({
   archivedBehaviors,
   visibleIds,
-  categories,
-  updateAction,
-  lifecycleFormAction,
-  lifecycleResult,
-  reminderRuntime,
-  noteShortcutViews,
-  noteShortcutAction,
-  linkCoordinator,
+  renderRecord,
 }: Readonly<{
   archivedBehaviors: BehaviorView[];
   visibleIds: ReadonlySet<string>;
-  categories: CategoryOption[];
-  updateAction: BehaviorFormAction;
-  lifecycleFormAction: BehaviorLifecycleFormAction;
-  lifecycleResult: BehaviorLifecycleActionState;
-  reminderRuntime?: "web" | "desktop";
-  noteShortcutViews: Record<string, NoteShortcutView>;
-  noteShortcutAction?: NoteShortcutAction;
-  linkCoordinator: SourceLinkCoordinator | null;
+  renderRecord: (behavior: BehaviorView) => ReactNode;
 }>) {
   return (
     <section className="border-t border-line pt-4" aria-labelledby="archived-behaviors-title">
@@ -1192,17 +1345,7 @@ function ArchivedBehaviorDisclosure({
             {visibleIds.size === 0 ? <p className="py-4 text-sm text-muted-readable">No matching archived behaviors.</p> : null}
             {archivedBehaviors.map((behavior) => (
               <div key={behavior.id} hidden={!visibleIds.has(behavior.id)}>
-              <BehaviorRecord
-                reminderRuntime={reminderRuntime}
-                behavior={behavior}
-                categories={categories}
-                updateAction={updateAction}
-                lifecycleFormAction={lifecycleFormAction}
-                lifecycleResult={lifecycleResult}
-                noteShortcutView={noteShortcutViews[behavior.id]}
-                noteShortcutAction={noteShortcutAction}
-                sourceLinkCoordinator={linkCoordinator}
-              />
+                {renderRecord(behavior)}
               </div>
             ))}
           </div>

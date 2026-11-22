@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-081` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-085` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2283,7 +2283,6 @@ cite has not changed.
 - **Conflicting current text:** any copy that says the Daily Brief only moves today's items.
 - **Update needed:** user guide Daily Brief section; Privacy/Trust Daily Brief write list.
 - **Related:** P-078, P-079.
-- **Status:** logged.
 
 ## P-081: Cadence may record how the advisor's avatar is used
 
@@ -2299,4 +2298,56 @@ cite has not changed.
 - **Conflicting current text:** any copy that says Cadence records no usage of its interface.
 - **Update needed:** Privacy wording before the first experiment runs on real accounts.
 - **Related:** P-070.
+- **Status:** logged.
+
+## P-082: Routines and sub-behaviors in the app
+
+- **Change:** implemented November 21, 2026 (Ticket 349). New in-app copy:
+  - Behaviors: "Part of", "Follow parent schedule", "Uses the schedule of {parent}.",
+    "Add sub-behavior", "Sub-behaviors (n)", "Detach", "New sub-behavior", "Add an
+    existing behavior", "Full routines x of y", "Order saved.", "{title} created with n
+    sub-behaviors.", "{title} is now part of {parent}.", "{title} is now its own
+    behavior.", "Check sub-behavior {n}: …".
+  - Timeline: routine rows with progress "2/3", the Routines / All steps control and
+    "Routine updated.".
+  - Markdown export: "(routine, n sub-behaviors)" lines.
+- **Affected:** `packages/core/src/notices/catalog/sub-behaviors.json`,
+  `components/behaviors/SubBehaviorEditor.tsx`, `BehaviorForm.tsx`, `BehaviorList.tsx`,
+  `components/timeline/ParentOccurrenceRow.tsx`, `SemanticZoomToggle.tsx`. The Mac shows
+  the same shared components.
+- **Surfaces:** in-app copy (new); user guide (`docs/user-guide/behaviors-and-review.md`,
+  "Group Behaviors into a routine"; `docs/user-guide/timeline.md`, "Mark a routine or its
+  steps" and "Zoom between routines and all steps").
+- **Conflicting current text:** none.
+- **Update needed:** the messaging pass (Ticket 246) reviews the user guide wording.
+- **Status:** logged.
+
+## P-083: Outside AI clients read and write routines (MCP contract 1.7.0)
+
+- **Change:** implemented November 21, 2026 (Ticket 349). MCP contract 1.7.0 adds the
+  Behavior hierarchy fields, `parent_groups` on `get_timeline`, hierarchy filters on
+  `list_behaviors`, `sub_behaviors` on `create_behavior`, grouping on `update_behavior`
+  and the tool `set_parent_occurrence_status`.
+- **Affected:** the developer reference (regenerated), `docs/MCP_CONTRACT.md`, and the
+  `routine-setup` and `daily-check-in` plugin skills (shared copy and both plugins).
+- **Surfaces:** developer docs, Claude and ChatGPT plugin and directory listings
+  (provider submissions).
+- **Conflicting current text:** listing copy that lists the tools does not name
+  `set_parent_occurrence_status` or routines.
+- **Update needed:** before the next plugin or directory submission, update the listing
+  tool list and descriptions.
+- **Status:** logged.
+
+## P-084: Hevy completion and disclosures on routines
+
+- **Change:** implemented November 21, 2026 (Ticket 349). A Hevy source link on a routine
+  marks each Unresolved step of the matched slot Completed (D28 rules per step).
+- **Affected:** `components/behaviors/SourceLinkSettings.tsx` (unchanged text).
+- **Surfaces:** in-app disclosure, user guide (`docs/user-guide/timeline.md`, connected
+  sources), Privacy (connector completion section), marketing if it later names routines.
+- **Conflicting current text:** the link disclosure says "A matching workout marks this
+  Behavior Completed on the workout's day." On a routine it marks the steps, not the
+  routine row.
+- **Update needed:** the messaging track words the disclosure for routines. No public
+  claim changes now.
 - **Status:** logged.

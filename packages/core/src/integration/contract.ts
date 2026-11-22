@@ -44,6 +44,11 @@ export function validateOperationInput<N extends IntegrationOperationName>(
   checkTimeRanges(record.schedules, issues);
   if (name === "create_behavior" || name === "update_behavior") checkEmptySchedules(name, record, issues);
   if (name === "add_opportunity_occurrence") checkOpportunityPlacement(record, issues);
+  if (Array.isArray(record.sub_behaviors)) {
+    record.sub_behaviors.forEach((item, index) =>
+      checkTimeRanges((item as { schedules?: unknown }).schedules, issues, `$.sub_behaviors[${index}]`));
+  }
+  checkSubBehaviorRules(name, record, issues);
   if (issues.length) return { ok: false, error: invalidInputError(issues), issues };
 
   const maxRange = name === "list_occurrences"
@@ -133,7 +138,78 @@ function checkDateRange(
   return null;
 }
 
-function checkTimeRanges(schedules: unknown, issues: ValidationIssue[]): void {
+/**
+ * Sub-behavior rules (contract 1.7.0): one level deep, and a sub-behavior either follows
+ * its parent's schedule (no `schedules`) or has its own (`inherit_parent_schedule` false).
+ */
+function checkSubBehaviorRules(name: IntegrationOperationName, record: Record<string, unknown>, issues: ValidationIssue[]): void {
+  const issue = (path: string, keyword: string, message: string) => issues.push({ path, keyword, message });
+  const checkSchedules = (item: Record<string, unknown>, at: string) => {
+    const inherits = item.inherit_parent_schedule !== false;
+    if (inherits && item.schedules !== undefined) {
+      issue(`${at}.schedules`, "inheritParentSchedule", "must be omitted while the sub-behavior follows its parent's schedule; set inherit_parent_schedule to false to give it its own");
+    }
+    if (!inherits && item.schedules === undefined) {
+      issue(`${at}.schedules`, "required", "is required when inherit_parent_schedule is false");
+    }
+  };
+  if (name === "create_behavior") {
+    const hasParent = typeof record.parent_behavior_id === "string";
+    if (hasParent && record.sub_behaviors !== undefined) {
+      issue("$.sub_behaviors", "maxDepth", "is not allowed with parent_behavior_id: a sub-behavior can't have sub-behaviors");
+    }
+    if (hasParent) checkSchedules(record, "$");
+    for (const key of ["inherit_parent_schedule", "sub_behavior_sort_order"] as const) {
+      if (!hasParent && record[key] !== undefined) issue(`$.${key}`, "requiresParent", "needs parent_behavior_id");
+    }
+    if (Array.isArray(record.sub_behaviors)) {
+      const refs = new Set<string>(typeof record.external_ref === "string" ? [record.external_ref] : []);
+      record.sub_behaviors.forEach((item, index) => {
+        const value = item as Record<string, unknown>;
+        checkSchedules(value, `$.sub_behaviors[${index}]`);
+        if (typeof value.external_ref === "string") {
+          if (refs.has(value.external_ref)) issue(`$.sub_behaviors[${index}].external_ref`, "uniqueItems", "repeats another external_ref in this call");
+          refs.add(value.external_ref);
+        }
+      });
+    }
+  }
+  // Behaviors of Opportunity: an opportunity Behavior is never part of a routine.
+  if ((name === "create_behavior" || name === "update_behavior") && record.is_opportunity === true) {
+    if (typeof record.parent_behavior_id === "string") {
+      issue("$.is_opportunity", "opportunityRoutine", "is not allowed with parent_behavior_id: an opportunity Behavior can't be part of a routine");
+    }
+    if (record.sub_behaviors !== undefined) {
+      issue("$.is_opportunity", "opportunityRoutine", "is not allowed with sub_behaviors: an opportunity Behavior can't be part of a routine");
+    }
+  }
+  if (name === "update_behavior") {
+    if (record.parent_behavior_id !== undefined && record.parent_behavior_id === record.behavior_id) {
+      issue("$.parent_behavior_id", "selfParent", "must name another Behavior");
+    }
+    if (record.inherit_parent_schedule === true && record.schedules !== undefined) {
+      issue("$.schedules", "inheritParentSchedule", "must be omitted when inherit_parent_schedule is true");
+    }
+    if (record.parent_behavior_id === null && (record.inherit_parent_schedule !== undefined || record.sub_behavior_sort_order !== undefined)) {
+      issue("$.parent_behavior_id", "requiresParent", "is null, so inherit_parent_schedule and sub_behavior_sort_order do not apply");
+    }
+  }
+  if (name === "set_parent_occurrence_status") {
+    if (record.slot_key !== undefined && record.local_date === undefined) {
+      issue("$.slot_key", "requiresLocalDate", "needs local_date");
+    }
+    if (Array.isArray(record.expected_statuses)) {
+      const seen = new Set<unknown>();
+      record.expected_statuses.forEach((entry, index) => {
+        const id = (entry as { occurrence_id?: unknown }).occurrence_id;
+        if (seen.has(id)) issue(`$.expected_statuses[${index}].occurrence_id`, "uniqueItems", "repeats another expected status");
+        seen.add(id);
+      });
+    }
+  }
+}
+
+function checkTimeRanges(schedules: unknown, issues: ValidationIssue[], at = "$"): void {
   if (!Array.isArray(schedules)) return;
   schedules.forEach((schedule, scheduleIndex) => {
     const entries = (schedule as { time_entries?: unknown }).time_entries;
@@ -142,7 +218,7 @@ function checkTimeRanges(schedules: unknown, issues: ValidationIssue[]): void {
       const value = entry as { kind?: unknown; start_time?: unknown; end_time?: unknown };
       if (value.kind === "range" && typeof value.end_time === "string" && value.end_time === value.start_time) {
         issues.push({
-          path: `$.schedules[${scheduleIndex}].time_entries[${entryIndex}].end_time`,
+          path: `${at}.schedules[${scheduleIndex}].time_entries[${entryIndex}].end_time`,
           keyword: "timeRange",
           message: "must differ from start_time",
         });

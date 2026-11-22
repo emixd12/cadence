@@ -77,6 +77,13 @@ export type BriefMoveProposalStatus = (typeof BRIEF_MOVE_PROPOSAL_STATUSES)[numb
 export type BriefMoveSpan = Readonly<{ startAt: string; endAt: string }>;
 
 /** One move line, as stored with its proposal and rebuilt on reopen with no model call. */
+/**
+ * A routine whose steps follow its time and move together on one line: one Yes moves
+ * every step, one Undo puts every step back. `occurrenceIds` lists the steps, the
+ * line's own Occurrence first.
+ */
+export type BriefMoveRoutine = Readonly<{ parentBehaviorId: string; title: string; occurrenceIds: readonly string[] }>;
+
 export type BriefMoveLine = Readonly<{
   proposalId: string;
   occurrenceId: string;
@@ -113,6 +120,8 @@ export type BriefMoveLine = Readonly<{
    * Null when nothing was applied or Undo reverted it. Missing from older servers.
    */
   appliedTo?: BriefMoveSpan | null;
+  /** Set when the line moves a whole routine. Missing from older servers. */
+  routine?: BriefMoveRoutine;
 }>;
 
 /** An open schedule-edit collision (Phase 2 move_conflicts) shown as a line in the brief. */

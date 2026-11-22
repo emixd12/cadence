@@ -18,6 +18,10 @@ export type AnalyticsOccurrenceInput = {
   timezone: string;
   /** Behaviors of Opportunity. Missing means "scheduled". Adherence reads scheduled rows only. */
   origin?: OccurrenceOrigin;
+  /** Sub-behaviors (depth 1): set on a sub-behavior's Occurrence. */
+  parentBehaviorId?: string | null;
+  parentBehaviorTitle?: string | null;
+  subBehaviorSortOrder?: number;
 };
 
 export type AnalyticsTimeSessionInput = {
@@ -132,6 +136,30 @@ export type AnalyticsConnectorTiming = Readonly<{
   label: string;
 }>;
 
+/** Parent slots by derived state. A slot is one parent, day and time. */
+export type AnalyticsParentSlotCounts = {
+  totalSlots: number;
+  completedSlots: number;
+  partialSlots: number;
+  notCompletedSlots: number;
+  unresolvedSlots: number;
+};
+
+/**
+ * Rolled-up progress of one parent Behavior: its sub-behaviors' Occurrences plus its own
+ * Occurrences from before it had sub-behaviors. Each Occurrence counts once.
+ */
+export type AnalyticsParentSummary = AnalyticsStatusCounts &
+  AnalyticsAdherence & {
+    parentBehaviorId: string;
+    title: string;
+    categoryName: string;
+    /** Sub-behaviors seen in range, in sibling order. Their own summaries sit in `behaviorSummaries`. */
+    subBehaviorIds: string[];
+    slotCounts: AnalyticsParentSlotCounts;
+    dailyCells: AnalyticsBehaviorDayCell[];
+  };
+
 export type AnalyticsCategorySummary = AnalyticsStatusCounts &
   AnalyticsAdherence & AnalyticsOpportunityCounts & {
     categoryName: string;
@@ -168,6 +196,7 @@ export type AnalyticsView = {
   summary: AnalyticsSummary;
   overallHeatmap: AnalyticsDayCell[];
   behaviorSummaries: AnalyticsBehaviorSummary[];
+  parentSummaries: AnalyticsParentSummary[];
   categorySummaries: AnalyticsCategorySummary[];
   selectedBehaviorDay: AnalyticsSelectedBehaviorDay | null;
 };

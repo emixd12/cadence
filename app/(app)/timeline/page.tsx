@@ -14,6 +14,7 @@ import { getTimelinePageBundle } from "@/lib/services/timeline.service";
 import { listAcceptedNoteShortcutsForCurrentUser } from "@/lib/services/note-shortcut.service";
 import {
   markOccurrenceStatusAction,
+  markParentSlotStatusAction,
   resetTimeTrackingAction,
   saveDayNoteAction,
   startTimeTrackingAction,
@@ -144,6 +145,7 @@ async function TimelineContent({
         runAction={behaviorRunAction}
         addOpportunityAction={addOpportunityOccurrenceAction}
         removeOpportunityAction={removeOpportunityOccurrenceAction}
+        parentSlotStatusAction={markParentSlotStatusAction}
       />
       </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>

@@ -70,7 +70,7 @@ export function planBehaviorLogRestoreWrite(context: PortabilityPlanContext & { 
     // Keep is a promise about the stored rows, including nullable categories and timestamps.
     // Reconstructing a kept native graph from the portable representation can normalize those away.
     if (previous && behaviorAction === "keep" && !deletesSchedule && scheduleSources.every((row) => keepsSchedule(string(row.id)))) continue;
-    const graph: PortabilityGraph = previous ? { behavior: { ...previous.behavior }, schedules: previous.schedules.map((row) => ({ ...row })), slots: previous.slots.map((row) => ({ ...row })) } : { behavior: { id: behaviorId, user_id, category_id: null, title: "", description: null, recurrence_rule: {}, scheduled_time: "00:00:00", timezone: context.snapshot.profile.timezone, browser_reminder_enabled: true, email_reminder_enabled: false, reminder_offset_minutes: 0, default_duration_minutes: null, end_on: null, end_time: null, pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, active: true, archived_at: null, current_configuration_event_id: null, created_at: context.now, updated_at: context.now }, schedules: [], slots: [] };
+    const graph: PortabilityGraph = previous ? { behavior: { ...previous.behavior }, schedules: previous.schedules.map((row) => ({ ...row })), slots: previous.slots.map((row) => ({ ...row })) } : { behavior: { id: behaviorId, user_id, category_id: null, title: "", description: null, recurrence_rule: {}, scheduled_time: "00:00:00", timezone: context.snapshot.profile.timezone, browser_reminder_enabled: true, email_reminder_enabled: false, reminder_offset_minutes: 0, default_duration_minutes: null, end_on: null, end_time: null, pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, parent_behavior_id: null, sub_behavior_sort_order: 0, inherit_parent_schedule: false, active: true, archived_at: null, current_configuration_event_id: null, created_at: context.now, updated_at: context.now }, schedules: [], slots: [] };
     if (source) {
       if (behaviorAction !== "keep") {
       let category = [...context.snapshot.categories, ...plan.categoryCreates].find(({ name }) => name.trim().replace(/\s+/g, " ").toLowerCase() === String(source.category_name ?? "").trim().replace(/\s+/g, " ").toLowerCase());
@@ -89,6 +89,11 @@ export function planBehaviorLogRestoreWrite(context: PortabilityPlanContext & { 
         }),
         ...storedRunColumnsFromJson(source),
         ...(source.auto_archived_at === undefined ? {} : { auto_archived_at: nullable(source.auto_archived_at) }),
+        ...(source.parent_behavior_id === undefined ? {} : {
+          parent_behavior_id: nullable(source.parent_behavior_id),
+          sub_behavior_sort_order: typeof source.sub_behavior_sort_order === "number" ? source.sub_behavior_sort_order : 0,
+          inherit_parent_schedule: source.inherit_parent_schedule === true,
+        }),
         created_at: previous?.behavior.created_at ?? nullable(source.created_at) ?? context.now, updated_at: context.now };
       }
       if (graph.behavior.active && behaviorAction !== "keep") {

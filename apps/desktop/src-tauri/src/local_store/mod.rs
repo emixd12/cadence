@@ -15,6 +15,7 @@ mod reminder;
 #[cfg(test)]
 mod repair_tests;
 pub mod rows;
+mod sub_behavior;
 mod sync_apply;
 mod travel;
 #[cfg(test)]
@@ -439,6 +440,35 @@ pub enum Request {
         expected_normalized_definition: Definition,
         definition_event: Option<BehaviorDefinitionEvent>,
         configuration_event: Option<BehaviorConfigurationEvent>,
+    },
+    /// Sub-behaviors: a parent, then its new sub-behaviors, in one transaction.
+    CreateBehaviorGroup {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        items: Vec<sub_behavior::GroupCreateItem>,
+    },
+    /// Sub-behaviors: several Behavior updates in one transaction, in order.
+    UpdateBehaviorGroup {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        items: Vec<sub_behavior::GroupUpdateItem>,
+    },
+    ReorderSubBehaviors {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        parent_behavior_id: String,
+        ordered_behavior_ids: Vec<String>,
+    },
+    /// Sub-behaviors: marks every planned sub-behavior Occurrence of one parent slot.
+    ApplyParentSlotStatusTransition {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        parent_behavior_id: String,
+        transitions: Vec<sub_behavior::SlotStatusTransition>,
     },
     ApplyOccurrenceGeneration {
         profile_id: String,
@@ -920,6 +950,39 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             definition_event.as_ref(),
             configuration_event.as_ref(),
         ),
+        Request::CreateBehaviorGroup {
+            profile_id,
+            mutation_id,
+            now,
+            items,
+        } => sub_behavior::create_group(db, profile_id, mutation_id, now, items),
+        Request::UpdateBehaviorGroup {
+            profile_id,
+            mutation_id,
+            now,
+            items,
+        } => sub_behavior::update_group(db, profile_id, mutation_id, now, items),
+        Request::ReorderSubBehaviors {
+            profile_id,
+            now,
+            parent_behavior_id,
+            ordered_behavior_ids,
+            ..
+        } => sub_behavior::reorder(db, profile_id, now, parent_behavior_id, ordered_behavior_ids),
+        Request::ApplyParentSlotStatusTransition {
+            profile_id,
+            mutation_id,
+            now,
+            parent_behavior_id,
+            transitions,
+        } => sub_behavior::parent_slot_status(
+            db,
+            profile_id,
+            mutation_id,
+            now,
+            parent_behavior_id,
+            transitions,
+        ),
         Request::ApplyOccurrenceGeneration { .. } => occurrence::generate(db, request),
         Request::ApplyStatusTransition { .. } => occurrence::status(db, request),
         Request::ApplyMarkDetail { .. } => occurrence::mark_detail(db, request),
@@ -1082,6 +1145,30 @@ impl Request {
                 ..
             }
             | Self::UpdateBehaviorGraph {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CreateBehaviorGroup {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::UpdateBehaviorGroup {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::ReorderSubBehaviors {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::ApplyParentSlotStatusTransition {
                 profile_id,
                 mutation_id,
                 now,

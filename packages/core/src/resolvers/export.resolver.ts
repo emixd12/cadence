@@ -255,7 +255,8 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
       includeNotes,
     }),
   );
-  const overallCounts = countOccurrences(occurrences);
+  // Sub-behaviors own a routine's days: a parent's own row on such a day is not counted twice.
+  const overallCounts = countOccurrences(leafOccurrences(occurrences, behaviors));
   const timeSessions = includeTimeTracking
     ? toJsonTimeSessions({
         timeSessions: input.timeSessions ?? [],
@@ -489,6 +490,11 @@ function toJsonBehavior(
     ...(behavior.autoArchivedAt === undefined
       ? {}
       : { auto_archived_at: behavior.autoArchivedAt }),
+    ...(behavior.parentBehaviorId === undefined ? {} : {
+      parent_behavior_id: behavior.parentBehaviorId,
+      sub_behavior_sort_order: behavior.parentBehaviorId ? behavior.subBehaviorSortOrder ?? 0 : 0,
+      inherit_parent_schedule: behavior.parentBehaviorId ? behavior.inheritParentSchedule ?? true : false,
+    }),
     created_at: behavior.createdAt,
     updated_at: behavior.updatedAt,
   };
@@ -576,6 +582,11 @@ function toJsonBehaviorConfigurationSnapshot(
     ...(snapshot.pause === undefined ? {} : {
       pause: snapshot.pause ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn } : null,
     }),
+    // A standalone snapshot carries no link, so it matches snapshots written before sub-behaviors.
+    ...(snapshot.parentBehaviorId ? {
+      parent_behavior_id: snapshot.parentBehaviorId,
+      inherit_parent_schedule: snapshot.inheritParentSchedule ?? true,
+    } : {}),
   };
 }
 
@@ -1419,6 +1430,11 @@ function toBehaviorLogBehavior(
         ...(behavior.is_opportunity !== undefined
           ? { is_opportunity: behavior.is_opportunity }
           : {}),
+        ...(behavior.parent_behavior_id !== undefined ? {
+          parent_behavior_id: behavior.parent_behavior_id,
+          sub_behavior_sort_order: behavior.sub_behavior_sort_order ?? 0,
+          inherit_parent_schedule: behavior.inherit_parent_schedule ?? false,
+        } : {}),
       },
     },
   });
@@ -2251,7 +2267,13 @@ function toBehaviorLogConfigurationEvents(input: {
         offset_minutes: -value.reminder_offset_minutes, timezone: value.timezone,
         ...(channel === "other" ? { extensions: { [BEHAVIORLOG_EXTENSION_NAMESPACE]: { native_notification: true } } } : {}),
       })),
-      extensions: { [BEHAVIORLOG_EXTENSION_NAMESPACE]: { category_id: value.category_id } },
+      extensions: { [BEHAVIORLOG_EXTENSION_NAMESPACE]: {
+        category_id: value.category_id,
+        ...(value.parent_behavior_id ? {
+          parent_behavior_id: value.parent_behavior_id,
+          inherit_parent_schedule: value.inherit_parent_schedule ?? false,
+        } : {}),
+      } },
     });
     const previous = event.previous_configuration ? snapshot(event.previous_configuration) : null;
     const next = snapshot(event.next_configuration);
@@ -2895,8 +2917,9 @@ function toMarkdownSummary(input: {
   timeSessions: ExportJsonTimeSession[];
   statusEvents: ExportJsonStatusEvent[];
 }): string {
-  const behaviorLines = summarizeByBehavior(input.occurrences);
-  const categoryLines = summarizeByCategory(input.occurrences);
+  const countedOccurrences = leafOccurrences(input.occurrences, input.behaviors);
+  const behaviorLines = summarizeByBehavior(countedOccurrences, input.behaviors);
+  const categoryLines = summarizeByCategory(countedOccurrences);
   const noteLines = summarizeOccurrenceNotes(input.occurrences);
   const timeTrackingLines = input.includeTimeTracking
     ? summarizeTimeTracking(input.timeSessions, input.behaviors)
@@ -2920,6 +2943,9 @@ function toMarkdownSummary(input: {
     ...(behaviorLines.length > 0
       ? behaviorLines
       : ["- No occurrences in this range."]),
+    ...(behaviorLines.some((entry) => entry.includes("\n  - "))
+      ? ["- A routine's totals count each sub-behavior Occurrence once. Its sub-behaviors are listed under it; `parent_behavior_id` links them in Full JSON and BehaviorLog."]
+      : []),
     "",
     "## By category",
     ...input.categories.filter((category) => category.description).map((category) => `- ${category.name}: ${normalizeMarkdownNote(category.description!)}`),
@@ -3001,7 +3027,26 @@ function summarizeTimeTracking(
     .sort((left, right) => left.localeCompare(right));
 }
 
-function summarizeByBehavior(occurrences: ExportJsonOccurrence[]): string[] {
+/** Drops a parent's own Occurrence on a local date its sub-behaviors cover. */
+function leafOccurrences(
+  occurrences: ExportJsonOccurrence[],
+  behaviors: ExportJsonBehavior[],
+): ExportJsonOccurrence[] {
+  const parentById = new Map(behaviors.map((behavior) => [behavior.id, behavior.parent_behavior_id ?? null]));
+  const coveredParentDays = new Set(occurrences.flatMap((occurrence) => {
+    const parentId = parentById.get(occurrence.behavior_id);
+    return parentId ? [`${parentId}|${occurrence.local_date}`] : [];
+  }));
+  return occurrences.filter((occurrence) =>
+    parentById.get(occurrence.behavior_id) || !coveredParentDays.has(`${occurrence.behavior_id}|${occurrence.local_date}`));
+}
+
+/** One line per Behavior. A routine's line counts its sub-behaviors, listed under it. */
+function summarizeByBehavior(
+  occurrences: ExportJsonOccurrence[],
+  behaviors: ExportJsonBehavior[],
+): string[] {
+  const behaviorById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   const groups = new Map<string, ExportJsonOccurrence[]>();
 
   for (const occurrence of occurrences) {
@@ -3010,13 +3055,39 @@ function summarizeByBehavior(occurrences: ExportJsonOccurrence[]): string[] {
     groups.set(occurrence.behavior_id, existing);
   }
 
-  return Array.from(groups.values())
-    .map((group) => {
-      const firstOccurrence = group[0];
-      const title = firstOccurrence?.behavior_title ?? "Unknown behavior";
-      const counts = countOccurrences(group);
+  const line = (title: string, counts: ExportStatusCounts) =>
+    `${title}: ${counts.completedCount} completed, ${counts.notCompletedCount} not completed, ${counts.unresolvedCount} unresolved, ${formatAdherenceLabel(counts)}`;
+  const parentOf = (behaviorId: string) => {
+    const parentId = behaviorById.get(behaviorId)?.parent_behavior_id;
+    return parentId && behaviorById.has(parentId) ? parentId : null;
+  };
+  const childrenByParent = new Map<string, string[]>();
+  for (const behaviorId of groups.keys()) {
+    const parentId = parentOf(behaviorId);
+    if (parentId) childrenByParent.set(parentId, [...(childrenByParent.get(parentId) ?? []), behaviorId]);
+  }
 
-      return `- ${title}: ${counts.completedCount} completed, ${counts.notCompletedCount} not completed, ${counts.unresolvedCount} unresolved, ${formatAdherenceLabel(counts)}`;
+  const topLevel = new Set([
+    ...[...groups.keys()].filter((behaviorId) => !parentOf(behaviorId)),
+    ...childrenByParent.keys(),
+  ]);
+  return [...topLevel]
+    .map((behaviorId) => {
+      const own = groups.get(behaviorId) ?? [];
+      const title = behaviorById.get(behaviorId)?.title ?? own[0]?.behavior_title ?? "Unknown behavior";
+      const children = (childrenByParent.get(behaviorId) ?? []).sort((left, right) =>
+        (behaviorById.get(left)?.sub_behavior_sort_order ?? 0) - (behaviorById.get(right)?.sub_behavior_sort_order ?? 0)
+        || left.localeCompare(right));
+      if (children.length === 0) return `- ${line(title, countOccurrences(own))}`;
+      const routine = [...own, ...children.flatMap((childId) => groups.get(childId) ?? [])];
+      return [
+        `- ${line(`${title} (routine, ${children.length} ${children.length === 1 ? "sub-behavior" : "sub-behaviors"})`, countOccurrences(routine))}`,
+        ...children.map((childId) => {
+          const childOccurrences = groups.get(childId) ?? [];
+          const childTitle = behaviorById.get(childId)?.title ?? childOccurrences[0]?.behavior_title ?? "Unknown behavior";
+          return `  - ${line(childTitle, countOccurrences(childOccurrences))}`;
+        }),
+      ].join("\n");
     })
     .sort((left, right) => left.localeCompare(right));
 }

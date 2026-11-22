@@ -43,6 +43,9 @@ import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { OpportunityBasket } from "./OpportunityBasket";
+import { ParentOccurrenceRow } from "./ParentOccurrenceRow";
+import { SemanticZoomToggle } from "./SemanticZoomToggle";
+import { useSemanticZoom } from "./use-semantic-zoom";
 import { calendarBusyFromEvents, MoveCalendarEventsContext } from "./OccurrenceMoves";
 import { useDayProgressClock } from "./day-progress-clock";
 import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
@@ -75,6 +78,8 @@ import type {
   OpportunityFormAction,
   TimeTrackingFormAction,
   TimelineDaySection,
+  TimelineOccurrenceView,
+  TimelineParentGroupView,
   TimelineView,
 } from "@/lib/types/timeline";
 
@@ -136,6 +141,8 @@ type DayProgressTimelineProps = Readonly<{
   /** Behaviors of Opportunity: the basket's add and Done now, and a row's Remove. Omitted where unavailable. */
   addOpportunityAction?: OpportunityFormAction;
   removeOpportunityAction?: OpportunityFormAction;
+  /** Marks every sub-behavior in a routine's slot. Web: server action; Mac: its local action. */
+  parentSlotStatusAction?: OccurrenceFormAction;
 }>;
 
 /**
@@ -199,6 +206,7 @@ export function DayProgressTimeline({
   leaveReminderDigest = null,
   addOpportunityAction,
   removeOpportunityAction,
+  parentSlotStatusAction,
 }: DayProgressTimelineProps) {
   const runtimeRefresh = useRefresh();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -212,6 +220,8 @@ export function DayProgressTimeline({
   const [corrections, setCorrections] = useState<readonly TravelCorrection[]>([]);
   const now = useDayProgressClock(context?.now, timeline.timezone, onDayChange ?? runtimeRefresh);
   const visibleSections = timeline.daySections;
+  const hasParentGroups = visibleSections.some((section) => section.parentGroups.length > 0);
+  const zoom = useSemanticZoom({ containerRef: rootRef, enabled: hasParentGroups });
   const live = useWebGoogleCalendarTimeline({ enabled: liveCalendar && !context, localDates: visibleSections.map((section) => section.localDate), timezone: timeline.timezone });
   const liveConnectors = liveCalendar && !context;
   const outlook = useWebOutlookCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
@@ -552,6 +562,7 @@ export function DayProgressTimeline({
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
+      {hasParentGroups ? <SemanticZoomToggle layer={zoom.layer} onChange={zoom.setLayer} className={styles.zoomToggle} /> : null}
       {layout && firstMeasured ? <DayOverlay
         layout={layout}
         measured={measured}
@@ -598,6 +609,10 @@ export function DayProgressTimeline({
         removeOpportunityAction={removeOpportunityAction}
         opportunityBasket={section.localDate === timeline.todayLocalDate
           ? <OpportunityBasket timeline={timeline} now={now} addAction={addOpportunityAction} /> : null}
+        parentSlotStatusAction={parentSlotStatusAction}
+        isParentExpanded={zoom.isExpanded}
+        onToggleParent={zoom.toggleParent}
+        reducedMotion={zoom.reducedMotion}
       />; })}
       {preview && previewEvents.length ? <ExternalEventPreview
         id="calendar-preview"
@@ -665,7 +680,31 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   dayNote: string;
   nextTrip: DayProgressNextTripInput | null;
   opportunityBasket?: React.ReactNode;
+  parentSlotStatusAction?: OccurrenceFormAction;
+  isParentExpanded: (key: string) => boolean;
+  onToggleParent: (key: string) => void;
+  reducedMotion: boolean;
 }>;
+
+type DayItem =
+  | Readonly<{ kind: "occurrence"; occurrence: TimelineOccurrenceView }>
+  | Readonly<{ kind: "parent"; group: TimelineParentGroupView }>;
+
+/**
+ * The day's rows in the flat list's time order. A routine takes the place of its earliest
+ * sub-behavior, so standalone rows and routines interleave on the axis as their times do.
+ */
+export function dayProgressItems(section: TimelineDaySection): DayItem[] {
+  const groupByOccurrence = new Map(section.parentGroups.flatMap((group) => group.children.map((child) => [child.id, group] as const)));
+  const shown = new Set<string>();
+  return section.occurrences.flatMap((occurrence): DayItem[] => {
+    const group = groupByOccurrence.get(occurrence.id);
+    if (!group) return [{ kind: "occurrence", occurrence }];
+    if (shown.has(group.key)) return [];
+    shown.add(group.key);
+    return [{ kind: "parent", group }];
+  });
+}
 
 function DayProgressDay({
   root,
@@ -701,6 +740,10 @@ function DayProgressDay({
   dayNote,
   removeOpportunityAction,
   opportunityBasket = null,
+  parentSlotStatusAction,
+  isParentExpanded,
+  onToggleParent,
+  reducedMotion,
 }: DayProgressDayProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -744,7 +787,8 @@ function DayProgressDay({
           + (main ? Number.parseFloat(getComputedStyle(main).columnGap) || 8 : 8) + 40;
         nextIconsOnly[occurrence.id] = parentRect.width < 576 || (!!summary && required > summary.getBoundingClientRect().width);
         return [{ occurrenceId: occurrence.id, scheduledFor: occurrence.scheduledFor, center: rect.top - parentRect.top + rect.height / 2 }];
-      });
+      // An open routine lists its steps in sibling order, so screen order can differ from time order.
+      }).sort((left, right) => left.center - right.center);
       setIconsOnly((previous) => sameIconState(previous, nextIconsOnly) ? previous : nextIconsOnly);
       return {
         localDate: section.localDate,
@@ -772,6 +816,42 @@ function DayProgressDay({
   // Ticket 324: a workout already shown on a row here was matched by a link.
   const shownWorkoutStarts = new Set(section.occurrences.flatMap((item) => (item.sourceEvidence?.workouts ?? [])
     .map((workout) => Temporal.Instant.from(workout.startAt).toString())));
+  const registerRow = (id: string, node: HTMLElement | null) => {
+    if (node) rows.current.set(id, node);
+    else rows.current.delete(id);
+  };
+  const renderOccurrence = (occurrence: TimelineOccurrenceView) => {
+    const countableWorkouts = activity?.day && activity.day.localDate === section.localDate ? countableSourceWorkouts({
+      occurrence, source: "hevy", todayLocalDate: section.localDate, now: Temporal.Instant.from(now), timezone,
+      minimumDurationSeconds: RECORDED_ACTIVITY_MIN_MATCH_SECONDS.hevy, items: activity.day.items, matchedStartAts: shownWorkoutStarts,
+    }) : [];
+    const highlighted = contexts.get(occurrence.id)?.overlappingEventIds.some((id) => activeIds.includes(id));
+    const context = contexts.get(occurrence.id);
+    return <div
+      key={occurrence.id}
+      ref={(node) => registerRow(occurrence.id, node)}
+      className={styles.row}
+      onFocus={(event) => { if (travel?.legs.some((item) => item.leg.destinationCommitmentRef === occurrence.id || item.leg.originCommitmentRef === occurrence.id)) onPreview([occurrence.id], event.target as HTMLElement); }}
+      data-event-highlight={highlighted ? "true" : undefined}
+      data-status-icons-only={iconsOnly[occurrence.id] ? "true" : "false"}
+    >
+      <OccurrenceRow
+        occurrence={occurrence}
+        context={context}
+        travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh, steps })}
+        statusAction={statusAction}
+        noteAction={noteAction}
+        startTimeTrackingAction={startTimeTrackingAction}
+        stopTimeTrackingAction={stopTimeTrackingAction}
+        resetTimeTrackingAction={resetTimeTrackingAction}
+        shortcuts={shortcutsByBehavior?.[occurrence.behaviorId]}
+        statusIconsOnly={iconsOnly[occurrence.id] ?? false}
+        crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
+        countableWorkouts={countableWorkouts}
+        removeOpportunityAction={removeOpportunityAction}
+      />
+    </div>;
+  };
   return (
     <section ref={sectionRef} className={styles.day} aria-labelledby={`${section.key}-title`}>
       <header className={styles.dayHeader}>
@@ -816,37 +896,25 @@ function DayProgressDay({
       <div className={styles.feed}>
         <div ref={bodyRef} className="relative min-h-24 py-4" data-day-progress-date={section.localDate}>
           {section.occurrences.length === 0 ? <p className="bg-surface p-3 text-base leading-7 text-muted-readable">{section.emptyMessage}</p> : <div className="grid gap-1">
-            {section.occurrences.map((occurrence) => {
-              const countableWorkouts = activity?.day && activity.day.localDate === section.localDate ? countableSourceWorkouts({
-                occurrence, source: "hevy", todayLocalDate: section.localDate, now: Temporal.Instant.from(now), timezone,
-                minimumDurationSeconds: RECORDED_ACTIVITY_MIN_MATCH_SECONDS.hevy, items: activity.day.items, matchedStartAts: shownWorkoutStarts,
-              }) : [];
-              const highlighted = contexts.get(occurrence.id)?.overlappingEventIds.some((id) => activeIds.includes(id));
-              const context = contexts.get(occurrence.id);
-              return <div
-                key={occurrence.id}
-                ref={(node) => { if (node) rows.current.set(occurrence.id, node); else rows.current.delete(occurrence.id); }}
-                className={styles.row}
-                onFocus={(event) => { if (travel?.legs.some((item) => item.leg.destinationCommitmentRef === occurrence.id || item.leg.originCommitmentRef === occurrence.id)) onPreview([occurrence.id], event.target as HTMLElement); }}
-                data-event-highlight={highlighted ? "true" : undefined}
-                data-status-icons-only={iconsOnly[occurrence.id] ? "true" : "false"}
+            {dayProgressItems(section).map((item) => {
+              if (item.kind === "occurrence") return renderOccurrence(item.occurrence);
+              const { group } = item;
+              const expanded = isParentExpanded(group.key);
+              const anchor = group.children[0]!;
+              return <ParentOccurrenceRow
+                key={group.key}
+                group={group}
+                expanded={expanded}
+                onToggle={() => onToggleParent(group.key)}
+                parentSlotStatusAction={parentSlotStatusAction}
+                statusIconsOnly={iconsOnly[anchor.id] ?? false}
+                reducedMotion={reducedMotion}
+                headerClassName={styles.row}
+                // Collapsed, the routine's header stands on the axis for its first sub-behavior.
+                headerRef={expanded ? undefined : (node) => registerRow(anchor.id, node)}
               >
-                <OccurrenceRow
-                  occurrence={occurrence}
-                  context={context}
-                  travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh, steps })}
-                  statusAction={statusAction}
-                  noteAction={noteAction}
-                  startTimeTrackingAction={startTimeTrackingAction}
-                  stopTimeTrackingAction={stopTimeTrackingAction}
-                  resetTimeTrackingAction={resetTimeTrackingAction}
-                  shortcuts={shortcutsByBehavior?.[occurrence.behaviorId]}
-                  statusIconsOnly={iconsOnly[occurrence.id] ?? false}
-                  crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
-                  countableWorkouts={countableWorkouts}
-                  removeOpportunityAction={removeOpportunityAction}
-                />
-              </div>;
+                {group.children.map(renderOccurrence)}
+              </ParentOccurrenceRow>;
             })}
           </div>}
         </div>

@@ -19,7 +19,8 @@ import { resolveCoachSignalsV2, weekdayMoveCounts } from "./coach-signals-v2.res
  * midnight but before the visit is already a fact.
  */
 
-export const COACH_SIGNAL_VERSION = "coach-signals-2";
+/** Version 3 adds `sub_behavior_dropoff` and counts a routine's steps at one time as one item. */
+export const COACH_SIGNAL_VERSION = "coach-signals-3";
 
 export const COACH_SIGNAL_THRESHOLDS = Object.freeze({
   /** Read this many days of Occurrences before today (version 2: eight weeks for dip and recovery). */
@@ -71,6 +72,8 @@ export const COACH_SIGNAL_KINDS = [
   "moved_vs_unmoved",
   // Behaviors of Opportunity (Task 7, ./coach-signals-v2.ts).
   "opportunity_ready_to_schedule",
+  // Version 3: routines and their steps (sub-behaviors).
+  "sub_behavior_dropoff",
 ] as const;
 
 export type CoachSignalKind = (typeof COACH_SIGNAL_KINDS)[number];
@@ -101,6 +104,10 @@ export type CoachSignalBehavior = Readonly<{
   isOpportunity?: boolean;
   /** Behaviors of Opportunity: has a recurring schedule. False for an unscheduled opportunity Behavior. */
   hasSchedule?: boolean;
+  /** Version 3: the routine this Behavior is a step of (depth 1), or null. Undefined when not read. */
+  parentBehaviorId?: string | null;
+  /** Version 3: the step follows its routine's schedule. */
+  inheritParentSchedule?: boolean;
 }>;
 
 export type CoachSignalOccurrence = Readonly<{

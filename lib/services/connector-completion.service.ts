@@ -92,6 +92,7 @@ export type ConnectorCompletionStore = Readonly<{
   recordOutcome(source: RecordedActivitySourceV1_1, outcome: Readonly<{ at: string; succeeded: boolean; readCursor?: string | null }>): Promise<void>;
   readConnection(source: RecordedActivitySourceV1_1): Promise<ConnectionFence | null>;
   listLinks(source: RecordedActivitySourceV1_1): Promise<SourceLinkRow[]>;
+  /** The active linked Behaviors and the active sub-behaviors of linked parents. */
   listBehaviors(ids: readonly string[]): Promise<ActivityMatchBehavior[]>;
   listOccurrences(behaviorIds: readonly string[], startLocalDate: string, endLocalDate: string): Promise<Occurrence[]>;
   latestStatusEventIds(occurrenceIds: readonly string[]): Promise<Map<string, string>>;
@@ -182,8 +183,9 @@ export async function reconcileConnectorCompletions(
 
   const now = clock();
   const enabledLinks = links.filter((link) => link.enabled);
-  const behaviorIds = [...new Set(enabledLinks.map((link) => link.behavior_id))];
-  const behaviors = await store.listBehaviors(behaviorIds);
+  const linkedBehaviorIds = [...new Set(enabledLinks.map((link) => link.behavior_id))];
+  const behaviors = await store.listBehaviors(linkedBehaviorIds);
+  const behaviorIds = [...new Set([...linkedBehaviorIds, ...behaviors.map((behavior) => behavior.id)])];
   const window = matchWindow(now, behaviors);
   const occurrences = (await store.listOccurrences(behaviorIds, window.start, window.end))
     .filter((occurrence) => behaviorIds.includes(occurrence.behavior_id));
@@ -359,10 +361,19 @@ export function createConnectorCompletionStore(caller: ConnectorCaller, client: 
     listLinks: (source) => listSourceLinks(client, userId, source),
     async listBehaviors(ids) {
       if (ids.length === 0) return [];
-      const { data, error } = await client.from("behaviors").select("id,timezone,active,archived_at").eq("user_id", userId).in("id", [...ids]);
+      const list = ids.join(",");
+      const { data, error } = await client.from("behaviors").select("id,timezone,active,archived_at,parent_behavior_id")
+        .eq("user_id", userId).or(`id.in.(${list}),parent_behavior_id.in.(${list})`);
       if (error) throw new ConnectorError("provider_unavailable");
-      return (data ?? []).filter((row) => row.active && !row.archived_at)
-        .map((row) => ({ id: row.id, timezone: row.timezone ?? DEFAULT_TIMEZONE }));
+      const rows = (data ?? []).filter((row) => row.active && !row.archived_at);
+      const activeIds = new Set(rows.map((row) => row.id));
+      return rows
+        .filter((row) => ids.includes(row.id) || (row.parent_behavior_id !== null && activeIds.has(row.parent_behavior_id)))
+        .map((row) => ({
+          id: row.id,
+          timezone: row.timezone ?? DEFAULT_TIMEZONE,
+          parentBehaviorId: row.parent_behavior_id ?? null,
+        }));
     },
     listOccurrences: (_behaviorIds, start, end) => listOccurrencesBetweenLocalDates(client, userId, start, end),
     async latestStatusEventIds(occurrenceIds) {

@@ -7,6 +7,7 @@ import {
 
 import { BehaviorCreateSection } from "@/components/behaviors/BehaviorCreateSection";
 import { BehaviorList } from "@/components/behaviors/BehaviorList";
+import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import type { BehaviorFormAction } from "@/lib/types/behavior";
 import type { SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { DesktopScreenFrame } from "./desktop-screen-frame";
@@ -52,8 +53,10 @@ export function BehaviorsScreen({
               defaultOpen={!hasBehaviors}
               reminderRuntime="desktop"
               sourceLinkCoordinator={sourceLinkCoordinator}
+              parentOptions={parentChoices(null, [...listProps.activeBehaviors, ...listProps.archivedBehaviors]).options}
             />
-            <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator} />
+            <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator}
+              createAction={createAction} subBehaviorsEnabled />
           </DesktopScreenFrame>
         </RefreshProvider>
       </LinkProvider>

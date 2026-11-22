@@ -1,11 +1,14 @@
 import { parseOccurrenceId, parseOccurrenceNote, parseOccurrenceStatus } from "@cadence/core/services/occurrence.service";
 import type { OccurrenceFormAction, TimeTrackingFormAction } from "../../../lib/types/timeline";
-import { markLocalOccurrence, recordLocalDoneAt, recordLocalNotDoneReason, saveLocalOccurrenceNote, trackLocalOccurrence } from "./local-occurrence.service";
+import { markLocalOccurrence, markLocalParentSlot, recordLocalDoneAt, recordLocalNotDoneReason, saveLocalOccurrenceNote, trackLocalOccurrence } from "./local-occurrence.service";
 import type { MarkDetailState, OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  applyBehaviorRunAction, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive, updateBehavior,
+  updateBehaviorArchiveNote,
 } from "@cadence/core/services/behavior.service";
+import { noticeText } from "@cadence/core/notices";
+import { hasDraftSubBehaviors, parseBehaviorGroupFormData } from "@/components/behaviors/sub-behavior-form-data";
 import { toBehaviorView } from "@cadence/core/services/behavior-views";
 import { behaviorErrorToActionState, parseBehaviorFormData, parseBehaviorRunActionFormData } from "../../../lib/services/behavior-form";
 import type { BehaviorFormAction } from "../../../lib/types/behavior";
@@ -34,6 +37,19 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
       });
       // StatusButtons refreshes after completion feedback, preserving the chime.
       return { status: "success", message: "Occurrence updated.", nextStatus };
+    } catch (error) { return { status: "error", message: localErrorMessage(error) }; }
+  };
+  // Sub-behaviors: one form marks every sub-behavior Occurrence of a routine slot.
+  const parentSlotStatusAction: OccurrenceFormAction = async (_previous, form) => {
+    try {
+      const nextStatus = parseOccurrenceStatus(form.get("status"));
+      const parentBehaviorId = form.get("parent_behavior_id");
+      if (typeof parentBehaviorId !== "string" || !parentBehaviorId) throw new Error("Choose a routine to mark.");
+      await markLocalParentSlot(profileId, {
+        parentBehaviorId, nextStatus,
+        occurrenceIds: form.getAll("occurrence_id").map((value) => parseOccurrenceId(value)),
+      });
+      return { status: "success", message: noticeText("sub-behaviors.routine-marked"), nextStatus };
     } catch (error) { return { status: "error", message: localErrorMessage(error) }; }
   };
   const noteAction: OccurrenceFormAction = async (_previous, form) => {
@@ -108,7 +124,7 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
       return opportunityResultState(result);
     } catch { return OPPORTUNITY_FAILED; }
   };
-  return { statusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
+  return { statusAction, parentSlotStatusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
     stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset"), markDetailActions,
     addOpportunityAction, removeOpportunityAction };
 }
@@ -127,10 +143,21 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
   const createAction: BehaviorFormAction = async (_previous, form) => {
     try {
       const now = Temporal.Now.instant();
+      const store = createLocalBehaviorStore(profile.id, now);
+      const newId = () => crypto.randomUUID();
+      if (hasDraftSubBehaviors(form)) {
+        const created = await createBehaviorGroup(store, {
+          ...parseBehaviorGroupFormData(form), userId: profile.id, timezone: profile.timezone, recordedAt: now.toString(), newId,
+        });
+        refresh();
+        return { status: "success",
+          message: noticeText("sub-behaviors.group-created", { title: created.parent.title, count: created.subBehaviors.length }),
+          behavior: withNativeReminderSummary(toBehaviorView(created.parent, now)) };
+      }
       const categories = await localCommand("readCategories", { profileId: profile.id });
       const values = parseBehaviorFormData(form, { mode: "create", categories });
-      const behavior = await createBehavior(createLocalBehaviorStore(profile.id, now), {
-        userId: profile.id, timezone: profile.timezone, values, recordedAt: now.toString(),
+      const behavior = await createBehavior(store, {
+        userId: profile.id, timezone: profile.timezone, values, recordedAt: now.toString(), newId,
       });
       refresh();
       return { status: "success", message: "Behavior created.", behavior: withNativeReminderSummary(toBehaviorView(behavior, now)) };
@@ -145,7 +172,7 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
       if (typeof expected !== "string" || !expected) throw new Error("Reload this behavior before saving changes.");
       await updateBehavior(createLocalBehaviorStore(profile.id, now), {
         behaviorId: values.behaviorId, expectedUpdatedAt: expected, values, recordedAt: now.toString(),
-        newArchiveNoteId: crypto.randomUUID(),
+        newArchiveNoteId: crypto.randomUUID(), newId: () => crypto.randomUUID(),
       });
       refresh();
       return { status: "success", message: "Behavior saved." };
@@ -161,7 +188,7 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
       const archiveNote = form.get("archive_note");
       if (!active && typeof archiveNote !== "string") throw new Error("Archive note must be text.");
       await setBehaviorActive(createLocalBehaviorStore(profile.id, now), {
-        behaviorId, active, expectedUpdatedAt, recordedAt: now.toString(),
+        behaviorId, active, expectedUpdatedAt, recordedAt: now.toString(), newId: () => crypto.randomUUID(),
         ...(active ? {} : { archiveNote: archiveNote as string, newArchiveNoteId: crypto.randomUUID() }),
       });
       refresh();
@@ -206,5 +233,18 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
       return { status: "success", message: behaviorRunOutcomeMessage(updated.title, action, localDateIn(updated.timezone)) };
     } catch (error) { return behaviorErrorToActionState(error); }
   };
-  return { createAction, updateAction, archiveAction: lifecycle(false), restoreAction: lifecycle(true), archiveNoteAction, runAction };
+  /** Sibling order under one parent: parent_behavior_id and repeated sub_behavior_id. */
+  const reorderAction: BehaviorFormAction = async (_previous, form) => {
+    try {
+      const parentBehaviorId = form.get("parent_behavior_id");
+      if (typeof parentBehaviorId !== "string" || !parentBehaviorId) throw new Error("Choose a parent Behavior.");
+      await reorderSubBehaviors(createLocalBehaviorStore(profile.id, Temporal.Now.instant()), {
+        parentBehaviorId,
+        orderedBehaviorIds: form.getAll("sub_behavior_id").filter((value): value is string => typeof value === "string"),
+      });
+      refresh();
+      return { status: "success", message: noticeText("sub-behaviors.reordered") };
+    } catch (error) { return behaviorErrorToActionState(error); }
+  };
+  return { createAction, updateAction, archiveAction: lifecycle(false), restoreAction: lifecycle(true), archiveNoteAction, runAction, reorderAction };
 }

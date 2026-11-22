@@ -246,6 +246,63 @@ date, start time, and end-time/range identity. Partial completion for multi-time
 behaviors is derived only from mixed occurrence statuses; it is not a stored
 status.
 
+## Sub-behaviors and routines (Ticket 349)
+
+Owner decision 2026-11-21 (`docs/DECISIONS.md`). A **routine** is a Behavior with
+sub-behaviors, such as a Skin routine with Cerave, Facewash and Retinol. Each
+sub-behavior is a real Behavior row with `parent_behavior_id`.
+
+1. **Depth 1.** A sub-behavior cannot have sub-behaviors, a Behavior with
+   sub-behaviors cannot become a sub-behavior, and a Behavior cannot be its own
+   parent. A new link never points at an archived parent.
+2. **Schedule inheritance and override.** A new sub-behavior follows its parent's
+   schedule by default (`inherit_parent_schedule`). It stores a mirror of the
+   parent's recurrence, times, timezone, end and pause, and parent edits update the
+   mirror in the same write. Turning "Follow parent schedule" off gives it its own
+   schedule (for example Retinol on Monday and Friday only).
+3. **Leaf Occurrences.** While a parent has active sub-behaviors, the sub-behaviors
+   own the generated Occurrences. The parent generates no new Occurrences and keeps
+   its past, marked, noted, timed or moved rows. No Occurrence is counted twice.
+4. **Derived routine status.** A routine slot (one parent, one local day, one
+   effective start) shows Completed or Not Completed when every step has that status,
+   Unresolved when none is marked, and progress such as "2/3" otherwise. Cadence
+   stores no fourth status; "partial" exists only in derived views and MCP output.
+5. **Marking.** Marking a routine Completed or Not Completed marks every step in the
+   slot in one transaction, one status event per changed step. Each step can still be
+   marked alone. The user can change any step later.
+6. **Archive and restore.** Archiving a parent archives its active sub-behaviors and
+   keeps the links. Restoring the parent restores the sub-behaviors archived with it.
+   A sub-behavior cannot be restored under an archived parent.
+7. **Adherence.** Behaviors shows the routine's rolled-up adherence, Completed, Not
+   Completed and "Full routines x of y", and each step's own adherence and calendar.
+8. **Timeline Semantic Zoom.** Two layers on the Timeline only: **Routines** (each
+   routine as one collapsed row beside standalone Behaviors) and **All steps** (every
+   routine open inline). Pinch, Ctrl/Cmd + wheel, Ctrl/Cmd + = / - and an accessible
+   Routines / All steps control switch layers. Opening or closing one routine
+   overrides the layer for that routine until the layer changes. The layer is stored
+   on the device.
+9. **Reminders.** Following steps of one slot share one reminder per channel, sent
+   with the parent's reminder settings and anchored on the first Unresolved step.
+   Steps with their own schedule keep their own reminders.
+10. **Connector completion (D28).** A Hevy source link may sit on a parent or on a
+    sub-behavior. A parent link completes every Unresolved sub-behavior Occurrence in
+    the matched slot under the D28 rules, one source match per Occurrence. The
+    parent's own Occurrence counts only on a day no sub-behavior covers.
+11. **Cadence Agent.** Chat (`chat-1.6`) creates routines, adds, moves and detaches
+    steps and marks a whole routine with one Undo. The Daily Brief moves a routine's
+    following steps together, on web and Mac; a routine line has no "set length",
+    because its length is the steps' sum. Coach signals (`coach-signals-3`) add
+    `sub_behavior_dropoff` and count a routine's steps at one time as one item for
+    `crowded_hour`. Tips (`coach-tips-3`) name a step "Retinol in Skin routine".
+12. **Outside AI clients.** MCP contract 1.7.0 reads and writes the hierarchy and adds
+    `set_parent_occurrence_status` (`docs/MCP_CONTRACT.md`).
+13. **Portability.** Full JSON and BehaviorLog carry the three link fields and restore
+    them; Markdown export groups steps under their routine. Bundles without the fields
+    import as standalone Behaviors.
+
+Data: `docs/DATA_MODEL.md`, "Sub-behaviors (depth 1, November 2026)". Mac:
+`docs/DESKTOP_DATA_MODEL.md`, "Sub-behaviors (Ticket 349)".
+
 ## Notes
 
 Any occurrence can have a free-text note.

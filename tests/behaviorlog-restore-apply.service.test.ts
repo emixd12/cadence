@@ -895,6 +895,8 @@ describe("BehaviorLog restore apply service", () => {
           "end",
           "pause",
           "is_opportunity",
+          "parent_behavior_id",
+          "inherit_parent_schedule",
         ],
         recorded_at: expect.any(String),
         effective_at: expect.any(String),

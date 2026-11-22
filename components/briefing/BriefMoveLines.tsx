@@ -351,7 +351,8 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
         <span className="whitespace-nowrap tabular-nums">{from} → {to}</span>
         {line.reason ? <>: {line.reason}</> : null}
       </p>
-      {!closed && !moved && line.length.assumed ? <p className="text-xs leading-5 text-muted-readable">
+      {/* A routine line shows the steps' summed length, which is no one Behavior's length to correct. */}
+      {!closed && !moved && line.length.assumed && !line.routine ? <p className="text-xs leading-5 text-muted-readable">
         {noticeText("brief-moves.length-guess", { minutes: line.length.minutes })} ·{" "}
         <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button>
       </p> : null}

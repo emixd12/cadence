@@ -35,6 +35,8 @@ type TimelineProps = Readonly<{
   /** Behaviors of Opportunity: the basket's add and Done now, and a row's Remove. Omitted where unavailable. */
   addOpportunityAction?: OpportunityFormAction;
   removeOpportunityAction?: OpportunityFormAction;
+  /** Completed or Not Completed for a whole routine slot (sub-behaviors). */
+  parentSlotStatusAction?: OccurrenceFormAction;
 }>;
 
 export function Timeline({
@@ -54,6 +56,7 @@ export function Timeline({
   runAction,
   addOpportunityAction,
   removeOpportunityAction,
+  parentSlotStatusAction,
 }: TimelineProps) {
   return (
     <MobileTimelinePullToRefresh>
@@ -87,6 +90,7 @@ export function Timeline({
                   dayNoteAction={dayNoteAction}
                   dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
                   removeOpportunityAction={removeOpportunityAction}
+                  parentSlotStatusAction={parentSlotStatusAction}
                 />
               ))}
             </div>
@@ -109,6 +113,7 @@ export function Timeline({
           leaveReminderDigest={leaveReminderDigest}
           addOpportunityAction={addOpportunityAction}
           removeOpportunityAction={removeOpportunityAction}
+          parentSlotStatusAction={parentSlotStatusAction}
         />
 
         {timeline.nextFutureDays ? (

@@ -17,6 +17,7 @@ import { storedBehaviorWhere } from "./behavior-where";
 import { behaviorRunNotice, runFieldsFromStored } from "../resolvers/behavior-run.resolver";
 import type { BehaviorRunNotice } from "../types/timeline";
 import type { OpportunityAddedBy } from "../types/database";
+import { selectLeafOccurrences } from "../resolvers/analytics.resolver";
 
 export function resolvePersistedTimeline(input: {
   behaviors: BehaviorGraphRecord[];
@@ -40,9 +41,11 @@ export function resolvePersistedTimeline(input: {
     sessions.push(session);
     sessionsByOccurrence.set(session.occurrenceId, sessions);
   }
-  const occurrences = input.occurrences.map((row) => toTimelineOccurrenceInput(
-    row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [], input.removalFacts,
-  )).filter((row): row is TimelineOccurrenceInput => row !== null);
+  const behaviorById = new Map(input.behaviors.map((row) => [row.id, row]));
+  // A parent's own kept Occurrence never shows on a day its sub-behaviors cover.
+  const occurrences = selectLeafOccurrences(input.occurrences.map((row) => toTimelineOccurrenceInput(
+    row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [], input.removalFacts, behaviorById,
+  )).filter((row): row is TimelineOccurrenceInput => row !== null));
   const timeline = resolveTimeline({ occurrences, now: input.now, timezone: input.timezone, futureDays: input.futureDays, startLocalDate: input.startLocalDate });
   if (input.durationHistory || input.behaviors.some((behavior) => behavior.default_duration_minutes != null)) {
     const historySessions = new Map<string, TimeSession[]>();
@@ -99,6 +102,7 @@ function toTimelineOccurrenceInput(
   activeBehaviorById: Map<string, BehaviorGraphRecord>,
   timeSessions: TimeSession[],
   removalFacts?: OpportunityRemovalReadFacts,
+  behaviorById: Map<string, BehaviorGraphRecord> = activeBehaviorById,
 ): TimelineOccurrenceInput | null {
   const behavior = activeBehaviorById.get(occurrence.behavior_id);
 
@@ -138,6 +142,18 @@ function toTimelineOccurrenceInput(
       hasStatusHistory: removalFacts.statusHistoryOccurrenceIds.has(occurrence.id),
       hasActiveSourceMatch: removalFacts.activeSourceMatchOccurrenceIds.has(occurrence.id),
     } : {}),
+    ...subBehaviorTimelineFields(behavior, behaviorById),
+  };
+}
+
+function subBehaviorTimelineFields(behavior: BehaviorGraphRecord, behaviorById: Map<string, BehaviorGraphRecord>) {
+  const parentId = behavior.parent_behavior_id ?? null;
+  const parent = parentId ? behaviorById.get(parentId) : undefined;
+  if (!parentId || !parent) return {};
+  return {
+    parentBehaviorId: parentId,
+    parentTitle: parent.title,
+    subBehaviorSortOrder: behavior.sub_behavior_sort_order ?? 0,
   };
 }
 

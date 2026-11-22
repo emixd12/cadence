@@ -640,6 +640,7 @@ function analyticsView(
         detailLabel: "1 / 1",
       },
     ],
+    parentSummaries: [],
     categorySummaries: [],
     selectedBehaviorDay: {
       behaviorId: behavior.id,

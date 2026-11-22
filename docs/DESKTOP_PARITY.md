@@ -425,3 +425,34 @@ Settings screen. Linked desktop data becomes readable after synchronization;
 account-free local data never reaches this server. Marketing and future mobile
 are not applicable to this ticket. The interaction registry and design-system
 surface catalog carry the same platform decision.
+
+## Sub-behaviors (Ticket 349)
+
+Cadence for Mac has tracking parity for sub-behaviors in local and linked mode:
+
+- Behaviors: the shared `BehaviorCreateSection` gets `parentOptions`, and the shared
+  `BehaviorList` runs with `subBehaviorsEnabled`, `createAction` and the local
+  `reorderAction` (`apps/desktop/src/behaviors-screen.tsx`,
+  `apps/desktop/src/local-actions.ts`). Detach and attach use the local update action.
+- Timeline: the local `parentSlotStatusAction` reaches `DayProgressTimeline` and Needs
+  decision, so routine rows, bulk marks and Semantic Zoom work as on the web
+  (`apps/desktop/src/timeline-screen.tsx`).
+- Data: SQLite schema 28 and account sync contract 9 (`docs/DESKTOP_DATA_MODEL.md`,
+  "Sub-behaviors (Ticket 349)").
+- Registry: `INT-BEHAVIOR-039` to `INT-BEHAVIOR-045` and `INT-TIMELINE-025` to
+  `INT-TIMELINE-027` are implemented for desktop.
+- Evidence: `tests/desktop-sub-behaviors.test.ts`, shared DOM tests and `cargo test`.
+  Installed acceptance on a dev-signed build is still open.
+- Daily Brief routine moves: the Mac renders the shared `BriefMoveLines`, so a routine
+  line reads with the routine's title and Yes, Other time, Undo, Accept all and Undo all
+  go to the hosted answer route with the Mac session (`apps/desktop/src/daily-brief.ts`).
+  The server reads `routine` from its stored line; the request carries only the
+  proposal. Each applied answer asks account sync to pull every moved step, and the
+  local Timeline groups the steps at the moved time again. A routine line offers no
+  "set length", because its length is the steps' sum. Evidence:
+  `tests/desktop-brief-routine-moves.dom.test.tsx`, `tests/desktop-occurrence-moves.test.tsx`.
+- SQLite 0028 keeps opportunities out of routines: triggers refuse a child of an
+  opportunity parent and turning a Behavior with children (or a child) into an
+  opportunity, as hosted `20261122020000` does. Sync apply writes stored children
+  first, so a batch that detaches a step and flags its old parent applies cleanly.
+

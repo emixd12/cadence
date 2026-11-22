@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-20.3",
+  "version": "2026-11-21.2",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -882,6 +882,41 @@
       "audience": "first_two_weeks",
       "offer": null,
       "reviewed_at": "2026-11-20",
+      "reviewer": "Emi"
+    },
+    {
+      "id": "smaller-step-in-the-routine",
+      "revision": 1,
+      "status": "active",
+      "advice": "When one step of a routine rarely gets done while the others do, a smaller version of that step can be easier to repeat.",
+      "applies_when": [
+        {
+          "signal": "sub_behavior_dropoff",
+          "scope": "behavior",
+          "facts": []
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Shorten that step, give it its own time, or take it out of the routine for now.",
+      "evidence": {
+        "source_id": "gardner-lally-wardle-2012",
+        "kind": "theory_review",
+        "strength": "limited",
+        "claim": "Habit researchers advise small, manageable changes, because failure can be discouraging.",
+        "quote": "Patients should be encouraged to aim for small and manageable behaviour changes, because failure can be discouraging.",
+        "locator": "Making healthy habits"
+      },
+      "limitation": "Expert advice drawn from habit research, written for clinicians; not a study of routines with several steps.",
+      "quip_seeds": [
+        "{behavior} got done {step_completed} of {step_resolved} times; the other steps got done {sibling_rate_pct} on those days. A smaller version may fit better.",
+        "{behavior} is at {step_rate_pct} against {sibling_rate_pct} for the rest of its routine. Shorten it, or give it its own time?"
+      ],
+      "audience": "history_needed",
+      "offer": {
+        "kind": "open",
+        "target": "behavior"
+      },
+      "reviewed_at": "2026-11-21",
       "reviewer": "Emi"
     }
   ]

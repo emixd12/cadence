@@ -50,6 +50,8 @@ export function toBehaviorConfigurationSnapshotPayload(
       ? { from_on: snapshot.pause.fromOn, from_time: snapshot.pause.fromTime, back_on: snapshot.pause.backOn }
       : null,
     is_opportunity: snapshot.isOpportunity === true,
+    parent_behavior_id: snapshot.parentBehaviorId ?? null,
+    inherit_parent_schedule: snapshot.parentBehaviorId ? snapshot.inheritParentSchedule ?? false : false,
   };
 }
 
@@ -89,6 +91,10 @@ export function toStoredConfigurationSnapshot(value: Json): Json {
     ...(snapshot.end === undefined ? {} : { end: snapshot.end ?? null }),
     ...(snapshot.pause === undefined ? {} : { pause: storedPause(snapshot.pause) }),
     ...(snapshot.isOpportunity === undefined ? {} : { is_opportunity: snapshot.isOpportunity ?? false }),
+    ...(snapshot.parentBehaviorId === undefined ? {} : {
+      parent_behavior_id: snapshot.parentBehaviorId ?? null,
+      inherit_parent_schedule: snapshot.inheritParentSchedule ?? false,
+    }),
   };
 }
 

@@ -90,6 +90,14 @@ export type OccurrenceDataStore = {
     timezone: string;
   } | null>;
   applyStatusTransition(input: StatusTransitionCommit): Promise<StatusTransitionResult>;
+  /**
+   * Sub-behaviors: every commit of one parent slot in one transaction, in order. Stores
+   * without it cannot mark a parent slot.
+   */
+  applyParentSlotStatusTransition?(input: {
+    parentBehaviorId: string;
+    commits: StatusTransitionCommit[];
+  }): Promise<StatusTransitionResult[]>;
   /** Appends the detail event and sets `completed_at`, only while the latest event is still the expected one. */
   applyMarkDetail(input: MarkDetailCommit): Promise<MarkDetailResult>;
   updateOccurrenceNote(input: {

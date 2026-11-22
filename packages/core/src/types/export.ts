@@ -143,6 +143,9 @@ export type ExportBehaviorInput = {
   pauseFromTime?: string | null;
   pauseBackOn?: string | null;
   autoArchivedAt?: string | null;
+  parentBehaviorId?: string | null;
+  subBehaviorSortOrder?: number;
+  inheritParentSchedule?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -189,6 +192,8 @@ export type ExportBehaviorConfigurationSnapshot = {
   /** Absent on snapshots written before Behavior end and pause (November 2026). */
   end?: { on: string; time: string | null } | null;
   pause?: { fromOn: string; fromTime: string | null; backOn: string } | null;
+  parentBehaviorId?: string | null;
+  inheritParentSchedule?: boolean;
 };
 
 export type ExportBehaviorConfigurationEventInput = {
@@ -367,6 +372,10 @@ export type ExportJsonBehavior = {
   pause_from_time?: string | null;
   pause_back_on?: string | null;
   auto_archived_at?: string | null;
+  /** Sub-behaviors (depth 1). Absent on standalone Behaviors and in older bundles. */
+  parent_behavior_id?: string | null;
+  sub_behavior_sort_order?: number;
+  inherit_parent_schedule?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -453,6 +462,8 @@ export type ExportJsonBehaviorConfigurationSnapshot = {
   timezone: string;
   end?: { on: string; time: string | null } | null;
   pause?: { from_on: string; from_time: string | null; back_on: string } | null;
+  parent_behavior_id?: string | null;
+  inherit_parent_schedule?: boolean;
 };
 
 export type ExportJsonBehaviorConfigurationEvent = {

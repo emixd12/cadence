@@ -7,6 +7,7 @@ import type {
 } from "@/lib/types/timeline";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
+import { ParentOccurrenceRow } from "@/components/timeline/ParentOccurrenceRow";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 
@@ -22,6 +23,8 @@ type TimelineGroupProps = Readonly<{
   dayNoteAction?: OccurrenceFormAction;
   dayNote?: string;
   removeOpportunityAction?: OpportunityFormAction;
+  /** Marks every sub-behavior in a routine's slot. Without it routines offer no bulk marking. */
+  parentSlotStatusAction?: OccurrenceFormAction;
 }>;
 
 const SECTION_CLASSES: Record<TimelineDaySection["kind"], string> = {
@@ -42,6 +45,7 @@ export function TimelineGroup({
   dayNoteAction,
   dayNote = "",
   removeOpportunityAction,
+  parentSlotStatusAction,
 }: TimelineGroupProps) {
   const dayNoteControl = dayNoteAction ? (
     <DayNoteControl
@@ -52,7 +56,17 @@ export function TimelineGroup({
       shortcuts={shortcutsByBehavior[DAY_NOTE_SHORTCUT_POOL_ID]}
     />
   ) : null;
-  const isEmpty = section.occurrenceGroups.length === 0;
+  const isEmpty = section.occurrenceGroups.length === 0 && section.parentGroups.length === 0;
+  // Older views without `rows` keep their standalone stacks.
+  const rows: TimelineDaySection["rows"] = section.rows.length > 0 ? section.rows
+    : section.occurrenceGroups.map((group) => ({ kind: "behavior", key: group.key, group }));
+  const rowActions = {
+    statusAction,
+    noteAction,
+    startTimeTrackingAction,
+    stopTimeTrackingAction,
+    resetTimeTrackingAction,
+  };
   const isNeedsDecisionDialog = variant === "needsDecisionDialog";
 
   return (
@@ -104,18 +118,25 @@ export function TimelineGroup({
         </p>
       ) : (
         <div className="mt-3 grid gap-1">
-          {section.occurrenceGroups.map((group) => (
+          {rows.map((row) => row.kind === "behavior" ? (
             <OccurrenceStack
-              key={group.key}
-              group={group}
-              statusAction={statusAction}
-              noteAction={noteAction}
-              startTimeTrackingAction={startTimeTrackingAction}
-              stopTimeTrackingAction={stopTimeTrackingAction}
-              resetTimeTrackingAction={resetTimeTrackingAction}
+              key={row.key}
+              group={row.group}
+              {...rowActions}
               shortcutsByBehavior={shortcutsByBehavior}
               removeOpportunityAction={removeOpportunityAction}
             />
+          ) : (
+            <ParentOccurrenceRow key={row.key} group={row.group} parentSlotStatusAction={parentSlotStatusAction}>
+              {row.group.children.map((occurrence) => (
+                <OccurrenceRow
+                  key={occurrence.id}
+                  occurrence={occurrence}
+                  {...rowActions}
+                  shortcuts={shortcutsByBehavior[occurrence.behaviorId]}
+                />
+              ))}
+            </ParentOccurrenceRow>
           ))}
         </div>
       )}

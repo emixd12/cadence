@@ -25,8 +25,12 @@ export type ChatToolExecutor = (
 /** A write that can be run again later (Undo) or after a Yes (confirm). */
 export type ChatWriteCall = Readonly<{ name: ChatWriteName; args: Readonly<Record<string, unknown>> }>;
 
-/** How to undo a write that ran. `check` is the record state right after it, so Undo refuses once it changed. */
-export type ChatUndoPlan = Readonly<{ call: ChatWriteCall }>;
+/**
+ * How to undo a write that ran. Each call carries the record state right after the
+ * write, so Undo refuses once it changed. A routine mark sets every step it changed
+ * back with its own call, listed in `calls` (`call` is the first, for older plans).
+ */
+export type ChatUndoPlan = Readonly<{ call: ChatWriteCall; calls?: readonly ChatWriteCall[] }>;
 
 /** One write waiting for a Yes, with the record state it was described from. */
 export type ChatPendingWrite = Readonly<{
@@ -78,9 +82,68 @@ export type ChatWriteFacts = Readonly<{
   dayNote?: string | null;
   /** The day note's revision when the day has a note. */
   dayNoteRevision?: string | null;
+  /** The routine a sub-behavior write names: the new parent, or the one it leaves. */
+  parent?: Json | null;
+  /** A routine mark: the slot's step Occurrences as read before the write, with their statuses. */
+  slot?: readonly Json[] | null;
 }>;
 
 export function outcomeKind(name: ChatWriteName): ChatOutcomeKind { return CHAT_OUTCOME_KIND[name]; }
+
+const GROUPING_KEYS = ["parent_behavior_id", "inherit_parent_schedule", "sub_behavior_sort_order"] as const;
+
+function parentTitleOf(facts: ChatWriteFacts, fallback = "the routine"): string {
+  return str(obj(facts.parent).title) ?? fallback;
+}
+
+/** "Cerave, Facewash and Retinol". */
+function joinTitles(titles: readonly string[]): string {
+  if (titles.length <= 1) return titles.join("");
+  return `${titles.slice(0, -1).join(", ")} and ${titles.at(-1)}`;
+}
+
+function stepTitles(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(obj).flatMap((item) => (str(item.title) ? [item.title as string] : [])) : [];
+}
+
+function stepsText(titles: readonly string[]): string {
+  return `${titles.length} ${titles.length === 1 ? "step" : "steps"}: ${titles.join(", ")}`;
+}
+
+/** " in Skin routine" for a step of a routine. */
+function inRoutine(occurrence: Json): string {
+  const parent = str(occurrence.parent_title);
+  return parent ? ` in ${parent}` : "";
+}
+
+/** A routine mark's title: the routine's own name. */
+function routineTitle(result: unknown, facts: ChatWriteFacts): string {
+  const out = obj(result);
+  const group = Array.isArray(out.parent_groups) ? obj(out.parent_groups[0]) : {};
+  const first = Array.isArray(out.occurrences) ? obj(out.occurrences[0]) : {};
+  return str(group.title) ?? str(first.parent_title) ?? parentTitleOf(facts, "your routine");
+}
+
+/**
+ * The sentence for a grouping change (into or out of a routine, its schedule, its
+ * order), or null when the write changes none of them.
+ */
+function groupingText(args: Readonly<Record<string, unknown>>, title: string, facts: ChatWriteFacts, tense: "pending" | "done"): string | null {
+  const parent = parentTitleOf(facts);
+  const pending = tense === "pending";
+  if (typeof args.parent_behavior_id === "string") {
+    const schedule = args.inherit_parent_schedule === false ? ", with its own schedule"
+      : args.inherit_parent_schedule === true ? `, following ${parent}'s schedule` : "";
+    return `${pending ? "Move" : "Moved"} ${title} into ${parent}${schedule}`;
+  }
+  if ("parent_behavior_id" in args && args.parent_behavior_id === null) {
+    return `${pending ? "Take" : "Took"} ${title} out of ${parent}, as its own Behavior`;
+  }
+  if (args.inherit_parent_schedule === true) return pending ? `Have ${title} follow ${parent}'s schedule` : `${title} now follows ${parent}'s schedule`;
+  if (args.inherit_parent_schedule === false) return pending ? `Give ${title} its own schedule` : `${title} now has its own schedule`;
+  if ("sub_behavior_sort_order" in args) return `${pending ? "Change" : "Changed"} where ${title} sits in ${parent}`;
+  return null;
+}
 
 /** The confirm line, in the imperative: "Mark Walk done". */
 export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts): string {
@@ -89,7 +152,14 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
   switch (call.name) {
     case "set_occurrence_status": {
       const status = str(args.status) ?? "";
-      return status === "unresolved" ? `Set ${title} back to open` : `Mark ${title} ${STATUS_DONE[status] ?? status}`;
+      const where = inRoutine(obj(facts.occurrence));
+      return status === "unresolved" ? `Set ${title}${where} back to open` : `Mark ${title}${where} ${STATUS_DONE[status] ?? status}`;
+    }
+    case "set_parent_occurrence_status": {
+      const status = str(args.status) ?? "";
+      const steps = facts.slot?.length ?? 0;
+      const count = steps > 1 ? ` (${steps} steps)` : "";
+      return `Mark ${parentTitleOf(facts, "this routine")} ${STATUS_DONE[status] ?? status}${count}`;
     }
     case "update_occurrence_note": return str(args.note) ? `Save a note on ${title}` : `Clear the note on ${title}`;
     case "update_day_note": {
@@ -100,19 +170,32 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
     case "revert_occurrence_move": return `Move ${title} back to where it was`;
     case "add_opportunity_occurrence": return `Add ${title} to today${placementText(args)}`;
     case "remove_opportunity_occurrence": return `Take ${title} off today`;
-    case "create_behavior": return `Create a new Behavior, ${str(args.title) ?? "untitled"}`;
-    case "update_behavior": return `Change ${title}${changedFields(args)}`;
+    case "create_behavior": {
+      const name = str(args.title) ?? "untitled";
+      const steps = stepTitles(args.sub_behaviors);
+      if (steps.length) return `Create ${name} with ${stepsText(steps)}`;
+      if (str(args.parent_behavior_id)) {
+        return `Add ${name} to ${parentTitleOf(facts)}${args.inherit_parent_schedule === false ? ", with its own schedule" : ""}`;
+      }
+      return `Create a new Behavior, ${name}`;
+    }
+    case "update_behavior": {
+      const grouping = groupingText(args, title, facts, "pending");
+      // A step given its own schedule sends that schedule: the line already says so.
+      const rest = changedFields(args, args.inherit_parent_schedule === false ? ["schedules"] : []);
+      return grouping ? `${grouping}${rest ? `, and change ${rest.slice(2, -1)}` : ""}` : `Change ${title}${rest}`;
+    }
     case "archive_behavior": return `Archive ${title}`;
     case "restore_behavior": return `Restore ${title}`;
   }
 }
 
-function changedFields(args: Readonly<Record<string, unknown>>): string {
+function changedFields(args: Readonly<Record<string, unknown>>, skip: readonly string[] = []): string {
   const labels: Readonly<Record<string, string>> = {
     title: "name", description: "description", location_text: "place", category_id: "category", schedules: "schedule",
     reminders: "reminders", default_duration_minutes: "length", end_date: "end date", is_opportunity: "opportunity",
   };
-  const changed = Object.keys(labels).filter((key) => key in args).map((key) => labels[key]);
+  const changed = Object.keys(labels).filter((key) => key in args && !skip.includes(key)).map((key) => labels[key]);
   return changed.length ? ` (${changed.join(", ")})` : "";
 }
 
@@ -121,12 +204,20 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
   const out = obj(result);
   const occurrence = obj(out.occurrence);
   const behavior = obj(out.behavior);
-  const title = str(occurrence.behavior_title) ?? str(behavior.title) ?? str(obj(facts.occurrence).behavior_title) ?? "the item";
+  const title = str(occurrence.behavior_title) ?? str(behavior.title) ?? str(obj(facts.occurrence).behavior_title) ?? str(obj(facts.behavior).title) ?? "the item";
   const timezone = str(occurrence.timezone) ?? "UTC";
   switch (call.name) {
     case "set_occurrence_status": {
       const status = str(occurrence.status) ?? str(call.args.status) ?? "";
-      return status === "unresolved" ? `Set ${title} back to open.` : `Marked ${title} ${STATUS_DONE[status] ?? status}.`;
+      const where = inRoutine(Object.keys(occurrence).length ? occurrence : obj(facts.occurrence));
+      return status === "unresolved" ? `Set ${title}${where} back to open.` : `Marked ${title}${where} ${STATUS_DONE[status] ?? status}.`;
+    }
+    case "set_parent_occurrence_status": {
+      const status = STATUS_DONE[str(out.status) ?? str(call.args.status) ?? ""] ?? "";
+      const routine = routineTitle(result, facts);
+      if (out.changed === false) return `${routine} was already marked ${status}.`;
+      const steps = stepTitles((Array.isArray(out.occurrences) ? out.occurrences : []).map((item) => ({ title: obj(item).behavior_title })));
+      return steps.length > 1 ? `Marked ${routine} ${status}: ${joinTitles(steps)}.` : `Marked ${routine} ${status}.`;
     }
     case "update_occurrence_note": return str(call.args.note) ? `Saved a note on ${title}.` : `Cleared the note on ${title}.`;
     case "update_day_note": {
@@ -139,8 +230,16 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
       ? `Marked ${title} done at ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`
       : `Added ${title} to today${placementText(call.args)}.`;
     case "remove_opportunity_occurrence": return `Took ${title} off today.`;
-    case "create_behavior": return `Created ${title}.`;
-    case "update_behavior": return `Changed ${title}.`;
+    case "create_behavior": {
+      const steps = stepTitles(out.sub_behaviors).length ? stepTitles(out.sub_behaviors) : stepTitles(call.args.sub_behaviors);
+      if (steps.length) return `Created ${title} with ${stepsText(steps)}.`;
+      if (str(behavior.parent_behavior_id) ?? str(call.args.parent_behavior_id)) return `Added ${title} to ${parentTitleOf(facts)}.`;
+      return `Created ${title}.`;
+    }
+    case "update_behavior": {
+      const grouping = groupingText(call.args, title, facts, "done");
+      return grouping ? `${grouping}.` : `Changed ${title}.`;
+    }
     case "archive_behavior": return `Archived ${title}.`;
     case "restore_behavior": return `Restored ${title}.`;
   }
@@ -182,6 +281,22 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
       const previous = str(out.previous_status);
       if (!occurrenceId || !previous || out.changed === false) return null;
       return { call: { name: "set_occurrence_status", args: { occurrence_id: occurrenceId, status: previous, expected_status: occurrence.status } } };
+    }
+    // A routine mark is undone step by step: each changed step goes back to the status
+    // chat read before the write, and refuses once anyone changed that step since.
+    case "set_parent_occurrence_status": {
+      const changedIds = Array.isArray(out.changed_occurrence_ids) ? out.changed_occurrence_ids.filter((id): id is string => typeof id === "string") : [];
+      if (out.changed === false || changedIds.length === 0 || !facts.slot) return null;
+      const before = new Map(facts.slot.map((item) => [str(item.id), str(item.status)]));
+      const after = new Map((Array.isArray(out.occurrences) ? out.occurrences : []).map(obj).map((item) => [str(item.id), str(item.status)]));
+      const calls: ChatWriteCall[] = [];
+      for (const id of changedIds) {
+        const previous = before.get(id);
+        const now = after.get(id) ?? str(out.status);
+        if (!previous || !now || previous === now) return null;
+        calls.push({ name: "set_occurrence_status", args: { occurrence_id: id, status: previous, expected_status: now } });
+      }
+      return { call: calls[0]!, calls };
     }
     case "update_occurrence_note": {
       if (!occurrenceId || out.changed === false || !facts.occurrence) return null;
@@ -249,13 +364,19 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
 export function outcomeTargets(call: ChatWriteCall, result: unknown): Readonly<{ occurrenceId?: string; behaviorId?: string; localDate?: string }> {
   const out = obj(result);
   const occurrenceId = str(obj(out.occurrence).id) ?? str(call.args.occurrence_id);
-  const behaviorId = str(obj(out.behavior).id) ?? str(obj(out.occurrence).behavior_id) ?? str(call.args.behavior_id);
-  const localDate = str(obj(out.occurrence).local_date) ?? str(call.args.local_date);
+  const first = Array.isArray(out.occurrences) ? obj(out.occurrences[0]) : {};
+  const behaviorId = str(obj(out.behavior).id) ?? str(obj(out.occurrence).behavior_id) ?? str(call.args.behavior_id)
+    ?? str(out.parent_behavior_id) ?? str(call.args.parent_behavior_id);
+  const localDate = str(obj(out.occurrence).local_date) ?? str(first.local_date) ?? str(call.args.local_date);
   return { ...(occurrenceId ? { occurrenceId } : {}), ...(behaviorId ? { behaviorId } : {}), ...(localDate ? { localDate } : {}) };
 }
 
 /** What chat reads before a write, so the outcome and Undo have their facts. */
 export function factsReadFor(call: ChatWriteCall): Readonly<{ name: ChatToolName; args: Json }> | null {
+  // A routine mark reads the day's Timeline (and Needs decision) for each step's status.
+  if (call.name === "set_parent_occurrence_status") {
+    return { name: "get_timeline", args: { ...(str(call.args.local_date) ? { start_local_date: call.args.local_date } : {}), days: 1 } };
+  }
   const occurrenceId = str(call.args.occurrence_id);
   const behaviorId = str(call.args.behavior_id);
   if (occurrenceId) return { name: "get_occurrence", args: { occurrence_id: occurrenceId } };
@@ -268,8 +389,9 @@ export function factsReadFor(call: ChatWriteCall): Readonly<{ name: ChatToolName
 
 /** Facts from that read's result. */
 export function factsFrom(call: ChatWriteCall, read: ChatToolResult | null): ChatWriteFacts {
-  if (!read || !read.ok) return call.name === "update_day_note" ? {} : {};
+  if (!read || !read.ok) return {};
   const out = obj(read.result);
+  if (call.name === "set_parent_occurrence_status") return { slot: slotFrom(call.args, out) };
   if (call.name === "update_day_note") {
     const notes = Array.isArray(out.day_notes) ? out.day_notes.map(obj) : [];
     const match = notes.find((note) => note.local_date === call.args.local_date);
@@ -278,6 +400,58 @@ export function factsFrom(call: ChatWriteCall, read: ChatToolResult | null): Cha
   if (out.occurrence) return { occurrence: obj(out.occurrence) };
   if (out.behavior) return { behavior: obj(out.behavior) };
   return {};
+}
+
+/** The parent a write names, read so its lines can say the routine's name. */
+function parentIdFor(call: ChatWriteCall, facts: ChatWriteFacts): string | null {
+  const args = call.args;
+  if (call.name === "set_parent_occurrence_status" || call.name === "create_behavior") return str(args.parent_behavior_id);
+  if (call.name !== "update_behavior") return null;
+  if (typeof args.parent_behavior_id === "string") return args.parent_behavior_id;
+  return GROUPING_KEYS.some((key) => key in args) ? str(obj(facts.behavior).parent_behavior_id) : null;
+}
+
+/**
+ * Every fact a write needs: its record, and for routine writes the routine itself.
+ * Shared by the turn loop and a Yes, so both describe and undo a write the same way.
+ */
+export async function readWriteFacts(
+  call: ChatWriteCall, read: (name: ChatToolName, args: Json) => Promise<ChatToolResult>,
+): Promise<ChatWriteFacts> {
+  const first = factsReadFor(call);
+  const facts = factsFrom(call, first ? await read(first.name, first.args) : null);
+  const parentId = parentIdFor(call, facts);
+  if (!parentId) return facts;
+  const parent = await read("get_behavior", { behavior_id: parentId });
+  return { ...facts, parent: parent.ok ? obj(obj(parent.result).behavior) : null };
+}
+
+/** The step Occurrences a routine mark targets, from a get_timeline result. */
+function slotFrom(args: Readonly<Record<string, unknown>>, timeline: Json): Json[] | null {
+  const days = Array.isArray(timeline.days) ? timeline.days.map(obj) : [];
+  const needs = obj(timeline.needs_decision);
+  const occurrences = [...days.flatMap((day) => (Array.isArray(day.occurrences) ? day.occurrences.map(obj) : [])),
+    ...(Array.isArray(needs.occurrences) ? needs.occurrences.map(obj) : [])];
+  const byId = new Map(occurrences.map((item) => [str(item.id), item]));
+  let ids: string[];
+  if (Array.isArray(args.occurrence_ids)) ids = args.occurrence_ids.filter((id): id is string => typeof id === "string");
+  else {
+    const groups = [...days.flatMap((day) => (Array.isArray(day.parent_groups) ? day.parent_groups.map(obj) : [])),
+      ...(Array.isArray(needs.parent_groups) ? needs.parent_groups.map(obj) : [])]
+      .filter((group) => group.parent_behavior_id === args.parent_behavior_id && group.local_date === args.local_date)
+      .filter((group) => !str(args.slot_key) || sameInstant(str(group.slot_key), args.slot_key as string));
+    const unique = new Map(groups.map((group) => [str(group.slot_key), group]));
+    if (unique.size !== 1) return null;
+    const group = [...unique.values()][0]!;
+    ids = Array.isArray(group.occurrence_ids) ? group.occurrence_ids.filter((id): id is string => typeof id === "string") : [];
+  }
+  const slot = ids.map((id) => byId.get(id));
+  return ids.length && slot.every(Boolean) ? slot as Json[] : null;
+}
+
+function sameInstant(left: string | null, right: string): boolean {
+  if (!left) return false;
+  try { return Temporal.Instant.compare(Temporal.Instant.from(left), Temporal.Instant.from(right)) === 0; } catch { return left === right; }
 }
 
 /** The record a confirm item depends on, for expiry when it changes (T13). */

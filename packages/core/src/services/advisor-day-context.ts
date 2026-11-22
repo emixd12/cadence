@@ -73,6 +73,8 @@ type AdvisorCadenceOccurrenceInput = Readonly<{
   startAt: string;
   /** Phase 3A1: set when the item was moved for today. */
   move?: AdvisorOccurrenceMove;
+  /** Set for a routine's step (sub-behaviors, depth 1). */
+  routine?: Readonly<{ parentBehaviorId: string; parentTitle: string; inheritParentSchedule: boolean; stepOrder: number }>;
   scheduleKind: "exact" | "range";
   scheduleStartTime: string;
   scheduleEndTime: string | null;
@@ -223,6 +225,12 @@ export function projectAdvisorCadenceSource(input: Readonly<{
       duration: projectDuration(occurrence.duration),
       ...(occurrence.durationCandidates ? { durationCandidates: occurrence.durationCandidates } : {}),
       ...(occurrence.move ? { move: occurrence.move } : {}),
+      ...(occurrence.routine ? { routine: {
+        parentBehaviorRef: input.makeOpaqueRef("behavior", nonempty(occurrence.routine.parentBehaviorId, "occurrence.routine.parentBehaviorId")),
+        parentTitle: occurrence.routine.parentTitle,
+        inheritParentSchedule: occurrence.routine.inheritParentSchedule,
+        stepOrder: occurrence.routine.stepOrder,
+      } } : {}),
     };
   });
 
@@ -849,7 +857,7 @@ function projectDuration(estimate: AdvisorCadenceOccurrenceInput["duration"]): A
 
 function validateOccurrence(value: unknown, index: number, localDate: string): void {
   const occurrence = record(value, `occurrence[${index}]`);
-  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates", "move"], `occurrence[${index}]`);
+  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates", "move", "routine"], `occurrence[${index}]`);
   nonempty(occurrence.ref, "occurrence.ref");
   nonempty(occurrence.behaviorRef, "occurrence.behaviorRef");
   if (typeof occurrence.title !== "string" || occurrence.title.length > 200) fail("occurrence.title is invalid.");
@@ -871,6 +879,14 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
     instant(move.plannedFor, "occurrence.move.plannedFor");
     if (move.endAt !== null) instant(move.endAt, "occurrence.move.endAt");
     if (move.by !== null && !(ADVISOR_MOVE_SOURCES as readonly unknown[]).includes(move.by)) fail("occurrence.move.by is invalid.");
+  }
+  if ("routine" in occurrence) {
+    const routine = record(occurrence.routine, "occurrence.routine");
+    exactKeys(routine, ["parentBehaviorRef", "parentTitle", "inheritParentSchedule", "stepOrder"], "occurrence.routine");
+    nonempty(routine.parentBehaviorRef, "occurrence.routine.parentBehaviorRef");
+    if (typeof routine.parentTitle !== "string" || routine.parentTitle.length > 200) fail("occurrence.routine.parentTitle is invalid.");
+    if (typeof routine.inheritParentSchedule !== "boolean") fail("occurrence.routine.inheritParentSchedule is invalid.");
+    if (!Number.isInteger(routine.stepOrder) || (routine.stepOrder as number) < 0) fail("occurrence.routine.stepOrder is invalid.");
   }
 }
 

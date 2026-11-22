@@ -139,6 +139,22 @@ export type LocalCommandMap = {
       definitionEvent: BehaviorDefinitionEvent | null; configurationEvent: BehaviorConfigurationEvent | null };
     result: LocalBehaviorGraph & { revision: number };
   };
+  createBehaviorGroup: {
+    input: Mutation & { items: Array<{ graph: LocalBehaviorGraph; definitionEvent: BehaviorDefinitionEvent; configurationEvent: BehaviorConfigurationEvent }> };
+    result: Array<LocalBehaviorGraph & { revision: number }>;
+  };
+  updateBehaviorGroup: {
+    input: Mutation & { items: Array<{ graph: LocalBehaviorGraph; expectedRevision: number;
+      expectedNormalizedDefinition: { title: string; description: string | null };
+      definitionEvent: BehaviorDefinitionEvent | null; configurationEvent: BehaviorConfigurationEvent | null }> };
+    result: Array<LocalBehaviorGraph & { revision: number }>;
+  };
+  reorderSubBehaviors: { input: Mutation & { parentBehaviorId: string; orderedBehaviorIds: string[] }; result: number };
+  applyParentSlotStatusTransition: {
+    input: Mutation & { parentBehaviorId: string;
+      transitions: Array<Omit<StatusTransitionCommit, "event"> & { event: OccurrenceStatusEventRecord | null }> };
+    result: StatusTransitionResult[];
+  };
   applyOccurrenceGeneration: {
     input: Mutation & {
       behaviorId: string; expectedConfigurationEventId: string;

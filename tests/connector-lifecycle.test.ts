@@ -395,7 +395,9 @@ describe("connector data stays out of tracking surfaces", () => {
   const completionFence = "supabase/migrations/20261111140000_connector_completion.sql";
   // Ticket 324: counting a workout by hand reads connection status only.
   const countFence = "supabase/migrations/20261113050000_count_unlinked_workout.sql";
-  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence, completionFence, countFence]);
+  // Sub-behaviors: the completion precondition reads the same connection status and digest.
+  const subBehaviorCompletionFence = "supabase/migrations/20261122020000_sub_behavior_portability_connectors.sql";
+  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence, agentCalendarFence, completionFence, countFence, subBehaviorCompletionFence]);
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);
@@ -413,6 +415,7 @@ describe("connector data stays out of tracking surfaces", () => {
     expect(readFileSync(agentCalendarFence, "utf8")).not.toMatch(/connector_(credentials|attempts)|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
     // Connector completion reads connections only, never credentials, attempts or credential RPCs.
     expect(readFileSync(completionFence, "utf8")).not.toMatch(/connector_(credentials|attempts|preferences)|sealed_|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
+    expect(readFileSync(subBehaviorCompletionFence, "utf8")).not.toMatch(/connector_(credentials|attempts|preferences)|sealed_|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
   });
   it("does not log from connector lifecycle modules", () => {
     for (const path of ["lib/services/connector-credentials.ts", "lib/services/connector-request.ts", "lib/db/connectors.repo.ts", "lib/types/connectors.ts"]) {

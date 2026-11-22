@@ -24,6 +24,9 @@ import type {
  * - At most one row per kind per Behavior, plus at most one account-wide row
  *   (behaviorId null): the table keeps one row per (day, kind, Behavior).
  * - Sample-size floors follow the analysis lanes (`BRIEFING_ANALYSIS_THRESHOLDS`).
+ * - Routines (version 3): steps of one routine that follow its time are one item at
+ *   that time, so they never make an hour look crowded, and steps of one routine are
+ *   not reported as done together (they are meant to be).
  */
 
 export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
@@ -48,6 +51,8 @@ export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
   sessionLength: { minSessions: 4, shorterBelow: 0.8, longerAbove: 1.2, maxSessionMinutes: 12 * 60 },
   movedVsUnmoved: { behavior: { minEach: 5 }, account: { minEach: 8 }, minGap: 0.15 },
   opportunityReady: { minCompleted: 3, windowMinutes: 60 },
+  /** One step done much less than the other steps of its routine, on the days it was scheduled. */
+  subBehaviorDropoff: { minResolved: 6, minSiblingResolved: 8, minSiblingRate: 0.7, minGap: 0.3 },
 });
 
 const V = COACH_SIGNAL_V2_THRESHOLDS;
@@ -96,6 +101,7 @@ export function resolveCoachSignalsV2(input: ResolveCoachSignalsInput, active: R
     ...sessionLength(ctx),
     ...movedVsUnmoved(ctx),
     ...opportunityReadyToSchedule(ctx),
+    ...subBehaviorDropoff(ctx),
   ];
 }
 
@@ -493,6 +499,7 @@ function doneTogether(ctx: Ctx): CoachSignal[] {
       if (i === j) continue;
       const a = ids[i]!;
       const b = ids[j]!;
+      if (sameRoutine(ctx, a, b)) continue;
       const aDays = outcomes.get(a)!;
       const bDays = outcomes.get(b)!;
       const shared = [...aDays.keys()].filter((d) => bDays.has(d));
@@ -540,7 +547,8 @@ function crowdedHour(ctx: Ctx): CoachSignal[] {
   let best: { hour: number; perDay: number; t: Tally; other: Tally; gap: number } | null = null;
   for (const [hour, list] of groupBy(timed, hourOf)) {
     const days = new Set(list.map((row) => row.localDate)).size;
-    const perDay = list.length / days;
+    // A routine's steps at one time are one item in the hour, not several.
+    const perDay = new Set(list.map((row, index) => itemKey(ctx, row, index))).size / days;
     if (perDay < T.minItemsPerDay) continue;
     const t = tallyRows(list);
     const other = tallyRows(timed.filter((row) => hourOf(row) !== hour));
@@ -562,6 +570,19 @@ function crowdedHour(ctx: Ctx): CoachSignal[] {
       gap: best.gap,
     },
   }];
+}
+
+/** Both are steps of the same routine. */
+function sameRoutine(ctx: Ctx, a: string, b: string): boolean {
+  const parent = ctx.active.get(a)?.parentBehaviorId;
+  return !!parent && parent === ctx.active.get(b)?.parentBehaviorId;
+}
+
+/** One key per item a person sees at a time: a routine's following steps share the routine's. */
+function itemKey(ctx: Ctx, row: CoachSignalOccurrence, index: number): string {
+  const behavior = ctx.active.get(row.behaviorId);
+  if (behavior?.parentBehaviorId && behavior.inheritParentSchedule) return `routine:${behavior.parentBehaviorId}:${row.localDate}:${startMinute(row)}`;
+  return `item:${row.id ?? index}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -711,6 +732,50 @@ function movedVsUnmoved(ctx: Ctx): CoachSignal[] {
   }
   const account = facts(marked, T.account.minEach);
   if (account) signals.push({ kind: "moved_vs_unmoved", behaviorId: null, facts: account });
+  return signals;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-behavior drop-off (version 3): one step of a routine done much less than the
+// other steps, counted on the days that step was scheduled and marked.
+
+function subBehaviorDropoff(ctx: Ctx): CoachSignal[] {
+  const T = V.subBehaviorDropoff;
+  const signals: CoachSignal[] = [];
+  const byParent = groupBy([...ctx.active.values()], (behavior) => behavior.parentBehaviorId ?? null);
+  for (const [parentId, steps] of [...byParent].sort(([a], [b]) => a.localeCompare(b))) {
+    if (steps.length < 2) continue;
+    const ids = new Set(steps.map((step) => step.id));
+    // Marks only: an unmarked step is missing a decision, never a miss (D5).
+    const marked = ctx.recent.filter((row) => ids.has(row.behaviorId) && row.status !== "unresolved");
+    for (const step of [...steps].sort((a, b) => a.id.localeCompare(b.id))) {
+      const own = marked.filter((row) => row.behaviorId === step.id);
+      const days = new Set(own.map((row) => row.localDate));
+      const others = marked.filter((row) => row.behaviorId !== step.id && days.has(row.localDate));
+      const t = tallyRows(own);
+      const o = tallyRows(others);
+      if (resolved(t) < T.minResolved || resolved(o) < T.minSiblingResolved) continue;
+      const stepRate = rate(t)!;
+      const siblingRate = rate(o)!;
+      const gap = round(siblingRate - stepRate);
+      if (siblingRate < T.minSiblingRate || gap < T.minGap) continue;
+      signals.push({
+        kind: "sub_behavior_dropoff",
+        behaviorId: step.id,
+        facts: {
+          window_days: V.windowDays,
+          parent_behavior_id: parentId,
+          step_rate: stepRate,
+          step_completed: t.completed,
+          step_resolved: resolved(t),
+          sibling_rate: siblingRate,
+          sibling_resolved: resolved(o),
+          other_steps: steps.length - 1,
+          gap,
+        },
+      });
+    }
+  }
   return signals;
 }
 

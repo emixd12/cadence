@@ -19708,3 +19708,53 @@ Platform impact:
 Messaging impact: none beyond P-081.
 
 Verification: report tests on seeded rows.
+
+## Ticket 349: Sub-behaviors (routines) and Timeline Semantic Zoom
+
+Status: implemented on branch `feature-create` (November 21, 2026); awaiting review,
+the hosted push of three additive migrations and installed Mac acceptance. Decision:
+`docs/DECISIONS.md`, 2026-11-21, "Sub-behaviors and Timeline Semantic Zoom".
+
+Goal: a Behavior can hold ordered sub-behaviors that follow its schedule or their
+own, show as one routine on the Timeline, and be marked together or one by one.
+
+Scope and acceptance:
+
+- Data: migrations `20261122010000_sub_behaviors.sql`,
+  `20261122020000_sub_behavior_portability_connectors.sql` and
+  `20261122030000_coach_signal_sub_behavior_dropoff.sql`; depth 1 enforced in the
+  database; RPCs for group create, group update, reorder and routine slot marks
+  (`docs/DATA_MODEL.md`).
+- Core: `sub-behavior.resolver.ts`; leaf-Occurrence generation, Timeline parent groups,
+  analytics parent summaries and routine reminders (`docs/RECURRENCE_RULES.md`,
+  `docs/NOTIFICATION_SPEC.md`).
+- Behaviors UI: Part of, Follow parent schedule, drafted steps, reorder, detach, attach
+  and nested rows (`INT-BEHAVIOR-039` to `INT-BEHAVIOR-045`).
+- Timeline: routine rows, bulk marks and Semantic Zoom (`INT-TIMELINE-025` to
+  `INT-TIMELINE-027`).
+- MCP contract 1.7.0 and plugin skills; Chat `chat-1.6`; Daily Brief routine moves;
+  `coach-signals-3`; `coach-tips-3`; advice card `smaller-step-in-the-routine`
+  (owner-reviewed and active since 2026-11-21).
+- Portability (Full JSON, BehaviorLog, Markdown) and Hevy completion on routines.
+- Mac: SQLite schema 28, Rust store, account sync contract 9 (minimum writer stays 8)
+  and the shared UI.
+- Behaviors of Opportunity (PR #351): an opportunity Behavior is never a parent or a
+  sub-behavior, in the resolver, database, MCP contract and form.
+- Phone width: the routine title keeps the row's width; the routine's two marks move to
+  a second line below 576px.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | This ticket: `components/behaviors/SubBehaviorEditor.tsx`, `components/timeline/ParentOccurrenceRow.tsx`, `app/(app)/behaviors/actions.ts`, `app/(app)/timeline/actions.ts`. |
+| Desktop | This ticket: `apps/desktop/src-tauri/migrations/0028_sub_behaviors.sql`, `apps/desktop/src/local-actions.ts`, `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/timeline-screen.tsx`. Daily Brief routine moves on the Mac: `apps/desktop/src/daily-brief.ts` with the shared `BriefMoveLines`. |
+| Marketing | Not applicable: no public claim changes; P-084 records copy that may mention routines later. |
+| Future mobile | Not applicable until a mobile app is ticketed; it inherits the model and the two-layer zoom. |
+
+Messaging impact: P-082, P-083, P-084.
+
+Verification: resolver, service, DOM, desktop and Rust tests; SQL smokes
+`tests/sql/sub-behaviors-smoke.sql` and
+`tests/sql/sub-behavior-portability-connectors-smoke.sql`; the local integration file
+`tests/integration-sub-behaviors.local-integration.test.ts` on a migrated stack.

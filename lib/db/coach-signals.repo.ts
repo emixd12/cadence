@@ -88,13 +88,14 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
   return {
     async behaviors() {
       const { data, error } = await client.from("behaviors")
-        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind,is_opportunity,recurrence_rule").eq("user_id", userId);
+        .select("id,created_at,timezone,active,archived_at,default_duration_minutes,where_kind,is_opportunity,recurrence_rule,parent_behavior_id,inherit_parent_schedule").eq("user_id", userId);
       if (error) throw new CoachSignalsError("read_behaviors_failed");
       return (data ?? []).map((row) => ({
         id: row.id, createdAt: row.created_at, timezone: row.timezone, active: row.active && row.archived_at === null,
         hasLength: row.default_duration_minutes !== null, lengthMinutes: row.default_duration_minutes,
         hasPlace: row.where_kind !== null,
         isOpportunity: row.is_opportunity === true, hasSchedule: row.recurrence_rule !== null,
+        parentBehaviorId: row.parent_behavior_id ?? null, inheritParentSchedule: row.inherit_parent_schedule === true,
       }));
     },
     async occurrences(since, before) {
@@ -136,7 +137,7 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
     async reminders(since, before) {
       // Joined to the Occurrence for its local date; a reminder belongs to its item's day.
       const rows = await pages("read_reminders_failed", (from, to) => client.from("reminder_deliveries")
-        .select("id,occurrence_id,sent_at,occurrences!inner(local_date)").eq("user_id", userId).eq("status", "sent")
+        .select("id,occurrence_id,sent_at,occurrences!reminder_deliveries_occurrence_owner_fkey!inner(local_date)").eq("user_id", userId).eq("status", "sent")
         .not("sent_at", "is", null).gte("occurrences.local_date", since).lt("occurrences.local_date", before)
         .order("id").range(from, to));
       return rows.flatMap((row) => row.sent_at ? [{ occurrenceId: row.occurrence_id, sentAt: row.sent_at }] : []);

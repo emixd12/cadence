@@ -2421,6 +2421,96 @@ through `remove_opportunity_occurrence`. `cadence_advisor_private.coach_signals.
 accepts `opportunity_ready_to_schedule`. Migration:
 `20261121130000_brief_opportunity_proposals.sql` (additive).
 
+## Sub-behaviors (depth 1, November 2026)
+
+A Behavior can sit under one parent Behavior. Three columns on `behaviors`:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `parent_behavior_id` | `uuid` | Parent Behavior, or null on standalone and parent Behaviors. |
+| `sub_behavior_sort_order` | `integer` | Display order among siblings, `>= 0`. Default 0. Not in configuration history. |
+| `inherit_parent_schedule` | `boolean` | True while the sub-behavior stores a mirror of its parent's schedule, end and pause. Default false. |
+
+Rules:
+
+1. `behaviors_parent_behavior_id_fkey` and `behaviors_parent_owner_fkey`
+   (`(user_id, parent_behavior_id)` to `(user_id, id)`) keep the parent in the same
+   account. Both are deferred, so a sync plan or a restore may write a child before
+   its parent. Deleting a parent sets the link to null.
+2. `behaviors_parent_not_self`, `behaviors_sub_behavior_sort_order_check` and
+   `behaviors_inherit_requires_parent` (no inheritance without a parent).
+3. The deferred constraint trigger `enforce_behavior_sub_behavior_depth` checks the
+   committed row: the parent has no parent, the Behavior has no children (archived
+   children count), and a new or changed link never points at an archived parent.
+4. `normalize_behavior_parent_link` clears inheritance and order when a link is
+   removed. The `updated_at` trigger watches the three columns.
+
+While a parent has active sub-behaviors, they own its generated Occurrences; the
+parent keeps its past and marked rows. Inheriting sub-behaviors store a copy of the
+parent's recurrence, slots, timezone, end and pause on their own schedule rows. The
+service mirrors each parent change onto them in the same transaction.
+
+The configuration snapshot gains `parent_behavior_id` and `inherit_parent_schedule`;
+`changed_fields` accepts both and baselines list both. A plan without the keys (an
+older writer) keeps the stored link, through
+`cadence_private.behavior_configuration_with_link`.
+
+RPCs (all as the signed-in user):
+
+- `create_behavior_with_schedule_graph` accepts an optional `id` and the three link
+  fields.
+- `create_behavior_group_with_schedule_graphs(items jsonb)`: a parent and 1 to 50
+  sub-behaviors in one transaction. The first item is the parent; every other item
+  names it.
+- `update_behavior_with_schedule_graph` changes each link field only when the
+  payload carries it. `update_behavior_group_with_schedule_graphs(items jsonb)` runs
+  1 to 51 updates in one transaction: a parent edit with its mirrors, or a parent
+  archived or restored with its sub-behaviors.
+- `reorder_sub_behaviors(parent uuid, ordered uuid[])`: dense order; the list must
+  name each live sub-behavior once.
+- `apply_parent_slot_status_transition(parent uuid, transitions jsonb)`: one
+  `apply_occurrence_status_transition` per child Occurrence of one parent, on one
+  local day. One status event per child; one failure rolls back the slot.
+
+Export, the advisor snapshot, the MCP receipt source and BehaviorLog restore carry the
+three columns. Account sync contract 9 adds them (defaults `null`, `0`, `false`); the
+minimum writer contract stays 8 (Behaviors of Opportunity), so contract-8 writers such
+as Cadence for Mac 0.1.14 keep syncing and keep the stored values. A contract-9 Behavior
+write must carry all three. Account sync apply leaves `sub_behavior_sort_order` out of its
+configuration-history check, so a reorder syncs without a configuration event
+(`20261122040000_account_sync_sub_behavior_order`); a link or inheritance change still needs one.
+
+An opportunity Behavior (`is_opportunity`) is never part of a routine: it cannot be a
+parent or a sub-behavior. The deferred depth trigger also runs when `is_opportunity`
+changes and refuses either case ("An opportunity Behavior can't be part of a routine.",
+migration `20261122020000`).
+
+Migration: `20261122010000_sub_behaviors.sql`. Smoke: `tests/sql/sub-behaviors-smoke.sql`.
+
+### Portability and connector completion on routines
+
+Migration `20261122020000_sub_behavior_portability_connectors.sql`:
+
+1. `connector_match_precondition` accepts an Occurrence of a sub-behavior of the
+   source link's Behavior. Both Behaviors must be active. A source link on a parent
+   completes the sub-behavior Occurrences of the matched slot under the D28 rules,
+   one source match per sub-behavior Occurrence.
+2. `apply_connector_completion` and `attach_source_activity` find the existing match
+   by the Occurrence's own Behavior, so a parent link and a sub-behavior's own link
+   never write two matches for one Occurrence.
+3. `enforce_behavior_sub_behavior_depth` lets an archived sub-behavior keep a link to
+   an archived parent (restore and import). A new link to an archived parent from an
+   active Behavior is still refused.
+
+Smoke: `tests/sql/sub-behavior-portability-connectors-smoke.sql`.
+
+Coach signal kind `sub_behavior_dropoff`: migration
+`20261122030000_coach_signal_sub_behavior_dropoff.sql` widens the `coach_signals.kind`
+check (see "Coach signals in shadow").
+
+Hosted state (2026-11-21): the three migrations are not pushed to the hosted database.
+They are additive; push them before this code reaches production.
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
@@ -3425,7 +3515,11 @@ shown to the person; Phase 4 matches the signals to advice cards.
   migration `20261119220500`), `weekly_numbers`, `weekday_gap`, `time_of_day_gap`,
   `timing_mode_gap`, `steady_behavior`, `never_done`, `dip_recovery`, `day_shape`,
   `unmarked_items`, `marking_time`, `done_together`, `crowded_hour`, `setup_gaps`,
-  `reminder_response`, `session_length` or `moved_vs_unmoved`. At most
+  `reminder_response`, `session_length` or `moved_vs_unmoved`, or, since version 3
+  (`coach-signals-3`, migration `20261122030000`), `sub_behavior_dropoff`: one step of a
+  routine is done much less often than its sibling steps over 28 days. Its facts are
+  `parent_behavior_id`, `step_rate`, `step_completed`, `step_resolved`,
+  `sibling_rate`, `sibling_resolved`, `other_steps` and `gap`. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
   local times of day only, never titles, notes or calendar data; `signal_version`

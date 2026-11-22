@@ -85,8 +85,11 @@ describe("local Behavior adapter", () => {
     await expect(updateBehavior(store, { behaviorId: "behavior", expectedUpdatedAt: "2026-08-28T00:00:00Z", recordedAt, values }))
       .rejects.toThrow("Behavior schedule graph changed after it was read.");
     expect(command.mock.calls.some(([operation]) => operation === "updateBehaviorGraph")).toBe(false);
-    command.mockImplementationOnce(async () => [structuredClone(fixture)]).mockImplementationOnce(async () => []);
-    command.mockRejectedValueOnce(new Error("Behavior changed. Review the latest Behavior and try again."));
+    const reads = command.getMockImplementation()!;
+    command.mockImplementation(async (operation: keyof LocalCommandMap, input: { graph?: LocalBehaviorGraph }) => {
+      if (operation === "updateBehaviorGraph") throw new Error("Behavior changed. Review the latest Behavior and try again.");
+      return reads(operation, input);
+    });
     await expect(updateBehavior(store, { behaviorId: "behavior", expectedUpdatedAt: stored.updated_at, recordedAt, values }))
       .rejects.toThrow("Behavior schedule graph changed after it was read.");
     expect(command.mock.calls.filter(([operation]) => operation === "updateBehaviorGraph")).toHaveLength(1);

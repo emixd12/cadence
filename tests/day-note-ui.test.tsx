@@ -83,7 +83,7 @@ describe("Day note control", () => {
   it("appears under the date in Needs decision day sections only when an action is provided", async () => {
     const section: TimelineDaySection = {
       key: "needs-2026-11-08", kind: "needs_decision_day", localDate: "2026-11-08", label: "Sunday, November 8",
-      relativeLabel: "2 days ago", emptyMessage: "", occurrenceGroups: [], unresolvedOccurrenceCount: 0,
+      relativeLabel: "2 days ago", emptyMessage: "", occurrenceGroups: [], parentGroups: [], rows: [], unresolvedOccurrenceCount: 0,
     } as unknown as TimelineDaySection;
     const common = { section, statusAction: idle, noteAction: idle, startTimeTrackingAction: idle, stopTimeTrackingAction: idle, resetTimeTrackingAction: idle } as unknown as React.ComponentProps<typeof TimelineGroup>;
     const without = await render(<TimelineGroup {...common} variant="needsDecisionDialog" />);

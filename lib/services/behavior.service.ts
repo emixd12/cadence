@@ -2,8 +2,8 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
-  applyBehaviorRunAction, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
-  type BehaviorRunAction,
+  applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive,
+  updateBehavior, updateBehaviorArchiveNote, type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
 import { behaviorRunOutcomeMessage, localDateIn } from "@/lib/ui/behavior-run";
@@ -33,6 +33,9 @@ import {
 } from "@/lib/services/behavior-form";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 export { behaviorErrorToActionState };
+
+/** Ids for sub-behavior writes: new group members and the archive notes of archived children. */
+const newId = () => crypto.randomUUID();
 
 export async function getBehaviorReadDataForUser(supabase: AppSupabaseClient, userId: string) {
   const [behaviors, profileTimezone] = await Promise.all([
@@ -67,11 +70,50 @@ export async function createBehaviorForUser(
 ) {
   const timezone = (await getProfileTimezone(supabase, userId)) ?? DEFAULT_TIMEZONE;
   const confirmed = await createBehavior(createBehaviorStore(supabase, userId), {
-    userId, timezone, values, recordedAt,
+    userId, timezone, values, recordedAt, newId,
   });
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, "create");
   return confirmed;
+}
+
+/**
+ * A parent Behavior and its sub-behaviors in one write (depth 1). Sub-behaviors inherit
+ * the parent's schedule unless their input says otherwise.
+ */
+export async function createBehaviorGroupForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { parent: BehaviorInput; subBehaviors: BehaviorInput[] },
+  recordedAt = new Date().toISOString(),
+) {
+  const timezone = (await getProfileTimezone(supabase, userId)) ?? DEFAULT_TIMEZONE;
+  const created = await createBehaviorGroup(createBehaviorStore(supabase, userId), {
+    ...input, userId, timezone, recordedAt, newId,
+  });
+  invalidateBehaviorData(userId);
+  await syncBehaviorGraphForUser(supabase, userId, "create");
+  return created;
+}
+
+/** Sibling order under one parent; ids must name each live sub-behavior once. */
+export async function reorderSubBehaviorsForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { parentBehaviorId: string; orderedBehaviorIds: string[] },
+): Promise<number> {
+  const changed = await reorderSubBehaviors(createBehaviorStore(supabase, userId), input);
+  if (changed > 0) invalidateBehaviorData(userId);
+  return changed;
+}
+
+export async function reorderSubBehaviorsFromFormData(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const userId = await requireUserId(supabase);
+  const parentBehaviorId = formData.get("parent_behavior_id");
+  if (typeof parentBehaviorId !== "string" || !parentBehaviorId) throw new Error("Choose a parent Behavior.");
+  await reorderSubBehaviorsForUser(supabase, userId, {
+    parentBehaviorId,
+    orderedBehaviorIds: formData.getAll("sub_behavior_id").filter((value): value is string => typeof value === "string"),
+  });
 }
 
 export async function updateBehaviorFromFormData(formData: FormData): Promise<void> {
@@ -90,7 +132,7 @@ export async function updateBehaviorForUser(
   recordedAt = new Date().toISOString(),
 ) {
   const updated = await updateBehavior(createBehaviorStore(supabase, userId), {
-    ...input, newArchiveNoteId: crypto.randomUUID(), recordedAt,
+    ...input, newArchiveNoteId: crypto.randomUUID(), recordedAt, newId,
   });
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, "update");
@@ -132,7 +174,7 @@ export async function setBehaviorActiveForUser(
   recordedAt = new Date().toISOString(),
 ) {
   const updated = await setBehaviorActive(createBehaviorStore(supabase, userId), {
-    ...input, ...(!input.active ? { newArchiveNoteId: crypto.randomUUID() } : {}), recordedAt,
+    ...input, ...(!input.active ? { newArchiveNoteId: crypto.randomUUID() } : {}), recordedAt, newId,
   });
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, input.active ? "restore" : "archive");

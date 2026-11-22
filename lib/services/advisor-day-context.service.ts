@@ -310,6 +310,7 @@ async function assembleDayContexts(
         endAt: timing.effective_end_at ?? null,
         by: (ADVISOR_MOVE_SOURCES as readonly string[]).includes(occurrence.movedBy ?? "") ? occurrence.movedBy as AdvisorOccurrenceMove["by"] : null,
       } } : {}),
+      ...routineFor(behavior, behaviorById),
       scheduleKind: scheduleKind as "exact" | "range",
       scheduleStartTime: occurrence.scheduleStartTime,
       scheduleEndTime: occurrence.scheduleEndTime,
@@ -641,6 +642,22 @@ function connectorFailure(error: unknown): { code: AdvisorSourceFailureCode; ret
     return { code, retryable: code === "rate_limited" || code === "timeout" || code === "provider_unavailable", retryAfterSeconds: null };
   }
   return { code: "provider_unavailable", retryable: true, retryAfterSeconds: null };
+}
+
+/**
+ * A routine step's grouping, so the brief treats the routine's steps as one block.
+ * Left out when the routine itself is not in the snapshot (its title would be unknown).
+ */
+function routineFor(
+  behavior: Readonly<{ parentBehaviorId?: string | null; inheritParentSchedule?: boolean; subBehaviorSortOrder?: number }>,
+  behaviorById: ReadonlyMap<string, Readonly<{ id: string; title: string }>>,
+) {
+  const parent = behavior.parentBehaviorId ? behaviorById.get(behavior.parentBehaviorId) : null;
+  if (!parent) return {};
+  return { routine: {
+    parentBehaviorId: parent.id, parentTitle: parent.title,
+    inheritParentSchedule: behavior.inheritParentSchedule === true, stepOrder: Math.max(0, behavior.subBehaviorSortOrder ?? 0),
+  } };
 }
 
 function durationHistory(snapshot: Awaited<ReturnType<typeof readAdvisorCadenceSnapshot>>, userId: string): BehaviorDurationHistoryOccurrence[] {

@@ -241,7 +241,7 @@ describe("Timeline connector label (Tickets 317 and 319)", () => {
     expect(byId.o2).toMatchObject({ fromConnector: false, workouts: [{ label: "6:05 PM–6:50 PM" }] });
     expect(byId.o3).toBeUndefined();
     const view = attachTimelineSourceEvidence({
-      daySections: [{ occurrences: [occurrenceBase], occurrenceGroups: [{ occurrences: [occurrenceBase] }] }],
+      daySections: [{ occurrences: [occurrenceBase], occurrenceGroups: [{ occurrences: [occurrenceBase] }], parentGroups: [], rows: [] }],
       needsDecision: { daySections: [] },
     } as never, byId) as unknown as { daySections: Array<{ occurrences: TimelineOccurrenceView[]; occurrenceGroups: Array<{ occurrences: TimelineOccurrenceView[] }> }> };
     expect(view.daySections[0].occurrences[0].sourceEvidence?.fromConnector).toBe(true);

@@ -242,6 +242,27 @@ An opportunity can be added only at a time the Behavior is running, by the stop 
 
 Database details: docs/DATA_MODEL.md, "Behaviors of Opportunity".
 
+## Sub-behavior schedules (Ticket 349)
+
+1. A sub-behavior with `inherit_parent_schedule = true` stores a copy of its parent's
+   schedules, time entries, timezone, end and pause on its own rows. The resolver
+   `mirrorParentSchedule` builds the copy and reuses the child's schedule row ids by
+   position; parent row ids are never copied. `planInheritedScheduleMirrors` lists the
+   children that need a new copy after a parent edit, and the service writes the parent
+   and those copies in one transaction.
+2. A following sub-behavior's own schedule, end and pause cannot be edited. Run actions
+   (End now, Pause, Resume now) on it are refused; they apply on the parent.
+3. A sub-behavior with `inherit_parent_schedule = false` keeps its own schedule and
+   follows every rule in this document on its own.
+4. While a parent has at least one active sub-behavior (`hasActiveSubBehaviors`),
+   Occurrence generation creates and updates no Occurrence for the parent. Future
+   Unresolved parent Occurrences with no note, time, move or mark are deleted; all
+   other parent Occurrences stay. When the last active sub-behavior leaves, the parent
+   generates again.
+5. A routine slot is one parent, one local date and one effective start. Following
+   steps share the slot; a step with its own schedule appears in the routine only on
+   its own days.
+
 ## Idempotence
 
 Occurrence generation must be idempotent.

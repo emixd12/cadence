@@ -24,7 +24,10 @@ import { readIntegrationCategories, readIntegrationDayNote, readIntegrationOccur
 import { getBehaviorReadDataForUser } from "./behavior.service";
 import { ensureUserOccurrencesFresh } from "./occurrence.service";
 import { readOccurrenceSyncState } from "./occurrence-sync-state.service";
-import { integrationInstant, serializeIntegrationBehavior, serializeIntegrationOccurrence } from "./integration-read-serialization";
+import {
+  integrationInstant, occurrenceParent, serializeIntegrationBehavior, serializeIntegrationOccurrence,
+  serializeIntegrationParentGroup, subBehaviorsOf,
+} from "./integration-read-serialization";
 import type { Occurrence } from "@/lib/types/database";
 import { listAllDayNotes, listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 import { listDayNotes } from "@cadence/core/services/day-note.service";
@@ -95,18 +98,22 @@ function findBehavior(account: Account, id: string): BehaviorWithCategory {
   return behavior;
 }
 
-function serializeOccurrences(account: Account, occurrences: Occurrence[]) {
+export function serializeAccountOccurrences(
+  account: Pick<Account, "behaviors" | "now" | "timezone">, occurrences: Occurrence[],
+) {
   const behaviors = new Map(account.behaviors.map((row) => [row.id, row]));
   return occurrences.map((row) => {
     const behavior = behaviors.get(row.behavior_id);
     if (!behavior) throw new IntegrationReadError("service_unavailable", "Tracking data changed during this read. Retry the request.");
-    return serializeIntegrationOccurrence(row, behavior, account.now, account.timezone);
+    return serializeIntegrationOccurrence(row, behavior, account.now, account.timezone, occurrenceParent(behavior, behaviors));
   });
 }
+const serializeOccurrences = serializeAccountOccurrences;
 
-async function behaviorResult(context: IntegrationContext, behavior: BehaviorWithCategory) {
+async function behaviorResult(context: IntegrationContext, behavior: BehaviorWithCategory, behaviors: readonly BehaviorWithCategory[]) {
   const refs = await listExternalReferences(context.supabase, { entityType: "behavior", entityIds: [behavior.id] });
-  return serializeIntegrationBehavior(behavior, refs.get(behavior.id) ?? null, Temporal.Instant.from(context.now.toISOString()));
+  return serializeIntegrationBehavior(behavior, refs.get(behavior.id) ?? null, Temporal.Instant.from(context.now.toISOString()),
+    subBehaviorsOf(behavior.id, behaviors));
 }
 
 async function occurrenceDetail(context: IntegrationContext, account: Account, id: string): Promise<OccurrenceDetailOutput> {
@@ -161,17 +168,26 @@ export async function listIntegrationBehaviors(context: IntegrationContext, inpu
   };
   const opportunityMatches = (row: BehaviorWithCategory) =>
     input.is_opportunity === undefined || (row.is_opportunity === true) === input.is_opportunity;
-  const rows = account.behaviors.filter((row) => inState(row) && opportunityMatches(row) &&
+  const hierarchy = input.hierarchy ?? "all";
+  const inHierarchy = (row: BehaviorWithCategory) => {
+    const parentId = row.parent_behavior_id ?? null;
+    if (input.parent_behavior_id && parentId !== input.parent_behavior_id) return false;
+    return hierarchy === "all" || (hierarchy === "top_level" ? parentId === null : parentId !== null);
+  };
+  const rows = account.behaviors.filter((row) => inState(row) && opportunityMatches(row) && inHierarchy(row) &&
     (!input.category_id || row.category_id === input.category_id) && changedSince(row.updated_at, input.updated_since),
   );
   const selected = page(context, rows, input, ["behaviors", input.state ?? "all", input.category_id, input.updated_since,
-    ...(input.is_opportunity === undefined ? [] : [input.is_opportunity])], (row) => row.id);
+    ...(input.is_opportunity === undefined ? [] : [input.is_opportunity]),
+    ...(input.parent_behavior_id || hierarchy !== "all" ? [input.parent_behavior_id ?? null, hierarchy] : [])], (row) => row.id);
   const refs = await listExternalReferences(context.supabase, { entityType: "behavior", entityIds: selected.rows.map((row) => row.id) });
-  return { behaviors: selected.rows.map((row) => serializeIntegrationBehavior(row, refs.get(row.id) ?? null, account.now)), next_cursor: selected.next_cursor };
+  return { behaviors: selected.rows.map((row) => serializeIntegrationBehavior(row, refs.get(row.id) ?? null, account.now,
+    subBehaviorsOf(row.id, account.behaviors))), next_cursor: selected.next_cursor };
 }
 
 export async function getIntegrationBehavior(context: IntegrationContext, input: IntegrationOperationInput<"get_behavior">): Promise<IntegrationOperationOutput<"get_behavior">> {
-  return { behavior: await behaviorResult(context, findBehavior(await readAccount(context), input.behavior_id)) };
+  const account = await readAccount(context);
+  return { behavior: await behaviorResult(context, findBehavior(account, input.behavior_id), account.behaviors) };
 }
 
 export async function listIntegrationCategories(context: IntegrationContext, input: IntegrationOperationInput<"list_categories">): Promise<IntegrationOperationOutput<"list_categories">> {
@@ -204,17 +220,22 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
     timezone: account.timezone, startLocalDate: start, futureDays: days - 1,
   });
   const serialized = new Map(serializeOccurrences(account, rows).map((row) => [row.id, row]));
-  const needs = timeline.needsDecision.daySections.flatMap((day) => day.occurrences).filter((row) => row.localDate >= lookback).map((row) => serialized.get(row.id)!);
+  const needsDays = timeline.needsDecision.daySections.filter((day) => day.localDate >= lookback);
+  const needs = needsDays.flatMap((day) => day.occurrences).filter((row) => row.localDate >= lookback).map((row) => serialized.get(row.id)!);
   if (includeNeedsDecision && needs.length > L.maxNeedsDecisionItems) {
     throw new IntegrationReadError("limit_exceeded", "Needs decision exceeds 100 Occurrences. Set include_needs_decision to false and use list_occurrences with needs_decision_only.");
   }
   return {
     timezone: account.timezone, today_local_date: account.today,
-    needs_decision: includeNeedsDecision ? { occurrences: needs, total_count: needs.length, truncated: false, lookback_start_local_date: lookback } : null,
+    needs_decision: includeNeedsDecision ? {
+      occurrences: needs, total_count: needs.length, truncated: false, lookback_start_local_date: lookback,
+      parent_groups: needsDays.flatMap((day) => day.parentGroups).map(serializeIntegrationParentGroup),
+    } : null,
     days: timeline.daySections.map((day) => ({
       local_date: day.localDate, is_today: day.localDate === account.today,
       day_note: dayNotes[day.localDate] ?? null,
       occurrences: day.occurrences.map((row) => serialized.get(row.id)!),
+      parent_groups: day.parentGroups.map(serializeIntegrationParentGroup),
     })), freshness: account.freshness,
   };
 }
@@ -310,7 +331,7 @@ export async function fetchIntegrationRecord(context: IntegrationContext, input:
   }
   const account = await readAccount(context, kind === "occurrence");
   if (kind === "behavior") {
-    const behavior = await behaviorResult(context, findBehavior(account, id));
+    const behavior = await behaviorResult(context, findBehavior(account, id), account.behaviors);
     return { id: input.id, title: behavior.title, text: JSON.stringify(behavior, null, 2), url: behaviorUrl(id), metadata: { kind, behavior_id: id } };
   }
   const occurrence = await occurrenceDetail(context, account, id);

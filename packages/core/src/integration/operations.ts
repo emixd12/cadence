@@ -34,6 +34,8 @@ import {
   occurrenceOutput,
   occurrenceStatus,
   pageSize,
+  parentGroupOutput,
+  subBehaviorSortOrder,
   remindersInput,
   revision,
   schedulesInput,
@@ -41,6 +43,7 @@ import {
   updatedSince,
   utcInstant,
   uuid,
+  inputInstant,
 } from "./domain";
 import type { IntegrationErrorCode } from "./errors";
 import { INTEGRATION_LIMITS } from "./limits";
@@ -202,7 +205,7 @@ const listBehaviors = readOperation({
   name: "list_behaviors",
   title: "List Behaviors",
   description:
-    "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, and archive notes. Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
+    "Lists the user's Behaviors, the recurring things they track (habits, routines, or recurring tasks), with schedules, reminders, category, run state, archive notes, and sub-behavior links. A parent Behavior lists its sub-behaviors (one level deep). Use it to find a Behavior id or review what the user tracks. Includes archived Behaviors unless filtered.",
   input: object({
     state: optional(enumOf(["active", "archived", "running", "not_running", "all"] as const, {
       default: "all",
@@ -210,6 +213,11 @@ const listBehaviors = readOperation({
     })),
     category_id: optional(uuid("Only Behaviors in this category.")),
     is_opportunity: optional(boolean({ description: "true: only Behaviors available as opportunities; false: only the others. Omit for both (contract 1.6.0)." })),
+    parent_behavior_id: optional(uuid("Only the sub-behaviors of this parent Behavior (contract 1.7.0).")),
+    hierarchy: optional(enumOf(["all", "top_level", "sub_behaviors"] as const, {
+      default: "all",
+      description: "top_level returns parents and standalone Behaviors; sub_behaviors returns only sub-behaviors (contract 1.7.0).",
+    })),
     updated_since: optional(updatedSince()),
     page_size: optional(pageSize()),
     cursor: optional(cursor()),
@@ -224,7 +232,7 @@ const getBehavior = readOperation({
   name: "get_behavior",
   title: "Get Behavior",
   description:
-    "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, and revision. Use it before editing a Behavior.",
+    "Returns one Behavior's full definition: schedules and time entries, reminder settings, category, description, location, default duration, run state, end, pause, archive notes, parent link, sub-behaviors, and revision. Use it before editing a Behavior.",
   input: object({ behavior_id: behaviorIdInput() }),
   output: object({ behavior: behaviorOutput }),
   errors: ["not_found"],
@@ -260,14 +268,15 @@ const timelineDay = object({
   local_date: localDate(),
   is_today: boolean(),
   day_note: optional(nullable(string({ description: "The user's day note for this date, or null. Separate from Occurrence notes and statuses." }))),
-  occurrences: array(occurrenceOutput),
+  occurrences: array(occurrenceOutput, { description: "Every Occurrence of the day, sub-behavior Occurrences included." }),
+  parent_groups: optional(array(parentGroupOutput, { description: "The day's parent Behavior slots in time order. Their Occurrences also appear in `occurrences` (contract 1.7.0)." })),
 });
 
 const getTimeline = readOperation({
   name: "get_timeline",
   title: "Get Timeline",
   description:
-    `Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to ${L.maxTimelineDays} days from the start date.`,
+    `Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in \`parent_groups\`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to ${L.maxTimelineDays} days from the start date.`,
   input: object({
     start_local_date: optional(localDate("First day to return. Defaults to today in the account timezone.")),
     days: optional(integer({ minimum: 1, maximum: L.maxTimelineDays, default: 1, description: "Number of days to return." })),
@@ -281,6 +290,7 @@ const getTimeline = readOperation({
       total_count: integer({ minimum: 0 }),
       truncated: boolean({ description: "True when more Needs decision Occurrences exist than are returned." }),
       lookback_start_local_date: localDate(`Earliest date searched (${L.needsDecisionLookbackDays} days back). Use list_occurrences for older history.`),
+      parent_groups: optional(array(parentGroupOutput, { description: "Parent Behavior slots with a Needs decision Occurrence (contract 1.7.0)." })),
     }), { description: "Null when include_needs_decision is false." }),
     days: array(timelineDay, { maxItems: L.maxTimelineDays }),
     freshness: freshnessOutput,
@@ -426,6 +436,48 @@ const setOccurrenceStatus = writeOperation({
   idempotentHint: true,
   annotationRationale:
     "Changes stored data, so readOnlyHint is false. Claude's review criteria ask for destructiveHint true on tools that modify data, so Claude confirms each call; OpenAI reserves it for hard-to-reverse outcomes, and a status can be set back, so the hint is conservative for ChatGPT. The same arguments always produce the same end state, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.",
+});
+
+const parentSlotStatus = enumOf(["completed", "not_completed"] as const, { description: "New status for each sub-behavior Occurrence in the slot." });
+
+const setParentOccurrenceStatus = writeOperation({
+  name: "set_parent_occurrence_status",
+  since: "1.7.0",
+  title: "Set parent Behavior slot status",
+  description:
+    `Marks every sub-behavior Occurrence in one parent Behavior slot Completed or Not Completed in one change, such as a whole skin routine one morning. Name the slot with \`local_date\`, plus \`slot_key\` from get_timeline \`parent_groups\` when the parent has several times that day, or list \`occurrence_ids\`. Occurrences that already have the status do not change. To mark one step, use set_occurrence_status.`,
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    parent_behavior_id: behaviorIdInput(),
+    status: parentSlotStatus,
+    local_date: optional(localDate("Day of the slot, in the account timezone.")),
+    slot_key: optional(inputInstant("`slot_key` of one parent group from get_timeline. Needs local_date.")),
+    occurrence_ids: optional(array(uuid(), {
+      minItems: 1, maxItems: L.maxParentSlotOccurrences, uniqueItems: true,
+      description: "The sub-behavior Occurrences to mark. All must belong to sub-behaviors of this parent on one day.",
+    })),
+    expected_statuses: optional(array(object({
+      occurrence_id: occurrenceIdInput(),
+      status: occurrenceStatus("Status the client last read."),
+    }), {
+      minItems: 1, maxItems: L.maxParentSlotOccurrences,
+      description: "Statuses the client last read. If any stored status differs, the call fails with `conflict` and changes nothing.",
+    })),
+    idempotency_key: optional(idempotencyKey()),
+  }, { requireOneOf: ["local_date", "occurrence_ids"] }),
+  output: object({
+    parent_behavior_id: uuid(),
+    status: parentSlotStatus,
+    occurrences: array(occurrenceOutput, { maxItems: L.maxParentSlotOccurrences, description: "The marked Occurrences after the change, in sub-behavior order." }),
+    changed_occurrence_ids: array(uuid(), { description: "Occurrences whose status changed. Empty when all already had the status." }),
+    parent_groups: array(parentGroupOutput, { description: "The derived rollup of each slot the marked Occurrences belong to." }),
+    changed: boolean({ description: "False when every Occurrence already had this status." }),
+  }),
+  errors: ["not_found", "conflict", "idempotency_key_reused", "invalid_state"],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Changes stored statuses of several Occurrences at once, so readOnlyHint is false and destructiveHint is true under Claude's review criteria, which ask for it on tools that modify data; each status can be set back, so the hint is conservative for ChatGPT. The same arguments always leave the same statuses, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.",
 });
 
 const updateOccurrenceNote = writeOperation({
@@ -603,29 +655,48 @@ const removeOpportunityOccurrence = writeOperation({
     "Deletes an added Occurrence, so destructiveHint is true under both Claude's and OpenAI's guidance; the rules allow it only for a clean, unmarked item, and add_opportunity_occurrence can add it again. Repeating it leaves the same end state, the item gone, so idempotentHint is true. openWorldHint is false.",
 });
 
+const subBehaviorInput = object({
+  title: behaviorTitleInput(),
+  description: optional(behaviorDescriptionInput()),
+  inherit_parent_schedule: optional(boolean({ description: "True (the default) follows the parent's schedule and takes no `schedules`; false needs `schedules`." })),
+  schedules: optional(schedulesInput),
+  sub_behavior_sort_order: optional(subBehaviorSortOrder("Position among the sub-behaviors. Defaults to the list order.")),
+  external_ref: optional(externalRef("Optional id of the matching record in the calling app. Stored for this client only.")),
+}, { description: "One sub-behavior to create under the new parent." });
+
 const createBehavior = writeOperation({
   name: "create_behavior",
   title: "Create Behavior",
   description:
-    "Creates a Behavior, a recurring thing the user wants to track (a habit, routine, or recurring task), with structured schedules and reminder settings. Supports daily, every N days, weekly or every N weeks on chosen weekdays, and monthly on day N. With is_opportunity true it is also available to add to today when there is room, and schedules may be empty. Browser reminders default to on and email reminders to off. Use list_categories to pick a category.",
+    `Creates a Behavior, a recurring thing the user wants to track (a habit, routine or recurring task), with schedules (daily, every N days, weekly or every N weeks on chosen weekdays, monthly on day N) and reminders. With is_opportunity true it can be added to today when there is room, and schedules may be empty. \`sub_behaviors\` creates a parent and up to ${L.maxInlineSubBehaviors} sub-behaviors in one change; \`parent_behavior_id\` adds one sub-behavior to an existing parent, and one that follows the parent's schedule needs no \`schedules\`. An opportunity Behavior is never in a routine. list_categories lists categories.`,
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     title: behaviorTitleInput(),
     description: optional(behaviorDescriptionInput()),
     location_text: optional(locationTextInput()),
     category_id: optional(nullable(uuid("Category id from list_categories."))),
-    schedules: schedulesInput,
-    is_opportunity: optional(boolean({ default: false, description: "Available as an opportunity: the person can add it to today when there is room. Required true for empty schedules (contract 1.6.0)." })),
+    schedules: optional(schedulesInput),
+    is_opportunity: optional(boolean({ default: false, description: "Available as an opportunity: the person can add it to today when there is room. Required true for empty schedules (contract 1.6.0). An opportunity Behavior cannot be a parent or a sub-behavior (contract 1.7.0)." })),
     reminders: optional(remindersInput),
     default_duration_minutes: optional(defaultDurationInput()),
+    parent_behavior_id: optional(uuid("Optional parent Behavior: the new Behavior becomes its sub-behavior. The parent must be active and top-level (contract 1.7.0).")),
+    inherit_parent_schedule: optional(boolean({ description: "With parent_behavior_id: true (the default) follows the parent's schedule and takes no `schedules`; false needs `schedules`." })),
+    sub_behavior_sort_order: optional(subBehaviorSortOrder("With parent_behavior_id: position among the parent's sub-behaviors. Defaults to last.")),
+    sub_behaviors: optional(array(subBehaviorInput, {
+      minItems: 1, maxItems: L.maxInlineSubBehaviors,
+      description: "Sub-behaviors to create with this Behavior in the same change, in display order. Not allowed with parent_behavior_id: a sub-behavior can't have sub-behaviors.",
+    })),
     end_on: optional(localDate("Optional last local day the Behavior runs. It stays active and moves to Not running after it.")),
     end_time: optional(localTime("Optional local time on end_on when it stops. Needs end_on. Without it the Behavior stops at the end of end_on.")),
     end_date: optional(localDate("Deprecated: send end_on. The first day without the Behavior; Cadence stores end_on as the day before.")),
     external_ref: optional(externalRef("Optional id of the matching record in the calling app. Stored for this client only.")),
     idempotency_key: optional(idempotencyKey()),
+  }, { requireOneOf: ["schedules", "parent_behavior_id"] }),
+  output: object({
+    behavior: behaviorOutput,
+    sub_behaviors: optional(array(behaviorOutput, { description: "The created sub-behaviors in order, when the call sent `sub_behaviors` (contract 1.7.0)." })),
   }),
-  output: object({ behavior: behaviorOutput }),
-  errors: ["not_found", "idempotency_key_reused"],
+  errors: ["not_found", "idempotency_key_reused", "invalid_state"],
   destructiveHint: false,
   idempotentHint: false,
   annotationRationale:
@@ -644,13 +715,16 @@ const behaviorChangeFields = [
   "end_time",
   "end_date",
   "is_opportunity",
+  "parent_behavior_id",
+  "inherit_parent_schedule",
+  "sub_behavior_sort_order",
 ] as const;
 
 const updateBehavior = writeOperation({
   name: "update_behavior",
   title: "Update Behavior",
   description:
-    "Edits a Behavior's title, description, location, category, schedules, reminders, default duration, end, or whether it is available as an opportunity. Only the fields sent change; `schedules`, when sent, replaces the whole schedule list, and may be empty only for an opportunity Behavior. Past and resolved Occurrences are preserved. Use get_behavior first to read the current definition and revision.",
+    `Edits a Behavior's title, description, place, category, schedules, reminders, length, end, opportunity flag or sub-behavior link. Only the fields sent change; \`schedules\` replaces the whole list and may be empty only for an opportunity Behavior. \`parent_behavior_id\` groups it under a parent, or null makes it top-level; \`sub_behavior_sort_order\` moves it among its siblings. An opportunity Behavior is never part of a routine. A parent's schedule change also reaches the sub-behaviors that follow it. Past and resolved Occurrences are kept. Read get_behavior first for the revision.`,
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),
@@ -666,6 +740,9 @@ const updateBehavior = writeOperation({
     end_on: optional(nullable(localDate(), { description: "New last local day, or null to clear the end. It must be later than now. To stop right away, use end_behavior." })),
     end_time: optional(nullable(localTime(), { description: "New local stop time on end_on, or null to stop at the end of that day." })),
     end_date: optional(nullable(localDate(), { description: "Deprecated: send end_on. The first day without the Behavior, or null to clear the end." })),
+    parent_behavior_id: optional(nullable(uuid(), { description: "New parent Behavior, or null to make this a top-level Behavior. The parent must be active and top-level, and a Behavior with sub-behaviors can't get a parent (contract 1.7.0)." })),
+    inherit_parent_schedule: optional(boolean({ description: "For a sub-behavior: true follows the parent's schedule and takes no `schedules`; false keeps its current schedules unless `schedules` is sent. A Behavior newly given a parent follows it unless this is false." })),
+    sub_behavior_sort_order: optional(subBehaviorSortOrder("For a sub-behavior: new position among its siblings, 0 first. The other sub-behaviors shift to make room.")),
     idempotency_key: optional(idempotencyKey()),
   }, { requireOneOf: behaviorChangeFields }),
   output: object({
@@ -683,7 +760,7 @@ const archiveBehavior = writeOperation({
   name: "archive_behavior",
   title: "Archive Behavior",
   description:
-    "Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Nothing is deleted. Archiving an archived Behavior changes nothing.",
+    "Archives a Behavior so it schedules no new Occurrences, with an optional archive note. History, notes, and past Occurrences are kept, and restore_behavior reverses it. Archiving a parent Behavior also archives its active sub-behaviors. Nothing is deleted. Archiving an archived Behavior changes nothing.",
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),
@@ -706,7 +783,7 @@ const restoreBehavior = writeOperation({
   name: "restore_behavior",
   title: "Restore Behavior",
   description:
-    "Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring an active Behavior changes nothing.",
+    "Restores an archived Behavior so it schedules Occurrences again from today. Archive notes are kept. Restoring a parent Behavior also restores the sub-behaviors archived with it; a sub-behavior of an archived parent can't be restored on its own. Restoring an active Behavior changes nothing.",
   scope: INTEGRATION_SCOPES.behaviorsWrite,
   input: object({
     behavior_id: behaviorIdInput(),
@@ -812,6 +889,7 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   search,
   "fetch": fetchRecord,
   set_occurrence_status: setOccurrenceStatus,
+  set_parent_occurrence_status: setParentOccurrenceStatus,
   update_occurrence_note: updateOccurrenceNote,
   move_occurrence_for_day: moveOccurrenceForDay,
   revert_occurrence_move: revertOccurrenceMove,

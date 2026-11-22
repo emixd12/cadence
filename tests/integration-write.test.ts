@@ -4,29 +4,36 @@ import { integrationBehaviorInput } from "@/lib/services/integration-behavior-in
 import { writeOperationHandlers } from "@/lib/integrations/operations/write";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { recordIntegrationActivity, beginIdempotentWrite } from "@/lib/db/integration.repo";
-import { getBehaviorById } from "@/lib/db/behaviors.repo";
+import { getBehaviorById, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
+import { updateBehaviorForUser } from "@/lib/services/behavior.service";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/integration.repo", () => ({
   beginIdempotentWrite: vi.fn(), releaseIdempotentWrite: vi.fn(), recordIntegrationActivity: vi.fn(),
 }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: vi.fn(), listBehaviorCategories: vi.fn() }));
+vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: vi.fn(), listBehaviorCategories: vi.fn(), listUserBehaviors: vi.fn() }));
+vi.mock("@/lib/services/behavior.service", async (original) => ({
+  ...await original<typeof import("@/lib/services/behavior.service")>(), updateBehaviorForUser: vi.fn(),
+}));
 const id = "22500000-0000-4000-8000-000000000001";
 const context = { supabase: {}, userId: id, now: new Date("2026-10-18T12:00:00Z"),
   actor: { grantedScopes: ["cadence.read", "cadence.behaviors.write", "cadence.occurrences.write"] } } as unknown as IntegrationContext;
 const create = { title: "Walk", schedules: [{ recurrence: { frequency: "daily" as const, interval: 1 },
   time_entries: [{ kind: "exact" as const, start_time: "09:00" }] }] };
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(listUserBehaviors).mockResolvedValue([]);
+});
 describe("integration write boundary", () => {
   it("denies each operation before data access and records the attempt", async () => {
     for (const handler of Object.values(writeOperationHandlers)) {
       const result = await handler({ ...context, actor: { ...context.actor, grantedScopes: ["cadence.read"] } }, {});
       expect(result).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });
     }
-    expect(recordIntegrationActivity).toHaveBeenCalledTimes(14);
+    expect(recordIntegrationActivity).toHaveBeenCalledTimes(15);
     expect(beginIdempotentWrite).not.toHaveBeenCalled();
     expect(getBehaviorById).not.toHaveBeenCalled();
   });
@@ -77,6 +84,34 @@ describe("integration write boundary", () => {
     expect(await writeOperationHandlers.update_behavior(context, {
       behavior_id: id, expected_revision: "2026-10-18T12:00:00Z", title: "Other",
     })).toMatchObject({ ok: false, error: { code: "conflict" } });
+  });
+});
+
+describe("update_behavior opportunity flag", () => {
+  it("writes an is_opportunity-only update through the update transaction and returns its receipt", async () => {
+    const current = { id, title: "Walk", description: null, location_text: null, category: null, active: true,
+      recurrence_rule: { frequency: "daily", interval: 1 }, scheduled_time: "09:00:00", timezone: "America/New_York",
+      browser_reminder_enabled: true, email_reminder_enabled: false, reminder_offset_minutes: 0,
+      created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", archived_at: null,
+      auto_archived_at: null, end_date: null, default_duration_minutes: null, archive_notes: [], is_opportunity: false,
+      schedule_slots: [{ id, kind: "exact", preset: null, start_time: "09:00:00", end_time: null, sort_order: 0 }],
+    } as unknown as BehaviorWithCategory;
+    vi.mocked(getBehaviorById).mockResolvedValue(current);
+    const rpc = vi.fn(async (_name: string, args: { p_args: { _integration_prepared?: { output_json: string } } }) => {
+      const prepared = args.p_args._integration_prepared;
+      if (!prepared) return { data: { fingerprint: "f", source: { version: 1, behavior: { ...current, is_opportunity: true, recurrence_rule: null, scheduled_time: null, schedule_slots: [], schedules: [] },
+        occurrence: null, previous_status: null, changed: true, as_of: current.updated_at, timezone: "America/New_York", external_ref: null } }, error: null };
+      return { data: { receipt: { version: 2, output_json: prepared.output_json }, rpc_result: { id } }, error: null };
+    });
+    vi.mocked(updateBehaviorForUser).mockImplementation(async (client) => {
+      await client.rpc("update_behavior_with_schedule_graph" as never, {} as never);
+      return undefined as never;
+    });
+    const result = await writeOperationHandlers.update_behavior({ ...context, supabase: { rpc } } as unknown as IntegrationContext,
+      { behavior_id: id, expected_revision: current.updated_at, is_opportunity: true });
+    expect(result).toMatchObject({ ok: true, value: { changed: true } });
+    expect(updateBehaviorForUser).toHaveBeenCalledWith(expect.anything(), id,
+      expect.objectContaining({ behaviorId: id, values: expect.objectContaining({ isOpportunity: true }) }), expect.any(String));
   });
 });
 

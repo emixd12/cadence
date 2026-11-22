@@ -497,8 +497,8 @@ declare
   current_snapshot jsonb := public.read_account_sync_snapshot(8);
   legacy_snapshot jsonb := public.read_account_sync_snapshot(7);
 begin
-  if cadence_private.account_sync_current_contract() <> 8 or cadence_private.account_sync_min_writer_contract() <> 8 then
-    raise exception 'Account sync contract 8 is not the current and minimum writer contract.';
+  if cadence_private.account_sync_current_contract() < 8 or cadence_private.account_sync_min_writer_contract() <> 8 then
+    raise exception 'Account sync contract 8 is not in force as the minimum writer contract.';
   end if;
   if not exists (
     select 1 from jsonb_array_elements(current_snapshot -> 'entities') entity

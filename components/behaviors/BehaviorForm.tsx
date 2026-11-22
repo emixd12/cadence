@@ -12,6 +12,8 @@ import {
 import { useFormStatus } from "react-dom";
 
 import { ReminderEditor } from "@/components/behaviors/ReminderEditor";
+import { SubBehaviorDraftEditor, type SubBehaviorDraft } from "@/components/behaviors/SubBehaviorEditor";
+import type { ParentOption } from "@/components/behaviors/behavior-list-state";
 import { Notice } from "@/components/feedback/Notice";
 import { PlaceMarkerControl, type WhereDraft } from "@/components/travel/PlaceLabels";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
@@ -51,6 +53,15 @@ type BehaviorFormProps = Readonly<{
    * A runtime that cannot store the flag yet passes false; the stored flag is kept.
    */
   allowOpportunity?: boolean;
+  /**
+   * Sub-behaviors (depth 1): Behaviors this one may go under. Without it the form has no
+   * parent field and saving keeps the stored link. Build it with `parentChoices`.
+   */
+  parentOptions?: readonly ParentOption[];
+  /** True when this Behavior has sub-behaviors, so it can't go under another one. */
+  parentLocked?: boolean;
+  /** Create mode: let the person draft sub-behaviors that save with this Behavior. */
+  allowSubBehaviorDrafts?: boolean;
 }>;
 
 export type TimeEntryRow = {
@@ -118,6 +129,9 @@ export function BehaviorForm({
   extraFields,
   whereDraft = null,
   allowOpportunity = true,
+  parentOptions,
+  parentLocked = false,
+  allowSubBehaviorDrafts = false,
 }: BehaviorFormProps) {
   const planningId = useId();
   const [selectedCategory, setSelectedCategory] = useState(behavior?.categoryId ?? "");
@@ -138,6 +152,15 @@ export function BehaviorForm({
   );
   const [isOpportunity, setIsOpportunity] = useState(behavior?.isOpportunity === true);
   const unscheduled = scheduleRows.length === 0;
+  const [parentId, setParentId] = useState(behavior?.parentBehaviorId ?? "");
+  const [inheritSchedule, setInheritSchedule] = useState(behavior?.parentBehaviorId ? behavior.inheritParentSchedule ?? true : true);
+  const [subBehaviorDrafts, setSubBehaviorDrafts] = useState<SubBehaviorDraft[]>([]);
+  const parentTitle = parentOptions?.find((option) => option.id === parentId)?.title ?? null;
+  // An opportunity Behavior stays out of routines: it is never a parent or a sub-behavior.
+  const showParentField = Boolean(parentOptions) && !parentLocked && !isOpportunity && subBehaviorDrafts.length === 0 &&
+    (parentId === "" || parentTitle !== null);
+  const followsParent = Boolean(parentId) && inheritSchedule;
+  const inRoutine = Boolean(parentId) || parentLocked || subBehaviorDrafts.length > 0;
   const [draftDirty, setDraftDirty] = useState(Boolean(whereDraft));
   const formRef = useRef<HTMLFormElement>(null);
   const draftRevisionRef = useRef(0);
@@ -285,6 +308,9 @@ export function BehaviorForm({
     setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
     setIsOpportunity(behavior?.isOpportunity === true);
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
+    setParentId(behavior?.parentBehaviorId ?? "");
+    setInheritSchedule(behavior?.parentBehaviorId ? behavior.inheritParentSchedule ?? true : true);
+    setSubBehaviorDrafts([]);
   }, [behavior]);
 
   return (
@@ -352,6 +378,35 @@ export function BehaviorForm({
           defaultValue={behavior?.description ?? ""}
           error={fieldErrors.description}
         />
+        {showParentField ? (
+          <div className="grid gap-2">
+            <div className="grid gap-3 sm:grid-cols-[minmax(12rem,20rem)_minmax(0,1fr)] sm:items-end lg:grid-cols-[minmax(14rem,24rem)_minmax(0,1fr)]">
+              <SelectField
+                label="Part of"
+                name="parent_behavior_id"
+                value={parentId}
+                onChange={(value) => {
+                  setParentId(value);
+                  if (value && !behavior?.parentBehaviorId) setInheritSchedule(true);
+                }}
+              >
+                <option value="">None</option>
+                {parentOptions?.map((option) => (
+                  <option key={option.id} value={option.id}>{option.title}</option>
+                ))}
+              </SelectField>
+              {parentId ? (
+                <label className="flex min-h-11 items-center gap-3 text-sm sm:min-h-8">
+                  <input type="checkbox" checked={inheritSchedule}
+                    onChange={(event) => setInheritSchedule(event.target.checked)}
+                    className="h-4 w-4 accent-[var(--primary)]" />
+                  Follow parent schedule
+                </label>
+              ) : null}
+            </div>
+            {parentId ? <input type="hidden" name="inherit_parent_schedule" value={inheritSchedule ? "true" : "false"} /> : null}
+          </div>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-[minmax(12rem,20rem)_minmax(0,1fr)] lg:grid-cols-[minmax(14rem,24rem)_minmax(0,1fr)]">
           <SelectField
             label="Where"
@@ -396,7 +451,7 @@ export function BehaviorForm({
               <FieldError message={fieldErrors.default_duration_minutes} />
             </div>
           </div>
-          <div className="grid min-w-0 gap-1 text-sm">
+          <div className="grid min-w-0 gap-1 text-sm" hidden={followsParent}>
             <label htmlFor={`${planningId}-end-date`}>Ends after</label>
             <input id={`${planningId}-end-date`} name="end_on" type="date"
               min="0001-01-01" max="9999-12-30" value={endDay}
@@ -436,7 +491,7 @@ export function BehaviorForm({
           </div>
         </div>
 
-        {allowOpportunity ? (
+        {allowOpportunity && !inRoutine ? (
           <div className="grid gap-1 text-sm">
             <input type="hidden" name="is_opportunity" value="false" />
             <label className="flex min-h-11 items-center gap-2 py-1">
@@ -468,7 +523,11 @@ export function BehaviorForm({
           value={scheduleRows.length}
         />
 
-        <div className="divide-y divide-line" hidden={unscheduled}>
+        {followsParent && parentTitle ? (
+          <Notice id="sub-behaviors.follows-parent" params={{ parent: parentTitle }} className="text-sm" />
+        ) : null}
+
+        <div className="divide-y divide-line" hidden={unscheduled || followsParent}>
           {scheduleRows.map((schedule, index) => (
             <ScheduleRowEditor
               key={schedule.key}
@@ -490,7 +549,7 @@ export function BehaviorForm({
           ))}
         </div>
 
-        <div className={unscheduled ? "grid gap-2 text-sm" : "-mt-2 grid gap-2 text-sm"}>
+        <div className={unscheduled ? "grid gap-2 text-sm" : "-mt-2 grid gap-2 text-sm"} hidden={followsParent}>
           <button
             type="button"
             onClick={addScheduleRow}
@@ -503,6 +562,16 @@ export function BehaviorForm({
           <FieldError message={fieldErrors.schedule} />
         </div>
       </fieldset>
+
+      {allowSubBehaviorDrafts && mode === "create" && !parentId && !isOpportunity ? (
+        <SubBehaviorDraftEditor
+          drafts={subBehaviorDrafts}
+          onChange={(drafts) => {
+            markDraftDirty();
+            setSubBehaviorDrafts(drafts);
+          }}
+        />
+      ) : null}
 
       <div>
         <ReminderEditor

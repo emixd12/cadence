@@ -6,6 +6,7 @@ import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
 import { createLinkMessage, SourceLinkCreateChoice, type SourceLinkChoice } from "@/components/behaviors/SourceLinkSettings";
 import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { dispatchBehaviorCreated } from "@/components/behaviors/behavior-events";
+import type { ParentOption } from "@/components/behaviors/behavior-list-state";
 import type {
   BehaviorActionState,
   BehaviorFormAction,
@@ -25,6 +26,12 @@ type BehaviorCreateSectionProps = Readonly<{
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
   /** Behaviors of Opportunity: show Available as an opportunity in the form. */
   allowOpportunity?: boolean;
+  /**
+   * Sub-behaviors (depth 1): Behaviors a new one may go under. When set, the form also
+   * lets the person draft sub-behaviors; `action` then receives the `sub_behavior_*`
+   * fields (`sub-behavior-form-data.ts`).
+   */
+  parentOptions?: readonly ParentOption[];
 }>;
 
 export function BehaviorCreateSection({
@@ -35,6 +42,7 @@ export function BehaviorCreateSection({
   reminderRuntime = "web",
   sourceLinkCoordinator,
   allowOpportunity = true,
+  parentOptions,
 }: BehaviorCreateSectionProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -104,6 +112,8 @@ export function BehaviorCreateSection({
             defaultTimezone={defaultTimezone}
             onSuccess={handleSuccess}
             allowOpportunity={allowOpportunity}
+            parentOptions={parentOptions}
+            allowSubBehaviorDrafts={parentOptions !== undefined}
             extraFields={linkCoordinator
               ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={linkCoordinator} />
               : null}

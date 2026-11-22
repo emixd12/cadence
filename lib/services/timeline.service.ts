@@ -272,6 +272,13 @@ async function readTimelineSourceCountable(
     const enabled = links.filter((link) => link.enabled);
     if (enabled.some((link) => link.selector_kind === "any")) return {};
     const linked = new Set(enabled.map((link) => link.behavior_id));
+    // A link on a parent covers its sub-behaviors.
+    if (linked.size > 0) {
+      const { data, error } = await supabase.from("behaviors").select("id").eq("user_id", userId)
+        .in("parent_behavior_id", [...linked]);
+      if (error) return {};
+      for (const row of data ?? []) linked.add(row.id);
+    }
     return Object.fromEntries(candidates.filter((occurrence) => !linked.has(occurrence.behavior_id))
       .map((occurrence) => [occurrence.id, ["hevy"]]));
   } catch {

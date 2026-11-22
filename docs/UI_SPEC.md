@@ -635,6 +635,28 @@ activity) offers an underlined **Remove** at the end of its expanded details, on
 and in Needs decision. The result shows below it as `opportunity.removed` or an
 `opportunity.remove-refused.*` notice. Scheduled rows never show either.
 
+### Routine rows and Semantic Zoom (Ticket 349)
+
+- A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine
+  title, slot time, derived state (progress "2/3", or Completed / Not Completed with
+  the status fill) and, on today and in Needs decision, bulk **Completed** and **Not
+  Completed**. Future days show no bulk actions.
+- On phones (below 576px) the routine title keeps the row's width. A resolved routine
+  keeps its status label on the same line; the bulk marks move to a second line,
+  right-aligned.
+- Open, the routine lists its steps in sibling order as normal Occurrence rows, each
+  with its own Completed, Not Completed, Note, time tracking and connector label.
+- Standalone Behaviors and routines share one time order (`section.rows`). On the day
+  axis a collapsed routine takes its first step's place.
+- **Semantic Zoom:** layer 1 **Routines** (collapsed) and layer 2 **All steps**
+  (expanded inline). The `SemanticZoomToggle` (Routines / All steps, `aria-pressed`)
+  sits above the first day only when a routine is visible. Pinch, Ctrl/Cmd + wheel
+  and Ctrl/Cmd + = / - switch once per gesture past a threshold; plain scrolling
+  never switches. Opening or closing one routine overrides the layer until the layer
+  changes. Reduced motion turns the reveal off.
+- Needs decision groups prior-day routine slots the same way.
+- Bench: `/design-system?preview=timeline-sub-behaviors&state=routines|all-steps|needs-decision`.
+
 ## Disclosure controls
 
 Use native `details` and `summary` for hide/show sections and drawer-like
@@ -980,6 +1002,24 @@ archived lists; archived results stay in their disclosure. Show matching/total
 counts and Clear filters. Keep overall analytics scope explicit and unchanged.
 Preserve drafts and selections through in-screen updates. Stack controls on
 narrow screens. Detailed lifecycle and empty-state criteria live in Ticket 124.
+
+### Sub-behaviors on Behaviors (Ticket 349)
+
+- Behavior form: **Part of** (`parent_behavior_id`; None, or an active top-level
+  Behavior other than itself) and **Follow parent schedule** (on by default). While a
+  step follows, Ends after and the schedule rows are hidden and the note "Uses the
+  schedule of {parent}." shows. A Behavior with sub-behaviors shows no Part of field.
+- Create form: **Add sub-behavior** drafts steps (`SubBehaviorDraftEditor`) with Title,
+  Description, Follow parent schedule and, when off, Daily/Weekly, weekdays and a time.
+  Up, Down and Remove order the drafts. Choosing a parent hides the drafts.
+- Behaviors list: a routine shows **Sub-behaviors (n)** (open `<details>`) with its
+  steps nested in sibling order. The routine row shows rolled-up Adherence, Completed,
+  Not Completed and "Full routines x of y"; each step keeps its own adherence,
+  calendar and settings. The category filter keeps a routine visible when a step
+  matches.
+- A saved routine's Details and Settings (`SubBehaviorManager`): Up / Down (saved at
+  once, reverted on error), Detach, New sub-behavior and Add an existing behavior.
+  Run controls are hidden on following steps.
 
 ## Behavior review details
 

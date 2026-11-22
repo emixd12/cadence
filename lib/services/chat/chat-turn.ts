@@ -15,7 +15,7 @@ import {
   type ChatToolDefinition, type ChatToolName, type ChatWriteName,
 } from "./chat-tools";
 import {
-  describeOutcome, describePendingWrite, factsFrom, factsReadFor, guardFrom, moveRefusal, outcomeKind, outcomeTargets,
+  describeOutcome, describePendingWrite, guardFrom, moveRefusal, outcomeKind, outcomeTargets, readWriteFacts,
   undoPlanFor, withRevision, type ChatPendingWrite, type ChatToolExecutor, type ChatToolResult, type ChatUndoPlan,
   type ChatWriteCall, type ChatWriteFacts,
 } from "./chat-writes";
@@ -27,7 +27,8 @@ import {
  * The loop calls the model, runs the tool calls it asks for, and repeats until the
  * model answers without tools. Rules decided here in code, never by the model:
  *   - T12: the first single-record write of the question runs at once and gets an
- *     Undo. Behavior changes and every further write wait for one Yes.
+ *     Undo. A routine mark counts as one write: its Undo sets each step it changed
+ *     back. Behavior changes and every further write wait for one Yes.
  *   - T14: every tool call has a fixed idempotency key from the reply's id and the
  *     call's position, so a retried reply never writes twice.
  *   - T21: tool results are cut to 12 KB, at most 8 tool calls run, each model call
@@ -283,8 +284,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       // Claim the one immediate slot before any await, so parallel calls never both run (T12).
       const runNow = isImmediateWrite(name) && !writeAttempted && pending.length === 0;
       if (runNow) writeAttempted = true;
-      const factsRead = factsReadFor(write);
-      const facts = factsFrom(write, factsRead ? await run(factsRead.name, factsRead.args, false) : null);
+      const facts = await readWriteFacts(write, (readName, readArgs) => run(readName, readArgs, false));
       if (!runNow) {
         pending.push({ call: write, item: { text: describePendingWrite(write, facts), kind: outcomeKind(write.name) }, guard: guardFrom(facts, write) });
         answer(WAITING);

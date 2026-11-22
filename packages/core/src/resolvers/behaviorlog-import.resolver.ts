@@ -469,6 +469,7 @@ export function resolveBehaviorLogImportPreview(
   validateDuplicateInterventionIds(plan, errors);
   skipDuplicateInterventionRules(plan, warnings);
   validateCrossReferences({ plan, errors, warnings });
+  validateSubBehaviorLinks({ plan, errors, warnings });
   limitRunningTimeSessions(plan, warnings);
   validateNoteImportPolicy({ plan, warnings });
   validateSupportedSchedules({ plan, warnings, exportedAtUtc: typeof manifest?.exported_at_utc === "string" ? manifest.exported_at_utc : null });
@@ -1054,6 +1055,7 @@ function toBehaviorPlan(
     row,
     errors,
   );
+  const subBehaviorLink = readExtensionSubBehaviorLink(cadence, row, errors);
 
   if (
     expectedDurationMinutes !== null &&
@@ -1110,6 +1112,7 @@ function toBehaviorPlan(
     ...(cadenceRun === undefined ? {} : { cadenceRun }),
     ...(cadenceAutoArchivedAt === undefined ? {} : { cadenceAutoArchivedAt }),
     ...(cadenceIsOpportunity === null ? {} : { cadenceIsOpportunity }),
+    ...(subBehaviorLink ?? {}),
     active: archivedAtUtc === null,
     cadenceActive,
     cadenceBrowserReminderEnabled: readExtensionBoolean(
@@ -5719,6 +5722,79 @@ function readExtensionInstant(
     message: `${row.file} row ${row.row}: extensions.app.cadence.${field} must be a UTC instant or null.`,
     file: row.file, row: row.row, path: `extensions.app.cadence.${field}` });
   return undefined;
+}
+
+/** `parent_behavior_id`, `sub_behavior_sort_order`, `inherit_parent_schedule`; undefined when absent. */
+function readExtensionSubBehaviorLink(
+  extension: JsonRecord | null,
+  row: ParsedJsonlRecord,
+  errors: BehaviorLogImportIssue[],
+): Pick<BehaviorLogImportBehaviorPlan, "cadenceParentBehaviorExternalId" | "cadenceSubBehaviorSortOrder" | "cadenceInheritParentSchedule"> | undefined {
+  if (!extension || !Object.hasOwn(extension, "parent_behavior_id")) return undefined;
+  const invalid = (field: string, expected: string) => {
+    errors.push({ severity: "error", code: `cadence_${field}_invalid`,
+      message: `${row.file} row ${row.row}: extensions.app.cadence.${field} must be ${expected}.`,
+      file: row.file, row: row.row, path: `extensions.app.cadence.${field}` });
+  };
+  const parent = extension.parent_behavior_id;
+  if (parent !== null && (typeof parent !== "string" || parent.trim().length === 0)) {
+    invalid("parent_behavior_id", "a behavior_id or null");
+    return undefined;
+  }
+  const order = extension.sub_behavior_sort_order;
+  if (order !== undefined && order !== null && (!Number.isInteger(order) || (order as number) < 0 || (order as number) > 9_999)) {
+    invalid("sub_behavior_sort_order", "an integer from 0 through 9,999");
+  }
+  const inherit = extension.inherit_parent_schedule;
+  if (inherit !== undefined && inherit !== null && typeof inherit !== "boolean") {
+    invalid("inherit_parent_schedule", "true or false");
+  }
+  const parentId = typeof parent === "string" ? parent.trim() : null;
+  return {
+    cadenceParentBehaviorExternalId: parentId,
+    cadenceSubBehaviorSortOrder: parentId && Number.isInteger(order) ? order as number : 0,
+    cadenceInheritParentSchedule: parentId ? (typeof inherit === "boolean" ? inherit : true) : false,
+  };
+}
+
+/**
+ * Sub-behaviors stay one level deep. A self link, a parent that is itself a
+ * sub-behavior (which includes every cycle) is an error. A parent missing from the bundle
+ * imports the Behavior on its own. Parents are ordered before their sub-behaviors so
+ * every write can name its parent.
+ */
+function validateSubBehaviorLinks(input: {
+  plan: BehaviorLogImportPlan;
+  errors: BehaviorLogImportIssue[];
+  warnings: BehaviorLogImportIssue[];
+}): void {
+  const byId = new Map(input.plan.behaviors.map((behavior) => [behavior.externalId, behavior]));
+  for (const behavior of input.plan.behaviors) {
+    const parentId = behavior.cadenceParentBehaviorExternalId;
+    if (!parentId) continue;
+    const parent = byId.get(parentId);
+    const fail = (code: string, message: string) => input.errors.push({
+      severity: "error", code, message, file: JSONL_FILES.behaviors,
+      path: "extensions.app.cadence.parent_behavior_id",
+    });
+    if (parentId === behavior.externalId) {
+      fail("cadence_sub_behavior_self_parent", `Behavior ${behavior.externalId} names itself as its parent Behavior.`);
+    } else if (!parent) {
+      input.warnings.push({
+        severity: "warning",
+        code: "cadence_sub_behavior_parent_missing",
+        message: `Behavior ${behavior.externalId} names parent Behavior ${parentId}, which is not in this bundle. Cadence imports it on its own.`,
+        file: JSONL_FILES.behaviors,
+      });
+      behavior.cadenceParentBehaviorExternalId = null;
+      behavior.cadenceSubBehaviorSortOrder = 0;
+      behavior.cadenceInheritParentSchedule = false;
+    } else if (parent.cadenceParentBehaviorExternalId) {
+      fail("cadence_sub_behavior_depth", `Behavior ${behavior.externalId} is under ${parentId}, which is itself a sub-behavior. Sub-behaviors are one level deep.`);
+    }
+  }
+  const depth = (behavior: BehaviorLogImportBehaviorPlan) => behavior.cadenceParentBehaviorExternalId ? 1 : 0;
+  input.plan.behaviors.sort((left, right) => depth(left) - depth(right));
 }
 
 function readExtensionString(

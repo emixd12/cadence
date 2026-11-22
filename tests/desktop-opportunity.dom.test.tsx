@@ -86,6 +86,9 @@ function timeline(today: TimelineOccurrenceView[]): TimelineView {
     key: `today-${TODAY}`, kind: "today", localDate: TODAY, label: TODAY, relativeLabel: "Today", emptyMessage: "Nothing.",
     unresolvedOccurrenceCount: today.length, occurrences: today,
     occurrenceGroups: today.map((item) => ({ key: item.id, behaviorId: item.behaviorId, title: item.title, occurrences: [item], isGroupedStack: false })),
+    parentGroups: [],
+    rows: today.map((item) => ({ kind: "behavior" as const, key: item.id,
+      group: { key: item.id, behaviorId: item.behaviorId, title: item.title, occurrences: [item], isGroupedStack: false } })),
   };
   return {
     timezone: "America/New_York", todayLocalDate: TODAY, visibleFutureDays: 0, maxFutureDays: 30, nextFutureDays: null,

@@ -94,6 +94,39 @@ export async function applyOccurrenceStatusTransitionRpc(
   return normalizeStatusTransitionRpcResult(data);
 }
 
+/**
+ * Marks every sub-behavior Occurrence in one parent slot in one transaction. Each plan is
+ * one `apply_occurrence_status_transition`; one stale child rolls the whole slot back.
+ */
+export async function applyParentSlotStatusTransitionRpc(
+  supabase: AppSupabaseClient,
+  input: { parentBehaviorId: string; transitions: ApplyOccurrenceStatusTransitionRpcInput[] },
+): Promise<ApplyOccurrenceStatusTransitionRpcResult[]> {
+  const { data, error } = await supabase.rpc("apply_parent_slot_status_transition", {
+    target_parent_behavior_id: input.parentBehaviorId,
+    transitions: input.transitions.map((transition) => ({
+      occurrence_id: transition.occurrenceId,
+      expected_status: transition.expectedStatus,
+      expected_latest_event_id: transition.expectedLatestEventId,
+      planned_status: transition.status,
+      planned_completed_at: transition.completedAt,
+      planned_status_marked_at: transition.statusMarkedAt,
+      planned_event_semantics: transition.event?.statusSemantics ?? null,
+      planned_event_recorded_at: transition.event?.recordedAt ?? null,
+      planned_event_effective_at: transition.event?.effectiveAt ?? null,
+      planned_event_source_capture_method: transition.event?.sourceCaptureMethod ?? null,
+      planned_event_source_confidence: transition.event?.sourceConfidence ?? null,
+      planned_cancel_pending_reminders: transition.cancelPendingReminders,
+    })),
+  });
+  if (error) throw normalizeStatusTransitionRpcError(error);
+  const results = (data as { results?: unknown } | null)?.results;
+  if (!Array.isArray(results) || results.length !== input.transitions.length) {
+    throw new Error("Parent slot change returned an unexpected result.");
+  }
+  return results.map(normalizeStatusTransitionRpcResult);
+}
+
 export async function createOccurrenceStatusEvent(
   supabase: AppSupabaseClient,
   event: NewOccurrenceStatusEvent,

@@ -1,6 +1,7 @@
 import type { OccurrenceOrigin, OpportunityAddedBy } from "./database";
 import type { BehaviorWhereKind } from "./behavior";
 import type { BehaviorDurationEstimate } from "./day-progress";
+import type { ParentSlotRollup } from "./sub-behavior";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
 
@@ -54,6 +55,15 @@ export type TimelineOccurrenceInput = {
    * the recorded time, which misses zero-length sessions.
    */
   hasTimeSessions?: boolean;
+  /** Sub-behaviors (depth 1): set on a sub-behavior's Occurrence. Absent on standalone rows. */
+  parentBehaviorId?: string | null;
+  parentTitle?: string;
+  subBehaviorSortOrder?: number;
+  /**
+   * Groups sub-behavior rows into one parent slot. Defaults to `scheduledFor`, so rows that
+   * share the parent's time on a day form one group.
+   */
+  parentSlotKey?: string;
 };
 
 export type TimelineTimeTrackingView = Readonly<{
@@ -124,6 +134,15 @@ export type TimelineOccurrenceView = {
   addedBy?: OpportunityAddedBy | null;
   /** A clean added row can be removed, from Today or from Needs decision. */
   canRemove?: boolean;
+  /** Sub-behaviors (depth 1): set on a sub-behavior's Occurrence. Absent on standalone rows. */
+  parentBehaviorId?: string | null;
+  parentTitle?: string;
+  subBehaviorSortOrder?: number;
+  /**
+   * Groups sub-behavior rows into one parent slot. Defaults to `scheduledFor`, so rows that
+   * share the parent's time on a day form one group.
+   */
+  parentSlotKey?: string;
 };
 
 export type TimelineSourceEvidence = Readonly<{
@@ -145,6 +164,29 @@ export type TimelineOccurrenceGroup = {
   isGroupedStack: boolean;
 };
 
+/** One parent slot on one day: the sub-behavior rows scheduled together. */
+export type TimelineParentGroupView = {
+  key: string;
+  parentBehaviorId: string;
+  title: string;
+  localDate: string;
+  /** Earliest child time in the slot. */
+  scheduledFor: string;
+  scheduledTimeLabel: string;
+  /** Sub-behavior rows in sibling order. */
+  children: TimelineOccurrenceView[];
+  rollup: ParentSlotRollup;
+  visualTone: TimelineVisualTone;
+  /** True when any child row shows Completed and Not Completed actions. */
+  showDecisionActions: boolean;
+  isVisibleInNeedsDecision: boolean;
+};
+
+/** A day's rows in time order: standalone Behavior groups and parent slots. */
+export type TimelineDayRow =
+  | { kind: "behavior"; key: string; group: TimelineOccurrenceGroup }
+  | { kind: "parent"; key: string; group: TimelineParentGroupView };
+
 export type TimelineDaySection = {
   key: string;
   kind: TimelineDaySectionKind;
@@ -154,7 +196,10 @@ export type TimelineDaySection = {
   emptyMessage: string;
   occurrences: TimelineOccurrenceView[];
   unresolvedOccurrenceCount: number;
+  /** Standalone Behaviors only; sub-behavior rows sit in `parentGroups`. */
   occurrenceGroups: TimelineOccurrenceGroup[];
+  parentGroups: TimelineParentGroupView[];
+  rows: TimelineDayRow[];
 };
 
 export type TimelineNeedsDecisionGroup = {

@@ -2799,6 +2799,44 @@ presses (update buttons, conflict review, Settings) fail until Cadence is in fro
 Platform impact: Mac acceptance only; web, marketing and future mobile not applicable.
 Messaging impact: none.
 
+## 2026-11-21: Sub-behaviors and Timeline Semantic Zoom
+
+The owner decided the sub-behaviors design in chat on November 21, 2026 (Ticket 349). A
+routine, such as a Skin routine with Cerave, Facewash and Retinol, is a Behavior with
+sub-behaviors.
+
+- **Model.** Sub-behaviors are real `behaviors` rows with `parent_behavior_id`,
+  `sub_behavior_sort_order` and `inherit_parent_schedule`. Depth is 1.
+- **Schedule.** A sub-behavior follows its parent's schedule by default and may set its
+  own.
+- **Completion and adherence.** While a parent has active sub-behaviors, the
+  sub-behaviors own the generated Occurrences, so nothing is counted twice. Marking the
+  parent marks every step of the slot in one transaction. Marking single steps shows
+  derived progress such as 2/3. No fourth stored status is added.
+- **Semantic Zoom.** Timeline only, two layers: Routines (collapsed) and All steps
+  (open inline). Pinch, Ctrl/Cmd + wheel and an accessible control switch layers; a
+  per-routine open or close stays until the layer changes.
+- **Outside AI clients.** MCP contract 1.7.0 creates routines with their steps, groups
+  and ungroups through `update_behavior`, filters by hierarchy, returns parent groups
+  on `get_timeline` and adds `set_parent_occurrence_status`.
+- **Cadence Agent.** The full cascade: Chat (`chat-1.6`), Daily Brief routine moves,
+  coach signals (`sub_behavior_dropoff`; no `crowded_hour` from one routine's steps)
+  and advisor tips.
+- **Portability and connectors.** Full JSON and BehaviorLog round-trip the links. Hevy
+  source links work on a parent or a sub-behavior under D28. Following steps share one
+  reminder per slot.
+- **Mac.** Parity through SQLite schema 28 and account sync contract 9. The minimum
+  writer contract stays 8, so Cadence for Mac 0.1.14 keeps syncing.
+- **Behaviors of Opportunity.** An opportunity Behavior is never part of a routine: it
+  cannot be a parent or a sub-behavior. The resolver, the database trigger, the MCP
+  contract and the Behavior form all refuse it (rebase onto PR #351, November 21).
+- **Rollout.** Only the owner's dogfooding account exists, so no compatibility shims
+  for older Mac builds or legacy data are added beyond the default column values.
+
+Platform impact: web and Mac (Ticket 349); marketing not applicable (no public claim
+changes; P-084); future mobile inherits the model when a mobile ticket exists.
+Messaging impact: P-082, P-083, P-084.
+
 ## 2026-11-21: Merge queue; the repository moves to an organization
 
 The owner decided this on November 21, 2026 ("I think we should do this, guide me through
