@@ -4,7 +4,38 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error Operational JavaScript module intentionally has no declarations.
 import { aggregateAudit, aggregateSbom, buildSnapshot, codeqlAnalysisComplete, codeScanningFact, deploymentOwnsOrigin, readHostedMigrationBoundary } from "../scripts/collect-public-trust-evidence.mjs";
 
+// @ts-expect-error Operational JavaScript module intentionally has no declarations.
+import { isRepositoryPagesOrigin } from "../scripts/public-trust-http.mjs";
+
 const input = JSON.parse(readFileSync("tests/fixtures/public-trust-collector/input.json", "utf8"));
+
+describe("GitHub Pages origin of a repository", () => {
+  it.each([
+    ["https://emixd12.github.io/cadence/", "emixd12/cadence"],
+    ["https://emixd12.github.io/cadence", "emixd12/cadence"],
+    ["https://example-org.github.io/cadence/", "Example-Org/cadence"],
+    ["https://Example-Org.github.io/cadence/", "Example-Org/cadence"],
+  ])("accepts %s for %s", (origin, repository) => {
+    expect(isRepositoryPagesOrigin(origin, repository)).toBe(true);
+  });
+
+  it.each([
+    ["http://example-org.github.io/cadence/", "Example-Org/cadence"],
+    ["https://other-org.github.io/cadence/", "Example-Org/cadence"],
+    ["https://example-org.github.io.attacker.example/cadence/", "Example-Org/cadence"],
+    ["https://example-org.github.io/other/", "Example-Org/cadence"],
+    ["https://example-org.github.io/Cadence/", "Example-Org/cadence"],
+    ["https://example-org.github.io/cadence/trust/", "Example-Org/cadence"],
+    ["https://example-org.github.io:8443/cadence/", "Example-Org/cadence"],
+    ["https://user@example-org.github.io/cadence/", "Example-Org/cadence"],
+    ["https://example-org.github.io/cadence/", "Example-Org"],
+    ["https://example-org.github.io/cadence/", "Example-Org/cadence/extra"],
+    ["not a url", "Example-Org/cadence"],
+    ["https://example-org.github.io/cadence/", undefined],
+  ])("refuses %s for %s", (origin, repository) => {
+    expect(isRepositoryPagesOrigin(origin, repository)).toBe(false);
+  });
+});
 
 describe("public Trust collector", () => {
   it("builds one valid deterministic snapshot with immutable Pages evidence paths", () => {

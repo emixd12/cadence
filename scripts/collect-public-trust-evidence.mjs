@@ -8,7 +8,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { PUBLIC_TRUST_CHECKS, validatePublicTrustEvidence } from "../lib/resolvers/public-trust-evidence.resolver.ts";
 import { buildIntegrityManifest } from "./build-public-integrity-manifest.mjs";
 import { collectRouteCandidates, collectRoutes, marketingContracts } from "./compare-public-routes.mjs";
-import { boundedFetch } from "./public-trust-http.mjs";
+import { boundedFetch, isRepositoryPagesOrigin } from "./public-trust-http.mjs";
 
 const ROOT = new URL("..", import.meta.url);
 const GITHUB_ALERT_PAGE_SIZE = 100;
@@ -185,9 +185,7 @@ export async function readHostedMigrationBoundary({ accessToken, projectRef, fet
 
 async function liveFacts(input) {
   const fixture = input.fixture;
-  const [owner, repositoryName] = input.repository.split("/");
-  const pages = new URL(input.pages_origin);
-  if (pages.protocol !== "https:" || pages.hostname !== `${owner}.github.io` || pages.pathname.replace(/\/$/, "") !== `/${repositoryName}`) throw new Error("Pages origin does not match the named public repository.");
+  if (!isRepositoryPagesOrigin(input.pages_origin, input.repository)) throw new Error("Pages origin does not match the named public repository.");
   let inspectedProvenance;
   if (!fixture) {
     const headers = { authorization: `Bearer ${process.env.VERCEL_TOKEN}` };
