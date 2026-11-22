@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { advisorAvatarArt, advisorAvatarFile } from "@cadence/core/advisor-avatar";
+import { advisorAvatarArt, advisorAvatarRendition } from "@cadence/core/advisor-avatar";
 import type { AdvisorAvatarGesture, AdvisorAvatarState } from "@cadence/core/resolvers/advisor-avatar.resolver";
 
 import styles from "./advisor-avatar.module.css";
@@ -33,6 +33,19 @@ function usePrefersReducedMotion(): boolean {
   );
 }
 
+/** Screen pixels per CSS pixel, as a whole number from 1 to 3. The server and the first paint assume 2. */
+function useScreenDensity(): number {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`);
+      query?.addEventListener("change", onChange);
+      return () => query?.removeEventListener("change", onChange);
+    },
+    () => Math.min(3, Math.max(1, Math.ceil((window.devicePixelRatio || 1) - 0.01))),
+    () => 2,
+  );
+}
+
 /** Rotates its children around a point of the drawing; CSS animates the middle group. */
 function Pivot({ x, y, className, children }: Readonly<{ x: number; y: number; className: string; children: ReactNode }>) {
   return (
@@ -54,7 +67,10 @@ export function AdvisorAvatar({
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const reduceMotion = usePrefersReducedMotion();
   const detailed = size > DETAIL_FROM && !reduceMotion;
-  const art = <image href={advisorAvatarFile(size)} x="0" y="0" width={ART_SIZE} height={ART_SIZE} />;
+  // A product size has a file made at exactly its pixels for this screen, so nothing is scaled at rest.
+  const rendition = advisorAvatarRendition(size, useScreenDensity());
+  const { area } = rendition;
+  const art = <image href={rendition.file.replace(/^public/, "")} x={area.x} y={area.y} width={area.width} height={area.height} />;
   const full = <rect width={ART_SIZE} height={ART_SIZE} fill="#fff" />;
 
   return (

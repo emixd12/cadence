@@ -19499,7 +19499,7 @@ then 347 and 348. Each of 343 and 346 ends with the owner's approval.
 
 ## Ticket 343: Advisor avatar base image
 
-Status: complete on web (November 22, 2026): the owner approved the three-tone vector trace as the master. Mac: next release. The owner reopened the review the same day because round 3 was hurried, compared the master with the Sunburst render and round 2's pick in round 4, and kept the master ("go with A"). Round 4's findings on the 40px and 48px files, the 120px file and the crop are not answered (plan, "Round 4").
+Status: complete on web (November 22, 2026): the owner approved the three-tone vector trace as the master. Mac: next release. The owner reopened the review the same day because round 3 was hurried, compared the master with the Sunburst render and round 2's pick in round 4, and kept the master ("go with A"). Round 5 (sized files): the owner chose exact-size files, one per size and screen density ("Go with B"); built November 22. The crop and the small sizes' tone strengths stay as they were (plan, "Round 5").
 
 Goal: one approved master drawing of the advisor, with every size made from it.
 
@@ -19512,6 +19512,7 @@ Scope and acceptance:
 - On approval: a master of at least 1024 × 1024 with a transparent background under
   `public/brand/advisor/`; `scripts/build-advisor-avatar.mjs` makes each size with the
   approved line weight; the files are committed and listed in the catalog's `art` block.
+  Since round 5 there is one file per product size and screen density, at exactly its pixels.
 - The catalog's `art.anchors` holds the eye outlines, ear bases, mane root, jaw and neck
   line in the master's coordinates.
 - `AdvisorHorse` (`components/advisor/AdvisorParts.tsx`) reads its files from the catalog.

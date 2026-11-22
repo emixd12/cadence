@@ -99,6 +99,38 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   and 3: the drawing is lines only, with the trace's strokes. Findings 2, 4 and 5 concern
   the sized files and the crop, which code makes from the master; the owner has not
   answered them.
+- **Round 5, November 22:** sized files. The master does not change. Four options made by
+  code from it, each at 40, 48 and 120px on white, on a 2× screen and as a 1× screen
+  draws it. Sheet: `docs/design-exploration/advisor-avatar/round-5-sized-files.png`.
+  - **A, current files:** one 256px file for 40 and 48px and one 768px file for 120px,
+    scaled by the browser.
+  - **B, exact-size files:** the same drawing and tone strengths, with a file for each
+    size and screen density, so the browser never scales.
+  - **C, cleaner small sizes:** B, and at 40 and 48px the lightest tone goes from 0.35 to
+    0.14, the darkest lines are 6 master pixels thicker at 0.8, and the mane is 50%
+    lighter. 120px as B.
+  - **D, cleaner and closer:** C with the window at x 215, y 28, size 800 in place of
+    x 72, y 10, size 900. The head is 12% larger; the mane's left edge and the neck are cut.
+  Findings: B is a small gain over A. C is the clear gain: the outline and both eyes hold
+  at 40 and 48px on 1× and 2× screens, though the mane still merges at 40px on a 1×
+  screen. D gains little, because the ears and muzzle already span most of the circle,
+  and it cuts the mane that the animation moves. This corrects round 4's finding 5.
+  Recommendation: C. The options are on white at the owner's request; the product's
+  circle is still light blue, and whether it changes is not decided.
+  Owner's answer (November 22): "Go with B". Built the same day:
+  - The catalog's `art.renditions` lists nine files, one per size (40, 48, 120) and
+    density (1×, 2×, 3×), each with the `area` of the drawing it covers and its `pixels`.
+    A file covers the round window plus whole pixels of margin, so one file pixel is one
+    screen pixel and the moving layers still have drawing beyond the circle.
+  - `npm run avatar:build` rasterises each area larger and reduces it, and writes
+    lossless WebP. `advisor-256.webp` is gone; `advisor-768.webp` stays for other sizes.
+  - `AdvisorAvatar` reads the screen's density and places the matching file by its
+    `area`. The server and the first paint assume 2×.
+  - **Measured in the product's component** (Chrome, 1×, 2× and 3×): with the still
+    drawing the avatar is crisper at every size. With motion on, the breathing movement
+    turns and scales the whole drawing all the time, which softens it before and after
+    this change alike, most at 40 and 48px on a 1× screen. That softening belongs to
+    step 2 and is not fixed here.
 - **Review viewer, from round 4.** The owner marks candidates in the render-review
   viewer of the `design-render-rounds` skill, as on the Cadent page's images. It runs on
   the owner's Mac from the launch config `avatar-review` (port 4398) and reads

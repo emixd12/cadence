@@ -16,7 +16,15 @@ const productAssets = [
   "brand/cadence-timeline-horse-lines-dots-clear-background.png",
   "brand/cadence-timeline-horse-lines-dots-mobile-right-18.png",
   // The advisor's avatar (Ticket 343): made by scripts/build-advisor-avatar.mjs.
-  "brand/advisor/advisor-256.webp",
+  "brand/advisor/advisor-40-1x.webp",
+  "brand/advisor/advisor-40-2x.webp",
+  "brand/advisor/advisor-40-3x.webp",
+  "brand/advisor/advisor-48-1x.webp",
+  "brand/advisor/advisor-48-2x.webp",
+  "brand/advisor/advisor-48-3x.webp",
+  "brand/advisor/advisor-120-1x.webp",
+  "brand/advisor/advisor-120-2x.webp",
+  "brand/advisor/advisor-120-3x.webp",
   "brand/advisor/advisor-768.webp",
   "sounds/completion-chime.mp3",
 ];
