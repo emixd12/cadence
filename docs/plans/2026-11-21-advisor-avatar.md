@@ -94,6 +94,12 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   6. **Not reviewed here:** motion, the Mac, and the Timeline bar in place. They belong to
      step 2.
   Owner's answer: pending.
+- **Review viewer, from round 4.** The owner marks candidates in the render-review
+  viewer of the `design-render-rounds` skill, as on the Cadent page's images. It runs on
+  the owner's Mac from the launch config `avatar-review` (port 4398) and reads
+  `.local/design-exploration/advisor-avatar/rounds/`. That folder is local and not
+  committed: each round's `notes.json` holds the owner's marks, and the answer is copied
+  into this plan. Each round still commits one sheet here.
 
 ## What shipped on November 22, 2026 (Tickets 343 to 346)
 
