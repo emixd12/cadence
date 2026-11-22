@@ -99,6 +99,25 @@ Goal: one approved master drawing. Every size on every surface is made from it.
   and 3: the drawing is lines only, with the trace's strokes. Findings 2, 4 and 5 concern
   the sized files and the crop, which code makes from the master; the owner has not
   answered them.
+- **Round 5, November 22:** sized files. The master does not change. Four options made by
+  code from it, each at 40, 48 and 120px on white, on a 2× screen and as a 1× screen
+  draws it. Sheet: `docs/design-exploration/advisor-avatar/round-5-sized-files.png`.
+  - **A, current files:** one 256px file for 40 and 48px and one 768px file for 120px,
+    scaled by the browser.
+  - **B, exact-size files:** the same drawing and tone strengths, with a file for each
+    size and screen density, so the browser never scales.
+  - **C, cleaner small sizes:** B, and at 40 and 48px the lightest tone goes from 0.35 to
+    0.14, the darkest lines are 6 master pixels thicker at 0.8, and the mane is 50%
+    lighter. 120px as B.
+  - **D, cleaner and closer:** C with the window at x 215, y 28, size 800 in place of
+    x 72, y 10, size 900. The head is 12% larger; the mane's left edge and the neck are cut.
+  Findings: B is a small gain over A. C is the clear gain: the outline and both eyes hold
+  at 40 and 48px on 1× and 2× screens, though the mane still merges at 40px on a 1×
+  screen. D gains little, because the ears and muzzle already span most of the circle,
+  and it cuts the mane that the animation moves. This corrects round 4's finding 5.
+  Recommendation: C. The options are on white at the owner's request; the product's
+  circle is still light blue, and whether it changes is not decided.
+  Owner's answer: pending.
 - **Review viewer, from round 4.** The owner marks candidates in the render-review
   viewer of the `design-render-rounds` skill, as on the Cadent page's images. It runs on
   the owner's Mac from the launch config `avatar-review` (port 4398) and reads
