@@ -32,12 +32,12 @@
 // deleted, and env files are 0600 inside the 0700 workdir. Never point this at
 // habit-tracking-app (Emi's local data) or run it in Ticket 232's checkout.
 import { execFileSync, spawn } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:https';
 import { createServer } from 'node:net';
 import { createInterface } from 'node:readline';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
@@ -413,7 +413,9 @@ async function status({ name }) {
   if (!bound.length) say('containers are gone (Docker restart?): run down, then up again');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+// Node resolves symlinks in import.meta.url but not in argv[1]. Without realpathSync a
+// path through a symlink (macOS's /var and /tmp) made this script do nothing and exit 0.
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const { positionals, values } = parseArgs({ allowPositionals: true, options: {
     name: { type: 'string', default: 'cadence-accept-run' }, 'db-base': { type: 'string', default: '56150' }, 'app-port': { type: 'string', default: '4450' },
     run: { type: 'string' }, scenario: { type: 'string', default: 'read-write' }, client: { type: 'string', default: 'all' }, account: { type: 'string', default: 'A' },
