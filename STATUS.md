@@ -201,13 +201,22 @@ State: implemented on branch `feature-create`, rebased on `origin/main` `39a6911
   signals); `smoke:rls` 92 checks and the account sync smoke (now checks contract 9)
   pass. The one failure is pre-existing on `main`: the coach-signals test expects
   `brief_answers` signals and gets `setup_gaps`. Fixed here: the coach reminders read
-  named two foreign keys (PGRST201 on every call since #315). Not run: installed Mac
-  acceptance (Task 13).
+  named two foreign keys (PGRST201 on every call since #315).
+- Installed Mac acceptance passed November 22 on dev-signed `0.1.15-dev.1` (owner's Mac;
+  owner approved `--allow-unmerged-migrations`): schema 27 → 28 with every row kept; a
+  routine with an inheriting step and an own-schedule step, draft and saved reorder, the
+  Routines / All steps layers, a step edit, bulk Completed and archive, each synced under
+  contract 9 and read back from the hosted snapshot. It found a defect: hosted sync apply
+  refused a Mac reorder ("requires append-only configuration history"), which stopped
+  that Mac's sync. Fixed by `20261122040000_account_sync_sub_behavior_order`, pushed to
+  hosted at 04:21Z under the additive-migration approval (151/151); a new account sync
+  smoke case covers it. `docs/qa/2026-11-21-ticket-349-sub-behaviors-mac-acceptance.md`.
 - Phone width: the routine title keeps the row's width; the two marks wrap below it.
 - Open:
   1. Coach-signals local test: `brief_answers` expectation is stale on `main`.
-  2. Mac: routine reminder text names the anchor step, not the routine. Installed Mac
-     acceptance not run.
+  2. Mac: routine reminder text names the anchor step, not the routine.
+  3. Tooling: the pinned Supabase CLI binary fails its code signature and macOS kills it;
+     the shared local stack's API port differs from this worktree's `supabase status`.
 
 ## Product map, features and journeys — November 20, 2026
 

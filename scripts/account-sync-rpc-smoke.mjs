@@ -282,6 +282,31 @@ try {
   const occurrenceUnchanged = await readSnapshot(clients[0]);
   assert(occurrenceUnchanged.fingerprint === statusResult.fingerprint, "rejected status-history writes leave Occurrences unchanged");
 
+  // Ticket 349: sibling order is display order, so a contract-9 reorder needs no configuration event.
+  const parentId = randomUUID();
+  const childId = randomUUID();
+  for (const row of [{ id: parentId, title: "Sync smoke routine" }, { id: childId, title: "Sync smoke step", parent_behavior_id: parentId, sub_behavior_sort_order: 0 }]) {
+    const inserted = await admin.from("behaviors").insert({ ...row, user_id: users[0].id, description: null, recurrence_rule: { type: "daily", interval: 1 },
+      scheduled_time: "07:00:00", timezone: "America/New_York", browser_reminder_enabled: false, email_reminder_enabled: false, reminder_offset_minutes: 0, active: true });
+    if (inserted.error) throw inserted.error;
+  }
+  const routineBase = await readSnapshot(clients[0], 9);
+  const step = routineBase.entities.find((row) => row.kind === "behavior" && row.id === childId);
+  assert(step?.value.parent_behavior_id === parentId, "contract 9 snapshot carries the step link");
+  const stepWrite = (value, key) => {
+    const entities = routineBase.entities.map((row) => row.id === childId && row.kind === "behavior" ? { ...row, value } : row);
+    return { ...payload(routineBase, [{ kind: "behavior", id: childId, operation: "upsert", expected: step.value, value }], entityDigest(entities), key), contract: 9 };
+  };
+  const reordered = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: stepWrite({ ...step.value, sub_behavior_sort_order: 1,
+    updated_at: "2026-09-04T12:00:00.000000Z" }, digest("contract-9-reorder")) }));
+  assert(reordered.snapshot.entities.some((row) => row.id === childId && row.value.sub_behavior_sort_order === 1), "a contract 9 reorder applies without configuration history");
+  const afterReorder = reordered.snapshot.entities.find((row) => row.kind === "behavior" && row.id === childId);
+  const rescheduled = { ...afterReorder.value, scheduled_time: "08:00:00" };
+  const rescheduledEntities = reordered.snapshot.entities.map((row) => row.id === childId && row.kind === "behavior" ? { ...row, value: rescheduled } : row);
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(reordered.snapshot,
+    [{ kind: "behavior", id: childId, operation: "upsert", expected: afterReorder.value, value: rescheduled }], entityDigest(rescheduledEntities), digest("contract-9-reschedule")), contract: 9 } }),
+  "a contract 9 schedule change without configuration history");
+
   const sameAccountBase = await readSnapshot(clients[1]);
   const sameAccountProfile = sameAccountBase.entities.find((row) => row.kind === "profile");
   assert(sameAccountProfile, "same-account race profile");
@@ -306,7 +331,7 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 8 writer floor and opportunity fields, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 8 writer floor and opportunity fields, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, the contract 9 reorder without configuration history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }

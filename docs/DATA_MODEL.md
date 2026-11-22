@@ -2476,7 +2476,9 @@ Export, the advisor snapshot, the MCP receipt source and BehaviorLog restore car
 three columns. Account sync contract 9 adds them (defaults `null`, `0`, `false`); the
 minimum writer contract stays 8 (Behaviors of Opportunity), so contract-8 writers such
 as Cadence for Mac 0.1.14 keep syncing and keep the stored values. A contract-9 Behavior
-write must carry all three.
+write must carry all three. Account sync apply leaves `sub_behavior_sort_order` out of its
+configuration-history check, so a reorder syncs without a configuration event
+(`20261122040000_account_sync_sub_behavior_order`); a link or inheritance change still needs one.
 
 An opportunity Behavior (`is_opportunity`) is never part of a routine: it cannot be a
 parent or a sub-behavior. The deferred depth trigger also runs when `is_opportunity`

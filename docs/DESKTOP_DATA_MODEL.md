@@ -668,7 +668,9 @@ every live child listed once, bumps revision and `updated_at`) and
 day, one status event each, all or nothing).
 
 **Account sync contract 9.** `ACCOUNT_SYNC_CONTRACT = 9`. Behavior upserts must carry
-the three fields; a write without them is refused with "Update Cadence". The planner
+the three fields; a write without them is refused with "Update Cadence". A reorder changes only
+`sub_behavior_sort_order`, which hosted apply keeps out of configuration history
+(`20261122040000`), so `reorderSubBehaviors` writes no configuration event. The planner
 treats `parent_behavior_id` as an optional Behavior-to-Behavior dependency and checks
 depth 1 on every input and on the merged graph. Apply writes Behaviors unlinked first,
 then restores the links once every row exists, so a regroup never trips the depth
