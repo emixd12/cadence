@@ -35,6 +35,7 @@ vi.mock("@/lib/services/occurrence.service", () => ({
 }));
 vi.mock("@/lib/db/occurrences.repo", () => ({
   listOccurrencesBetweenLocalDates: mocks.listOccurrencesBetweenLocalDates,
+  listOccurrencesByIds: vi.fn(async () => []),
   listResolvedOccurrencesBeforeLocalDateMarkedBetween:
     mocks.listResolvedOccurrencesBeforeLocalDateMarkedBetween,
   listUnresolvedOccurrencesBeforeLocalDate:
@@ -93,7 +94,7 @@ describe("timeline service time-session routing", () => {
       { userId: "user-1", occurrenceIds: [] },
     );
     expect(mocks.listTimeSessionHistory).toHaveBeenCalledWith(expect.anything(), {
-      userId: "user-1", startLocalDate: "2026-05-10", endLocalDate: "2026-08-07",
+      userId: "user-1", startLocalDate: null, endLocalDate: "2026-08-07",
       includeArchived: false, throughStartedAt: "2026-08-08T16:00:00Z",
     });
   });

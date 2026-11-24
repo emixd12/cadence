@@ -289,3 +289,9 @@ export type TimeTrackingActionState = Readonly<{
   tracking?: TimelineTimeTrackingView;
   requestId?: string;
 }>;
+
+export type DefaultDurationActionState = Readonly<{
+  status: "idle" | "success" | "error";
+  message: string;
+  minutes?: number;
+}>;

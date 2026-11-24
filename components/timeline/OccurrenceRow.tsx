@@ -11,6 +11,7 @@ import { useOccurrenceMarkDetailParts, type JustMarked } from "@/components/time
 import { OccurrenceMovedLine, OccurrenceMoveMenu, OccurrenceMoveNotice } from "@/components/timeline/OccurrenceMoveMenu";
 import { useOccurrenceMoves } from "@/components/timeline/OccurrenceMoves";
 import { OpportunityRemoveControl } from "@/components/timeline/OpportunityBasket";
+import { InlineDurationControl } from "@/components/timeline/InlineDurationControl";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
@@ -24,6 +25,7 @@ import {
   type TimelineStatusActionStatus,
 } from "@/lib/resolvers/timeline-optimistic-status.resolver";
 import type {
+  DefaultDurationFormAction,
   OccurrenceFormAction,
   OpportunityFormAction,
   TimeTrackingFormAction,
@@ -47,6 +49,8 @@ type OccurrenceRowProps = Readonly<{
   countableWorkouts?: readonly CountableSourceWorkout[];
   /** Behaviors of Opportunity: Remove for a clean added row. Omitted where removal is unavailable. */
   removeOpportunityAction?: OpportunityFormAction;
+  /** Quick inline default duration setter for this Behavior. Omitted where unavailable. */
+  defaultDurationAction?: DefaultDurationFormAction;
 }>;
 
 type KeyedOptimisticStatusState = Readonly<{
@@ -92,6 +96,7 @@ export function OccurrenceRow({
   crowdedLine = null,
   countableWorkouts = [],
   removeOpportunityAction,
+  defaultDurationAction,
 }: OccurrenceRowProps) {
   const serverStatusKey = [
     occurrence.id,
@@ -263,11 +268,14 @@ export function OccurrenceRow({
               value={visibleOccurrence.scheduleSummary}
             /> : null}
 
-            {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Scheduling context">
-              <h4 className="font-bold text-foreground">Scheduling context</h4>
-              <p>{context.estimate.kind === "known" ? context.estimate.provenance === "behavior_default" ? `Default duration: ${context.estimate.durationLabel}. Set on this Behavior; separate from tracked time.` : `Estimated duration: ${context.estimate.durationLabel}. Mean of ${context.estimate.sampleCount} completed Occurrences in the preceding ${context.estimate.lookbackDays} days.`
-                : `Duration unknown. ${context.estimate.sampleCount} of ${context.estimate.requiredSampleCount} required completed Occurrences have usable timing.`}</p>
-              <p>{context.overlapLabel}</p>
+            {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Duration">
+              <h4 className="font-bold text-foreground">Duration</h4>
+              <InlineDurationControl
+                behaviorId={visibleOccurrence.behaviorId}
+                estimate={context.estimate}
+                action={defaultDurationAction}
+              />
+              {shouldShowOverlapLabel(context) ? <p>{context.overlapLabel}</p> : null}
               {context.activitySignals.map((signal) => <p key={signal}>{signal === "scheduled_now" ? "Scheduled now" : signal === "estimated_window" ? "Estimated window" : "Tracking now"}</p>)}
             </div> : null}
 
@@ -405,6 +413,16 @@ function statusLabel(status: TimelineStatusActionStatus): string {
     case "unresolved":
       return "Unresolved";
   }
+}
+
+function shouldShowOverlapLabel(context: TimelineOccurrenceContext): boolean {
+  if (context.overlapAssessment === "possible") {
+    return true;
+  }
+  return (
+    context.overlapLabel === "Return time unknown." ||
+    context.overlapLabel.startsWith("Event end unknown")
+  );
 }
 
 function DetailItem({

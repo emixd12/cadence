@@ -21,7 +21,7 @@ import type { BehaviorDurationHistoryOccurrence, BehaviorDurationEstimate } from
 import type { TravelCollisionCandidate, TravelCommitment, TravelEndpoint, TravelPoint } from "@cadence/core/types/travel";
 import { TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS, readTravelMonthSpend, reserveTravelProviderSpend } from "@/lib/db/travelSpend.repo";
 import { readTravelPlaceCache, writeTravelPlaceCache, type TravelPlaceCacheRow } from "@/lib/db/travelPlaceCache.repo";
-import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { listOccurrencesBetweenLocalDates, listOccurrencesByIds } from "@/lib/db/occurrences.repo";
 import { getProfileTimezone, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
@@ -109,10 +109,11 @@ export async function refreshTravelRoutesReportingCalendars(
     throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
   }
   const historyRange = travelDurationHistoryRange(request.startLocalDate);
-  const readDurationHistory = () => Promise.all([
-    listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
-    listTimeSessionHistory(caller.client, { userId: caller.user.id, startLocalDate: historyRange.startLocalDate, endLocalDate: historyRange.endLocalDate, includeArchived: false, throughStartedAt: now.toString() }),
-  ]);
+  const readDurationHistory = async () => {
+    const sessions = await listTimeSessionHistory(caller.client, { userId: caller.user.id, startLocalDate: historyRange.startLocalDate, endLocalDate: historyRange.endLocalDate, includeArchived: false, throughStartedAt: now.toString() });
+    const occurrences = await listOccurrencesByIds(caller.client, caller.user.id, sessions.map((session) => session.occurrence_id));
+    return [occurrences, sessions] as const;
+  };
   const [historyOccurrences, historySessions] = await readDurationHistory();
   const durationEstimates = behaviorDurationEstimates(historyOccurrences, historySessions, behaviors, now, timezone);
   const occurrenceRevisions = occurrenceRouteRevision(behaviorOccurrences);

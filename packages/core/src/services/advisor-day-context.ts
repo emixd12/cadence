@@ -82,7 +82,7 @@ type AdvisorCadenceOccurrenceInput = Readonly<{
     kind: "unknown";
     reason: "history_limit_exceeded";
     sampleCount: 0;
-    requiredSampleCount: 3;
+    requiredSampleCount: number;
     lookbackDays: 90;
   }>;
   durationCandidates?: AdvisorDurationCandidates;

@@ -15,9 +15,11 @@ import {
 } from "@/lib/db/behaviors.repo";
 import {
   listOccurrencesBetweenLocalDates,
+  listOccurrencesByIds,
   listResolvedOccurrencesBeforeLocalDateMarkedBetween,
   listUnresolvedOccurrencesBeforeLocalDate,
 } from "@/lib/db/occurrences.repo";
+import { behaviorEstimateInputHash } from "@/lib/services/brief-move-day.service";
 import {
   listTimeSessionsByOccurrenceIds,
   listTimeSessionHistory,
@@ -37,6 +39,7 @@ import { readOccurrenceSyncState } from "@/lib/services/occurrence-sync-state.se
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import {
+  invalidateBehaviorData,
   readCachedBehaviorLogImportRuns,
   readCachedProfileTimezone,
   readCachedUserBehaviors,
@@ -98,6 +101,43 @@ export async function getTimelinePageBundleForUser(
       travel,
     }),
   };
+}
+
+export async function setBehaviorDefaultDurationForCurrentUser(
+  behaviorId: string,
+  minutes: number,
+): Promise<Readonly<{ ok: true; minutes: number } | { ok: false; message: string }>> {
+  const supabase = await createClient();
+  const userId = await requireCurrentUserId("Sign in again before updating duration.");
+  const { data: behavior, error: readError } = await supabase
+    .from("behaviors")
+    .select("id, updated_at")
+    .eq("user_id", userId)
+    .eq("id", behaviorId)
+    .maybeSingle();
+
+  if (readError || !behavior) {
+    return { ok: false, message: "This Behavior is no longer available." };
+  }
+
+  const { error } = await supabase.rpc("set_behavior_default_length", {
+    p_behavior_id: behaviorId,
+    p_minutes: minutes,
+    p_expected_revision: behavior.updated_at,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.message === "behavior_revision_changed"
+          ? "This Behavior was just updated. Try saving again."
+          : "Unable to save duration.",
+    };
+  }
+
+  invalidateBehaviorData(userId);
+  return { ok: true, minutes };
 }
 
 export async function getTimelinePageData(
@@ -195,16 +235,21 @@ async function getTimelineViewForUser(input: {
     occurrenceIds: occurrenceRows.map((occurrence) => occurrence.id),
   });
   const historyEnd = Temporal.PlainDate.from(timelineWindow.startLocalDate).subtract({ days: 1 }).toString();
-  const historyStart = Temporal.PlainDate.from(timelineWindow.startLocalDate).subtract({ days: 90 }).toString();
-  const [historyOccurrences, historySessions] = await Promise.all([
-    listOccurrencesBetweenLocalDates(supabase, userId, historyStart, historyEnd),
-    listTimeSessionHistory(supabase, { userId, startLocalDate: historyStart, endLocalDate: historyEnd,
+  const [historySessions, advisorEstimates, removalFacts] = await Promise.all([
+    listTimeSessionHistory(supabase, { userId, startLocalDate: null, endLocalDate: historyEnd,
       includeArchived: false, throughStartedAt: now.toString() }),
+    readCachedBehaviorAdvisorEstimates(supabase, userId, behaviors),
+    readOpportunityRemovalFacts(supabase, userId, occurrenceRows),
   ]);
-  const removalFacts = await readOpportunityRemovalFacts(supabase, userId, occurrenceRows);
+  const historyOccurrences = await listOccurrencesByIds(
+    supabase,
+    userId,
+    historySessions.map((session) => session.occurrence_id),
+  );
   const view = resolvePersistedTimeline({
     removalFacts,
     durationHistory: { occurrences: historyOccurrences, timeSessions: historySessions.map(toTimeSession) },
+    advisorEstimates,
     behaviors,
     occurrences: occurrenceRows,
     timeSessions: timeSessions.map(toTimeSession),
@@ -217,6 +262,45 @@ async function getTimelineViewForUser(input: {
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
   ]);
   return attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable);
+}
+
+/**
+ * Reads cached AI duration estimates (`behavior_advisor_estimates`) for active Behaviors
+ * whose title, description, and place still match the cached `input_hash`.
+ */
+async function readCachedBehaviorAdvisorEstimates(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behaviors: readonly BehaviorWithCategory[],
+): Promise<Record<string, number>> {
+  const active = behaviors.filter((behavior) => behavior.active);
+  if (active.length === 0) return {};
+  const { data, error } = await supabase
+    .from("behavior_advisor_estimates")
+    .select("behavior_id, input_hash, duration_minutes")
+    .eq("user_id", userId)
+    .in("behavior_id", active.map((behavior) => behavior.id));
+  if (error || !data) return {};
+  const hashByBehavior = new Map(
+    active.map((behavior) => [
+      behavior.id,
+      behaviorEstimateInputHash({
+        title: behavior.title,
+        description: behavior.description ?? null,
+        whereKind: behavior.where_kind ?? null,
+      }),
+    ]),
+  );
+  const estimates: Record<string, number> = {};
+  for (const row of data) {
+    if (
+      row.duration_minutes != null &&
+      row.input_hash === hashByBehavior.get(row.behavior_id)
+    ) {
+      estimates[row.behavior_id] = row.duration_minutes;
+    }
+  }
+  return estimates;
 }
 
 /**

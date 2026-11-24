@@ -9,6 +9,7 @@ import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { BehaviorRunNotices } from "@/components/timeline/BehaviorRunNotices";
 import type { BehaviorFormAction } from "@/lib/types/behavior";
 import type {
+  DefaultDurationFormAction,
   OccurrenceFormAction,
   OpportunityFormAction,
   TimeTrackingFormAction,
@@ -37,6 +38,8 @@ type TimelineProps = Readonly<{
   removeOpportunityAction?: OpportunityFormAction;
   /** Completed or Not Completed for a whole routine slot (sub-behaviors). */
   parentSlotStatusAction?: OccurrenceFormAction;
+  /** Quick inline default duration setter for a Behavior. */
+  defaultDurationAction?: DefaultDurationFormAction;
 }>;
 
 export function Timeline({
@@ -57,6 +60,7 @@ export function Timeline({
   addOpportunityAction,
   removeOpportunityAction,
   parentSlotStatusAction,
+  defaultDurationAction,
 }: TimelineProps) {
   return (
     <MobileTimelinePullToRefresh>
@@ -114,6 +118,7 @@ export function Timeline({
           addOpportunityAction={addOpportunityAction}
           removeOpportunityAction={removeOpportunityAction}
           parentSlotStatusAction={parentSlotStatusAction}
+          defaultDurationAction={defaultDurationAction}
         />
 
         {timeline.nextFutureDays ? (

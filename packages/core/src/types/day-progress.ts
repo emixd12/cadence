@@ -300,15 +300,18 @@ export type BehaviorDurationEstimate =
       seconds: number;
       durationLabel: string;
       sampleCount: number;
-      lookbackDays: number;
-      provenance: "completed_stopped_occurrence_mean" | "behavior_default";
+      lookbackDays: number | null;
+      provenance:
+        | "completed_stopped_occurrence_mean"
+        | "behavior_default"
+        | "description_estimate";
     }>
   | Readonly<{
       kind: "unknown";
       reason: "insufficient_samples";
       sampleCount: number;
       requiredSampleCount: number;
-      lookbackDays: number;
+      lookbackDays: number | null;
     }>;
 
 export type TimelineActivitySignal =

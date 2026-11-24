@@ -14,7 +14,9 @@ import {
 import { noticeText } from "@cadence/core/notices";
 import { revalidatePath } from "next/cache";
 import { saveDayNoteFromFormData } from "@/lib/services/day-note.service";
+import { setBehaviorDefaultDurationForCurrentUser } from "@/lib/services/timeline.service";
 import type {
+  DefaultDurationActionState,
   OccurrenceActionState,
   TimelineStatus,
   TimeTrackingActionState,
@@ -121,6 +123,40 @@ export async function resetTimeTrackingAction(
   formData: FormData,
 ): Promise<TimeTrackingActionState> {
   return runTimeTrackingAction(formData, resetOccurrenceTimeTracking, "Tracked time reset.");
+}
+
+export async function setBehaviorDefaultDurationAction(
+  _previousState: DefaultDurationActionState,
+  formData: FormData,
+): Promise<DefaultDurationActionState> {
+  const behaviorId = formData.get("behavior_id");
+  const rawMinutes = formData.get("default_duration_minutes");
+
+  if (typeof behaviorId !== "string" || behaviorId.length === 0) {
+    return { status: "error", message: "Choose a Behavior first." };
+  }
+
+  const trimmed = typeof rawMinutes === "string" ? rawMinutes.trim() : "";
+  const minutes = Number(trimmed);
+  if (!trimmed || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+    return {
+      status: "error",
+      message: "Enter a whole number from 1 to 1,440 minutes.",
+    };
+  }
+
+  try {
+    const result = await setBehaviorDefaultDurationForCurrentUser(behaviorId, minutes);
+    if (!result.ok) {
+      return { status: "error", message: result.message };
+    }
+
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+    return { status: "success", message: "Default duration saved.", minutes: result.minutes };
+  } catch {
+    return { status: "error", message: "Unable to save duration." };
+  }
 }
 
 async function runTimeTrackingAction(

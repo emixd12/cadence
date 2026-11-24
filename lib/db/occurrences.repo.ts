@@ -131,21 +131,64 @@ export async function listOccurrencesBetweenLocalDates(
       span: "db.list_occurrences_between_local_dates",
       counts: (occurrences) => ({ occurrences: occurrences.length }),
     },
-    async () => {
-      const { data, error } = await supabase
-        .from("occurrences")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("local_date", startLocalDate)
-        .lte("local_date", endLocalDate)
-        .order("local_date", { ascending: true })
-        .order("scheduled_for", { ascending: true });
+    async () =>
+      readAllPostgrestRows<Occurrence>({
+        label: "Occurrences between local dates",
+        getRowKey: (occurrence) => occurrence.id,
+        createQuery: () =>
+          supabase
+            .from("occurrences")
+            .select("*")
+            .eq("user_id", userId)
+            .gte("local_date", startLocalDate)
+            .lte("local_date", endLocalDate)
+            .order("local_date", { ascending: true })
+            .order("scheduled_for", { ascending: true })
+            .order("id", { ascending: true }),
+      }),
+  );
+}
 
-      if (error) {
-        throw error;
+const OCCURRENCE_ID_BATCH_SIZE = 200;
+
+export async function listOccurrencesByIds(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrenceIds: readonly string[],
+): Promise<Occurrence[]> {
+  const uniqueIds = [...new Set(occurrenceIds.filter((id) => id.length > 0))];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  return measurePerformanceSpan(
+    {
+      span: "db.list_occurrences_by_ids",
+      counts: (occurrences) => ({
+        requested: uniqueIds.length,
+        occurrences: occurrences.length,
+      }),
+    },
+    async () => {
+      const results: Occurrence[] = [];
+      for (let i = 0; i < uniqueIds.length; i += OCCURRENCE_ID_BATCH_SIZE) {
+        const batch = uniqueIds.slice(i, i + OCCURRENCE_ID_BATCH_SIZE);
+        const { data, error } = await supabase
+          .from("occurrences")
+          .select("*")
+          .eq("user_id", userId)
+          .in("id", batch);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          results.push(...data);
+        }
       }
 
-      return data ?? [];
+      return results;
     },
   );
 }

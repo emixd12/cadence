@@ -134,10 +134,10 @@ export function travelConclusionsSourceKey(input: Readonly<{
   ])).digest("base64url");
 }
 
-/** The same completed-day history window feeds route planning and token validation. */
-export function travelDurationHistoryRange(localDate: string): { startLocalDate: string; endLocalDate: string } {
+/** The same all-time completed-day history window feeds route planning and token validation. */
+export function travelDurationHistoryRange(localDate: string): { startLocalDate: null; endLocalDate: string } {
   const start = Temporal.PlainDate.from(localDate);
-  return { startLocalDate: start.subtract({ days: 90 }).toString(), endLocalDate: start.subtract({ days: 1 }).toString() };
+  return { startLocalDate: null, endLocalDate: start.subtract({ days: 1 }).toString() };
 }
 
 export function travelDurationRevision(
