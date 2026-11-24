@@ -1,5 +1,7 @@
 import { writeFile } from "node:fs/promises";
 
+import { isRepositoryPagesOrigin } from "./public-trust-http.mjs";
+
 async function latestDeployment(projectId) {
   const team = process.env.VERCEL_TEAM_ID ? `&teamId=${encodeURIComponent(process.env.VERCEL_TEAM_ID)}` : "";
   const response = await fetch(`https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(projectId)}&target=production&state=READY&limit=1${team}`, { headers: { authorization: `Bearer ${process.env.VERCEL_TOKEN}` }, signal: AbortSignal.timeout(10_000) });
@@ -52,9 +54,7 @@ async function main() {
   const verifiedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const compact = verifiedAt.replace(/[-:]/g, "").replace(".000", "");
   const pagesOrigin = process.env.TRUST_PAGES_ORIGIN;
-  const [owner, repositoryName] = process.env.GITHUB_REPOSITORY.split("/");
-  const pagesUrl = new URL(pagesOrigin);
-  if (pagesUrl.protocol !== "https:" || pagesUrl.hostname !== `${owner}.github.io` || pagesUrl.pathname.replace(/\/$/, "") !== `/${repositoryName}`) throw new Error("TRUST_PAGES_ORIGIN must identify this repository's GitHub Pages root.");
+  if (!isRepositoryPagesOrigin(pagesOrigin, process.env.GITHUB_REPOSITORY)) throw new Error("TRUST_PAGES_ORIGIN must identify this repository's GitHub Pages root.");
   const input = {
     repository: process.env.GITHUB_REPOSITORY,
     pages_origin: pagesOrigin,
