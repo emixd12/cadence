@@ -32,7 +32,11 @@ vi.mock("@/lib/db/occurrences.repo", () => ({
   }),
 }));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ listUserBehaviors: mocks.behaviors, getProfileTimezone: mocks.timezone }));
+vi.mock("@/lib/db/behaviors.repo", () => ({
+  listUserBehaviors: mocks.behaviors,
+  getProfileTimezone: mocks.timezone,
+  listBehaviorAdvisorEstimates: vi.fn(async () => []),
+}));
 vi.mock("@/lib/services/travel-provider", async (load) => ({ ...(await load<Record<string, unknown>>()), geocodeGoogleAddress: mocks.geocode }));
 vi.mock("@/lib/services/weather-forecast.service", () => ({ readTravelWeather: mocks.weather }));
 vi.mock("@/lib/services/travel-routing.service", async (load) => ({ ...(await load<Record<string, unknown>>()), routeTravelLegs: mocks.route }));

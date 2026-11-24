@@ -332,3 +332,73 @@ function sortScheduleSlots(
     return left.start_time.localeCompare(right.start_time);
   });
 }
+
+export type BehaviorAdvisorEstimateRow = Readonly<{
+  behavior_id: string;
+  input_hash: string;
+  duration_minutes: number | null;
+}>;
+
+export async function listBehaviorAdvisorEstimates(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behaviorIds: readonly string[],
+): Promise<BehaviorAdvisorEstimateRow[]> {
+  if (behaviorIds.length === 0) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from("behavior_advisor_estimates")
+    .select("behavior_id, input_hash, duration_minutes")
+    .eq("user_id", userId)
+    .in("behavior_id", [...behaviorIds]);
+
+  if (error) {
+    return [];
+  }
+
+  return data ?? [];
+}
+
+export async function readBehaviorRevisionById(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behaviorId: string,
+): Promise<Readonly<{ id: string; updated_at: string }> | null> {
+  const { data, error } = await supabase
+    .from("behaviors")
+    .select("id, updated_at")
+    .eq("user_id", userId)
+    .eq("id", behaviorId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+export async function setBehaviorDefaultLength(
+  supabase: AppSupabaseClient,
+  input: Readonly<{
+    behaviorId: string;
+    minutes: number;
+    expectedRevision: string;
+  }>,
+): Promise<Readonly<{ ok: true } | { ok: false; reason: "revision_changed" | "failed" }>> {
+  const { error } = await supabase.rpc("set_behavior_default_length", {
+    p_behavior_id: input.behaviorId,
+    p_minutes: input.minutes,
+    p_expected_revision: input.expectedRevision,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      reason: error.message === "behavior_revision_changed" ? "revision_changed" : "failed",
+    };
+  }
+
+  return { ok: true };
+}

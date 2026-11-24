@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from "react";
 import { formatRecordedDuration } from "@cadence/core/resolvers/time-tracking.resolver";
 import type { BehaviorDurationEstimate } from "@cadence/core/types/day-progress";
+import { Notice } from "@/components/feedback/Notice";
 import type {
   DefaultDurationActionState,
   DefaultDurationFormAction,
@@ -19,18 +20,31 @@ const IDLE_STATE: DefaultDurationActionState = {
   message: "",
 };
 
+function estimateSignature(estimate: BehaviorDurationEstimate): string {
+  return estimate.kind === "known"
+    ? `${estimate.provenance}:${estimate.seconds}:${estimate.sampleCount}`
+    : `unknown:${estimate.sampleCount}`;
+}
+
 export function InlineDurationControl({
   behaviorId,
   estimate,
   action,
 }: InlineDurationControlProps) {
   const inputId = useId();
+  const currentSignature = estimateSignature(estimate);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const [savedOverride, setSavedOverride] = useState<Readonly<{
+    minutes: number;
+    forSignature: string;
+  }> | null>(null);
   const wrappedAction: DefaultDurationFormAction = async (previousState, formData) => {
     if (!action) return IDLE_STATE;
+    const submittedSignature = currentSignature;
     const next = await action(previousState, formData);
     if (next.status === "success" && next.minutes != null) {
+      setSavedOverride({ minutes: next.minutes, forSignature: submittedSignature });
       setEditing(false);
     }
     return next;
@@ -40,7 +54,9 @@ export function InlineDurationControl({
     IDLE_STATE,
   );
   const savedMinutes =
-    state.status === "success" && state.minutes != null ? state.minutes : null;
+    savedOverride && savedOverride.forSignature === currentSignature
+      ? savedOverride.minutes
+      : null;
 
   const effectiveEstimate: BehaviorDurationEstimate =
     savedMinutes !== null
@@ -123,10 +139,8 @@ export function InlineDurationControl({
           >
             Cancel
           </button>
-          {state.status === "error" && state.message ? (
-            <p className="w-full text-xs text-destructive" role="alert">
-              {state.message}
-            </p>
+          {state.status === "error" && state.noticeId ? (
+            <Notice id={state.noticeId} size="small" className="w-full" />
           ) : null}
         </form>
       ) : null}

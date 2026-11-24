@@ -8,8 +8,8 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 25 |
-| error | 82 |
+| outcome | 26 |
+| error | 87 |
 | note | 21 |
 | question | 3 |
 
@@ -189,6 +189,12 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
 | `sub-behaviors.routine-marked` Says on Timeline that a whole routine slot was marked Completed or Not Completed. | outcome | Routine updated. | web, Mac | INT-TIMELINE-025, `app/(app)/timeline/actions.ts`, `apps/desktop/src/local-actions.ts` |
+| `timeline.duration-choose-behavior` Says the inline default-duration form was submitted without a Behavior. | error | Choose a Behavior first. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts` |
+| `timeline.duration-invalid-minutes` Says the inline default-duration input needs a whole number of minutes from 1 to 1,440. | error | Enter a whole number from 1 to 1,440 minutes. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts` |
+| `timeline.duration-revision-changed` Says the Behavior changed elsewhere while saving its default duration. | error | This Behavior was just updated. Try saving again. | web | INT-BEHAVIOR-030, `lib/services/timeline.service.ts` |
+| `timeline.duration-save-failed` Says saving the Behavior's default duration failed. | error | Unable to save duration. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts`, `lib/services/timeline.service.ts` |
+| `timeline.duration-saved` Confirms the Behavior's default duration was saved from the Timeline row. | outcome | Default duration saved. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts` |
+| `timeline.duration-unavailable` Says the Behavior whose default duration is being set is no longer available. | error | This Behavior is no longer available. | web | INT-BEHAVIOR-030, `lib/services/timeline.service.ts` |
 | `timeline.reload-incomplete` Says a reload finished but Cadence or a connector did not refresh, so shown data may be old. | error | Reload incomplete. Cadence or connector data may be stale. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reload-offline` Web: says a reload could not run while offline, so shown data may be old. | error | Reload failed while offline. Displayed data may be stale. | web | INT-TIMELINE-010, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reloaded` Confirms that the Timeline reloaded Cadence and every connector. | outcome | Cadence and connectors reloaded. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |

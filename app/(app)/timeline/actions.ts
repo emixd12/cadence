@@ -133,29 +133,39 @@ export async function setBehaviorDefaultDurationAction(
   const rawMinutes = formData.get("default_duration_minutes");
 
   if (typeof behaviorId !== "string" || behaviorId.length === 0) {
-    return { status: "error", message: "Choose a Behavior first." };
+    const noticeId = "timeline.duration-choose-behavior" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
   }
 
   const trimmed = typeof rawMinutes === "string" ? rawMinutes.trim() : "";
   const minutes = Number(trimmed);
   if (!trimmed || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
-    return {
-      status: "error",
-      message: "Enter a whole number from 1 to 1,440 minutes.",
-    };
+    const noticeId = "timeline.duration-invalid-minutes" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
   }
 
   try {
     const result = await setBehaviorDefaultDurationForCurrentUser(behaviorId, minutes);
     if (!result.ok) {
-      return { status: "error", message: result.message };
+      return {
+        status: "error",
+        noticeId: result.noticeId,
+        message: noticeText(result.noticeId),
+      };
     }
 
     revalidatePath("/timeline");
     revalidatePath("/behaviors");
-    return { status: "success", message: "Default duration saved.", minutes: result.minutes };
+    const noticeId = "timeline.duration-saved" as const;
+    return {
+      status: "success",
+      noticeId,
+      message: noticeText(noticeId),
+      minutes: result.minutes,
+    };
   } catch {
-    return { status: "error", message: "Unable to save duration." };
+    const noticeId = "timeline.duration-save-failed" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
   }
 }
 

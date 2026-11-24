@@ -28,7 +28,11 @@ vi.mock("@/lib/db/occurrences.repo", () => ({
   }),
 }));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ listUserBehaviors: mocks.behaviors, getProfileTimezone: mocks.timezone }));
+vi.mock("@/lib/db/behaviors.repo", () => ({
+  listUserBehaviors: mocks.behaviors,
+  getProfileTimezone: mocks.timezone,
+  listBehaviorAdvisorEstimates: vi.fn(async () => []),
+}));
 vi.mock("@/lib/services/travel-provider", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-provider")>()),
   geocodeGoogleAddress: mocks.geocode,

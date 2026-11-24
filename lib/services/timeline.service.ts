@@ -10,9 +10,13 @@ import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
 
 import {
+  listBehaviorAdvisorEstimates,
+  readBehaviorRevisionById,
+  setBehaviorDefaultLength,
   type AppSupabaseClient,
   type BehaviorWithCategory,
 } from "@/lib/db/behaviors.repo";
+import type { NoticeId } from "@cadence/core/notices";
 import {
   listOccurrencesBetweenLocalDates,
   listOccurrencesByIds,
@@ -106,33 +110,28 @@ export async function getTimelinePageBundleForUser(
 export async function setBehaviorDefaultDurationForCurrentUser(
   behaviorId: string,
   minutes: number,
-): Promise<Readonly<{ ok: true; minutes: number } | { ok: false; message: string }>> {
+): Promise<Readonly<{ ok: true; minutes: number } | { ok: false; noticeId: NoticeId }>> {
   const supabase = await createClient();
   const userId = await requireCurrentUserId("Sign in again before updating duration.");
-  const { data: behavior, error: readError } = await supabase
-    .from("behaviors")
-    .select("id, updated_at")
-    .eq("user_id", userId)
-    .eq("id", behaviorId)
-    .maybeSingle();
+  const behavior = await readBehaviorRevisionById(supabase, userId, behaviorId);
 
-  if (readError || !behavior) {
-    return { ok: false, message: "This Behavior is no longer available." };
+  if (!behavior) {
+    return { ok: false, noticeId: "timeline.duration-unavailable" };
   }
 
-  const { error } = await supabase.rpc("set_behavior_default_length", {
-    p_behavior_id: behaviorId,
-    p_minutes: minutes,
-    p_expected_revision: behavior.updated_at,
+  const saved = await setBehaviorDefaultLength(supabase, {
+    behaviorId,
+    minutes,
+    expectedRevision: behavior.updated_at,
   });
 
-  if (error) {
+  if (!saved.ok) {
     return {
       ok: false,
-      message:
-        error.message === "behavior_revision_changed"
-          ? "This Behavior was just updated. Try saving again."
-          : "Unable to save duration.",
+      noticeId:
+        saved.reason === "revision_changed"
+          ? "timeline.duration-revision-changed"
+          : "timeline.duration-save-failed",
     };
   }
 
@@ -238,7 +237,7 @@ async function getTimelineViewForUser(input: {
   const [historySessions, advisorEstimates, removalFacts] = await Promise.all([
     listTimeSessionHistory(supabase, { userId, startLocalDate: null, endLocalDate: historyEnd,
       includeArchived: false, throughStartedAt: now.toString() }),
-    readCachedBehaviorAdvisorEstimates(supabase, userId, behaviors),
+    readValidBehaviorAdvisorEstimates(supabase, userId, behaviors),
     readOpportunityRemovalFacts(supabase, userId, occurrenceRows),
   ]);
   const historyOccurrences = await listOccurrencesByIds(
@@ -265,24 +264,30 @@ async function getTimelineViewForUser(input: {
 }
 
 /**
- * Reads cached AI duration estimates (`behavior_advisor_estimates`) for active Behaviors
+ * Reads cached AI duration estimates (`behavior_advisor_estimates`) for Behaviors
  * whose title, description, and place still match the cached `input_hash`.
  */
-async function readCachedBehaviorAdvisorEstimates(
+export async function readValidBehaviorAdvisorEstimates(
   supabase: AppSupabaseClient,
   userId: string,
-  behaviors: readonly BehaviorWithCategory[],
+  behaviors: readonly Readonly<{
+    id: string;
+    title: string;
+    description?: string | null;
+    where_kind?: string | null;
+    active?: boolean;
+  }>[],
 ): Promise<Record<string, number>> {
-  const active = behaviors.filter((behavior) => behavior.active);
-  if (active.length === 0) return {};
-  const { data, error } = await supabase
-    .from("behavior_advisor_estimates")
-    .select("behavior_id, input_hash, duration_minutes")
-    .eq("user_id", userId)
-    .in("behavior_id", active.map((behavior) => behavior.id));
-  if (error || !data) return {};
+  const eligible = behaviors.filter((behavior) => behavior.active !== false);
+  if (eligible.length === 0) return {};
+  const rows = await listBehaviorAdvisorEstimates(
+    supabase,
+    userId,
+    eligible.map((behavior) => behavior.id),
+  );
+  if (rows.length === 0) return {};
   const hashByBehavior = new Map(
-    active.map((behavior) => [
+    eligible.map((behavior) => [
       behavior.id,
       behaviorEstimateInputHash({
         title: behavior.title,
@@ -292,7 +297,7 @@ async function readCachedBehaviorAdvisorEstimates(
     ]),
   );
   const estimates: Record<string, number> = {};
-  for (const row of data) {
+  for (const row of rows) {
     if (
       row.duration_minutes != null &&
       row.input_hash === hashByBehavior.get(row.behavior_id)
