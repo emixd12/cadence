@@ -268,7 +268,7 @@ export function OccurrenceRow({
               value={visibleOccurrence.scheduleSummary}
             /> : null}
 
-            {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Duration">
+            {context ? <div id={`${detailsId}-context`} className="grid gap-1" aria-label="Duration" data-overlap-assessment={context.overlapAssessment}>
               <h4 className="font-bold text-foreground">Duration</h4>
               <InlineDurationControl
                 behaviorId={visibleOccurrence.behaviorId}

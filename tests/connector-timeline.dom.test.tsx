@@ -117,10 +117,12 @@ describe("Google source state with Outlook ready (Ticket 238 re-review)", () => 
     await render(withEstimate());
     await vi.waitFor(() => expect(container.querySelector('[data-calendar-node="outlook_calendar/calendar-1/timed-1"]')).not.toBeNull());
     await act(async () => { observers.forEach((callback) => callback()); await Promise.resolve(); });
-    if (canAssert) await vi.waitFor(() => expect(container.textContent).toContain("No timed overlap"));
-    else {
-      await vi.waitFor(() => expect(container.querySelector("[data-calendar-state]")?.getAttribute("data-calendar-state")).toMatch(/disconnected|error/));
+    if (canAssert) {
+      await vi.waitFor(() => expect(container.querySelector('[data-overlap-assessment="none"]')).not.toBeNull());
       expect(container.textContent).not.toContain("No timed overlap");
+    } else {
+      await vi.waitFor(() => expect(container.querySelector("[data-calendar-state]")?.getAttribute("data-calendar-state")).toMatch(/disconnected|error/));
+      expect(container.querySelector('[data-overlap-assessment="none"]')).toBeNull();
     }
   });
 });
