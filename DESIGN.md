@@ -1005,9 +1005,10 @@ no advisor.
   sections, separated by thin rules:
   - Today's brief
   - Needs your answer (schedule proposals: "Try for two weeks · Change for good · No")
-  - Today's tip, with all four reactions
+  - Today's tip, with all four reactions and a "See past tips (N)" link when tips were shown in
+    the last 7 days; tapping it switches the panel to a Past tips view (with "← Back", "Why
+    this?", and any tip action link, without reaction buttons)
   - Trying for two weeks
-  - Earlier
   - Chat with the advisor (an underlined link)
 - **Panel width.** From 1280px wide, the panel is a 26rem column on the right, and the Timeline
   narrows beside it so the status links stay usable. Below 1280px, which includes a typical Mac

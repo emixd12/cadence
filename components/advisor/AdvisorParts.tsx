@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { AdvisorTip, AdvisorTipReaction, AdvisorTipResearch } from "@cadence/core/types/advisor-tips";
+import { ADVISOR_RECENT_TIPS, type AdvisorTip, type AdvisorTipReaction, type AdvisorTipResearch } from "@cadence/core/types/advisor-tips";
 import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
 
 import {
@@ -268,73 +268,123 @@ function BriefSection() {
 export function AdvisorPanel() {
   const advisor = useAdvisor();
   if (!advisor?.panelOpen) return null;
+  return <AdvisorPanelContent />;
+}
+
+function AdvisorPanelContent() {
+  const advisor = useAdvisor();
+  const [pastTipsOpen, setPastTipsOpen] = useState(false);
+  if (!advisor) return null;
   const { brief, proposal, tip, recent, chatHref, closePanel } = advisor;
   const view = proposal?.view;
+  const pastCount = recent?.length ?? 0;
+  const showTodayTip = Boolean(tip && !(view?.kind === "proposal" && tip.tip.proposalId && tip.tip.proposalId === view.proposalId));
+  const showPastTipsView = pastTipsOpen && pastCount > 0;
+  const pastTipsButton = pastCount > 0 ? (
+    <p className={showTodayTip ? "mt-3" : undefined}>
+      <button type="button" className={LINK} onClick={() => setPastTipsOpen(true)} data-advisor-past-tips-open>
+        See past tips ({pastCount})
+      </button>
+    </p>
+  ) : null;
+
   return (
     <section aria-label="Advisor" role="dialog" aria-modal={false}
       className="fixed inset-0 z-50 overflow-y-auto bg-background px-5 pb-10 pt-4 xl:inset-y-0 xl:left-auto xl:right-0 xl:w-[26rem] xl:border-l xl:border-line"
-      onKeyDown={(event) => { if (event.key === "Escape") closePanel(); }} data-advisor-panel>
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        if (showPastTipsView) setPastTipsOpen(false);
+        else closePanel();
+      }} data-advisor-panel>
       <div className="mx-auto max-w-xl">
-        <div className="flex justify-end">
+        <div className={showPastTipsView ? "flex items-center justify-between" : "flex justify-end"}>
+          {showPastTipsView ? (
+            <button type="button" onClick={() => setPastTipsOpen(false)}
+              className="min-h-11 text-left text-muted-readable underline underline-offset-2 hover:text-foreground"
+              data-advisor-past-tips-back>
+              <span className="text-sm">← Back</span>
+            </button>
+          ) : null}
           <button type="button" onClick={closePanel} className="min-h-11 min-w-11 text-right text-muted-readable underline underline-offset-2 hover:text-foreground">
             <span className="text-sm">Close</span>
           </button>
         </div>
-        <div className="flex flex-col items-center gap-1 text-center">
-          <AdvisorHorse size={120} />
-          <h2 className="mt-2 text-xl">Advisor</h2>
-        </div>
-        {brief.kind !== "none" ? <BriefSection /> : null}
-        {view && (view.kind === "proposal" || view.kind === "check_in" || view.kind === "notice") ? (
-          <Section heading="Needs your answer">
-            {view.kind === "proposal" && view.tip ? <TipQuestion view={view} /> : view.kind === "proposal" ? (
-              <>
-                <p>{view.line}</p>
-                {view.reason ? <p className="text-xs leading-5 text-muted-readable">{view.reason}</p> : null}
-                {proposal?.outcome ? <ProposalOutcome /> : <ProposalAnswers answers={PROPOSAL_ANSWERS} />}
-              </>
-            ) : view.kind === "check_in" ? (
-              <>
-                <p>{view.question}</p>
-                {proposal?.outcome ? <Outcome>{proposal.outcome}</Outcome> : <ProposalAnswers answers={CHECK_IN_ANSWERS} />}
-              </>
-            ) : <p>{view.text}</p>}
-            <ErrorLine text={proposal?.error ?? null} />
-          </Section>
-        ) : null}
-        {/* A tip that carries the question above is shown there, once. */}
-        {tip && !(view?.kind === "proposal" && tip.tip.proposalId && tip.tip.proposalId === view.proposalId)
-          ? <Section heading="Today’s tip"><TipBlock full /></Section> : null}
-        {view?.kind === "trial" ? (
-          <Section heading="Trying for two weeks">
-            <p>{view.line}</p>
-            <p className="text-xs leading-5 text-muted-readable">Check-in on {formatDay(view.checkInDate)}.</p>
-          </Section>
-        ) : null}
-        {recent?.length ? (
-          <Section heading="Earlier">
-            <div className="grid gap-3">
-              {recent.map((earlier) => <EarlierTip key={earlier.id} tip={earlier} />)}
+        {showPastTipsView ? (
+          <div data-advisor-past-tips>
+            <h2 className="mt-2 text-xl">Past tips</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-readable">Tips shown in the last {ADVISOR_RECENT_TIPS.days} days.</p>
+            <div className="mt-4 divide-y divide-line border-t border-line text-sm leading-6">
+              {recent!.map((earlier) => <PastTip key={earlier.id} tip={earlier} />)}
             </div>
-          </Section>
-        ) : null}
-        {brief.kind === "none" && (!view || view.kind === "none" || view.kind === "hold") && !tip && !recent?.length ? (
-          <Section><p className="text-muted-readable">Nothing from the advisor today.</p></Section>
-        ) : null}
-        {chatHref ? (
-          <Section><a href={chatHref} style={ANCHOR_STYLE}>Chat with the advisor</a></Section>
-        ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <AdvisorHorse size={120} />
+              <h2 className="mt-2 text-xl">Advisor</h2>
+            </div>
+            {brief.kind !== "none" ? <BriefSection /> : null}
+            {view && (view.kind === "proposal" || view.kind === "check_in" || view.kind === "notice") ? (
+              <Section heading="Needs your answer">
+                {view.kind === "proposal" && view.tip ? <TipQuestion view={view} /> : view.kind === "proposal" ? (
+                  <>
+                    <p>{view.line}</p>
+                    {view.reason ? <p className="text-xs leading-5 text-muted-readable">{view.reason}</p> : null}
+                    {proposal?.outcome ? <ProposalOutcome /> : <ProposalAnswers answers={PROPOSAL_ANSWERS} />}
+                  </>
+                ) : view.kind === "check_in" ? (
+                  <>
+                    <p>{view.question}</p>
+                    {proposal?.outcome ? <Outcome>{proposal.outcome}</Outcome> : <ProposalAnswers answers={CHECK_IN_ANSWERS} />}
+                  </>
+                ) : <p>{view.text}</p>}
+                <ErrorLine text={proposal?.error ?? null} />
+              </Section>
+            ) : null}
+            {/* A tip that carries the question above is shown there, once. */}
+            {showTodayTip ? (
+              <Section heading="Today’s tip">
+                <TipBlock full />
+                {pastTipsButton}
+              </Section>
+            ) : pastTipsButton ? (
+              <Section heading="Past tips">{pastTipsButton}</Section>
+            ) : null}
+            {view?.kind === "trial" ? (
+              <Section heading="Trying for two weeks">
+                <p>{view.line}</p>
+                <p className="text-xs leading-5 text-muted-readable">Check-in on {formatDay(view.checkInDate)}.</p>
+              </Section>
+            ) : null}
+            {brief.kind === "none" && (!view || view.kind === "none" || view.kind === "hold") && !tip && !pastCount ? (
+              <Section><p className="text-muted-readable">Nothing from the advisor today.</p></Section>
+            ) : null}
+            {chatHref ? (
+              <Section><a href={chatHref} style={ANCHOR_STYLE}>Chat with the advisor</a></Section>
+            ) : null}
+          </>
+        )}
       </div>
     </section>
   );
 }
 
-function EarlierTip({ tip }: Readonly<{ tip: AdvisorTip }>) {
+function PastTip({ tip }: Readonly<{ tip: AdvisorTip }>) {
+  const [researchOpen, setResearchOpen] = useState(false);
   return (
-    <div>
-      <p className="break-words [overflow-wrap:anywhere]">{tip.text}</p>
-      {tip.reaction ? <p className="italic">{TIP_REACTION_OUTCOME[tip.reaction]}</p> : null}
-      <p className="text-xs leading-5 text-muted-readable">{formatDay(tip.localDate)}</p>
+    <div className="py-4 first:pt-4" data-advisor-past-tip={tip.id}>
+      <p className="break-words text-foreground [overflow-wrap:anywhere]">{tip.text}</p>
+      <p className="mt-1 text-xs leading-5 text-muted-readable">
+        {formatDay(tip.localDate)}
+        {tip.reaction ? <> · <span className="italic">{TIP_REACTION_OUTCOME[tip.reaction]}</span></> : null}
+      </p>
+      <p className="mt-1">
+        {tip.link ? <span className="whitespace-nowrap"><TipLinkButton tip={tip} /><Dot /></span> : null}
+        <button type="button" className={LINK} onClick={() => setResearchOpen((open) => !open)} aria-expanded={researchOpen}>
+          {researchOpen ? "Hide research" : "Why this?"}
+        </button>
+      </p>
+      {researchOpen ? <ResearchCard research={tip.research} full /> : null}
     </div>
   );
 }

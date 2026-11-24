@@ -1392,7 +1392,7 @@
     {
       "path": "components/advisor/AdvisorParts.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 25,
+      "interaction_marker_count": 31,
       "interaction_ids": [
         "INT-ADVISOR-001",
         "INT-ADVISOR-002",
