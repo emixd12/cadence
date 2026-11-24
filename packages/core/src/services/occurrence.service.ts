@@ -55,10 +55,9 @@ export async function applyOccurrenceStatusTransition(
     expectedLatestEventId: context.latestStatusEventId,
     ...update,
     cancelPendingReminders: resolveReminderDeliveryCancellation({ occurrence: update }).cancelPending,
-    timeTrackingStop:
-      stopPlan.kind === "stop"
-        ? { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt }
-        : null,
+    ...(stopPlan.kind === "stop"
+      ? { timeTrackingStop: { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt } }
+      : {}),
     event,
   });
   return { result, timezone: context.timezone };
@@ -121,10 +120,9 @@ export async function applyParentSlotStatusTransition(
       expectedLatestEventId: context.latestStatusEventId,
       ...update,
       cancelPendingReminders: resolveReminderDeliveryCancellation({ occurrence: update }).cancelPending,
-      timeTrackingStop:
-        stopPlan.kind === "stop"
-          ? { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt }
-          : null,
+      ...(stopPlan.kind === "stop"
+        ? { timeTrackingStop: { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt } }
+        : {}),
       event: resolveStatusEvent({
         occurrence, nextStatus: input.nextStatus, now: input.now,
         hasPriorStatusEvent: context.latestStatusEventId !== null, update,
