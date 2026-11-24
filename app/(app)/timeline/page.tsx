@@ -11,12 +11,15 @@ import { getCurrentUserClaims } from "@/lib/auth/current-user";
 import { LEAVE_REMINDER_LINK_PARAM, parseLeaveReminderDigest } from "@/lib/ui/leave-reminder-link";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 import { getTimelinePageBundle } from "@/lib/services/timeline.service";
-import { listAcceptedNoteShortcutsForCurrentUser } from "@/lib/services/note-shortcut.service";
+import { dismissNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
+import { NoteShortcutDismissProvider } from "@/components/notes/NoteEditor";
+import { listInlineNoteShortcutsForCurrentUser } from "@/lib/services/note-shortcut.service";
 import {
   markOccurrenceStatusAction,
   markParentSlotStatusAction,
   resetTimeTrackingAction,
   saveDayNoteAction,
+  setBehaviorDefaultDurationAction,
   startTimeTrackingAction,
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
@@ -111,11 +114,12 @@ async function TimelineContent({
       }),
     },
   );
-  const shortcutsByBehavior = await listAcceptedNoteShortcutsForCurrentUser();
+  const shortcutsByBehavior = await listInlineNoteShortcutsForCurrentUser();
   const { userId } = await getCurrentUserClaims();
   const moveState = await loadMoveState(userId, timeline.todayLocalDate);
 
   return (
+    <NoteShortcutDismissProvider onDismiss={dismissNoteShortcutAction}>
     <OccurrenceMovesProvider
       actions={MOVE_ACTIONS}
       timezone={timeline.timezone}
@@ -146,9 +150,11 @@ async function TimelineContent({
         addOpportunityAction={addOpportunityOccurrenceAction}
         removeOpportunityAction={removeOpportunityOccurrenceAction}
         parentSlotStatusAction={markParentSlotStatusAction}
+        defaultDurationAction={setBehaviorDefaultDurationAction}
       />
       </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>
+    </NoteShortcutDismissProvider>
   );
 }
 

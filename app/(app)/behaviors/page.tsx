@@ -13,7 +13,8 @@ import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 import { parseBehaviorEditTarget, type BehaviorEditTarget } from "@/lib/ui/advisor";
 import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
-import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
+import { dismissNoteShortcutAction, manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
+import { NoteShortcutDismissProvider } from "@/components/notes/NoteEditor";
 import {
   archiveBehaviorAction,
   behaviorRunAction,
@@ -122,6 +123,7 @@ async function BehaviorsContent({
         parentOptions={parentChoices(null, [...data.activeBehaviors, ...data.archivedBehaviors]).options}
       />
 
+      <NoteShortcutDismissProvider onDismiss={dismissNoteShortcutAction}>
       <BehaviorList
         activeBehaviors={data.activeBehaviors}
         archivedBehaviors={data.archivedBehaviors}
@@ -142,6 +144,7 @@ async function BehaviorsContent({
         reorderAction={reorderSubBehaviorsAction}
         createAction={createBehaviorAction}
       />
+      </NoteShortcutDismissProvider>
     </>
   );
 }

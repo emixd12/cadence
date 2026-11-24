@@ -8,6 +8,7 @@ import {
   resolveResetTimeTracking,
   resolveStartTimeTracking,
   resolveStopTimeTracking,
+  resolveStopTimeTrackingOnStatusTransition,
 } from "@/lib/resolvers/time-tracking.resolver";
 import type { TimeSession } from "@/lib/types/time-tracking";
 
@@ -173,6 +174,92 @@ describe("time tracking resolver", () => {
       sessionIds: [],
       hasSessions: false,
     });
+  });
+
+  it("stops a running session when transitioning to Completed and leaves other transitions alone", () => {
+    const running = session({ startedAt: "2026-08-02T14:00:00Z", stoppedAt: null });
+    const stopped = session({
+      id: "session-2",
+      startedAt: "2026-08-02T13:00:00Z",
+      stoppedAt: "2026-08-02T13:10:00Z",
+    });
+
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "unresolved",
+        nextStatus: "completed",
+        sessions: [stopped, running],
+        statusMarkedAt: "2026-08-02T14:15:30Z",
+      }),
+    ).toEqual({
+      kind: "stop",
+      sessionId: running.id,
+      stoppedAt: "2026-08-02T14:15:30Z",
+      durationSeconds: 930,
+    });
+
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "not_completed",
+        nextStatus: "completed",
+        sessions: [running],
+        statusMarkedAt: "2026-08-02T14:15:30Z",
+      }),
+    ).toEqual({
+      kind: "stop",
+      sessionId: running.id,
+      stoppedAt: "2026-08-02T14:15:30Z",
+      durationSeconds: 930,
+    });
+
+    // Clamps to startedAt if clock skew places statusMarkedAt earlier.
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "unresolved",
+        nextStatus: "completed",
+        sessions: [running],
+        statusMarkedAt: "2026-08-02T13:59:55Z",
+      }),
+    ).toEqual({
+      kind: "stop",
+      sessionId: running.id,
+      stoppedAt: "2026-08-02T14:00:00Z",
+      durationSeconds: 0,
+    });
+
+    // Not Completed, Unresolved, unchanged Completed, and no running session do nothing.
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "unresolved",
+        nextStatus: "not_completed",
+        sessions: [running],
+        statusMarkedAt: "2026-08-02T14:15:30Z",
+      }),
+    ).toEqual({ kind: "none" });
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "completed",
+        nextStatus: "unresolved",
+        sessions: [running],
+        statusMarkedAt: null,
+      }),
+    ).toEqual({ kind: "none" });
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "completed",
+        nextStatus: "completed",
+        sessions: [running],
+        statusMarkedAt: "2026-08-02T14:15:30Z",
+      }),
+    ).toEqual({ kind: "none" });
+    expect(
+      resolveStopTimeTrackingOnStatusTransition({
+        previousStatus: "unresolved",
+        nextStatus: "completed",
+        sessions: [stopped],
+        statusMarkedAt: "2026-08-02T14:15:30Z",
+      }),
+    ).toEqual({ kind: "none" });
   });
 });
 

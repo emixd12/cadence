@@ -11,7 +11,6 @@ import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
-import { RecordedActivityList } from "@/components/timeline/RecordedActivityList";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import { ConnectorClientError, type HevyCoordinator, type HevyTimelineState, type OutlookCalendarCoordinator, type IcloudCalendarCoordinator } from "@/lib/ui/connectors";
@@ -121,11 +120,4 @@ export function OutlookCalendarPanelBench() {
 
 export function HevyPanelBench() {
   return <HevyPanel coordinator={hevyCoordinator("disconnected")} localDate="2026-11-01" timezone="America/New_York" />;
-}
-
-export function RecordedActivityBench() {
-  return <div className="grid gap-4">
-    {(Object.keys(benchRecordedActivity) as (keyof typeof benchRecordedActivity)[]).map((state) =>
-      <RecordedActivityList key={state} activity={benchRecordedActivity[state]} timezone="America/New_York" label={`Sunday (${state})`} />)}
-  </div>;
 }

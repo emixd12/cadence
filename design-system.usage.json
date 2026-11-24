@@ -316,62 +316,6 @@
       "confidence": "exact"
     },
     {
-      "componentId": "composite.recorded-activity-list",
-      "file": "components/timeline/DayProgressTimeline.tsx",
-      "line": 533,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 225,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 236,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 237,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 238,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 239,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 240,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
       "componentId": "composite.travel-leave-question",
       "file": "components/timeline/DayProgressTimeline.tsx",
       "line": 328,

@@ -5,9 +5,23 @@ import { revalidatePath } from "next/cache";
 import type { NoteShortcutCommand } from "@cadence/core/types/note-shortcut";
 import type { NoteShortcutActionState } from "@/components/note-shortcuts/NoteShortcutControls";
 import {
+  dismissNoteShortcutForCurrentUser,
   getNoteShortcutViewForCurrentUser,
   manageNoteShortcutsForCurrentUser,
 } from "@/lib/services/note-shortcut.service";
+
+export async function dismissNoteShortcutAction(
+  poolId: string,
+  key: string,
+): Promise<void> {
+  try {
+    await dismissNoteShortcutForCurrentUser(poolId, key);
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+  } catch {
+    // Dismissing a shortcut is optional; ordinary Note entry stays usable.
+  }
+}
 
 export async function manageNoteShortcutAction(
   behaviorId: string | null,

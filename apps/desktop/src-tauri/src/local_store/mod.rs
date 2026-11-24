@@ -263,6 +263,13 @@ pub struct TravelLeaveFeedbackEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TimeTrackingStopPlan {
+    pub session_id: String,
+    pub stopped_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "operation",
     rename_all = "camelCase",
@@ -491,6 +498,8 @@ pub enum Request {
         completed_at: Option<String>,
         status_marked_at: Option<String>,
         cancel_pending_reminders: bool,
+        #[serde(default)]
+        time_tracking_stop: Option<TimeTrackingStopPlan>,
         event: Option<OccurrenceStatusEvent>,
     },
     /// Advisor plan 4G: a same-status detail event ("done_at" or "not_done:<reason>").

@@ -175,10 +175,44 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("#calendar-details-title")?.textContent).toBe("Untitled event");
   });
 
-  it("distinguishes repeated DST clock times and exposes duration context", () => {
+  it("distinguishes repeated DST clock times and exposes duration context without duplicate unknown text", () => {
     const event = validateExternalEventSnapshot(snapshotFixture).events[0]!;
     expect(eventTimeLabel(event, "America/New_York")).toBe("1:30 AM EDT–1:30 AM EST");
-    expect(container.textContent).toContain("Duration unknown.");
+    expect(container.textContent).toContain("No duration yet — track time below or set a default.");
+    expect(container.textContent).not.toContain("Duration unknown");
+  });
+
+  it("shows AI description duration estimates and opens the inline default duration form", async () => {
+    const input = props();
+    const saveDuration = vi.fn(async () => ({ status: "success" as const, message: "Default duration saved.", minutes: 25 }));
+    await act(() => root.render(
+      <RefreshProvider onRefresh={() => {}}>
+        <DayProgressTimeline
+          {...input}
+          defaultDurationAction={saveDuration}
+          context={{
+            ...input.context,
+            durationEstimates: {
+              "behavior-1": {
+                kind: "known",
+                seconds: 1200,
+                durationLabel: "20m 0s",
+                sampleCount: 0,
+                lookbackDays: null,
+                provenance: "description_estimate",
+              },
+            },
+          }}
+        />
+      </RefreshProvider>,
+    ));
+    expect(container.textContent).toContain("About 20m 0s · Estimated from description");
+    const setDefaultButton = [...container.querySelectorAll("button")].find((item) => item.textContent === "Set default");
+    expect(setDefaultButton).toBeDefined();
+    await act(() => setDefaultButton!.click());
+    const minutesInput = container.querySelector<HTMLInputElement>('input[name="default_duration_minutes"]');
+    expect(minutesInput).not.toBeNull();
+    expect(minutesInput?.value).toBe("20");
   });
 
   it("accepts a running mutation between display-clock ticks", async () => {
@@ -383,7 +417,7 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("[data-current-time-marker]")).not.toBeNull();
   });
 
-  it("labels Outlook markers by source and shows recorded workouts apart from Calendar markers (Ticket 238)", async () => {
+  it("labels Outlook markers by source and keeps recorded workouts out of the Timeline header and Calendar markers", async () => {
     const input = props();
     const recordedActivity = { state: "ready" as const, error: null, day: { localDate: "2026-09-16", state: "current" as const, fetchedAt: "2026-09-16T13:55:00Z",
       items: [{ id: "hevy/workout-1", startAt: "2026-09-16T11:00:00Z", endAt: "2026-09-16T11:45:00Z", durationSeconds: 2700 }] } };
@@ -395,11 +429,9 @@ describe("DayProgressTimeline", () => {
     expect(marker?.dataset.eventSource).toBe("outlook_calendar");
     expect(marker?.querySelector("img")).toBeNull();
     expect(container.textContent).toContain("Outlook Calendar context is incomplete; some events may be missing.");
-    const activity = container.querySelector('[data-recorded-activity="ready"]');
-    expect(activity?.closest("section[aria-labelledby='today-2026-09-16-title']")).not.toBeNull();
-    expect(activity?.textContent).toContain("Workout");
-    expect(activity?.textContent).toContain("7:00 AM–7:45 AM");
-    expect(activity?.textContent).toContain("45 min");
+    // Recorded activity does not render a dedicated connector banner/section above the Timeline.
+    expect(container.querySelector("[data-recorded-activity]")).toBeNull();
+    expect(container.textContent).not.toContain("Recorded activity");
     // A workout is never a Calendar marker, overlap cue, or Occurrence change.
     expect(container.querySelectorAll("[data-calendar-node]")).toHaveLength(1);
     expect(container.querySelector('[data-calendar-node^="hevy/"]')).toBeNull();

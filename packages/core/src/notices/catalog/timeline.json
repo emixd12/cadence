@@ -70,6 +70,48 @@
       "platforms": ["mac"],
       "interactions": ["INT-NOTIFICATION-001"],
       "previous": [{ "look": "Readable Ash", "until": "2026-11-20", "change": "Error style: one Rust Signal line (Emi, product map answer 1)." }]
+    },
+    "timeline.duration-choose-behavior": {
+      "meaning": "Says the inline default-duration form was submitted without a Behavior.",
+      "text": "Choose a Behavior first.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.duration-invalid-minutes": {
+      "meaning": "Says the inline default-duration input needs a whole number of minutes from 1 to 1,440.",
+      "text": "Enter a whole number from 1 to 1,440 minutes.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.duration-unavailable": {
+      "meaning": "Says the Behavior whose default duration is being set is no longer available.",
+      "text": "This Behavior is no longer available.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.duration-revision-changed": {
+      "meaning": "Says the Behavior changed elsewhere while saving its default duration.",
+      "text": "This Behavior was just updated. Try saving again.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.duration-save-failed": {
+      "meaning": "Says saving the Behavior's default duration failed.",
+      "text": "Unable to save duration.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.duration-saved": {
+      "meaning": "Confirms the Behavior's default duration was saved from the Timeline row.",
+      "text": "Default duration saved.",
+      "style": "outcome",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-030"]
     }
   }
 }

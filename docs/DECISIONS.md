@@ -2951,3 +2951,69 @@ be adapted right away, and asked for a quick production deployment of the update
 Platform impact: web on merge; Mac in its next release (shared components and files, not
 checked on an installed Mac); marketing not applicable; future mobile reads the same
 catalog. Messaging impact: none.
+
+## 2026-11-23: Marking an Occurrence Completed stops its running timer
+
+Owner decision on November 23, 2026 (Ticket 351):
+
+- **Completed auto-stops a running session.** Transitioning an Occurrence to `completed`
+  (from `unresolved` or `not_completed`, including routine bulk marks and MCP) atomically
+  stops any running `occurrence_time_sessions` row on that Occurrence at
+  `status_marked_at` (clamped to `started_at` on clock skew).
+- **Not Completed and Unresolved do not.** `not_completed` marks the behavior as not done,
+  so it cannot carry a completion time; `unresolved` and unchanged `completed` re-marks
+  also leave running sessions untouched.
+- **One-way coupling stays.** Stopping a timer manually still never changes status,
+  timestamps, status history, notes, or reminders. Starting a new timer after marking
+  `completed` remains allowed on today's occurrences and same-day retained Needs decision
+  rows.
+- **No backfill.** Existing already-completed occurrences with running sessions are not
+  retroactively stopped by the migration.
+
+Platform impact: web implemented (Postgres `apply_occurrence_status_transition`,
+`TimeTracker` refresh sync); desktop implemented (`apps/desktop/src-tauri/src/local_store/occurrence.rs`,
+ships in the next Mac release); marketing not applicable; future mobile inherits the same
+core rule. Messaging impact: none.
+
+## 2026-11-24: Note shortcuts revamp — inline by default, full history, floor of 2, and AI pattern analysis
+
+Owner decision on November 24, 2026:
+
+- **Remove Settings & Behavior-settings management UI.** Remove the Day note shortcuts drawer from
+  Settings → General (web and desktop) and the static Note shortcuts section from Behavior Details
+  and Settings. The existing `Settings → AI features → Notes` toggle (approved during onboarding) is
+  sufficient for AI-backed note pattern analysis; deterministic matching stays always on.
+- **Show chips inline by default with inline dismiss.** `NoteEditor` renders both accepted and
+  proposed shortcuts directly above the note textarea (ranked by frequency + recency, capped at 5
+  chips), with a lightweight inline `×` dismiss button on each chip. No trip to Settings is needed
+  before shortcuts appear.
+- **Full history and floor of 2.** Remove the 90-day cutoff (scan full history up to today, capped
+  at 500 notes per pool and 100 evidence refs per entry), lower the minimum evidence floor from 3 to
+  2 distinct Occurrences / day notes (Postgres `note_shortcut_entries_valid`, Rust SQLite validator,
+  and core resolver), normalize trailing punctuation in `notePatternKey`, and match repeated lines
+  across multi-line notes.
+- **Hybrid AI pattern analysis.** Layer `openai/gpt-5.6-luna` structured extraction (`source: "model"`)
+  on top of deterministic matching after in-app note saves, gated on `ai.approved && sources.notes`,
+  requiring at least 3 eligible notes and a 12-hour per-pool cooldown, and merged through pure
+  `mergeModelNoteSuggestions`.
+
+Platform impact: web implemented (awaits hosted migration push for `20261124103000_note_shortcuts_min_two_evidence.sql`);
+desktop implemented (shared components, `apps/desktop/src/product.tsx`, `settings-screen.tsx`, Rust validator in `db.rs`;
+ships in next Mac release); marketing not applicable; future mobile inherits the same core resolver. Messaging impact: none.
+
+## 2026-11-24: Remove dedicated Recorded activity · Hevy section from Timeline header
+
+Owner decision on November 24, 2026:
+
+- **No dedicated connector status/activity section above the Timeline.** Remove
+  `RecordedActivityList` (`"Recorded activity · Hevy"` / `"No recorded workouts today."`) from
+  `DayProgressTimeline`. Connector status belongs in Settings; empty states and internal
+  contract labels should not occupy Timeline header space or stack as more connectors are added.
+- **Keep internal recorded-activity capture and completion intact.** `DayProgressTimeline` still
+  receives today's recorded-activity snapshot so manual workout counting (`countableWorkouts`)
+  keeps working on occurrences; background connector completion (`occurrence_source_matches`),
+  Daily Brief, and Chat reads are unchanged.
+
+Platform impact: web implemented (`components/timeline/DayProgressTimeline.tsx`, `RecordedActivityList`
+removed); desktop implemented (shares `DayProgressTimeline`, ships in next Mac release); marketing not
+applicable; future mobile deferred. Messaging impact: `P-085`.

@@ -236,6 +236,59 @@ does today.
 - **Shipping.** The animated avatar lands behind `CADENCE_ADVISOR_AVATAR_MOTION`, off in
   production until the owner accepts it on web and on the installed Mac (Ticket 346).
 
+#### Step 2 review, November 22, 2026
+
+The owner returned to this step after the hurried run. Review 1 measures the shipped
+motion in the bench, in Chrome at 1× and 2×. Sharpness is the mean difference between
+neighbouring pixels, as a share of the still drawing's.
+
+- **Breathing softens the whole drawing, all the time.** It turns and scales the drawing
+  without pause, so the browser redraws it between pixels. With every movement on, the
+  avatar keeps 62 to 69% of its sharpness at 40 and 48px and 56 to 58% at 120px. With
+  breathing off it keeps 89 to 94% at 40 and 48px and 78 to 80% at 120px.
+- **The mane costs the rest.** Its sway and, at 120px, its ripple redraw the mane. The
+  blink costs nothing measurable.
+- **Breathing at 40 and 48px breaks this plan's own rule,** "only the motions that read
+  at that size run (blink, mane, one gesture)".
+- **A state with a fixed tilt is soft too.** `state.trouble` and `state.attending` turn
+  the drawing by 2 degrees and hold it; they keep 67 to 84%.
+- **Round 5's gain needs this.** The exact-size files are sharper only when the drawing
+  is not turned or scaled.
+- **Options on the bench** (`/design-system?preview=advisor-avatar`, "Breathing options"):
+  A as shipped; B no breathing; C breathing in the 120px panel only. Tried and dropped:
+  one breath every 9 seconds, which stayed as soft as A between breaths.
+- **Not reviewed yet:** each gesture, the state-to-state differences, the Chat page, the
+  tilt in `state.trouble` and `state.attending`, and the installed Mac.
+- Owner's answer: pending.
+
+#### Step 2 review 2, November 22, 2026
+
+The owner asked for two things: the avatar on a white or transparent background instead
+of the light blue circle, and a head and neck movement to think about.
+
+- **The circle.** It is now the page's own background with its thin edge line; the eyelids
+  are filled with the same colour. No tint.
+- **A head layer in the rig.** The catalog's `art.anchors.head` holds the head's area and
+  its pivot at the poll. `AdvisorAvatar` draws the head as its own layer, carrying the ears
+  and the eyelids, so it can turn on the neck. Nothing in the product moves it yet, and
+  the still drawing is unchanged.
+- **The mane is painted last.** Chrome redraws, softly, whatever is painted after a moving
+  layer. With the swaying mane last, the face stays sharp while the mane moves. Without
+  breathing the avatar now keeps 89 to 94% at 40 and 48px and 83 to 88% at 120px (review 1
+  measured 78 to 80% at 120px). The loss that remains is in the mane itself; at 120px the
+  ripple smears it visibly.
+- **Head and neck trials on the bench** ("Head and neck movement"), not in the product:
+  Nod (the head dips on the neck), Lift (the head lifts and holds), Lean (head and neck
+  lean from the base of the neck), and Lean, then lift. Each plays once every 6 seconds
+  with no breathing. Between plays the drawing is as sharp as with no breathing; during
+  the 1.5 to 2.6 seconds of a play it drops to 53 to 77%.
+- **Limits of the head layer.** The drawing is lines with no fill, so a turned head shows
+  the neck's lines through it near the jaw. At the trial angles (3 to 5 degrees) this is
+  slight. Larger turns would need a filled head.
+- **Open for the owner:** which breathing option (A, B or C); whether a head and neck
+  movement replaces breathing as the resting movement, joins the gestures, or neither;
+  and which trial. Not checked: the installed Mac, where WebKit draws this.
+
 ### Step 3: tests on real accounts (Tickets 347 and 348)
 
 Goal: compare animation variants on real use and keep a record of each change.

@@ -281,10 +281,11 @@ async function assembleDayContexts(
       occurrences: history,
       now,
       timezone: cadenceSnapshot.timezone,
+      lookbackDays: 90,
     });
     return [behavior.id, durationHistoryCapped ? {
       ...sources,
-      historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0 as const, requiredSampleCount: 3 as const, lookbackDays: 90 as const },
+      historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0 as const, requiredSampleCount: 1 as const, lookbackDays: 90 as const },
       recordedElapsedDurations: [],
     } : sources] as const;
   }));
@@ -485,7 +486,7 @@ function advisorDuration(estimate: ReturnType<typeof resolveBehaviorDurationSour
   kind: "unknown";
   reason: "history_limit_exceeded";
   sampleCount: 0;
-  requiredSampleCount: 3;
+  requiredSampleCount: number;
   lookbackDays: 90;
 }>): AdvisorDuration {
   return estimate.kind === "known"

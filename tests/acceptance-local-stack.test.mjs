@@ -1,7 +1,7 @@
 // Ticket 252: the mcp-acceptance skill's local stack helper. Pure logic and CLI
 // argument validation; no Docker, Supabase or app is started.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -23,6 +23,21 @@ describe('local stack helper', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('usage: local-stack.mjs');
       expect(result.stdout).toBe('');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('runs the command-line entry point through a symlinked directory', () => {
+    // macOS's temporary directory is behind a symlink, and so was this failure.
+    const dir = mkdtempSync(join(tmpdir(), 'cadence-local-stack-'));
+    try {
+      mkdirSync(join(dir, 'real'));
+      symlinkSync(join(dir, 'real'), join(dir, 'link'));
+      copyFileSync(new URL('../.claude/skills/mcp-acceptance/local-stack.mjs', import.meta.url), join(dir, 'real', 'local-stack.mjs'));
+      const result = spawnSync(process.execPath, [join(dir, 'link', 'local-stack.mjs'), 'invalid-command'], { encoding: 'utf8', timeout: 10_000 });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('usage: local-stack.mjs');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

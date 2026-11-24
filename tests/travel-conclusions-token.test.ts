@@ -126,7 +126,7 @@ describe("travel conclusions token", () => {
   });
 
   it("uses the same completed-day duration window and stable history revision", () => {
-    expect(travelDurationHistoryRange("2026-11-01")).toEqual({ startLocalDate: "2026-08-03", endLocalDate: "2026-10-31" });
+    expect(travelDurationHistoryRange("2026-11-01")).toEqual({ startLocalDate: null, endLocalDate: "2026-10-31" });
     const occurrences = [{ id: "o1", updated_at: "2026-10-30T12:00:00Z" }, { id: "o2", updated_at: "2026-10-31T12:00:00Z" }];
     const sessions = [{ id: "s1", occurrence_id: "o1", behavior_id: "b1", started_at: "2026-10-30T11:00:00Z", stopped_at: "2026-10-30T12:00:00Z" }];
     const revision = travelDurationRevision(occurrences, sessions);

@@ -743,13 +743,14 @@ Settings keeps the open list until Ticket 302.
 
 Timeline markers name their source in accessible labels and details. Google
 keeps its bundled provider asset; Outlook uses the neutral lucide calendar
-glyph, not provider artwork. Recorded Hevy workouts are a plain
-`RecordedActivityList` under today's date title (Workout, time range, duration,
-12px muted text and an activity glyph). They are never axis markers, overlap
-cues, or Occurrence changes. Non-Google calendar status lines reuse the
-`calendarState` style. `ConnectorBench` and the Day Progress fixture menu cover
-connected, not connected, not configured, needs reconnection, status
-unavailable, desktop local, stale, incomplete, and offline states.
+glyph, not provider artwork. Recorded Hevy workouts do not render a dedicated
+section under today's date title (decision 2026-11-24) and are never axis
+markers or overlap cues; connection status lives in Settings, while matched
+workouts appear via connector completion on linked occurrences and today's
+workouts remain available for manual counting on occurrences. Non-Google
+calendar status lines reuse the `calendarState` style. `ConnectorBench` and the
+Day Progress fixture menu cover connected, not connected, not configured, needs
+reconnection, status unavailable, desktop local, and offline states.
 
 ## Briefing workbench (Tickets 151–155)
 
@@ -963,7 +964,8 @@ Bench with synthetic data: `/design-system?preview=advisor&state=tip|brief|propo
 no advisor.
 
 - **One horse.** The Timeline banner keeps its wave line and drops its horse. The advisor is a
-  round "window" avatar: the whole head shows and the neck runs out of the bottom of the circle,
+  round "window" avatar on the page's own background, with a thin line for its edge and no
+  tint (owner, November 22, 2026): the whole head shows and the neck runs out of the bottom of the circle,
   so it never looks cropped. The drawing has one vector master
   (`assets/advisor-avatar/master.svg`, approved November 22, 2026). `npm run avatar:build`
   makes the shipped files under `public/brand/advisor/`: one for each product size (40,
@@ -1004,9 +1006,10 @@ no advisor.
   sections, separated by thin rules:
   - Today's brief
   - Needs your answer (schedule proposals: "Try for two weeks · Change for good · No")
-  - Today's tip, with all four reactions
+  - Today's tip, with all four reactions and a "See past tips (N)" link when tips were shown in
+    the last 7 days; tapping it switches the panel to a Past tips view (with "← Back", "Why
+    this?", and any tip action link, without reaction buttons)
   - Trying for two weeks
-  - Earlier
   - Chat with the advisor (an underlined link)
 - **Panel width.** From 1280px wide, the panel is a 26rem column on the right, and the Timeline
   narrows beside it so the status links stay usable. Below 1280px, which includes a typical Mac

@@ -1,6 +1,6 @@
 import type { Temporal } from "@js-temporal/polyfill";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "../resolvers/day-note.resolver";
-import { currentNoteShortcuts, isDayNoteShortcutPool, noteShortcutRevision, noteShortcutsEnabled, resolveNoteShortcutCommand, validateNoteShortcutState } from "../resolvers/note-suggestion.resolver";
+import { currentNoteShortcuts, isDayNoteShortcutPool, noteShortcutRevision, noteShortcutsEnabled, rankInlineNoteShortcuts, resolveNoteShortcutCommand, validateNoteShortcutState } from "../resolvers/note-suggestion.resolver";
 import type { NoteShortcut, NoteShortcutCommand, NoteShortcutStore, NoteShortcutView } from "../types/note-shortcut";
 
 export async function getNoteShortcutView(store: NoteShortcutStore, behaviorId: string | null, now: Temporal.Instant): Promise<NoteShortcutView> {
@@ -65,4 +65,61 @@ export async function listAcceptedNoteShortcuts(store: NoteShortcutStore): Promi
   } catch {
     return {};
   }
+}
+
+export async function listInlineNoteShortcuts(
+  store: NoteShortcutStore,
+  now: Temporal.Instant,
+): Promise<Record<string, NoteShortcut[]>> {
+  try {
+    const states = await store.readStates();
+    for (const state of states) {
+      validateNoteShortcutState(state);
+      if (state.user_id !== store.userId) throw new Error("Shortcut state belongs to another owner.");
+    }
+    if (!noteShortcutsEnabled(states.find((state) => state.id === "global"))) return {};
+    const poolStates = states.filter((state) => state.behavior_id || state.id === DAY_NOTE_SHORTCUT_POOL_ID);
+    const resolved = await Promise.all(
+      poolStates.map(async (state) => {
+        const poolId = state.behavior_id ?? DAY_NOTE_SHORTCUT_POOL_ID;
+        const hasProposed = state.entries.some((entry) => entry.status === "proposed");
+        if (!hasProposed) {
+          return [poolId, rankInlineNoteShortcuts(state.entries, now)] as const;
+        }
+        // Validate proposal evidence against current notes so cleared/edited notes never leave stale chips.
+        try {
+          const context = await store.readContext(poolId);
+          const validEntries = currentNoteShortcuts({ context, userId: store.userId, now });
+          return [poolId, rankInlineNoteShortcuts(validEntries, now)] as const;
+        } catch {
+          return [poolId, rankInlineNoteShortcuts(state.entries.filter((entry) => entry.status === "accepted"), now)] as const;
+        }
+      }),
+    );
+    return Object.fromEntries(resolved.filter(([, entries]) => entries.length > 0));
+  } catch {
+    return {};
+  }
+}
+
+export async function dismissNoteShortcut(
+  store: NoteShortcutStore,
+  input: { poolId: string; key: string; now: Temporal.Instant },
+): Promise<boolean> {
+  const expected = await store.readContext(input.poolId);
+  const current = currentNoteShortcuts({ context: expected, userId: store.userId, now: input.now });
+  const entry = current.find((item) => item.key === input.key);
+  if (!entry || entry.status === "dismissed") return false;
+  const command: NoteShortcutCommand = entry.status === "accepted"
+    ? { operation: "remove", key: entry.key }
+    : { operation: "dismiss", key: entry.key };
+  const next = resolveNoteShortcutCommand({
+    context: expected,
+    userId: store.userId,
+    behaviorId: input.poolId,
+    command,
+    now: input.now,
+  });
+  await store.commit({ expected, next, requireEnabled: false });
+  return true;
 }

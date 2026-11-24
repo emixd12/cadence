@@ -36,7 +36,6 @@ import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, exter
 import { travelWeatherStateText } from "./TravelWeather";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
-import { RecordedActivityList } from "./RecordedActivityList";
 import { AdvisorDayLine } from "@/components/advisor/AdvisorParts";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
@@ -74,6 +73,7 @@ import {
   travelLeaveSubjects,
 } from "@cadence/core/services/travel-habits";
 import type {
+  DefaultDurationFormAction,
   OccurrenceFormAction,
   OpportunityFormAction,
   TimeTrackingFormAction,
@@ -143,6 +143,8 @@ type DayProgressTimelineProps = Readonly<{
   removeOpportunityAction?: OpportunityFormAction;
   /** Marks every sub-behavior in a routine's slot. Web: server action; Mac: its local action. */
   parentSlotStatusAction?: OccurrenceFormAction;
+  /** Quick inline default duration setter for a Behavior. */
+  defaultDurationAction?: DefaultDurationFormAction;
 }>;
 
 /**
@@ -175,8 +177,8 @@ const NO_ESTIMATE: BehaviorDurationEstimate = {
   kind: "unknown",
   reason: "insufficient_samples",
   sampleCount: 0,
-  requiredSampleCount: 3,
-  lookbackDays: 90,
+  requiredSampleCount: 1,
+  lookbackDays: null,
 };
 
 const UNAVAILABLE: ExternalEventFreshness = {
@@ -207,6 +209,7 @@ export function DayProgressTimeline({
   addOpportunityAction,
   removeOpportunityAction,
   parentSlotStatusAction,
+  defaultDurationAction,
 }: DayProgressTimelineProps) {
   const runtimeRefresh = useRefresh();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -610,6 +613,7 @@ export function DayProgressTimeline({
         opportunityBasket={section.localDate === timeline.todayLocalDate
           ? <OpportunityBasket timeline={timeline} now={now} addAction={addOpportunityAction} /> : null}
         parentSlotStatusAction={parentSlotStatusAction}
+        defaultDurationAction={defaultDurationAction}
         isParentExpanded={zoom.isExpanded}
         onToggleParent={zoom.toggleParent}
         reducedMotion={zoom.reducedMotion}
@@ -741,6 +745,7 @@ function DayProgressDay({
   removeOpportunityAction,
   opportunityBasket = null,
   parentSlotStatusAction,
+  defaultDurationAction,
   isParentExpanded,
   onToggleParent,
   reducedMotion,
@@ -849,6 +854,7 @@ function DayProgressDay({
         crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
         countableWorkouts={countableWorkouts}
         removeOpportunityAction={removeOpportunityAction}
+        defaultDurationAction={defaultDurationAction}
       />
     </div>;
   };
@@ -890,7 +896,6 @@ function DayProgressDay({
             shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
           /> : null}
           {opportunityBasket}
-          <RecordedActivityList activity={activity} timezone={timezone} label={section.label} />
         </div>
       </header>
       <div className={styles.feed}>

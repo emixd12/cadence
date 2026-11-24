@@ -1,6 +1,6 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
-import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
+import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench } from "./ConnectorBench";
 import { LeaveReminderSettingBench, TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
@@ -1906,7 +1906,6 @@ const previewFactories: Record<
   "module.icloud-calendar-panel": () => <ProductPreview><IcloudCalendarPanelBench /></ProductPreview>,
   "module.outlook-calendar-panel": () => <ProductPreview><OutlookCalendarPanelBench /></ProductPreview>,
   "module.hevy-panel": () => <ProductPreview><HevyPanelBench /></ProductPreview>,
-  "composite.recorded-activity-list": () => <ProductPreview><RecordedActivityBench /></ProductPreview>,
   "module.travel-settings-panel": () => <ProductPreview><TravelSettingsBench /></ProductPreview>,
   "module.travel-habits-section": () => <ProductPreview><TravelHabitsBench /></ProductPreview>,
   "module.leave-reminder-setting": () => <ProductPreview><LeaveReminderSettingBench /></ProductPreview>,

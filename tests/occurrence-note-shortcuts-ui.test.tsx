@@ -171,18 +171,31 @@ describe("Occurrence Note shortcuts", () => {
     }
   });
 
-  it("never exposes proposed shortcuts in an Occurrence Note form", async () => {
+  it("shows both accepted and proposed shortcuts inline in an Occurrence Note form and supports inline dismiss", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
     const proposed = { ...shortcut(), key: "proposal-1", text: "Draft proposal", status: "proposed" as const };
+    const dismissed: Array<{ poolId: string; key: string }> = [];
 
     try {
       await act(async () => root.render(
         <RefreshProvider onRefresh={() => undefined}>
-          <OccurrenceNoteForm occurrenceId="occurrence-1" note="" action={async () => ({ status: "idle", message: "" })} shortcuts={[shortcut(), proposed]} />
+          <OccurrenceNoteForm
+            occurrenceId="occurrence-1"
+            behaviorId="behavior-1"
+            note=""
+            action={async () => ({ status: "idle", message: "" })}
+            shortcuts={[shortcut(), proposed]}
+            onDismissShortcut={(poolId, key) => { dismissed.push({ poolId, key }); }}
+          />
         </RefreshProvider>,
       ));
       expect(container.textContent).toContain("Took a shorter walk.");
+      expect(container.textContent).toContain("Draft proposal");
+      const dismissBtn = container.querySelector('button[aria-label=\'Dismiss shortcut "Draft proposal"\']') as HTMLButtonElement;
+      expect(dismissBtn).toBeTruthy();
+      await act(async () => dismissBtn.click());
+      expect(dismissed).toEqual([{ poolId: "behavior-1", key: "proposal-1" }]);
       expect(container.textContent).not.toContain("Draft proposal");
     } finally {
       await act(async () => root.unmount());
@@ -252,7 +265,7 @@ describe("Occurrence Note shortcuts", () => {
     }
   });
 
-  it("offers only accepted shortcuts above an Occurrence Note field", async () => {
+  it("offers proposed shortcuts inline above an Occurrence Note field without needing Settings approval", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
     const proposed = { ...shortcut("Skipped after travel"), key: "proposal-1", status: "proposed" as const };
@@ -263,7 +276,7 @@ describe("Occurrence Note shortcuts", () => {
           <OccurrenceNoteForm occurrenceId="occurrence-1" note="" action={async () => ({ status: "idle", message: "" })} shortcuts={[proposed]} />
         </RefreshProvider>,
       ));
-      expect(button(container, "Skipped after travel")).toBeUndefined();
+      expect(button(container, "Skipped after travel")).toBeDefined();
     } finally {
       await act(async () => root.unmount());
     }

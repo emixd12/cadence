@@ -18,7 +18,7 @@ import {
   resolveOccurrenceTimeTracking,
 } from "./time-tracking.resolver";
 
-export const DURATION_ESTIMATE_MIN_SAMPLES = 3;
+export const DURATION_ESTIMATE_MIN_SAMPLES = 1;
 export const DURATION_ESTIMATE_LOOKBACK_DAYS = 90;
 
 export function resolveExternalEventFreshness(input: Readonly<{
@@ -76,19 +76,42 @@ export function resolveExternalEventFreshness(input: Readonly<{
 export function resolveBehaviorDurationEstimate(input: Readonly<{
   behaviorId: string;
   defaultDurationMinutes?: number | null;
+  descriptionEstimateMinutes?: number | null;
   occurrences: BehaviorDurationHistoryOccurrence[];
   now: Temporal.Instant;
   timezone: string;
+  /** Days before today to include, or null/omitted for all-time tracked history. */
+  lookbackDays?: number | null;
 }>): BehaviorDurationEstimate {
+  const lookbackDays = input.lookbackDays ?? null;
   if (input.defaultDurationMinutes != null) {
     if (!Number.isInteger(input.defaultDurationMinutes) || input.defaultDurationMinutes < 1 || input.defaultDurationMinutes > 1440) {
       throw new Error("Default duration must be a whole number from 1 to 1,440 minutes.");
     }
     return { kind: "known", seconds: input.defaultDurationMinutes * 60,
       durationLabel: formatRecordedDuration(input.defaultDurationMinutes * 60),
-      sampleCount: 0, lookbackDays: DURATION_ESTIMATE_LOOKBACK_DAYS, provenance: "behavior_default" };
+      sampleCount: 0, lookbackDays, provenance: "behavior_default" };
   }
   const sources = resolveBehaviorDurationSources(input);
+  if (sources.historicalAverage.kind === "known") {
+    return sources.historicalAverage;
+  }
+  if (input.descriptionEstimateMinutes != null) {
+    if (
+      Number.isInteger(input.descriptionEstimateMinutes) &&
+      input.descriptionEstimateMinutes >= 1 &&
+      input.descriptionEstimateMinutes <= 1440
+    ) {
+      return {
+        kind: "known",
+        seconds: input.descriptionEstimateMinutes * 60,
+        durationLabel: formatRecordedDuration(input.descriptionEstimateMinutes * 60),
+        sampleCount: 0,
+        lookbackDays,
+        provenance: "description_estimate",
+      };
+    }
+  }
   return sources.historicalAverage;
 }
 
@@ -98,11 +121,14 @@ export function resolveBehaviorDurationSources(input: Readonly<{
   occurrences: BehaviorDurationHistoryOccurrence[];
   now: Temporal.Instant;
   timezone: string;
+  /** Days before today to include, or null/omitted for all-time tracked history. */
+  lookbackDays?: number | null;
 }>): Readonly<{
   configuredDefault: Extract<BehaviorDurationEstimate, { kind: "known" }> | null;
   historicalAverage: BehaviorDurationEstimate;
   recordedElapsedDurations: readonly Readonly<{ localDate: string; seconds: number }>[];
 }> {
+  const lookbackDays = input.lookbackDays ?? null;
   let configuredDefault: Extract<BehaviorDurationEstimate, { kind: "known" }> | null = null;
   if (input.defaultDurationMinutes != null) {
     if (!Number.isInteger(input.defaultDurationMinutes) || input.defaultDurationMinutes < 1 || input.defaultDurationMinutes > 1440) {
@@ -110,10 +136,10 @@ export function resolveBehaviorDurationSources(input: Readonly<{
     }
     configuredDefault = { kind: "known", seconds: input.defaultDurationMinutes * 60,
       durationLabel: formatRecordedDuration(input.defaultDurationMinutes * 60),
-      sampleCount: 0, lookbackDays: DURATION_ESTIMATE_LOOKBACK_DAYS, provenance: "behavior_default" };
+      sampleCount: 0, lookbackDays, provenance: "behavior_default" };
   }
   const today = input.now.toZonedDateTimeISO(input.timezone).toPlainDate();
-  const start = today.subtract({ days: DURATION_ESTIMATE_LOOKBACK_DAYS });
+  const start = lookbackDays != null ? today.subtract({ days: lookbackDays }) : null;
   const occurrenceIds = new Set<string>();
   const sessionIds = new Set<string>();
   const samples: Array<{ localDate: string; seconds: number }> = [];
@@ -141,7 +167,7 @@ export function resolveBehaviorDurationSources(input: Readonly<{
     if (
       occurrence.behaviorId !== input.behaviorId ||
       occurrence.status !== "completed" ||
-      Temporal.PlainDate.compare(localDate, start) < 0 ||
+      (start !== null && Temporal.PlainDate.compare(localDate, start) < 0) ||
       Temporal.PlainDate.compare(localDate, today) >= 0 ||
       occurrence.sessions.some(
         (session) =>
@@ -169,7 +195,7 @@ export function resolveBehaviorDurationSources(input: Readonly<{
         reason: "insufficient_samples",
         sampleCount: samples.length,
         requiredSampleCount: DURATION_ESTIMATE_MIN_SAMPLES,
-        lookbackDays: DURATION_ESTIMATE_LOOKBACK_DAYS,
+        lookbackDays,
       },
       recordedElapsedDurations: samples,
     };
@@ -183,7 +209,7 @@ export function resolveBehaviorDurationSources(input: Readonly<{
       seconds,
       durationLabel: formatRecordedDuration(seconds),
       sampleCount: samples.length,
-      lookbackDays: DURATION_ESTIMATE_LOOKBACK_DAYS,
+      lookbackDays,
       provenance: "completed_stopped_occurrence_mean",
     },
     recordedElapsedDurations: samples,

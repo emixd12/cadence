@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-085` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-086` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2350,6 +2350,24 @@ cite has not changed.
   routine row.
 - **Update needed:** the messaging track words the disclosure for routines. No public
   claim changes now.
+- **Status:** logged.
+
+## P-085: Recorded activity · Hevy section removed from Timeline header
+
+- **Change:** implemented November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24). Removed
+  the dedicated `"Recorded activity · Hevy"` section (and `"No recorded workouts today."`
+  empty state) from the Timeline day header. Hevy still runs in the background for
+  connector completion (`occurrence_source_matches`), Daily Brief, Chat, and manual
+  workout counting on occurrences.
+- **Affected:** `components/timeline/DayProgressTimeline.tsx` (`RecordedActivityList`
+  removed).
+- **Surfaces:** user guide (`docs/user-guide/timeline.md`, Hevy section).
+- **Conflicting current text:** `docs/user-guide/timeline.md` says: `4. On Timeline,
+  today's workouts appear under **Recorded activity · Hevy** below the date, apart from
+  Calendar markers.`
+- **Update needed:** update the Hevy Timeline bullet in `docs/user-guide/timeline.md` to
+  describe connector completion on linked Behaviors (and Settings for connection status)
+  rather than a dedicated `"Recorded activity · Hevy"` header section.
 - **Status:** logged.
 
 ## P-086: The public source moves to github.com/cadence-me/cadence

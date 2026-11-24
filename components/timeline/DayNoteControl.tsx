@@ -2,10 +2,10 @@
 
 import { NotebookPen } from "lucide-react";
 
-import { dayNotePreview } from "@cadence/core/resolvers/day-note.resolver";
+import { DAY_NOTE_SHORTCUT_POOL_ID, dayNotePreview } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
-import { NoteEditor } from "@/components/notes/NoteEditor";
+import { NoteEditor, type NoteShortcutDismissHandler } from "@/components/notes/NoteEditor";
 import type { OccurrenceFormAction } from "@/lib/types/timeline";
 
 export type DayNoteControlProps = Readonly<{
@@ -14,6 +14,7 @@ export type DayNoteControlProps = Readonly<{
   note: string;
   action: OccurrenceFormAction;
   shortcuts?: readonly NoteShortcut[];
+  onDismissShortcut?: NoteShortcutDismissHandler;
 }>;
 
 /**
@@ -26,6 +27,7 @@ export function DayNoteControl({
   note,
   action,
   shortcuts,
+  onDismissShortcut,
 }: DayNoteControlProps) {
   const preview = note ? dayNotePreview(note) : "";
 
@@ -49,6 +51,8 @@ export function DayNoteControl({
           note={note}
           action={action}
           shortcuts={shortcuts}
+          poolId={DAY_NOTE_SHORTCUT_POOL_ID}
+          onDismissShortcut={onDismissShortcut}
           label="Day note"
           placeholder="Add a note about this day"
           shortcutsLabel="Day note shortcuts"

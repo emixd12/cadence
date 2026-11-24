@@ -28,6 +28,8 @@ export function resolvePersistedTimeline(input: {
   futureDays?: number;
   startLocalDate?: string;
   durationHistory?: { occurrences: OccurrenceRecord[]; timeSessions: TimeSession[] };
+  /** Cached AI description duration estimates (minutes) keyed by behaviorId, valid for current inputs. */
+  advisorEstimates?: Readonly<Record<string, number>>;
   /**
    * Behaviors of Opportunity: which added Occurrences have status history or an active
    * source match, for Remove. Without it, Remove stays hidden.
@@ -47,7 +49,11 @@ export function resolvePersistedTimeline(input: {
     row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [], input.removalFacts, behaviorById,
   )).filter((row): row is TimelineOccurrenceInput => row !== null));
   const timeline = resolveTimeline({ occurrences, now: input.now, timezone: input.timezone, futureDays: input.futureDays, startLocalDate: input.startLocalDate });
-  if (input.durationHistory || input.behaviors.some((behavior) => behavior.default_duration_minutes != null)) {
+  if (
+    input.durationHistory ||
+    input.behaviors.some((behavior) => behavior.default_duration_minutes != null) ||
+    (input.advisorEstimates && Object.keys(input.advisorEstimates).length > 0)
+  ) {
     const historySessions = new Map<string, TimeSession[]>();
     for (const session of (input.durationHistory?.timeSessions ?? [])) {
       const group = historySessions.get(session.occurrenceId) ?? [];
@@ -59,7 +65,14 @@ export function resolvePersistedTimeline(input: {
       status: normalizeOccurrenceStatus(row.status), sessions: historySessions.get(row.id) ?? [],
     }));
     timeline.durationEstimates = Object.fromEntries([...activeBehaviorById.keys()].map((behaviorId) => [behaviorId,
-      resolveBehaviorDurationEstimate({ behaviorId, defaultDurationMinutes: activeBehaviorById.get(behaviorId)?.default_duration_minutes, occurrences: history, now: input.now, timezone: input.timezone }),
+      resolveBehaviorDurationEstimate({
+        behaviorId,
+        defaultDurationMinutes: activeBehaviorById.get(behaviorId)?.default_duration_minutes,
+        descriptionEstimateMinutes: input.advisorEstimates?.[behaviorId] ?? null,
+        occurrences: history,
+        now: input.now,
+        timezone: input.timezone,
+      }),
     ]));
   }
   timeline.runNotices = resolveBehaviorRunNotices(input.behaviors, input.now);

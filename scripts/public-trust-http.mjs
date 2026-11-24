@@ -14,6 +14,22 @@ export function isPrivateHostname(hostname) {
   return host === "::1" || host.startsWith("fe8") || host.startsWith("fe9") || host.startsWith("fea") || host.startsWith("feb") || host.startsWith("fc") || host.startsWith("fd");
 }
 
+/**
+ * True when `origin` is the GitHub Pages root of `repository` ("owner/name").
+ * A Pages hostname is lowercase and an owner name may hold capitals
+ * ("Example-Org" publishes at example-org.github.io), so the owner is compared
+ * in lowercase. The repository name and the path stay case-sensitive.
+ */
+export function isRepositoryPagesOrigin(origin, repository) {
+  const [owner, name, ...rest] = typeof repository === "string" ? repository.split("/") : [];
+  if (!owner || !name || rest.length) return false;
+  let url;
+  try { url = new URL(origin); } catch { return false; }
+  return url.protocol === "https:" && !url.username && !url.password && !url.port
+    && url.hostname === `${owner.toLowerCase()}.github.io`
+    && url.pathname.replace(/\/$/, "") === `/${name}`;
+}
+
 export function allowedUrl(origin, path) {
   const base = new URL(origin);
   if (base.protocol !== "https:" || isPrivateHostname(base.hostname)) {

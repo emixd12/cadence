@@ -34,7 +34,14 @@ const mocks = vi.hoisted(() => ({
   historySessions: vi.fn(),
 }));
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.routeSource }));
-vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.dayOccurrences }));
+vi.mock("@/lib/db/occurrences.repo", () => ({
+  listOccurrencesBetweenLocalDates: mocks.dayOccurrences,
+  listOccurrencesByIds: vi.fn(async (client: unknown, userId: unknown, ids: readonly string[]) => {
+    if (!ids.length) return [];
+    const rows = await mocks.dayOccurrences(client, userId, "0001-01-01", "9999-12-31");
+    return Array.isArray(rows) ? rows.filter((row: { id: string }) => ids.includes(row.id)) : [];
+  }),
+}));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
 vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readTravelBehaviorLocations: mocks.whereKinds }));
 vi.mock("@/lib/db/placeLabels.repo", () => ({ readPlaceLabelSettingsRow: mocks.labelSettings, readCompletionPlaceLabelRows: mocks.labels }));

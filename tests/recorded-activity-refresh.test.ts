@@ -97,7 +97,7 @@ describe("connector client boundaries", () => {
   const clientFiles = [
     "lib/ui/connectors.ts", "lib/ui/timeline-connector-reloads.ts",
     "components/settings/ConnectorLibrary.tsx", "components/settings/HevyPanel.tsx", "components/settings/OutlookCalendarPanel.tsx",
-    "components/settings/WebConnectorLibrary.tsx", "components/timeline/RecordedActivityList.tsx",
+    "components/settings/WebConnectorLibrary.tsx",
     "packages/core/src/services/recorded-activity-refresh.ts",
     ...readdirSync(path.join(root, "apps/desktop/src/calendar")).map((file) => `apps/desktop/src/calendar/${file}`),
   ];
