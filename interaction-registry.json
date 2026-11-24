@@ -1341,7 +1341,7 @@
     {
       "path": "components/notes/NoteEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 10,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011",

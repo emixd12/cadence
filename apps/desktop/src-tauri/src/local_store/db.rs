@@ -1105,7 +1105,7 @@ fn validate_note_shortcut_state(value: &Value) -> Result<()> {
         match status {
             Some("proposed") => {
                 proposed += 1;
-                if evidence.len() < 3 || entry["expires_at"].is_null() {
+                if evidence.len() < 2 || entry["expires_at"].is_null() {
                     return Err("A proposed Note shortcut requires evidence and expiry.".into());
                 }
             }

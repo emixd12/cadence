@@ -99,19 +99,27 @@ describe("Day note shortcuts in Settings", () => {
 });
 
 describe("Day note shortcut chips", () => {
-  it("shows accepted day-note shortcuts in the day-note editor and never proposals", async () => {
+  it("shows accepted and proposed day-note shortcuts inline and supports inline dismiss", async () => {
+    const dismissed: Array<{ poolId: string; key: string }> = [];
     const { container, unmount } = await render(
       <RefreshProvider onRefresh={() => undefined}>
         <DayNoteControl localDate="2026-11-10" dayLabel="Tuesday" note="" action={async () => ({ status: "idle", message: "" })}
-          shortcuts={[shortcut("Travel day"), shortcut("Rest day", "proposed")]} />
+          shortcuts={[shortcut("Travel day"), shortcut("Rest day", "proposed")]}
+          onDismissShortcut={(poolId, key) => { dismissed.push({ poolId, key }); }} />
       </RefreshProvider>,
     );
     try {
       const chips = container.querySelector('[aria-label="Day note shortcuts"]')!;
-      expect(chips.textContent).toBe("Travel day");
+      expect(chips.textContent).toContain("Travel day");
+      expect(chips.textContent).toContain("Rest day");
       await act(async () => button(container, "Travel day")!.click());
       expect(container.querySelector("textarea")!.value).toBe("Travel day");
       expect((container.querySelector('input[name="used_shortcut"]') as HTMLInputElement).value).toBe("true");
+      const dismissBtn = container.querySelector('button[aria-label=\'Dismiss shortcut "Rest day"\']') as HTMLButtonElement;
+      expect(dismissBtn).toBeTruthy();
+      await act(async () => dismissBtn.click());
+      expect(dismissed).toEqual([{ poolId: DAY_NOTE_SHORTCUT_POOL_ID, key: "b".repeat(64) }]);
+      expect(chips.textContent).not.toContain("Rest day");
     } finally {
       await unmount();
     }

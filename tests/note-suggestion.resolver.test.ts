@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { currentNoteShortcuts, eligibleNoteSources, notePatternKey, noteShortcutRevision, noteShortcutsEnabled, resolveNoteShortcutCommand, resolveNoteSuggestions, validateNoteShortcutState, validateNoteShortcutText } from "@cadence/core/resolvers/note-suggestion.resolver";
-import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts, matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
+import { currentNoteShortcuts, eligibleNoteSources, notePatternKey, noteShortcutRevision, noteShortcutsEnabled, rankInlineNoteShortcuts, resolveNoteShortcutCommand, resolveNoteSuggestions, validateNoteShortcutState, validateNoteShortcutText } from "@cadence/core/resolvers/note-suggestion.resolver";
+import { dismissNoteShortcut, getNoteShortcutView, listAcceptedNoteShortcuts, listInlineNoteShortcuts, manageNoteShortcuts, matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutContext, NoteShortcutState, NoteShortcutStore, NoteSource } from "@cadence/core/types/note-shortcut";
 
 const owner = "10000000-0000-4000-8000-000000000001";
@@ -23,14 +23,27 @@ function acceptedContext(text?: string) {
 }
 
 describe("Note suggestion source and output boundaries", () => {
-  it("requires three distinct Occurrences and preserves negation without advice", () => {
-    expect(suggest(context([note(1), note(1), note(2)]))).toEqual([]);
-    const ctx = context([note(1, "Did not stretch"), note(2, "did not stretch"), note(3, "DID NOT STRETCH"), note(4, "Did stretch"), note(5, "Did stretch")]);
+  it("requires two distinct Occurrences and preserves negation without advice", () => {
+    expect(suggest(context([note(1), note(1)]))).toEqual([]);
+    const ctx = context([note(1, "Did not stretch"), note(2, "did not stretch"), note(3, "DID NOT STRETCH."), note(4, "Did stretch")]);
     const output = suggest(ctx);
     expect(output).toHaveLength(1);
     expect(output[0].text).toBe("Did not stretch");
     expect(output[0].evidence.map((ref) => ref.occurrence_id)).toEqual([id(1), id(2), id(3)]);
     expect(suggest()[0].text).toBe("Did not wear Invisalign");
+  });
+
+  it("matches trailing punctuation differences and repeated lines across multi-line notes", () => {
+    expect(notePatternKey("Slept poorly")).toBe(notePatternKey("slept poorly."));
+    expect(notePatternKey("Slept poorly!")).toBe(notePatternKey("Slept poorly"));
+    const ctx = context([
+      note(1, "Traveling\nLate flight", "2026-09-07"),
+      note(2, "Traveling.\nEarly morning", "2026-09-06"),
+      note(3, "Repeated inside one note\nRepeated inside one note", "2026-09-05"),
+    ]);
+    const output = suggest(ctx);
+    expect(output.map((entry) => entry.text)).toEqual(["Traveling"]);
+    expect(output[0].evidence.map((ref) => ref.occurrence_id)).toEqual([id(1), id(2)]);
   });
 
   it("does not group paraphrases, unrelated statements, or instructions", () => {
@@ -43,28 +56,36 @@ describe("Note suggestion source and output boundaries", () => {
   });
 
   it("normalizes NFKC, whitespace, and case while enforcing Unicode lengths", () => {
-    expect(suggest(context([note(1, "  Ｒｅａｄ\n book "), note(2, "read book"), note(3, "READ BOOK")]))[0].text).toBe("Read book");
+    expect(suggest(context([note(1, "  Ｒｅａｄ\t book "), note(2, "read book")]))[0].text).toBe("Read book");
     expect(validateNoteShortcutText("😀".repeat(160))).toHaveLength(320);
     expect(() => validateNoteShortcutText("😀".repeat(161))).toThrow("1–160");
     expect(() => validateNoteShortcutText("a\u0000b")).toThrow();
     expect(() => validateNoteShortcutText("a\u202eb")).toThrow();
   });
 
-  it("uses 90 local calendar days, excludes future dates, and counts no foreign or reused/imported Notes", () => {
-    const ctx = context([note(1, "Read", "2026-06-10"), note(2, "Read", "2026-06-09"), note(3, "Read", "2026-09-08"), note(4), note(5), { ...note(6), user_id: foreignId }, { ...note(7), behavior_id: foreignId }, note(8, " "), note(9, "a".repeat(2001)), note(10)]);
+  it("uses full history up to today, excludes future dates, and counts no foreign or reused/imported Notes", () => {
+    const ctx = context([note(1, "Read", "2026-06-10"), note(2, "Read", "2025-01-09"), note(3, "Read", "2026-09-08"), note(4), note(5), { ...note(6), user_id: foreignId }, { ...note(7), behavior_id: foreignId }, note(8, " "), note(9, "a".repeat(2001)), note(10)]);
     ctx.state!.excluded_occurrence_ids = [id(4)]; ctx.importedOccurrenceIds = [id(5)];
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(10), id(1)]);
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(10), id(1), id(2)]);
     const midnight = Temporal.Instant.from("2026-09-08T04:00:00Z");
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now: midnight }).map((row) => row.id)).toEqual([id(3), id(10)]);
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now: midnight }).map((row) => row.id)).toEqual([id(3), id(10), id(1), id(2)]);
     ctx.behavior!.active = false;
     expect(suggest(ctx)).toEqual([]);
   });
 
-  it("takes only the latest 100 eligible Notes and at most five stable proposals", () => {
-    const ctx = context(Array.from({ length: 103 }, (_, i) => note(i, i < 100 ? "Recent" : "Older", i < 100 ? "2026-09-07" : "2026-09-06")));
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now })).toHaveLength(100);
-    expect(suggest(ctx).map((row) => row.text)).toEqual(["Recent"]);
-    const many = context(Array.from({ length: 18 }, (_, i) => note(i, `Pattern ${Math.floor(i / 3)}`)));
+  it("takes only the latest 500 eligible Notes, caps evidence at 100, and ranks top five by frequency then recency", () => {
+    const ctx = context(Array.from({ length: 503 }, (_, i) => note(i, i < 500 ? "Recent" : "Older", i < 500 ? "2026-09-07" : "2026-09-06")));
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now })).toHaveLength(500);
+    const recentProposals = suggest(ctx);
+    expect(recentProposals.map((row) => row.text)).toEqual(["Recent"]);
+    expect(recentProposals[0].evidence).toHaveLength(100);
+    const ranked = suggest(context([
+      note(1, "Two old", "2026-01-01"), note(2, "Two old", "2026-01-02"),
+      note(3, "Two newer", "2026-09-06"), note(4, "Two newer", "2026-09-07"),
+      note(5, "Three older", "2026-02-01"), note(6, "Three older", "2026-02-02"), note(7, "Three older", "2026-02-03"),
+    ]));
+    expect(ranked.map((row) => row.text)).toEqual(["Three older", "Two newer", "Two old"]);
+    const many = context(Array.from({ length: 18 }, (_, i) => note(i, `Pattern ${Math.floor(i / 2)}`)));
     expect(suggest(many)).toHaveLength(5);
     expect(suggest({ ...many, notes: [...many.notes].reverse() })).toEqual(suggest(many));
   });
@@ -90,7 +111,8 @@ describe("Note shortcut review lifecycle", () => {
     expect(ctx.state!.entries[0].status).toBe("accepted");
   });
   it("invalidates changed/deleted sources and expires proposals without rewriting accepted edits", () => {
-    const ctx = proposedContext();
+    const ctx = context([note(1), note(2)]);
+    ctx.state!.entries = suggest(ctx);
     ctx.notes[0].note = "Changed";
     expect(currentNoteShortcuts({ context: ctx, userId: owner, now })).toEqual([]);
     expect(() => command(ctx, { operation: "accept", key: ctx.state!.entries[0].key, text: "Text" })).toThrow("expired");
@@ -303,12 +325,25 @@ describe("Ticket 305: Note shortcuts on by default", () => {
 
   it("writes nothing when there is nothing to propose, the switch is off, or the Behavior is archived", async () => {
     const quiet = vi.fn();
-    expect(await matchRepeatedNoteShortcuts(store({ ...context([note(1), note(2)]), state: null, globalState: null }, quiet), behaviorId, now)).toBe(false);
+    expect(await matchRepeatedNoteShortcuts(store({ ...context([note(1)]), state: null, globalState: null }, quiet), behaviorId, now)).toBe(false);
     const off = context(); off.globalState!.enabled = false;
     expect(await matchRepeatedNoteShortcuts(store(off, quiet), behaviorId, now)).toBe(false);
     const archived = { ...context(), behavior: { ...context().behavior!, active: false } };
     expect(await matchRepeatedNoteShortcuts(store(archived, quiet), behaviorId, now)).toBe(false);
     expect(quiet).not.toHaveBeenCalled();
+  });
+
+  it("lists ranked inline shortcuts (accepted + non-expired proposed) and dismisses inline", async () => {
+    const ctx = proposedContext();
+    const commit = vi.fn(async ({ next }: { next: NoteShortcutState }) => next);
+    const inline = await listInlineNoteShortcuts(store(ctx, commit), now);
+    expect(inline[behaviorId]).toHaveLength(1);
+    expect(inline[behaviorId][0].text).toBe("Did not wear Invisalign");
+    expect(rankInlineNoteShortcuts(ctx.state!.entries, now.add({ hours: 720 }))).toEqual([]);
+    const dismissed = await dismissNoteShortcut(store(ctx, commit), { poolId: behaviorId, key: ctx.state!.entries[0].key, now });
+    expect(dismissed).toBe(true);
+    expect(commit).toHaveBeenCalledOnce();
+    expect((commit.mock.calls[0][0] as unknown as { next: NoteShortcutState }).next.entries[0].status).toBe("dismissed");
   });
 
   it("does not re-propose a dismissed pattern after a save", async () => {

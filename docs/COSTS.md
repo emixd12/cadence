@@ -61,6 +61,7 @@ implement most of it in source; it is not deployed yet.
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
 | Daily Brief model | US$0.03 | US$0.07 | US$0.14 | Live; measured on two production briefs, November 11, 2026 |
+| Note shortcuts AI pattern model (`openai/gpt-5.6-luna`) | <US$0.01 | ~US$0.01 | ~US$0.03 | Assumed; gated on `AI features → Notes`, capped at 40 notes / 500 output tokens with a 12-hour per-pool cooldown |
 | Duration estimate model, incremental | US$0.015 | US$0.030 | US$0.060 | Opt-in recipe 1.1/1.2 candidates only; excluded from the production-default totals |
 | Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |

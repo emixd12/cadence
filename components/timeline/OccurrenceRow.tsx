@@ -329,6 +329,7 @@ export function OccurrenceRow({
 
             <OccurrenceNoteForm
               occurrenceId={visibleOccurrence.id}
+              behaviorId={visibleOccurrence.behaviorId}
               note={visibleOccurrence.note}
               action={noteAction}
               shortcuts={shortcuts}

@@ -18,7 +18,7 @@ import { createOpenAI } from "@ai-sdk/openai";
  * Never log prompts, facts, output or response IDs here.
  */
 
-export type AgentName = "daily_brief" | "coach" | "chat";
+export type AgentName = "daily_brief" | "coach" | "chat" | "note_shortcuts";
 
 /** Provider-neutral reasoning effort values the AI SDK accepts (`reasoning` call option). */
 export const AGENT_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -44,6 +44,7 @@ export const AGENT_MODEL_SETTINGS = {
   daily_brief: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 30_000 },
   coach: { model: "openai/gpt-5.6-terra", reasoning: "low", maxOutputTokens: 1_000, timeoutMs: 30_000 },
   chat: { model: "openai/gpt-6.1-terra", reasoning: "low", maxOutputTokens: 2_000, timeoutMs: 60_000 },
+  note_shortcuts: { model: "openai/gpt-5.6-luna", reasoning: "low", maxOutputTokens: 500, timeoutMs: 12_000 },
 } as const satisfies Record<AgentName, AgentModelSetting>;
 
 export function agentModelSetting(agent: AgentName, override: Partial<AgentModelSetting> = {}): AgentModelSetting {
