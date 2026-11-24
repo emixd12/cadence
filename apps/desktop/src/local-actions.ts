@@ -83,8 +83,9 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
         localDate: form.get("local_date"), expectedNote: form.get("expected_note"), note: form.get("note"),
         ...(form.get("used_shortcut") === "true" ? { usedShortcut: true } : {}),
       }, Temporal.Now.instant());
-      // Ticket 305 applied to day notes (Ticket 292): propose repeated day notes after the save.
-      if (result.changed && result.note !== null) {
+      // Ticket 305 applied to day notes (Ticket 292): propose repeated day notes after the save,
+      // and prune unsupported proposals when a day note is cleared.
+      if (result.changed) {
         try {
           await matchRepeatedNoteShortcuts(createLocalNoteShortcutStore(profileId), DAY_NOTE_SHORTCUT_POOL_ID, Temporal.Now.instant());
         } catch { /* The next save tries again. */ }

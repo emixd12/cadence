@@ -22,7 +22,7 @@ import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPerm
 import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
-import { connectorUnavailableSectionState, dayNoteShortcutsSectionState } from "@/lib/ui/settings-sections";
+import { connectorUnavailableSectionState } from "@/lib/ui/settings-sections";
 import { desktopAccountSectionState } from "./account/account-section-state";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
@@ -45,9 +45,10 @@ import { desktopSourceLinkCoordinator } from "./calendar/source-links";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
-import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
+import { dismissNoteShortcut, getNoteShortcutView, listInlineNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
-import { DayNoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
+import { NoteShortcutDismissProvider } from "@/components/notes/NoteEditor";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
 import { SettingsScreen } from "./settings-screen";
 import { LocalExportScreen } from "./export-screen";
@@ -190,7 +191,7 @@ export function Product() {
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
             localCommand("readImportRuns", { profileId: timeline.profile.id, limit: 1 }),
             getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), DAY_NOTE_SHORTCUT_POOL_ID, now),
-            listAcceptedNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id)),
+            listInlineNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id), now),
             Promise.all(timeline.behaviors.map(async (behavior) => [behavior.id, await getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), behavior.id, now)] as const)),
           ]);
           if (requestedActivation) {
@@ -599,6 +600,19 @@ export function Product() {
       return { status: "error", message: localErrorMessage(failure) };
     }
   };
+  const dismissShortcut = async (poolId: string, key: string) => {
+    if (!profile) return;
+    try {
+      await dismissNoteShortcut(createLocalNoteShortcutStore(profile.id), {
+        poolId,
+        key,
+        now: Temporal.Now.instant(),
+      });
+      refresh();
+    } catch {
+      // Dismissing a shortcut is optional; ordinary Note entry stays usable.
+    }
+  };
   /* eslint-enable react-hooks/refs */
   const coverage = reminders ? reminderCoverageView(reminders.state) : null;
   const permission = reminders?.permission ?? "checking";
@@ -691,28 +705,26 @@ export function Product() {
         hasAnyBehavior={bundle.timeline.behaviors.length > 0} hasImportRuns={bundle.hasImportRuns} currentTimezone={bundle.timeline.profile.timezone}
         permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS}
         loadTravelSetup={readLocalTravelSetupPresence} readTravelRoutingConfigured={travelClient?.configured ?? null} /> : null}
-      {activeScreen === "timeline" ? <TimelineScreen timeline={bundle.timeline.timeline} {...occurrenceActions}
+      {activeScreen === "timeline" ? <NoteShortcutDismissProvider onDismiss={dismissShortcut}><TimelineScreen timeline={bundle.timeline.timeline} {...occurrenceActions}
         shortcutsByBehavior={bundle.shortcuts.accepted} dayProgress={calendarContext}
         notificationTarget={notificationTarget}
         dailyBriefClient={dailyBriefClient}
         dailyBriefSessionKey={accountUserId ?? "local"}
         onNavigate={navigate} runAction={behaviorActions.runAction}
         onOpenAdvisorLink={openAdvisorLink}
-        onRefresh={refresh} onReload={reloadTimeline} onShowMore={(days) => { parameters.current.days = days; void refreshScreen(); }} /> : null}
-      {activeScreen === "behaviors" ? <BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
+        onRefresh={refresh} onReload={reloadTimeline} onShowMore={(days) => { parameters.current.days = days; void refreshScreen(); }} /></NoteShortcutDismissProvider> : null}
+      {activeScreen === "behaviors" ? <NoteShortcutDismissProvider onDismiss={dismissShortcut}><BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
         sourceLinkCoordinator={sourceLinkCoordinator}
         editTarget={behaviorEditTarget}
-        onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /> : null}
+        onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /></NoteShortcutDismissProvider> : null}
       {activeScreen === "settings" ? <SettingsScreen currentTimezone={bundle.timeline.profile.timezone} accountConnected={syncReady}
         shellCue={(conflictReview?.conflicts.length ?? 0) > 0}
         accountState={desktopAccountSectionState({ known: accountKnown, account, configured: readDesktopAuthConfig() !== null, connected: syncReady,
           syncStatus, conflictCount: conflictReview?.conflicts.length ?? 0, firstLinkPending: Boolean(firstLink && !firstLink.complete) })}
         categoryCount={bundle.timeline.categories.length}
         onOpenExport={() => navigate("export")}
-        dayNoteShortcutControls={<DayNoteShortcutSettings view={bundle.shortcuts.day} action={noteShortcutAction} />}
-        dayNoteShortcutState={dayNoteShortcutsSectionState(bundle.shortcuts.day)}
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}

@@ -2974,3 +2974,29 @@ Platform impact: web implemented (Postgres `apply_occurrence_status_transition`,
 `TimeTracker` refresh sync); desktop implemented (`apps/desktop/src-tauri/src/local_store/occurrence.rs`,
 ships in the next Mac release); marketing not applicable; future mobile inherits the same
 core rule. Messaging impact: none.
+
+## 2026-11-24: Note shortcuts revamp — inline by default, full history, floor of 2, and AI pattern analysis
+
+Owner decision on November 24, 2026:
+
+- **Remove Settings & Behavior-settings management UI.** Remove the Day note shortcuts drawer from
+  Settings → General (web and desktop) and the static Note shortcuts section from Behavior Details
+  and Settings. The existing `Settings → AI features → Notes` toggle (approved during onboarding) is
+  sufficient for AI-backed note pattern analysis; deterministic matching stays always on.
+- **Show chips inline by default with inline dismiss.** `NoteEditor` renders both accepted and
+  proposed shortcuts directly above the note textarea (ranked by frequency + recency, capped at 5
+  chips), with a lightweight inline `×` dismiss button on each chip. No trip to Settings is needed
+  before shortcuts appear.
+- **Full history and floor of 2.** Remove the 90-day cutoff (scan full history up to today, capped
+  at 500 notes per pool and 100 evidence refs per entry), lower the minimum evidence floor from 3 to
+  2 distinct Occurrences / day notes (Postgres `note_shortcut_entries_valid`, Rust SQLite validator,
+  and core resolver), normalize trailing punctuation in `notePatternKey`, and match repeated lines
+  across multi-line notes.
+- **Hybrid AI pattern analysis.** Layer `openai/gpt-5.6-luna` structured extraction (`source: "model"`)
+  on top of deterministic matching after in-app note saves, gated on `ai.approved && sources.notes`,
+  requiring at least 3 eligible notes and a 12-hour per-pool cooldown, and merged through pure
+  `mergeModelNoteSuggestions`.
+
+Platform impact: web implemented (awaits hosted migration push for `20261124103000_note_shortcuts_min_two_evidence.sql`);
+desktop implemented (shared components, `apps/desktop/src/product.tsx`, `settings-screen.tsx`, Rust validator in `db.rs`;
+ships in next Mac release); marketing not applicable; future mobile inherits the same core resolver. Messaging impact: none.

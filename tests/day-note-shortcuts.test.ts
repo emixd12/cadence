@@ -49,11 +49,11 @@ describe("Day note shortcut pool", () => {
     expect(() => validateNoteShortcutState(next)).not.toThrow();
   });
 
-  it("needs three days and counts only the owner's day notes inside the local 90-day window", () => {
-    expect(resolveNoteSuggestions({ context: context([dayNote(1), dayNote(2)]), userId: owner, now })).toEqual([]);
+  it("needs two days across the full history and counts only the owner's day notes up to today", () => {
+    expect(resolveNoteSuggestions({ context: context([dayNote(1)]), userId: owner, now })).toEqual([]);
     const ctx = context([
       dayNote(1), dayNote(2),
-      dayNote(3, "Travel day", "2026-08-12"), // 91 days before November 10.
+      dayNote(3, "Travel day", "2026-01-12"), // Older than 90 days; now included in full history.
       dayNote(4, "Travel day", "2026-11-11"), // Tomorrow in New York.
       { ...dayNote(5), user_id: foreign },
       { ...dayNote(6), behavior_id: behaviorId },
@@ -62,26 +62,26 @@ describe("Day note shortcut pool", () => {
       dayNote(9, "a".repeat(2001)),
       dayNote(10, "Travel day", "2026-08-13"),
     ]);
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(1), id(2), id(10)]);
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(1), id(2), id(10), id(3)]);
     expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toHaveLength(1);
   });
 
   it("excludes day notes written with a shortcut; imported day notes count like typed ones", () => {
     // The hosted day pool context always sends no imported IDs: day-note import writes no provenance.
-    const ctx = context([dayNote(1), dayNote(2), dayNote(3), dayNote(4)]);
+    const ctx = context([dayNote(1), dayNote(2), dayNote(3)]);
     ctx.state!.excluded_occurrence_ids = [id(1)];
-    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(2), id(3), id(4)]);
+    expect(eligibleNoteSources({ context: ctx, userId: owner, now }).map((row) => row.id)).toEqual([id(2), id(3)]);
     expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toHaveLength(1);
     ctx.state!.excluded_occurrence_ids = [id(1), id(2)];
     expect(resolveNoteSuggestions({ context: ctx, userId: owner, now })).toEqual([]);
   });
 
-  it("expires proposals after 30 days and drops them when evidence notes change", () => {
-    const ctx = context();
+  it("expires proposals after 30 days and drops them when evidence falls below two notes", () => {
+    const ctx = context([dayNote(1), dayNote(2)]);
     ctx.state = command(ctx, { operation: "analyze" });
     expect(currentNoteShortcuts({ context: ctx, userId: owner, now })).toHaveLength(1);
     expect(currentNoteShortcuts({ context: ctx, userId: owner, now: now.add({ hours: 30 * 24 }) })).toEqual([]);
-    const edited = { ...ctx, notes: [dayNote(1, "Rest day"), dayNote(2), dayNote(3)] };
+    const edited = { ...ctx, notes: [dayNote(1, "Rest day"), dayNote(2)] };
     expect(currentNoteShortcuts({ context: edited, userId: owner, now })).toEqual([]);
   });
 

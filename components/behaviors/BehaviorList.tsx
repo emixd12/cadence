@@ -32,10 +32,7 @@ import { SubBehaviorManager, type SubBehaviorManageActions } from "@/components/
 import { behaviorViewFormData, newSubBehaviorFormData } from "@/components/behaviors/sub-behavior-form-data";
 import { OccurrenceNoteForm } from "@/components/timeline/OccurrenceNoteForm";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
-import {
-  NoteShortcutSettings,
-  type NoteShortcutAction,
-} from "@/components/note-shortcuts/NoteShortcutControls";
+import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import type { NoteShortcut, NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import type {
@@ -823,7 +820,6 @@ function BehaviorRecord({
                     parentLocked={parentLocked}
                   />
                   {subBehaviorManager}
-                  {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
                   {runAction && !notRunning ? (
                     <div className="grid gap-1 border-t border-line pt-4">
@@ -857,7 +853,6 @@ function BehaviorRecord({
                     showActiveToggle={false}
                     allowOpportunity={allowOpportunity}
                   />
-                  {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   <ArchiveNoteHistory
                     behavior={behavior}
                     action={lifecycleFormAction}
@@ -878,7 +873,7 @@ function BehaviorRecord({
           stopTimeTrackingAction={stopTimeTrackingAction}
           resetTimeTrackingAction={resetTimeTrackingAction}
           shortcuts={noteShortcutView?.globalEnabled && noteShortcutView.available
-            ? noteShortcutView.entries.filter((entry) => entry.status === "accepted")
+            ? noteShortcutView.entries.filter((entry) => entry.status === "accepted" || entry.status === "proposed")
             : []}
         />
       ) : null}
@@ -1178,6 +1173,7 @@ function BehaviorDateReview({
 
                 <OccurrenceNoteForm
                   occurrenceId={occurrence.id}
+                  behaviorId={selectedBehaviorDay.behaviorId}
                   note={occurrence.note}
                   action={noteAction}
                   shortcuts={shortcuts}

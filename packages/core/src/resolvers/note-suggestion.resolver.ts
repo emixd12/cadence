@@ -3,14 +3,16 @@ import { sha256 } from "../hash";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "./day-note.resolver";
 import type { NoteShortcut, NoteShortcutCommand, NoteShortcutContext, NoteShortcutState, NoteSource } from "../types/note-shortcut";
 
-export const NOTE_SHORTCUT_LIMITS = { notes: 100, days: 90, evidence: 3, proposals: 5, characters: 160, sourceCharacters: 2_000, accepted: 20, entries: 128, exclusions: 100_000, revision: 2_147_483_647 } as const;
+export const NOTE_SHORTCUT_LIMITS = { notes: 500, evidence: 2, evidenceMax: 100, proposals: 5, characters: 160, sourceCharacters: 2_000, accepted: 20, entries: 128, exclusions: 100_000, revision: 2_147_483_647 } as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[0-9a-f]{64}$/;
 const INSTRUCTION = /\b(?:ignore|disregard|override)\b.{0,80}\b(?:previous|instructions?|prompts?|system|developer)\b|\b(?:output|return|respond with)\b.{0,80}\b(?:status|json|instructions?|secrets?|credentials)\b|(?:system|assistant|developer)\s*:|<\|(?:im_start|im_end|system)|\b(?:system prompt|developer message|output a completed status)\b/i;
 const CONTROL = /[\p{Cc}\p{Cf}]/u;
+const TRAILING_PUNCTUATION = /[.!?,;:]+$/u;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const onlyKeys = (value: object, keys: string[]) => Object.keys(value).every((key) => keys.includes(key));
 const compareScheduled = (a: string | null, b: string | null) => a && b ? Temporal.Instant.compare(a, b) : a ? 1 : b ? -1 : 0;
+const compareNoteSources = (a: NoteSource, b: NoteSource) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id);
 export const isDayNoteShortcutPool = (poolId: string | null): boolean => poolId === DAY_NOTE_SHORTCUT_POOL_ID;
 
 // Ticket 305: Note shortcuts are on unless the account's stored global switch says off.
@@ -24,7 +26,9 @@ export function normalizeNoteShortcutText(text: string): string {
   return text.normalize("NFKC").trim().replace(/\s+/gu, " ");
 }
 export function notePatternKey(text: string): string {
-  return sha256(normalizeNoteShortcutText(text).toLowerCase());
+  const normalized = normalizeNoteShortcutText(text).toLowerCase();
+  const canonical = normalized.replace(TRAILING_PUNCTUATION, "").trim();
+  return sha256(canonical || normalized);
 }
 // Include content as well as the counter: independent devices can have equal revisions.
 export function noteShortcutRevision(state: NoteShortcutState | null): string {
@@ -50,13 +54,12 @@ export function eligibleNoteSources(input: { context: NoteShortcutContext; userI
   if (dayPool ? behavior || dayPool.user_id !== userId : !behavior || behavior.user_id !== userId || !behavior.active) return [];
   const poolBehaviorId = dayPool ? null : behavior!.id;
   const today = now.toZonedDateTimeISO(dayPool ? dayPool.timezone : behavior!.timezone).toPlainDate();
-  const firstDate = today.subtract({ days: NOTE_SHORTCUT_LIMITS.days - 1 }).toString();
   const lastDate = today.toString();
   const excluded = new Set([...(context.state?.excluded_occurrence_ids ?? []), ...context.importedOccurrenceIds]);
   const seen = new Set<string>();
-  return [...context.notes].sort((a, b) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id))
+  return [...context.notes].sort(compareNoteSources)
     .filter((note) => {
-      if (note.user_id !== userId || note.behavior_id !== poolBehaviorId || (note.scheduled_for === null) !== Boolean(dayPool) || seen.has(note.id) || excluded.has(note.id) || note.local_date < firstDate || note.local_date > lastDate || !note.note?.trim() || [...note.note].length > NOTE_SHORTCUT_LIMITS.sourceCharacters) return false;
+      if (note.user_id !== userId || note.behavior_id !== poolBehaviorId || (note.scheduled_for === null) !== Boolean(dayPool) || seen.has(note.id) || excluded.has(note.id) || note.local_date > lastDate || !note.note?.trim() || [...note.note].length > NOTE_SHORTCUT_LIMITS.sourceCharacters) return false;
       seen.add(note.id);
       return true;
     }).slice(0, NOTE_SHORTCUT_LIMITS.notes);
@@ -71,32 +74,163 @@ export function currentNoteShortcuts(input: { context: NoteShortcutContext; user
   });
 }
 
+export function rankInlineNoteShortcuts(
+  entries: readonly NoteShortcut[],
+  now: Temporal.Instant,
+  limit: number = NOTE_SHORTCUT_LIMITS.proposals,
+): NoteShortcut[] {
+  const eligible = entries.filter((entry) => {
+    if (!entry.text) return false;
+    if (entry.status === "accepted") return true;
+    if (entry.status !== "proposed") return false;
+    return Boolean(entry.expires_at && Temporal.Instant.compare(entry.expires_at, now) > 0);
+  });
+  const sorted = [...eligible].sort((left, right) => {
+    if (left.status !== right.status) return left.status === "accepted" ? -1 : 1;
+    const freqDiff = right.evidence.length - left.evidence.length;
+    if (freqDiff !== 0) return freqDiff;
+    const timeDiff = Temporal.Instant.compare(right.created_at, left.created_at);
+    if (timeDiff !== 0) return timeDiff;
+    return compare(left.key, right.key);
+  });
+  const seenKeys = new Set<string>();
+  const ranked: NoteShortcut[] = [];
+  for (const entry of sorted) {
+    const patternKey = notePatternKey(entry.text!);
+    if (seenKeys.has(patternKey)) continue;
+    seenKeys.add(patternKey);
+    ranked.push(entry);
+    if (ranked.length >= limit) break;
+  }
+  return ranked;
+}
+
 export function resolveNoteSuggestions(input: { context: NoteShortcutContext; userId: string; now: Temporal.Instant }): NoteShortcut[] {
   const current = currentNoteShortcuts(input);
   const retained = current.filter((entry) => entry.status !== "proposed");
   // A proposal that is still supported keeps its first proposal time and 30-day expiry.
   const proposedAt = new Map(current.filter((entry) => entry.status === "proposed").map((entry) => [entry.key, entry]));
+  const existingModelProposals = current.filter((entry) => entry.status === "proposed" && entry.source === "model");
   const suppressed = new Set(retained.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]));
   const groups = new Map<string, { text: string; notes: NoteSource[] }>();
   for (const note of eligibleNoteSources(input)) {
-    let text: string;
-    try { text = validateNoteShortcutText(note.note); } catch { continue; }
-    const key = notePatternKey(text);
-    if (suppressed.has(key)) continue;
-    const group = groups.get(key) ?? { text, notes: [] };
-    group.notes.push(note);
-    groups.set(key, group);
+    const lines = note.note!.split(/\r?\n/u);
+    const seenInNote = new Set<string>();
+    for (const rawLine of lines) {
+      let text: string;
+      try { text = validateNoteShortcutText(rawLine); } catch { continue; }
+      const key = notePatternKey(text);
+      if (suppressed.has(key) || seenInNote.has(key)) continue;
+      seenInNote.add(key);
+      const group = groups.get(key) ?? { text, notes: [] };
+      group.notes.push(note);
+      groups.set(key, group);
+    }
   }
-  const proposals: NoteShortcut[] = [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
+  const deterministicProposals: NoteShortcut[] = [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
     .sort(([a, left], [b, right]) => right.notes.length - left.notes.length || compare(right.notes[0].local_date, left.notes[0].local_date) || compare(a, b))
     .slice(0, NOTE_SHORTCUT_LIMITS.proposals).map(([key, group]) => ({
       key, text: group.text, status: "proposed", source: "repeated_text",
-      evidence: group.notes.map((note) => ({ occurrence_id: note.id, note_hash: sha256(note.note!) })),
+      evidence: group.notes.slice(0, NOTE_SHORTCUT_LIMITS.evidenceMax).map((note) => ({ occurrence_id: note.id, note_hash: sha256(note.note!) })),
       created_at: proposedAt.get(key)?.created_at ?? input.now.toString(),
       expires_at: proposedAt.get(key)?.expires_at ?? input.now.add({ hours: 30 * 24 }).toString(),
     }));
+  const deterministicKeys = new Set(deterministicProposals.map((entry) => entry.key));
+  const remainingSlots = Math.max(0, NOTE_SHORTCUT_LIMITS.proposals - deterministicProposals.length);
+  const keptModelProposals = existingModelProposals
+    .filter((entry) => !suppressed.has(entry.key) && !deterministicKeys.has(entry.key))
+    .slice(0, remainingSlots);
+  const proposals = [...deterministicProposals, ...keptModelProposals];
   if (retained.length + proposals.length + retained.filter((entry) => entry.status === "accepted").length > NOTE_SHORTCUT_LIMITS.entries) throw new Error("The shortcut history is full. Try again after dismissed patterns expire.");
   return [...retained, ...proposals];
+}
+
+export type ModelNoteShortcutCandidate = Readonly<{
+  text: string;
+  occurrenceIds: readonly string[];
+}>;
+
+export function mergeModelNoteSuggestions(input: {
+  context: NoteShortcutContext;
+  userId: string;
+  behaviorId: string;
+  candidates: readonly ModelNoteShortcutCandidate[];
+  now: Temporal.Instant;
+}): NoteShortcutState {
+  const { context, userId, behaviorId, candidates, now } = input;
+  const dayPool = isDayNoteShortcutPool(behaviorId);
+  const stateBehaviorId = dayPool ? null : behaviorId;
+  if (dayPool && (!context.dayPool || context.dayPool.user_id !== userId || context.behavior)) throw new Error("Day note shortcuts are unavailable.");
+  if (!dayPool && (!context.behavior || context.behavior.id !== behaviorId || context.behavior.user_id !== userId || !context.behavior.active)) throw new Error("Note shortcuts are available for active Behaviors only.");
+  if (!noteShortcutsEnabled(context.globalState)) throw new Error("Note shortcuts are turned off for this account.");
+  if (context.state) validateNoteShortcutState(context.state);
+  if (context.globalState) validateNoteShortcutState(context.globalState);
+  const state: NoteShortcutState = context.state ?? {
+    id: behaviorId,
+    behavior_id: stateBehaviorId,
+    user_id: userId,
+    enabled: NOTE_SHORTCUTS_ON_BY_DEFAULT,
+    entries: [],
+    excluded_occurrence_ids: [],
+    revision: 0,
+    updated_at: now.toString(),
+  };
+  if (state.revision === NOTE_SHORTCUT_LIMITS.revision) throw new Error("The Note shortcut revision limit has been reached.");
+
+  const eligible = eligibleNoteSources({ context, userId, now });
+  const sourceById = new Map(eligible.map((row) => [row.id, row]));
+  const current = currentNoteShortcuts({ context, userId, now });
+  const retained = current.filter((entry) => entry.status !== "proposed");
+  const deterministicProposals = current.filter((entry) => entry.status === "proposed" && entry.source === "repeated_text");
+  const existingModelByKey = new Map(
+    current.filter((entry) => entry.status === "proposed" && entry.source === "model").map((entry) => [entry.key, entry]),
+  );
+  const blockedKeys = new Set([
+    ...retained.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]),
+    ...deterministicProposals.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]),
+  ]);
+
+  const seenModelKeys = new Set<string>();
+  const modelCandidates: Array<{ entry: NoteShortcut; latestDate: string }> = [];
+  for (const candidate of candidates) {
+    let text: string;
+    try { text = validateNoteShortcutText(candidate.text); } catch { continue; }
+    const key = notePatternKey(text);
+    if (blockedKeys.has(key) || seenModelKeys.has(key)) continue;
+    const validSources = [...new Set(candidate.occurrenceIds)]
+      .map((id) => sourceById.get(id))
+      .filter((row): row is NoteSource => Boolean(row))
+      .sort(compareNoteSources);
+    if (validSources.length < NOTE_SHORTCUT_LIMITS.evidence) continue;
+    seenModelKeys.add(key);
+    const existing = existingModelByKey.get(key);
+    modelCandidates.push({
+      latestDate: validSources[0].local_date,
+      entry: {
+        key,
+        text,
+        status: "proposed",
+        source: "model",
+        evidence: validSources.slice(0, NOTE_SHORTCUT_LIMITS.evidenceMax).map((row) => ({ occurrence_id: row.id, note_hash: sha256(row.note!) })),
+        created_at: existing?.created_at ?? now.toString(),
+        expires_at: existing?.expires_at ?? now.add({ hours: 30 * 24 }).toString(),
+      },
+    });
+  }
+
+  const remainingSlots = Math.max(0, NOTE_SHORTCUT_LIMITS.proposals - deterministicProposals.length);
+  const modelProposals = modelCandidates
+    .sort((left, right) => right.entry.evidence.length - left.entry.evidence.length || compare(right.latestDate, left.latestDate) || compare(left.entry.key, right.entry.key))
+    .slice(0, remainingSlots)
+    .map((item) => item.entry);
+
+  const entries = [...retained, ...deterministicProposals, ...modelProposals];
+  if (entries.length + retained.filter((entry) => entry.status === "accepted").length > NOTE_SHORTCUT_LIMITS.entries) {
+    throw new Error("The shortcut history is full. Try again after dismissed patterns expire.");
+  }
+  const result: NoteShortcutState = { ...state, entries, revision: state.revision + 1, updated_at: now.toString() };
+  validateNoteShortcutState(result);
+  return result;
 }
 
 export function resolveNoteShortcutCommand(input: { context: NoteShortcutContext; userId: string; behaviorId: string | null; command: NoteShortcutCommand; now: Temporal.Instant }): NoteShortcutState {
@@ -180,7 +314,7 @@ export function validateNoteShortcutState(value: unknown): asserts value is Note
   const acceptedTexts = new Set<string>();
   let accepted = 0, proposed = 0;
   for (const entry of state.entries) {
-    if (!entry || !HASH.test(entry.key) || keys.has(entry.key) || !["proposed", "accepted", "dismissed"].includes(entry.status) || !["repeated_text", "model"].includes(entry.source) || !Array.isArray(entry.evidence) || entry.evidence.length > NOTE_SHORTCUT_LIMITS.notes) return fail();
+    if (!entry || !HASH.test(entry.key) || keys.has(entry.key) || !["proposed", "accepted", "dismissed"].includes(entry.status) || !["repeated_text", "model"].includes(entry.source) || !Array.isArray(entry.evidence) || entry.evidence.length > NOTE_SHORTCUT_LIMITS.evidenceMax) return fail();
     if (!onlyKeys(entry, ["key", "text", "status", "source", "evidence", "created_at", "expires_at"])) return fail();
     keys.add(entry.key);
     try { Temporal.Instant.from(entry.created_at); if (entry.expires_at !== null) Temporal.Instant.from(entry.expires_at); } catch { return fail(); }

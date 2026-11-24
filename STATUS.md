@@ -97,6 +97,39 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Note shortcuts revamp: inline chips, full history, floor of 2, and AI pattern analysis — November 24, 2026
+
+- **Owner's decision:** remove the Day note shortcuts drawer from Settings → General and the
+  static Note shortcuts section from Behavior Details & Settings; show shortcuts inline in
+  `NoteEditor` by default (ranked by frequency + recency, capped at 5) with inline dismiss (`×`);
+  drop the 90-day cutoff (full history up to today), lower the minimum floor from 3 to 2, normalize
+  trailing punctuation and multi-line notes; and layer AI pattern analysis (`openai/gpt-5.6-luna`)
+  gated on `Settings → AI features → Notes` (`docs/DECISIONS.md`, 2026-11-24).
+- **Implemented:**
+  - Step 1: `supabase/migrations/20261124103000_note_shortcuts_min_two_evidence.sql` and Rust
+    validator `apps/desktop/src-tauri/src/local_store/db.rs` (min 2 evidence);
+    `packages/core/src/resolvers/note-suggestion.resolver.ts` (full history, floor 2, trailing
+    punctuation normalization, multi-line matching, `rankInlineNoteShortcuts`);
+    `packages/core/src/services/note-shortcut.service.ts` (`listInlineNoteShortcuts`,
+    `dismissNoteShortcut`); `components/notes/NoteEditor.tsx` (`NoteShortcutDismissProvider`,
+    inline proposed+accepted chips with inline `×` dismiss); removed Day note shortcuts drawer from
+    `app/(app)/settings/page.tsx`, `apps/desktop/src/settings-screen.tsx`, and
+    `apps/desktop/src/product.tsx`, and removed `<NoteShortcutSettings>` from
+    `components/behaviors/BehaviorList.tsx`.
+  - Step 2: `mergeModelNoteSuggestions` in `packages/core/src/resolvers/note-suggestion.resolver.ts`,
+    `note_shortcuts` model config in `lib/services/agent-model.ts`,
+    `lib/services/note-shortcut-ai.service.ts` (gated on `ai.approved && sources.notes`, 12h
+    cooldown, max 40 notes / 500 output tokens), wired into `matchRepeatedNotesAfterNoteSave`, and
+    `docs/COSTS.md` updated.
+- **Hosted migration applied:** `20261124103000_note_shortcuts_min_two_evidence.sql` pushed to
+  hosted Supabase on November 24, 2026 (Local and Remote histories match).
+- **Pending:** merge to `main` (web deploy) and publish Cadence for Mac `0.1.16` (older linked
+  Macs still require ≥ 3 evidence on proposed entries until they update).
+
+Platform impact: web implemented (hosted migration applied); desktop implemented (ships in
+Cadence for Mac `0.1.16`); marketing not applicable; future mobile inherits the same core
+resolver. Messaging impact: none.
+
 ## Cadence for Mac 0.1.15 published — November 23, 2026
 
 - **Published November 24, 04:49Z (Nov 23, 23:49 EST)** on the owner's instruction. Version

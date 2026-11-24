@@ -1341,7 +1341,7 @@
     {
       "path": "components/notes/NoteEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 10,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011",
@@ -12420,7 +12420,7 @@
     },
     {
       "id": "INT-TIMELINE-011",
-      "name": "Fill an occurrence Note with an accepted shortcut",
+      "name": "Fill or dismiss an inline Note shortcut",
       "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
@@ -12441,16 +12441,16 @@
         "J07",
         "J10"
       ],
-      "intent": "Fill or append accepted Behavior-scoped shortcut text in one unsaved Occurrence Note draft.",
+      "intent": "Fill or append a Behavior-scoped or day-note shortcut chip in an unsaved Note draft, or dismiss an unwanted chip inline.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Accepted Note shortcut"
+          "control": "Inline Note shortcut chip or inline dismiss (×) button"
         }
       ],
-      "availability": "Available above supported Occurrence Note fields only when global and Behavior Note shortcuts are enabled.",
-      "success_result": "Fills an empty draft or appends a new line, increments the draft revision, and marks the submitted draft as shortcut-assisted without saving it.",
-      "failure_result": "No stored Note, status, reminder, or draft text changes when no accepted shortcut is available.",
+      "availability": "Available directly above Occurrence Note and Day note fields by default once at least two matching notes exist in history (or AI pattern analysis is enabled under Settings → AI features → Notes). Top five chips ranked by frequency and recency.",
+      "success_result": "Clicking a chip fills an empty draft or appends a new line, increments the draft revision, and marks the submitted draft as shortcut-assisted without saving it; clicking dismiss hides and suppresses the chip.",
+      "failure_result": "No stored Note, status, reminder, or draft text changes when no shortcut is available or dismissal fails.",
       "effects": [
         "form_draft"
       ],
@@ -12718,7 +12718,7 @@
     },
     {
       "id": "INT-BEHAVIOR-029",
-      "name": "Manage Behavior Note shortcuts",
+      "name": "Dismiss Behavior Note shortcuts inline",
       "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
@@ -12728,25 +12728,27 @@
       },
       "status": "implemented",
       "surfaces": [
+        "timeline",
         "behaviors"
       ],
       "routes": [
+        "/timeline",
         "/behaviors"
       ],
       "journeys": [
         "J06",
         "J10"
       ],
-      "intent": "Review repeated-Note text that Cadence proposed after Note saves: accept, edit, dismiss, or remove it. Note shortcuts are on by default (Ticket 305); there is no per-Behavior or Settings switch and no request to find repeated Notes.",
+      "intent": "Dismiss unwanted Behavior-scoped Note shortcuts directly inline in the Note editor. The static Behavior Details and Settings Note shortcuts section is removed; shortcuts appear inline by default after two matching notes across full history (plus optional AI pattern extraction under Settings → AI features → Notes).",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Accept, Edit, Dismiss, or Remove Note shortcut"
+          "control": "Dismiss shortcut (×) button in NoteEditor"
         }
       ],
-      "availability": "Available in Behavior Details and Settings. Proposals appear after the same Note is saved on three eligible Occurrences of an active Behavior; they need Accept before reaching a Note field. Retained shortcut removal remains available when archived or when the retained account switch is stored off.",
-      "success_result": "Persists the reviewed shortcut state for one Behavior and announces the result without changing historical Notes.",
-      "failure_result": "Shows the service error and retains the visible editor draft.",
+      "availability": "Available inline beside each Behavior Note shortcut chip in Timeline and Behavior day review Note editors.",
+      "success_result": "Hides the chip immediately and persists dismissal/removal for that Behavior without changing historical Notes.",
+      "failure_result": "Ordinary Note entry stays usable if dismissal fails.",
       "effects": [
         "database_write",
         "ui_state"
@@ -12754,8 +12756,8 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/note-shortcuts/NoteShortcutControls.tsx#NoteShortcutSettings",
-        "components/behaviors/BehaviorList.tsx#BehaviorRecord",
+        "components/notes/NoteEditor.tsx#NoteEditor",
+        "app/(app)/note-shortcuts/actions.ts#dismissNoteShortcutAction",
         "apps/desktop/src/product.tsx#Product"
       ],
       "test_coverage": {
@@ -13131,7 +13133,7 @@
     },
     {
       "id": "INT-SETTINGS-018",
-      "name": "Manage day note shortcuts",
+      "name": "Dismiss day note shortcuts inline",
       "feature": "note-shortcuts",
       "user_guidance": {
         "audience": "user",
@@ -13141,28 +13143,24 @@
       },
       "status": "implemented",
       "surfaces": [
-        "settings"
+        "timeline"
       ],
       "routes": [
-        "/settings#settings-general"
+        "/timeline"
       ],
       "journeys": [
         "J07"
       ],
-      "intent": "Review suggested shortcuts from repeated day notes: accept, edit, dismiss, or remove them. The pool is on by default (Ticket 305), learns only from day notes after each save, and its shortcuts appear only in the day-note editor.",
+      "intent": "Dismiss unwanted day-note shortcuts directly inline in the day-note editor. The Settings → General Day note shortcuts drawer is removed; day-note shortcuts appear inline by default after two matching day notes across full history (plus optional AI pattern extraction under Settings → AI features → Notes).",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Day note shortcuts drawer"
-        },
-        {
-          "kind": "activate",
-          "control": "Accept, Edit, Dismiss, or Remove day note shortcut"
+          "control": "Dismiss shortcut (×) button in DayNoteControl"
         }
       ],
-      "availability": "Available in the Day note shortcuts drawer in Settings, General, after Categories. Accepting and editing are blocked only when the retained account switch is stored off; removing an accepted shortcut stays available.",
-      "success_result": "Persists the reviewed day-note shortcut state and announces the result without changing saved day notes or Behavior shortcut pools.",
-      "failure_result": "Shows the service error and retains the visible editor draft.",
+      "availability": "Available inline beside each day-note shortcut chip in DayNoteControl on the Timeline.",
+      "success_result": "Hides the chip immediately and persists dismissal/removal in the day-note pool without changing saved day notes or Behavior shortcut pools.",
+      "failure_result": "Ordinary day-note entry stays usable if dismissal fails.",
       "effects": [
         "database_write",
         "ui_state"
@@ -13170,9 +13168,9 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings",
-        "app/(app)/settings/page.tsx",
-        "app/(app)/note-shortcuts/actions.ts#manageNoteShortcutAction",
+        "components/timeline/DayNoteControl.tsx#DayNoteControl",
+        "components/notes/NoteEditor.tsx#NoteEditor",
+        "app/(app)/note-shortcuts/actions.ts#dismissNoteShortcutAction",
         "apps/desktop/src/product.tsx"
       ],
       "test_coverage": {
