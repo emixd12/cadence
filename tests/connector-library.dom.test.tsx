@@ -12,7 +12,6 @@ import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } fr
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
-import { RecordedActivityList, workoutDuration } from "@/components/timeline/RecordedActivityList";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import { ConnectorClientError, outlookCallbackMessage, type HevyCoordinator, type IcloudCalendarCoordinator, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
@@ -226,29 +225,6 @@ describe("OutlookCalendarPanel partial refresh", () => {
     await act(async () => { button("Refresh Outlook Calendar").click(); });
     await vi.waitFor(() => expect(container.textContent).toContain("Timeline shows the last full refresh."));
     expect(container.textContent).not.toContain("Outlook Calendar refreshed.");
-  });
-});
-
-describe("RecordedActivityList", () => {
-  const day = { localDate: "2026-11-01", state: "current" as const, fetchedAt: "2026-11-01T15:00:00Z",
-    items: [{ id: "hevy/abc", startAt: "2026-11-01T12:05:00Z", endAt: "2026-11-01T13:10:00Z", durationSeconds: 3900 }] };
-  it("shows when and how long, with recorded-activity semantics and no workout details", () => {
-    const html = renderToStaticMarkup(<RecordedActivityList activity={{ state: "ready", day, error: null }} timezone="America/New_York" label="Sunday" />);
-    expect(html).toContain('aria-label="Recorded activity · Sunday"');
-    expect(html).toContain("Recorded activity · Hevy");
-    expect(html).toContain("Workout");
-    expect(html).toContain("7:05 AM–8:10 AM");
-    expect(html).toContain("1 hr 5 min");
-    expect(html).not.toMatch(/Completed|Not Completed|button|Calendar/);
-    expect(workoutDuration(2700)).toBe("45 min");
-    expect(workoutDuration(7200)).toBe("2 hr");
-  });
-  it("labels stale, incomplete, and failing reads and hides disconnected sources", () => {
-    expect(renderToStaticMarkup(<RecordedActivityList activity={{ state: "stale", day, error: null }} timezone="America/New_York" label="Sunday" />)).toContain("may be out of date. Last read 10:00 AM.");
-    expect(renderToStaticMarkup(<RecordedActivityList activity={{ state: "incomplete", day, error: null }} timezone="America/New_York" label="Sunday" />)).toContain("may be incomplete");
-    expect(renderToStaticMarkup(<RecordedActivityList activity={{ state: "error", day: null, error: "timeout" }} timezone="America/New_York" label="Sunday" />)).toContain("could not refresh: timeout");
-    expect(renderToStaticMarkup(<RecordedActivityList activity={{ state: "disconnected", day: null, error: null }} timezone="America/New_York" label="Sunday" />)).toBe("");
-    expect(renderToStaticMarkup(<RecordedActivityList activity={{ state: "not_loaded", day: null, error: null }} timezone="America/New_York" label="Sunday" />)).toBe("");
   });
 });
 

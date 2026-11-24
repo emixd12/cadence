@@ -25,17 +25,17 @@
     "nodes": {
       "api": 62,
       "avatar": 11,
-      "component": 71,
+      "component": 70,
       "family": 16,
       "feature": 36,
-      "file": 345,
+      "file": 344,
       "interaction": 231,
       "journey": 29,
       "mcp-tool": 26,
       "notice": 137,
       "repository": 48,
       "route": 77,
-      "service": 215,
+      "service": 216,
       "surface": 12,
       "table": 55,
       "term": 287,
@@ -44,23 +44,23 @@
     },
     "links": {
       "aliases (asserted)": 28,
-      "belongs-to (asserted)": 212,
-      "calls (derived)": 679,
+      "belongs-to (asserted)": 211,
+      "calls (derived)": 671,
       "contains (asserted)": 588,
-      "defined-in (asserted)": 630,
+      "defined-in (asserted)": 629,
       "explained-in (asserted)": 251,
       "follows (asserted)": 17,
-      "implemented-in (asserted)": 1013,
+      "implemented-in (asserted)": 1015,
       "implemented-in (derived)": 52,
-      "on (asserted)": 629,
+      "on (asserted)": 631,
       "relates-to (asserted)": 564,
       "renders (asserted)": 2,
-      "renders (derived)": 244,
+      "renders (derived)": 239,
       "shown-by (asserted)": 179,
       "shows (derived)": 172,
-      "styled-by (derived)": 516,
+      "styled-by (derived)": 515,
       "tested-by (asserted)": 595,
-      "uses (derived)": 1791
+      "uses (derived)": 1792
     }
   },
   "nodes": [
@@ -759,19 +759,6 @@
       ],
       "bench": "design-system#ds-composite-place-marker-control",
       "source": "design-system.manifest.json#composite.place-marker-control"
-    },
-    {
-      "id": "component:composite.recorded-activity-list",
-      "kind": "component",
-      "name": "RecordedActivityList",
-      "meaning": "Ticket 238 current-day Hevy workouts: when and how long only, outside Calendar markers and overlap cues; ready, stale, incomplete, and error states.",
-      "componentKind": "composite",
-      "status": "active",
-      "usageNames": [
-        "RecordedActivityList"
-      ],
-      "bench": "design-system#ds-composite-recorded-activity-list",
-      "source": "design-system.manifest.json#composite.recorded-activity-list"
     },
     {
       "id": "component:composite.travel-leave-question",
@@ -3590,13 +3577,6 @@
       "source": "repository file"
     },
     {
-      "id": "file:components/timeline/RecordedActivityList.tsx",
-      "kind": "file",
-      "name": "components/timeline/RecordedActivityList.tsx",
-      "path": "components/timeline/RecordedActivityList.tsx",
-      "source": "repository file"
-    },
-    {
       "id": "file:components/timeline/SemanticZoomToggle.tsx",
       "kind": "file",
       "name": "components/timeline/SemanticZoomToggle.tsx",
@@ -4419,7 +4399,7 @@
       "id": "interaction:INT-ADVISOR-001",
       "kind": "interaction",
       "name": "Open the advisor panel",
-      "meaning": "Open the advisor (the horse at the top of the Timeline) to see today's brief, questions that need an answer, today's tip, a two-week try and earlier tips.",
+      "meaning": "Open the advisor (the horse at the top of the Timeline) to see today's brief, questions that need an answer, today's tip, a two-week try and a Past tips drill-down for tips shown in the last 7 days.",
       "status": "implemented",
       "risk": "low",
       "source": "interaction-registry.json#INT-ADVISOR-001"
@@ -4859,8 +4839,8 @@
     {
       "id": "interaction:INT-BEHAVIOR-029",
       "kind": "interaction",
-      "name": "Manage Behavior Note shortcuts",
-      "meaning": "Review repeated-Note text that Cadence proposed after Note saves: accept, edit, dismiss, or remove it. Note shortcuts are on by default (Ticket 305); there is no per-Behavior or Settings switch and no request to find repeated Notes.",
+      "name": "Dismiss Behavior Note shortcuts inline",
+      "meaning": "Dismiss unwanted Behavior-scoped Note shortcuts directly inline in the Note editor. The static Behavior Details and Settings Note shortcuts section is removed; shortcuts appear inline by default after two matching notes across full history (plus optional AI pattern extraction under Settings → AI features → Notes).",
       "status": "implemented",
       "risk": "moderate",
       "source": "interaction-registry.json#INT-BEHAVIOR-029"
@@ -5984,8 +5964,8 @@
     {
       "id": "interaction:INT-SETTINGS-018",
       "kind": "interaction",
-      "name": "Manage day note shortcuts",
-      "meaning": "Review suggested shortcuts from repeated day notes: accept, edit, dismiss, or remove them. The pool is on by default (Ticket 305), learns only from day notes after each save, and its shortcuts appear only in the day-note editor.",
+      "name": "Dismiss day note shortcuts inline",
+      "meaning": "Dismiss unwanted day-note shortcuts directly inline in the day-note editor. The Settings → General Day note shortcuts drawer is removed; day-note shortcuts appear inline by default after two matching day notes across full history (plus optional AI pattern extraction under Settings → AI features → Notes).",
       "status": "implemented",
       "risk": "moderate",
       "source": "interaction-registry.json#INT-SETTINGS-018"
@@ -6209,8 +6189,8 @@
     {
       "id": "interaction:INT-TIMELINE-011",
       "kind": "interaction",
-      "name": "Fill an occurrence Note with an accepted shortcut",
-      "meaning": "Fill or append accepted Behavior-scoped shortcut text in one unsaved Occurrence Note draft.",
+      "name": "Fill or dismiss an inline Note shortcut",
+      "meaning": "Fill or append a Behavior-scoped or day-note shortcut chip in an unsaved Note draft, or dismiss an unwanted chip inline.",
       "status": "implemented",
       "risk": "low",
       "source": "interaction-registry.json#INT-TIMELINE-011"
@@ -10967,6 +10947,13 @@
       "kind": "service",
       "name": "lib/services/leave-reminder-web-push.ts",
       "path": "lib/services/leave-reminder-web-push.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "service:lib/services/note-shortcut-ai.service.ts",
+      "kind": "service",
+      "name": "lib/services/note-shortcut-ai.service.ts",
+      "path": "lib/services/note-shortcut-ai.service.ts",
       "source": "repository file"
     },
     {
@@ -18325,27 +18312,6 @@
       "source": "scan:components/travel/PlaceLabels.tsx"
     },
     {
-      "from": "component:composite.recorded-activity-list",
-      "type": "belongs-to",
-      "to": "family:module.timeline-feed",
-      "grade": "asserted",
-      "source": "design-system.surfaces.json#module.timeline-feed/web-app/implementationIds/composite.recorded-activity-list"
-    },
-    {
-      "from": "component:composite.recorded-activity-list",
-      "type": "defined-in",
-      "to": "file:components/timeline/RecordedActivityList.tsx",
-      "grade": "asserted",
-      "source": "design-system.manifest.json#composite.recorded-activity-list/source"
-    },
-    {
-      "from": "component:composite.recorded-activity-list",
-      "type": "styled-by",
-      "to": "token:--color-muted-readable",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx"
-    },
-    {
       "from": "component:composite.travel-leave-question",
       "type": "belongs-to",
       "to": "family:module.timeline-feed",
@@ -22184,13 +22150,6 @@
     {
       "from": "family:module.timeline-feed",
       "type": "implemented-in",
-      "to": "file:components/timeline/RecordedActivityList.tsx",
-      "grade": "asserted",
-      "source": "design-system.surfaces.json#module.timeline-feed/web-app/sources/components/timeline/RecordedActivityList.tsx"
-    },
-    {
-      "from": "family:module.timeline-feed",
-      "type": "implemented-in",
       "to": "file:components/timeline/Timeline.tsx",
       "grade": "asserted",
       "source": "design-system.surfaces.json#module.timeline-feed/web-app/sources/components/timeline/Timeline.tsx"
@@ -24753,13 +24712,6 @@
     {
       "from": "file:app/(app)/settings/page.tsx",
       "type": "renders",
-      "to": "component:module.note-shortcut-controls",
-      "grade": "derived",
-      "source": "scan:app/(app)/settings/page.tsx#DayNoteShortcutSettings"
-    },
-    {
-      "from": "file:app/(app)/settings/page.tsx",
-      "type": "renders",
       "to": "component:module.notification-permission-panel",
       "grade": "derived",
       "source": "scan:app/(app)/settings/page.tsx#NotificationPermissionPanel"
@@ -24812,13 +24764,6 @@
       "to": "service:lib/services/category.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/settings/page.tsx#lib/services/category.service.ts"
-    },
-    {
-      "from": "file:app/(app)/settings/page.tsx",
-      "type": "uses",
-      "to": "service:lib/services/note-shortcut.service.ts",
-      "grade": "derived",
-      "source": "scan:app/(app)/settings/page.tsx#lib/services/note-shortcut.service.ts"
     },
     {
       "from": "file:app/(app)/settings/page.tsx",
@@ -25491,13 +25436,6 @@
       "to": "component:module.chat-page",
       "grade": "derived",
       "source": "scan:app/design-system/ChatBench.tsx#ChatPage"
-    },
-    {
-      "from": "file:app/design-system/ConnectorBench.tsx",
-      "type": "renders",
-      "to": "component:composite.recorded-activity-list",
-      "grade": "derived",
-      "source": "scan:app/design-system/ConnectorBench.tsx#RecordedActivityList"
     },
     {
       "from": "file:app/design-system/ConnectorBench.tsx",
@@ -29254,13 +29192,6 @@
     {
       "from": "file:apps/desktop/src/product.tsx",
       "type": "renders",
-      "to": "component:module.note-shortcut-controls",
-      "grade": "derived",
-      "source": "scan:apps/desktop/src/product.tsx#DayNoteShortcutSettings"
-    },
-    {
-      "from": "file:apps/desktop/src/product.tsx",
-      "type": "renders",
       "to": "component:module.outlook-calendar-panel",
       "grade": "derived",
       "source": "scan:apps/desktop/src/product.tsx#OutlookCalendarPanel"
@@ -30223,13 +30154,6 @@
       "to": "component:composite.occurrence-note-form",
       "grade": "derived",
       "source": "scan:components/behaviors/BehaviorList.tsx#OccurrenceNoteForm"
-    },
-    {
-      "from": "file:components/behaviors/BehaviorList.tsx",
-      "type": "renders",
-      "to": "component:module.note-shortcut-controls",
-      "grade": "derived",
-      "source": "scan:components/behaviors/BehaviorList.tsx#NoteShortcutSettings"
     },
     {
       "from": "file:components/behaviors/BehaviorList.tsx",
@@ -32516,13 +32440,6 @@
     {
       "from": "file:components/timeline/DayProgressTimeline.tsx",
       "type": "renders",
-      "to": "component:composite.recorded-activity-list",
-      "grade": "derived",
-      "source": "scan:components/timeline/DayProgressTimeline.tsx#RecordedActivityList"
-    },
-    {
-      "from": "file:components/timeline/DayProgressTimeline.tsx",
-      "type": "renders",
       "to": "component:composite.travel-leave-question",
       "grade": "derived",
       "source": "scan:components/timeline/DayProgressTimeline.tsx#TravelLeaveQuestion"
@@ -32988,83 +32905,6 @@
       "to": "component:module.alert-notice",
       "grade": "derived",
       "source": "scan:components/timeline/ParentOccurrenceRow.tsx#AlertNotice"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/connectors/completions/reconcile",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/connectors/completions/reconcile"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/connectors/completions/status",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/connectors/completions/status"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/hevy/activities",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/hevy/activities"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/hevy/connection",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/hevy/connection"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/icloud-calendar/calendars",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/icloud-calendar/calendars"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/icloud-calendar/connection",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/icloud-calendar/connection"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/outlook-calendar/calendars",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/outlook-calendar/calendars"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "calls",
-      "to": "api:/api/outlook-calendar/connection",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#/api/outlook-calendar/connection"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "uses",
-      "to": "service:packages/core/src/services/external-event-validation.ts",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#packages/core/src/services/external-event-validation.ts"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "uses",
-      "to": "service:packages/core/src/services/recorded-activity-refresh.ts",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#packages/core/src/services/recorded-activity-refresh.ts"
-    },
-    {
-      "from": "file:components/timeline/RecordedActivityList.tsx",
-      "type": "uses",
-      "to": "service:packages/core/src/services/recorded-activity-validation.ts",
-      "grade": "derived",
-      "source": "scan:components/timeline/RecordedActivityList.tsx#packages/core/src/services/recorded-activity-validation.ts"
     },
     {
       "from": "file:components/timeline/Timeline.tsx",
@@ -36814,6 +36654,13 @@
     {
       "from": "interaction:INT-BEHAVIOR-029",
       "type": "implemented-in",
+      "to": "file:app/(app)/note-shortcuts/actions.ts",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-029/implementation/app/(app)/note-shortcuts/actions.ts#dismissNoteShortcutAction"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-029",
+      "type": "implemented-in",
       "to": "file:apps/desktop/src/product.tsx",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-BEHAVIOR-029/implementation/apps/desktop/src/product.tsx#Product"
@@ -36821,16 +36668,16 @@
     {
       "from": "interaction:INT-BEHAVIOR-029",
       "type": "implemented-in",
-      "to": "file:components/behaviors/BehaviorList.tsx",
+      "to": "file:components/note-shortcuts/NoteShortcutControls.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-BEHAVIOR-029/implementation/components/behaviors/BehaviorList.tsx#BehaviorRecord"
+      "source": "interaction-registry.json#INT-BEHAVIOR-029/platforms/web/implementation/components/note-shortcuts/NoteShortcutControls.tsx#NoteShortcutSettings"
     },
     {
       "from": "interaction:INT-BEHAVIOR-029",
       "type": "implemented-in",
-      "to": "file:components/note-shortcuts/NoteShortcutControls.tsx",
+      "to": "file:components/notes/NoteEditor.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-BEHAVIOR-029/implementation/components/note-shortcuts/NoteShortcutControls.tsx#NoteShortcutSettings"
+      "source": "interaction-registry.json#INT-BEHAVIOR-029/implementation/components/notes/NoteEditor.tsx#NoteEditor"
     },
     {
       "from": "interaction:INT-BEHAVIOR-029",
@@ -36842,9 +36689,23 @@
     {
       "from": "interaction:INT-BEHAVIOR-029",
       "type": "on",
+      "to": "route:/timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-029/routes//timeline"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-029",
+      "type": "on",
       "to": "surface:behaviors",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-BEHAVIOR-029/surfaces/behaviors"
+    },
+    {
+      "from": "interaction:INT-BEHAVIOR-029",
+      "type": "on",
+      "to": "surface:timeline",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-BEHAVIOR-029/surfaces/timeline"
     },
     {
       "from": "interaction:INT-BEHAVIOR-029",
@@ -45671,14 +45532,14 @@
       "type": "implemented-in",
       "to": "file:app/(app)/note-shortcuts/actions.ts",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/app/(app)/note-shortcuts/actions.ts#manageNoteShortcutAction"
+      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/app/(app)/note-shortcuts/actions.ts#dismissNoteShortcutAction"
     },
     {
       "from": "interaction:INT-SETTINGS-018",
       "type": "implemented-in",
       "to": "file:app/(app)/settings/page.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/app/(app)/settings/page.tsx"
+      "source": "interaction-registry.json#INT-SETTINGS-018/platforms/web/implementation/app/(app)/settings/page.tsx"
     },
     {
       "from": "interaction:INT-SETTINGS-018",
@@ -45706,21 +45567,35 @@
       "type": "implemented-in",
       "to": "file:components/note-shortcuts/NoteShortcutControls.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings"
+      "source": "interaction-registry.json#INT-SETTINGS-018/platforms/web/implementation/components/note-shortcuts/NoteShortcutControls.tsx#DayNoteShortcutSettings"
+    },
+    {
+      "from": "interaction:INT-SETTINGS-018",
+      "type": "implemented-in",
+      "to": "file:components/notes/NoteEditor.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/components/notes/NoteEditor.tsx#NoteEditor"
+    },
+    {
+      "from": "interaction:INT-SETTINGS-018",
+      "type": "implemented-in",
+      "to": "file:components/timeline/DayNoteControl.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-SETTINGS-018/implementation/components/timeline/DayNoteControl.tsx#DayNoteControl"
     },
     {
       "from": "interaction:INT-SETTINGS-018",
       "type": "on",
-      "to": "route:/settings#settings-general",
+      "to": "route:/timeline",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-SETTINGS-018/routes//settings#settings-general"
+      "source": "interaction-registry.json#INT-SETTINGS-018/routes//timeline"
     },
     {
       "from": "interaction:INT-SETTINGS-018",
       "type": "on",
-      "to": "surface:settings",
+      "to": "surface:timeline",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-SETTINGS-018/surfaces/settings"
+      "source": "interaction-registry.json#INT-SETTINGS-018/surfaces/timeline"
     },
     {
       "from": "interaction:INT-SETTINGS-018",
@@ -63594,6 +63469,34 @@
       "source": "scan:lib/services/leave-reminder-web-push.ts#packages/core/src/services/leave-reminder-plan.ts"
     },
     {
+      "from": "service:lib/services/note-shortcut-ai.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/behaviors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/note-shortcut-ai.service.ts#lib/db/behaviors.repo.ts"
+    },
+    {
+      "from": "service:lib/services/note-shortcut-ai.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/noteShortcuts.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/note-shortcut-ai.service.ts#lib/db/noteShortcuts.repo.ts"
+    },
+    {
+      "from": "service:lib/services/note-shortcut-ai.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/agent-model.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/note-shortcut-ai.service.ts#lib/services/agent-model.ts"
+    },
+    {
+      "from": "service:lib/services/note-shortcut-ai.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/ai-settings.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/note-shortcut-ai.service.ts#lib/services/ai-settings.service.ts"
+    },
+    {
       "from": "service:lib/services/note-shortcut.service.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -63606,6 +63509,13 @@
       "to": "repository:lib/db/noteShortcuts.repo.ts",
       "grade": "derived",
       "source": "scan:lib/services/note-shortcut.service.ts#lib/db/noteShortcuts.repo.ts"
+    },
+    {
+      "from": "service:lib/services/note-shortcut.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/note-shortcut-ai.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/note-shortcut.service.ts#lib/services/note-shortcut-ai.service.ts"
     },
     {
       "from": "service:lib/services/note-shortcut.service.ts",
@@ -73723,7 +73633,6 @@
       "found in code, missing from design-system.usage.json: module.chat-page in app/(app)/chat/page.tsx",
       "found in code, missing from design-system.usage.json: module.chat-page in apps/desktop/src/chat-screen.tsx",
       "found in code, missing from design-system.usage.json: module.daily-brief-moves in components/briefing/DailyBriefBubble.tsx",
-      "found in code, missing from design-system.usage.json: module.note-shortcut-controls in app/(app)/settings/page.tsx",
       "found in code, missing from design-system.usage.json: module.notice in apps/desktop/src/timeline-screen.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/behaviors/BehaviorForm.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/behaviors/BehaviorList.tsx",
@@ -73744,7 +73653,9 @@
       "found in code, missing from design-system.usage.json: module.settings-drawer in apps/desktop/src/settings-screen.tsx",
       "found in code, missing from design-system.usage.json: module.settings-row in components/settings/SignInMethodsPanel.tsx",
       "found in code, missing from design-system.usage.json: module.settings-saving in components/settings/SignInMethodsPanel.tsx",
-      "found in code, missing from design-system.usage.json: module.settings-sections in apps/desktop/src/settings-screen.tsx"
+      "found in code, missing from design-system.usage.json: module.settings-sections in apps/desktop/src/settings-screen.tsx",
+      "in design-system.usage.json, not found in code: module.note-shortcut-controls in apps/desktop/src/product.tsx",
+      "in design-system.usage.json, not found in code: module.note-shortcut-controls in components/behaviors/BehaviorList.tsx"
     ],
     "token descriptions": [
       "app/globals.css: --font-mono has no description comment",

@@ -3000,3 +3000,20 @@ Owner decision on November 24, 2026:
 Platform impact: web implemented (awaits hosted migration push for `20261124103000_note_shortcuts_min_two_evidence.sql`);
 desktop implemented (shared components, `apps/desktop/src/product.tsx`, `settings-screen.tsx`, Rust validator in `db.rs`;
 ships in next Mac release); marketing not applicable; future mobile inherits the same core resolver. Messaging impact: none.
+
+## 2026-11-24: Remove dedicated Recorded activity · Hevy section from Timeline header
+
+Owner decision on November 24, 2026:
+
+- **No dedicated connector status/activity section above the Timeline.** Remove
+  `RecordedActivityList` (`"Recorded activity · Hevy"` / `"No recorded workouts today."`) from
+  `DayProgressTimeline`. Connector status belongs in Settings; empty states and internal
+  contract labels should not occupy Timeline header space or stack as more connectors are added.
+- **Keep internal recorded-activity capture and completion intact.** `DayProgressTimeline` still
+  receives today's recorded-activity snapshot so manual workout counting (`countableWorkouts`)
+  keeps working on occurrences; background connector completion (`occurrence_source_matches`),
+  Daily Brief, and Chat reads are unchanged.
+
+Platform impact: web implemented (`components/timeline/DayProgressTimeline.tsx`, `RecordedActivityList`
+removed); desktop implemented (shares `DayProgressTimeline`, ships in next Mac release); marketing not
+applicable; future mobile deferred. Messaging impact: `P-085`.

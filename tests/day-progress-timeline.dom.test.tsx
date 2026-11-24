@@ -417,7 +417,7 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("[data-current-time-marker]")).not.toBeNull();
   });
 
-  it("labels Outlook markers by source and shows recorded workouts apart from Calendar markers (Ticket 238)", async () => {
+  it("labels Outlook markers by source and keeps recorded workouts out of the Timeline header and Calendar markers", async () => {
     const input = props();
     const recordedActivity = { state: "ready" as const, error: null, day: { localDate: "2026-09-16", state: "current" as const, fetchedAt: "2026-09-16T13:55:00Z",
       items: [{ id: "hevy/workout-1", startAt: "2026-09-16T11:00:00Z", endAt: "2026-09-16T11:45:00Z", durationSeconds: 2700 }] } };
@@ -429,11 +429,9 @@ describe("DayProgressTimeline", () => {
     expect(marker?.dataset.eventSource).toBe("outlook_calendar");
     expect(marker?.querySelector("img")).toBeNull();
     expect(container.textContent).toContain("Outlook Calendar context is incomplete; some events may be missing.");
-    const activity = container.querySelector('[data-recorded-activity="ready"]');
-    expect(activity?.closest("section[aria-labelledby='today-2026-09-16-title']")).not.toBeNull();
-    expect(activity?.textContent).toContain("Workout");
-    expect(activity?.textContent).toContain("7:00 AM–7:45 AM");
-    expect(activity?.textContent).toContain("45 min");
+    // Recorded activity does not render a dedicated connector banner/section above the Timeline.
+    expect(container.querySelector("[data-recorded-activity]")).toBeNull();
+    expect(container.textContent).not.toContain("Recorded activity");
     // A workout is never a Calendar marker, overlap cue, or Occurrence change.
     expect(container.querySelectorAll("[data-calendar-node]")).toHaveLength(1);
     expect(container.querySelector('[data-calendar-node^="hevy/"]')).toBeNull();

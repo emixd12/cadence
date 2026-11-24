@@ -36,7 +36,6 @@ import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, exter
 import { travelWeatherStateText } from "./TravelWeather";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
-import { RecordedActivityList } from "./RecordedActivityList";
 import { AdvisorDayLine } from "@/components/advisor/AdvisorParts";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
@@ -897,7 +896,6 @@ function DayProgressDay({
             shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
           /> : null}
           {opportunityBasket}
-          <RecordedActivityList activity={activity} timezone={timezone} label={section.label} />
         </div>
       </header>
       <div className={styles.feed}>

@@ -97,6 +97,23 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Remove Recorded activity · Hevy section from Timeline header — November 24, 2026
+
+- **Owner's decision:** remove the dedicated `"Recorded activity · Hevy"` section (including
+  `"No recorded workouts today."`) from the Timeline header while preserving internal Hevy
+  reads, connector completion (`occurrence_source_matches`), Daily Brief/Chat context, and
+  `countableWorkouts` on occurrences (`docs/DECISIONS.md`, 2026-11-24).
+- **Implemented:** removed `<RecordedActivityList>` from `components/timeline/DayProgressTimeline.tsx`,
+  deleted `components/timeline/RecordedActivityList.tsx` and its unused `.activity` CSS rules in
+  `components/timeline/day-progress-timeline.module.css`, updated the design-system bench and
+  manifests (`app/design-system/ConnectorBench.tsx`, `app/design-system/page.tsx`,
+  `design-system.{manifest,surfaces,usage}.json`), regenerated `docs/PRODUCT_MAP.md`, and updated
+  `tests/day-progress-timeline.dom.test.tsx`, `tests/connector-library.dom.test.tsx`, and
+  `tests/recorded-activity-refresh.test.ts`.
+
+Platform impact: web implemented; desktop implemented (shares `DayProgressTimeline`, ships in
+next Mac release); marketing not applicable; future mobile deferred. Messaging impact: P-085.
+
 ## Note shortcuts revamp: inline chips, full history, floor of 2, and AI pattern analysis — November 24, 2026
 
 - **Owner's decision:** remove the Day note shortcuts drawer from Settings → General and the

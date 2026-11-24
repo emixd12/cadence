@@ -820,20 +820,6 @@
       "notes": "Ticket 238 recorded-activity source; one-time API key field cleared on submit, Hevy Pro and 500-workout disclosure. Synthetic bench never contacts Hevy."
     },
     {
-      "id": "composite.recorded-activity-list",
-      "name": "RecordedActivityList",
-      "kind": "composite",
-      "source": "components/timeline/RecordedActivityList.tsx",
-      "exportName": "RecordedActivityList",
-      "usageNames": [
-        "RecordedActivityList"
-      ],
-      "benchAnchor": "design-system#ds-composite-recorded-activity-list",
-      "trackUsages": "optional",
-      "status": "active",
-      "notes": "Ticket 238 current-day Hevy workouts: when and how long only, outside Calendar markers and overlap cues; ready, stale, incomplete, and error states."
-    },
-    {
       "id": "composite.external-event-details",
       "name": "ExternalEventDetails",
       "kind": "composite",
