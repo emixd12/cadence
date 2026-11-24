@@ -173,7 +173,11 @@ decision. Needs decision eligibility includes prior unresolved occurrences and
 prior decisions retained through the current local day. Future occurrences,
 archived behaviors, and prior resolved occurrences outside that retention
 window cannot start a new timing session. Stop and reset remain available for
-persisted timing data.
+persisted timing data. Transitioning an occurrence to Completed automatically
+stops any running timing session on that occurrence at `status_marked_at`
+(clamped to `started_at` on clock skew); Not Completed, Unresolved, and
+unchanged Completed transitions leave running sessions untouched, and manual
+timing controls never change occurrence status (Ticket 351).
 
 ## Day boundary
 

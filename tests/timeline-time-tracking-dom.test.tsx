@@ -63,4 +63,51 @@ describe("TimeTracker visibility", () => {
     await act(() => root.unmount());
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("switches to stopped state when refreshed tracking props stop a locally started timer", async () => {
+    const startAction: TimeTrackingFormAction = async (_prev, formData) => ({
+      status: "success",
+      message: "Time tracking started.",
+      requestId: String(formData.get("client_action_id") ?? ""),
+      tracking: {
+        recordedSeconds: 0,
+        runningStartedAt: "2026-08-02T14:00:00Z",
+      },
+    });
+
+    await act(() => root.render(
+      <TimeTracker
+        occurrenceId="occurrence-1"
+        tracking={{ recordedSeconds: 0, runningStartedAt: null }}
+        canStart
+        startAction={startAction}
+        stopAction={action}
+        resetAction={action}
+      />,
+    ));
+
+    const startButton = container.querySelector("button[type='submit']") as HTMLButtonElement;
+    expect(startButton.textContent).toBe("Track Time");
+    await act(async () => {
+      startButton.click();
+    });
+    expect(container.textContent).toContain("Stop");
+    expect(vi.getTimerCount()).toBe(1);
+
+    // Simulates Completed auto-stopping the running session and refreshing props.
+    await act(() => root.render(
+      <TimeTracker
+        occurrenceId="occurrence-1"
+        tracking={{ recordedSeconds: 900, runningStartedAt: null }}
+        canStart
+        startAction={startAction}
+        stopAction={action}
+        resetAction={action}
+      />,
+    ));
+
+    expect(container.textContent).toContain("00:15:00");
+    expect(container.textContent).not.toContain("Stop");
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
