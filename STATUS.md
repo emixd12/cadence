@@ -97,6 +97,25 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 351: Auto-stop running time-tracking session on Completed — November 23, 2026
+
+- **Owner's decision:** transitioning an Occurrence to `completed` (not `not_completed`)
+  atomically stops any running `occurrence_time_sessions` row on that Occurrence at
+  `greatest(started_at, status_marked_at)`; existing completed rows are not backfilled
+  (`docs/DECISIONS.md`, 2026-11-23).
+- **Implemented:** `resolveStopTimeTrackingOnStatusTransition` in
+  `packages/core/src/resolvers/time-tracking.resolver.ts`; Postgres migration
+  `supabase/migrations/20261123183000_auto_stop_time_session_on_completed.sql` updating
+  `apply_occurrence_status_transition` (covering single marks, routine bulk marks, and
+  MCP); desktop SQLite `apps/desktop/src-tauri/src/local_store/occurrence.rs`;
+  `components/timeline/TimeTracker.tsx` server-tracking key sync; unit, DOM, migration,
+  Rust, and rollback SQL smoke tests (`tests/sql/ticket-351-auto-stop-time-session-on-completed.sql`).
+- **Pending:** hosted migration push and next Cadence for Mac release.
+
+Platform impact: web implemented (awaits hosted migration push); desktop implemented
+(ships in next Mac release); marketing not applicable; future mobile deferred. Messaging
+impact: none.
+
 ## Advisor avatar: step 2 review 1, breathing softens the drawing — November 22, 2026
 
 - **In review (draft PR, branch `claude/avatar-motion-review`).** The owner returned to the
@@ -110,8 +129,8 @@ Check the cited entry before acting on a row.
 - **Waits for the owner's choice.** Findings: `docs/plans/2026-11-21-advisor-avatar.md`,
   "Step 2 review".
 
-Platform impact: none yet (bench only; the choice will change the shared component on web
-and desktop). Marketing not applicable; future mobile deferred. Messaging impact: none.
+Platform impact: web and desktop share the changed component (desktop in its next
+release); marketing not applicable; future mobile deferred. Messaging impact: none.
 
 ## Ticket 350 started: organization transfer and merge queue — November 22, 2026
 

@@ -44,6 +44,8 @@ pub struct SlotStatusTransition {
     pub completed_at: Option<String>,
     pub status_marked_at: Option<String>,
     pub cancel_pending_reminders: bool,
+    #[serde(default)]
+    pub time_tracking_stop: Option<super::TimeTrackingStopPlan>,
     pub event: Option<OccurrenceStatusEvent>,
 }
 
@@ -206,6 +208,7 @@ pub fn parent_slot_status(
             completed_at: transition.completed_at.clone(),
             status_marked_at: transition.status_marked_at.clone(),
             cancel_pending_reminders: transition.cancel_pending_reminders,
+            time_tracking_stop: transition.time_tracking_stop.clone(),
             event: transition.event.clone(),
         };
         results.push(occurrence::status(db, &request)?);

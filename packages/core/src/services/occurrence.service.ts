@@ -4,6 +4,7 @@ import type { OccurrenceDataStore, StatusTransitionCommit } from "../data-store"
 import { planParentSlotStatusChange } from "../resolvers/sub-behavior.resolver";
 import type { OccurrenceStatus } from "../types/database";
 import { resolveReminderDeliveryCancellation } from "../resolvers/reminder.resolver";
+import { resolveStopTimeTrackingOnStatusTransition } from "../resolvers/time-tracking.resolver";
 import {
   MarkDetailRefusal,
   resolveDoneAtDetail,
@@ -35,6 +36,12 @@ export async function applyOccurrenceStatusTransition(
     throw new Error("Occurrence status changed. Review the latest status and try again.");
   }
   const update = resolveStatusTransition({ occurrence, nextStatus: input.nextStatus, now: input.now });
+  const stopPlan = resolveStopTimeTrackingOnStatusTransition({
+    previousStatus: occurrence.status,
+    nextStatus: input.nextStatus,
+    sessions: context.timeSessions ?? [],
+    statusMarkedAt: update.statusMarkedAt,
+  });
   const event = resolveStatusEvent({
     occurrence,
     nextStatus: input.nextStatus,
@@ -48,6 +55,9 @@ export async function applyOccurrenceStatusTransition(
     expectedLatestEventId: context.latestStatusEventId,
     ...update,
     cancelPendingReminders: resolveReminderDeliveryCancellation({ occurrence: update }).cancelPending,
+    ...(stopPlan.kind === "stop"
+      ? { timeTrackingStop: { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt } }
+      : {}),
     event,
   });
   return { result, timezone: context.timezone };
@@ -98,12 +108,21 @@ export async function applyParentSlotStatusTransition(
       note: context.occurrence.note,
     };
     const update = resolveStatusTransition({ occurrence, nextStatus: input.nextStatus, now: input.now });
+    const stopPlan = resolveStopTimeTrackingOnStatusTransition({
+      previousStatus: status,
+      nextStatus: input.nextStatus,
+      sessions: context.timeSessions ?? [],
+      statusMarkedAt: update.statusMarkedAt,
+    });
     return {
       occurrenceId: context.occurrence.id,
       expectedStatus: status,
       expectedLatestEventId: context.latestStatusEventId,
       ...update,
       cancelPendingReminders: resolveReminderDeliveryCancellation({ occurrence: update }).cancelPending,
+      ...(stopPlan.kind === "stop"
+        ? { timeTrackingStop: { sessionId: stopPlan.sessionId, stoppedAt: stopPlan.stoppedAt } }
+        : {}),
       event: resolveStatusEvent({
         occurrence, nextStatus: input.nextStatus, now: input.now,
         hasPriorStatusEvent: context.latestStatusEventId !== null, update,

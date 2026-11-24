@@ -1,5 +1,6 @@
 import type { OccurrenceStatus } from "./types/database";
 import type { MarkDetailEventPlan, OccurrenceStatusEventPlan } from "./resolvers/status.resolver";
+import type { TimeSession } from "./types/time-tracking";
 
 // Portable persisted records. Web's generated rows must satisfy these contracts.
 export type OccurrenceRecord = {
@@ -49,6 +50,11 @@ export type OccurrenceStatusEventRecord = {
   updated_at: string;
 };
 
+export type StatusTransitionTimeTrackingStop = Readonly<{
+  sessionId: string;
+  stoppedAt: string;
+}>;
+
 export type StatusTransitionCommit = {
   occurrenceId: string;
   expectedStatus: OccurrenceStatus;
@@ -57,6 +63,7 @@ export type StatusTransitionCommit = {
   completedAt: string | null;
   statusMarkedAt: string | null;
   cancelPendingReminders: boolean;
+  timeTrackingStop?: StatusTransitionTimeTrackingStop | null;
   event: OccurrenceStatusEventPlan | null;
 };
 
@@ -88,6 +95,7 @@ export type OccurrenceDataStore = {
     occurrence: OccurrenceRecord;
     latestStatusEventId: string | null;
     timezone: string;
+    timeSessions?: TimeSession[];
   } | null>;
   applyStatusTransition(input: StatusTransitionCommit): Promise<StatusTransitionResult>;
   /**

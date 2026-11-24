@@ -4827,7 +4827,7 @@
         }
       ],
       "availability": "Available on unresolved rows and inside expanded correction controls; behavior date review also exposes it.",
-      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, refreshes the view, and attempts the completion chime at most once for a new Completed transition. With completion places on and location already allowed, a first resolution on the occurrence's day and hours reads one foreground position, stores only a place label and discards the position (Ticket 216).",
+      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, stops any running time-tracking session on that occurrence at status_marked_at (clamped to started_at) when transitioning into Completed (unchanged Completed re-marks leave running sessions untouched; Ticket 351), refreshes the view, and attempts the completion chime at most once for a new Completed transition. With completion places on and location already allowed, a first resolution on the occurrence's day and hours reads one foreground position, stores only a place label and discards the position (Ticket 216).",
       "failure_result": "Refreshes server truth after a stale-status conflict, rolls back optimistic presentation, and shows a factual error; no partial status write is retained.",
       "effects": [
         "database_write",
@@ -22111,7 +22111,7 @@
         }
       ],
       "availability": "On a routine row on today's Timeline or in Needs decision while at least one of its sub-behaviors shows status actions. Future days and fully resolved routines show no bulk actions.",
-      "success_result": "Sends every sub-behavior Occurrence in the slot to markParentSlotStatusAction, which writes only the rows whose status changes in one transaction (one status event per changed child), cancels their pending reminders, refreshes the Timeline and attempts the completion chime once for Completed. The routine then shows Completed, Not Completed or derived progress such as 2/3; no fourth status is stored.",
+      "success_result": "Sends every sub-behavior Occurrence in the slot to markParentSlotStatusAction, which writes only the rows whose status changes in one transaction (one status event per changed child), cancels their pending reminders, stops any running time-tracking session on each child transitioning into Completed at status_marked_at (clamped to started_at; Not Completed and unchanged Completed rows leave running sessions untouched; Ticket 351), refreshes the Timeline and attempts the completion chime once for Completed. The routine then shows Completed, Not Completed or derived progress such as 2/3; no fourth status is stored.",
       "failure_result": "Shows the factual error under the actions, refreshes server truth and keeps every child's stored status; one failed child rolls the whole slot back.",
       "effects": [
         "database_write",
