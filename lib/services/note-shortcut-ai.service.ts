@@ -19,6 +19,8 @@ const MAX_MODEL_NOTES = 40;
 const MAX_MODEL_NOTE_CHARS = 300;
 const MIN_NOTES_FOR_MODEL = 3;
 const MODEL_COOLDOWN_HOURS = 12;
+const MAX_COOLDOWN_CACHE = 500;
+const recentModelRuns = new Map<string, Temporal.Instant>();
 
 const NOTE_SHORTCUT_SCHEMA = {
   type: "object",
@@ -177,13 +179,21 @@ export async function analyzeModelNoteShortcutsAfterNoteSave(
   poolId: string,
 ): Promise<void> {
   if (!agentModelConfigured()) return;
+  const now = Temporal.Now.instant();
+  const cacheKey = `${userId}:${poolId}`;
+  const lastRun = recentModelRuns.get(cacheKey);
+  if (lastRun && Temporal.Instant.compare(now, lastRun.add({ hours: MODEL_COOLDOWN_HOURS })) < 0) {
+    return;
+  }
   try {
     const aiSettings = await readAiSettings(supabase);
     if (!aiSettings.approved || !aiSettings.sources.notes) return;
+    if (recentModelRuns.size >= MAX_COOLDOWN_CACHE) recentModelRuns.clear();
+    recentModelRuns.set(cacheKey, now);
     await runModelNoteShortcutAnalysis({
       store: createNoteShortcutStore(supabase, userId),
       poolId,
-      now: Temporal.Now.instant(),
+      now,
       extract: defaultModelExtractor,
     });
   } catch {

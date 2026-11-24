@@ -110,6 +110,7 @@ export function resolveNoteSuggestions(input: { context: NoteShortcutContext; us
   const retained = current.filter((entry) => entry.status !== "proposed");
   // A proposal that is still supported keeps its first proposal time and 30-day expiry.
   const proposedAt = new Map(current.filter((entry) => entry.status === "proposed").map((entry) => [entry.key, entry]));
+  const existingModelProposals = current.filter((entry) => entry.status === "proposed" && entry.source === "model");
   const suppressed = new Set(retained.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]));
   const groups = new Map<string, { text: string; notes: NoteSource[] }>();
   for (const note of eligibleNoteSources(input)) {
@@ -126,7 +127,7 @@ export function resolveNoteSuggestions(input: { context: NoteShortcutContext; us
       groups.set(key, group);
     }
   }
-  const proposals: NoteShortcut[] = [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
+  const deterministicProposals: NoteShortcut[] = [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
     .sort(([a, left], [b, right]) => right.notes.length - left.notes.length || compare(right.notes[0].local_date, left.notes[0].local_date) || compare(a, b))
     .slice(0, NOTE_SHORTCUT_LIMITS.proposals).map(([key, group]) => ({
       key, text: group.text, status: "proposed", source: "repeated_text",
@@ -134,6 +135,12 @@ export function resolveNoteSuggestions(input: { context: NoteShortcutContext; us
       created_at: proposedAt.get(key)?.created_at ?? input.now.toString(),
       expires_at: proposedAt.get(key)?.expires_at ?? input.now.add({ hours: 30 * 24 }).toString(),
     }));
+  const deterministicKeys = new Set(deterministicProposals.map((entry) => entry.key));
+  const remainingSlots = Math.max(0, NOTE_SHORTCUT_LIMITS.proposals - deterministicProposals.length);
+  const keptModelProposals = existingModelProposals
+    .filter((entry) => !suppressed.has(entry.key) && !deterministicKeys.has(entry.key))
+    .slice(0, remainingSlots);
+  const proposals = [...deterministicProposals, ...keptModelProposals];
   if (retained.length + proposals.length + retained.filter((entry) => entry.status === "accepted").length > NOTE_SHORTCUT_LIMITS.entries) throw new Error("The shortcut history is full. Try again after dismissed patterns expire.");
   return [...retained, ...proposals];
 }

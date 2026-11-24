@@ -78,15 +78,25 @@ export async function listInlineNoteShortcuts(
       if (state.user_id !== store.userId) throw new Error("Shortcut state belongs to another owner.");
     }
     if (!noteShortcutsEnabled(states.find((state) => state.id === "global"))) return {};
-    return Object.fromEntries(
-      states
-        .filter((state) => state.behavior_id || state.id === DAY_NOTE_SHORTCUT_POOL_ID)
-        .map((state) => [
-          state.behavior_id ?? DAY_NOTE_SHORTCUT_POOL_ID,
-          rankInlineNoteShortcuts(state.entries, now),
-        ])
-        .filter(([, entries]) => entries.length > 0),
+    const poolStates = states.filter((state) => state.behavior_id || state.id === DAY_NOTE_SHORTCUT_POOL_ID);
+    const resolved = await Promise.all(
+      poolStates.map(async (state) => {
+        const poolId = state.behavior_id ?? DAY_NOTE_SHORTCUT_POOL_ID;
+        const hasProposed = state.entries.some((entry) => entry.status === "proposed");
+        if (!hasProposed) {
+          return [poolId, rankInlineNoteShortcuts(state.entries, now)] as const;
+        }
+        // Validate proposal evidence against current notes so cleared/edited notes never leave stale chips.
+        try {
+          const context = await store.readContext(poolId);
+          const validEntries = currentNoteShortcuts({ context, userId: store.userId, now });
+          return [poolId, rankInlineNoteShortcuts(validEntries, now)] as const;
+        } catch {
+          return [poolId, rankInlineNoteShortcuts(state.entries.filter((entry) => entry.status === "accepted"), now)] as const;
+        }
+      }),
     );
+    return Object.fromEntries(resolved.filter(([, entries]) => entries.length > 0));
   } catch {
     return {};
   }

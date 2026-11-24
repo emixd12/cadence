@@ -20,8 +20,8 @@ export async function saveDayNoteFromFormData(formData: FormData): Promise<DayNo
     usedShortcut: formData.get("used_shortcut") === "true",
   });
   // Ticket 305 applied to day notes (Ticket 292): propose repeated day notes after an
-  // in-app save. A failure never fails the saved day note.
-  if (result.changed && result.note !== null) {
+  // in-app save, and prune unsupported proposals when a day note is cleared.
+  if (result.changed) {
     await matchRepeatedNotesAfterNoteSave(supabase, userId, DAY_NOTE_SHORTCUT_POOL_ID);
   }
   return result;

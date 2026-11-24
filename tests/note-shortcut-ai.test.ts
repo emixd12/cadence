@@ -13,6 +13,7 @@ import {
   notePatternKey,
   resolveNoteSuggestions,
 } from "@cadence/core/resolvers/note-suggestion.resolver";
+import { listInlineNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutContext, NoteShortcutState, NoteShortcutStore, NoteSource } from "@cadence/core/types/note-shortcut";
 import {
   runModelNoteShortcutAnalysis,
@@ -160,5 +161,38 @@ describe("runModelNoteShortcutAnalysis", () => {
         source: "model",
       }),
     ]);
+  });
+
+  it("preserves supported model proposals across subsequent deterministic matching and drops unsupported proposals inline", async () => {
+    const ctx = context([
+      note(1, "Out of town for work"),
+      note(2, "On a work trip"),
+      note(3, "Slept poorly"),
+      note(4, "Slept poorly"),
+    ]);
+    ctx.state = mergeModelNoteSuggestions({
+      context: ctx,
+      userId: owner,
+      behaviorId,
+      now,
+      candidates: [{ text: "Work trip", occurrenceIds: [id(1), id(2)] }],
+    });
+    const afterDeterministic = resolveNoteSuggestions({ context: ctx, userId: owner, now: now.add({ hours: 1 }) });
+    expect(afterDeterministic.map((entry) => [entry.source, entry.text])).toEqual([
+      ["repeated_text", "Slept poorly"],
+      ["model", "Work trip"],
+    ]);
+
+    // Clearing one of the two supporting notes drops the unsupported proposal in listInlineNoteShortcuts.
+    ctx.state = { ...ctx.state, entries: afterDeterministic };
+    ctx.notes[0].note = null;
+    const store: NoteShortcutStore = {
+      userId: owner,
+      readStates: async () => [ctx.globalState!, ctx.state!],
+      readContext: async () => ctx,
+      commit: vi.fn(),
+    };
+    const inline = await listInlineNoteShortcuts(store, now.add({ hours: 1 }));
+    expect(inline[behaviorId].map((entry) => entry.text)).toEqual(["Slept poorly"]);
   });
 });
