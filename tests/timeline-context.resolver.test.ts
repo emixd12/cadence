@@ -25,7 +25,7 @@ const CURRENT = resolveExternalEventFreshness({
 });
 
 describe("resolveBehaviorDurationEstimate", () => {
-  it("means positive stopped totals from distinct Completed occurrences in [today-90, today)", () => {
+  it("means positive stopped totals from distinct Completed occurrences across all-time history before today", () => {
     const estimate = resolveBehaviorDurationEstimate({
       behaviorId: "behavior-1",
       now: NOW,
@@ -33,28 +33,106 @@ describe("resolveBehaviorDurationEstimate", () => {
       occurrences: [
         history("one", "2026-09-15", [session("one", "a", 60)]),
         history("two", "2026-08-01", [session("two", "b", 20), session("two", "c", 40)]),
-        history("three", "2026-06-18", [session("three", "d", 61)]),
+        history("three", "2026-01-10", [session("three", "d", 61)]),
         history("today-excluded", "2026-09-16", [session("today-excluded", "e", 1000)]),
-        history("old-excluded", "2026-06-17", [session("old-excluded", "f", 1000)]),
       ],
     });
 
-    expect(DURATION_ESTIMATE_MIN_SAMPLES).toBe(3);
+    expect(DURATION_ESTIMATE_MIN_SAMPLES).toBe(1);
     expect(DURATION_ESTIMATE_LOOKBACK_DAYS).toBe(90);
     expect(estimate).toEqual({
       kind: "known",
       seconds: 181 / 3,
       durationLabel: "1m 0s",
       sampleCount: 3,
-      lookbackDays: 90,
+      lookbackDays: null,
       provenance: "completed_stopped_occurrence_mean",
+    });
+  });
+
+  it("supports a single completed tracked occurrence as the minimum floor and respects an explicit lookback window", () => {
+    const single = resolveBehaviorDurationEstimate({
+      behaviorId: "behavior-1",
+      now: NOW,
+      timezone: "America/New_York",
+      occurrences: [
+        history("one", "2026-01-10", [session("one", "a", 1800)]),
+      ],
+    });
+    expect(single).toEqual({
+      kind: "known",
+      seconds: 1800,
+      durationLabel: "30m 0s",
+      sampleCount: 1,
+      lookbackDays: null,
+      provenance: "completed_stopped_occurrence_mean",
+    });
+
+    const bounded = resolveBehaviorDurationEstimate({
+      behaviorId: "behavior-1",
+      now: NOW,
+      timezone: "America/New_York",
+      lookbackDays: 90,
+      occurrences: [
+        history("old-excluded", "2026-06-17", [session("old-excluded", "f", 1000)]),
+      ],
+    });
+    expect(bounded).toEqual({
+      kind: "unknown",
+      reason: "insufficient_samples",
+      sampleCount: 0,
+      requiredSampleCount: 1,
+      lookbackDays: 90,
+    });
+  });
+
+  it("follows default > tracked history > cached description estimate > unknown hierarchy", () => {
+    const fromDescription = resolveBehaviorDurationEstimate({
+      behaviorId: "behavior-1",
+      descriptionEstimateMinutes: 25,
+      now: NOW,
+      timezone: "America/New_York",
+      occurrences: [],
+    });
+    expect(fromDescription).toEqual({
+      kind: "known",
+      seconds: 1500,
+      durationLabel: "25m 0s",
+      sampleCount: 0,
+      lookbackDays: null,
+      provenance: "description_estimate",
+    });
+
+    const trackedBeatsDescription = resolveBehaviorDurationEstimate({
+      behaviorId: "behavior-1",
+      descriptionEstimateMinutes: 25,
+      now: NOW,
+      timezone: "America/New_York",
+      occurrences: [history("one", "2026-09-15", [session("one", "a", 1800)])],
+    });
+    expect(trackedBeatsDescription).toMatchObject({
+      kind: "known",
+      seconds: 1800,
+      provenance: "completed_stopped_occurrence_mean",
+    });
+
+    const defaultBeatsAll = resolveBehaviorDurationEstimate({
+      behaviorId: "behavior-1",
+      defaultDurationMinutes: 15,
+      descriptionEstimateMinutes: 25,
+      now: NOW,
+      timezone: "America/New_York",
+      occurrences: [history("one", "2026-09-15", [session("one", "a", 1800)])],
+    });
+    expect(defaultBeatsAll).toMatchObject({
+      kind: "known",
+      seconds: 900,
+      provenance: "behavior_default",
     });
   });
 
   it("excludes running, non-Completed, zero, and future-stopped occurrences", () => {
     const occurrences = [
-      history("valid-one", "2026-09-15", [session("valid-one", "a", 60)]),
-      history("valid-two", "2026-09-14", [session("valid-two", "b", 60)]),
       history("running", "2026-09-13", [session("running", "c", 60), running("running", "d")]),
       history("not-completed", "2026-09-12", [session("not-completed", "e", 60)], "not_completed"),
       history("zero", "2026-09-11", [session("zero", "f", 0)]),
@@ -73,9 +151,9 @@ describe("resolveBehaviorDurationEstimate", () => {
     })).toEqual({
       kind: "unknown",
       reason: "insufficient_samples",
-      sampleCount: 2,
-      requiredSampleCount: 3,
-      lookbackDays: 90,
+      sampleCount: 0,
+      requiredSampleCount: 1,
+      lookbackDays: null,
     });
   });
 

@@ -175,10 +175,44 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("#calendar-details-title")?.textContent).toBe("Untitled event");
   });
 
-  it("distinguishes repeated DST clock times and exposes duration context", () => {
+  it("distinguishes repeated DST clock times and exposes duration context without duplicate unknown text", () => {
     const event = validateExternalEventSnapshot(snapshotFixture).events[0]!;
     expect(eventTimeLabel(event, "America/New_York")).toBe("1:30 AM EDT–1:30 AM EST");
-    expect(container.textContent).toContain("Duration unknown.");
+    expect(container.textContent).toContain("No duration yet — track time below or set a default.");
+    expect(container.textContent).not.toContain("Duration unknown");
+  });
+
+  it("shows AI description duration estimates and opens the inline default duration form", async () => {
+    const input = props();
+    const saveDuration = vi.fn(async () => ({ status: "success" as const, message: "Default duration saved.", minutes: 25 }));
+    await act(() => root.render(
+      <RefreshProvider onRefresh={() => {}}>
+        <DayProgressTimeline
+          {...input}
+          defaultDurationAction={saveDuration}
+          context={{
+            ...input.context,
+            durationEstimates: {
+              "behavior-1": {
+                kind: "known",
+                seconds: 1200,
+                durationLabel: "20m 0s",
+                sampleCount: 0,
+                lookbackDays: null,
+                provenance: "description_estimate",
+              },
+            },
+          }}
+        />
+      </RefreshProvider>,
+    ));
+    expect(container.textContent).toContain("About 20m 0s · Estimated from description");
+    const setDefaultButton = [...container.querySelectorAll("button")].find((item) => item.textContent === "Set default");
+    expect(setDefaultButton).toBeDefined();
+    await act(() => setDefaultButton!.click());
+    const minutesInput = container.querySelector<HTMLInputElement>('input[name="default_duration_minutes"]');
+    expect(minutesInput).not.toBeNull();
+    expect(minutesInput?.value).toBe("20");
   });
 
   it("accepts a running mutation between display-clock ticks", async () => {

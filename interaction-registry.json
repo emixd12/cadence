@@ -960,6 +960,14 @@
       ]
     },
     {
+      "path": "components/timeline/InlineDurationControl.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 9,
+      "interaction_ids": [
+        "INT-BEHAVIOR-030"
+      ]
+    },
+    {
       "path": "components/timeline/TimeTracker.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 8,

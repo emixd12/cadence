@@ -14,7 +14,9 @@ import {
 import { noticeText } from "@cadence/core/notices";
 import { revalidatePath } from "next/cache";
 import { saveDayNoteFromFormData } from "@/lib/services/day-note.service";
+import { setBehaviorDefaultDurationForCurrentUser } from "@/lib/services/timeline.service";
 import type {
+  DefaultDurationActionState,
   OccurrenceActionState,
   TimelineStatus,
   TimeTrackingActionState,
@@ -121,6 +123,50 @@ export async function resetTimeTrackingAction(
   formData: FormData,
 ): Promise<TimeTrackingActionState> {
   return runTimeTrackingAction(formData, resetOccurrenceTimeTracking, "Tracked time reset.");
+}
+
+export async function setBehaviorDefaultDurationAction(
+  _previousState: DefaultDurationActionState,
+  formData: FormData,
+): Promise<DefaultDurationActionState> {
+  const behaviorId = formData.get("behavior_id");
+  const rawMinutes = formData.get("default_duration_minutes");
+
+  if (typeof behaviorId !== "string" || behaviorId.length === 0) {
+    const noticeId = "timeline.duration-choose-behavior" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
+  }
+
+  const trimmed = typeof rawMinutes === "string" ? rawMinutes.trim() : "";
+  const minutes = Number(trimmed);
+  if (!trimmed || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+    const noticeId = "timeline.duration-invalid-minutes" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
+  }
+
+  try {
+    const result = await setBehaviorDefaultDurationForCurrentUser(behaviorId, minutes);
+    if (!result.ok) {
+      return {
+        status: "error",
+        noticeId: result.noticeId,
+        message: noticeText(result.noticeId),
+      };
+    }
+
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+    const noticeId = "timeline.duration-saved" as const;
+    return {
+      status: "success",
+      noticeId,
+      message: noticeText(noticeId),
+      minutes: result.minutes,
+    };
+  } catch {
+    const noticeId = "timeline.duration-save-failed" as const;
+    return { status: "error", noticeId, message: noticeText(noticeId) };
+  }
 }
 
 async function runTimeTrackingAction(

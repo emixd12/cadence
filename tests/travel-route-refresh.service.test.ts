@@ -19,9 +19,20 @@ vi.mock("@/lib/db/travelSpend.repo", async (load) => ({
   reserveTravelProviderSpend: mocks.spend, readTravelMonthSpend: mocks.monthSpend,
 }));
 vi.mock("@/lib/db/travelPlaceCache.repo", () => ({ readTravelPlaceCache: mocks.readPlaces, writeTravelPlaceCache: mocks.writePlaces }));
-vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.occurrences }));
+vi.mock("@/lib/db/occurrences.repo", () => ({
+  listOccurrencesBetweenLocalDates: mocks.occurrences,
+  listOccurrencesByIds: vi.fn(async (client: unknown, userId: unknown, ids: readonly string[]) => {
+    if (!ids.length) return [];
+    const rows = await mocks.occurrences(client, userId, "0001-01-01", "9999-12-31");
+    return Array.isArray(rows) ? rows.filter((row: { id: string }) => ids.includes(row.id)) : [];
+  }),
+}));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ listUserBehaviors: mocks.behaviors, getProfileTimezone: mocks.timezone }));
+vi.mock("@/lib/db/behaviors.repo", () => ({
+  listUserBehaviors: mocks.behaviors,
+  getProfileTimezone: mocks.timezone,
+  listBehaviorAdvisorEstimates: vi.fn(async () => []),
+}));
 vi.mock("@/lib/services/travel-provider", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-provider")>()),
   geocodeGoogleAddress: mocks.geocode,
@@ -271,7 +282,7 @@ describe("refreshTravelRoutes", () => {
   it("uses completed stopped-session history when no Behavior default duration exists", async () => {
     located();
     mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: null }, { id: "behavior-2", default_duration_minutes: null }]);
-    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-06-24"
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "0001-01-01"
       ? ["a", "b", "c"].map((id, index) => ({ ...occurrence(id, "behavior-1", `2026-0${7 + index}-01T10:00:00Z`), local_date: `2026-0${7 + index}-01`, updated_at: "2026-09-01T00:00:00Z", status: "completed" }))
       : [occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z")]);
     mocks.historySessions.mockResolvedValue(["a", "b", "c"].map((occurrenceId, index) => ({ id: `s${index}`, user_id: "owner", occurrence_id: occurrenceId, behavior_id: "behavior-1", started_at: `2026-0${7 + index}-01T10:00:00Z`, stopped_at: `2026-0${7 + index}-01T10:10:00Z` })));

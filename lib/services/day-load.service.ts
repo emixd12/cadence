@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { DAY_LOAD_VERSION, resolveDayLoad, type DayLoad } from "@cadence/core/resolvers/day-load.resolver";
-import { resolveBehaviorDurationEstimate, DURATION_ESTIMATE_LOOKBACK_DAYS } from "@cadence/core/resolvers/timeline-context.resolver";
+import { resolveBehaviorDurationEstimate } from "@cadence/core/resolvers/timeline-context.resolver";
 import type { BehaviorDurationEstimate, BehaviorDurationHistoryOccurrence, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { Json } from "@/lib/db/database.types";
 import { listUserBehaviors, type AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -26,7 +26,7 @@ export type DayLoadReads = Readonly<{
   occurrences(startLocalDate: string, endLocalDate: string): Promise<ReadonlyArray<Readonly<{
     id: string; behavior_id: string; local_date: string; status: string;
   }>>>;
-  sessions(startLocalDate: string, endLocalDate: string, throughStartedAt: string): Promise<ReadonlyArray<Readonly<{
+  sessions(startLocalDate: string | null, endLocalDate: string, throughStartedAt: string): Promise<ReadonlyArray<Readonly<{
     id: string; user_id: string; occurrence_id: string; behavior_id: string; started_at: string; stopped_at: string | null;
   }>>>;
   /** The day's events from every connected calendar, or null when none could be read. */
@@ -40,13 +40,13 @@ export async function computeDayLoad(reads: DayLoadReads, input: Readonly<{
   calendarSourceOn: boolean;
 }>): Promise<DayLoad> {
   const day = Temporal.PlainDate.from(input.localDate);
-  const historyStart = day.subtract({ days: DURATION_ESTIMATE_LOOKBACK_DAYS }).toString();
+  const historyStart = "0001-01-01";
   const historyEnd = day.subtract({ days: 1 }).toString();
   const [behaviors, dayItems, history, sessions, calendarEvents] = await Promise.all([
     reads.behaviors(),
     reads.occurrences(input.localDate, input.localDate),
     reads.occurrences(historyStart, historyEnd),
-    reads.sessions(historyStart, historyEnd, input.now.toString()),
+    reads.sessions(null, historyEnd, input.now.toString()),
     input.calendarSourceOn ? reads.calendarEvents(input.localDate).catch(() => null) : Promise.resolve(null),
   ]);
   const byOccurrence = new Map<string, typeof sessions[number][]>();

@@ -9,7 +9,7 @@ import { travelHabitsFromSyncValue } from "@cadence/core/services/travel-habits"
 import { PLACE_LABEL_RETENTIONS, type PlaceLabelRetention, type PlaceLabelValue } from "@cadence/core/types/place-labels";
 import { readTravelBehaviorLocations, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import { readCompletionPlaceLabelRows, readPlaceLabelSettingsRow } from "@/lib/db/placeLabels.repo";
-import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { listOccurrencesBetweenLocalDates, listOccurrencesByIds } from "@/lib/db/occurrences.repo";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { readTravelRouteSource } from "./travel-settings.service";
 import {
@@ -429,14 +429,14 @@ async function readSuppliedTravelConclusions(caller: CalendarCaller, supplied: R
 
 async function readCurrentTravelSource(caller: CalendarCaller, localDate: string, now: Temporal.Instant): Promise<Readonly<{ key: string; takingPart: readonly TravelCalendarSource[] }>> {
   const historyRange = travelDurationHistoryRange(localDate);
-  const [source, calendars, occurrences, timezone, historyOccurrences, historySessions] = await Promise.all([
+  const [source, calendars, occurrences, timezone, historySessions] = await Promise.all([
     readTravelRouteSource(caller.client, caller.user.id),
     readTravelCalendarConnections(caller),
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, localDate, localDate),
     readAdvisorProfileTimezone(caller.client, caller.user.id),
-    listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
     listTimeSessionHistory(caller.client, { userId: caller.user.id, ...historyRange, includeArchived: false, throughStartedAt: now.toString() }),
   ]);
+  const historyOccurrences = await listOccurrencesByIds(caller.client, caller.user.id, historySessions.map((session) => session.occurrence_id));
   if (!timezone) throw new DailyBriefError("context_changed");
   const key = travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
     enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,

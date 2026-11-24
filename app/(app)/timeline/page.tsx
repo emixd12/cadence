@@ -17,6 +17,7 @@ import {
   markParentSlotStatusAction,
   resetTimeTrackingAction,
   saveDayNoteAction,
+  setBehaviorDefaultDurationAction,
   startTimeTrackingAction,
   stopTimeTrackingAction,
   updateOccurrenceNoteAction,
@@ -146,6 +147,7 @@ async function TimelineContent({
         addOpportunityAction={addOpportunityOccurrenceAction}
         removeOpportunityAction={removeOpportunityOccurrenceAction}
         parentSlotStatusAction={markParentSlotStatusAction}
+        defaultDurationAction={setBehaviorDefaultDurationAction}
       />
       </OccurrenceMarkDetailsProvider>
     </OccurrenceMovesProvider>

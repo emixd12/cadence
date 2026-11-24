@@ -21,8 +21,9 @@ import type { BehaviorDurationHistoryOccurrence, BehaviorDurationEstimate } from
 import type { TravelCollisionCandidate, TravelCommitment, TravelEndpoint, TravelPoint } from "@cadence/core/types/travel";
 import { TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS, readTravelMonthSpend, reserveTravelProviderSpend } from "@/lib/db/travelSpend.repo";
 import { readTravelPlaceCache, writeTravelPlaceCache, type TravelPlaceCacheRow } from "@/lib/db/travelPlaceCache.repo";
-import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
-import { getProfileTimezone, listUserBehaviors } from "@/lib/db/behaviors.repo";
+import { listOccurrencesBetweenLocalDates, listOccurrencesByIds } from "@/lib/db/occurrences.repo";
+import { getProfileTimezone, listBehaviorAdvisorEstimates, listUserBehaviors } from "@/lib/db/behaviors.repo";
+import { behaviorEstimateInputHash } from "@/lib/services/brief-move-day.service";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/services/travel-display.service";
@@ -109,12 +110,17 @@ export async function refreshTravelRoutesReportingCalendars(
     throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
   }
   const historyRange = travelDurationHistoryRange(request.startLocalDate);
-  const readDurationHistory = () => Promise.all([
-    listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
-    listTimeSessionHistory(caller.client, { userId: caller.user.id, startLocalDate: historyRange.startLocalDate, endLocalDate: historyRange.endLocalDate, includeArchived: false, throughStartedAt: now.toString() }),
+  const readDurationHistory = async () => {
+    const sessions = await listTimeSessionHistory(caller.client, { userId: caller.user.id, startLocalDate: historyRange.startLocalDate, endLocalDate: historyRange.endLocalDate, includeArchived: false, throughStartedAt: now.toString() });
+    const occurrences = await listOccurrencesByIds(caller.client, caller.user.id, sessions.map((session) => session.occurrence_id));
+    return [occurrences, sessions] as const;
+  };
+  const [[historyOccurrences, historySessions], advisorEstimateRows] = await Promise.all([
+    readDurationHistory(),
+    listBehaviorAdvisorEstimates(caller.client, caller.user.id, behaviors.filter((behavior) => behavior.active !== false).map((behavior) => behavior.id)),
   ]);
-  const [historyOccurrences, historySessions] = await readDurationHistory();
-  const durationEstimates = behaviorDurationEstimates(historyOccurrences, historySessions, behaviors, now, timezone);
+  const advisorEstimates = validAdvisorDurationEstimates(behaviors, advisorEstimateRows);
+  const durationEstimates = behaviorDurationEstimates(historyOccurrences, historySessions, behaviors, now, timezone, advisorEstimates);
   const occurrenceRevisions = occurrenceRouteRevision(behaviorOccurrences);
   const durationRevision = travelDurationRevision(historyOccurrences, historySessions);
   const deadline = AbortSignal.timeout(45_000);
@@ -539,12 +545,39 @@ function sameCalendarRevisions(left: readonly NormalizedExternalEvent[], right: 
   return JSON.stringify(revisions(left)) === JSON.stringify(revisions(right));
 }
 
+function validAdvisorDurationEstimates(
+  behaviors: Awaited<ReturnType<typeof listUserBehaviors>>,
+  rows: Awaited<ReturnType<typeof listBehaviorAdvisorEstimates>>,
+): Record<string, number> {
+  if (rows.length === 0) return {};
+  const hashByBehavior = new Map(
+    behaviors
+      .filter((behavior) => behavior.active !== false && typeof behavior.title === "string")
+      .map((behavior) => [
+        behavior.id,
+        behaviorEstimateInputHash({
+          title: behavior.title,
+          description: behavior.description ?? null,
+          whereKind: behavior.where_kind ?? null,
+        }),
+      ]),
+  );
+  const estimates: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.duration_minutes != null && row.input_hash === hashByBehavior.get(row.behavior_id)) {
+      estimates[row.behavior_id] = row.duration_minutes;
+    }
+  }
+  return estimates;
+}
+
 function behaviorDurationEstimates(
   occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>,
   sessions: Awaited<ReturnType<typeof listTimeSessionHistory>>,
   behaviors: Awaited<ReturnType<typeof listUserBehaviors>>,
   now: Temporal.Instant,
   timezone: string,
+  advisorEstimates: Readonly<Record<string, number>> = {},
 ): ReadonlyMap<string, BehaviorDurationEstimate> {
   const sessionsByOccurrence = new Map<string, typeof sessions>();
   for (const session of sessions) {
@@ -562,6 +595,7 @@ function behaviorDurationEstimates(
   }));
   return new Map(behaviors.map((behavior) => [behavior.id, resolveBehaviorDurationEstimate({
     behaviorId: behavior.id, defaultDurationMinutes: behavior.default_duration_minutes,
+    descriptionEstimateMinutes: advisorEstimates[behavior.id] ?? null,
     occurrences: history, now, timezone,
   })]));
 }

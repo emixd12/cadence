@@ -28,11 +28,11 @@
       "component": 71,
       "family": 16,
       "feature": 36,
-      "file": 344,
+      "file": 345,
       "interaction": 231,
       "journey": 29,
       "mcp-tool": 26,
-      "notice": 131,
+      "notice": 137,
       "repository": 48,
       "route": 77,
       "service": 215,
@@ -44,7 +44,7 @@
     },
     "links": {
       "aliases (asserted)": 28,
-      "belongs-to (asserted)": 206,
+      "belongs-to (asserted)": 212,
       "calls (derived)": 679,
       "contains (asserted)": 588,
       "defined-in (asserted)": 630,
@@ -55,12 +55,12 @@
       "on (asserted)": 629,
       "relates-to (asserted)": 564,
       "renders (asserted)": 2,
-      "renders (derived)": 243,
-      "shown-by (asserted)": 173,
-      "shows (derived)": 165,
-      "styled-by (derived)": 510,
+      "renders (derived)": 244,
+      "shown-by (asserted)": 179,
+      "shows (derived)": 172,
+      "styled-by (derived)": 516,
       "tested-by (asserted)": 595,
-      "uses (derived)": 1787
+      "uses (derived)": 1791
     }
   },
   "nodes": [
@@ -3503,6 +3503,13 @@
       "kind": "file",
       "name": "components/timeline/ExternalEventDetails.tsx",
       "path": "components/timeline/ExternalEventDetails.tsx",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/timeline/InlineDurationControl.tsx",
+      "kind": "file",
+      "name": "components/timeline/InlineDurationControl.tsx",
+      "path": "components/timeline/InlineDurationControl.tsx",
       "source": "repository file"
     },
     {
@@ -9249,6 +9256,90 @@
         "mac"
       ],
       "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked"
+    },
+    {
+      "id": "notice:timeline.duration-choose-behavior",
+      "kind": "notice",
+      "name": "timeline.duration-choose-behavior",
+      "meaning": "Says the inline default-duration form was submitted without a Behavior.",
+      "text": "Choose a Behavior first.",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-choose-behavior"
+    },
+    {
+      "id": "notice:timeline.duration-invalid-minutes",
+      "kind": "notice",
+      "name": "timeline.duration-invalid-minutes",
+      "meaning": "Says the inline default-duration input needs a whole number of minutes from 1 to 1,440.",
+      "text": "Enter a whole number from 1 to 1,440 minutes.",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-invalid-minutes"
+    },
+    {
+      "id": "notice:timeline.duration-revision-changed",
+      "kind": "notice",
+      "name": "timeline.duration-revision-changed",
+      "meaning": "Says the Behavior changed elsewhere while saving its default duration.",
+      "text": "This Behavior was just updated. Try saving again.",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-revision-changed"
+    },
+    {
+      "id": "notice:timeline.duration-save-failed",
+      "kind": "notice",
+      "name": "timeline.duration-save-failed",
+      "meaning": "Says saving the Behavior's default duration failed.",
+      "text": "Unable to save duration.",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-save-failed"
+    },
+    {
+      "id": "notice:timeline.duration-saved",
+      "kind": "notice",
+      "name": "timeline.duration-saved",
+      "meaning": "Confirms the Behavior's default duration was saved from the Timeline row.",
+      "text": "Default duration saved.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-saved"
+    },
+    {
+      "id": "notice:timeline.duration-unavailable",
+      "kind": "notice",
+      "name": "timeline.duration-unavailable",
+      "meaning": "Says the Behavior whose default duration is being set is no longer available.",
+      "text": "This Behavior is no longer available.",
+      "style": "error",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web"
+      ],
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-unavailable"
     },
     {
       "id": "notice:timeline.left-to-decide",
@@ -24794,6 +24885,34 @@
     },
     {
       "from": "file:app/(app)/timeline/actions.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-choose-behavior",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#timeline.duration-choose-behavior"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-invalid-minutes",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#timeline.duration-invalid-minutes"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-save-failed",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#timeline.duration-save-failed"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-saved",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#timeline.duration-saved"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
       "type": "uses",
       "to": "service:lib/services/day-note.service.ts",
       "grade": "derived",
@@ -24812,6 +24931,13 @@
       "to": "service:lib/services/time-tracking.service.ts",
       "grade": "derived",
       "source": "scan:app/(app)/timeline/actions.ts#lib/services/time-tracking.service.ts"
+    },
+    {
+      "from": "file:app/(app)/timeline/actions.ts",
+      "type": "uses",
+      "to": "service:lib/services/timeline.service.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/timeline/actions.ts#lib/services/timeline.service.ts"
     },
     {
       "from": "file:app/(app)/timeline/mark-detail-actions.ts",
@@ -32582,6 +32708,13 @@
       "to": "service:packages/core/src/services/travel-refresh-policy.ts",
       "grade": "derived",
       "source": "scan:components/timeline/ExternalEventDetails.tsx#packages/core/src/services/travel-refresh-policy.ts"
+    },
+    {
+      "from": "file:components/timeline/InlineDurationControl.tsx",
+      "type": "renders",
+      "to": "component:module.notice",
+      "grade": "derived",
+      "source": "scan:components/timeline/InlineDurationControl.tsx#Notice"
     },
     {
       "from": "file:components/timeline/MobileTimelinePullToRefresh.tsx",
@@ -56013,6 +56146,132 @@
       "source": "packages/core/src/notices/catalog/sub-behaviors.json#sub-behaviors.routine-marked/style/outcome"
     },
     {
+      "from": "notice:timeline.duration-choose-behavior",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-choose-behavior/feature"
+    },
+    {
+      "from": "notice:timeline.duration-choose-behavior",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-choose-behavior/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-choose-behavior",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-choose-behavior/style/error"
+    },
+    {
+      "from": "notice:timeline.duration-invalid-minutes",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-invalid-minutes/feature"
+    },
+    {
+      "from": "notice:timeline.duration-invalid-minutes",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-invalid-minutes/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-invalid-minutes",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-invalid-minutes/style/error"
+    },
+    {
+      "from": "notice:timeline.duration-revision-changed",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-revision-changed/feature"
+    },
+    {
+      "from": "notice:timeline.duration-revision-changed",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-revision-changed/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-revision-changed",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-revision-changed/style/error"
+    },
+    {
+      "from": "notice:timeline.duration-save-failed",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-save-failed/feature"
+    },
+    {
+      "from": "notice:timeline.duration-save-failed",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-save-failed/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-save-failed",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-save-failed/style/error"
+    },
+    {
+      "from": "notice:timeline.duration-saved",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-saved/feature"
+    },
+    {
+      "from": "notice:timeline.duration-saved",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-saved/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-saved",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-saved/style/outcome"
+    },
+    {
+      "from": "notice:timeline.duration-unavailable",
+      "type": "belongs-to",
+      "to": "feature:timeline",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-unavailable/feature"
+    },
+    {
+      "from": "notice:timeline.duration-unavailable",
+      "type": "shown-by",
+      "to": "interaction:INT-BEHAVIOR-030",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-unavailable/interactions/INT-BEHAVIOR-030"
+    },
+    {
+      "from": "notice:timeline.duration-unavailable",
+      "type": "styled-by",
+      "to": "token:--alert-signal",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/timeline.json#timeline.duration-unavailable/style/error"
+    },
+    {
       "from": "notice:timeline.left-to-decide",
       "type": "belongs-to",
       "to": "feature:needs-decision",
@@ -56452,6 +56711,13 @@
       "to": "service:lib/services/performance-timing.ts",
       "grade": "derived",
       "source": "scan:lib/db/behaviors.repo.ts#lib/services/performance-timing.ts"
+    },
+    {
+      "from": "repository:lib/db/behaviors.repo.ts",
+      "type": "uses",
+      "to": "table:behavior_advisor_estimates",
+      "grade": "derived",
+      "source": "scan:lib/db/behaviors.repo.ts#from(behavior_advisor_estimates)"
     },
     {
       "from": "repository:lib/db/behaviors.repo.ts",
@@ -64589,6 +64855,27 @@
     },
     {
       "from": "service:lib/services/timeline.service.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-revision-changed",
+      "grade": "derived",
+      "source": "scan:lib/services/timeline.service.ts#timeline.duration-revision-changed"
+    },
+    {
+      "from": "service:lib/services/timeline.service.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-save-failed",
+      "grade": "derived",
+      "source": "scan:lib/services/timeline.service.ts#timeline.duration-save-failed"
+    },
+    {
+      "from": "service:lib/services/timeline.service.ts",
+      "type": "shows",
+      "to": "notice:timeline.duration-unavailable",
+      "grade": "derived",
+      "source": "scan:lib/services/timeline.service.ts#timeline.duration-unavailable"
+    },
+    {
+      "from": "service:lib/services/timeline.service.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviorLogImports.repo.ts",
       "grade": "derived",
@@ -64663,6 +64950,13 @@
       "to": "repository:lib/db/timeSessions.repo.ts",
       "grade": "derived",
       "source": "scan:lib/services/timeline.service.ts#lib/db/timeSessions.repo.ts"
+    },
+    {
+      "from": "service:lib/services/timeline.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/brief-move-day.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/timeline.service.ts#lib/services/brief-move-day.service.ts"
     },
     {
       "from": "service:lib/services/timeline.service.ts",
@@ -64859,6 +65153,13 @@
       "to": "repository:lib/db/travelSpend.repo.ts",
       "grade": "derived",
       "source": "scan:lib/services/travel-route-refresh.service.ts#lib/db/travelSpend.repo.ts"
+    },
+    {
+      "from": "service:lib/services/travel-route-refresh.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/brief-move-day.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/travel-route-refresh.service.ts#lib/services/brief-move-day.service.ts"
     },
     {
       "from": "service:lib/services/travel-route-refresh.service.ts",
@@ -73430,6 +73731,7 @@
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefMoveLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefOpportunityLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/DailyBriefBubble.tsx",
+      "found in code, missing from design-system.usage.json: module.notice in components/timeline/InlineDurationControl.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/MoveConflictNotices.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/OccurrenceMoves.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/OpportunityBasket.tsx",

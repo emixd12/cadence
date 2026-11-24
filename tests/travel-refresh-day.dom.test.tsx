@@ -23,9 +23,20 @@ vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarCo
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud, getIcloudCalendarEvents: mocks.icloudEvents }));
 vi.mock("@/lib/db/travelSpend.repo", async (load) => ({ ...(await load<Record<string, unknown>>()), reserveTravelProviderSpend: mocks.spend, readTravelMonthSpend: mocks.monthSpend }));
 vi.mock("@/lib/db/travelPlaceCache.repo", () => ({ readTravelPlaceCache: mocks.readPlaces, writeTravelPlaceCache: mocks.writePlaces }));
-vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.occurrences }));
+vi.mock("@/lib/db/occurrences.repo", () => ({
+  listOccurrencesBetweenLocalDates: mocks.occurrences,
+  listOccurrencesByIds: vi.fn(async (client: unknown, userId: unknown, ids: readonly string[]) => {
+    if (!ids.length) return [];
+    const rows = await mocks.occurrences(client, userId, "0001-01-01", "9999-12-31");
+    return Array.isArray(rows) ? rows.filter((row: { id: string }) => ids.includes(row.id)) : [];
+  }),
+}));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
-vi.mock("@/lib/db/behaviors.repo", () => ({ listUserBehaviors: mocks.behaviors, getProfileTimezone: mocks.timezone }));
+vi.mock("@/lib/db/behaviors.repo", () => ({
+  listUserBehaviors: mocks.behaviors,
+  getProfileTimezone: mocks.timezone,
+  listBehaviorAdvisorEstimates: vi.fn(async () => []),
+}));
 vi.mock("@/lib/services/travel-provider", async (load) => ({ ...(await load<Record<string, unknown>>()), geocodeGoogleAddress: mocks.geocode }));
 vi.mock("@/lib/services/weather-forecast.service", () => ({ readTravelWeather: mocks.weather }));
 vi.mock("@/lib/services/travel-routing.service", async (load) => ({ ...(await load<Record<string, unknown>>()), routeTravelLegs: mocks.route }));

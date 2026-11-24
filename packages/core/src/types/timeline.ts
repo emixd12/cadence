@@ -1,6 +1,7 @@
 import type { OccurrenceOrigin, OpportunityAddedBy } from "./database";
 import type { BehaviorWhereKind } from "./behavior";
 import type { BehaviorDurationEstimate } from "./day-progress";
+import type { NoticeId } from "../notices";
 import type { ParentSlotRollup } from "./sub-behavior";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
@@ -288,4 +289,11 @@ export type TimeTrackingActionState = Readonly<{
   message: string;
   tracking?: TimelineTimeTrackingView;
   requestId?: string;
+}>;
+
+export type DefaultDurationActionState = Readonly<{
+  status: "idle" | "success" | "error";
+  message: string;
+  noticeId?: NoticeId;
+  minutes?: number;
 }>;

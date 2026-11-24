@@ -23,7 +23,7 @@ it("loads the visible window and prior unresolved occurrences with bounded durat
     profileId: "owner", startLocalDate: "2026-08-30", endLocalDate: "2026-09-29",
   });
   expect(mocks.command).toHaveBeenCalledWith("readOccurrences", {
-    profileId: "owner", startLocalDate: "2026-06-01", endLocalDate: "2026-08-29",
+    profileId: "owner", startLocalDate: "0001-01-01", endLocalDate: "2026-08-29",
   });
   expect(mocks.command).toHaveBeenCalledWith("readOccurrences", {
     profileId: "owner", startLocalDate: "0001-01-01", endLocalDate: "2026-08-29", status: "unresolved",
