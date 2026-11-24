@@ -19831,3 +19831,42 @@ Messaging impact: one `docs/MESSAGING_CHANGES.md` entry at step 8, for the sourc
 Privacy and Terms.
 
 Execution evidence: a dated record under `docs/qa/`, written at the transfer.
+
+## Ticket 351: Auto-stop running time-tracking session when marking an Occurrence Completed
+
+Status: complete in source on November 23, 2026; awaiting hosted migration push and next Mac release.
+Owner decision: `docs/DECISIONS.md`, 2026-11-23, "Marking an Occurrence Completed stops its running timer".
+
+Goal: When a user marks an Occurrence `Completed` while a time-tracking session is running
+on that Occurrence, automatically stop that session in the same atomic transaction so the
+completed duration is recorded instead of being silently dropped from `Average tracked time`
+and duration estimates.
+
+Requirements:
+
+- Transitioning an Occurrence from `unresolved` or `not_completed` to `completed` stops
+  any running `occurrence_time_sessions` row (`stopped_at IS NULL`) on that Occurrence at
+  `greatest(started_at, status_marked_at)`.
+- Applies uniformly to single-occurrence marks, routine bulk marks
+  (`apply_parent_slot_status_transition`), and MCP `set_occurrence_status` through
+  `apply_occurrence_status_transition` (Postgres) and `occurrence::status` (desktop SQLite).
+- Transitioning to `not_completed` or `unresolved`, or reapplying an unchanged `completed`
+  status, leaves any running session untouched.
+- Stopping a timer manually still never changes status, `completed_at`, `status_marked_at`,
+  status history, notes, or reminders.
+- `TimeTracker` immediately reflects externally stopped `tracking` props after refresh so a
+  running counter stops ticking when the row is marked `Completed`.
+- No retroactive backfill of existing completed occurrences with running sessions.
+- Pure resolver helper `resolveStopTimeTrackingOnStatusTransition` in
+  `packages/core/src/resolvers/time-tracking.resolver.ts` with paired unit tests.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Implemented in `supabase/migrations/20261123183000_auto_stop_time_session_on_completed.sql`, `packages/core/src/resolvers/time-tracking.resolver.ts`, and `components/timeline/TimeTracker.tsx`. Hosted migration push required for production. |
+| Desktop | Implemented in `apps/desktop/src-tauri/src/local_store/occurrence.rs` (shared by `sub_behavior::parent_slot_status`) and shared `TimeTracker.tsx`; ships with the next Cadence for Mac release. |
+| Marketing | Not applicable: no marketing claim or copy changes. |
+| Future mobile | Deferred (no mobile track active); future mobile inherits the shared core resolver rule. |
+
+Messaging impact: none.

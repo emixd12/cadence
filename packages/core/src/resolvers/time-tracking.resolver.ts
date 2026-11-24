@@ -18,6 +18,15 @@ export type StopTimeTrackingPlan =
     }>
   | Readonly<{ kind: "already_stopped"; session: TimeSession | null }>;
 
+export type StatusTransitionTimeTrackingStopPlan =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{
+      kind: "stop";
+      sessionId: string;
+      stoppedAt: string;
+      durationSeconds: number;
+    }>;
+
 export type ResetTimeTrackingPlan = Readonly<{
   sessionIds: string[];
   hasSessions: boolean;
@@ -92,6 +101,46 @@ export function resolveStopTimeTracking(input: Readonly<{
     sessionId: runningSession.id,
     stoppedAt: input.now.toString(),
     durationSeconds,
+  };
+}
+
+/**
+ * Ticket 351 (owner decision 2026-11-23): transitioning an Occurrence to Completed
+ * stops any running time-tracking session on that Occurrence at `statusMarkedAt`
+ * (clamped to `startedAt` if clock skew puts `statusMarkedAt` earlier). Not Completed,
+ * Unresolved, and unchanged Completed transitions leave running sessions untouched.
+ */
+export function resolveStopTimeTrackingOnStatusTransition(input: Readonly<{
+  previousStatus: "unresolved" | "completed" | "not_completed";
+  nextStatus: "unresolved" | "completed" | "not_completed";
+  sessions: TimeSession[];
+  statusMarkedAt: string | null;
+}>): StatusTransitionTimeTrackingStopPlan {
+  if (
+    input.nextStatus !== "completed" ||
+    input.previousStatus === "completed" ||
+    !input.statusMarkedAt
+  ) {
+    return { kind: "none" };
+  }
+
+  const tracking = resolveOccurrenceTimeTracking(input.sessions);
+  const runningSession = tracking.runningSession;
+
+  if (!runningSession) {
+    return { kind: "none" };
+  }
+
+  const startedAt = parseInstant(runningSession.startedAt, "started_at");
+  const markedAt = parseInstant(input.statusMarkedAt, "stopped_at");
+  const stoppedAt =
+    Temporal.Instant.compare(markedAt, startedAt) < 0 ? startedAt : markedAt;
+
+  return {
+    kind: "stop",
+    sessionId: runningSession.id,
+    stoppedAt: stoppedAt.toString(),
+    durationSeconds: durationSecondsBetween(startedAt, stoppedAt),
   };
 }
 

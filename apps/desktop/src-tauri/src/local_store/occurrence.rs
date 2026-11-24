@@ -480,6 +480,30 @@ pub fn status(db: &Connection, request: &Request) -> Result<Value> {
         db.execute("UPDATE reminder_deliveries SET status='cancelled',error=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status='pending'",params![profile_id,occurrence_id,now]).map_err(error)?;
         db.execute("UPDATE native_reminder_state SET status='cancelled',error=NULL,verified_at=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status IN ('planned','scheduled')",params![profile_id,occurrence_id,now]).map_err(error)?;
     }
+    if changed && status == "completed" {
+        // Ticket 351: transitioning to Completed stops any running time session at status_marked_at.
+        if let Some(marked_at) = status_marked_at.as_deref() {
+            let running_sessions = db::read::<OccurrenceTimeSession>(
+                db,
+                "SELECT * FROM occurrence_time_sessions WHERE user_id=?1 AND occurrence_id=?2 AND stopped_at IS NULL",
+                &[
+                    profile_id.to_string().into(),
+                    occurrence_id.to_string().into(),
+                ],
+            )?;
+            let marked_key = db::instant_key(marked_at)?;
+            for mut session in running_sessions {
+                let stopped_at = if marked_key < db::instant_key(&session.started_at)? {
+                    session.started_at.clone()
+                } else {
+                    marked_at.to_string()
+                };
+                session.stopped_at = Some(stopped_at);
+                session.updated_at = now.clone();
+                db::update(db, profile_id, &session.id, &session)?;
+            }
+        }
+    }
     Ok(
         json!({"statusChanged":changed,"concurrentDuplicate":false,"occurrence":current,"statusEvent":event}),
     )

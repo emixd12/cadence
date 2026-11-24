@@ -473,8 +473,11 @@ Start is unavailable for future local dates, archived behaviors, and prior
 resolved occurrences no longer retained in Needs decision. Stop and reset remain
 available after midnight for an earlier valid start. None of these controls
 marks a status, changes a note, affects adherence, or changes reminder
-eligibility. The counter is display-only; saved duration always uses server-side
-persisted instants.
+eligibility. Conversely, transitioning an occurrence to Completed automatically
+stops any running session on that occurrence at `status_marked_at` (Ticket 351),
+while Not Completed, Unresolved, and unchanged Completed transitions leave
+running sessions untouched. The counter is display-only; saved duration always
+uses server-side persisted instants.
 
 BehaviorLog imports may fill this occurrence Note field only when an accepted
 import plan identifies the target occurrence safely, the imported note is not

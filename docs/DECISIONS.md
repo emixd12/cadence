@@ -2951,3 +2951,26 @@ be adapted right away, and asked for a quick production deployment of the update
 Platform impact: web on merge; Mac in its next release (shared components and files, not
 checked on an installed Mac); marketing not applicable; future mobile reads the same
 catalog. Messaging impact: none.
+
+## 2026-11-23: Marking an Occurrence Completed stops its running timer
+
+Owner decision on November 23, 2026 (Ticket 351):
+
+- **Completed auto-stops a running session.** Transitioning an Occurrence to `completed`
+  (from `unresolved` or `not_completed`, including routine bulk marks and MCP) atomically
+  stops any running `occurrence_time_sessions` row on that Occurrence at
+  `status_marked_at` (clamped to `started_at` on clock skew).
+- **Not Completed and Unresolved do not.** `not_completed` marks the behavior as not done,
+  so it cannot carry a completion time; `unresolved` and unchanged `completed` re-marks
+  also leave running sessions untouched.
+- **One-way coupling stays.** Stopping a timer manually still never changes status,
+  timestamps, status history, notes, or reminders. Starting a new timer after marking
+  `completed` remains allowed on today's occurrences and same-day retained Needs decision
+  rows.
+- **No backfill.** Existing already-completed occurrences with running sessions are not
+  retroactively stopped by the migration.
+
+Platform impact: web implemented (Postgres `apply_occurrence_status_transition`,
+`TimeTracker` refresh sync); desktop implemented (`apps/desktop/src-tauri/src/local_store/occurrence.rs`,
+ships in the next Mac release); marketing not applicable; future mobile inherits the same
+core rule. Messaging impact: none.
