@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ADVISOR_RECENT_TIPS, type AdvisorTip, type AdvisorTipReaction, type AdvisorTipResearch } from "@cadence/core/types/advisor-tips";
 import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
 
@@ -274,15 +274,28 @@ export function AdvisorPanel() {
 function AdvisorPanelContent() {
   const advisor = useAdvisor();
   const [pastTipsOpen, setPastTipsOpen] = useState(false);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const pastTipsButtonRef = useRef<HTMLButtonElement>(null);
+  const previousPastTipsOpen = useRef(false);
+  const pastCount = advisor?.recent?.length ?? 0;
+  const showPastTipsView = pastTipsOpen && pastCount > 0;
+
+  useEffect(() => {
+    if (showPastTipsView && !previousPastTipsOpen.current) {
+      backButtonRef.current?.focus();
+    } else if (!showPastTipsView && previousPastTipsOpen.current) {
+      pastTipsButtonRef.current?.focus();
+    }
+    previousPastTipsOpen.current = showPastTipsView;
+  }, [showPastTipsView]);
+
   if (!advisor) return null;
   const { brief, proposal, tip, recent, chatHref, closePanel } = advisor;
   const view = proposal?.view;
-  const pastCount = recent?.length ?? 0;
   const showTodayTip = Boolean(tip && !(view?.kind === "proposal" && tip.tip.proposalId && tip.tip.proposalId === view.proposalId));
-  const showPastTipsView = pastTipsOpen && pastCount > 0;
   const pastTipsButton = pastCount > 0 ? (
     <p className={showTodayTip ? "mt-3" : undefined}>
-      <button type="button" className={LINK} onClick={() => setPastTipsOpen(true)} data-advisor-past-tips-open>
+      <button ref={pastTipsButtonRef} type="button" className={LINK} onClick={() => setPastTipsOpen(true)} data-advisor-past-tips-open>
         See past tips ({pastCount})
       </button>
     </p>
@@ -299,7 +312,7 @@ function AdvisorPanelContent() {
       <div className="mx-auto max-w-xl">
         <div className={showPastTipsView ? "flex items-center justify-between" : "flex justify-end"}>
           {showPastTipsView ? (
-            <button type="button" onClick={() => setPastTipsOpen(false)}
+            <button ref={backButtonRef} type="button" onClick={() => setPastTipsOpen(false)}
               className="min-h-11 text-left text-muted-readable underline underline-offset-2 hover:text-foreground"
               data-advisor-past-tips-back>
               <span className="text-sm">← Back</span>

@@ -140,10 +140,11 @@ describe("advisor placement K", () => {
     // The line under the date steps aside while the panel is open.
     expect(line()).toBeNull();
 
-    // Open the Past tips drill-down, expand a research card, and return with Back.
+    // Open the Past tips drill-down, verify focus moves to Back, expand a research card, and return with Escape and Back.
     await click("See past tips (2)", panel()!);
     const past = panel()!.querySelector<HTMLElement>("[data-advisor-past-tips]");
     expect(past).not.toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-back]"));
     expect(past!.textContent).toContain("Past tips");
     expect(past!.textContent).toContain("Tips shown in the last 7 days.");
     expect(past!.textContent).toContain("Saved as helpful.");
@@ -151,8 +152,20 @@ describe("advisor placement K", () => {
     expect(firstPast).not.toBeNull();
     await click("Why this?", firstPast!);
     expect(firstPast!.querySelector("[data-advisor-card]")).not.toBeNull();
+
+    // Pressing Escape in Past tips returns to the main panel and restores focus to See past tips.
+    await act(async () => {
+      document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(panel()!.querySelector("[data-advisor-past-tips]")).toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-open]"));
+
+    // Returning via ← Back also restores focus to See past tips.
+    await click("See past tips (2)", panel()!);
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-back]"));
     await click("← Back", panel()!);
     expect(panel()!.querySelector("[data-advisor-past-tips]")).toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-open]"));
     expect(panel()!.textContent).toContain("Today’s tip");
 
     await click("Close", panel()!);
