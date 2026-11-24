@@ -67,7 +67,7 @@ Check the cited entry before acting on a row.
 | Mac leave reminders for newly added Calendar events | PR #198 in 0.1.10; installed run on November 12 inconclusive (event too close to plan a reminder) | Rerun on the test Mac with an event at least two hours ahead | STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026" |
 | Updater key rotation and new Developer ID identity | 0.1.10 published November 12, 05:29–05:33Z, with the rotated key and new identity; 0.1.9 and earlier install it by hand once | Renew the certificate before December 11, 2027. PR #241 and PR #243 shipped dormant in 0.1.11 after ordinary installed acceptance | DECISIONS, 2026-11-11; STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026"; release packet, "PR review follow-up" |
 | Ticket 325: release credential backup and restore | Identity, notarization-password and updater backups verified November 12; API-key backup and checks recorded as passed in `dd4cb67b`; notarization uses the API key (0.1.10) | Certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026"; 0.1.10 release packet |
-| Cadence for Mac 0.1.14 | Published November 21, 2026, 06:36Z (0.1.13 at 01:59Z): schema 27, contract 8, Behaviors of Opportunity; real-updater upgrade and Opportunity round trip passed on the test Mac | Owner signs Cadence on the owner's Mac in to check contract 8 sync there; earlier linked Macs cannot sync until they update; macOS 14 not tested | `docs/qa/2026-11-21-desktop-0.1.14-release-packet.md` |
+| Cadence for Mac 0.1.15 | Published November 24, 2026, 04:49Z (Nov 23, 23:49 EST): schema 28, contract 9, Sub-behaviors (Ticket 349), Advisor avatar (Tickets 343–346), Ticket 341, Ticket 351, PR #369 duration context; real-updater upgrade (`0.1.14` → `0.1.15`) and public readback passed on `test-mac` | 1-hour session renewal & revoked-session check for `@supabase/supabase-js` 2.119.0 deferred; macOS 14 not tested | `docs/qa/2026-11-23-desktop-0.1.15-release-packet.md` |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
@@ -96,6 +96,25 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Cadence for Mac 0.1.15 published — November 23, 2026
+
+- **Published November 24, 04:49Z (Nov 23, 23:49 EST)** on the owner's instruction. Version
+  bump PR #370 (`6e468d72`); notarized (`6cd35997-0ad9-4d69-8288-656776dc5a0f`, DMG
+  `67f0672d…`), 14 artifact checks, quarantined download checks, and public readback all
+  passed. Batched Sub-behaviors / SQLite schema 28 / contract 9 (PR #354), Advisor avatar
+  updates (PRs #357, #360, #361, #364), Ticket 341 (PR #359), Ticket 351 auto-stop timer
+  on Completed (PR #368, hosted migration `20261123183000` live), PR #369 duration context
+  + `InlineDurationControl`, and Trust/tooling fixes.
+- **Test Mac (`test-mac`):** `0.1.14` updated through the real updater (**Check for updates**
+  → **Install update** → **Restart Cadence**); schema 27 → 28, integrity `ok`, 0 FK errors,
+  profile kept, 73 Behaviors / 257 Occurrences preserved, launch sync succeeded at
+  `04:48:30Z` with 0 pending (`acceptance-20261124T044832Z.json`).
+- **Release packet:** `docs/qa/2026-11-23-desktop-0.1.15-release-packet.md`.
+
+Platform impact: desktop published (`desktop-stable` and `desktop-preview` feeds, version-free
+`Cadence_aarch64.dmg`); web already live on `main`; marketing download link points at
+`Cadence_aarch64.dmg` (no site rebuild needed); future mobile deferred. Messaging impact: none.
 
 ## Ticket 351: Auto-stop running time-tracking session on Completed — November 23, 2026
 
