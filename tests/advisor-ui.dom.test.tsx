@@ -126,7 +126,7 @@ describe("advisor placement K", () => {
     expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
   });
 
-  it("opens the panel with the full tip, the trial and earlier tips, and closes it", async () => {
+  it("opens the panel with the full tip, the trial and a Past tips drill-down, and closes it", async () => {
     await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_TRIAL }));
     await click("Advisor · 1 new");
     expect(panel()).not.toBeNull();
@@ -135,11 +135,51 @@ describe("advisor placement K", () => {
     expect(text).toContain("Don’t suggest this again");
     expect(text).toContain("Trying for two weeks");
     expect(text).toContain("Read at 9:00 PM every day");
-    expect(text).toContain("Earlier");
-    expect(text).toContain("Saved as helpful.");
+    expect(text).toContain("See past tips (2)");
+    expect(text).not.toContain("Saved as helpful.");
     // The line under the date steps aside while the panel is open.
     expect(line()).toBeNull();
+
+    // Open the Past tips drill-down, verify focus moves to Back, expand a research card, and return with Escape and Back.
+    await click("See past tips (2)", panel()!);
+    const past = panel()!.querySelector<HTMLElement>("[data-advisor-past-tips]");
+    expect(past).not.toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-back]"));
+    expect(past!.textContent).toContain("Past tips");
+    expect(past!.textContent).toContain("Tips shown in the last 7 days.");
+    expect(past!.textContent).toContain("Saved as helpful.");
+    const firstPast = past!.querySelector<HTMLElement>("[data-advisor-past-tip]");
+    expect(firstPast).not.toBeNull();
+    await click("Why this?", firstPast!);
+    expect(firstPast!.querySelector("[data-advisor-card]")).not.toBeNull();
+
+    // Pressing Escape in Past tips returns to the main panel and restores focus to See past tips.
+    await act(async () => {
+      document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(panel()!.querySelector("[data-advisor-past-tips]")).toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-open]"));
+
+    // Returning via ← Back also restores focus to See past tips.
+    await click("See past tips (2)", panel()!);
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-back]"));
+    await click("← Back", panel()!);
+    expect(panel()!.querySelector("[data-advisor-past-tips]")).toBeNull();
+    expect(document.activeElement).toBe(panel()!.querySelector("[data-advisor-past-tips-open]"));
+    expect(panel()!.textContent).toContain("Today’s tip");
+
     await click("Close", panel()!);
+    expect(panel()).toBeNull();
+  });
+
+  it("shows Past tips even without a tip today and follows a past tip's action link", async () => {
+    const opened = vi.fn<(link: AdvisorTipLink) => void>();
+    await render(fixtureAdvisorClient({ tip: null, recent: [ADVISOR_FIXTURE_LINK_TIP] }), undefined, opened);
+    await click("Advisor");
+    expect(panel()!.textContent).toContain("See past tips (1)");
+    await click("See past tips (1)", panel()!);
+    await click("Set a length", panel()!);
+    expect(opened).toHaveBeenCalledWith(ADVISOR_FIXTURE_LINK_TIP.link);
     expect(panel()).toBeNull();
   });
 
