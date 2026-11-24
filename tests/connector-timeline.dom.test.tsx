@@ -77,12 +77,14 @@ async function render(view: TimelineView = timeline()) {
 }
 
 describe("live connector Timeline", () => {
-  it("shows Outlook events while a Hevy failure stays in its own line", async () => {
+  it("shows Outlook events while a Hevy failure stays off the Timeline header", async () => {
     await render();
     await vi.waitFor(() => expect(container.querySelector('[data-calendar-node="outlook_calendar/calendar-1/timed-1"]')).not.toBeNull());
     await act(async () => { observers.forEach((callback) => callback()); await Promise.resolve(); });
-    await vi.waitFor(() => expect(container.textContent).toContain("Hevy workouts could not refresh: timeout."));
     expect(container.querySelector('[data-calendar-node="outlook_calendar/calendar-1/timed-1"]')?.getAttribute("aria-label")).toBe("Preview Outlook Calendar event: Planning review");
+    // Hevy does not render a dedicated connector banner/status line above the Timeline.
+    expect(container.querySelector("[data-recorded-activity]")).toBeNull();
+    expect(container.textContent).not.toContain("Recorded activity");
     // Google is unused here, so its "not connected" line does not crowd the Timeline.
     expect(container.textContent).not.toContain("Calendar is not connected.");
     expect(container.querySelector('article[data-occurrence-id="occurrence-1"]')).not.toBeNull();
@@ -91,13 +93,14 @@ describe("live connector Timeline", () => {
     await expect(reloadWebTimelineConnectors()).resolves.toBe(false);
   });
 
-  it("drops Outlook context and keeps Hevy when Outlook needs reconnection", async () => {
+  it("drops Outlook context when Outlook needs reconnection while Hevy stays in the background", async () => {
     routes["/api/outlook-calendar/connection"] = () => json({ ...connector("outlook_calendar"), status: "reconnect_required" });
     routes["/api/hevy/activities"] = () => json({ error: "permission_denied" }, 403);
     await render();
     await vi.waitFor(() => expect(container.textContent).toContain("Outlook Calendar needs reconnection in Settings."));
     expect(container.querySelector("[data-calendar-node]")).toBeNull();
-    await vi.waitFor(() => expect(container.textContent).toContain("Hevy workouts could not refresh: permission_denied."));
+    expect(container.querySelector("[data-recorded-activity]")).toBeNull();
+    await expect(reloadWebTimelineConnectors()).resolves.toBe(false);
   });
 });
 
