@@ -15,7 +15,7 @@ import styles from "./advisor-avatar.module.css";
 
 export type AdvisorAvatarGestureEvent = Readonly<{ id: AdvisorAvatarGesture; key: number }>;
 
-const { window: VIEW, eyes: EYES, mane: MANE_AREA, maneRoot: MANE_ROOT, ears: EARS } = advisorAvatarArt.anchors;
+const { window: VIEW, eyes: EYES, mane: MANE_AREA, maneRoot: MANE_ROOT, ears: EARS, head: HEAD } = advisorAvatarArt.anchors;
 const ART_SIZE = 1024;
 /** Above this size the mane also ripples; smaller, its strands are too fine to show it. */
 const DETAIL_FROM = 72;
@@ -47,10 +47,10 @@ function useScreenDensity(): number {
 }
 
 /** Rotates its children around a point of the drawing; CSS animates the middle group. */
-function Pivot({ x, y, className, children }: Readonly<{ x: number; y: number; className: string; children: ReactNode }>) {
+function Pivot({ x, y, className, part, children }: Readonly<{ x: number; y: number; className: string; part?: string; children: ReactNode }>) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <g className={className}>
+      <g className={className} data-avatar-part={part}>
         <g className={styles.gesture}>
           <g transform={`translate(${-x} ${-y})`}>{children}</g>
         </g>
@@ -105,6 +105,13 @@ export function AdvisorAvatar({
               {full}
               <path d={MANE_AREA} fill={`url(#${id}-weight-inverse)`} filter={`url(#${id}-soft)`} />
               {EARS.map((ear) => <path key={ear.area} d={ear.area} fill="#000" filter={`url(#${id}-soft-small)`} />)}
+              <path d={HEAD.area} fill="#000" filter={`url(#${id}-soft-small)`} />
+            </mask>
+            {/* The head without the mane and the ears, which are layers of their own. */}
+            <mask id={`${id}-head`} maskUnits="userSpaceOnUse" x="0" y="0" width={ART_SIZE} height={ART_SIZE}>
+              <path d={HEAD.area} fill="#fff" filter={`url(#${id}-soft-small)`} />
+              <path d={MANE_AREA} fill={`url(#${id}-weight-inverse)`} filter={`url(#${id}-soft)`} />
+              {EARS.map((ear) => <path key={ear.area} d={ear.area} fill="#000" filter={`url(#${id}-soft-small)`} />)}
             </mask>
             <mask id={`${id}-mane`} maskUnits="userSpaceOnUse" x="0" y="0" width={ART_SIZE} height={ART_SIZE}>
               <path d={MANE_AREA} fill={`url(#${id}-weight)`} filter={`url(#${id}-soft)`} />
@@ -130,11 +137,9 @@ export function AdvisorAvatar({
           </defs>
 
           <g mask={`url(#${id}-still)`}>{art}</g>
-          <Pivot x={MANE_ROOT.x} y={MANE_ROOT.y} className={styles.mane}>
-            <g filter={detailed ? `url(#${id}-wind)` : undefined}>
-              <g mask={`url(#${id}-mane)`}>{art}</g>
-            </g>
-          </Pivot>
+          {/* The head turns on the neck around the poll, and carries the ears and the eyelids. */}
+          <Pivot x={HEAD.pivot.x} y={HEAD.pivot.y} className={styles.head} part="head">
+          <g mask={`url(#${id}-head)`}>{art}</g>
           {EARS.map((ear, index) => (
             <Pivot key={ear.area} x={ear.pivot.x} y={ear.pivot.y} className={`${styles.ear} ${index === 0 ? styles.earNear : styles.earFar}`}>
               <g mask={`url(#${id}-ear-${index})`}>{art}</g>
@@ -159,6 +164,13 @@ export function AdvisorAvatar({
               </g>
             );
           })}
+          </Pivot>
+          {/* The mane is painted last: Chrome redraws, softly, whatever is painted after a moving layer. */}
+          <Pivot x={MANE_ROOT.x} y={MANE_ROOT.y} className={styles.mane}>
+            <g filter={detailed ? `url(#${id}-wind)` : undefined}>
+              <g mask={`url(#${id}-mane)`}>{art}</g>
+            </g>
+          </Pivot>
         </svg>
         </span>
       </span>
