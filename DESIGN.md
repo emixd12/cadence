@@ -743,13 +743,14 @@ Settings keeps the open list until Ticket 302.
 
 Timeline markers name their source in accessible labels and details. Google
 keeps its bundled provider asset; Outlook uses the neutral lucide calendar
-glyph, not provider artwork. Recorded Hevy workouts are a plain
-`RecordedActivityList` under today's date title (Workout, time range, duration,
-12px muted text and an activity glyph). They are never axis markers, overlap
-cues, or Occurrence changes. Non-Google calendar status lines reuse the
-`calendarState` style. `ConnectorBench` and the Day Progress fixture menu cover
-connected, not connected, not configured, needs reconnection, status
-unavailable, desktop local, stale, incomplete, and offline states.
+glyph, not provider artwork. Recorded Hevy workouts do not render a dedicated
+section under today's date title (decision 2026-11-24) and are never axis
+markers or overlap cues; connection status lives in Settings, while matched
+workouts appear via connector completion on linked occurrences and today's
+workouts remain available for manual counting on occurrences. Non-Google
+calendar status lines reuse the `calendarState` style. `ConnectorBench` and the
+Day Progress fixture menu cover connected, not connected, not configured, needs
+reconnection, status unavailable, desktop local, and offline states.
 
 ## Briefing workbench (Tickets 151–155)
 
