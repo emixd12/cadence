@@ -16,7 +16,7 @@ insert into public.behaviors (id, user_id, title, recurrence_rule, scheduled_tim
   ('35110000-0000-4000-8000-000000000001', '35100000-0000-4000-8000-000000000001', 'Shower', '{"type":"daily"}', '08:00', 'America/New_York'),
   ('35110000-0000-4000-8000-000000000002', '35100000-0000-4000-8000-000000000001', 'Morning routine', '{"type":"daily"}', '08:00', 'America/New_York');
 
-insert into public.behaviors (id, user_id, title, recurrence_rule, scheduled_time, timezone, parent_behavior_id, sub_behavior_order, inherit_parent_schedule) values
+insert into public.behaviors (id, user_id, title, recurrence_rule, scheduled_time, timezone, parent_behavior_id, sub_behavior_sort_order, inherit_parent_schedule) values
   ('35110000-0000-4000-8000-000000000003', '35100000-0000-4000-8000-000000000001', 'Facewash', '{"type":"daily"}', '08:00', 'America/New_York', '35110000-0000-4000-8000-000000000002', 0, true);
 
 insert into public.occurrences (id, user_id, behavior_id, scheduled_for, local_date, schedule_kind, schedule_start_time, status) values

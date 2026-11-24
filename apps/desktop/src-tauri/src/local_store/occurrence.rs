@@ -358,6 +358,7 @@ pub fn status(db: &Connection, request: &Request) -> Result<Value> {
         completed_at,
         status_marked_at,
         cancel_pending_reminders,
+        time_tracking_stop,
         event,
         ..
     } = request
@@ -480,8 +481,24 @@ pub fn status(db: &Connection, request: &Request) -> Result<Value> {
         db.execute("UPDATE reminder_deliveries SET status='cancelled',error=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status='pending'",params![profile_id,occurrence_id,now]).map_err(error)?;
         db.execute("UPDATE native_reminder_state SET status='cancelled',error=NULL,verified_at=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status IN ('planned','scheduled')",params![profile_id,occurrence_id,now]).map_err(error)?;
     }
-    if changed && status == "completed" {
-        // Ticket 351: transitioning to Completed stops any running time session at status_marked_at.
+    if let Some(plan) = time_tracking_stop {
+        if !changed || status != "completed" {
+            return Err("Time-tracking auto-stop is only allowed when transitioning to Completed.".into());
+        }
+        let mut session: OccurrenceTimeSession = db::by_id(db, profile_id, &plan.session_id)?;
+        if session.occurrence_id != *occurrence_id {
+            return Err("The planned time session belongs to another Occurrence.".into());
+        }
+        if session.stopped_at.is_none() {
+            if db::instant_key(&plan.stopped_at)? < db::instant_key(&session.started_at)? {
+                return Err("The planned session stop instant precedes its start.".into());
+            }
+            session.stopped_at = Some(plan.stopped_at.clone());
+            session.updated_at = now.clone();
+            db::update(db, profile_id, &session.id, &session)?;
+        }
+    } else if changed && status == "completed" {
+        // Fallback guard if a running session started concurrently after TS read context.
         if let Some(marked_at) = status_marked_at.as_deref() {
             let running_sessions = db::read::<OccurrenceTimeSession>(
                 db,

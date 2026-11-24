@@ -3192,14 +3192,19 @@ fn marking_completed_auto_stops_running_time_session_only_on_completed_transitio
     let after_not_completed: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(90)).unwrap();
     assert_eq!(after_not_completed.stopped_at, None);
 
-    // Correcting Not Completed -> Completed stops the running session at status_marked_at.
-    fixture.run(status_request(&profile, "not_completed", Some(91), "completed", 92, "2026-08-31T14:12:00Z"), 503).unwrap();
+    // Correcting Not Completed -> Completed with an explicit resolver plan stops the running session.
+    let mut completed_req = status_request(&profile, "not_completed", Some(91), "completed", 92, "2026-08-31T14:12:00Z");
+    completed_req["timeTrackingStop"] = json!({"sessionId":id(90),"stoppedAt":"2026-08-31T14:12:00Z"});
+    fixture.run(completed_req, 503).unwrap();
     let after_completed: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(90)).unwrap();
     assert_eq!(after_completed.stopped_at.as_deref(), Some("2026-08-31T14:12:00Z"));
 
-    // A new timer started after Completed stays running on an unchanged Completed re-mark.
+    // A new timer started after Completed stays running on an unchanged Completed re-mark,
+    // and an explicit stop plan on an unchanged transition is rejected.
     let second = json!({"id":id(93),"user_id":profile,"occurrence_id":id(10),"behavior_id":id(1),"started_at":"2026-08-31T14:20:00Z","stopped_at":null,"created_at":"2026-08-31T14:20:00Z","updated_at":"2026-08-31T14:20:00Z"});
     fixture.run(json!({"operation":"startTimeSession","session":second}), 504).unwrap();
+    let bad_noop = json!({"operation":"applyStatusTransition","occurrenceId":id(10),"expectedStatus":"completed","expectedLatestEventId":id(92),"status":"completed","completedAt":"2026-08-31T14:12:00Z","statusMarkedAt":"2026-08-31T14:12:00Z","cancelPendingReminders":true,"timeTrackingStop":{"sessionId":id(93),"stoppedAt":"2026-08-31T14:20:00Z"},"event":null});
+    assert!(fixture.run(bad_noop, 508).unwrap_err().contains("only allowed when transitioning to Completed"));
     let noop = json!({"operation":"applyStatusTransition","occurrenceId":id(10),"expectedStatus":"completed","expectedLatestEventId":id(92),"status":"completed","completedAt":"2026-08-31T14:12:00Z","statusMarkedAt":"2026-08-31T14:12:00Z","cancelPendingReminders":true,"event":null});
     fixture.run(noop, 505).unwrap();
     let after_noop: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(93)).unwrap();
