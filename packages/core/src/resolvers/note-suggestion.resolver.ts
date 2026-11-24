@@ -12,6 +12,7 @@ const TRAILING_PUNCTUATION = /[.!?,;:]+$/u;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const onlyKeys = (value: object, keys: string[]) => Object.keys(value).every((key) => keys.includes(key));
 const compareScheduled = (a: string | null, b: string | null) => a && b ? Temporal.Instant.compare(a, b) : a ? 1 : b ? -1 : 0;
+const compareNoteSources = (a: NoteSource, b: NoteSource) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id);
 export const isDayNoteShortcutPool = (poolId: string | null): boolean => poolId === DAY_NOTE_SHORTCUT_POOL_ID;
 
 // Ticket 305: Note shortcuts are on unless the account's stored global switch says off.
@@ -56,7 +57,7 @@ export function eligibleNoteSources(input: { context: NoteShortcutContext; userI
   const lastDate = today.toString();
   const excluded = new Set([...(context.state?.excluded_occurrence_ids ?? []), ...context.importedOccurrenceIds]);
   const seen = new Set<string>();
-  return [...context.notes].sort((a, b) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id))
+  return [...context.notes].sort(compareNoteSources)
     .filter((note) => {
       if (note.user_id !== userId || note.behavior_id !== poolBehaviorId || (note.scheduled_for === null) !== Boolean(dayPool) || seen.has(note.id) || excluded.has(note.id) || note.local_date > lastDate || !note.note?.trim() || [...note.note].length > NOTE_SHORTCUT_LIMITS.sourceCharacters) return false;
       seen.add(note.id);
@@ -192,7 +193,7 @@ export function mergeModelNoteSuggestions(input: {
     const validSources = [...new Set(candidate.occurrenceIds)]
       .map((id) => sourceById.get(id))
       .filter((row): row is NoteSource => Boolean(row))
-      .sort((a, b) => compare(b.local_date, a.local_date) || compareScheduled(b.scheduled_for, a.scheduled_for) || compare(a.id, b.id));
+      .sort(compareNoteSources);
     if (validSources.length < NOTE_SHORTCUT_LIMITS.evidence) continue;
     seenModelKeys.add(key);
     const existing = existingModelByKey.get(key);
