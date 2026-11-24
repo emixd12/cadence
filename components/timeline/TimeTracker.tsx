@@ -47,7 +47,17 @@ export function TimeTracker({
     resetAction,
     IDLE_STATE,
   );
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const serverTrackingKey = `${tracking.recordedSeconds}:${tracking.runningStartedAt ?? ""}`;
+  const [keyedActiveRequest, setKeyedActiveRequest] = useState<Readonly<{
+    serverTrackingKey: string;
+    requestId: string | null;
+  }>>({ serverTrackingKey, requestId: null });
+  const activeRequestId =
+    keyedActiveRequest.serverTrackingKey === serverTrackingKey
+      ? keyedActiveRequest.requestId
+      : null;
+  const setActiveRequestId = (requestId: string) =>
+    setKeyedActiveRequest({ serverTrackingKey, requestId });
   const requestCounter = useRef(0);
   const actionState = resolveActionStateForRequest(
     activeRequestId,

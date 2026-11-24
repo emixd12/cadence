@@ -1041,7 +1041,11 @@ RLS grants select, insert, update, and delete only to the authenticated owner.
 The table cascades on occurrence or account deletion. Duration is derived from
 `stopped_at - started_at`; no mutable duration column exists. Ticket 068 adds
 no backfill and does not change occurrence, status-event, note, reminder,
-import, or export rows.
+import, or export rows. Under Ticket 351, `apply_occurrence_status_transition`
+atomically sets `stopped_at = greatest(started_at, planned_status_marked_at)` on
+any running session for the target Occurrence when a changed transition sets
+`status = 'completed'`; `not_completed`, `unresolved`, and unchanged `completed`
+transitions leave running sessions untouched.
 
 Ticket 094 adds
 `occurrence_time_sessions_user_started_id_idx (user_id, started_at, id)` for

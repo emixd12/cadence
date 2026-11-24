@@ -3175,3 +3175,47 @@ fn account_sync_round_trips_a_routine_child_first() {
     let stale = AccountSyncWrite { kind: Kind::Behavior, id: behaviors[0].id.clone(), operation: Op::Upsert, expected: Some(current), value: Some(legacy) };
     assert!(execute(&mut target.db, Request::ApplyAccountSync { profile_id: target_profile, writes: vec![stale] }).unwrap_err().contains("Update Cadence"));
 }
+
+#[test]
+fn marking_completed_auto_stops_running_time_session_only_on_completed_transitions() {
+    let mut fixture = Fixture::new();
+    let profile = fixture.profile.clone();
+    fixture.create();
+    fixture.occurrence();
+
+    // Start a running time session at 14:00Z.
+    let session = json!({"id":id(90),"user_id":profile,"occurrence_id":id(10),"behavior_id":id(1),"started_at":"2026-08-31T14:00:00Z","stopped_at":null,"created_at":"2026-08-31T14:00:00Z","updated_at":"2026-08-31T14:00:00Z"});
+    fixture.run(json!({"operation":"startTimeSession","session":session}), 501).unwrap();
+
+    // Not Completed leaves the running session untouched.
+    fixture.run(status_request(&profile, "unresolved", None, "not_completed", 91, "2026-08-31T14:05:00Z"), 502).unwrap();
+    let after_not_completed: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(90)).unwrap();
+    assert_eq!(after_not_completed.stopped_at, None);
+
+    // Correcting Not Completed -> Completed with an explicit resolver plan stops the running session.
+    let mut completed_req = status_request(&profile, "not_completed", Some(91), "completed", 92, "2026-08-31T14:12:00Z");
+    completed_req["timeTrackingStop"] = json!({"sessionId":id(90),"stoppedAt":"2026-08-31T14:12:00Z"});
+    fixture.run(completed_req, 503).unwrap();
+    let after_completed: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(90)).unwrap();
+    assert_eq!(after_completed.stopped_at.as_deref(), Some("2026-08-31T14:12:00Z"));
+
+    // A new timer started after Completed stays running on an unchanged Completed re-mark,
+    // and an explicit stop plan on an unchanged transition is rejected.
+    let second = json!({"id":id(93),"user_id":profile,"occurrence_id":id(10),"behavior_id":id(1),"started_at":"2026-08-31T14:20:00Z","stopped_at":null,"created_at":"2026-08-31T14:20:00Z","updated_at":"2026-08-31T14:20:00Z"});
+    fixture.run(json!({"operation":"startTimeSession","session":second}), 504).unwrap();
+    let bad_noop = json!({"operation":"applyStatusTransition","occurrenceId":id(10),"expectedStatus":"completed","expectedLatestEventId":id(92),"status":"completed","completedAt":"2026-08-31T14:12:00Z","statusMarkedAt":"2026-08-31T14:12:00Z","cancelPendingReminders":true,"timeTrackingStop":{"sessionId":id(93),"stoppedAt":"2026-08-31T14:20:00Z"},"event":null});
+    assert!(fixture.run(bad_noop, 508).unwrap_err().contains("only allowed when transitioning to Completed"));
+    let noop = json!({"operation":"applyStatusTransition","occurrenceId":id(10),"expectedStatus":"completed","expectedLatestEventId":id(92),"status":"completed","completedAt":"2026-08-31T14:12:00Z","statusMarkedAt":"2026-08-31T14:12:00Z","cancelPendingReminders":true,"event":null});
+    fixture.run(noop, 505).unwrap();
+    let after_noop: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(93)).unwrap();
+    assert_eq!(after_noop.stopped_at, None);
+
+    // Clock skew: started_at (14:20Z) > status_marked_at (14:19Z) after returning to Unresolved clamps to started_at.
+    fixture.run(status_request(&profile, "completed", Some(92), "unresolved", 94, "2026-08-31T14:18:00Z"), 506).unwrap();
+    let after_unresolved: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(93)).unwrap();
+    assert_eq!(after_unresolved.stopped_at, None);
+
+    fixture.run(status_request(&profile, "unresolved", Some(94), "completed", 95, "2026-08-31T14:19:00Z"), 507).unwrap();
+    let clamped: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(93)).unwrap();
+    assert_eq!(clamped.stopped_at.as_deref(), Some("2026-08-31T14:20:00Z"));
+}

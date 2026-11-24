@@ -40,7 +40,12 @@ export function createLocalOccurrenceStore(profileId: string, now: Temporal.Inst
       const graph = graphs.find(({ behavior }) => behavior.id === occurrence.behavior_id);
       if (!graph) throw new Error("Behavior not found.");
       const latest = [...history.statusEvents].sort(compareStatusEvents)[0];
-      context = { occurrence, latestStatusEventId: latest?.id ?? null, timezone: graph.behavior.timezone };
+      context = {
+        occurrence,
+        latestStatusEventId: latest?.id ?? null,
+        timezone: graph.behavior.timezone,
+        timeSessions: history.timeSessions.map(toTimeSession),
+      };
       contexts.set(occurrence.id, context);
       return context;
     },
