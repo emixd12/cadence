@@ -189,6 +189,8 @@ export async function getCalendarEventsForAdvisor(
     expectedSelectionRevision?: number;
     authorizationScope?: string;
     allowPastDates?: boolean;
+    /** When true, reads Google Calendar ephemerally in memory without persisting `daily_calendar_load`. */
+    ephemeralOnly?: boolean;
     now?: Temporal.Instant;
     signal?: AbortSignal;
   }> = {},
