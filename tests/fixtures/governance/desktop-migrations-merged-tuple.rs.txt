@@ -1,0 +1,16 @@
+// Negative fixture for scripts/check-contract-numbers.mjs: the shape commit 3f59eed6
+// repaired, where a rebase left migrations 0002 and 0003 in one MIGRATIONS tuple.
+pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (
+        1,
+        "current_local_model",
+        include_str!("../../migrations/0001_current_local_model.sql"),
+    ),
+    (
+        2,
+        "native_reminder_coverage",
+        include_str!("../../migrations/0002_native_reminder_coverage.sql"),
+        "bound_behaviorlog_plans",
+        include_str!("../../migrations/0003_bound_behaviorlog_plans.sql"),
+    ),
+];
