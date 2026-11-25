@@ -2472,3 +2472,25 @@ cite has not changed.
   Completion places is enabled, and document the Undo flow in `docs/user-guide/travel.md`.
 - **Related:** P-001, P-036, L-003.
 - **Status:** logged.
+
+## P-093: Alongside Behaviors, the guessed Where and pairing (D33)
+
+- **Change:** planned November 25, 2026 (Tickets 356–365), behind `CADENCE_ALONGSIDE`. A
+  Behavior gains an "alongside" setting. Until the person answers, Cadence plans with a
+  model guess made from the Behavior's title, description and Where, and labels it as a
+  guess. The same model call also guesses a coarse Where (`home`, `anywhere`, `elsewhere`
+  or `unknown`); counted completion place labels outrank it. The Daily Brief and Chat may
+  propose doing an alongside item during another item, the coach may propose a lasting
+  schedule change, and Cadence may ask the person to confirm the guess.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D33); Tickets 356–365.
+- **Surfaces:** Privacy, in-app Daily Brief and Chat disclosures, user guide, MCP
+  developer docs, marketing feature copy.
+- **Conflicting current text:** the Daily Brief disclosure and user guide describe the
+  model estimating a length only; they do not mention a guess about doing things at the
+  same time or a guessed kind of place. No model input changes.
+- **Update needed:** say that Cadence guesses whether a Behavior can be done alongside
+  other things and what kind of place it happens in, that the person's own setting always
+  wins, and that a guessed place never requests a route or a reminder. Document the
+  setting and pairing in the user guide and the new field in the MCP docs.
+- **Related:** P-066, P-067, P-082.
+- **Status:** logged.
