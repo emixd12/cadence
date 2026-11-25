@@ -132,7 +132,7 @@ export function checkIntegrationReport(report, files, root) {
     }
     summary.push(`${file}: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`);
     if (counts.failed > 0 || result.status === "failed") problems.push(`${file}: ${counts.failed} failed test(s); read the vitest output above.`);
-    if (counts.passed === 0) problems.push(`${file}: ran zero tests; its environment check probably skipped. Export the variables it reads or move it to excluded with a reason.`);
+    if (counts.passed + counts.failed === 0) problems.push(`${file}: ran zero tests; its environment check probably skipped. Export the variables it reads or move it to excluded with a reason.`);
     if (counts.skipped > 0) problems.push(`${file}: skipped ${counts.skipped} test(s); a skipped test proves nothing. Export the variables it reads or move it to excluded with a reason.`);
   }
   return { problems, summary };

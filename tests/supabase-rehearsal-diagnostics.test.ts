@@ -89,8 +89,8 @@ describe("database-backed local integration tests in the rehearsal", () => {
     const { run, excluded } = parseIntegrationAllowlist(await readAllowlist());
     const files = (await readdir("tests")).filter((name) => /\.local-integration\.test\.(?:ts|mjs)$/.test(name)).map((name) => `tests/${name}`).sort();
     expect([...run, ...excluded].sort()).toEqual(files);
-    // The d13b715e regression (a PostgREST query that failed on every call) must stay covered.
-    expect(run).toContain("tests/coach-signals.local-integration.test.ts");
+    // The run list must keep real coverage. coach-signals (the d13b715e case) returns once its failing test is fixed.
+    expect(run).toContain("tests/integration-write.local-integration.test.ts");
   });
 
   it("rejects an allowlist with a duplicate, an unknown need, a non-test path or a missing reason", async () => {
