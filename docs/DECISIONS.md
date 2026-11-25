@@ -3040,3 +3040,49 @@ Platform impact: web implemented (`components/advisor/AdvisorParts.tsx`, `Adviso
 `packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`);
 desktop implemented (shares components and lists new assets in `apps/desktop/vite.config.ts`, ships
 in next Mac release); marketing not applicable; future mobile deferred. Messaging impact: `P-086`.
+
+## 2026-11-24: Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down
+
+Owner decision on November 24, 2026 (Tickets 352–355):
+
+- **Retention horizon:** Persisted connector activity (`recorded_activities` and `daily_calendar_load`)
+  is kept **until the connector is disconnected or the Cadence account is deleted**, at which point
+  rows for that source/account are hard-deleted. Both tables are hosted-only Postgres tables with
+  owner RLS, excluded from `account_sync`, desktop SQLite, and BehaviorLog exports.
+- **Recorded activity ledger (`recorded_activities`, Ticket 352):** Persist minimized workout timing
+  from Hevy (and future activity connectors) in a capability-scoped `recorded_activities` table
+  matching `RecordedActivity` (opaque `activity_ref`, `kind`, `start_at`, `end_at`, `local_start_date`,
+  `duration_seconds`, optional opaque `selector_digest`, `provider_updated_at`, `state`,
+  `account_digest`, `connection_generation`, `synced_at`). No titles, exercises, sets, weights, or
+  raw provider IDs are stored. Initial connect runs a bounded backfill and initializes its own
+  incremental `ledger_cursor` (separate from connector completion's `read_cursor`); disconnect
+  hard-deletes the source's rows. `occurrence_source_matches` stays focused on Behavior-completion
+  provenance.
+- **Unlinked Hevy daily background sync, freshness & telemetry (Ticket 353):** Include connected,
+  unlinked Hevy accounts in the background job (`connector-completion-job.service.ts`) on a
+  lightweight **daily** schedule (once per 24h in the user's timezone, ahead of morning Brief),
+  prioritizing linked Behavior-completion accounts ahead of unlinked daily syncs within the 50s cron
+  budget. Pause unlinked daily polling after **21 days** of no Cadence activity and automatically
+  re-arm on next app open. Keep a **15-minute** on-demand incremental freshness window on Brief,
+  Chat, and Timeline reads, and switch Daily Brief, Chat (`list_workouts`, removing the 31-day cap),
+  and Timeline (`countableWorkouts`) to read from `recorded_activities`. Emit non-PII telemetry via
+  `reportMonitoringEvent` (`surface`, `account_mode`, `sync_outcome`, `sync_duration_ms`,
+  `pages_fetched`).
+- **Calendar context: derived daily rollups + bounded live past drill-down (Tickets 354–355):**
+  Do **not** persist raw Calendar events (Google, Outlook, iCloud). Instead, persist a compact
+  per-source daily busy-load rollup (`daily_calendar_load`: `busy_minutes`, `event_count`,
+  `earliest_start_minute`, `latest_end_minute`, `has_all_day_busy`, `connection_generation`,
+  `synced_at`) populated via write-through on normal calendar reads plus a bounded 30-day backfill
+  on selection/connect, with hard-delete on disconnect or calendar-selection change (no background
+  calendar cron). Widen Chat's `list_calendar_events` to allow past dates with a strict ≤31-day
+  span cap per call, coalescing nearby requested dates into minimal bounding-window reads with a
+  short-lived ephemeral session cache (filtered in the user's timezone), keeping live fields to
+  `title`, `start`, `end`, `calendar`, `location`, `all_day`, and `busy` (no descriptions or
+  attendees), and guiding the agent to inspect `daily_calendar_load` first and sample top outlier
+  days.
+
+Platform impact: web implemented (hosted Postgres migrations, services, cron extension, Brief/Chat/Timeline
+consumers); desktop unaffected (hosted-only, no SQLite migration or `account_sync` contract bump; linked
+Macs inherit hosted Brief/Chat/Timeline reads automatically); marketing not applicable; future mobile
+deferred (inherits hosted path). Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated,
+`L-026` logged.

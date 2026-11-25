@@ -62,15 +62,23 @@ export async function connectHevy(caller: ConnectorCaller, body: unknown, option
     catch (error) { throw connectorError(error); }
   });
   // Ticket 321: a reconnect resumes background completion checks a disconnect stopped.
+  // Ticket 352: run bounded initial backfill into `recorded_activities` and arm daily sync.
   // Best effort: connecting never fails on this.
   await import("./connector-completion.service")
     .then(({ rearmConnectorCompletionChecks }) => rearmConnectorCompletionChecks(caller.client, caller.user.id, "hevy", new Date().toISOString()))
     .catch(() => undefined);
+  await import("./recorded-activity-sync.service")
+    .then(({ backfillHevyOnConnect }) => backfillHevyOnConnect(caller, options))
+    .catch(() => undefined);
   return view;
 }
 
-export function disconnectHevy(caller: ConnectorCaller): Promise<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }> {
-  return disconnectConnector(caller, "hevy");
+export async function disconnectHevy(caller: ConnectorCaller): Promise<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }> {
+  const result = await disconnectConnector(caller, "hevy");
+  await import("./recorded-activity-sync.service")
+    .then(({ clearRecordedActivitiesOnDisconnect }) => clearRecordedActivitiesOnDisconnect(caller.client, caller.user.id, "hevy"))
+    .catch(() => undefined);
+  return result;
 }
 
 export type HevyActivityReadOptions = HevyServiceOptions & Readonly<{

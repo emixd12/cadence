@@ -122,3 +122,79 @@ function startOfNextLocalDay(now: Temporal.Instant, timezone: string): Temporal.
   return now.toZonedDateTimeISO(timezone).toPlainDate().add({ days: 1 })
     .toZonedDateTime({ timeZone: timezone }).toInstant();
 }
+
+/** Ticket 353 (2026-11-24): pause unlinked daily background sync after 21 days with no Cadence activity. */
+export const UNLINKED_SYNC_INACTIVITY_DAYS = 21;
+/** Local hour/minute ahead of typical morning Daily Brief (05:30 local). */
+export const UNLINKED_DAILY_SYNC_LOCAL_HOUR = 5;
+export const UNLINKED_DAILY_SYNC_LOCAL_MINUTE = 30;
+
+export type UnlinkedDailySyncScheduleInput = Readonly<{
+  now: Temporal.Instant;
+  timezone: string;
+  consecutiveFailures: number;
+  lastAttemptAt: string | null;
+  lastUserActivityAt: string | null;
+  reconnectRequired: boolean;
+}>;
+
+export type UnlinkedDailySyncSchedule = Readonly<{
+  nextCheckAt: string | null;
+  pausedForInactivity: boolean;
+}>;
+
+/**
+ * Pure schedule for connected, unlinked Hevy accounts (Ticket 353):
+ * - Runs once per 24h in the user's timezone at 05:30 local (snapped to the first
+ *   cron run minute after 05:30) ahead of typical morning Brief time.
+ * - Pauses (`pausedForInactivity: true`, `nextCheckAt: null`) when `lastUserActivityAt`
+ *   is at least `UNLINKED_SYNC_INACTIVITY_DAYS` old.
+ */
+export function resolveUnlinkedDailySyncSchedule(
+  input: UnlinkedDailySyncScheduleInput,
+): UnlinkedDailySyncSchedule {
+  if (input.reconnectRequired) {
+    return { nextCheckAt: null, pausedForInactivity: false };
+  }
+  if (isUnlinkedAccountInactive(input.now, input.lastUserActivityAt)) {
+    return { nextCheckAt: null, pausedForInactivity: true };
+  }
+  const zonedNow = input.now.toZonedDateTimeISO(input.timezone);
+  const todayTarget = zonedNow.toPlainDate().toZonedDateTime({
+    timeZone: input.timezone,
+    plainTime: Temporal.PlainTime.from({
+      hour: UNLINKED_DAILY_SYNC_LOCAL_HOUR,
+      minute: UNLINKED_DAILY_SYNC_LOCAL_MINUTE,
+    }),
+  }).toInstant();
+  const baseTarget = Temporal.Instant.compare(todayTarget, input.now) > 0
+    ? todayTarget
+    : zonedNow.toPlainDate().add({ days: 1 }).toZonedDateTime({
+      timeZone: input.timezone,
+      plainTime: Temporal.PlainTime.from({
+        hour: UNLINKED_DAILY_SYNC_LOCAL_HOUR,
+        minute: UNLINKED_DAILY_SYNC_LOCAL_MINUTE,
+      }),
+    }).toInstant();
+
+  let chosen = firstRunAfter(baseTarget);
+  if (input.consecutiveFailures > 0 && input.lastAttemptAt) {
+    const minutes = Math.min(
+      COMPLETION_CHECK_MAX_BACKOFF_MINUTES,
+      COMPLETION_CHECK_BASE_BACKOFF_MINUTES * 2 ** Math.min(16, input.consecutiveFailures - 1),
+    );
+    const earliest = Temporal.Instant.from(input.lastAttemptAt).add({ minutes });
+    if (Temporal.Instant.compare(chosen, earliest) < 0) chosen = earliest;
+  }
+  return { nextCheckAt: chosen.toString(), pausedForInactivity: false };
+}
+
+export function isUnlinkedAccountInactive(
+  now: Temporal.Instant,
+  lastUserActivityAt: string | null,
+  inactivityDays: number = UNLINKED_SYNC_INACTIVITY_DAYS,
+): boolean {
+  if (!lastUserActivityAt) return false;
+  const elapsedHours = now.since(Temporal.Instant.from(lastUserActivityAt)).total({ unit: "hours" });
+  return elapsedHours >= inactivityDays * 24;
+}

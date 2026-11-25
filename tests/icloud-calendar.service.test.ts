@@ -247,6 +247,7 @@ describe("listing, selection, and reads", () => {
 
   it("fences reads on generation, selection, and principal changes", async () => {
     await connectAndSelect();
+    apple.calls.length = 0;
     await expect(getIcloudCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", { ...options, expectedConnectionGeneration: 9 })).rejects.toThrow("connection_changed");
     await expect(getIcloudCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", { ...options, expectedSelectionRevision: 99 })).rejects.toThrow("connection_changed");
     apple.onReport = () => { db.preferences.get(key(OWNER, "icloud_calendar"))!.selection_revision += 1; };

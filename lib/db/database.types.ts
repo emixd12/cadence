@@ -952,38 +952,59 @@ export type Database = {
       }
       connector_completion_state: {
         Row: {
+          backfill_complete: boolean
+          backfilled_at: string | null
           check_count: number
           check_count_date: string | null
           consecutive_failures: number
           last_attempted_at: string | null
           last_reconciled_at: string | null
+          last_synced_at: string | null
+          last_user_activity_at: string | null
+          ledger_cursor: string | null
           next_check_at: string | null
+          paused_for_inactivity: boolean
           read_cursor: string | null
           source: string
+          sync_priority: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          backfill_complete?: boolean
+          backfilled_at?: string | null
           check_count?: number
           check_count_date?: string | null
           consecutive_failures?: number
           last_attempted_at?: string | null
           last_reconciled_at?: string | null
+          last_synced_at?: string | null
+          last_user_activity_at?: string | null
+          ledger_cursor?: string | null
           next_check_at?: string | null
+          paused_for_inactivity?: boolean
           read_cursor?: string | null
           source: string
+          sync_priority?: number
           updated_at?: string
           user_id?: string
         }
         Update: {
+          backfill_complete?: boolean
+          backfilled_at?: string | null
           check_count?: number
           check_count_date?: string | null
           consecutive_failures?: number
           last_attempted_at?: string | null
           last_reconciled_at?: string | null
+          last_synced_at?: string | null
+          last_user_activity_at?: string | null
+          ledger_cursor?: string | null
           next_check_at?: string | null
+          paused_for_inactivity?: boolean
           read_cursor?: string | null
           source?: string
+          sync_priority?: number
           updated_at?: string
           user_id?: string
         }
@@ -1055,6 +1076,45 @@ export type Database = {
             referencedColumns: ["user_id", "provider"]
           },
         ]
+      }
+      daily_calendar_load: {
+        Row: {
+          busy_minutes: number
+          connection_generation: number
+          earliest_start_minute: number | null
+          event_count: number
+          has_all_day_busy: boolean
+          latest_end_minute: number | null
+          local_date: string
+          source: string
+          synced_at: string
+          user_id: string
+        }
+        Insert: {
+          busy_minutes: number
+          connection_generation: number
+          earliest_start_minute?: number | null
+          event_count: number
+          has_all_day_busy?: boolean
+          latest_end_minute?: number | null
+          local_date: string
+          source: string
+          synced_at?: string
+          user_id?: string
+        }
+        Update: {
+          busy_minutes?: number
+          connection_generation?: number
+          earliest_start_minute?: number | null
+          event_count?: number
+          has_all_day_busy?: boolean
+          latest_end_minute?: number | null
+          local_date?: string
+          source?: string
+          synced_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       day_notes: {
         Row: {
@@ -2417,6 +2477,60 @@ export type Database = {
           p256dh?: string
           updated_at?: string
           user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recorded_activities: {
+        Row: {
+          account_digest: string
+          activity_ref: string
+          connection_generation: number
+          duration_seconds: number
+          end_at: string
+          id: string
+          kind: string
+          local_start_date: string
+          provider_updated_at: string | null
+          selector_digest: string | null
+          source: string
+          start_at: string
+          state: string
+          synced_at: string
+          user_id: string
+        }
+        Insert: {
+          account_digest: string
+          activity_ref: string
+          connection_generation: number
+          duration_seconds: number
+          end_at: string
+          id?: string
+          kind: string
+          local_start_date: string
+          provider_updated_at?: string | null
+          selector_digest?: string | null
+          source: string
+          start_at: string
+          state?: string
+          synced_at?: string
+          user_id?: string
+        }
+        Update: {
+          account_digest?: string
+          activity_ref?: string
+          connection_generation?: number
+          duration_seconds?: number
+          end_at?: string
+          id?: string
+          kind?: string
+          local_start_date?: string
+          provider_updated_at?: string | null
+          selector_digest?: string | null
+          source?: string
+          start_at?: string
+          state?: string
+          synced_at?: string
           user_id?: string
         }
         Relationships: []

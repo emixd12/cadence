@@ -2,6 +2,7 @@ import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   resolveCompletionCheckSchedule,
+  resolveUnlinkedDailySyncSchedule,
   type CompletionCheckOccurrence,
   type CompletionReadStrategy,
 } from "@cadence/core/resolvers/completion-check-schedule.resolver";
@@ -36,7 +37,12 @@ const ACCOUNT_CONCURRENCY = 4;
  */
 export const CONNECTOR_COMPLETION_READ_STRATEGY: CompletionReadStrategy = "cheap";
 
-export type DueCompletionAccount = Readonly<{ userId: string; source: RecordedActivitySourceV1_1; nextCheckAt: string }>;
+export type DueCompletionAccount = Readonly<{
+  userId: string;
+  source: RecordedActivitySourceV1_1;
+  nextCheckAt: string;
+  syncPriority?: 1 | 2;
+}>;
 
 export type CompletionScheduleContext = Readonly<{
   timezone: string;
@@ -46,12 +52,23 @@ export type CompletionScheduleContext = Readonly<{
   consecutiveFailures: number;
   lastAttemptedAt: string | null;
   reconnectRequired: boolean;
+  /** Ticket 353: true when the account has at least one enabled source link. */
+  hasEnabledLinks?: boolean;
+  lastUserActivityAt?: string | null;
 }>;
 
 export type CompletionJobAccountPort = Readonly<{
   reconcile(now: Temporal.Instant): Promise<ReconcileResult>;
+  /** Ticket 353: lightweight incremental ledger sync for connected unlinked accounts. */
+  syncUnlinkedLedger?(now: Temporal.Instant): Promise<{ failed: boolean }>;
   readScheduleContext(now: Temporal.Instant): Promise<CompletionScheduleContext>;
-  writeSchedule(input: Readonly<{ nextCheckAt: string | null; checkCountDate: string; checkCount: number }>): Promise<void>;
+  writeSchedule(input: Readonly<{
+    nextCheckAt: string | null;
+    checkCountDate: string;
+    checkCount: number;
+    syncPriority?: 1 | 2;
+    pausedForInactivity?: boolean;
+  }>): Promise<void>;
 }>;
 
 export type ConnectorCompletionJobResult = {
@@ -121,6 +138,35 @@ async function visitAccount(port: CompletionJobAccountPort, clock: () => Tempora
   const context = await port.readScheduleContext(now);
   const today = now.toZonedDateTimeISO(context.timezone).toPlainDate().toString();
   const checkCount = (context.checkCountDate === today ? context.checkCount : 0) + 1;
+
+  // Ticket 353: connected, unlinked accounts run a lightweight daily incremental
+  // ledger sync instead of stopping on `no_links`, paused after 21 days of inactivity.
+  const isUnlinkedConnected = result?.status === "no_links" && !context.reconnectRequired && context.hasEnabledLinks === false;
+  if (isUnlinkedConnected && port.syncUnlinkedLedger) {
+    try {
+      const ledger = await port.syncUnlinkedLedger(clock());
+      failed = ledger.failed;
+    } catch {
+      failed = true;
+    }
+    const unlinkedSchedule = resolveUnlinkedDailySyncSchedule({
+      now: clock(),
+      timezone: context.timezone,
+      consecutiveFailures: failed ? context.consecutiveFailures + 1 : 0,
+      lastAttemptAt: clock().toString(),
+      lastUserActivityAt: context.lastUserActivityAt ?? null,
+      reconnectRequired: context.reconnectRequired,
+    });
+    await port.writeSchedule({
+      nextCheckAt: unlinkedSchedule.nextCheckAt,
+      checkCountDate: today,
+      checkCount,
+      syncPriority: 2,
+      pausedForInactivity: unlinkedSchedule.pausedForInactivity,
+    });
+    return { result, failed };
+  }
+
   const schedule = resolveCompletionCheckSchedule({
     now,
     timezone: context.timezone,
@@ -131,11 +177,20 @@ async function visitAccount(port: CompletionJobAccountPort, clock: () => Tempora
     lastAttemptAt: context.lastAttemptedAt,
     reconnectRequired: context.reconnectRequired || result?.status === "not_connected" || result?.status === "no_links",
   });
-  await port.writeSchedule({ nextCheckAt: schedule.nextCheckAt, checkCountDate: today, checkCount });
+  await port.writeSchedule({
+    nextCheckAt: schedule.nextCheckAt,
+    checkCountDate: today,
+    checkCount,
+    ...(context.hasEnabledLinks !== undefined ? { syncPriority: 1 as const, pausedForInactivity: false } : {}),
+  });
   return { result, failed };
 }
 
-/** Service role: due accounts only, reading `user_id`, `source` and `next_check_at`. */
+/**
+ * Service role: due accounts only, reading `user_id`, `source`, `next_check_at`,
+ * `sync_priority` and `paused_for_inactivity`. Linked completion accounts
+ * (`sync_priority = 1`) are always selected ahead of unlinked daily syncs (`2`).
+ */
 export function hostedDueCompletionAccountSelection(serviceRole: AppSupabaseClient) {
   return async (input: Readonly<{ dueBy: Date; limit: number }>): Promise<DueCompletionAccount[]> => {
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > CONNECTOR_COMPLETION_JOB_BATCH_MAX) {
@@ -143,13 +198,20 @@ export function hostedDueCompletionAccountSelection(serviceRole: AppSupabaseClie
     }
     const { data, error } = await serviceRole
       .from("connector_completion_state")
-      .select("user_id, source, next_check_at")
+      .select("user_id, source, next_check_at, sync_priority, paused_for_inactivity")
       .lte("next_check_at", input.dueBy.toISOString())
+      .eq("paused_for_inactivity", false)
+      .order("sync_priority", { ascending: true })
       .order("next_check_at", { ascending: true })
       .limit(input.limit);
     if (error) throw error;
     return (data ?? []).flatMap((row) => row.next_check_at && row.source === "hevy"
-      ? [{ userId: row.user_id, source: row.source, nextCheckAt: row.next_check_at }] : []);
+      ? [{
+        userId: row.user_id,
+        source: row.source,
+        nextCheckAt: row.next_check_at,
+        syncPriority: row.sync_priority === 2 ? 2 : 1,
+      }] : []);
   };
 }
 
@@ -163,13 +225,18 @@ export function createCompletionAccountPort(caller: ConnectorCaller, source: Rec
   const userId = caller.user.id;
   return {
     reconcile: () => reconcileConnectorCompletions(caller, source, { deadlineMs: 20_000 }),
+    async syncUnlinkedLedger() {
+      const { syncHevyLedger } = await import("./recorded-activity-sync.service");
+      const res = await syncHevyLedger(caller, { deadlineMs: 20_000, freshnessSeconds: 0, touchUserActivity: false });
+      return { failed: res.outcome === "failed" || res.outcome === "timeout" };
+    },
     async readScheduleContext(now) {
       const [timezone, links, connection, state] = await Promise.all([
         getProfileTimezone(client, userId),
         listSourceLinks(client, userId, source),
         readConnectorConnection(client, userId, source),
         client.from("connector_completion_state")
-          .select("check_count_date,check_count,consecutive_failures,last_attempted_at")
+          .select("check_count_date,check_count,consecutive_failures,last_attempted_at,last_user_activity_at")
           .eq("user_id", userId).eq("source", source).maybeSingle(),
       ]);
       if (state.error) throw state.error;
@@ -183,11 +250,19 @@ export function createCompletionAccountPort(caller: ConnectorCaller, source: Rec
         consecutiveFailures: state.data?.consecutive_failures ?? 0,
         lastAttemptedAt: state.data?.last_attempted_at ?? null,
         reconnectRequired: connection?.status !== "connected",
+        hasEnabledLinks: behaviorIds.length > 0,
+        lastUserActivityAt: state.data?.last_user_activity_at ?? null,
       };
     },
     async writeSchedule(input) {
       const { error } = await client.from("connector_completion_state")
-        .update({ next_check_at: input.nextCheckAt, check_count_date: input.checkCountDate, check_count: input.checkCount })
+        .update({
+          next_check_at: input.nextCheckAt,
+          check_count_date: input.checkCountDate,
+          check_count: input.checkCount,
+          ...(input.syncPriority !== undefined ? { sync_priority: input.syncPriority } : {}),
+          ...(input.pausedForInactivity !== undefined ? { paused_for_inactivity: input.pausedForInactivity } : {}),
+        })
         .eq("user_id", userId).eq("source", source);
       if (error) throw error;
     },

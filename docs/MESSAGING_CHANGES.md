@@ -2388,3 +2388,63 @@ cite has not changed.
   the speech pill on the banner, natural scrolling, and answering tips/check-ins in the
   Advisor panel.
 - **Status:** logged.
+
+## P-087: Persisted Hevy workout timing (`recorded_activities`) and daily background sync for unlinked accounts
+
+- **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Tickets 352–353).
+  Cadence now persists minimized Hevy workout timing (start/end, local date, duration, opaque
+  activity/routine digests—never titles, exercises, sets, weights, or notes) in a hosted-only
+  `recorded_activities` table for all connected Hevy accounts, even when no Behavior is linked
+  for connector completion. Rows are kept until Hevy is disconnected or the Cadence account is
+  deleted (hard-deleted on disconnect/delete). Connected unlinked Hevy accounts also run a
+  lightweight daily background incremental sync (paused after 21 days of Cadence inactivity and
+  re-armed on next open), plus on-demand incremental refreshes when stale (>15 minutes).
+- **Affected:** Tickets 352–353. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/HevyPanel.tsx`, `docs/user-guide/privacy-and-account.md`,
+  `apps/marketing/src/data/faq.ts`. Related legal entry: `L-023`.
+- **Surfaces:** Privacy, Trust, in-app Hevy disclosure, user guide, marketing FAQ.
+- **Conflicting current text:** Privacy and P-039 describe stored Hevy timing only for linked
+  Behavior completions (`occurrence_source_matches`) and say background polling runs only for
+  linked Behaviors; `HevyPanel.tsx` mentions scanning at most 500 workouts on demand.
+- **Update needed:** disclose that connected Hevy accounts store minimized workout timing until
+  disconnect/delete and run a daily background sync even without linked Behaviors (paused after
+  inactivity), with no titles/exercises stored.
+- **Status:** logged.
+
+## P-088: Persisted derived daily calendar busy-load rollups (`daily_calendar_load`)
+
+- **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Ticket 354). Cadence
+  persists a compact derived daily busy-load rollup per connected calendar source (Google,
+  Outlook, iCloud): `busy_minutes`, `event_count`, `earliest_start_minute`, `latest_end_minute`,
+  and `has_all_day_busy`. No event titles, descriptions, locations, or attendees are stored.
+  Populated via write-through on normal calendar reads plus a bounded 30-day backfill on
+  selection/connect, and hard-deleted when the calendar source is disconnected, its selected
+  calendars change, or the account is deleted.
+- **Affected:** Ticket 354. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/privacy-and-account.md`, Google OAuth verification materials. Related legal
+  entry: `L-026`.
+- **Surfaces:** Privacy, Trust, user guide, provider submissions (Google Limited Use).
+- **Conflicting current text:** Privacy says Cadence does not persist calendar data on its
+  hosted server beyond temporary travel place keys and advisor day-load snapshots.
+- **Update needed:** add a retention row and description for derived daily calendar busy-load
+  rollups (numeric busy-load counts/minutes only, no event details, hard-deleted on disconnect
+  or account deletion).
+- **Status:** logged.
+
+## P-089: AI (Chat and Daily Brief) reading past calendar history on demand
+
+- **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Ticket 355). Cadence
+  Chat can now live-read past calendar dates (bounded to ≤31 days per tool call) in addition to
+  today and upcoming days when the person's AI calendar sources are enabled, to inspect outlier
+  days flagged by `daily_calendar_load`. Live-read fields remain limited to `title`, `start`,
+  `end`, `calendar`, `location`, `all_day`, and `busy` (no descriptions or attendees) and are
+  discarded after the turn.
+- **Affected:** Ticket 355. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/privacy-and-account.md`, `docs/user-guide/timeline.md`, Google OAuth
+  verification materials. Related legal entry: `L-026`.
+- **Surfaces:** Privacy, user guide, provider submissions.
+- **Conflicting current text:** Privacy and Chat disclosures describe calendar reads as today
+  and upcoming days only.
+- **Update needed:** note that when AI calendar access is enabled, Chat may live-read bounded
+  past date windows (up to 31 days per call) on demand without storing raw events.
+- **Status:** logged.

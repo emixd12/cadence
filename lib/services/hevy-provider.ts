@@ -264,6 +264,8 @@ export type HevyMatchChanges = Readonly<{
   complete: boolean;
   /** When the read started, on Cadence's clock. */
   fetchedAt: string;
+  /** Number of Hevy API event pages fetched during this read. */
+  pagesFetched: number;
 }>;
 
 /**
@@ -280,6 +282,7 @@ export async function readHevyMatchChanges(input: HevyMatchReadInput & Readonly<
   const activities = new Map<string, RecordedActivityV1_1>();
   const deleted = new Set<string>();
   let newest: Temporal.Instant | null = null;
+  let pagesFetched = 0;
   const note = (value: unknown) => {
     const at = instantOrNull(value);
     if (at && (!newest || Temporal.Instant.compare(at, newest) > 0)) newest = at;
@@ -287,13 +290,14 @@ export async function readHevyMatchChanges(input: HevyMatchReadInput & Readonly<
   try {
     for (let page = 1; page <= HEVY_EVENT_MAX_PAGES; page += 1) {
       const body = record(await session.get({ kind: "workout_events", page, since: input.since }));
+      pagesFetched = page;
       const pageCount = body?.page_count;
       if (!body || !Number.isSafeInteger(pageCount) || (pageCount as number) < 0 || !Array.isArray(body.events)
         || body.events.length > HEVY_EVENT_PAGE_SIZE) {
         throw new HevyProviderError(failure("malformed_provider_response", false, null));
       }
       if ((pageCount as number) > HEVY_EVENT_MAX_PAGES) {
-        return { activities: [], deletedActivityRefs: [], newestChangeAt: null, complete: false, fetchedAt };
+        return { activities: [], deletedActivityRefs: [], newestChangeAt: null, complete: false, fetchedAt, pagesFetched };
       }
       for (const item of body.events) acceptEvent(item);
       if (page >= (pageCount as number)) break;
@@ -307,6 +311,7 @@ export async function readHevyMatchChanges(input: HevyMatchReadInput & Readonly<
     newestChangeAt: newest === null ? null : (newest as Temporal.Instant).toString(),
     complete: true,
     fetchedAt,
+    pagesFetched,
   };
 
   function acceptEvent(item: unknown): void {
@@ -339,6 +344,70 @@ export async function readHevyMatchChanges(input: HevyMatchReadInput & Readonly<
       source: RECORDED_ACTIVITY_SOURCE, accountDigest: input.accountDigest, providerKey: routineId,
     })]));
   }
+}
+
+export type HevyLedgerBackfillResult = Readonly<{
+  activities: readonly RecordedActivityV1_1[];
+  complete: boolean;
+  fetchedAt: string;
+  pagesFetched: number;
+}>;
+
+/**
+ * Ticket 352: bounded full backfill for `recorded_activities` across history up
+ * to today (not capped at 31 days). Scans up to `RECORDED_ACTIVITY_MAX_PAGES`
+ * (50 pages / 500 workouts) and returns normalized activities with optional
+ * selector digests.
+ */
+export async function readHevyLedgerBackfill(
+  input: Omit<HevyMatchReadInput, "range"> & Readonly<{ timezone: string }>,
+): Promise<HevyLedgerBackfillResult> {
+  if (!/^[a-f0-9]{64}$/u.test(input.accountDigest)) throw new RangeError("Hevy ledger backfill requires the account digest.");
+  const clock = input.clock ?? Date.now;
+  const today = Temporal.Instant.fromEpochMilliseconds(clock()).toZonedDateTimeISO(input.timezone).toPlainDate();
+  const wideRange = { startLocalDate: "2000-01-01", endLocalDate: today.toString(), timezone: input.timezone };
+  const session = new HevySession(input.apiKey, input);
+  const fetchedAt = Temporal.Instant.fromEpochMilliseconds(session.startedAt).toString();
+  const state = new ReadState(input.accountId);
+  let complete = false;
+  try {
+    for (let page = 1; page <= RECORDED_ACTIVITY_MAX_PAGES; page += 1) {
+      const body = record(await session.get({ kind: "workouts", page }));
+      const pageCount = body?.page_count;
+      if (!body || !Number.isSafeInteger(pageCount) || (pageCount as number) < 0 || body.page !== page || !Array.isArray(body.workouts)
+        || body.workouts.length > RECORDED_ACTIVITY_PAGE_SIZE) {
+        throw new HevyProviderError(failure("malformed_provider_response", false, null));
+      }
+      if (state.pageCount === null) state.pageCount = pageCount as number;
+      if (state.pageCount === 0) {
+        complete = true;
+        break;
+      }
+      state.pagesRead = page;
+      for (const item of body.workouts) acceptItem(state, item);
+      if (page >= state.pageCount) {
+        complete = true;
+        break;
+      }
+    }
+  } finally {
+    session.close();
+  }
+  const activities: RecordedActivityV1_1[] = [];
+  for (const timing of state.timing.values()) {
+    const normalized = normalizeRecordedWorkout(timing, {
+      accountId: input.accountId,
+      requestedRange: wideRange,
+      fetchedAt,
+    });
+    if (normalized.status !== "accepted") continue;
+    const providerKey = state.routineByActivity.get(normalized.activity.id) ?? null;
+    activities.push(withSelectorKeys(normalized.activity, providerKey === null ? [] : [recordedActivitySelectorKey({
+      source: RECORDED_ACTIVITY_SOURCE, accountDigest: input.accountDigest, providerKey,
+    })]));
+  }
+  activities.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.id.localeCompare(right.id));
+  return { activities, complete, fetchedAt, pagesFetched: state.pagesRead };
 }
 
 async function readWorkoutPages(input: HevyReadInput, keepRoutines: boolean): Promise<Readonly<{

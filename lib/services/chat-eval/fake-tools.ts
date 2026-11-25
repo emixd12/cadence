@@ -36,7 +36,7 @@ export type ToolCallRecord = Readonly<{
   replayed: boolean;
 }>;
 
-export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_workouts", "search_advice"] as const;
+export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_calendar_load", "list_workouts", "search_advice"] as const;
 
 export const WRITE_OPERATIONS: ReadonlySet<string> = new Set([
   "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
@@ -77,6 +77,7 @@ function snapshot(world: ChatWorld): string {
 
 function run(world: ChatWorld, name: string, args: unknown): ChatToolResult {
   if (name === "list_calendar_events") return calendarEvents(world, args);
+  if (name === "list_calendar_load") return { ok: true, result: { days: [], sources: [], note: null } };
   if (name === "list_workouts") return workouts(world, args);
   if (name === "search_advice") return searchAdvice(world, args);
   if (!isIntegrationOperationName(name)) return fail("not_found", `No tool named ${name}.`);
