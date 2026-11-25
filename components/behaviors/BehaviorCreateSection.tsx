@@ -32,6 +32,8 @@ type BehaviorCreateSectionProps = Readonly<{
    * fields (`sub-behavior-form-data.ts`).
    */
   parentOptions?: readonly ParentOption[];
+  /** Unique saved places from existing Behaviors for instant local autocomplete. */
+  savedPlaces?: readonly string[];
 }>;
 
 export function BehaviorCreateSection({
@@ -43,6 +45,7 @@ export function BehaviorCreateSection({
   sourceLinkCoordinator,
   allowOpportunity = true,
   parentOptions,
+  savedPlaces,
 }: BehaviorCreateSectionProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -114,6 +117,7 @@ export function BehaviorCreateSection({
             allowOpportunity={allowOpportunity}
             parentOptions={parentOptions}
             allowSubBehaviorDrafts={parentOptions !== undefined}
+            savedPlaces={savedPlaces}
             extraFields={linkCoordinator
               ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={linkCoordinator} />
               : null}
