@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { revalidatePath } from "next/cache";
 import {
-  checkOperationScope, createIntegrationError, INTEGRATION_LIMITS, validateOperationInput, validateOperationOutput,
-  type BehaviorOutput, type IntegrationError, type IntegrationOperationInput, type IntegrationOperationOutput,
+  checkOperationScope, createIntegrationError, fitOutputToContract, INTEGRATION_LIMITS, validateOperationInput, validateOperationOutput,
+  type AlongsideInputField, type BehaviorOutput, type IntegrationContractOptions, type IntegrationError,
+  type IntegrationOperationInput, type IntegrationOperationOutput,
 } from "@cadence/core/integration";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import {
   beginIdempotentWrite, completeIdempotentWrite, findExternalReference, linkExternalReference, listExternalReferences,
@@ -78,9 +80,12 @@ function outputFromSnapshot(name: WriteOperationName, snapshot: IntegrationWrite
   return name === "create_behavior" ? { behavior } : { behavior, changed: snapshot.changed };
 }
 
-function readWriteOutput(name: WriteOperationName, receipt: unknown): IntegrationOperationOutput<WriteOperationName> {
+/** A stored result in the caller's contract edition: a 1.8.0 receipt replayed after the flag turns off drops `alongside`. */
+function readWriteOutput(
+  name: WriteOperationName, receipt: unknown, contract: IntegrationContractOptions,
+): IntegrationOperationOutput<WriteOperationName> {
   if (receipt && typeof receipt === "object" && "version" in receipt && receipt.version === 2 &&
-      "output_json" in receipt && typeof receipt.output_json === "string") return JSON.parse(receipt.output_json);
+      "output_json" in receipt && typeof receipt.output_json === "string") return fitOutputToContract(JSON.parse(receipt.output_json), contract);
   return outputFromSnapshot(name, readIntegrationWriteSnapshot(receipt));
 }
 
@@ -187,7 +192,9 @@ const DEFINITION_FIELDS = [
 ] as const;
 
 function hasDefinitionChange(input: IntegrationOperationInput<"update_behavior">): boolean {
-  return DEFINITION_FIELDS.some((field) => input[field] !== undefined);
+  // `alongside` (contract 1.8.0) passes input validation only with CADENCE_ALONGSIDE on.
+  return DEFINITION_FIELDS.some((field) => input[field] !== undefined)
+    || (input as AlongsideInputField).alongside !== undefined;
 }
 
 async function usesDirectWrite(name: WriteOperationName, context: IntegrationContext, input: unknown): Promise<boolean> {
@@ -457,7 +464,8 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
   let recover = false;
   try {
     if (scopeError) throw new WriteError(scopeError);
-    const validated = validateOperationInput(name, raw);
+    const contract = integrationContractOptions();
+    const validated = validateOperationInput(name, raw, contract);
     if (!validated.ok) throw new WriteError(validated.error);
     const input = validated.value;
     const requestHash = integrationWriteHash(name, input);
@@ -469,7 +477,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
       if (result.state === "in_progress") fail("service_unavailable", "This write is still running. Retry with the same key shortly.");
       if (result.state === "replay") {
         receipt = result.result;
-        const replay = readWriteOutput(name, receipt);
+        const replay = readWriteOutput(name, receipt, contract);
         committed = true;
         recover = true;
         await recordIntegrationActivity(context.supabase, { operation: name,
@@ -482,7 +490,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
     }
     if (!receipt && await usesDirectWrite(name, context, input)) {
       const result = await performDirectWrite(name, context, input, () => { committed = true; });
-      const checked = validateOperationOutput(name, result.output);
+      const checked = validateOperationOutput(name, result.output, contract);
       if (!checked.ok) throw new WriteError(checked.error);
       receipt = { version: 2, output_json: JSON.stringify(result.output) };
       if (claim) await completeIdempotentWrite(context.supabase, { ...claim, result: receipt as Json });
@@ -496,7 +504,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
         externalRef: "external_ref" in input ? input.external_ref : undefined,
       }, snapshot => {
         const projected = outputFromSnapshot(name, snapshot);
-        const checked = validateOperationOutput(name, projected);
+        const checked = validateOperationOutput(name, projected, contract);
         // The transaction checks exact bytes after binding its generated UUIDs/revision clock.
         if (!checked.ok && checked.error.code !== "limit_exceeded") throw new WriteError(checked.error);
         return JSON.stringify(projected);
@@ -507,7 +515,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
       if (!receipt) throw new Error("No committed integration receipt.");
       committed = true;
     }
-    const projected = readWriteOutput(name, receipt);
+    const projected = readWriteOutput(name, receipt, contract);
     if (recover) {
       if (name.includes("behavior")) {
         await syncBehaviorGraphForUser(context.supabase, context.userId,
@@ -523,7 +531,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
     invalidateBehaviorData(context.userId);
     revalidatePath("/timeline");
     if (name.includes("behavior") && name !== "create_behavior") revalidatePath("/behaviors");
-    const output = validateOperationOutput(name, projected);
+    const output = validateOperationOutput(name, projected, contract);
     if (!output.ok) throw new WriteError(output.error);
     return { ok: true, value: output.value };
   } catch (error) {

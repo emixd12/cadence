@@ -51,4 +51,6 @@ export const INTEGRATION_FORBIDDEN_OUTPUT_FIELD_FRAGMENTS: readonly string[] = O
   "password",
   "streak",
   "missed",
+  // D33 (Ticket 364): only the person's alongside answer is returned, never a model guess.
+  "guess",
 ]);

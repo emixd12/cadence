@@ -17,6 +17,7 @@ import {
   type IntegrationOperationOutput,
 } from "./operations";
 import { INTEGRATION_AGENT_SCOPES, type IntegrationScope } from "./scopes";
+import { integrationOperationFor, type IntegrationContractOptions } from "./editions";
 
 /** Operations that also accept the agent-only move scope. */
 const MOVE_OPERATIONS: ReadonlySet<string> = new Set(["move_occurrence_for_day", "revert_occurrence_move"]);
@@ -29,13 +30,15 @@ export type IntegrationContractResult<T> =
 /**
  * Validates tool input against the operation's JSON Schema, then applies the
  * cross-field rules JSON Schema cannot express (date-range order and caps,
- * custom time ranges with distinct ends).
+ * custom time ranges with distinct ends). `options` selects the contract edition
+ * (`editions.ts`); without them the published contract applies.
  */
 export function validateOperationInput<N extends IntegrationOperationName>(
   name: N,
   value: unknown,
+  options: IntegrationContractOptions = {},
 ): IntegrationContractResult<IntegrationOperationInput<N>> {
-  const operation: IntegrationOperation = INTEGRATION_OPERATIONS[name];
+  const operation: IntegrationOperation = integrationOperationFor(name, options);
   const result = validateAgainstSchema<IntegrationOperationInput<N>>(operation.input.schema, value);
   if (!result.ok) return { ok: false, error: invalidInputError(result.issues), issues: result.issues };
 
@@ -69,8 +72,9 @@ export function validateOperationInput<N extends IntegrationOperationName>(
 export function validateOperationOutput<N extends IntegrationOperationName>(
   name: N,
   value: unknown,
+  options: IntegrationContractOptions = {},
 ): IntegrationContractResult<IntegrationOperationOutput<N>> {
-  const operation: IntegrationOperation = INTEGRATION_OPERATIONS[name];
+  const operation: IntegrationOperation = integrationOperationFor(name, options);
   const result = validateAgainstSchema<IntegrationOperationOutput<N>>(operation.output.schema, value);
   if (!result.ok) {
     return {

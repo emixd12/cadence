@@ -25,7 +25,7 @@ const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
 /** In-memory Cadence: grants, token families, two accounts' data, per-grant rate limits. */
-function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false } = {}) {
+function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false, contractVersion = '1.7.0' } = {}) {
   const grants = [];
   const access = new Map();
   const refresh = new Map();
@@ -80,7 +80,9 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
   const own = (list, slot, id) => list.find((x) => x.id === id && x.slot === slot) ?? null;
   const notFound = () => ({ isError: true, errorCode: 'not_found', structured: { error: { code: 'not_found' } } });
   const okResult = (structured) => ({ isError: false, errorCode: null, structured });
-  const view = (b) => ({ id: b.id, title: b.title, state: b.state, revision: b.revision, created_at: b.created_at });
+  const alongside = contractVersion === '1.8.0';
+  const view = (b) => ({ id: b.id, title: b.title, state: b.state, revision: b.revision, created_at: b.created_at,
+    ...(alongside ? { alongside: b.alongside ?? null } : {}) });
   const PLANNED = '2026-10-18T13:00:00Z';
   const occView = (o) => ({ id: o.id, behavior_id: o.behavior_id, status: o.status, note: o.note, local_date: o.local_date, status_history: [...o.history],
     scheduled_for: PLANNED, effective_start_at: o.moved ?? PLANNED, move: o.moved ? { planned_start_at: PLANNED, start_at: o.moved, end_at: o.moved } : null,
@@ -88,7 +90,7 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
   const execute = (grant, name, args) => {
     const slot = grant.slot;
     switch (name) {
-      case 'get_account_context': return okResult({ account_ref: sha(`${slot}${grant.clientId}`).slice(0, 24), today_local_date: TODAY, granted_scopes: grant.scopes });
+      case 'get_account_context': return okResult({ account_ref: sha(`${slot}${grant.clientId}`).slice(0, 24), today_local_date: TODAY, granted_scopes: grant.scopes, contract_version: contractVersion });
       case 'list_behaviors': return okResult({ behaviors: data.behaviors.filter((b) => b.slot === slot).map(view), next_cursor: null });
       case 'get_behavior': { const b = own(data.behaviors, slot, args.behavior_id); return b ? okResult({ behavior: view(b) }) : notFound(); }
       case 'list_categories': return okResult({ categories: [], next_cursor: null });
@@ -109,7 +111,12 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false 
         if (args.idempotency_key) data.idempotent.set(k, structuredClone(out));
         return okResult(out);
       }
-      case 'update_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.title = args.title; b.revision += 1; return okResult({ behavior: view(b), changed: true }); }
+      case 'update_behavior': {
+        const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound();
+        if (args.title !== undefined) b.title = args.title;
+        if (alongside && args.alongside !== undefined) b.alongside = args.alongside;
+        b.revision += 1; return okResult({ behavior: view(b), changed: true });
+      }
       case 'archive_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.state = 'archived'; return okResult({ behavior: view(b), changed: true }); }
       case 'restore_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); b.state = 'active'; return okResult({ behavior: view(b), changed: true }); }
       case 'end_behavior': case 'pause_behavior': case 'resume_behavior': { const b = own(data.behaviors, slot, args.behavior_id); if (!b) return notFound(); return okResult({ behavior: view(b), changed: true }); }
@@ -217,6 +224,17 @@ describe('Ticket 249 protocol acceptance suite', () => {
     for (const tool of REGISTRY_TOOLS) expect(checks.some((c) => c.check.startsWith(tool))).toBe(true);
     expect(report).toMatch(/\| ratelimit-a \| read-limit \| pass \| first-429=121 \|/);
     expect(report).toMatch(/PASS/);
+  });
+
+  it('checks the alongside setting when the server reports contract 1.8.0 (Ticket 364)', async () => {
+    const { ok, checks } = await runFake({ fake: createFakeCadence({ contractVersion: '1.8.0' }) });
+    expect(failed(checks)).toEqual([]);
+    expect(ok).toBe(true);
+    for (const name of ['alongside-unanswered-on-create', 'alongside-saved', 'alongside-read-back']) {
+      expect(checks.some((c) => c.check === name && c.ok)).toBe(true);
+    }
+    const published = await runFake();
+    expect(published.checks.some((c) => c.check === 'alongside-absent-before-1.8.0' && c.ok)).toBe(true);
   });
 
   it.each(['token-request-failed', 'granted-scope-mismatch'])('cleans the final consent-created grant after %s', async reason => {

@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { revalidatePath } from "next/cache";
 import {
-  checkOperationScope, createIntegrationError, validateOperationInput, validateOperationOutput,
+  checkOperationScope, createIntegrationError, fitOutputToContract, validateOperationInput, validateOperationOutput,
   type IntegrationError, type IntegrationOperationInput, type IntegrationOperationOutput,
 } from "@cadence/core/integration";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 import { noticeText, type NoticeId } from "@cadence/core/notices";
 import { zonedInstant } from "@cadence/core/resolvers/time.resolver";
 import { MOVE_ALTERNATIVES_LIMIT, type MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
@@ -61,7 +62,8 @@ export async function executeOpportunityWrite<N extends OpportunityOperationName
   let committed = false;
   try {
     if (scopeError) throw new OpportunityWriteError(scopeError);
-    const validated = validateOperationInput(name, raw);
+    const contract = integrationContractOptions();
+    const validated = validateOperationInput(name, raw, contract);
     if (!validated.ok) throw new OpportunityWriteError(validated.error);
     const input = validated.value as IntegrationOperationInput<OpportunityOperationName>;
     const requestHash = integrationWriteHash(name, input);
@@ -71,7 +73,7 @@ export async function executeOpportunityWrite<N extends OpportunityOperationName
       if (started.state === "mismatch") fail("idempotency_key_reused", "Use a new key for different input.");
       if (started.state === "in_progress") fail("service_unavailable", "This write is still running. Retry with the same key shortly.");
       if (started.state === "replay") {
-        const replay = readReceipt(started.result) as IntegrationOperationOutput<N>;
+        const replay = fitOutputToContract(readReceipt(started.result), contract) as IntegrationOperationOutput<N>;
         await recordIntegrationActivity(context.supabase, { operation: name, targetIds: targetIds(replay), outcome: "success", errorCode: null });
         return { ok: true, value: replay };
       }
@@ -82,7 +84,7 @@ export async function executeOpportunityWrite<N extends OpportunityOperationName
     const projected = name === "add_opportunity_occurrence"
       ? await addOpportunity(context, caller, input as IntegrationOperationInput<"add_opportunity_occurrence">, options)
       : await removeOpportunity(context, caller, input as IntegrationOperationInput<"remove_opportunity_occurrence">);
-    const output = validateOperationOutput(name, projected);
+    const output = validateOperationOutput(name, projected, contract);
     if (!output.ok) throw new OpportunityWriteError(output.error);
     committed = projected.outcome !== "refused";
     if (claim) await completeIdempotentWrite(context.supabase, { ...claim, result: { version: 2, output_json: JSON.stringify(output.value) } });
