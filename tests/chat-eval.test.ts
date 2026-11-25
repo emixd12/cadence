@@ -96,6 +96,33 @@ describe("chat eval layer 1 rules", () => {
     const leak = checkChatRules({ scenario: chatScenario("calendar_off"), world: off, turns: [{ turn: 1, user: "", parts: [{ type: "text", text: "You have Standup at 9." }] }], calls: [], undoResults: [] });
     expect(leak.map((item) => item.rule)).toEqual(["off_source_data"]);
   });
+
+  it("Ticket 359: flags a planning field name in a reply, and moving an alongside item nobody asked to move", () => {
+    const alongside = chatEvalWorld("alongside");
+    const helmet = occurrence(alongside, "Red light helmet", TODAY);
+    const words = checkChatRules({ scenario: chatScenario("alongside_guess"), world: alongside,
+      turns: [{ turn: 1, user: "", parts: [{ type: "text", text: "Yes: its alongside_source is guess." }] }], calls: [], undoResults: [] });
+    expect(words.map((item) => item.rule)).toEqual(["planning_words"]);
+    const move: PhasedCall = { name: "move_occurrence_for_day", args: { occurrence_id: helmet.id, start_time: "22:00" },
+      idempotencyKey: null, outcome: { ok: true, result: {} }, changed: true, replayed: false, turn: 1, phase: "turn" };
+    const moved = checkChatRules({ scenario: chatScenario("alongside_clashes"), world: alongside, turns: [{ turn: 1, user: "", parts: [] }], calls: [move], undoResults: [] });
+    expect(moved.map((item) => item.rule)).toEqual(["unasked_write"]);
+  });
+});
+
+describe("chat eval alongside world (Ticket 359)", () => {
+  it("reads carry planning for the helmet, pill and gym; other worlds carry none", async () => {
+    const world = chatEvalWorld("alongside");
+    const timeline = await createFakeExecutor(world).execute("get_timeline", { days: 1 }, {});
+    const items = (timeline as { result: { days: Array<{ occurrences: Array<{ behavior_title: string; planning?: unknown }> }> } }).result.days[0]!.occurrences;
+    const planning = Object.fromEntries(items.map((item) => [item.behavior_title, item.planning]));
+    expect(planning["Red light helmet"]).toEqual({ alongside: true, alongside_source: "guess", where: "home", where_source: "guess" });
+    expect(planning["Vitamin D"]).toEqual({ alongside: true, alongside_source: "person", where: "anywhere", where_source: "person" });
+    expect(planning["Gym session"]).toEqual({ alongside: false, alongside_source: "guess", where: "elsewhere", where_source: "guess" });
+    expect(planning["Read"]).toEqual({ alongside: false, alongside_source: "person", where: "home", where_source: "person" });
+    const everyday = await createFakeExecutor(chatEvalWorld("everyday")).execute("get_timeline", { days: 1 }, {});
+    expect(JSON.stringify(everyday)).not.toContain("planning");
+  });
 });
 
 describe("chat eval scenarios and report", () => {

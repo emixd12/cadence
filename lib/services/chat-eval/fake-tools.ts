@@ -7,6 +7,7 @@ import {
   clockLabel, effectiveTime, minutesOf, timeOf, toInstant,
   type ChatWorld, type WorldBehavior, type WorldOccurrence, type Weekday,
 } from "./world";
+import { CHAT_PLANNING_READS, withChatPlanning } from "../chat/chat-planning";
 
 /**
  * Phase 5 (5D) chat eval: an in-memory stand-in for the chat route's tool executor.
@@ -62,13 +63,26 @@ export function createFakeExecutor(world: ChatWorld): FakeExecutor {
       return outcome;
     }
     const before = WRITE_OPERATIONS.has(name) ? snapshot(world) : null;
-    const outcome = run(world, name, args);
+    const outcome = withWorldPlanning(world, name, run(world, name, args));
     const changed = before !== null && outcome.ok && snapshot(world) !== before;
     if (replayKey && WRITE_OPERATIONS.has(name)) replays.set(replayKey, outcome);
     calls.push({ name, args, idempotencyKey: key, outcome, changed, replayed: false });
     return outcome;
   };
   return { execute, calls, world };
+}
+
+/**
+ * Ticket 359: in a world read with CADENCE_ALONGSIDE on, timeline and Behavior reads carry
+ * `planning` the way the live executor adds it (after the output schema check).
+ */
+function withWorldPlanning(world: ChatWorld, name: string, outcome: ChatToolResult): ChatToolResult {
+  if (!world.alongside || !outcome.ok || !CHAT_PLANNING_READS.has(name)) return outcome;
+  const facts = new Map(world.behaviors.map((item) => {
+    const planning = item.planning ?? { alongside: false, alongsideSource: "default" as const, where: "unknown" as const, whereSource: "none" as const };
+    return [item.id, { alongside: { value: planning.alongside, source: planning.alongsideSource }, where: { kind: planning.where, source: planning.whereSource } }];
+  }));
+  return { ok: true, result: withChatPlanning(outcome.result, facts) };
 }
 
 function snapshot(world: ChatWorld): string {

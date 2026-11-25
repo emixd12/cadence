@@ -4,6 +4,7 @@ import {
   type BriefMoveBlock, type BriefMoveCandidate, type BriefMoveInterval, type BriefMovePlanInputs,
 } from "@cadence/core/resolvers/brief-move.resolver";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brief-moves";
+import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
 
 /**
  * Advisor Phase 3 (3A2) eval, layer 1: rules every offered line must keep, checked with
@@ -13,6 +14,8 @@ import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brie
 export const BRIEF_LAYER_ONE_RULES = [
   "yes_check_alone", "yes_check_all", "declined_reoffered", "alongside_offered", "never_move_offered",
   "after_latest_hour", "lines_collide", "leaves_day", "starts_in_past", "offered_on_stale_calendar",
+  // Ticket 359 (D33): a line's new time overlaps an alongside item at a different place.
+  "alongside_other_place",
 ] as const;
 export type BriefLayerOneRule = typeof BRIEF_LAYER_ONE_RULES[number];
 export type BriefLayerOneViolation = Readonly<{ rule: BriefLayerOneRule; occurrenceId: string; detail: string }>;
@@ -36,6 +39,14 @@ export function checkBriefLayerOne(input: BriefMovePlanInputs, lines: readonly L
     if (input.declinedToday.has(line.occurrenceId)) add("declined_reoffered", line, "answered No or undone today");
     if (alongside.has(line.behaviorId)) add("alongside_offered", line, "happens alongside other things");
     if (input.neverMoveBehaviorIds.has(line.behaviorId)) add("never_move_offered", line, "set to Don't suggest moving this");
+    // Items carry a Where only while CADENCE_ALONGSIDE is on; without one this rule cannot apply.
+    const moving = input.items.find((item) => item.occurrenceId === line.occurrenceId);
+    for (const item of input.items) {
+      if (!item.alongside || !item.where || !moving?.where || item.occurrenceId === line.occurrenceId || item.status !== "unresolved") continue;
+      if (overlaps(to, { start: item.start, end: item.end }) && !alongsideMayOverlap(item, { kind: "item", where: moving.where })) {
+        add("alongside_other_place", line, `overlaps ${item.occurrenceId} (${item.where.kind}) from ${moving.where.kind}`);
+      }
+    }
     if (!briefMoveStartAllowed(to.start, input.localDate, input.timezone, latest)) add("after_latest_hour", line, `starts ${line.to.startAt}`);
     if (Temporal.Instant.compare(to.end, dayEnd) > 0) add("leaves_day", line, `ends ${line.to.endAt}`);
     if (Temporal.Instant.compare(to.start, input.now) < 0) add("starts_in_past", line, `starts ${line.to.startAt}`);
