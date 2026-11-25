@@ -1,35 +1,56 @@
-/* Chat thinking mark (DESIGN.md "Chat"): a line-drawn horse gallops in place while a
-   curve with two dots scrolls under it. One inline SVG and keyframes; no image, no script. */
+/* Chat thinking mark (DESIGN.md "Chat"): a pale horse silhouette gallops in place while a
+   curve with dots scrolls under it. One inline SVG and keyframes; no image, no script. */
 
-.mark { display: inline-block; position: relative; width: 60px; height: 38px; vertical-align: middle; --t: .56s; }
+.mark {
+  --t: 0.56s;
+  --body: color-mix(in oklab, var(--primary) 13%, var(--background));
+  --edge: color-mix(in oklab, var(--primary) 34%, var(--background));
+  display: inline-block;
+  position: relative;
+  width: 50px;
+  height: 32px;
+  vertical-align: middle;
+}
 .mark svg { display: block; overflow: visible; }
-.mark .horse { position: absolute; left: 4px; top: 0; width: 52px; height: 34.7px; }
-.mark .ink { fill: none; stroke: var(--primary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.mark .fill { fill: var(--background); }
-.mark .fine { stroke-width: 1.1; opacity: .6; }
-.mark .far { opacity: .5; }
-.mark .eye { fill: var(--primary); }
-.mark .bob, .mark .leg, .mark .shin, .mark .tail, .mark .mane { transform-box: view-box; animation: var(--t) ease-in-out infinite; }
-.mark .bob { transform-origin: 60px 40px; animation-name: horse-bob; }
-.mark .leg.front { transform-origin: 73px 42px; animation-name: horse-front; }
-.mark .leg.front .shin { transform-origin: 73px 56px; animation-name: horse-front-shin; }
-.mark .leg.hind { transform-origin: 31px 40px; animation-name: horse-hind; }
-.mark .leg.hind .shin { transform-origin: 28px 57px; animation-name: horse-hind-shin; }
-.mark .far, .mark .far .shin { animation-delay: calc(var(--t) * -0.13); }
-.mark .tail { transform-origin: 24px 31px; animation-name: horse-tail; }
-.mark .mane { transform-origin: 78px 14px; animation-name: horse-mane; }
-@keyframes horse-bob { 0%,100% { transform: translateY(-1.8px) rotate(-2.5deg); } 50% { transform: translateY(1px) rotate(2.5deg); } }
-@keyframes horse-front { 0%,100% { transform: rotate(-62deg); } 50% { transform: rotate(34deg); } }
-@keyframes horse-front-shin { 0%,100% { transform: rotate(8deg); } 50% { transform: rotate(20deg); } 76% { transform: rotate(105deg); } }
-@keyframes horse-hind { 0%,100% { transform: rotate(48deg); } 50% { transform: rotate(-44deg); } }
-@keyframes horse-hind-shin { 0%,100% { transform: rotate(-8deg); } 26% { transform: rotate(55deg); } 50% { transform: rotate(10deg); } }
-@keyframes horse-tail { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(7deg); } }
-@keyframes horse-mane { 0%,100% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } }
-.mark .wave { position: absolute; left: 0; bottom: 0; width: 60px; height: 9px; overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); }
-.mark .wave svg { width: 120px; height: 9px; animation: horse-wave 1.68s linear infinite; }
-.mark .wave path { fill: none; stroke: var(--line); stroke-width: 1; }
-.mark .wave circle { fill: var(--primary); }
-.mark .wave circle.rust { fill: var(--accent); }
-@keyframes horse-wave { to { transform: translateX(-60px); } }
-@media (prefers-reduced-motion: reduce) { .mark, .mark * { animation: none !important; } }
+.horse { position: absolute; left: 3px; top: 0; width: 44px; height: 29.3px; }
+.edge { fill: var(--body); stroke: var(--edge); stroke-width: 0.9; stroke-linejoin: round; }
+.plume { fill: var(--body); }
+.far { opacity: 0.6; }
+
+.bob, .leg, .shin, .tail, .mane { transform-box: view-box; animation: var(--t) ease-in-out infinite; }
+.bob { transform-origin: 60px 40px; animation-name: horse-bob; }
+.leg.front { transform-origin: 73px 42px; animation-name: horse-front; }
+.leg.front .shin { transform-origin: 73px 56px; animation-name: horse-front-shin; }
+.leg.hind { transform-origin: 31px 40px; animation-name: horse-hind; }
+.leg.hind .shin { transform-origin: 28px 57px; animation-name: horse-hind-shin; }
+.far, .far .shin { animation-delay: calc(var(--t) * -0.13); }
+.tail { transform-origin: 24px 31px; animation-name: horse-tail; }
+.mane { transform-origin: 78px 14px; animation-name: horse-mane; }
+
+@keyframes horse-bob { 0%, 100% { transform: translateY(-1.8px) rotate(-2.5deg); } 50% { transform: translateY(1px) rotate(2.5deg); } }
+@keyframes horse-front { 0%, 100% { transform: rotate(-62deg); } 50% { transform: rotate(34deg); } }
+@keyframes horse-front-shin { 0%, 100% { transform: rotate(8deg); } 50% { transform: rotate(20deg); } 76% { transform: rotate(105deg); } }
+@keyframes horse-hind { 0%, 100% { transform: rotate(48deg); } 50% { transform: rotate(-44deg); } }
+@keyframes horse-hind-shin { 0%, 100% { transform: rotate(-8deg); } 26% { transform: rotate(55deg); } 50% { transform: rotate(10deg); } }
+@keyframes horse-tail { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(7deg); } }
+@keyframes horse-mane { 0%, 100% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } }
+
+.wave {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 50px;
+  height: 8px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+.wave svg { width: 100px; height: 8px; animation: horse-wave 1.68s linear infinite; }
+.wave path { fill: none; stroke: var(--line); stroke-width: 1; }
+.wave circle { fill: var(--primary); }
+.wave circle.rust { fill: var(--accent); }
+@keyframes horse-wave { to { transform: translateX(-50px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mark, .mark * { animation: none !important; }
+}
