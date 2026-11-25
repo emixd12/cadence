@@ -13,7 +13,7 @@ import type { OccurrenceFormAction } from "../lib/types/timeline";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe("Occurrence Note shortcuts", () => {
-  it("uses the first saved Note as the expected value for a second edit", async () => {
+  it("saves immediately on shortcut tap, uses the saved Note as expected value for a second edit, and collapses only the note on Done", async () => {
     let storedNote = "";
     const submissions: FormData[] = [];
     const action: OccurrenceFormAction = async (_state, form) => {
@@ -24,37 +24,50 @@ describe("Occurrence Note shortcuts", () => {
       storedNote = String(form.get("note")).trim();
       return { status: "success", message: "Note saved." };
     };
-    const container = document.createElement("div");
+    const container = document.body.appendChild(document.createElement("div"));
     const root = createRoot(container);
 
     try {
       await act(async () => root.render(
         <RefreshProvider onRefresh={() => undefined}>
-          <OccurrenceNoteForm occurrenceId="occurrence-1" note="" action={action} shortcuts={[shortcut()]} />
+          <details open data-parent-row>
+            <summary>Behavior row</summary>
+            <OccurrenceNoteForm occurrenceId="occurrence-1" note="" action={action} shortcuts={[shortcut()]} />
+          </details>
         </RefreshProvider>,
       ));
-      const form = container.querySelector("form")!;
+      const parentDetails = container.querySelector<HTMLDetailsElement>("[data-parent-row]")!;
+      const noteDetails = container.querySelector<HTMLDetailsElement>("[data-occurrence-note]")!;
+      expect(noteDetails.open).toBe(false);
+      await act(async () => noteDetails.querySelector("summary")!.click());
+      expect(noteDetails.open).toBe(true);
+
+      // Tapping a shortcut chip saves immediately.
       await act(async () => button(container, "Took a shorter walk.").click());
-      await act(async () => form.requestSubmit(button(container, "Save note")));
 
       expect(storedNote).toBe("Took a shorter walk.");
       expect(submissions[0]?.get("expected_note")).toBe("");
       expect(submissions[0]?.get("used_shortcut")).toBe("true");
+      expect(noteDetails.open).toBe(true);
 
       const textarea = container.querySelector("textarea")!;
       await act(async () => {
         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, "Took a longer walk.");
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      await act(async () => form.requestSubmit(button(container, "Save note")));
+      await act(async () => button(container, "Done").click());
 
       expect(submissions).toHaveLength(2);
       expect(submissions[1]?.get("expected_note")).toBe("Took a shorter walk.");
       expect(submissions[1]?.get("used_shortcut")).toBe("false");
       expect(storedNote).toBe("Took a longer walk.");
-      expect(container.querySelector('[role="status"]')?.textContent).toBe("Note saved.");
+      // Only the note disclosure collapses; the parent occurrence row stays open.
+      expect(noteDetails.open).toBe(false);
+      expect(parentDetails.open).toBe(true);
+      expect(noteDetails.querySelector("summary")?.textContent).toBe("NoteTook a longer walk.Saved");
     } finally {
       await act(async () => root.unmount());
+      container.remove();
     }
   });
 
@@ -67,7 +80,7 @@ describe("Occurrence Note shortcuts", () => {
       storedNote = String(form.get("note")).trim();
       return { status: "success", message: "Note saved." };
     };
-    const container = document.createElement("div");
+    const container = document.body.appendChild(document.createElement("div"));
     const root = createRoot(container);
     const renderForm = (note: string) => (
       <RefreshProvider onRefresh={() => undefined}>
@@ -77,28 +90,29 @@ describe("Occurrence Note shortcuts", () => {
 
     try {
       await act(async () => root.render(renderForm(storedNote)));
-      await act(async () => button(container, "Took a shorter walk.").click());
+      const noteDetails = container.querySelector<HTMLDetailsElement>("[data-occurrence-note]")!;
+      await act(async () => noteDetails.querySelector("summary")!.click());
+
+      // External device changes stored note before shortcut tap saves.
       storedNote = "Changed on another device";
+      await act(async () => button(container, "Took a shorter walk.").click());
       await act(async () => root.render(renderForm(storedNote)));
 
       const form = container.querySelector("form")!;
-      expect(new FormData(form).get("note")).toBe("Original note\nTook a shorter walk.");
-      expect(new FormData(form).get("expected_note")).toBe("Original note");
-      expect(new FormData(form).get("used_shortcut")).toBe("true");
-
-      await act(async () => form.requestSubmit(button(container, "Save note")));
-
       expect(container.querySelector('[role="alert"]')?.textContent).toBe("This note changed elsewhere.");
       expect(new FormData(form).get("note")).toBe("Original note\nTook a shorter walk.");
       expect(new FormData(form).get("expected_note")).toBe("Original note");
       expect(new FormData(form).get("used_shortcut")).toBe("true");
       expect(storedNote).toBe("Changed on another device");
+      expect(noteDetails.open).toBe(true);
+      expect(button(container, "Try again")).toBeDefined();
     } finally {
       await act(async () => root.unmount());
+      container.remove();
     }
   });
 
-  it("preserves a shortcut inserted during a pending save for the next submitted draft", async () => {
+  it("preserves a shortcut inserted during a pending save and automatically submits it next", async () => {
     let finishSave: ((state: { status: "success"; message: string }) => void) | undefined;
     const submissions: FormData[] = [];
     const action: OccurrenceFormAction = async (_state, form) => {
@@ -115,28 +129,37 @@ describe("Occurrence Note shortcuts", () => {
           <OccurrenceNoteForm occurrenceId="occurrence-1" note="Warm-up" action={action} shortcuts={[shortcut()]} />
         </RefreshProvider>,
       ));
+      const noteDetails = container.querySelector<HTMLDetailsElement>("[data-occurrence-note]")!;
+      await act(async () => noteDetails.querySelector("summary")!.click());
       const form = container.querySelector("form")!;
-      const shortcutButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Took a shorter walk.")!;
-      const saveButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Save note")!;
+      const textarea = container.querySelector("textarea")!;
+      const shortcutButton = button(container, "Took a shorter walk.");
 
-      await act(async () => form.requestSubmit(saveButton));
+      // Trigger first in-flight save via blur.
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, "Warm-up extended");
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        textarea.focus();
+        textarea.blur();
+      });
       expect(finishSave).toBeDefined();
-      expect(saveButton.disabled).toBe(true);
+      expect(button(container, "Saving...").disabled).toBe(true);
       expect(hasPendingDesktopWrites()).toBe(true);
+
+      // Tap shortcut while first save is still in flight.
       await act(async () => shortcutButton.click());
-
-      expect(new FormData(form).get("note")).toBe("Warm-up\nTook a shorter walk.");
+      expect(new FormData(form).get("note")).toBe("Warm-up extended\nTook a shorter walk.");
       expect(new FormData(form).get("used_shortcut")).toBe("true");
 
+      // Completing first save automatically flushes the queued shortcut save.
       await act(async () => finishSave!({ status: "success", message: "Note saved." }));
-      expect(new FormData(form).get("note")).toBe("Warm-up\nTook a shorter walk.");
-      expect(new FormData(form).get("used_shortcut")).toBe("true");
-      expect(hasPendingDesktopWrites()).toBe(false);
-      expect(hasUnsavedDesktopDrafts()).toBe(true);
-      await act(async () => form.requestSubmit(button(container, "Save note")));
       expect(submissions).toHaveLength(2);
-      expect(submissions[1]?.get("note")).toBe("Warm-up\nTook a shorter walk.");
+      expect(submissions[1]?.get("expected_note")).toBe("Warm-up extended");
+      expect(submissions[1]?.get("note")).toBe("Warm-up extended\nTook a shorter walk.");
       expect(submissions[1]?.get("used_shortcut")).toBe("true");
+      expect(hasPendingDesktopWrites()).toBe(false);
       expect(hasUnsavedDesktopDrafts()).toBe(false);
     } finally {
       await act(async () => root.unmount());

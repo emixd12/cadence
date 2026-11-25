@@ -586,10 +586,16 @@ Do not show previous days except for unresolved prior-day items inside the Needs
 
 Under each Timeline day's date, including future days and Needs decision day
 sections, a quiet disclosure reads "Add day note", or "Day note" followed by a
-one-line preview when a note exists. Opening it shows the shared note editor with the
-label "Day note", the placeholder "Add a note about this day", accepted day-note
-shortcut chips, and Save note. Saving refreshes the Timeline; a conflict keeps the
-draft and shows the factual conflict message. No modal and no status controls.
+one-line preview when a note exists. Opening it shows the shared note editor
+(without repeating the visible "Day note" label), the placeholder "Add a note about
+this day", inline day-note shortcut chips, and Done. Typing auto-saves after a short
+pause (~750ms), tapping a shortcut chip saves immediately, and blurring outside the
+editor flushes any unsaved draft without closing it. Selecting Done (or pressing
+Cmd/Ctrl+Enter or Escape) flushes any pending save, refreshes the Timeline, updates
+the header preview immediately, and collapses back to the one-line summary with a
+quiet "Saved" indicator that fades after ~2.5s. A conflict or error keeps the editor
+open with the draft preserved, shows the factual message, and offers Try again. No
+modal and no status controls.
 
 ### Opportunity Basket (Behaviors of Opportunity)
 
@@ -721,9 +727,14 @@ field edges: the largest gap is between the collapsed row content and the first
 detail label and should measure 16px optically. This gap is part of the
 standard disclosure pattern for row details. The next-largest gap is between
 detail pairs, and the smallest gap is shared by detail label/value, Note
-label/textarea, and textarea/Save note
-relationships. The Note textarea keeps its field border, but Save note uses the
-same underlined text-action vocabulary as Completed and Not Completed.
+disclosure/textarea, and textarea/Done
+relationships. The Note section uses the same one-line collapsible disclosure
+("Add note" when empty, or "Note" followed by a one-line preview when saved) and
+auto-saves on pause, blur, or shortcut-chip tap. The Note textarea keeps its field
+border, and Done (or Try again on error) uses the same underlined text-action
+vocabulary as Completed and Not Completed. Choosing Done (or Cmd/Ctrl+Enter or
+Escape) collapses only the Note disclosure back to its one-line preview with a
+quiet fading "Saved" indicator, leaving the expanded occurrence row open.
 When an occurrence is open, the whole occurrence row should hold the same blue
 background used by that row's hover state so the expanded content remains
 visually attached to the behavior.
