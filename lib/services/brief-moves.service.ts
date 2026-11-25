@@ -4,8 +4,10 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartInstant } from "@cadence/core/resolvers/time.resolver";
 import {
   BRIEF_MOVE_OTHER_TIMES,
+  briefMoveBlocksForSubject,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
+  briefMoveOverlapSubject,
   checkBriefMoveSlot,
   planBriefMoveLinesFromInputs,
   travelBlocksFor,
@@ -655,11 +657,11 @@ function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonl
   : Readonly<{ blocks: BriefMoveBlock[]; before: number; after: number }> {
   const stop = travel?.stops.get(occurrenceId);
   return {
-    blocks: [
+    blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId, positions),
       ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
       ...travelBlocksFor(travel, occurrenceId),
-    ],
+    ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,
     after: stop?.afterSeconds ?? 0,
   };
@@ -968,11 +970,11 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   const starts = briefMoveFreeStarts({
     localDate: proposal.local_date, timezone: old.timezone, now: person.now,
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
-    blocks: [
+    blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
       ...calendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
       ...travelBlocksFor(travel, item.occurrenceId),
-    ],
+    ], briefMoveOverlapSubject(day.items, item.occurrenceId)),
     travelBeforeSeconds: stop?.beforeSeconds, travelAfterSeconds: stop?.afterSeconds,
     limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [effectiveStartInstant(day.occurrences.get(item.occurrenceId)!), shown[0]!],
   });

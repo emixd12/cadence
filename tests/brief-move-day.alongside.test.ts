@@ -17,14 +17,15 @@ const ON = { CADENCE_ALONGSIDE: "on" };
 const OFF = {};
 const DAY = "2026-11-25";
 
-type BehaviorRow = Readonly<{ id: string; title: string; alongside: boolean | null }>;
-type EstimateRow = Readonly<{ behavior_id: string; input_hash: string; duration_minutes: number | null; alongside: boolean }>;
+type BehaviorRow = Readonly<{ id: string; title: string; alongside: boolean | null; where_kind?: string | null; location_text?: string | null }>;
+type EstimateRow = Readonly<{ behavior_id: string; input_hash: string; duration_minutes: number | null; alongside: boolean; where_guess?: string | null }>;
+type LabelRow = Readonly<{ behavior_id: string; label: string; local_date: string }>;
 
 function behaviorRow(row: BehaviorRow) {
   return {
     id: row.id, title: row.title, description: null, timezone: "America/New_York", default_duration_minutes: 10,
-    where_kind: null, updated_at: "2026-11-01T00:00:00.000Z", parent_behavior_id: null, inherit_parent_schedule: false,
-    sub_behavior_sort_order: 0, alongside: row.alongside,
+    where_kind: row.where_kind ?? null, location_text: row.location_text ?? null, updated_at: "2026-11-01T00:00:00.000Z",
+    parent_behavior_id: null, inherit_parent_schedule: false, sub_behavior_sort_order: 0, alongside: row.alongside,
   };
 }
 
@@ -36,12 +37,13 @@ function occurrence(behaviorId: string): Occurrence {
 }
 
 /** A read-only fake: each `from(table)` resolves to that table's rows; `rpc` records its arguments. */
-function fakeClient(tables: Readonly<{ behaviors: BehaviorRow[]; estimates: EstimateRow[] }>) {
+function fakeClient(tables: Readonly<{ behaviors: BehaviorRow[]; estimates: EstimateRow[]; labels?: LabelRow[] }>) {
   const selects: Record<string, string[]> = {};
   const rpcs: Array<Readonly<{ name: string; args: unknown }>> = [];
   const rows = (table: string): unknown[] => {
     if (table === "behaviors") return tables.behaviors.map(behaviorRow);
     if (table === "behavior_advisor_estimates") return tables.estimates;
+    if (table === "completion_place_labels") return tables.labels ?? [];
     return [];
   };
   const client = {
@@ -49,7 +51,7 @@ function fakeClient(tables: Readonly<{ behaviors: BehaviorRow[]; estimates: Esti
       const result = { data: rows(table), error: null };
       const chain = {
         select(columns: string) { (selects[table] ??= []).push(columns); return chain; },
-        eq: () => chain, in: () => chain, not: () => chain, order: () => chain, limit: () => chain,
+        eq: () => chain, in: () => chain, not: () => chain, order: () => chain, limit: () => chain, gte: () => chain, lte: () => chain,
         then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
       };
       return chain;
@@ -119,6 +121,48 @@ describe("readBriefMoveDay alongside", () => {
     expect(cleared.items[0]).toMatchObject({ alongside: false, alongsideSource: "default" });
     const off = await readBriefMoveDay(fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: true }], estimates: [lengthOnly] }).client, "user", DAY, { env: OFF });
     expect(off.staleEstimateBehaviorIds.has("pill")).toBe(true);
+  });
+});
+
+describe("readBriefMoveDay effective Where (Ticket 357)", () => {
+  const labels = (behaviorId: string, label: string, count: number): LabelRow[] =>
+    Array.from({ length: count }, (_, index) => ({ behavior_id: behaviorId, label, local_date: `2026-11-${String(25 - index).padStart(2, "0")}` }));
+
+  it("flag off: no item has a Where and nothing place-related is read", async () => {
+    const fake = fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: null }], estimates: [], labels: labels("pill", "home", 6) });
+    const day = await readBriefMoveDay(fake.client, "user", DAY, { env: OFF });
+    expect(day.items.every((item) => !("where" in item))).toBe(true);
+    expect(fake.selects.completion_place_labels).toBeUndefined();
+    expect(fake.selects.behaviors!.every((columns) => !columns.includes("location_text"))).toBe(true);
+    expect(fake.selects.behavior_advisor_estimates!.every((columns) => !columns.includes("where_guess"))).toBe(true);
+  });
+
+  it("flag on: the person's Where, then counted labels, then a current guess, then unknown", async () => {
+    const fake = fakeClient({
+      behaviors: [
+        { id: "pill", title: "Pill", alongside: null, where_kind: "home" },
+        { id: "reading", title: "Reading", alongside: null },
+      ],
+      estimates: [{ behavior_id: "reading", input_hash: behaviorEstimateInputHash(facts("Reading")), duration_minutes: 30, alongside: false, where_guess: "anywhere" }],
+      labels: labels("pill", "elsewhere", 6),
+    });
+    const day = await readBriefMoveDay(fake.client, "user", DAY, { env: ON });
+    expect(day.items.map((item) => [item.behaviorId, item.where])).toEqual([
+      ["pill", { kind: "home", source: "person" }],
+      ["reading", { kind: "anywhere", source: "guess" }],
+    ]);
+    expect(fake.selects.behavior_advisor_estimates!.some((columns) => columns.includes("where_guess"))).toBe(true);
+
+    const counted = await readBriefMoveDay(fakeClient({
+      behaviors: [{ id: "pill", title: "Pill", alongside: null }, { id: "reading", title: "Reading", alongside: null }],
+      // A stale estimate's guess is not read.
+      estimates: [{ behavior_id: "reading", input_hash: "0".repeat(64), duration_minutes: 30, alongside: false, where_guess: "home" }],
+      labels: labels("pill", "home", 6),
+    }).client, "user", DAY, { env: ON });
+    expect(counted.items.map((item) => [item.behaviorId, item.where])).toEqual([
+      ["pill", { kind: "home", source: "evidence" }],
+      ["reading", { kind: "unknown", source: "none" }],
+    ]);
   });
 });
 

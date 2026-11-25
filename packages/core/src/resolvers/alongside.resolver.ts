@@ -12,6 +12,8 @@
  * it is not.
  */
 
+import type { EffectiveWhere } from "./effective-where.resolver";
+
 export const ALONGSIDE_SOURCES = ["person", "guess", "default"] as const;
 export type AlongsideSource = (typeof ALONGSIDE_SOURCES)[number];
 
@@ -55,4 +57,39 @@ export function resolveRoutineBlockAlongside(members: readonly AlongsideMember[]
   if (blocking) return { value: false, source: blocking.alongsideSource ?? "default" };
   const guessed = members.some((member) => (member.alongsideSource ?? "guess") === "guess");
   return { value: true, source: guessed ? "guess" : "person" };
+}
+
+/** One side's place for the same-place rule: an effective Where, or nothing known. */
+export type OverlapPlace = Pick<EffectiveWhere, "kind" | "placeKey"> | null | undefined;
+
+export type AlongsideOverlapOther = Readonly<{
+  kind: "item" | "calendar" | "travel";
+  /** A Cadence item's effective Where. Calendar events carry none yet: their place is unknown. */
+  where?: OverlapPlace;
+}>;
+
+/**
+ * Ticket 357 (D33): may `alongsideItem` (an alongside item) overlap `other`?
+ *
+ *   - Never travel: the person is on the way somewhere.
+ *   - Yes when either place is unknown or Anywhere.
+ *   - Yes at the same place: both Home, or both the same saved place (same place key).
+ *   - No at a different place: Home against a place away from home.
+ *
+ * `elsewhere` is a place away from home whose identity is unknown, and a `place` with
+ * no key is the same. Against another place away from home either counts as unknown,
+ * so the overlap is allowed; against Home it is refused.
+ */
+export function alongsideMayOverlap(alongsideItem: Readonly<{ where?: OverlapPlace }>, other: AlongsideOverlapOther): boolean {
+  if (other.kind === "travel") return false;
+  const left = alongsideItem.where, right = other.where;
+  if (!left || !right || open(left) || open(right)) return true;
+  if (left.kind === "home" || right.kind === "home") return left.kind === right.kind;
+  // Both are away from home. Two known place keys decide; anything less is unknown.
+  if (left.kind === "place" && right.kind === "place" && left.placeKey && right.placeKey) return left.placeKey === right.placeKey;
+  return true;
+}
+
+function open(where: NonNullable<OverlapPlace>): boolean {
+  return where.kind === "unknown" || where.kind === "anywhere";
 }
