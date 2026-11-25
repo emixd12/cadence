@@ -50,9 +50,11 @@ $$;
 
 -- 2. Agent grant lifecycle + auto-clear exclude_google_calendar + Ticket 335 unlink lock
 insert into cadence_advisor_private.daily_brief_preferences (
-  user_id, enabled, include_calendar, revision, use_connected_sources, exclude_google_calendar
+  user_id, enabled, include_calendar, revision,
+  use_connected_sources, exclude_google_calendar, exclude_outlook_calendar, exclude_icloud_calendar, exclude_hevy
 ) values (
-  '20261125-0000-4000-8000-000000000001', true, false, 1, true, true
+  '20261125-0000-4000-8000-000000000001', true, false, 1,
+  true, true, false, false, false
 );
 
 do $$
