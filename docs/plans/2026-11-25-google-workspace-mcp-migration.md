@@ -98,6 +98,12 @@ Workstreams are decomposed with **disjoint file ownership** per wave so parallel
 - **WS-4B — Cadence for Mac `0.1.16` Versioned `purpose=ai_mcp` Broker & Shared Settings Wiring:**
   - `apps/desktop/src/calendar/google-calendar.ts` (dedicated `ai_mcp` Keychain pending slot & callback marker, preserving `purpose=agent` as `not_configured` and standard `cadence://calendar/callback` for older Macs), `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/product.tsx`, desktop tests (`npm run desktop:typecheck`, `npm run desktop:build`, `npm run desktop:native:test`).
 
-### Wave 4 — Integration Verification, Phase 0 Live Spike & Pre-Ticket-245 Readiness
-- Full verification suite (`agents:check`, `interactions:check`, `map:check`, `resolvers:check`, `lint`, `typecheck`, `test`, `build`, `desktop:typecheck`, `desktop:build`, `desktop:native:test`, local Supabase rehearsal if Docker available).
-- Run Phase 0 live `calendarmcp.googleapis.com` wire check once a fresh Google sign-in token is authorized, update `STATUS.md`, and prepare Ticket 245 verification deployment & demo video.
+### Wave 4 — Integration Verification, Phase 0 Live Spike & Pre-Ticket-245 Readiness (Completed / In Progress)
+- Waves 1–4 implementation landed on `feat/google-calendar-mcp-migration`; Google Cloud Model Armor template (`projects/habit-tracker-498717/locations/us-east1/templates/cadence-calendar-mcp-screen`, `INSPECT_AND_BLOCK`, Cloud Logging OFF) is live on `habit-tracker-498717` so `cadence-calendar-agent-prod` stays unbilled on Standard Tier.
+
+### Wave 5+ — Wave-Based Sequencing at Inference Pace (No Calendar Date Targets)
+Calendar-date targets (prior December/January milestones) are dismissed in favor of wave-based execution at inference pace ahead of Google's February 1, 2027 external enforcement deadline:
+- **Wave 5A (Disclosures, Model Armor OIDC & Verification Packet):** Privacy/Terms `P-090` updates, Ticket 245 verification packet refresh, Model Armor Workload Identity OIDC wiring (`habit-tracker-498717`, `x-goog-user-project`).
+- **Wave 5B (Review & Rehearsal):** Full verification suite (`agents:check`, `interactions:check`, `map:check`, `resolvers:check`, `lint`, `typecheck`, `test`, `build`, `desktop:typecheck`, `desktop:build`, `desktop:native:test`) and clean local Supabase rehearsal.
+- **Wave 6 (Phase 0 Live Wire Spike):** Run live `calendarmcp.googleapis.com` wire check once a fresh Google sign-in token is authorized.
+- **Wave 7 (Ticket 245 Submission & Mac `0.1.16` Bundle):** Deploy to production, record and upload the Ticket 245 demo video on `https://app.cadence-me.com`, submit Data Access verification for `cadence-calendar-agent-prod`, and bundle Mac `0.1.16`.

@@ -136,7 +136,7 @@ Status values:
 | [P-087](#p-087-persisted-hevy-workout-timing-recorded_activities-and-daily-background-sync-for-unlinked-accounts) | Persisted Hevy workout timing (`recorded_activities`) and daily background sync for unlinked accounts | logged | 352, 353 | Privacy, Trust, in-app copy, user guide, marketing |
 | [P-088](#p-088-persisted-derived-daily-calendar-busy-load-rollups-daily_calendar_load) | Persisted derived daily calendar busy-load rollups (`daily_calendar_load`) | logged | 354 | Privacy, Trust, user guide, provider submissions |
 | [P-089](#p-089-ai-chat-and-daily-brief-reading-past-calendar-history-on-demand) | AI (Chat and Daily Brief) reading past calendar history on demand | logged | 355 | Privacy, user guide, provider submissions |
-| [P-090](#p-090-google-workspace-mcp-migration-ai-calendar-consent-retention-longitudinal-review-and-travel-chat) | Google Workspace MCP migration, AI Calendar consent, retention, longitudinal review, and travel Chat | logged | 187, 245, 246, 307, 354, 355 | Privacy, Terms, in-app copy, user guide, provider submissions |
+| [P-090](#p-090-google-workspace-mcp-migration-ai-calendar-consent-retention-longitudinal-review-and-travel-chat) | Google Workspace MCP migration, AI Calendar consent, retention, longitudinal review, and travel Chat | drafted | 187, 245, 246, 307, 354, 355 | Privacy, Terms, in-app copy, user guide, provider submissions |
 | [P-091](#p-091-geoapify-place-and-home-autocomplete-and-auto-saved-completion-markers) | Geoapify place and Home autocomplete and auto-saved completion markers | logged | — | Privacy and Terms, in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
@@ -2516,7 +2516,7 @@ cite has not changed.
      P-088, P-089, and this entry across Privacy, Terms, Settings, and the user guide.
 - **Related:** L-001, L-021, L-026, L-027, P-010, P-012, P-035, P-060, P-065, P-066, P-088,
   P-089.
-- **Status:** logged.
+- **Status:** drafted (`components/settings/LegalContent.tsx` and `docs/qa/2026-10-12-agentic-calendar.md` updated for Ticket 245 verification; awaiting production deploy).
 
 ## P-091: Geoapify place and Home autocomplete and auto-saved completion markers
 

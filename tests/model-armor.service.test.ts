@@ -203,4 +203,108 @@ describe("model-armor.service", () => {
     expect(reportEvent).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(reportEvent.mock.calls[0][0])).not.toContain("Secret meeting");
   });
+
+  it("defaults project to habit-tracker-498717 and sends x-goog-user-project header", async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      expect(String(url)).toBe(
+        "https://modelarmor.us-east1.rep.googleapis.com/v1/projects/habit-tracker-498717/locations/us-east1/templates/cadence-calendar-mcp-screen:sanitizeUserPrompt",
+      );
+      const headers = new Headers(init?.headers);
+      expect(headers.get("x-goog-user-project")).toBe("habit-tracker-498717");
+      expect(headers.get("authorization")).toBe("Bearer ma-token");
+      return new Response(
+        JSON.stringify({ sanitizationResult: { filterMatchState: "NO_MATCH_FOUND" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const result = await screenExternalCalendarTextWithModelArmor({
+      text: "Dentist",
+      env: {
+        NODE_ENV: "test",
+        CADENCE_MODEL_ARMOR_LOCATION: "us-east1",
+        CADENCE_MODEL_ARMOR_TEMPLATE: "cadence-calendar-mcp-screen",
+      },
+      accessToken: "ma-token",
+      fetch: fetchMock,
+    });
+
+    expect(result).toEqual({
+      text: "Dentist",
+      blocked: false,
+      screenedBy: "model_armor",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves access token automatically via Google Workload Identity OIDC when configured", async () => {
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const jwtPayload = Buffer.from(JSON.stringify({
+      iss: "https://oidc.vercel.com/cadence",
+      aud: "https://vercel.com/cadence",
+      sub: "owner:cadence:project:cadence:environment:production",
+      owner_id: "owner_1",
+      project_id: "prj_1",
+      environment: "production",
+      iat: nowSeconds - 10,
+      nbf: nowSeconds - 10,
+      exp: nowSeconds + 600,
+    })).toString("base64url");
+    const subjectToken = `eyJhbGciOiJSUzI1NiJ9.${jwtPayload}.sig`;
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const target = String(url);
+      if (target === "https://sts.googleapis.com/v1/token") {
+        return new Response(
+          JSON.stringify({ access_token: "fed-token", token_type: "Bearer" }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (target.includes("iamcredentials.googleapis.com")) {
+        return new Response(
+          JSON.stringify({
+            accessToken: "oidc-ma-token",
+            expireTime: new Date(Date.now() + 900_000).toISOString(),
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer oidc-ma-token");
+      expect(headers.get("x-goog-user-project")).toBe("habit-tracker-498717");
+      return new Response(
+        JSON.stringify({ sanitizationResult: { filterMatchState: "NO_MATCH_FOUND" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const result = await screenExternalCalendarTextWithModelArmor({
+      text: "Weekly review",
+      env: {
+        NODE_ENV: "test",
+        CADENCE_MODEL_ARMOR_LOCATION: "us-east1",
+        CADENCE_MODEL_ARMOR_TEMPLATE: "cadence-calendar-mcp-screen",
+        GOOGLE_CLOUD_PROJECT_ID: "habit-tracker-498717",
+        GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER:
+          "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-oidc",
+        GOOGLE_CLOUD_TRAVEL_SERVICE_ACCOUNT_EMAIL:
+          "cadence-travel@habit-tracker-498717.iam.gserviceaccount.com",
+        CADENCE_TRAVEL_VERCEL_OIDC_ISSUER: "https://oidc.vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_AUDIENCE: "https://vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_SUBJECT: "owner:cadence:project:cadence:environment:production",
+        CADENCE_TRAVEL_VERCEL_OIDC_OWNER_ID: "owner_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_PROJECT_ID: "prj_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_ENVIRONMENT: "production",
+        VERCEL_OIDC_TOKEN: subjectToken,
+      },
+      fetch: fetchMock,
+    });
+
+    expect(result).toEqual({
+      text: "Weekly review",
+      blocked: false,
+      screenedBy: "model_armor",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });

@@ -44,7 +44,7 @@ describe("trust and legal UI content", () => {
   it("renders Privacy with processor, retention and separate connector disclosures", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="privacy" />);
 
-    expect(html).toContain("October 24, 2026");
+    expect(html).toContain("November 25, 2026");
     expect(html).not.toContain("draft");
     expect(html).not.toContain("not legally approved");
     expect(html).toContain("Cadence service providers and purposes");
@@ -104,25 +104,40 @@ describe("trust and legal UI content", () => {
     ]) expect(privacy).toContain(disclosure);
   });
 
-  it("separates the Timeline and Daily Brief Google Calendar connections and states the AI training limit", () => {
+  it("separates the Timeline and AI features Google Calendar connections and states the AI training limit", () => {
     const calendar = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Optional Google Calendar");
     const copy = calendar?.paragraphs.join(" ") ?? "";
     for (const disclosure of [
+      "Timeline & Travel (using Google's Calendar REST API, calendar-json.googleapis.com)",
+      "AI features (Daily Brief & Chat) (using Google's Calendar MCP server, calendarmcp.googleapis.com)",
       "Each requires its own Google consent for the same Google account used to sign in",
-      "Where available, a second connection, Google Calendar for Daily Brief, supplies event timing to Daily Brief only",
-      "Daily Brief reads Calendar only through that connection, never through the Timeline connection",
+      "Daily Brief and Advisor Chat read Google Calendar only through the AI features MCP connection, never through the Timeline & Travel connection",
       "connecting a calendar alone sends nothing to OpenAI",
+      "Google Cloud Model Armor (INSPECT_AND_BLOCK, payload logging disabled)",
       "does not use information received from Google APIs to develop, improve, or train generalized artificial intelligence or machine-learning models",
-      "Desktop keeps no event cache for Google Calendar for Daily Brief",
+      "daily_calendar_load",
+      "capped at 30 days",
+      "discarded immediately after the turn",
+      "opted-in, activity-gated weekly or monthly longitudinal review",
+      "Desktop keeps no event cache for the AI features Google Calendar connection",
       "Each connection has its own Disconnect",
-      "The other connection stays connected",
+      "atomically deletes its live server credential",
+      "The Timeline & Travel connection stays connected",
       "Account deletion attempts revocation for each connection",
       "Limited Use requirements",
     ]) expect(copy).toContain(disclosure);
     const daily = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Optional Daily Brief")?.paragraphs.join(" ") ?? "";
-    expect(daily).toContain("Calendar context uses today's selected event timing, timezone, availability and response state without event titles or details");
+    expect(daily).toContain("Daily Brief and Advisor Chat read Google Calendar only through the AI features MCP connection (calendarmcp.googleapis.com)");
+    expect(daily).toContain("deterministic fit or conflict conclusions and free windows to the model");
+    expect(daily).toContain("without sending raw Google Maps durations to the model");
+    expect(daily).toContain("derived conversation summaries expire after 30 days");
+    const processors = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Processors")?.table?.rows ?? [];
+    expect(processors.find(([label]) => label === "Google Cloud Model Armor")?.join(" ")).toContain("payload logging disabled");
+    expect(processors.filter(([label]) => label === "OpenAI")).toHaveLength(1);
     const retention = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.rows ?? [];
     expect(retention.find(([label]) => label === "Desktop Google Calendar cache")?.[2]).toContain("for the Timeline connection only");
+    expect(retention.find(([label]) => label === "Google Calendar AI derived findings")?.join(" ")).toContain("No more than 30 days");
+    expect(retention.find(([label]) => label === "Advisor Chat conversations using Google Calendar")?.join(" ")).toContain("atomically deletes Google-Calendar-touched Chat conversations");
   });
 
   it("distinguishes validity, physical cleanup, and shared registration retention", () => {
@@ -132,11 +147,11 @@ describe("trust and legal UI content", () => {
       "Failed maintenance can extend storage", "no automatic deletion deadline",
       "does not remove a shared client registration", "live account-owned integration records",
     ]) expect(privacy).toContain(disclosure);
-    expect(LEGAL_PAGES.privacy.updated).toBe("October 24, 2026");
+    expect(LEGAL_PAGES.privacy.updated).toBe("November 25, 2026");
     expect(LEGAL_PAGES.terms.updated).toBe("October 18, 2026");
     expect(LEGAL_PAGES.trust.updated).toBe("October 24, 2026");
     expect(LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.caption)
-      .toBe("Cadence retention periods as of October 18, 2026");
+      .toBe("Cadence retention periods as of November 25, 2026");
   });
 
   it("discloses backup lifecycle without changing live deletion or ordinary log periods", () => {

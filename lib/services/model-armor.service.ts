@@ -4,11 +4,15 @@ import {
   ProviderCallTimeoutError,
   runProviderCallWithTimeout,
 } from "@/lib/services/provider-call-timeout";
+import {
+  getGoogleWorkloadIdentityAccessToken,
+  type GoogleWorkloadIdentityConfig,
+} from "@/lib/services/travel-google-auth";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { ExternalEventSnapshotV1 } from "@cadence/core/types/external-event";
 
 export const MODEL_ARMOR_REDACTED_PLACEHOLDER = "[filtered calendar text]";
-const DEFAULT_MODEL_ARMOR_PROJECT = "cadence-calendar-agent-prod";
+const DEFAULT_MODEL_ARMOR_PROJECT = "habit-tracker-498717";
 const DEFAULT_MODEL_ARMOR_TIMEOUT_MS = 4_000;
 
 export type ModelArmorFetch = (
@@ -29,6 +33,7 @@ export type ModelArmorScreenTextInput = Readonly<{
   env?: NodeJS.ProcessEnv;
   accessToken?: string;
   getAccessToken?: () => Promise<string | null>;
+  vercelOidcToken?: string | null;
   fetch?: ModelArmorFetch;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -48,6 +53,7 @@ export type ModelArmorScreenSnapshotOptions = Readonly<{
   env?: NodeJS.ProcessEnv;
   accessToken?: string;
   getAccessToken?: () => Promise<string | null>;
+  vercelOidcToken?: string | null;
   fetch?: ModelArmorFetch;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -85,6 +91,66 @@ export function isModelArmorConfigured(env: NodeJS.ProcessEnv = process.env): bo
   return resolveModelArmorConfig(env) !== null;
 }
 
+function readModelArmorWorkloadIdentityConfig(
+  sourceEnv: NodeJS.ProcessEnv,
+  vercelOidcToken?: string | null,
+): GoogleWorkloadIdentityConfig | null {
+  const subjectToken = (vercelOidcToken ?? readEnvVar(sourceEnv, "VERCEL_OIDC_TOKEN"))?.trim() || null;
+  const values = [
+    readEnvVar(sourceEnv, "GOOGLE_CLOUD_PROJECT_ID"),
+    readEnvVar(sourceEnv, "GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER"),
+    readEnvVar(sourceEnv, "GOOGLE_CLOUD_TRAVEL_SERVICE_ACCOUNT_EMAIL"),
+    subjectToken,
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_ISSUER"),
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_AUDIENCE"),
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_SUBJECT"),
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_OWNER_ID"),
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_PROJECT_ID"),
+    readEnvVar(sourceEnv, "CADENCE_TRAVEL_VERCEL_OIDC_ENVIRONMENT"),
+  ];
+  if (!values.every((value): value is string => typeof value === "string" && value.length > 0)) {
+    return null;
+  }
+  return {
+    projectId: values[0]!,
+    provider: values[1]!,
+    serviceAccountEmail: values[2]!,
+    subjectToken: values[3]!,
+    expectedIssuer: values[4]!,
+    expectedAudience: values[5]!,
+    expectedSubject: values[6]!,
+    expectedOwnerId: values[7]!,
+    expectedProjectId: values[8]!,
+    expectedEnvironment: values[9]!,
+  };
+}
+
+async function resolveModelArmorAccessToken(
+  input: ModelArmorScreenTextInput,
+  sourceEnv: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  if (input.accessToken) return input.accessToken;
+  if (input.getAccessToken) {
+    const token = await input.getAccessToken();
+    if (token) return token;
+  }
+  const envToken = readEnvVar(sourceEnv, "CADENCE_MODEL_ARMOR_ACCESS_TOKEN");
+  if (envToken) return envToken;
+
+  const workloadIdentity = readModelArmorWorkloadIdentityConfig(sourceEnv, input.vercelOidcToken);
+  if (!workloadIdentity) return null;
+
+  try {
+    return await getGoogleWorkloadIdentityAccessToken(workloadIdentity, {
+      fetch: input.fetch as typeof fetch | undefined,
+      signal: input.signal,
+      timeoutMs: input.timeoutMs ?? DEFAULT_MODEL_ARMOR_TIMEOUT_MS,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function screenExternalCalendarTextWithModelArmor(
   input: ModelArmorScreenTextInput,
 ): Promise<ModelArmorScreenTextResult> {
@@ -101,7 +167,8 @@ export async function screenExternalCalendarTextWithModelArmor(
     };
   }
 
-  const config = resolveModelArmorConfig(input.env);
+  const sourceEnv = input.env ?? process.env;
+  const config = resolveModelArmorConfig(sourceEnv);
   if (!config) {
     return {
       text: sanitized,
@@ -113,10 +180,7 @@ export async function screenExternalCalendarTextWithModelArmor(
   const emitEvent = input.reportEvent ?? reportMonitoringEvent;
   const shouldEmit = input.emitMonitoringEvent ?? true;
 
-  const accessToken = input.accessToken
-    ?? (input.getAccessToken ? await input.getAccessToken() : null)
-    ?? readEnvVar(input.env ?? process.env, "CADENCE_MODEL_ARMOR_ACCESS_TOKEN")
-    ?? null;
+  const accessToken = await resolveModelArmorAccessToken(input, sourceEnv);
 
   if (!accessToken) {
     emitEvent({
@@ -144,6 +208,7 @@ export async function screenExternalCalendarTextWithModelArmor(
         headers: {
           authorization: `Bearer ${accessToken}`,
           "content-type": "application/json",
+          "x-goog-user-project": config.project,
         },
         body: JSON.stringify({
           userPromptData: {
@@ -242,6 +307,7 @@ export async function screenSnapshotWithModelArmor(
             env: options.env,
             accessToken: options.accessToken,
             getAccessToken: options.getAccessToken,
+            vercelOidcToken: options.vercelOidcToken,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
@@ -258,6 +324,7 @@ export async function screenSnapshotWithModelArmor(
             env: options.env,
             accessToken: options.accessToken,
             getAccessToken: options.getAccessToken,
+            vercelOidcToken: options.vercelOidcToken,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
@@ -274,6 +341,7 @@ export async function screenSnapshotWithModelArmor(
             env: options.env,
             accessToken: options.accessToken,
             getAccessToken: options.getAccessToken,
+            vercelOidcToken: options.vercelOidcToken,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
