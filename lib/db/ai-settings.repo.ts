@@ -52,7 +52,7 @@ export async function saveStoredAiSettings(
   expectedRevision: number,
   signal?: AbortSignal,
 ): Promise<StoredAiSettings> {
-  const request = client.rpc("save_ai_settings", {
+  const params = {
     p_daily_brief_enabled: input.dailyBriefEnabled,
     p_tips_enabled: input.tipsEnabled,
     p_chat_enabled: input.chatEnabled,
@@ -64,7 +64,14 @@ export async function saveStoredAiSettings(
     p_include_reminder_history: input.includeReminderHistory,
     p_include_notes: input.includeNotes,
     p_expected_revision: expectedRevision,
-  });
+    ...(input.longitudinalCalendarReviewEnabled !== undefined || input.longitudinalCalendarReviewCadence !== undefined
+      ? {
+          p_longitudinal_calendar_review_enabled: input.longitudinalCalendarReviewEnabled ?? false,
+          p_longitudinal_calendar_review_cadence: input.longitudinalCalendarReviewCadence ?? "weekly",
+        }
+      : {}),
+  };
+  const request = client.rpc("save_ai_settings", params as never);
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   return parseAiSettings(data);

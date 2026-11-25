@@ -45,6 +45,7 @@ const LEGACY_SETTINGS_KEY_SETS = [
 const SETTINGS_KEYS = "enabled,excludedSources,includeNotes,includeReminderHistory,useConnectedSources";
 /** Advisor 4F: every AI choice at once. Source choices no longer depend on Daily Brief being on. */
 const AI_SETTINGS_KEYS = "chatEnabled,enabled,excludedSources,includeNotes,includeReminderHistory,tipsEnabled,useConnectedSources";
+const AI_SETTINGS_WITH_LONGITUDINAL_KEYS = "chatEnabled,enabled,excludedSources,includeNotes,includeReminderHistory,longitudinalCalendarReviewCadence,longitudinalCalendarReviewEnabled,tipsEnabled,useConnectedSources";
 /** Advisor 4F: the answer to the one AI features question. */
 const AI_APPROVAL_KEYS = "approval";
 const EXCLUDED_SOURCE_KEYS = [...DAILY_BRIEF_CONNECTED_SOURCES].sort().join();
@@ -62,11 +63,13 @@ export function dailyBriefUsageCounts(usage: readonly DailyBriefCallUsage[]): Pe
 
 export async function getDailyBriefSettings(caller: CalendarCaller): Promise<DailyBriefSettings> {
   const preferences = await readDailyBriefPreferences(caller.client);
-  const [timezone, sourceStatus, ai] = await Promise.all([
+  const [timezone, sourceStatus, ai, timelineGoogle, agentGoogle] = await Promise.all([
     readAdvisorProfileTimezone(caller.client, caller.user.id),
     readDailyBriefSourceStatus(caller, preferences),
     // A server whose database lacks the 4F migration reports no AI features question.
     readStoredAiSettings(caller.client).catch(() => null),
+    getCalendarConnection(caller, "standard").catch(() => null),
+    getCalendarConnection(caller, "agent").catch(() => null),
   ]);
   const used = dailyBriefSourcesUsed(preferences, sourceStatus);
   return { accountRef: briefingAccountRef(caller.user.id), available: agentModelConfigured(),
@@ -80,7 +83,14 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     connectorSources: { outlookCalendar: sourceStatus.outlookCalendar === "ready", icloudCalendar: sourceStatus.icloudCalendar === "ready", hevy: sourceStatus.hevy === "ready" },
     connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: null },
     timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString(),
-    ...(ai ? { ai: { approved: ai.approvedAt !== null, tipsEnabled: ai.tipsEnabled, chatEnabled: ai.chatEnabled } } : {}) };
+    timelineGoogleCalendarConnected: timelineGoogle?.status === "connected",
+    googleCalendarAiGeneration: agentGoogle?.status === "connected" ? agentGoogle.generation : null,
+    googleCalendarAiSelectionRevision: agentGoogle?.status === "connected" ? agentGoogle.selectionRevision : null,
+    ...(ai ? {
+      ai: { approved: ai.approvedAt !== null, tipsEnabled: ai.tipsEnabled, chatEnabled: ai.chatEnabled },
+      longitudinalCalendarReviewEnabled: ai.longitudinalCalendarReviewEnabled ?? false,
+      longitudinalCalendarReviewCadence: ai.longitudinalCalendarReviewCadence ?? "weekly",
+    } : {}) };
 }
 
 /**
@@ -91,8 +101,11 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
  * Turning Daily Brief off requires every other choice off.
  */
 export async function updateDailyBriefSettings(caller: CalendarCaller, value: unknown): Promise<DailyBriefSettings> {
-  if (record(value) && (Object.keys(value).sort().join() === AI_SETTINGS_KEYS || Object.keys(value).join() === AI_APPROVAL_KEYS)) {
-    return updateAiSettings(caller, value);
+  if (record(value)) {
+    const keys = Object.keys(value).sort().join();
+    if (keys === AI_SETTINGS_KEYS || keys === AI_SETTINGS_WITH_LONGITUDINAL_KEYS || Object.keys(value).join() === AI_APPROVAL_KEYS) {
+      return updateAiSettings(caller, value);
+    }
   }
   const input = parseDailyBriefSettingsInput(value);
   if (!input) throw new DailyBriefError("invalid_request");
@@ -136,11 +149,20 @@ export function parseAiSettingsInput(value: Record<string, unknown>, current: St
       Object.values(excluded).some((item) => typeof item !== "boolean") ||
       [value.enabled, value.tipsEnabled, value.chatEnabled, value.useConnectedSources, value.includeReminderHistory, value.includeNotes]
         .some((item) => typeof item !== "boolean")) return null;
+  const hasLongitudinal = value.longitudinalCalendarReviewEnabled !== undefined || value.longitudinalCalendarReviewCadence !== undefined;
+  if (hasLongitudinal) {
+    if (typeof value.longitudinalCalendarReviewEnabled !== "boolean") return null;
+    if (value.longitudinalCalendarReviewCadence !== "weekly" && value.longitudinalCalendarReviewCadence !== "monthly") return null;
+  }
   return {
     dailyBriefEnabled: value.enabled as boolean, tipsEnabled: value.tipsEnabled as boolean, chatEnabled: value.chatEnabled as boolean,
     useConnectedSources: value.useConnectedSources as boolean,
     excludedSources: dailyBriefSourceFlags((source) => excluded[source] === true),
     includeReminderHistory: value.includeReminderHistory as boolean, includeNotes: value.includeNotes as boolean,
+    ...(hasLongitudinal ? {
+      longitudinalCalendarReviewEnabled: value.longitudinalCalendarReviewEnabled as boolean,
+      longitudinalCalendarReviewCadence: value.longitudinalCalendarReviewCadence as "weekly" | "monthly",
+    } : {}),
   };
 }
 

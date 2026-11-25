@@ -120,6 +120,39 @@ export const webGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
     clearAccount(result.accountId);
     return { view: result, revocationFailed: result.revocationFailed };
   },
+  ai: {
+    async getConnection() {
+      return request<GoogleCalendarAiConnectionView>("/api/google-calendar/connection?purpose=ai_mcp");
+    },
+    async beginConnect() {
+      const result = await request<{ url: string }>("/api/google-calendar/connection?purpose=ai_mcp", {
+        method: "POST",
+        body: JSON.stringify({ target: "web" }),
+      });
+      window.location.assign(result.url);
+    },
+    async listCalendars() {
+      const result = await request<{ calendars: CalendarListEntry[] }>("/api/google-calendar/calendars?purpose=ai_mcp");
+      return result.calendars;
+    },
+    async savePreferences(preferences) {
+      return request<CalendarConnectionView>("/api/google-calendar/calendars?purpose=ai_mcp", {
+        method: "PUT",
+        body: JSON.stringify(preferences),
+      });
+    },
+    async syncFromTimeline() {
+      return request<{ view: CalendarConnectionView; hiddenCalendarsSkipped: number }>("/api/google-calendar/calendars?purpose=ai_mcp", {
+        method: "POST",
+      });
+    },
+    async disconnect() {
+      const result = await request<CalendarConnectionView & { revocationFailed: boolean }>("/api/google-calendar/connection?purpose=ai_mcp", {
+        method: "DELETE",
+      });
+      return { view: result, revocationFailed: result.revocationFailed };
+    },
+  },
 };
 
 export function useWebGoogleCalendarTimeline(input: Readonly<{

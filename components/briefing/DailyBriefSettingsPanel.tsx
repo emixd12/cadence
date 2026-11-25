@@ -74,7 +74,15 @@ function sourceState(settings: DailyBriefSettings, source: (typeof SOURCES)[numb
  * choice also answers the AI features question. The export keeps its Ticket 306
  * name because the web and the Mac both mount it.
  */
-export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ client?: DailyBriefClient | null; desktop?: boolean }>) {
+export function DailyBriefSettingsPanel({
+  client,
+  desktop = false,
+  onConnectGoogleCalendarAi,
+}: Readonly<{
+  client?: DailyBriefClient | null;
+  desktop?: boolean;
+  onConnectGoogleCalendarAi?: () => void;
+}>) {
   const resolvedClient = useMemo(() => client === undefined ? createWebDailyBriefClient() : client, [client]);
   const [settings, setSettings] = useState<DailyBriefSettings>();
   const [error, setError] = useState("");
@@ -132,6 +140,12 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       excludedSources: change.exclude ? { ...excluded, [change.exclude.source]: change.exclude.excluded } : excluded,
       includeReminderHistory: change.includeReminderHistory ?? settings.includeReminderHistory === true,
       includeNotes: change.includeNotes ?? settings.includeNotes === true,
+      ...(change.longitudinalCalendarReviewEnabled !== undefined || change.longitudinalCalendarReviewCadence !== undefined || settings.longitudinalCalendarReviewEnabled !== undefined
+        ? {
+            longitudinalCalendarReviewEnabled: change.longitudinalCalendarReviewEnabled ?? settings.longitudinalCalendarReviewEnabled ?? false,
+            longitudinalCalendarReviewCadence: change.longitudinalCalendarReviewCadence ?? settings.longitudinalCalendarReviewCadence ?? "weekly",
+          }
+        : {}),
     });
   };
 
@@ -200,10 +214,65 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
                   onChange={(event) => save({ exclude: { source: item.key, excluded: !event.target.checked } })} />
                 <span>{item.title}</span>
               </label>
-              <p id={item.id} className="max-w-2xl pl-7 text-muted-readable">{item.detail}{sourceState(settings, item)}</p>
+              <p id={item.id} className="max-w-2xl pl-7 text-muted-readable">
+                {item.detail}{sourceState(settings, item)}
+                {item.key === "googleCalendar" ? <>{" "}<a href="#connector-google_calendar" className="underline underline-offset-2">Manage in Connected sources</a></> : null}
+              </p>
             </div>)}
           </div>
         </details> : null}
+        {settings.timelineGoogleCalendarConnected && statusOf(settings, "googleCalendar") === "not_connected" ? (
+          <div className="flex flex-wrap items-center gap-3 pl-7" data-testid="ai-connect-google-calendar-shortcut">
+            <span className="text-muted-readable">Google Calendar is connected for Timeline, not yet for AI features.</span>
+            {onConnectGoogleCalendarAi ? (
+              <button type="button" onClick={onConnectGoogleCalendarAi} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">
+                Connect Google Calendar for AI
+              </button>
+            ) : (
+              <a href="/settings?connectAiCalendar=1#connector-google_calendar" className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">
+                Connect Google Calendar for AI
+              </a>
+            )}
+          </div>
+        ) : null}
+        {settings.ai ? (
+          <div className="grid gap-2 border-t border-line pt-3" data-testid="longitudinal-calendar-review-section">
+            <label className="flex min-h-11 items-center gap-3">
+              <input
+                type="checkbox"
+                checked={settings.longitudinalCalendarReviewEnabled === true}
+                disabled={saving}
+                aria-describedby="longitudinal-calendar-review-detail"
+                onChange={(event) => save({
+                  longitudinalCalendarReviewEnabled: event.target.checked,
+                  longitudinalCalendarReviewCadence: settings.longitudinalCalendarReviewCadence ?? "weekly",
+                })}
+              />
+              <span>Longitudinal calendar-load review</span>
+            </label>
+            <p id="longitudinal-calendar-review-detail" className="max-w-2xl pl-7 text-muted-readable">
+              Optional periodic summary of calendar load and schedule patterns. Runs only when you have been recently active; Google Calendar inputs older than 30 days are discarded immediately after the summary is computed.
+            </p>
+            {settings.longitudinalCalendarReviewEnabled ? (
+              <div className="flex items-center gap-3 pl-7">
+                <label htmlFor="longitudinal-review-cadence" className="text-muted-readable">Cadence</label>
+                <select
+                  id="longitudinal-review-cadence"
+                  value={settings.longitudinalCalendarReviewCadence ?? "weekly"}
+                  disabled={saving}
+                  onChange={(event) => save({
+                    longitudinalCalendarReviewEnabled: true,
+                    longitudinalCalendarReviewCadence: event.target.value === "monthly" ? "monthly" : "weekly",
+                  })}
+                  className="min-h-11 border border-line bg-background px-3 py-2"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <p className="max-w-2xl pt-2 text-muted-readable">{AI_PROVIDER_LINE} <a className="underline underline-offset-2" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noreferrer">OpenAI data retention may apply.</a></p>
         {desktop ? <p className="max-w-2xl text-muted-readable">Hosted context does not include unsynchronized or local-only desktop data.</p> : null}
         {error ? <p role="alert" className="text-accent">{error}</p> : null}
