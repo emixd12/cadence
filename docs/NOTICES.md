@@ -8,9 +8,9 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 26 |
+| outcome | 32 |
 | error | 87 |
-| note | 21 |
+| note | 23 |
 | question | 3 |
 
 ## Behavior editor
@@ -199,6 +199,19 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `timeline.reload-offline` Web: says a reload could not run while offline, so shown data may be old. | error | Reload failed while offline. Displayed data may be stale. | web | INT-TIMELINE-010, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reloaded` Confirms that the Timeline reloaded Cadence and every connector. | outcome | Cadence and connectors reloaded. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reloading` Shows at the top of the Timeline while a pull, wheel or Refresh reloads Cadence and its connectors. | note | Reloading Cadence and connectors | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx` |
+
+## Travel and leave times
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `place-search.home-selected` Says below Settings Home that a place suggestion was chosen and will save on Enter or blur, with Undo beside it. | outcome | Selected {title}. Press Enter or leave the field to save. | web, Mac | INT-TRAVEL-002, `components/settings/TravelSettingsPanel.tsx` |
+| `place-search.home-selected-with-marker` Says below Settings Home that a specific Geoapify place was chosen and its Home completion marker will save when Home saves, with Undo beside it. | outcome | Selected {title}. Press Enter or leave the field to save. Its Home marker will save with it. | web, Mac | INT-PLACE-006, INT-TRAVEL-002, `components/settings/TravelSettingsPanel.tsx` |
+| `place-search.home-updated` Says below Settings Home that the selected address saved, with Undo beside it. | outcome | Home updated from selection. | web, Mac | INT-TRAVEL-002, `components/settings/TravelSettingsPanel.tsx` |
+| `place-search.home-updated-with-marker` Says below Settings Home that the selected address and its Home completion marker saved, with Undo beside it. | outcome | Home and its marker updated from selection. | web, Mac | INT-PLACE-006, INT-TRAVEL-002, `components/settings/TravelSettingsPanel.tsx` |
+| `place-search.place-selected` Says below Behavior Place that a place suggestion was chosen, with Undo beside it. | outcome | Selected {title}. | web, Mac | INT-TRAVEL-005, `components/behaviors/BehaviorForm.tsx` |
+| `place-search.place-selected-with-marker` Says below Behavior Place that a specific Geoapify place was chosen and its completion marker will save when the Behavior saves, with Undo beside it. | outcome | Selected {title}. Its marker will save when you save this behavior. | web, Mac | INT-PLACE-006, INT-TRAVEL-005, `components/behaviors/BehaviorForm.tsx` |
+| `place-search.rate-limited` Says inside the open place autocomplete list that the account hit the place-search rate limit and free-text typing still works. | note | Too many searches for now. You can keep typing the place directly. | web, Mac | INT-TRAVEL-002, INT-TRAVEL-005, `components/travel/PlaceAutocomplete.tsx` |
+| `place-search.searching` Says inside the open place autocomplete list that Geoapify results are loading. | note | Searching places… | web, Mac | INT-TRAVEL-002, INT-TRAVEL-005, `components/travel/PlaceAutocomplete.tsx` |
 
 ## Changes
 
