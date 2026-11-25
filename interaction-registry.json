@@ -1016,7 +1016,7 @@
     {
       "path": "components/settings/GoogleCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 20,
+      "interaction_marker_count": 31,
       "interaction_ids": [
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
@@ -1125,7 +1125,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 22,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]

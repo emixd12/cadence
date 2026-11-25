@@ -12,6 +12,9 @@ export function WebGoogleCalendarPanel({ timezone, nested = false }: Readonly<{ 
   const refreshRange = useMemo(() => calendarRangeForToday(timezone), [timezone]);
   const searchParams = useSearchParams();
   const result = searchParams?.get("calendar") ?? null;
+  const aiResult = searchParams?.get("aiCalendar") ?? searchParams?.get("agentCalendar") ?? null;
+  const aiSkippedRaw = searchParams?.get("aiCalendarSkipped") ?? null;
+  const aiHiddenSkipped = aiSkippedRaw && /^\d+$/.test(aiSkippedRaw) ? Number.parseInt(aiSkippedRaw, 10) : 0;
   // Ticket 335: read once, because the address is cleaned up below.
   const [afterSignIn] = useState(() => result === CALENDAR_AFTER_GOOGLE_SIGN_IN
     ? calendarAfterGoogleSignIn(searchParams?.get(SIGN_IN_METHODS_RESULT_PARAM) ?? null, searchParams?.get(SIGN_IN_METHODS_METHOD_PARAM) ?? null)
@@ -26,7 +29,22 @@ export function WebGoogleCalendarPanel({ timezone, nested = false }: Readonly<{ 
   }, [afterSignIn]);
 
   const message = afterSignIn ?? calendarCallbackMessage(result);
-  return <GoogleCalendarPanel coordinator={webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={message} wrongAccount={result === "same_account_required"} nested={nested} />;
+  const aiMessage = aiCalendarCallbackMessage(aiResult);
+  return (
+    <GoogleCalendarPanel
+      coordinator={webGoogleCalendarCoordinator}
+      refreshRange={refreshRange}
+      callbackMessage={message}
+      aiCallbackMessage={aiMessage}
+      aiHiddenSkipped={aiHiddenSkipped}
+      aiEnabled
+      onAiConnectionChange={() => {
+        window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: {} }));
+      }}
+      wrongAccount={result === "same_account_required" || aiResult === "same_account_required"}
+      nested={nested}
+    />
+  );
 }
 
 /** Ticket 335 (D31.5): the message on return from adding Google as a sign-in method before Calendar. */
@@ -45,5 +63,15 @@ export function calendarCallbackMessage(code: string | null): string | undefined
   if (code === "reconnect_required") return "Google Calendar needs reconnection. Reconnect to continue.";
   if (code === "unauthenticated") return "Sign in to the same Cadence account and reconnect Google Calendar.";
   if (code === "error" || code === "invalid_request") return "Google Calendar did not connect. Try again.";
+  return undefined;
+}
+
+export function aiCalendarCallbackMessage(code: string | null): string | undefined {
+  if (code === "connected") return "Google Calendar connected for AI features.";
+  if (code === "cancelled" || code === "consent_denied") return "Google Calendar for AI permission was not granted. You can try again.";
+  if (code === "same_account_required") return "Use the same Google account as the Cadence account that started this AI Calendar connection.";
+  if (code === "reconnect_required") return "Google Calendar for AI needs reconnection. Reconnect to continue.";
+  if (code === "unauthenticated") return "Sign in to the same Cadence account and reconnect Google Calendar for AI.";
+  if (code === "error" || code === "invalid_request") return "Google Calendar for AI did not connect. Try again.";
   return undefined;
 }

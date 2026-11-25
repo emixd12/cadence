@@ -4,6 +4,7 @@ import type { Database } from "@/lib/db/database.types";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseRuntimeConfig } from "@/lib/supabase/env";
+import { resolveCalendarPurposeWireParam } from "@/lib/types/google-calendar";
 import { CalendarConnectionError } from "./google-calendar-oauth";
 import type { CalendarCaller } from "./google-calendar.service";
 
@@ -60,8 +61,8 @@ export async function readCalendarRequestBody(request: Request, maxBytes = 70_00
   catch { throw new CalendarConnectionError("invalid_request"); }
 }
 
-export function calendarRequestPurpose(request: Request): "standard" | "agent" {
-  const purpose = new URL(request.url).searchParams.get("purpose") ?? "standard";
-  if (purpose !== "standard" && purpose !== "agent") throw new CalendarConnectionError("invalid_request");
-  return purpose;
+export function calendarRequestPurpose(request: Request): "standard" | "agent" | "retired_agent" {
+  const resolved = resolveCalendarPurposeWireParam(new URL(request.url).searchParams.get("purpose"));
+  if (!resolved) throw new CalendarConnectionError("invalid_request");
+  return resolved;
 }
