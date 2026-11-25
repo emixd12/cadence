@@ -16,8 +16,9 @@ instead. Choose one, or type in the field at the bottom and press **Send** (or E
 Shift+Enter starts a new line). Chat can read all of your Cadence data, including
 notes and connected calendars; **Change this in Settings** opens Settings.
 
-While it works, small grey lines say what it looked at, such as "Looked at your
-Timeline". If a source is off in Settings, the line says so and Chat does not
+While it works, one small grey line says what it is looking at, such as "Looked at
+your Timeline". Each new action replaces the one before it. Select the line to open
+a box that lists every action; select it again to close the box. If a source is off in Settings, the line says so and Chat does not
 read it. A medical question gets no advice; a small grey note under the reply
 reads "Cadence does not advise on medical matters." Chat still says where the
 item fits in your day.

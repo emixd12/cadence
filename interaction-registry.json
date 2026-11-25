@@ -1486,7 +1486,8 @@
         "INT-CHAT-001",
         "INT-CHAT-002",
         "INT-CHAT-003",
-        "INT-CHAT-004"
+        "INT-CHAT-004",
+        "INT-CHAT-005"
       ]
     },
     {
@@ -1500,11 +1501,12 @@
     {
       "path": "components/chat/ChatMessages.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 10,
       "interaction_ids": [
         "INT-CHAT-001",
         "INT-CHAT-002",
-        "INT-CHAT-003"
+        "INT-CHAT-003",
+        "INT-CHAT-005"
       ]
     },
     {
@@ -22774,6 +22776,85 @@
           ],
           "evidence": [
             "tests/desktop-chat.dom.test.tsx"
+          ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CHAT-005",
+      "name": "Show what chat looked at",
+      "feature": "chat",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/chat.md#ask-a-question"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "chat"
+      ],
+      "routes": [
+        "/chat"
+      ],
+      "journeys": [
+        "J29"
+      ],
+      "intent": "See every action chat took for one reply; the line itself shows only the newest one.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "The action line under a reply (for example \"Looked at your Timeline ›\")"
+        }
+      ],
+      "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts). Shown on every reply that has an action line.",
+      "success_result": "A box opens under the line and lists every action in order; activating the line again closes it.",
+      "failure_result": "None; the list is already on the page.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/chat/ChatMessages.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/chat-thinking-horse.dom.test.tsx"
+        ],
+        "notes": "DOM check covers the newest action replacing the last and the list opening."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/chat/ChatMessages.tsx"
+          ],
+          "evidence": [
+            "tests/chat-thinking-horse.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/chat-screen.tsx",
+            "components/chat/ChatMessages.tsx"
+          ],
+          "evidence": [
+            "tests/chat-thinking-horse.dom.test.tsx"
           ]
         },
         "marketing": {

@@ -1922,6 +1922,11 @@
       "id": "INT-CHAT-004",
       "classification": "not_load_bearing",
       "reason": "Lists and opens stored conversations with one bounded read and no model call."
+    },
+    {
+      "id": "INT-CHAT-005",
+      "classification": "not_load_bearing",
+      "reason": "Opens a list already on the page; no request."
     }
   ]
 }

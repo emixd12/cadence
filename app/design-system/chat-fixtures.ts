@@ -59,11 +59,14 @@ const BEHAVIOR_CONFIRM: ChatConfirm = {
   state: "pending",
 };
 
-/** A question whose reply has not started: the thinking horse. */
+/** A reply under way after two actions: the thinking horse beside the newest action. */
 export const CHAT_FIXTURE_THINKING: ChatThreadState = {
   conversationId: "conv-thinking",
   streamingId: "bench-thinking",
-  messages: [user("m1", "How did my week go?", 12)],
+  messages: [
+    user("m1", "How did my week go?", 12),
+    reply("bench-thinking", [tool("tt1", "timeline", "Looked at your Timeline"), tool("tt2", "adherence", "Looked at this week")], 12),
+  ],
 };
 
 /** "What is on today?" with tool lines, a calendar answer, then a single write with Undo. */
