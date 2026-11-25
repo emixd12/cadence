@@ -6,6 +6,8 @@ const repo = vi.hoisted(() => ({ beginCalendarAttempt: vi.fn(), consumeCalendarA
 vi.mock("@/lib/db/google-calendar.repo", () => repo);
 const provider = vi.hoisted(() => ({ readGoogleCalendarCalendars: vi.fn(), readGoogleCalendarEvents: vi.fn() }));
 vi.mock("@/lib/services/google-calendar-provider", async (importOriginal) => ({ ...await importOriginal<object>(), ...provider }));
+const mcpProvider = vi.hoisted(() => ({ listGoogleCalendarMcpCalendars: vi.fn(), readGoogleCalendarMcpEvents: vi.fn() }));
+vi.mock("@/lib/services/google-calendar-mcp-provider", async (importOriginal) => ({ ...await importOriginal<object>(), ...mcpProvider }));
 import { GoogleCalendarProviderError } from "@/lib/services/google-calendar-provider";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import { Temporal } from "@js-temporal/polyfill";
@@ -44,7 +46,7 @@ describe("Calendar callback lifecycle", () => {
   it("consumes denied attempts and returns a fixed cancellation without exchanging tokens", async () => {
     const fetcher = vi.spyOn(globalThis, "fetch");
     expect(await finishCalendarConnection({ state, code: null, denied: true, cookieUser: user })).toBe("https://cadence.example/settings?calendar=cancelled");
-    expect(repo.consumeCalendarAttempt).toHaveBeenCalledWith(hashCalendarState(state));
+    expect(repo.consumeCalendarAttempt).toHaveBeenCalledWith(hashCalendarState(state), "standard");
     expect(fetcher).not.toHaveBeenCalled(); expect(repo.installCalendarCredential).not.toHaveBeenCalled();
   });
   it("rejects a web callback from a different signed-in account", async () => {
@@ -95,31 +97,51 @@ describe("Calendar broker typed failures", () => {
   });
 });
 
-it("reads the Timeline connection for Daily Brief, intersecting consent before the provider event read (Ticket 307)", async () => {
-  const connection = { userId: user.id, googleSubject: "subject", generation: 3, selectionRevision: 4, status: "connected",
-    preferences: { selectedCalendarIds: ["work", "private"], hiddenCalendarIds: ["private"], visible: false, showAllDay: true } } as const;
+it("reads the agent MCP connection for Daily Brief when enabled, intersecting consent before the MCP event read", async () => {
+  const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "UTC" }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
+  const now = Temporal.Instant.from("2026-09-19T12:00:00Z");
+
+  // Fails closed when AI MCP transport is disabled (never falls back to standard REST).
+  await expect(getCalendarEventsForAdvisor({ client, user }, "2026-09-19", "2026-09-19", {
+    authorizedCalendarIds: ["work"], expectedConnectionGeneration: 3, expectedSelectionRevision: 4,
+    authorizationScope: "daily-brief:7", now,
+  })).rejects.toMatchObject({ code: "not_configured" });
+
+  vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "agent_mcp");
+  vi.stubEnv("GOOGLE_CALENDAR_PROJECT_ID", "standard-project");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_PROJECT_ID", "agent-project");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_ID", "agent-client");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_SECRET", "agent-secret");
+
+  const connection = {
+    userId: user.id, googleSubject: "subject", generation: 3, selectionRevision: 4, status: "connected",
+    grantPurpose: "agent", oauthClientId: "agent-client",
+    preferences: { selectedCalendarIds: ["work", "private"], hiddenCalendarIds: ["private"], visible: false, showAllDay: true },
+  } as const;
   repo.readCalendarConnection.mockResolvedValue(connection);
-  repo.readCalendarCredential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig(process.env)!, "refresh", { ...connection, purpose: "refresh" }));
+  repo.readCalendarCredential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }));
   vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
-  provider.readGoogleCalendarCalendars.mockResolvedValue([
+  mcpProvider.listGoogleCalendarMcpCalendars.mockResolvedValue([
     { id: "work", name: "Work", timezone: "UTC", primary: true, selected: true, accessRole: "owner" },
     { id: "private", name: "Private", timezone: "UTC", primary: false, selected: true, accessRole: "owner" },
   ]);
-  provider.readGoogleCalendarEvents.mockResolvedValue({ ok: true, snapshot: {} });
-  const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "UTC" }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
-  const now = Temporal.Instant.from("2026-09-19T12:00:00Z");
+  mcpProvider.readGoogleCalendarMcpEvents.mockResolvedValue({
+    ok: true,
+    snapshot: { completeness: "incomplete", requestedRange: { startLocalDate: "2026-09-19", endLocalDate: "2026-09-19", timezone: "UTC" }, events: [] },
+  });
 
   await getCalendarEventsForAdvisor({ client, user }, "2026-09-19", "2026-09-19", {
     authorizedCalendarIds: ["work"], expectedConnectionGeneration: 3, expectedSelectionRevision: 4,
     authorizationScope: "daily-brief:7", now,
   });
-  expect(provider.readGoogleCalendarEvents).toHaveBeenCalledWith(expect.objectContaining({
+  expect(mcpProvider.readGoogleCalendarMcpEvents).toHaveBeenCalledWith(expect.objectContaining({
     calendars: [expect.objectContaining({ id: "work" })],
     range: expect.objectContaining({ selectedCalendarIds: ["work"] }),
   }));
-  expect(provider.readGoogleCalendarEvents.mock.calls[0]?.[0].calendars).not.toContainEqual(expect.objectContaining({ id: "private" }));
-  expect(repo.readCalendarConnection).toHaveBeenCalledWith(client, user.id, "standard");
-  expect(repo.readCalendarConnection).not.toHaveBeenCalledWith(client, user.id, "agent");
+  expect(mcpProvider.readGoogleCalendarMcpEvents.mock.calls[0]?.[0].calendars).not.toContainEqual(expect.objectContaining({ id: "private" }));
+  expect(provider.readGoogleCalendarEvents).not.toHaveBeenCalled();
+  expect(repo.readCalendarConnection).toHaveBeenCalledWith(client, user.id, "agent");
+  expect(repo.readCalendarConnection).not.toHaveBeenCalledWith(client, user.id, "standard");
 
   await expect(getCalendarEventsForAdvisor({ client, user }, "2026-09-19", "2026-09-19", {
     authorizedCalendarIds: ["work"], expectedConnectionGeneration: 2, expectedSelectionRevision: 4,
