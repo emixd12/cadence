@@ -161,6 +161,13 @@ const resolverRegistry = [
     source: "docs/DATA_MODEL.md",
   },
   {
+    domain: "effective Where",
+    resolver: "packages/core/src/resolvers/effective-where.resolver.ts",
+    compatibility: "lib/resolvers/effective-where.resolver.ts",
+    test: "tests/effective-where.resolver.test.ts",
+    source: "docs/DATA_MODEL.md",
+  },
+  {
     domain: "Daily Brief opportunity lines",
     resolver: "packages/core/src/resolvers/brief-opportunity.resolver.ts",
     compatibility: "lib/resolvers/brief-opportunity.resolver.ts",
