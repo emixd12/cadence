@@ -55,7 +55,7 @@ export function AdvisorWindow() {
   const toggle = panelOpen ? closePanel : openPanel;
 
   return (
-    <div className="relative z-10 -mt-7 flex justify-center px-4 pb-2 sm:-mt-9 lg:-mt-11">
+    <div className="relative z-10 flex justify-center px-4 pb-2 pt-2 lg:pt-3">
       {/* Phones and narrow windows: 60px horse centered, speech pill stacked below. */}
       <button
         type="button"

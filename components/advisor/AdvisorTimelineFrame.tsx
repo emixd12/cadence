@@ -44,8 +44,16 @@ function AdvisorColumn({ banner, children }: Readonly<{ banner: ReactNode; child
   const advisor = useAdvisor();
   return (
     <div className={["flex w-full flex-col", advisor?.panelOpen ? "xl:pr-[26rem]" : ""].join(" ")} data-advisor-column>
-      {banner}
-      <AdvisorWindow />
+      {advisor ? (
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-x-0 top-3 sm:top-4 lg:top-5" aria-hidden="true">
+            {banner}
+          </div>
+          <AdvisorWindow />
+        </div>
+      ) : (
+        banner
+      )}
       {children}
     </div>
   );
