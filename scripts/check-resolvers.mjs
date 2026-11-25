@@ -77,6 +77,20 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "chat 7-day travel horizon and etag-free event revision matching",
+    resolver: "packages/core/src/resolvers/travel-horizon.resolver.ts",
+    compatibility: "lib/resolvers/travel-horizon.resolver.ts",
+    test: "tests/travel-horizon.resolver.test.ts",
+    source: "docs/LEGAL.md",
+  },
+  {
+    domain: "first-party longitudinal behavioral patterns",
+    resolver: "packages/core/src/resolvers/longitudinal-patterns.resolver.ts",
+    compatibility: "lib/resolvers/longitudinal-patterns.resolver.ts",
+    test: "tests/longitudinal-patterns.resolver.test.ts",
+    source: "docs/plans/2026-11-25-google-workspace-mcp-migration.md",
+  },
+  {
     domain: "departure model",
     resolver: "packages/core/src/resolvers/departure.resolver.ts",
     test: "tests/departure.resolver.test.ts",
