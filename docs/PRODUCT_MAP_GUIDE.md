@@ -156,3 +156,18 @@ a feature with no interactions, a notice problem (above), or an out-of-date
 Warnings do not fail it: references that are not files, differences from
 `design-system.usage.json` (the map's own scan is the reference), hard-coded colors
 in component files, and missing descriptions outside the canonical token file.
+
+### Warning ratchet
+
+`scripts/product-map-warning-baseline.json` lists the accepted warnings for each
+category. A category under `ratcheted` fails `map:check` when it has more warnings
+than the baseline, and the failure lists the new messages. These are the
+categories the author can fix in the same pull request: missing references,
+hard-coded colors, token aliases and token descriptions. A category under
+`unratcheted` stays a plain warning, with its reason in the file. Today that is
+`design-system.usage.json` differences: fixing them needs
+`npm run design-system:check`, which is not in CI. A new category fails until it is
+added to one of the two lists. When a count drops, `map:check` passes and says so;
+`npm run map:build` (or `map:check -- --lower-baseline`) rewrites the baseline and
+never raises it. Raising a count is a hand edit of the file that the pull request
+explains. The check reads only the working tree, never git history.

@@ -6,6 +6,10 @@
 //   node scripts/build-product-map.mjs build          also write product-map.json, docs/PRODUCT_MAP.md and docs/NOTICES.md
 //   node scripts/build-product-map.mjs show <id|text> print one item and its links
 //
+// check and build also apply the warning ratchet in scripts/product-map-warning-baseline.json:
+// a ratcheted category fails when it has more warnings than the baseline. build (or
+// check --lower-baseline) lowers the baseline; --baseline <path> reads another file.
+//
 // Every link names the registry entry it came from by a stable id (never an array
 // position). "asserted" links are written in a registry by a person; "derived" links
 // come from scanning source code. See docs/PRODUCT_MAP_GUIDE.md.
@@ -1169,8 +1173,85 @@ function show(map, query) {
   return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Warning ratchet: a committed baseline of warnings per category. A ratcheted
+// category fails check when it has more warnings than its baseline; fewer is a
+// pass with a note, and build (or check --lower-baseline) writes the lower
+// baseline. Raising a baseline is a hand edit of the JSON file, seen in review.
+
+const DEFAULT_WARNING_BASELINE = "scripts/product-map-warning-baseline.json";
+
+function readWarningBaseline(path) {
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) return { error: `${path} is missing. Restore it from git; it records the accepted warnings per category.` };
+  try {
+    const baseline = JSON.parse(readFileSync(absolute, "utf8"));
+    if (!baseline || typeof baseline.ratcheted !== "object" || typeof baseline.unratcheted !== "object") {
+      return { error: `${path} needs "ratcheted" (category -> accepted messages) and "unratcheted" (category -> reason) objects.` };
+    }
+    for (const [category, messages] of Object.entries(baseline.ratcheted)) {
+      if (!Array.isArray(messages) || messages.some(message => typeof message !== "string")) {
+        return { error: `${path}: ratcheted category "${category}" must be an array of warning messages.` };
+      }
+    }
+    return { baseline };
+  } catch (error) {
+    return { error: `${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/** Messages in `current` beyond those in `accepted`, counting duplicates. */
+function newMessages(current, accepted) {
+  const remaining = new Map();
+  for (const message of accepted) remaining.set(message, (remaining.get(message) ?? 0) + 1);
+  const added = [];
+  for (const message of current) {
+    const left = remaining.get(message) ?? 0;
+    if (left > 0) remaining.set(message, left - 1);
+    else added.push(message);
+  }
+  return added;
+}
+
+function ratchetWarnings(currentWarnings, baseline, baselinePath) {
+  const failures = [];
+  const lowerable = [];
+  for (const category of Object.keys(currentWarnings).sort()) {
+    if (category in baseline.ratcheted || category in baseline.unratcheted) continue;
+    failures.push(`Warning category "${category}" is not in ${baselinePath}. Add it under "ratcheted" with its accepted messages, or under "unratcheted" with a reason.`);
+  }
+  for (const category of Object.keys(baseline.ratcheted).sort()) {
+    const accepted = baseline.ratcheted[category];
+    const current = currentWarnings[category] ?? [];
+    if (current.length > accepted.length) {
+      const added = newMessages(current, accepted);
+      failures.push([
+        `Warning category "${category}" grew: ${current.length} now, baseline ${accepted.length} in ${baselinePath}. Fix the new warning(s):`,
+        ...added.map(message => `    + ${message}`),
+      ].join("\n"));
+    } else if (current.length < accepted.length) {
+      lowerable.push(`"${category}": ${current.length} now, baseline ${accepted.length}`);
+    }
+  }
+  return { failures, lowerable };
+}
+
+/** Lowers each ratcheted category whose count did not grow to its current messages. Never raises. */
+function lowerWarningBaseline(currentWarnings, baseline) {
+  const ratcheted = {};
+  for (const category of Object.keys(baseline.ratcheted).sort()) {
+    const accepted = baseline.ratcheted[category];
+    const current = [...(currentWarnings[category] ?? [])].sort();
+    ratcheted[category] = current.length <= accepted.length ? current : accepted;
+  }
+  return { ...baseline, ratcheted };
+}
+
 const [mode = "check", ...rest] = process.argv.slice(2);
 const verbose = rest.includes("--verbose");
+const lowerBaseline = rest.includes("--lower-baseline");
+const baselineArgument = rest.indexOf("--baseline");
+const warningBaselinePath = baselineArgument === -1 ? DEFAULT_WARNING_BASELINE : rest[baselineArgument + 1];
 const { map, scanned } = build();
 
 if (mode === "show") {
@@ -1188,6 +1269,30 @@ if (mode === "show") {
     console.log(`warning: ${category}: ${messages.length}`);
     for (const message of verbose ? messages : messages.slice(0, 3)) console.log(`  - ${message}`);
     if (!verbose && messages.length > 3) console.log(`  … ${messages.length - 3} more (run with --verbose)`);
+  }
+  const { baseline, error: baselineError } = warningBaselinePath
+    ? readWarningBaseline(warningBaselinePath)
+    : { error: "--baseline needs a path." };
+  if (baselineError) {
+    console.error(baselineError);
+    process.exitCode = 1;
+  } else {
+    const ratchet = ratchetWarnings(map.warnings, baseline, warningBaselinePath);
+    if (ratchet.failures.length) {
+      console.error(`map:${mode} warning ratchet failed:`);
+      for (const failure of ratchet.failures) console.error(`- ${failure}`);
+      console.error(`Raising a baseline is a deliberate edit of ${warningBaselinePath}; explain it in the pull request.`);
+      process.exitCode = 1;
+    }
+    if (mode === "build" || lowerBaseline) {
+      const lowered = `${JSON.stringify(lowerWarningBaseline(map.warnings, baseline), null, 2)}\n`;
+      if (lowered !== readFileSync(resolve(root, warningBaselinePath), "utf8")) {
+        writeFileSync(resolve(root, warningBaselinePath), lowered);
+        console.log(`Updated the warning baseline in ${warningBaselinePath}${ratchet.lowerable.length ? ` (${ratchet.lowerable.join("; ")})` : ""}. Commit it.`);
+      }
+    } else if (ratchet.lowerable.length) {
+      console.log(`Warning baseline can be lowered: ${ratchet.lowerable.join("; ")}. Run npm run map:build (or node scripts/build-product-map.mjs check --lower-baseline) and commit ${warningBaselinePath}.`);
+    }
   }
   const noticesDoc = noticesMarkdown(map);
   const noticesCurrent = exists(NOTICES_DOC) && read(NOTICES_DOC) === noticesDoc;
