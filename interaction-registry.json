@@ -1359,7 +1359,7 @@
     {
       "path": "components/notes/NoteEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 18,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011",
@@ -1369,9 +1369,18 @@
     {
       "path": "components/timeline/DayNoteControl.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 1,
+      "interaction_marker_count": 3,
       "interaction_ids": [
         "INT-TIMELINE-012"
+      ]
+    },
+    {
+      "path": "components/timeline/OccurrenceNoteForm.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 3,
+      "interaction_ids": [
+        "INT-TIMELINE-008",
+        "INT-TIMELINE-011"
       ]
     },
     {
@@ -5154,17 +5163,21 @@
       "intent": "Add, replace, or clear free-text context on one occurrence.",
       "triggers": [
         {
-          "kind": "input",
-          "control": "Note textarea"
+          "kind": "activate",
+          "control": "Add note or Note disclosure inside expanded row"
         },
         {
-          "kind": "submit",
-          "control": "Save note"
+          "kind": "input",
+          "control": "Note textarea (auto-saves on pause or blur)"
+        },
+        {
+          "kind": "activate",
+          "control": "Done (or Cmd/Ctrl+Enter, Escape, or Try again on error)"
         }
       ],
       "availability": "Available inside expanded Timeline/Needs decision rows and behavior date Review disclosures.",
-      "success_result": "Updates the occurrence Note and refreshes the owning surface without changing status history. A shortcut-assisted save atomically records its Occurrence ID as excluded future suggestion evidence. Draft edits entered during a pending save remain visible.",
-      "failure_result": "Rejects a stale Note draft, shows a factual conflict error, and preserves both the stored Note and the unsaved draft.",
+      "success_result": "Auto-saves the occurrence Note on pause, blur, shortcut-chip tap, or Done, refreshes the owning surface without changing status history, and collapses only the Note disclosure back to its one-line preview with a brief fading Saved indicator while leaving the parent row open. A shortcut-assisted save atomically records its Occurrence ID as excluded future suggestion evidence. Draft edits entered during a pending save remain visible and flush automatically.",
+      "failure_result": "Rejects a stale Note draft, keeps the Note editor open, shows a factual conflict error with Try again, and preserves both the stored Note and the unsaved draft.",
       "effects": [
         "database_write",
         "ui_state"
@@ -12568,16 +12581,16 @@
         },
         {
           "kind": "activate",
-          "control": "Accepted day note shortcut"
+          "control": "Inline day note shortcut (saves immediately)"
         },
         {
-          "kind": "submit",
-          "control": "Save note"
+          "kind": "activate",
+          "control": "Done (or Cmd/Ctrl+Enter, Escape, or Try again on error)"
         }
       ],
       "availability": "Available under the date of every Timeline day, including future days and Needs decision days.",
-      "success_result": "Saves, edits, or clears the one note for that local date through the shared note editor and refreshes the Timeline. Clearing keeps the row with no text.",
-      "failure_result": "Rejects a stale draft with a factual conflict message and keeps both the stored day note and the unsaved draft.",
+      "success_result": "Auto-saves, edits, or clears the one note for that local date through the shared note editor, updates the header preview optimistically, refreshes the Timeline, and collapses back to the one-line summary with a brief fading Saved indicator on Done. Clearing keeps the row with no text.",
+      "failure_result": "Rejects a stale draft, keeps the editor open with Try again, shows a factual conflict message, and keeps both the stored day note and the unsaved draft.",
       "effects": [
         "database_write",
         "ui_state"

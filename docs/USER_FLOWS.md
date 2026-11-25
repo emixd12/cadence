@@ -366,13 +366,16 @@ No behaviors on this day
 ### Save a day note (Ticket 292)
 
 1. Under a day's date on the Timeline, the user opens "Add day note" (or "Day note").
-2. The user types or picks an accepted day-note shortcut, then selects Save note.
-3. Cadence saves the one note for that date and refreshes the Timeline. The header
-   shows a one-line preview.
-4. To edit, the user opens the same disclosure, changes the text and saves. To clear,
-   the user empties the text and saves.
-5. If the note changed elsewhere, Cadence keeps the draft and asks the user to review
-   the latest note before saving again.
+2. The user types (which auto-saves after a short pause or on blur) or picks a
+   day-note shortcut chip (which saves immediately).
+3. Selecting Done (or pressing Cmd/Ctrl+Enter or Escape) flushes any unsaved draft,
+   updates the header preview immediately, refreshes the Timeline, and collapses back
+   to the one-line summary with a quiet fading "Saved" indicator.
+4. To edit, the user opens the same disclosure, changes the text, and chooses Done.
+   To clear, the user empties the text and lets it auto-save or chooses Done.
+5. If the note changed elsewhere or a save fails, Cadence keeps the editor open with
+   the draft preserved, shows the factual conflict or error message, and offers
+   Try again.
 
 ## Occurrence card flow
 
@@ -433,8 +436,12 @@ between rendered text and field edges: the largest gap is between the collapsed
 row content and the first detail label and should measure 20px optically. The
 next-largest gap is between detail pairs, and the smallest gap is shared by
 detail label/value, Note
-label/textarea, and textarea/Save note relationships. The note save action is
-an underlined text action, matching the Completed and Not Completed controls.
+disclosure/textarea, and textarea/Done relationships. The Note section uses a
+collapsible one-line summary ("Add note" or "Note" + preview), auto-saves on pause,
+blur, or shortcut-chip tap, and closes only the Note disclosure when the user selects
+Done (or presses Cmd/Ctrl+Enter or Escape), keeping the parent occurrence row open.
+The Done (and Try again on error) action is an underlined text action, matching the
+Completed and Not Completed controls.
 An expanded occurrence holds the same blue background used on row hover, rather
 than adding a separate details box.
 

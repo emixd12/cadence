@@ -11,6 +11,7 @@ import type {
 } from "@cadence/core/types/chat";
 import { AlertNotice, type AlertNoticeKind } from "@/components/feedback/AlertNotice";
 import { CHAT_ALERT_LABELS } from "@/lib/ui/chat";
+import { ChatThinkingHorse } from "./ChatThinkingHorse";
 
 // Advisor plan Phase 5B: one conversation, text-like (DESIGN.md "Chat"). The
 // person's words sit in a Cold Surface block on the right; Cadence's reply is
@@ -252,7 +253,8 @@ function RefusalBlock({ refusal, handlers }: Readonly<{ refusal: ChatRefusal; ha
 function WaitingLine() {
   return (
     <p className="text-sm leading-5 text-muted-readable">
-      Reading your question…
+      <ChatThinkingHorse />
+      <span className="sr-only">Reading your question…</span>
     </p>
   );
 }
