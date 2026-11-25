@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { buildTravelEventRevisionFingerprint } from "@cadence/core/resolvers/travel-horizon.resolver";
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import { overlapsTravelSpans, projectBriefTravelGuidance, type BriefTravelEvidence } from "@cadence/core/services/brief-travel-guidance";
 import type { DepartureStop } from "@cadence/core/types/departure";
@@ -98,6 +99,25 @@ describe("brief travel guidance", () => {
   it("shows the trip home from the model once it is the next trip", () => {
     const fresh = evidence({ legs: evidence().legs.map((item) => ({ ...item, estimate: { ...item.estimate!, expiresAt: "2026-09-21T17:00:00Z" } })) });
     expect(phrases(projectBriefTravelGuidance(input(fresh, "2026-09-21T15:45:00Z")))).toEqual(["Head home in 25 minutes, by 12:10 PM · driving, home by 12:40 PM."]);
+  });
+
+  it("changes the travel event revision fingerprint when only event.location changes", () => {
+    const base = {
+      source: "google_calendar",
+      calendarId: "primary",
+      eventId: "evt-1",
+      startAt: "2026-09-21T15:00:00Z",
+      endAt: "2026-09-21T16:00:00Z",
+      location: "123 Main St",
+      status: "confirmed",
+      availability: "busy",
+    };
+    const same = buildTravelEventRevisionFingerprint(base);
+    const moved = buildTravelEventRevisionFingerprint({ ...base, location: "456 Oak Ave" });
+    const cleared = buildTravelEventRevisionFingerprint({ ...base, location: null });
+    expect(moved).not.toBe(same);
+    expect(cleared).not.toBe(same);
+    expect(moved).not.toBe(cleared);
     // After expiry the line stays, marked.
     expect(phrases(projectBriefTravelGuidance(input(evidence(), "2026-09-21T15:45:00Z")))).toEqual(["Last estimate: head home 12:10 PM · checked 9:00 AM."]);
     // After the trip home arrives nothing is left to say.

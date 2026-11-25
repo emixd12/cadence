@@ -264,4 +264,28 @@ describe("DailyBriefSettingsPanel dual-grant & longitudinal review UX (Q2, Q6)",
       longitudinalCalendarReviewCadence: "weekly",
     }));
   });
+
+  it("refreshes immediately when cadence:google-calendar-ai-changed fires", async () => {
+    const preferences = vi.fn()
+      .mockResolvedValueOnce(makeSettings())
+      .mockResolvedValueOnce(makeSettings({
+        sourceStatus: { googleCalendar: "ready", outlookCalendar: "not_connected", icloudCalendar: "not_connected", hevy: "not_connected" },
+      }));
+    const client: DailyBriefClient = {
+      preferences,
+      updatePreferences: vi.fn(async () => makeSettings()),
+      requestBrief: vi.fn(async () => ({ state: "already_attempted" as const })),
+    };
+
+    await renderAsync(<DailyBriefSettingsPanel client={client} />);
+    expect(container.querySelector("[data-testid='ai-connect-google-calendar-shortcut']")).toBeTruthy();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("cadence:google-calendar-ai-changed"));
+      await Promise.resolve();
+    });
+
+    expect(preferences).toHaveBeenCalledTimes(2);
+    expect(container.querySelector("[data-testid='ai-connect-google-calendar-shortcut']")).toBeNull();
+  });
 });

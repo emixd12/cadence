@@ -5,6 +5,7 @@ import type { DailyBriefConnectedSource, DailyBriefSettings, DailyBriefSourceSta
 import { NO_DAILY_BRIEF_SOURCES } from "@cadence/core/services/daily-brief-sources";
 
 import { createWebDailyBriefClient, type AiSettingsInput, type DailyBriefClient, type DailyBriefPreferenceInput, type DailyBriefSettingsUpdate } from "@/lib/ui/daily-brief";
+import { webGoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import {
   AI_FEATURE_COPY, AI_FEATURES_TITLE, AI_PROVIDER_LINE, AI_SETTINGS_APPROVE_LABEL, AI_SOURCE_COPY, AI_SOURCES_HEADING,
   AI_UNANSWERED_LINE, AI_DECLINE_LABEL, aiOffLine, type AiFeatureCopyKey,
@@ -22,8 +23,7 @@ import { getLocalStorage } from "@/lib/ui/browser-storage";
 const SOURCES = [
   {
     key: "googleCalendar", id: "daily-brief-google-disclosure", title: "Google Calendar", calendar: true,
-    // Ticket 307: the Timeline connection and its selected calendars.
-    detail: "Event times, availability and your response for the calendars you selected for Timeline. Chat also reads event titles and locations.",
+    detail: "Event times, availability and your response for the calendars you selected for AI features. Chat also reads event titles and locations.",
   },
   {
     key: "outlookCalendar", id: "daily-brief-outlook-disclosure", title: "Outlook Calendar", calendar: true,
@@ -88,18 +88,42 @@ export function DailyBriefSettingsPanel({
   const [settings, setSettings] = useState<DailyBriefSettings>();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [connectingAiCalendar, setConnectingAiCalendar] = useState(false);
   // Ticket 301: the drawer shows this state while closed. A failed save keeps the loaded settings.
   useReportSettingsSection(resolvedClient ? dailyBriefSectionState(settingsSectionLoad(settings, error !== "")) : null);
 
   useEffect(() => {
     if (!resolvedClient) return;
-    const controller = new AbortController();
-    void resolvedClient.preferences(controller.signal).then((value) => {
-      if (!controller.signal.aborted) setSettings(value);
-    }).catch(() => {
-      if (!controller.signal.aborted) setError("AI settings could not load. Reload Settings to try again.");
-    });
-    return () => controller.abort();
+    let active = true;
+    let controller = new AbortController();
+    const load = (reportError: boolean) => {
+      controller.abort();
+      controller = new AbortController();
+      const signal = controller.signal;
+      void resolvedClient.preferences(signal).then((value) => {
+        if (active && !signal.aborted) setSettings(value);
+      }).catch(() => {
+        if (reportError && active && !signal.aborted) setError("AI settings could not load. Reload Settings to try again.");
+      });
+    };
+    load(true);
+    const onAiCalendarChanged = () => load(false);
+    const onDailyBriefSettings = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail as Partial<DailyBriefSettings> | null : null;
+      if (detail && typeof detail.accountRef === "string" && typeof detail.revision === "number") {
+        setSettings(detail as DailyBriefSettings);
+      } else {
+        load(false);
+      }
+    };
+    window.addEventListener("cadence:google-calendar-ai-changed", onAiCalendarChanged);
+    window.addEventListener("cadence:daily-brief-settings", onDailyBriefSettings);
+    return () => {
+      active = false;
+      controller.abort();
+      window.removeEventListener("cadence:google-calendar-ai-changed", onAiCalendarChanged);
+      window.removeEventListener("cadence:daily-brief-settings", onDailyBriefSettings);
+    };
   }, [resolvedClient]);
 
   if (!resolvedClient || (desktop && !navigator.onLine)) {
@@ -228,15 +252,25 @@ export function DailyBriefSettingsPanel({
         {settings.timelineGoogleCalendarConnected && statusOf(settings, "googleCalendar") === "not_connected" ? (
           <div className="flex flex-wrap items-center gap-3 pl-7" data-testid="ai-connect-google-calendar-shortcut">
             <span className="text-muted-readable">Google Calendar is connected for Timeline, not yet for AI features.</span>
-            {onConnectGoogleCalendarAi ? (
-              <button type="button" onClick={onConnectGoogleCalendarAi} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">
-                Connect Google Calendar for AI
-              </button>
-            ) : (
-              <a href="/settings?connectAiCalendar=1#connector-google_calendar" className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">
-                Connect Google Calendar for AI
-              </a>
-            )}
+            <button
+              type="button"
+              disabled={connectingAiCalendar}
+              onClick={() => {
+                if (onConnectGoogleCalendarAi) {
+                  onConnectGoogleCalendarAi();
+                  return;
+                }
+                if (!webGoogleCalendarCoordinator.ai) return;
+                setConnectingAiCalendar(true);
+                setError("");
+                void webGoogleCalendarCoordinator.ai.beginConnect().catch(() => {
+                  setError("Google Calendar for AI could not start connecting. Try again.");
+                }).finally(() => setConnectingAiCalendar(false));
+              }}
+              className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold"
+            >
+              {connectingAiCalendar ? "Opening Google Calendar for AI…" : "Connect Google Calendar for AI"}
+            </button>
           </div>
         ) : null}
         {settings.ai ? (

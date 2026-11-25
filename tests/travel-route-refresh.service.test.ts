@@ -820,6 +820,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
         eventId: "provider-1",
         startAt: "2026-09-22T11:00:00Z",
         endAt: "2026-09-22T11:30:00Z",
+        location: "3 Event St",
         status: "confirmed",
         availability: undefined,
       }),
@@ -856,6 +857,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
         eventId: event.providerEventId,
         startAt: event.startAt,
         endAt: event.endAt,
+        location: event.location ?? null,
         status: event.state,
         availability: undefined,
       }),
@@ -1302,6 +1304,7 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
       eventId: event.providerEventId,
       startAt: event.startAt,
       endAt: event.endAt,
+      location: event.location ?? null,
       status: event.state,
       availability: undefined,
     });

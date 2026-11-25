@@ -36,12 +36,22 @@ begin
     raise exception 'service_role missing expected execute privileges.';
   end if;
 
+  if not has_table_privilege('service_role', 'public.longitudinal_calendar_reviews', 'SELECT')
+    or not has_table_privilege('service_role', 'public.longitudinal_calendar_reviews', 'INSERT')
+    or not has_table_privilege('service_role', 'public.longitudinal_calendar_reviews', 'UPDATE')
+    or not has_table_privilege('service_role', 'public.longitudinal_calendar_reviews', 'DELETE')
+  then
+    raise exception 'service_role missing expected table privileges on public.longitudinal_calendar_reviews.';
+  end if;
+
   if has_function_privilege('anon', 'public.calendar_agent_read_credential(uuid,text,bigint)', 'EXECUTE')
     or has_function_privilege('authenticated', 'public.calendar_agent_read_credential(uuid,text,bigint)', 'EXECUTE')
     or has_function_privilege('authenticated', 'public.purge_expired_google_calendar_ai_data()', 'EXECUTE')
     or has_function_privilege('anon', 'public.count_google_calendar_ai_chats()', 'EXECUTE')
     or has_function_privilege('authenticated', 'cadence_advisor_private.purge_google_calendar_ai_data(uuid)', 'EXECUTE')
     or has_function_privilege('service_role', 'cadence_advisor_private.purge_google_calendar_ai_data(uuid)', 'EXECUTE')
+    or has_function_privilege('authenticated', 'cadence_advisor_private.assert_google_calendar_agent_generation(uuid,bigint)', 'EXECUTE')
+    or has_function_privilege('service_role', 'cadence_advisor_private.assert_google_calendar_agent_generation(uuid,bigint)', 'EXECUTE')
   then
     raise exception 'Unexpected privilege exposure on private/service_role functions.';
   end if;
@@ -125,8 +135,30 @@ values
 insert into public.daily_calendar_load (user_id, source, local_date, busy_minutes, event_count, earliest_start_minute, latest_end_minute, connection_generation, grant_purpose, synced_at, expires_at)
 values
   ('20261125-0000-4000-8000-000000000001', 'google_calendar', current_date - 35, 60, 1, 540, 600, 1, 'agent_mcp', now() - interval '35 days', now() - interval '5 days'),
+  ('20261125-0000-4000-8000-000000000001', 'google_calendar', current_date - 10, 45, 1, 540, 585, 1, 'standard', now() - interval '10 days', null),
   ('20261125-0000-4000-8000-000000000001', 'google_calendar', current_date, 90, 2, 540, 720, 1, 'agent_mcp', now(), now() + interval '30 days'),
   ('20261125-0000-4000-8000-000000000001', 'outlook_calendar', current_date - 40, 30, 1, 600, 630, 1, 'standard', now() - interval '40 days', null);
+
+-- Generation fence triggers: stale/wrong generation must raise SQLSTATE 55000.
+do $$
+begin
+  begin
+    insert into public.daily_calendar_load (user_id, source, local_date, busy_minutes, event_count, earliest_start_minute, latest_end_minute, connection_generation, grant_purpose, synced_at, expires_at)
+    values ('20261125-0000-4000-8000-000000000001', 'google_calendar', current_date + 1, 30, 1, 540, 570, 999, 'agent_mcp', now(), now() + interval '30 days');
+    raise exception 'Inserting daily_calendar_load with wrong generation should have failed.';
+  exception when sqlstate '55000' then
+    null;
+  end;
+
+  begin
+    insert into public.longitudinal_calendar_reviews (id, user_id, cadence, window_start, window_end, summary_json, contains_google_calendar, google_calendar_grant_generation, created_at, expires_at)
+    values ('20261125-0000-4000-8000-000000002099', '20261125-0000-4000-8000-000000000001', 'weekly', current_date - 7, current_date, '{"ok":true}', true, 999, now(), now() + interval '30 days');
+    raise exception 'Inserting longitudinal_calendar_reviews with wrong generation should have failed.';
+  exception when sqlstate '55000' then
+    null;
+  end;
+end;
+$$;
 
 insert into public.longitudinal_calendar_reviews (id, user_id, cadence, window_start, window_end, summary_json, contains_google_calendar, google_calendar_grant_generation, created_at, expires_at)
 values
@@ -153,7 +185,11 @@ begin
     raise exception 'Expired chat summary was not nulled while keeping conversation.';
   end if;
 
-  -- Non-expired Google load and Outlook load remain.
+  -- Legacy REST-origin ('standard') Google row is removed; non-expired Google MCP and Outlook rows remain.
+  if exists (select 1 from public.daily_calendar_load where user_id = '20261125-0000-4000-8000-000000000001' and source = 'google_calendar' and grant_purpose = 'standard') then
+    raise exception 'Expiry sweep failed to remove legacy standard Google daily_calendar_load row.';
+  end if;
+
   if not exists (select 1 from public.daily_calendar_load where user_id = '20261125-0000-4000-8000-000000000001' and source = 'google_calendar' and local_date = current_date)
     or not exists (select 1 from public.daily_calendar_load where user_id = '20261125-0000-4000-8000-000000000001' and source = 'outlook_calendar')
   then
@@ -217,6 +253,34 @@ begin
     or exists (select 1 from public.longitudinal_calendar_reviews where user_id = '20261125-0000-4000-8000-000000000001')
   then
     raise exception 'Atomic disconnect purge failed to wipe Google AI data or touched non-Google data.';
+  end if;
+
+  -- After disconnect, attempting to insert a Google agent_mcp daily_calendar_load row
+  -- or stamp chat_conversations with the disconnected generation must raise SQLSTATE 55000.
+  begin
+    insert into public.daily_calendar_load (user_id, source, local_date, busy_minutes, event_count, earliest_start_minute, latest_end_minute, connection_generation, grant_purpose, synced_at, expires_at)
+    values ('20261125-0000-4000-8000-000000000001', 'google_calendar', current_date + 2, 30, 1, 540, 570, 1, 'agent_mcp', now(), now() + interval '30 days');
+    raise exception 'Inserting daily_calendar_load after disconnect should have failed.';
+  exception when sqlstate '55000' then
+    null;
+  end;
+
+  begin
+    update public.chat_conversations
+    set google_calendar_grant_generation = 1
+    where id = '20261125-0000-4000-8000-000000001002';
+    raise exception 'Stamping chat_conversations with disconnected generation should have failed.';
+  exception when sqlstate '55000' then
+    null;
+  end;
+
+  -- Nulling an expired chat_conversations.summary via expiry sweep still succeeds after disconnect.
+  insert into public.chat_conversations (id, user_id, title, summary, google_calendar_first_touched_at, google_calendar_grant_generation, summary_google_calendar_expires_at)
+  values ('20261125-0000-4000-8000-000000001003', '20261125-0000-4000-8000-000000000001', 'Backfilled expired summary', 'Legacy summary', now() - interval '35 days', null, now() - interval '1 hour');
+
+  perform public.purge_expired_google_calendar_ai_data();
+  if exists (select 1 from public.chat_conversations where id = '20261125-0000-4000-8000-000000001003' and summary is not null) then
+    raise exception 'Nulling expired chat_conversations.summary failed after disconnect.';
   end if;
 
   -- Now unlinking Google identity succeeds because agent grant is disconnected.

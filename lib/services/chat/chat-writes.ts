@@ -170,7 +170,11 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
       return str(args.note) ? `Save your note for ${date}` : `Clear your note for ${date}`;
     }
     case "move_occurrence_for_day": return `Move ${title} to ${chatClockFromLocal(str(args.start_time) ?? "")} today`;
-    case "move_occurrence_to_date": return `Move ${title} to ${chatDateText(str(args.target_local_date) ?? "")} at ${chatClockFromLocal(str(args.start_time) ?? "")}`;
+    case "move_occurrence_to_date": {
+      const time = str(args.start_time) ?? str(args.target_start_time);
+      const timePart = time ? ` at ${chatClockFromLocal(time)}` : "";
+      return `Move ${title} to ${chatDateText(str(args.target_local_date) ?? "")}${timePart}`;
+    }
     case "revert_occurrence_move": return `Move ${title} back to where it was`;
     case "add_opportunity_occurrence": return `Add ${title} to today${placementText(args)}`;
     case "remove_opportunity_occurrence": return `Take ${title} off today`;
@@ -229,7 +233,11 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
       return str(call.args.note) ? `Saved your note for ${date}.` : `Cleared your note for ${date}.`;
     }
     case "move_occurrence_for_day": return `Moved ${title} to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)} today.`;
-    case "move_occurrence_to_date": return `Moved ${title} to ${chatDateText(str(call.args.target_local_date) ?? "")} at ${chatClockFromLocal(str(call.args.start_time) ?? "")}.`;
+    case "move_occurrence_to_date": {
+      const time = str(call.args.start_time) ?? str(call.args.target_start_time);
+      const timePart = time ? ` at ${chatClockFromLocal(time)}` : "";
+      return `Moved ${title} to ${chatDateText(str(call.args.target_local_date) ?? "")}${timePart}.`;
+    }
     case "revert_occurrence_move": return `Moved ${title} back to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`;
     case "add_opportunity_occurrence": return out.outcome === "logged"
       ? `Marked ${title} done at ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`
@@ -324,9 +332,33 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
       return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId, expected_revision: revision } } };
     }
     case "move_occurrence_to_date": {
-      const revision = str(occurrence.revision);
-      if (!occurrenceId || out.outcome !== "moved" || !revision) return null;
-      return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId, expected_revision: revision } } };
+      const revision = str(occurrence.revision) ?? str(occurrence.updated_at);
+      const previous = obj(out.previous);
+      const prevLocalDate = str(previous.local_date) ?? str(obj(facts.occurrence).local_date);
+      const prevStartAt = str(previous.effective_start_at) ?? str(previous.scheduled_for) ?? str(obj(facts.occurrence).effective_start_at);
+      if (!occurrenceId || out.outcome !== "moved" || !revision || !prevLocalDate) return null;
+      const timezone = str(occurrence.timezone) ?? str(obj(facts.occurrence).timezone);
+      let prevStartTime: string | null = null;
+      if (prevStartAt && timezone) {
+        try {
+          const local = Temporal.Instant.from(prevStartAt).toZonedDateTimeISO(timezone);
+          prevStartTime = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+        } catch {
+          prevStartTime = null;
+        }
+      }
+      return {
+        call: {
+          name: "move_occurrence_to_date",
+          args: {
+            occurrence_id: occurrenceId,
+            target_local_date: prevLocalDate,
+            ...(prevStartTime ? { start_time: prevStartTime } : {}),
+            ...(prevStartAt ? { target_start_at: prevStartAt } : {}),
+            expected_revision: revision,
+          },
+        },
+      };
     }
     case "revert_occurrence_move": {
       const before = str(obj(facts.occurrence).effective_start_at);
@@ -480,7 +512,7 @@ export function guardFrom(facts: ChatWriteFacts, call?: ChatWriteCall): ChatPend
 export function withRevision(call: ChatWriteCall, facts: ChatWriteFacts): ChatWriteCall {
   const occurrence = facts.occurrence ? obj(facts.occurrence) : null;
   const revision = occurrence ? str(occurrence.revision) : null;
-  if (revision && (call.name === "move_occurrence_for_day" || call.name === "revert_occurrence_move" || call.name === "remove_opportunity_occurrence")
+  if (revision && (call.name === "move_occurrence_for_day" || call.name === "move_occurrence_to_date" || call.name === "revert_occurrence_move" || call.name === "remove_opportunity_occurrence")
     && !str(call.args.expected_revision)) {
     return { ...call, args: { ...call.args, expected_revision: revision } };
   }

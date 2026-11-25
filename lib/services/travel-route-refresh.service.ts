@@ -376,6 +376,8 @@ export async function refreshTravelRoutesReportingCalendars(
   const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip &&
     calendarEvents.unavailable.length === 0;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
+  // Timeline travel tokens intentionally stamp `googleSource: "standard" | "none"`;
+  // AI Google-event travel fit is computed server-side from authorized MCP events.
   const googleSource: TravelConclusionsGoogleSource = calendars.google.status === "connected" ? "standard" : "none";
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
@@ -832,6 +834,7 @@ function conclusionEventRevision(event: NormalizedExternalEvent): string {
     eventId: event.providerEventId,
     startAt: event.kind === "timed" ? event.startAt : event.startLocalDate,
     endAt: event.kind === "timed" ? event.endAt : event.endLocalDate,
+    location: event.location ?? null,
     status: event.state,
     availability: event.availability,
   });

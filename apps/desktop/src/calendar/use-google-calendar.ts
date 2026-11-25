@@ -23,6 +23,7 @@ export type DesktopGoogleCalendarHookResult = Readonly<{
   panelVersion: number;
   wrongAccount: boolean;
   callbackMessage?: string;
+  aiCallbackMessage?: string;
   snapshot: ExternalEventSnapshotV1 | null;
   preferences: CalendarPreferences | null;
   stale: boolean;
@@ -44,18 +45,20 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
   const lease = useRef(0);
   const [panelVersion, setPanelVersion] = useState(0);
   const [wrongAccountOwner, setWrongAccountOwner] = useState<string | null>(null);
+  const [callbackState, setCallbackState] = useState<{ accountId: string; message: string } | null>(null);
   const [aiCallbackState, setAiCallbackState] = useState<{ accountId: string; message: string } | null>(null);
   const scope = JSON.stringify([accountId, timezone, range.startLocalDate, range.endLocalDate]);
   const scopeRef = useRef(scope);
   const timezoneRef = useRef(timezone);
   timezoneRef.current = timezone;
   if (scopeRef.current !== scope) { scopeRef.current = scope; lease.current += 1; }
-  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "refresh" | "panelVersion" | "wrongAccount" | "callbackMessage">>({
+  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "refresh" | "panelVersion" | "wrongAccount" | "callbackMessage" | "aiCallbackMessage">>({
     snapshot: null, preferences: null, stale: true, label: broker ? DESKTOP_CALENDAR_NOT_LOADED_LABEL : "Calendar is unavailable in this build.", error: null,
   });
   const panelChanged = useCallback((view: Awaited<ReturnType<DesktopGoogleCalendarPanelCoordinator["getConnection"]>> | null, snapshot?: ExternalEventSnapshotV1) => {
     lease.current += 1;
     setWrongAccountOwner(null);
+    setCallbackState(null);
     setAiCallbackState(null);
     setState({ snapshot: snapshot ?? null, preferences: view?.preferences ?? null, stale: !snapshot,
       label: snapshot ? freshnessLabel(snapshot, false) : view?.status === "connected" ? "Calendar refresh required." : "Google Calendar is not connected.", error: null });
@@ -151,6 +154,7 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
               setWrongAccountOwner(callback.result === "same_account_required" ? accountId : null);
               setAiCallbackState({ accountId, message: aiCallbackResultMessage(callback.result) });
               setPanelVersion((version) => version + 1);
+              window.dispatchEvent(new Event("cadence:google-calendar-ai-changed"));
             }
           } catch (error) {
             if (active) {
@@ -219,7 +223,8 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
     coordinator: panel,
     panelVersion,
     wrongAccount: accountId !== null && wrongAccountOwner === accountId,
-    callbackMessage: accountId !== null && aiCallbackState?.accountId === accountId ? aiCallbackState.message : undefined,
+    callbackMessage: accountId !== null && callbackState?.accountId === accountId ? callbackState.message : undefined,
+    aiCallbackMessage: accountId !== null && aiCallbackState?.accountId === accountId ? aiCallbackState.message : undefined,
     ...state,
     snapshot: owned ? state.snapshot : null,
     preferences: owned || !state.snapshot ? state.preferences : null,

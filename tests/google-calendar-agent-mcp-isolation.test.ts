@@ -353,13 +353,19 @@ describe("WS-2B Google Calendar Agent MCP isolation & leak closures", () => {
     });
   });
 
-  describe("Path 4: Client calendarBusy ignored on AI endpoints", () => {
-    it("ignores client-supplied calendarBusy and uses only server-side context connectors", () => {
-      const result = briefMoveCalendar(null, [
-        { startAt: "2026-11-25T16:00:00Z", endAt: "2026-11-25T17:00:00Z", title: "Leaked REST event" },
+  describe("Path 4: Server-side context connectors take precedence over calendarBusy", () => {
+    it("uses server-side context connectors when context is present, and trusted busy when context is null", () => {
+      const withContext = briefMoveCalendar({ connectors: [] } as never, [
+        { startAt: "2026-11-25T16:00:00Z", endAt: "2026-11-25T17:00:00Z", title: "Ignored when context present" },
       ]);
-      expect(result.busy).toEqual([]);
-      expect(result.state).toBe("none");
+      expect(withContext.busy).toEqual([]);
+      expect(withContext.state).toBe("none");
+
+      const withTrusted = briefMoveCalendar(null, [
+        { startAt: "2026-11-25T16:00:00Z", endAt: "2026-11-25T17:00:00Z", title: "Trusted server event" },
+      ]);
+      expect(withTrusted.busy).toHaveLength(1);
+      expect(withTrusted.state).toBe("current");
     });
   });
 

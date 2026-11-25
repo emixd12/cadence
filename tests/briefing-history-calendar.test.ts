@@ -3,36 +3,43 @@ import type { User } from "@supabase/supabase-js";
 import { getCalendarEventsForAdvisor, getCalendarEventsForWorkbenchHistory, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { readCalendarOAuthConfig, sealCalendarSecret } from "@/lib/services/google-calendar-oauth";
 import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
-const mocks = vi.hoisted(() => ({ connection: vi.fn(), credential: vi.fn(), preference: vi.fn(), calendars: vi.fn(), events: vi.fn() }));
+const mocks = vi.hoisted(() => ({ connection: vi.fn(), credential: vi.fn(), preference: vi.fn(), calendars: vi.fn(), events: vi.fn(), mcpCalendars: vi.fn(), mcpEvents: vi.fn() }));
 vi.mock("@/lib/db/google-calendar.repo", () => ({ readCalendarConnection: mocks.connection, readCalendarCredential: mocks.credential, removeCalendarCredential: vi.fn() }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.preference }));
 vi.mock("@/lib/services/google-calendar-provider", async importOriginal => ({ ...await importOriginal<object>(), readGoogleCalendarCalendars: mocks.calendars, readGoogleCalendarEvents: mocks.events }));
+vi.mock("@/lib/services/google-calendar-mcp-provider", async importOriginal => ({ ...await importOriginal<object>(), listGoogleCalendarMcpCalendars: mocks.mcpCalendars, readGoogleCalendarMcpEvents: mocks.mcpEvents }));
+vi.mock("@/lib/services/model-armor.service", () => ({ screenSnapshotWithModelArmor: async (snapshot: unknown) => ({ snapshot, blocked: false }) }));
 const user = { id: "owner", identities: [{ provider: "google", identity_data: { sub: "subject" } }] } as unknown as User;
-// Ticket 307: Daily Brief history reads the Timeline connection.
-const connection = { userId: "owner", googleSubject: "subject", status: "connected", generation: 3, selectionRevision: 4,
+const connection = { userId: "owner", googleSubject: "subject", grantPurpose: "agent", oauthClientId: "agent-client", status: "connected", generation: 3, selectionRevision: 4,
   preferences: { selectedCalendarIds: ["work"], hiddenCalendarIds: [], visible: true, showAllDay: true } } as const;
 const preference = dailyBriefPreferences({ revision: 5, allow: ["googleCalendar"] });
 const caller = { user, client: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "America/New_York" }, error: null }) }) }) }) } } as unknown as CalendarCaller;
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("NODE_ENV", "development"); vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-15T12:00Z"));
+  vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "agent_mcp");
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client"); vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "secret");
   vi.stubEnv("GOOGLE_CALENDAR_CALLBACK_URL", "https://cadence.example/auth/google-calendar/callback"); vi.stubEnv("GOOGLE_CALENDAR_LEGACY_CALLBACK_URL", "");
   vi.stubEnv("GOOGLE_CALENDAR_ENCRYPTION_KEY", Buffer.alloc(32, 8).toString("base64")); vi.stubEnv("GOOGLE_CALENDAR_KEY_ID", "v1");
   vi.stubEnv("GOOGLE_CALENDAR_PROJECT_ID", "standard-project"); vi.stubEnv("GOOGLE_CALENDAR_AGENT_PROJECT_ID", "agent-project");
   vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_ID", "agent-client"); vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_SECRET", "agent-secret");
   mocks.connection.mockResolvedValue(connection); mocks.preference.mockResolvedValue(preference);
-  mocks.credential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig(process.env)!, "refresh", { ...connection, purpose: "refresh" }));
-  mocks.calendars.mockResolvedValue([{ id: "work", name: "Work", timezone: "America/New_York", primary: true, selected: true, accessRole: "owner" }]);
-  mocks.events.mockResolvedValue({ ok: true, snapshot: {} });
+  mocks.credential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }));
+  mocks.mcpCalendars.mockResolvedValue([{ id: "work", name: "Work", timezone: "America/New_York", primary: true, selected: true, accessRole: "owner" }]);
+  mocks.mcpEvents.mockResolvedValue({ ok: true, snapshot: { events: [], coverage: [], failures: [], tombstones: [] } });
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-it("permits only explicit development history while keeping the production today-only adapter unchanged", async () => {
+it("permits only explicit development history via agent_mcp and never calls REST", async () => {
+  vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "disabled");
   await expect(getCalendarEventsForAdvisor(caller, "2026-11-01", "2026-11-01")).rejects.toMatchObject({ code: "not_configured" });
   expect(mocks.events).not.toHaveBeenCalled();
+  expect(mocks.mcpEvents).not.toHaveBeenCalled();
+
+  vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "agent_mcp");
   await getCalendarEventsForWorkbenchHistory(caller, "2026-11-01", "2026-11-02");
-  expect(mocks.events).toHaveBeenCalledWith(expect.objectContaining({ fetchedAt: expect.stringMatching(/^2026-11-15T12:00:00/), range: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-02",
+  expect(mocks.events).not.toHaveBeenCalled();
+  expect(mocks.mcpEvents).toHaveBeenCalledWith(expect.objectContaining({ fetchedAt: expect.stringMatching(/^2026-11-15T12:00:00/), range: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-02",
     timezone: "America/New_York", selectedCalendarIds: ["work"] } }));
   expect(mocks.preference).toHaveBeenCalledTimes(2);
 });

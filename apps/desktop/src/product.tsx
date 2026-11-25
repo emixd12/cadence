@@ -373,6 +373,33 @@ export function Product() {
   const dailyBriefClient = useMemo(() => calendarClient && accountUserId
     ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan, () => setSyncRequest((previous) => previous + 1)) : null,
   [calendarClient, accountUserId, dailyBriefPlan]);
+  const [loadedDesktopAiEnabled, setLoadedDesktopAiEnabled] = useState(false);
+  const desktopAiEnabled = Boolean(dailyBriefClient && loadedDesktopAiEnabled);
+  useEffect(() => {
+    if (!dailyBriefClient) {
+      return;
+    }
+    let active = true;
+    const load = () => {
+      void dailyBriefClient.preferences().then((prefs) => {
+        if (active) setLoadedDesktopAiEnabled(Boolean(prefs.enabled || prefs.ai?.chatEnabled));
+      }).catch(() => undefined);
+    };
+    load();
+    const onSettingsChanged = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail as { enabled?: boolean; ai?: { chatEnabled?: boolean } } | null : null;
+      if (detail && (typeof detail.enabled === "boolean" || typeof detail.ai?.chatEnabled === "boolean")) {
+        setLoadedDesktopAiEnabled(Boolean(detail.enabled || detail.ai?.chatEnabled));
+      } else {
+        load();
+      }
+    };
+    window.addEventListener("cadence:daily-brief-settings", onSettingsChanged);
+    return () => {
+      active = false;
+      window.removeEventListener("cadence:daily-brief-settings", onSettingsChanged);
+    };
+  }, [dailyBriefClient]);
   useEffect(() => {
     activateDailyBriefClient(dailyBriefClient);
     if (!dailyBriefClient || !accountChatGpt) return;
@@ -732,7 +759,7 @@ export function Product() {
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
         calendarControls={<ConnectorLibrary rows sources={[
-          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} callbackMessage={calendar.callbackMessage} openExternalUrl={openCalendarSourceUrl} nested />
+          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} callbackMessage={calendar.callbackMessage} aiCallbackMessage={calendar.aiCallbackMessage} aiEnabled={desktopAiEnabled} onAiConnectionChange={() => { window.dispatchEvent(new Event("cadence:google-calendar-ai-changed")); window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: {} })); }} openExternalUrl={openCalendarSourceUrl} nested />
             : <ConnectorUnavailable id="google_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)}
               reason={connectors.unavailableReason ? connectorUnavailableReason("Google Calendar", connectors.unavailableReason) : calendar.label} /> },
           { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
@@ -747,7 +774,7 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
-        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
+        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop onConnectGoogleCalendarAi={calendar.coordinator ? () => { void calendar.coordinator!.ai.beginConnect(); } : undefined} />}
         chatGptPlanControls={accountChatGpt && dailyBriefClient && !accountBusy ? <ChatGptPlanSettings key={`chatgpt-${accountUserId}`} connection={accountChatGpt} connect={accountChatGpt.connect} openUsage={openChatGptUsage} /> : undefined}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
           leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}

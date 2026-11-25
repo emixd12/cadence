@@ -488,6 +488,7 @@ export function withSuppliedConclusions(context: AdvisorDayContext, travel: Advi
     source: string;
     startAt: string | null;
     endAt: string | null;
+    location: string | null;
     status: string;
     availability: string;
   }>> = calendars.flatMap((connector) =>
@@ -498,6 +499,7 @@ export function withSuppliedConclusions(context: AdvisorDayContext, travel: Advi
           source: connector.source,
           startAt: event.interval.kind === "timed" ? event.interval.startAt : event.interval.startLocalDate,
           endAt: event.interval.kind === "timed" ? event.interval.endAt : event.interval.endLocalDate,
+          location: (event as { location?: string | null }).location ?? null,
           status: event.state,
           availability: event.availability,
         }))
@@ -535,6 +537,7 @@ export function withSuppliedConclusions(context: AdvisorDayContext, travel: Advi
         eventId: parsed.eventId,
         startAt: current.startAt ?? "",
         endAt: current.endAt,
+        location: current.location ?? null,
         status: current.status,
         availability: current.availability,
       });

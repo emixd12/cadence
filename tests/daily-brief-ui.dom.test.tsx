@@ -233,7 +233,7 @@ describe("one choice for every connected source (Ticket 306)", () => {
     expect(container.querySelector("#daily-brief-sources-coverage")?.textContent).toBe("Event times from your calendars, and event titles for Chat. Workout times from Hevy. Covers Google Calendar, iCloud Calendar and Hevy, and any source you connect later.");
     expect(container.querySelector("details")?.open).toBe(false);
     const google = container.querySelector("#daily-brief-google-disclosure")?.textContent ?? "";
-    expect(google).toContain("Event times, availability and your response for the calendars you selected for Timeline.");
+    expect(google).toContain("Event times, availability and your response for the calendars you selected for AI features.");
     expect(google).toContain("Chat also reads event titles and locations.");
     expect(google).toContain("AI features use it.");
     expect(container.querySelector("#daily-brief-outlook-disclosure")?.textContent).toBe("Event times, availability and your response for the selected Outlook calendars. Chat also reads event titles and locations.");

@@ -11,7 +11,6 @@ import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { Json } from "@/lib/db/database.types";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getCalendarEventsForAdvisor } from "@/lib/services/google-calendar.service";
-import { consumeGoogleCalendarMcpBudget } from "@/lib/services/google-calendar-mcp-cache";
 import { MAX_CALENDAR_LIVE_SPAN_DAYS } from "@/lib/services/chat/chat-calendar-cache";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 
@@ -154,10 +153,11 @@ export async function runLongitudinalCalendarReviewForUser(
     Math.ceil(windowDays / MAX_CALENDAR_LIVE_SPAN_DAYS),
   );
 
-  const checkBudget = options.checkBudget ?? consumeGoogleCalendarMcpBudget;
-  const budget = checkBudget(caller.user.id, requiredChunks);
-  if (!budget.allowed) {
-    return { ran: false, reason: "mcp_daily_budget_exceeded" };
+  if (options.checkBudget) {
+    const budget = options.checkBudget(caller.user.id, requiredChunks);
+    if (!budget.allowed) {
+      return { ran: false, reason: "mcp_daily_budget_exceeded" };
+    }
   }
 
   const readChunk = options.readGoogleCalendarChunk ?? defaultReadGoogleCalendarChunk;
@@ -172,11 +172,23 @@ export async function runLongitudinalCalendarReviewForUser(
     const chunkEnd = Temporal.PlainDate.compare(chunkEndCandidate, endDate) <= 0 ? chunkEndCandidate : endDate;
     chunkCount += 1;
 
-    const chunkResult = await readChunk(caller, cursor.toString(), chunkEnd.toString(), {
-      allowPastDates: true,
-      ephemeralOnly: true,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
+    let chunkResult: Readonly<{ events: readonly NormalizedExternalEvent[]; grantGeneration: number | null }>;
+    try {
+      chunkResult = await readChunk(caller, cursor.toString(), chunkEnd.toString(), {
+        allowPastDates: true,
+        ephemeralOnly: true,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (code === "mcp_daily_budget_exceeded" || code === "rate_limited") {
+        if (loadDays.length === 0) {
+          return { ran: false, reason: "mcp_daily_budget_exceeded" };
+        }
+        break;
+      }
+      throw error;
+    }
     containsGoogleCalendar = true;
     if (chunkResult.grantGeneration !== null) {
       grantGeneration = chunkResult.grantGeneration;
@@ -284,7 +296,10 @@ async function defaultReadGoogleCalendarChunk(
   );
   const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
   const record = read as unknown as Record<string, unknown>;
-  const candidate = record.grantGeneration ?? record.connectionGeneration;
+  const connection = record.connection && typeof record.connection === "object"
+    ? (record.connection as Record<string, unknown>)
+    : null;
+  const candidate = connection?.generation ?? record.grantGeneration ?? record.connectionGeneration;
   return {
     events: snapshot.events as readonly NormalizedExternalEvent[],
     grantGeneration: typeof candidate === "number" && Number.isSafeInteger(candidate) ? candidate : null,

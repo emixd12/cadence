@@ -260,7 +260,7 @@ describe("model-armor.service", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }
-      if (target.includes("iamcredentials.googleapis.com")) {
+      if (new URL(target).hostname === "iamcredentials.googleapis.com") {
         return new Response(
           JSON.stringify({
             accessToken: "oidc-ma-token",

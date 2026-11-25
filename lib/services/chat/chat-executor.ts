@@ -17,7 +17,7 @@ import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { executeMcpOperation } from "@/lib/integrations/operations/execute";
-import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
+import { getCalendarConnection, getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { screenExternalCalendarTextWithModelArmor } from "@/lib/services/model-armor.service";
@@ -95,7 +95,11 @@ function isGracefulDegradationCode(code: string): boolean {
 
 function extractGrantGeneration(read: unknown): number | null {
   if (!read || typeof read !== "object") return null;
-  const candidate = (read as Record<string, unknown>).grantGeneration ?? (read as Record<string, unknown>).connectionGeneration;
+  const record = read as Record<string, unknown>;
+  const connection = record.connection && typeof record.connection === "object"
+    ? (record.connection as Record<string, unknown>)
+    : null;
+  const candidate = connection?.generation ?? record.grantGeneration ?? record.connectionGeneration;
   return typeof candidate === "number" && Number.isSafeInteger(candidate) ? candidate : null;
 }
 
@@ -168,8 +172,11 @@ export function liveChatConnectorReads(
           signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
         });
         let mergedDays = result.days;
-        if (sources.googleCalendar) {
+        const hasPersistedGoogle = result.days.some((day) => day.sources.includes("google_calendar"));
+        if (hasPersistedGoogle) {
           await readOptions.onGoogleCalendarRead?.(null);
+        }
+        if (sources.googleCalendar) {
           const ephemeral = await computeEphemeralGoogleCalendarLoad(
             caller,
             start,
@@ -218,6 +225,143 @@ export function liveChatConnectorReads(
         return { workouts: [], sources: [{ source: "hevy", state: code === "reconnect_required" || code === "not_connected" ? "not_connected" : "failed" }] };
       }
     },
+    travelHorizonData: async (horizonDays) => {
+      const clampedDays = Math.max(1, Math.min(7, Math.trunc(horizonDays)));
+      const startDate = getToday();
+      const endDate = Temporal.PlainDate.from(startDate).add({ days: clampedDays - 1 }).toString();
+      const reads = await Promise.all(
+        (["googleCalendar", "outlookCalendar", "icloudCalendar"] as const).map((source) =>
+          readSource(source, startDate, endDate),
+        ),
+      );
+      const events = reads.flatMap((read) => read.events).sort((a, b) => a.start.localeCompare(b.start));
+      const trips: ChatTravelHorizonTripInput[] = [];
+      for (const event of events) {
+        if (event.all_day || !event.busy || !event.location || !event.location.trim()) continue;
+        try {
+          const startZdt = Temporal.Instant.from(event.start).toZonedDateTimeISO(timezone);
+          trips.push({
+            localDate: startZdt.toPlainDate().toString(),
+            tripLabel: event.title,
+            destinationLabel: event.location.trim(),
+            mode: "driving",
+            departureAt: null,
+            arrivalAt: event.start,
+            durationSeconds: null,
+            bufferMinutes: 10,
+          });
+        } catch {
+          // Skip malformed event timestamps
+        }
+      }
+      let occurrences: ChatTravelHorizonOccurrenceInput[] = [];
+      try {
+        const { data } = await caller.client
+          .from("occurrences")
+          .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, schedule_kind")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startDate)
+          .lte("local_date", endDate)
+          .eq("status", "unresolved");
+        occurrences = (data ?? []).flatMap((row) => {
+          const startAt = row.effective_start_at ?? row.scheduled_for;
+          if (!startAt) return [];
+          let durationMinutes: number | null = null;
+          if (row.effective_end_at) {
+            try {
+              const sec = Temporal.Instant.from(startAt).until(Temporal.Instant.from(row.effective_end_at)).total({ unit: "seconds" });
+              if (sec > 0) durationMinutes = Math.round(sec / 60);
+            } catch {
+              durationMinutes = null;
+            }
+          }
+          return [{
+            occurrenceRef: row.id,
+            behaviorId: row.behavior_id,
+            localDate: row.local_date,
+            startAt,
+            endAt: row.effective_end_at ?? null,
+            durationMinutes,
+            flexible: row.schedule_kind === "exact",
+          }];
+        });
+      } catch {
+        occurrences = [];
+      }
+      return {
+        trips,
+        occurrences,
+        sources: reads.map((read) => read.report).filter((report) => report.state !== "not_connected"),
+      };
+    },
+    longitudinalData: async (windowDays) => {
+      const clampedDays = Math.max(7, Math.min(90, Math.trunc(windowDays)));
+      const endDate = Temporal.PlainDate.from(getToday());
+      const startDate = endDate.subtract({ days: clampedDays - 1 });
+      const startStr = startDate.toString();
+      const endStr = endDate.toString();
+
+      let occurrences: LongitudinalOccurrenceOutcomeRecord[] = [];
+      try {
+        const { data } = await caller.client
+          .from("occurrences")
+          .select("behavior_id, local_date, status, effective_start_at, effective_end_at")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startStr)
+          .lte("local_date", endStr);
+        occurrences = (data ?? []).map((row) => {
+          let trackedDurationMinutes: number | null = null;
+          if (row.effective_start_at && row.effective_end_at) {
+            try {
+              const sec = Temporal.Instant.from(row.effective_start_at)
+                .until(Temporal.Instant.from(row.effective_end_at))
+                .total({ unit: "seconds" });
+              if (sec > 0) trackedDurationMinutes = Math.round(sec / 60);
+            } catch {
+              trackedDurationMinutes = null;
+            }
+          }
+          const status = row.status === "completed" || row.status === "not_completed" ? row.status : "unresolved";
+          return {
+            behaviorId: row.behavior_id,
+            localDate: row.local_date,
+            status,
+            travelMotivatedShift: false,
+            travelDay: false,
+            trackedDurationMinutes,
+          };
+        });
+      } catch {
+        occurrences = [];
+      }
+
+      let proposalOutcomes: LongitudinalProposalOutcomeRecord[] = [];
+      try {
+        const { data: moves } = await caller.client
+          .from("occurrence_moves")
+          .select("kind, reason, local_date, occurrence_id, occurrences!occurrence_moves_occurrence_id_fkey(behavior_id)")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startStr)
+          .lte("local_date", endStr);
+        proposalOutcomes = (moves ?? []).flatMap((row) => {
+          const nested = row.occurrences as { behavior_id?: string } | null;
+          const behaviorId = nested?.behavior_id;
+          if (!behaviorId || !row.local_date) return [];
+          const outcome = row.kind === "revert" ? "undo" : "yes";
+          const travelMotivated = typeof row.reason === "string" && row.reason.toLowerCase().includes("travel");
+          return [{
+            behaviorId,
+            localDate: row.local_date,
+            outcome,
+            travelMotivated,
+          }];
+        });
+      } catch {
+        proposalOutcomes = [];
+      }
+
+      return { proposalOutcomes, occurrences };
+    },
   };
 }
 
@@ -227,8 +371,11 @@ export function liveChatConnectorReads(
  * calendars. Checked only after that refusal, so a normal read costs nothing extra.
  */
 async function connectedWithNoCalendars(caller: CalendarCaller, source: ChatCalendarSource): Promise<boolean> {
-  if (source === "googleCalendar") return false;
   try {
+    if (source === "googleCalendar") {
+      const connection = await getCalendarConnection(caller, "agent");
+      return connection.status === "connected" && connection.preferences.selectedCalendarIds.length === 0;
+    }
     const connection = source === "outlookCalendar" ? await getOutlookCalendarConnection(caller) : await getIcloudCalendarConnection(caller);
     return connection.status === "connected" && connection.preferences.selectedSourceIds.length === 0;
   } catch {
@@ -299,6 +446,9 @@ export function createLiveChatExecutor(input: Readonly<{
     }
     if (name === "get_longitudinal_patterns") {
       return longitudinalPatternsTool(input.reads, args, input.today());
+    }
+    if (name === "move_occurrence_to_date") {
+      return moveOccurrenceToDateTool(input.context, args, timezone);
     }
     if (name === "search_advice") {
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
@@ -653,5 +803,191 @@ async function longitudinalPatternsTool(
   return {
     ok: true,
     result: mergeLongitudinalLayers(firstParty, rollingCalendarSummary),
+  };
+}
+
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function sameRevision(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    return Temporal.Instant.from(a).equals(Temporal.Instant.from(b));
+  } catch {
+    return false;
+  }
+}
+
+async function moveOccurrenceToDateTool(
+  context: IntegrationContext,
+  args: Readonly<Record<string, unknown>>,
+  defaultTimezone: string,
+): Promise<ChatToolResult> {
+  const occurrenceId = typeof args.occurrence_id === "string" && args.occurrence_id.trim() ? args.occurrence_id.trim() : null;
+  const targetLocalDate = typeof args.target_local_date === "string" && DATE.test(args.target_local_date)
+    ? args.target_local_date
+    : null;
+  const expectedRevision = typeof args.expected_revision === "string" && args.expected_revision.trim()
+    ? args.expected_revision.trim()
+    : null;
+  const startTimeRaw = typeof args.start_time === "string"
+    ? args.start_time
+    : typeof args.target_start_time === "string"
+      ? args.target_start_time
+      : null;
+  const targetStartAtRaw = typeof args.target_start_at === "string" ? args.target_start_at : null;
+
+  if (!occurrenceId || !targetLocalDate || !expectedRevision) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "occurrence_id, target_local_date (YYYY-MM-DD), and expected_revision are required." },
+    };
+  }
+  let parsedTargetDate: Temporal.PlainDate;
+  try {
+    parsedTargetDate = Temporal.PlainDate.from(targetLocalDate);
+  } catch {
+    return { ok: false, error: { code: "invalid_input", message: "Use target_local_date as YYYY-MM-DD." } };
+  }
+  if (startTimeRaw !== null && !HHMM.test(startTimeRaw)) {
+    return { ok: false, error: { code: "invalid_input", message: "Use start_time as HH:MM." } };
+  }
+
+  const { data: occurrence, error: readError } = await context.supabase
+    .from("occurrences")
+    .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, updated_at")
+    .eq("id", occurrenceId)
+    .eq("user_id", context.userId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, error: { code: "failed", message: "Could not read that item." } };
+  }
+  if (!occurrence) {
+    return { ok: false, error: { code: "not_found", message: "Occurrence not found." } };
+  }
+  if (occurrence.status !== "unresolved") {
+    return {
+      ok: true,
+      result: {
+        outcome: "refused",
+        refusal: {
+          reason: "already_resolved",
+          message: "That item is already marked, so it cannot be moved.",
+        },
+      },
+    };
+  }
+  if (!sameRevision(occurrence.updated_at, expectedRevision)) {
+    return {
+      ok: true,
+      result: {
+        outcome: "refused",
+        refusal: {
+          reason: "revision_changed",
+          message: "That item changed since it was read.",
+        },
+      },
+    };
+  }
+
+  const { data: behavior } = await context.supabase
+    .from("behaviors")
+    .select("title, timezone, default_duration_minutes")
+    .eq("id", occurrence.behavior_id)
+    .eq("user_id", context.userId)
+    .maybeSingle();
+
+  const behaviorTimezone = typeof behavior?.timezone === "string" && behavior.timezone ? behavior.timezone : defaultTimezone;
+
+  let newStartInstant: Temporal.Instant;
+  try {
+    if (targetStartAtRaw) {
+      newStartInstant = Temporal.Instant.from(targetStartAtRaw);
+    } else if (startTimeRaw) {
+      newStartInstant = parsedTargetDate
+        .toZonedDateTime({ timeZone: behaviorTimezone, plainTime: Temporal.PlainTime.from(startTimeRaw) })
+        .toInstant();
+    } else {
+      const currentStart = Temporal.Instant.from(occurrence.effective_start_at ?? occurrence.scheduled_for)
+        .toZonedDateTimeISO(behaviorTimezone);
+      newStartInstant = parsedTargetDate
+        .toZonedDateTime({ timeZone: behaviorTimezone, plainTime: currentStart.toPlainTime() })
+        .toInstant();
+    }
+  } catch {
+    return { ok: false, error: { code: "invalid_input", message: "Could not compute target start time." } };
+  }
+
+  let durationSeconds: number | null = null;
+  if (occurrence.effective_start_at && occurrence.effective_end_at) {
+    try {
+      const diff = Temporal.Instant.from(occurrence.effective_start_at)
+        .until(Temporal.Instant.from(occurrence.effective_end_at))
+        .total({ unit: "seconds" });
+      if (diff > 0) durationSeconds = Math.round(diff);
+    } catch {
+      durationSeconds = null;
+    }
+  } else if (typeof behavior?.default_duration_minutes === "number" && behavior.default_duration_minutes > 0) {
+    durationSeconds = Math.round(behavior.default_duration_minutes * 60);
+  }
+
+  const newStartIso = newStartInstant.toString();
+  const newEndIso = durationSeconds !== null ? newStartInstant.add({ seconds: durationSeconds }).toString() : null;
+
+  const { data: updated, error: updateError } = await context.supabase
+    .from("occurrences")
+    .update({
+      local_date: targetLocalDate,
+      scheduled_for: newStartIso,
+      effective_start_at: newStartIso,
+      effective_end_at: newEndIso,
+    })
+    .eq("id", occurrenceId)
+    .eq("user_id", context.userId)
+    .eq("updated_at", occurrence.updated_at)
+    .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, updated_at")
+    .maybeSingle();
+
+  if (updateError) {
+    return { ok: false, error: { code: "failed", message: "Could not move that item." } };
+  }
+  if (!updated) {
+    return {
+      ok: true,
+      result: {
+        outcome: "refused",
+        refusal: {
+          reason: "revision_changed",
+          message: "That item changed since it was read.",
+        },
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    result: {
+      outcome: "moved",
+      occurrence: {
+        id: updated.id,
+        behavior_id: updated.behavior_id,
+        behavior_title: behavior?.title ?? null,
+        timezone: behaviorTimezone,
+        local_date: updated.local_date,
+        scheduled_for: updated.scheduled_for,
+        effective_start_at: updated.effective_start_at,
+        effective_end_at: updated.effective_end_at,
+        status: updated.status,
+        updated_at: updated.updated_at,
+        revision: updated.updated_at,
+      },
+      previous: {
+        local_date: occurrence.local_date,
+        scheduled_for: occurrence.scheduled_for,
+        effective_start_at: occurrence.effective_start_at,
+        effective_end_at: occurrence.effective_end_at,
+      },
+    },
   };
 }

@@ -42,6 +42,11 @@ import { screenSnapshotWithModelArmor } from "./model-armor.service";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 import {
+  EXTERNAL_EVENT_ADAPTER_VERSION,
+  EXTERNAL_EVENT_SCHEMA_VERSION,
+  type ExternalEventSnapshotV1,
+} from "@cadence/core/types/external-event";
+import {
   backfillCalendarLoadAfterSelection,
   clearCalendarLoadForSource,
   persistCalendarLoadFromSnapshot,
@@ -384,7 +389,7 @@ export async function getCalendarEventsForAdvisor(
   return readAuthorizedMcpCalendarRange(caller, start, end, options);
 }
 
-/** Development-only Retrospective reads. Live authorization never uses the evaluation clock. */
+/** Development-only Retrospective reads. Live authorization never uses the evaluation clock. Strictly `agent_mcp`. */
 export async function getCalendarEventsForWorkbenchHistory(
   caller: CalendarCaller, start: string, end: string,
   options: Readonly<{ signal?: AbortSignal }> = {},
@@ -393,13 +398,23 @@ export async function getCalendarEventsForWorkbenchHistory(
   options.signal?.throwIfAborted();
   const preference = await readDailyBriefPreferences(caller.client, options.signal);
   if (!dailyBriefSourceAllowed(preference, "googleCalendar") || !dailyBriefReadsGoogleCalendar(preference)) throw new CalendarConnectionError("permission_denied");
-  const connection = await getCalendarConnection(caller);
+  const connection = await getCalendarConnection(caller, "agent");
   if (connection.status !== "connected") throw new CalendarConnectionError("connection_changed");
-  const result = await readAuthorizedCalendarRange(caller, start, end, {
+  const { data: profile, error } = await caller.client.from("profiles").select("timezone").eq("id", caller.user.id).single();
+  if (error || !profile) throw new CalendarConnectionError("provider_unavailable");
+  let first: Temporal.PlainDate; let last: Temporal.PlainDate;
+  try { first = Temporal.PlainDate.from(start); last = Temporal.PlainDate.from(end); }
+  catch { throw new CalendarConnectionError("invalid_request"); }
+  const today = Temporal.Now.instant().toZonedDateTimeISO(profile.timezone).toPlainDate();
+  if (first.toString() !== start || last.toString() !== end || first.until(last).days < 0 || first.until(last).days > 30
+    || Temporal.PlainDate.compare(last, today) >= 0) {
+    throw new CalendarConnectionError("invalid_request");
+  }
+  const result = await getCalendarEventsForAdvisor(caller, start, end, {
     authorizedCalendarIds: connection.preferences.selectedCalendarIds,
     expectedConnectionGeneration: connection.generation, expectedSelectionRevision: connection.selectionRevision,
-    authorizationScope: `briefing-history:${preference.revision}`, signal: options.signal,
-  }, true, "standard");
+    authorizationScope: `briefing-history:${preference.revision}`, allowPastDates: true, ephemeralOnly: true, signal: options.signal,
+  });
   const current = await readDailyBriefPreferences(caller.client, options.signal);
   options.signal?.throwIfAborted();
   if (JSON.stringify(current) !== JSON.stringify(preference)) throw new CalendarConnectionError("connection_changed");
@@ -475,10 +490,44 @@ async function readAuthorizedMcpCalendarRange(
         if (!calendar) throw new CalendarConnectionError("provider_unavailable");
         return calendar;
       });
-      if (selected.length > 0) {
-        const budget = consumeGoogleCalendarMcpBudget(caller.user.id, selected.length);
-        if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
+      if (selected.length === 0) {
+        const emptySnapshot: ExternalEventSnapshotV1 = {
+          schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION,
+          adapterVersion: EXTERNAL_EVENT_ADAPTER_VERSION,
+          accountId: caller.user.id,
+          connectionGeneration: connection.generation,
+          source: "google_calendar",
+          requestedRange: {
+            startLocalDate: start,
+            endLocalDate: end,
+            timezone: profile.timezone,
+            selectedCalendarIds: [],
+          },
+          fetchedAt: now.toString(),
+          completeness: "complete",
+          freshness: {
+            state: "current",
+            refreshedAt: now.toString(),
+            label: "Calendar current",
+            canAssertNoOverlap: true,
+          },
+          capabilities: {
+            calendar_listing: { support: "supported", permission: "granted", availability: "available" },
+            timed_events: { support: "supported", permission: "granted", availability: "available" },
+            all_day_events: { support: "supported", permission: "granted", availability: "available" },
+            recurrence: { support: "supported", permission: "granted", availability: "available" },
+            details: { support: "supported", permission: "granted", availability: "available" },
+            source_links: { support: "supported", permission: "granted", availability: "available" },
+          },
+          coverage: [],
+          failures: [],
+          events: [],
+          tombstones: [],
+        };
+        return { ok: true, snapshot: emptySnapshot };
       }
+      const budget = consumeGoogleCalendarMcpBudget(caller.user.id, selected.length);
+      if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
       const mcpResult = await readGoogleCalendarMcpEvents({
         accessToken: token,
         accountId: caller.user.id,

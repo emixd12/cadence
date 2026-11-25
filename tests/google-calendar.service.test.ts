@@ -199,3 +199,37 @@ describe("tomorrow's first trip Calendar read (Ticket 282)", () => {
     expect(day.events).toHaveLength(4);
   });
 });
+
+it("returns an empty complete snapshot without calling MCP events when 0 AI calendars are selected", async () => {
+  vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "agent_mcp");
+  vi.stubEnv("GOOGLE_CALENDAR_PROJECT_ID", "standard-project");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_PROJECT_ID", "agent-project");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_ID", "agent-client");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_SECRET", "agent-secret");
+  const connection = {
+    userId: user.id,
+    googleSubject: "subject",
+    grantPurpose: "agent" as const,
+    oauthClientId: "agent-client",
+    generation: 2,
+    selectionRevision: 1,
+    status: "connected" as const,
+    preferences: { selectedCalendarIds: [], hiddenCalendarIds: [], visible: true, showAllDay: true },
+  };
+  repo.readCalendarConnection.mockResolvedValue(connection);
+  repo.readCalendarCredential.mockResolvedValue(
+    sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }),
+  );
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
+  mcpProvider.listGoogleCalendarMcpCalendars.mockResolvedValue([{ id: "work", name: "Work", timezone: "UTC", primary: true, selected: true, accessRole: "owner" }]);
+  const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "UTC" }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
+  const today = Temporal.Now.instant().toZonedDateTimeISO("UTC").toPlainDate().toString();
+  const read = await getCalendarEventsForAdvisor({ client, user }, today, today, { ephemeralOnly: true });
+  expect(read.result.ok).toBe(true);
+  if (read.result.ok) {
+    expect(read.result.snapshot.events).toEqual([]);
+    expect(read.result.snapshot.coverage).toEqual([]);
+    expect(read.result.snapshot.requestedRange.selectedCalendarIds).toEqual([]);
+  }
+  expect(mcpProvider.readGoogleCalendarMcpEvents).not.toHaveBeenCalled();
+});

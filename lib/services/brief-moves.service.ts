@@ -59,6 +59,13 @@ import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
 import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
 import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
 import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
+import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
+import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
+import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
+import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
+import { isGoogleCalendarAiTransportEnabled } from "@/lib/services/google-calendar-ai-transport";
+import { getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
+import { getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 
 /**
  * Advisor Phase 3A1: the Daily Brief's move lines and every answer to them. The planner
@@ -104,27 +111,138 @@ export type BriefMovePlanningInput = Readonly<{
   travelTimes?: string | null;
 }>;
 
+export type BriefServerCalendarBusyResult = Readonly<{
+  busy: readonly BriefMoveCalendarBusy[];
+  containsGoogleCalendar: boolean;
+  googleCalendarGrantGeneration: number | null;
+}>;
+
+function busyFromExternalEvents(events: readonly NormalizedExternalEvent[]): BriefMoveCalendarBusy[] {
+  const busy: BriefMoveCalendarBusy[] = [];
+  for (const event of events) {
+    if (event.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
+      || event.currentUserResponse === "declined") continue;
+    busy.push({
+      ref: `${event.source}:${event.calendarId}:${event.providerEventId}`,
+      start: Temporal.Instant.from(event.startAt),
+      end: Temporal.Instant.from(event.endAt),
+      ...(event.title ? { title: event.title } : {}),
+    });
+  }
+  return busy;
+}
+
 /**
- * The calendar as the one rule sees it: derived strictly server-side from authorized AI
- * context connectors. Client-supplied `calendarBusy` is ignored (WS-2B Path 4 closure)
- * so Timeline REST calendar data can never leak into AI move planning.
+ * Reads AI-authorized calendar busy intervals server-side for `localDate` from MCP Google
+ * Calendar, Outlook Calendar, and iCloud Calendar, respecting Daily Brief source preferences.
+ * Never reads client-supplied calendar data.
  */
-export function briefMoveCalendar(context: AdvisorDayContext | null, _requestBusy?: readonly BriefCalendarBusy[] | undefined)
+export async function readServerBriefCalendarBusy(input: Readonly<{
+  supabase: AppSupabaseClient;
+  userId: string;
+  localDate: string;
+  timezone?: string;
+  now: Temporal.Instant;
+  user?: CalendarCaller["user"];
+}>): Promise<BriefServerCalendarBusyResult> {
+  const empty: BriefServerCalendarBusyResult = { busy: [], containsGoogleCalendar: false, googleCalendarGrantGeneration: null };
+  let preferences;
+  try {
+    preferences = await readDailyBriefPreferences(input.supabase);
+  } catch {
+    return empty;
+  }
+  if (!preferences.enabled || !preferences.useConnectedSources) return empty;
+  let user = input.user ?? null;
+  if (!user) {
+    try {
+      const authResult = await (input.supabase as unknown as { auth?: { getUser?: () => Promise<{ data?: { user?: CalendarCaller["user"] | null } }> } }).auth?.getUser?.();
+      user = authResult?.data?.user ?? null;
+    } catch {
+      user = null;
+    }
+  }
+  if (!user) return empty;
+  const caller: CalendarCaller = { client: input.supabase, user };
+
+  const readGoogle = async (): Promise<Readonly<{ busy: BriefMoveCalendarBusy[]; generation: number | null; ok: boolean }>> => {
+    if (!dailyBriefSourceAllowed(preferences, "googleCalendar") || !dailyBriefReadsGoogleCalendar(preferences) || !isGoogleCalendarAiTransportEnabled()) {
+      return { busy: [], generation: null, ok: false };
+    }
+    try {
+      const read = await getCalendarEventsForAdvisor(caller, input.localDate, input.localDate, { ephemeralOnly: true, now: input.now });
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      return { busy: busyFromExternalEvents(snapshot.events), generation: read.connection.generation, ok: true };
+    } catch {
+      return { busy: [], generation: null, ok: false };
+    }
+  };
+
+  const readOutlook = async (): Promise<BriefMoveCalendarBusy[]> => {
+    if (!dailyBriefSourceAllowed(preferences, "outlookCalendar")) return [];
+    try {
+      const read = await getOutlookCalendarEventsForCaller(caller, input.localDate, input.localDate);
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      return busyFromExternalEvents(snapshot.events);
+    } catch {
+      return [];
+    }
+  };
+
+  const readIcloud = async (): Promise<BriefMoveCalendarBusy[]> => {
+    if (!dailyBriefSourceAllowed(preferences, "icloudCalendar")) return [];
+    try {
+      const read = await getIcloudCalendarEventsForCaller(caller, input.localDate, input.localDate);
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      return busyFromExternalEvents(snapshot.events);
+    } catch {
+      return [];
+    }
+  };
+
+  const [google, outlook, icloud] = await Promise.all([readGoogle(), readOutlook(), readIcloud()]);
+  return {
+    busy: [...google.busy, ...outlook, ...icloud],
+    containsGoogleCalendar: google.ok,
+    googleCalendarGrantGeneration: google.ok ? google.generation : null,
+  };
+}
+
+/**
+ * The calendar as the one rule sees it: derived from authorized AI context connectors when
+ * `context` is present, or from trusted server-side / internal busy intervals when provided.
+ */
+export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy?: readonly BriefCalendarBusy[] | undefined)
   : Readonly<{ busy: BriefMoveCalendarBusy[]; state: "current" | "stale" | "none" }> {
   const busy: BriefMoveCalendarBusy[] = [];
   let requested = false, stale = false;
-  for (const connector of context?.connectors ?? []) {
-    // Calendar connectors carry events; Hevy and not-requested sources do not.
-    if (!("events" in connector)) continue;
-    requested = true;
-    if (connector.state !== "current" || !connector.complete) stale = true;
-    for (const event of connector.events) {
-      if (event.interval.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
-        || event.currentUserResponse === "declined") continue;
-      busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) });
+  if (context) {
+    for (const connector of context.connectors ?? []) {
+      // Calendar connectors carry events; Hevy and not-requested sources do not.
+      if (!("events" in connector)) continue;
+      requested = true;
+      if (connector.state !== "current" || !connector.complete) stale = true;
+      for (const event of connector.events) {
+        if (event.interval.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
+          || event.currentUserResponse === "declined") continue;
+        busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) });
+      }
     }
+    return { busy, state: stale ? "stale" : requested ? "current" : "none" };
   }
-  return { busy, state: stale ? "stale" : requested ? "current" : "none" };
+  if (trustedBusy?.length) {
+    for (let index = 0; index < trustedBusy.length; index++) {
+      const event = trustedBusy[index]!;
+      busy.push({
+        ref: event.ref ?? `calendar:${index}`,
+        start: Temporal.Instant.from(event.startAt),
+        end: Temporal.Instant.from(event.endAt),
+        ...(event.title ? { title: event.title } : {}),
+      });
+    }
+    return { busy, state: "current" };
+  }
+  return { busy, state: "none" };
 }
 
 /** The verified travel times for this request, or null. Rejects Timeline-REST Google tokens (Path 3). Never throws. */
@@ -532,6 +650,7 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(proposal), null), replayed: false };
   }
   const line = lineFromRow(proposal);
+  const calendar = await resolveBriefCalendarBusy(callers.person, proposal.local_date, request.context);
   const moved = await moveOccurrenceForDay(await agentCaller(callers), {
     occurrenceId: proposal.occurrence_id,
     expectedRevision: request.expectedRevision,
@@ -539,13 +658,13 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     reason: proposal.reason,
     proposalId: proposal.id,
     idempotencyKey: request.idempotencyKey,
-    calendarBusy: requestBusy(request.context),
+    calendarBusy: calendar.busy,
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
     routine: !!line?.routine,
   }).catch(rethrowKeyReused);
   return settleMove(callers, proposal, moved, { kind: request.kind, key: request.idempotencyKey, batchId: request.batchId,
-    asked: { startAt: proposal.proposed_start_at, context: request.context } });
+    asked: { startAt: proposal.proposed_start_at, context: request.context, calendarBusy: calendar.busy } });
 }
 
 async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
@@ -556,6 +675,7 @@ async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
   let start: Temporal.Instant;
   try { start = Temporal.Instant.from(request.startAt); } catch { throw new BriefMoveError("invalid_request"); }
   const line = lineFromRow(proposal);
+  const calendar = await resolveBriefCalendarBusy(callers.person, proposal.local_date, request.context);
   // No proposal id: the move supersedes this line, and the answer then marks it other_time.
   const moved = await moveOccurrenceForDay(await agentCaller(callers), {
     occurrenceId: proposal.occurrence_id,
@@ -563,13 +683,13 @@ async function answerOtherTime(callers: BriefMoveCallers, proposal: ProposalRow,
     startAt: start.toString(),
     reason: proposal.reason,
     idempotencyKey: request.idempotencyKey,
-    calendarBusy: requestBusy(request.context),
+    calendarBusy: calendar.busy,
     length: line?.length ?? null,
     travel: briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date)),
     routine: !!line?.routine,
   }).catch(rethrowKeyReused);
   return settleMove(callers, proposal, moved, { kind: "other_time", key: request.idempotencyKey, batchId: null,
-    asked: { startAt: start.toString(), context: request.context } });
+    asked: { startAt: start.toString(), context: request.context, calendarBusy: calendar.busy } });
 }
 
 async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key: string, kind: "undo" | "undo_all",
@@ -595,7 +715,7 @@ async function answerUndo(callers: BriefMoveCallers, proposal: ProposalRow, key:
 async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, moved: OccurrenceMoveResult,
   answer: Readonly<{ kind: BriefMoveAnswerRequest["kind"]; key: string; batchId: string | null;
     /** The time a Yes or Other time asked for, so a refusal can name what is there now. */
-    asked?: Readonly<{ startAt: string; context: BriefPlanningContext }>;
+    asked?: Readonly<{ startAt: string; context: BriefPlanningContext; calendarBusy: readonly BriefMoveCalendarBusy[] }>;
   }>): Promise<AnswerOutcome> {
   if (moved.outcome === "refused") {
     const reason = moved.detail ?? moved.reason;
@@ -673,7 +793,7 @@ async function latestDayLines(person: OccurrenceMoveCaller, localDate: string): 
  * cannot name one: the move service's own message then stands.
  */
 async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, reason: string,
-  asked: Readonly<{ startAt: string; context: BriefPlanningContext }>, batchId: string | null): Promise<NamedCause | null> {
+  asked: Readonly<{ startAt: string; context: BriefPlanningContext; calendarBusy: readonly BriefMoveCalendarBusy[] }>, batchId: string | null): Promise<NamedCause | null> {
   const line = lineFromRow(proposal);
   if (!line) return null;
   if (reason === "proposal_closed") return { cause: closedRefusal(proposal).cause!, message: noticeText("brief-moves.refused.closed") };
@@ -687,7 +807,7 @@ async function refusalCause(callers: BriefMoveCallers, proposal: ProposalRow, re
   const { person } = callers;
   const day = await readBriefMoveDay(person.supabase, person.userId, proposal.local_date);
   const travel = briefMoveTravel(asked.context.travelTimes, travelInput(callers, proposal.local_date));
-  const view = slotView(day, proposal.occurrence_id, requestBusy(asked.context), travel);
+  const view = slotView(day, proposal.occurrence_id, asked.calendarBusy, travel);
   const start = Temporal.Instant.from(asked.startAt);
   const check = checkBriefMoveSlot({
     interval: { start, end: start.add({ minutes: line.length.minutes }) },
@@ -760,7 +880,8 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
   /** Updated as lines are re-planned, so two lines never take the same new time. */
   const positions = openLinePositions(latest.values());
 
-  const calendar = requestBusy(request.context);
+  const serverCalendar = await resolveBriefCalendarBusy(person, request.localDate, request.context);
+  const calendar = serverCalendar.busy;
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, request.localDate));
   /** Occurrence id to the line that now stands for it (null: none). */
   const outcome = new Map<string, Readonly<{ proposalId: string; line: BriefMoveLine | null }>>();
@@ -803,9 +924,15 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
       continue;
     }
     positions.set(row.occurrence_id, { start: Temporal.Instant.from(candidate.to.startAt), end: Temporal.Instant.from(candidate.to.endAt) });
+    const prevRow = row as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
+    const resolvedGeneration = serverCalendar.googleCalendarGrantGeneration ?? prevRow.google_calendar_grant_generation ?? null;
+    const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevRow.contains_google_calendar === true && resolvedGeneration !== null);
+    const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
     const [saved] = await saveBriefProposals(await callers.agent(), {
       runId: row.agent_run_id, localDate: row.local_date, refresh: false, candidates: [candidate],
       replaces: new Map([[item.occurrenceId, row.id]]),
+      containsGoogleCalendar,
+      googleCalendarGrantGeneration,
     });
     outcome.set(row.occurrence_id, { proposalId: row.id, line: saved ?? null });
   }
@@ -938,7 +1065,7 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   ]);
   const item = day.items.find((candidate) => candidate.occurrenceId === proposal.occurrence_id);
   if (!item || item.status !== "unresolved") throw new BriefMoveError("proposal_closed");
-  const calendar = briefMoveCalendar(null, request.context.calendarBusy);
+  const serverCalendar = await resolveBriefCalendarBusy(person, proposal.local_date, request.context);
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date));
   const stop = travel?.stops.get(item.occurrenceId);
   const shown = [old.to.startAt, ...old.otherTimes].map((value) => Temporal.Instant.from(value));
@@ -947,7 +1074,7 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
     blocks: [
       ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
-      ...calendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
+      ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
       ...travelBlocksFor(travel, item.occurrenceId),
     ],
     travelBeforeSeconds: stop?.beforeSeconds, travelAfterSeconds: stop?.afterSeconds,
@@ -963,9 +1090,15 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     travel: stop ? "checked" : old.travel === "checked" ? "not_checked" : old.travel,
     calendarDerived: (proposal.line as { calendarDerived?: boolean } | null)?.calendarDerived ?? false,
   };
+  const prevProposal = proposal as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
+  const resolvedGeneration = serverCalendar.googleCalendarGrantGeneration ?? prevProposal.google_calendar_grant_generation ?? null;
+  const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevProposal.contains_google_calendar === true && resolvedGeneration !== null);
+  const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
   const [line] = await saveBriefProposals(await callers.agent(), {
     runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false, candidates: [candidate],
     replaces: new Map([[item.occurrenceId, proposal.id]]),
+    containsGoogleCalendar,
+    googleCalendarGrantGeneration,
   });
   return { line: line ?? null, replacedProposalId: proposal.id };
 }
@@ -1035,8 +1168,19 @@ function travelInput(callers: BriefMoveCallers, localDate: string) {
   return { secrets: callers.travelSecrets, userId: callers.person.userId, localDate, now: callers.person.now };
 }
 
-function requestBusy(context: BriefPlanningContext) {
-  return briefMoveCalendar(null, context.calendarBusy).busy;
+async function resolveBriefCalendarBusy(
+  person: OccurrenceMoveCaller,
+  localDate: string,
+  context: BriefPlanningContext,
+): Promise<BriefServerCalendarBusyResult> {
+  if (context.calendarBusy?.length) {
+    return {
+      busy: briefMoveCalendar(null, context.calendarBusy).busy,
+      containsGoogleCalendar: false,
+      googleCalendarGrantGeneration: null,
+    };
+  }
+  return readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now });
 }
 
 /** The same Accept all key always gives the same batch. */

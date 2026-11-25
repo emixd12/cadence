@@ -53,6 +53,11 @@ create index if not exists daily_calendar_load_expiry_idx
   on public.daily_calendar_load (expires_at)
   where expires_at is not null;
 
+-- Remove any legacy REST-origin Google rows from daily_calendar_load.
+delete from public.daily_calendar_load
+where source = 'google_calendar'
+  and grant_purpose = 'standard';
+
 create table if not exists public.longitudinal_calendar_reviews (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -81,7 +86,7 @@ create index if not exists longitudinal_calendar_reviews_expiry_idx
 alter table public.longitudinal_calendar_reviews enable row level security;
 
 revoke all on table public.longitudinal_calendar_reviews from public, anon, authenticated, service_role;
-grant select, insert, update, delete on table public.longitudinal_calendar_reviews to authenticated;
+grant select, insert, update, delete on table public.longitudinal_calendar_reviews to authenticated, service_role;
 
 drop policy if exists longitudinal_calendar_reviews_select_own on public.longitudinal_calendar_reviews;
 drop policy if exists longitudinal_calendar_reviews_insert_own on public.longitudinal_calendar_reviews;
@@ -89,13 +94,18 @@ drop policy if exists longitudinal_calendar_reviews_update_own on public.longitu
 drop policy if exists longitudinal_calendar_reviews_delete_own on public.longitudinal_calendar_reviews;
 
 create policy longitudinal_calendar_reviews_select_own on public.longitudinal_calendar_reviews
-  for select to authenticated using ((select auth.uid()) = user_id);
+  for select to authenticated
+  using ((select auth.uid()) = user_id and (select auth.jwt() ->> 'cadence_grant_id') is null);
 create policy longitudinal_calendar_reviews_insert_own on public.longitudinal_calendar_reviews
-  for insert to authenticated with check ((select auth.uid()) = user_id);
+  for insert to authenticated
+  with check ((select auth.uid()) = user_id and (select auth.jwt() ->> 'cadence_grant_id') is null);
 create policy longitudinal_calendar_reviews_update_own on public.longitudinal_calendar_reviews
-  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+  for update to authenticated
+  using ((select auth.uid()) = user_id and (select auth.jwt() ->> 'cadence_grant_id') is null)
+  with check ((select auth.uid()) = user_id and (select auth.jwt() ->> 'cadence_grant_id') is null);
 create policy longitudinal_calendar_reviews_delete_own on public.longitudinal_calendar_reviews
-  for delete to authenticated using ((select auth.uid()) = user_id);
+  for delete to authenticated
+  using ((select auth.uid()) = user_id and (select auth.jwt() ->> 'cadence_grant_id') is null);
 
 -- Historical backfill (Q4): tag Nov 19+ Chat messages & conversations whose stored JSON
 -- contains a tool call with "subject":"calendar".
@@ -775,11 +785,13 @@ begin
   get diagnostics v_count = row_count;
   v_total := v_total + v_count;
 
-  -- Delete expired Google daily_calendar_load rows.
+  -- Delete expired Google daily_calendar_load rows and any legacy REST-origin ('standard') Google rows.
   delete from public.daily_calendar_load
   where source = 'google_calendar'
-    and expires_at is not null
-    and expires_at <= v_now;
+    and (
+      grant_purpose = 'standard'
+      or (expires_at is not null and expires_at <= v_now)
+    );
   get diagnostics v_count = row_count;
   v_total := v_total + v_count;
 
@@ -845,13 +857,18 @@ begin
   observed_at := pg_catalog.clock_timestamp();
 
   -- Atomic generation fence for Google Calendar MCP-derived briefs.
+  -- FOR SHARE serializes cleanly against calendar_agent_disconnect's UPDATE under READ COMMITTED.
   if v_included_google then
-    if p_google_calendar_grant_generation is null or not exists (
-      select 1 from public.google_calendar_agent_connections as connection
-      where connection.user_id = actor_id
-        and connection.status = 'connected'
-        and connection.generation = p_google_calendar_grant_generation
-    ) then
+    if p_google_calendar_grant_generation is null then
+      return false;
+    end if;
+    perform 1
+    from public.google_calendar_agent_connections as connection
+    where connection.user_id = actor_id
+      and connection.status = 'connected'
+      and connection.generation = p_google_calendar_grant_generation
+    for share;
+    if not found then
       return false;
     end if;
   end if;
@@ -1026,12 +1043,16 @@ begin
     v_contains_google := coalesce((v_item ->> 'contains_google_calendar')::boolean, false);
     if v_contains_google then
       v_google_gen := nullif(v_item ->> 'google_calendar_grant_generation', '')::bigint;
-      if v_google_gen is null or not exists (
-        select 1 from public.google_calendar_agent_connections as connection
-        where connection.user_id = v_user_id
-          and connection.status = 'connected'
-          and connection.generation = v_google_gen
-      ) then
+      if v_google_gen is null then
+        raise exception 'calendar_connection_changed' using errcode = '55000';
+      end if;
+      perform 1
+      from public.google_calendar_agent_connections as connection
+      where connection.user_id = v_user_id
+        and connection.status = 'connected'
+        and connection.generation = v_google_gen
+      for share;
+      if not found then
         raise exception 'calendar_connection_changed' using errcode = '55000';
       end if;
     end if;
@@ -1121,12 +1142,16 @@ begin
     v_contains_google := coalesce((v_item ->> 'contains_google_calendar')::boolean, false);
     if v_contains_google then
       v_google_gen := nullif(v_item ->> 'google_calendar_grant_generation', '')::bigint;
-      if v_google_gen is null or not exists (
-        select 1 from public.google_calendar_agent_connections as connection
-        where connection.user_id = v_user_id
-          and connection.status = 'connected'
-          and connection.generation = v_google_gen
-      ) then
+      if v_google_gen is null then
+        raise exception 'calendar_connection_changed' using errcode = '55000';
+      end if;
+      perform 1
+      from public.google_calendar_agent_connections as connection
+      where connection.user_id = v_user_id
+        and connection.status = 'connected'
+        and connection.generation = v_google_gen
+      for share;
+      if not found then
         raise exception 'calendar_connection_changed' using errcode = '55000';
       end if;
     end if;
@@ -1217,5 +1242,127 @@ $$;
 
 revoke all on function public.agent_run_store_content(uuid, text, integer, jsonb, boolean, boolean) from public, anon, service_role;
 grant execute on function public.agent_run_store_content(uuid, text, integer, jsonb, boolean, boolean) to authenticated;
+
+-- Private generation-fence helper and BEFORE INSERT OR UPDATE triggers to prevent
+-- READ COMMITTED write-skew races against calendar_agent_disconnect.
+create or replace function cadence_advisor_private.assert_google_calendar_agent_generation(
+  p_user_id uuid,
+  p_generation bigint
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_user_id is null or p_generation is null then
+    raise exception 'calendar_connection_changed' using errcode = '55000';
+  end if;
+
+  perform 1
+  from public.google_calendar_agent_connections as connection
+  where connection.user_id = p_user_id
+    and connection.status = 'connected'
+    and connection.generation = p_generation
+  for share;
+
+  if not found then
+    raise exception 'calendar_connection_changed' using errcode = '55000';
+  end if;
+end;
+$$;
+
+revoke all on function cadence_advisor_private.assert_google_calendar_agent_generation(uuid, bigint)
+  from public, anon, authenticated, service_role;
+
+create or replace function cadence_advisor_private.fence_daily_calendar_load_google_mcp()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.source = 'google_calendar' and new.grant_purpose = 'agent_mcp' then
+    if new.connection_generation is null then
+      raise exception 'calendar_connection_changed' using errcode = '55000';
+    end if;
+    perform cadence_advisor_private.assert_google_calendar_agent_generation(
+      new.user_id,
+      new.connection_generation
+    );
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function cadence_advisor_private.fence_daily_calendar_load_google_mcp()
+  from public, anon, authenticated, service_role;
+
+drop trigger if exists daily_calendar_load_google_mcp_generation_fence on public.daily_calendar_load;
+create trigger daily_calendar_load_google_mcp_generation_fence
+  before insert or update on public.daily_calendar_load
+  for each row
+  execute function cadence_advisor_private.fence_daily_calendar_load_google_mcp();
+
+create or replace function cadence_advisor_private.fence_longitudinal_calendar_reviews_google_mcp()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.contains_google_calendar = true then
+    if new.google_calendar_grant_generation is null then
+      raise exception 'calendar_connection_changed' using errcode = '55000';
+    end if;
+    perform cadence_advisor_private.assert_google_calendar_agent_generation(
+      new.user_id,
+      new.google_calendar_grant_generation
+    );
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function cadence_advisor_private.fence_longitudinal_calendar_reviews_google_mcp()
+  from public, anon, authenticated, service_role;
+
+drop trigger if exists longitudinal_calendar_reviews_google_mcp_generation_fence on public.longitudinal_calendar_reviews;
+create trigger longitudinal_calendar_reviews_google_mcp_generation_fence
+  before insert or update on public.longitudinal_calendar_reviews
+  for each row
+  execute function cadence_advisor_private.fence_longitudinal_calendar_reviews_google_mcp();
+
+create or replace function cadence_advisor_private.fence_chat_conversations_google_mcp()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.google_calendar_grant_generation is not null
+    and (
+      tg_op = 'INSERT'
+      or new.google_calendar_grant_generation is distinct from old.google_calendar_grant_generation
+      or (new.summary is distinct from old.summary and new.summary is not null)
+    )
+  then
+    perform cadence_advisor_private.assert_google_calendar_agent_generation(
+      new.user_id,
+      new.google_calendar_grant_generation
+    );
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function cadence_advisor_private.fence_chat_conversations_google_mcp()
+  from public, anon, authenticated, service_role;
+
+drop trigger if exists chat_conversations_google_mcp_generation_fence on public.chat_conversations;
+create trigger chat_conversations_google_mcp_generation_fence
+  before insert or update on public.chat_conversations
+  for each row
+  execute function cadence_advisor_private.fence_chat_conversations_google_mcp();
 
 commit;

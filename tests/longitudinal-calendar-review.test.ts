@@ -61,7 +61,7 @@ describe("Opted-in, activity-gated longitudinal calendar-load review (Q2)", () =
     ).toEqual({ eligible: true });
   });
 
-  it("respects per-user MCP budget gate", async () => {
+  it("respects per-user MCP budget gate without double-deducting on chunk reads", async () => {
     const caller = { user: { id: "user-1" }, client: {} } as unknown as CalendarCaller;
     const result = await runLongitudinalCalendarReviewForUser(caller, {
       longitudinalCalendarReviewEnabled: true,
@@ -72,6 +72,19 @@ describe("Opted-in, activity-gated longitudinal calendar-load review (Q2)", () =
       checkBudget: () => ({ allowed: false, reason: "mcp_daily_budget_exceeded" }),
     });
     expect(result).toEqual({ ran: false, reason: "mcp_daily_budget_exceeded" });
+
+    // Without checkBudget, stops cleanly when readGoogleCalendarChunk throws mcp_daily_budget_exceeded
+    const chunkRateLimited = await runLongitudinalCalendarReviewForUser(caller, {
+      longitudinalCalendarReviewEnabled: true,
+      cadence: "weekly",
+      lastReviewAt: null,
+      lastCadenceActivityAt: "2026-11-24T12:00:00Z",
+      now,
+      readGoogleCalendarChunk: async () => {
+        throw Object.assign(new Error("budget"), { code: "mcp_daily_budget_exceeded" });
+      },
+    });
+    expect(chunkRateLimited).toEqual({ ran: false, reason: "mcp_daily_budget_exceeded" });
   });
 
   it("reads >30d Google Calendar ephemerally and persists compact summary with <=30-day expiry", async () => {
