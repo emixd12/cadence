@@ -15,6 +15,8 @@ import { travelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowS
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createDesktopHomeLookupClient } from "./home-lookup";
+import { createDesktopPlaceSearchClient } from "./place-search";
+import { PlaceSearchProvider } from "@/components/travel/PlaceAutocomplete";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
@@ -416,6 +418,7 @@ export function Product() {
   const leaveReminderClient = useMemo(() => calendarClient && accountUserId ? createDesktopLeaveReminderClient(calendarClient) : null, [calendarClient, accountUserId]);
   // Ticket 308: Home from the Mac's position needs the hosted lookup, so only a linked Mac offers it.
   const homeLookupClient = useMemo(() => calendarClient && accountUserId ? createDesktopHomeLookupClient(calendarClient) : null, [calendarClient, accountUserId]);
+  const placeSearchClient = useMemo(() => calendarClient && accountUserId ? createDesktopPlaceSearchClient(calendarClient) : null, [calendarClient, accountUserId]);
   const leaveReminders = useDesktopLeaveReminders({ native: isTauri(), accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
     // "error" and "waiting" keep what is scheduled; only a read session or a signed-out Mac reconciles.
     accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient,
@@ -691,7 +694,7 @@ export function Product() {
     {account.status === "linked" || syncReady || disconnectResult ? <AccountDisconnectPanel busy={accountBusy} result={disconnectResult} error={disconnectError} onDisconnect={disconnect} /> : null}</>;
 
   return <DevelopmentBuildProvider value={import.meta.env.DEV}><DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0} chat={chatNav}>
-    <PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
+    <PlaceSearchProvider client={placeSearchClient}><PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
     <DesktopUpdateNotice required={syncStatus.state === "update_required"} {...restartActions} />
@@ -758,7 +761,7 @@ export function Product() {
         onOpenSettings={() => navigate("settings", "settings-planning")} /> : null}
     </> : null}
     </DesktopErrorBoundary>
-    </PlaceLabelProvider>
+    </PlaceLabelProvider></PlaceSearchProvider>
   </DesktopApp></DevelopmentBuildProvider>;
 }
 

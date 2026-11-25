@@ -1,0 +1,16 @@
+# Union merge for append-only ledgers: when two branches each add an entry,
+# Git keeps both sides' lines instead of writing conflict markers. Union never
+# reports a conflict, so it also keeps both versions of a line two branches
+# edited in place. `npm run agents:check` fails on a repeated ticket heading.
+#
+# Only these two files qualify. Do not add the other ledgers:
+# - STATUS.md has a table edited in place, and scripts/archive-status.mjs
+#   removes blocks; union would bring archived entries back.
+# - docs/MESSAGING_CHANGES.md and docs/LEGAL.md have single-line "is next"
+#   counters and index tables; union would keep both counter values.
+#
+# tests/check-agents-ledger.test.mjs proves it for local `git merge` and
+# `git rebase`. Whether
+# GitHub's server-side merge honours it has not been verified.
+docs/TICKETS.md merge=union
+docs/DECISIONS.md merge=union
