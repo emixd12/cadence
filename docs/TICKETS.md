@@ -20017,7 +20017,7 @@ Messaging impact: `P-089`. Legal: `L-026`.
 
 ## Ticket 356: Alongside setting: column, flag and effective-value resolver
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. Scope change: the column stays out of account sync and configuration history until Ticket 363, which adds them with the Mac's SQLite column and a sync contract bump (configuration events are synced, so either would force that bump now). Export, restore and MCP carriage stay with Ticket 364.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
