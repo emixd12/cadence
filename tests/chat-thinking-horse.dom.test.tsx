@@ -53,15 +53,43 @@ describe("Chat thinking horse", () => {
     expect(horse()).toBeNull();
   });
 
+  it("shows the newest action and opens to list them all", () => {
+    const second: ChatPart = { type: "tool", tool: { id: "t2", subject: "adherence", text: "Looked at this week", state: "done" } };
+    render([user, reply([tool, second])], "a1");
+    const toggle = container.querySelector<HTMLButtonElement>("[data-chat-tools-toggle]");
+    expect(toggle?.textContent).toContain("Looked at this week");
+    expect(toggle?.textContent).not.toContain("Looked at your Timeline");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(horse()?.closest("[data-chat-tools]")).not.toBeNull();
+    expect(container.querySelector("ul")?.hidden).toBe(true);
+
+    act(() => toggle?.click());
+    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector("ul")?.hidden).toBe(false);
+    expect([...container.querySelectorAll("li[data-chat-tool]")].map((item) => item.textContent)).toEqual([
+      "Looked at your Timeline",
+      "Looked at this week",
+    ]);
+  });
+
+  it("keeps the newest action as the label while the list is open", () => {
+    render([user, reply([tool, { type: "text", text: "A steady week." }])], null);
+    const toggle = container.querySelector<HTMLButtonElement>("[data-chat-tools-toggle]");
+    expect(toggle?.textContent).toBe("Looked at your Timeline");
+    act(() => toggle?.click());
+    expect(toggle?.textContent).toBe("Looked at your Timeline");
+    expect(container.querySelector('li[data-chat-tool="timeline"]')?.textContent).toBe("Looked at your Timeline");
+  });
+
   it("stops when the reply ends and keeps the streamed words", () => {
     render([user, reply([tool, { type: "text", text: "A steady week." }])], "a1");
     render([user, reply([tool, { type: "text", text: "A steady week." }])], null);
     expect(horse()).toBeNull();
-    expect(container.querySelector('[data-chat-role="assistant"] p')?.textContent).toBe("A steady week.");
+    expect(container.querySelector('[data-chat-role="assistant"] p.whitespace-pre-wrap')?.textContent).toBe("A steady week.");
   });
 
   it("shows a reopened reply as plain text", () => {
     render([user, reply([{ type: "text", text: "A steady week." }])], null);
-    expect(container.querySelector('[data-chat-role="assistant"] p span')).toBeNull();
+    expect(container.querySelector('[data-chat-role="assistant"] p.whitespace-pre-wrap span')).toBeNull();
   });
 });
