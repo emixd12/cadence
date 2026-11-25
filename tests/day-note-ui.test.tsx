@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RefreshProvider } from "@cadence/ui/runtime";
+import { NOTE_AUTO_SAVE_DELAY_MS, NOTE_CLOSED_SAVED_MS } from "../components/notes/NoteEditor";
 import { DayNoteControl } from "../components/timeline/DayNoteControl";
 import { TimelineGroup } from "../components/timeline/TimelineGroup";
 import type { OccurrenceFormAction, TimelineDaySection } from "../lib/types/timeline";
@@ -17,11 +18,27 @@ async function render(node: React.ReactNode) {
   document.body.append(container);
   const root = createRoot(container);
   await act(async () => root.render(<RefreshProvider onRefresh={() => undefined}>{node}</RefreshProvider>));
-  return { container, unmount: () => act(async () => root.unmount()) };
+  return {
+    container,
+    unmount: async () => {
+      await act(async () => root.unmount());
+      container.remove();
+    },
+  };
 }
 
+function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, value);
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("Day note control", () => {
-  it("submits the local date, the expected note and the new text through the shared editor", async () => {
+  it("auto-saves on pause, updates the summary optimistically, and collapses on Done with a fading Saved indicator", async () => {
+    vi.useFakeTimers();
     let stored = "";
     const submissions: FormData[] = [];
     const action: OccurrenceFormAction = async (_state, form) => {
@@ -32,26 +49,158 @@ describe("Day note control", () => {
     };
     const view = await render(<DayNoteControl localDate="2026-11-10" dayLabel="Tuesday, November 10" note="" action={action} />);
     try {
+      const details = view.container.querySelector("details")!;
       const summary = view.container.querySelector("summary")!;
+      expect(details.open).toBe(false);
       expect(summary.getAttribute("aria-label")).toBe("Add day note for Tuesday, November 10");
       expect(summary.textContent).toBe("Add day note");
       expect(view.container.querySelector("label span")?.textContent).toBe("Day note");
+      expect(view.container.querySelector("label span")?.className).toContain("sr-only");
       expect(view.container.querySelector('input[name="occurrence_id"]')).toBeNull();
+
+      await act(async () => summary.click());
+      expect(details.open).toBe(true);
 
       const textarea = view.container.querySelector("textarea")!;
       expect(textarea.placeholder).toBe("Add a note about this day");
+      await act(async () => setTextareaValue(textarea, "Travel day, slept badly."));
+
+      // Debounced auto-save fires after pause without closing.
       await act(async () => {
-        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, "Travel day, slept badly.");
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(NOTE_AUTO_SAVE_DELAY_MS);
       });
-      const form = view.container.querySelector("form")!;
-      await act(async () => form.requestSubmit(form.querySelector('button[type="submit"]') as HTMLButtonElement));
 
       expect(submissions).toHaveLength(1);
       expect(submissions[0]?.get("local_date")).toBe("2026-11-10");
       expect(submissions[0]?.get("expected_note")).toBe("");
       expect(stored).toBe("Travel day, slept badly.");
-      expect(view.container.querySelector('[role="status"]')?.textContent).toBe("Day note saved.");
+      expect(details.open).toBe(true);
+      expect(view.container.querySelector('[role="status"]')?.textContent).toBe("Saved");
+      expect(summary.getAttribute("aria-label")).toBe("Edit day note for Tuesday, November 10");
+
+      // Clicking Done collapses back to the 1-line summary with a fading Saved indicator.
+      const doneButton = [...view.container.querySelectorAll("button")].find((b) => b.textContent === "Done")!;
+      await act(async () => doneButton.click());
+      expect(details.open).toBe(false);
+      expect(summary.textContent).toBe("Day noteTravel day, slept badly.Saved");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(NOTE_CLOSED_SAVED_MS);
+      });
+      expect(summary.textContent).toBe("Day noteTravel day, slept badly.");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("flushes unsaved edits on Done and Cmd+Enter, and stays open with Try again on conflict", async () => {
+    let stored = "Initial";
+    const submissions: FormData[] = [];
+    const action: OccurrenceFormAction = async (_state, form) => {
+      submissions.push(form);
+      if (form.get("expected_note") !== stored) return { status: "error", message: "This day note changed elsewhere." };
+      stored = String(form.get("note")).trim();
+      return { status: "success", message: "Day note saved." };
+    };
+    const view = await render(<DayNoteControl localDate="2026-11-10" dayLabel="Tuesday, November 10" note="Initial" action={action} />);
+    try {
+      const details = view.container.querySelector("details")!;
+      const summary = view.container.querySelector("summary")!;
+      await act(async () => summary.click());
+      expect(details.open).toBe(true);
+
+      const textarea = view.container.querySelector("textarea")!;
+      await act(async () => setTextareaValue(textarea, "Updated via Cmd+Enter"));
+      await act(async () => {
+        textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }));
+      });
+      expect(submissions).toHaveLength(1);
+      expect(stored).toBe("Updated via Cmd+Enter");
+      expect(details.open).toBe(false);
+
+      // Simulate an external change causing a conflict: editor must stay open with Try again.
+      await act(async () => summary.click());
+      stored = "Changed on another device";
+      await act(async () => setTextareaValue(textarea, "Conflicting draft"));
+      const doneButton = [...view.container.querySelectorAll("button")].find((b) => b.textContent === "Done")!;
+      await act(async () => doneButton.click());
+
+      expect(details.open).toBe(true);
+      expect(view.container.querySelector('[role="alert"]')?.textContent).toBe("This day note changed elsewhere.");
+      expect(textarea.value).toBe("Conflicting draft");
+      expect([...view.container.querySelectorAll("button")].some((b) => b.textContent === "Try again")).toBe(true);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("flushes on blur without closing the editor", async () => {
+    let stored = "";
+    const action: OccurrenceFormAction = async (_state, form) => {
+      stored = String(form.get("note")).trim();
+      return { status: "success", message: "Day note saved." };
+    };
+    const view = await render(<DayNoteControl localDate="2026-11-10" dayLabel="Tuesday" note="" action={action} />);
+    try {
+      const details = view.container.querySelector("details")!;
+      await act(async () => view.container.querySelector("summary")!.click());
+      const textarea = view.container.querySelector("textarea")!;
+      await act(async () => setTextareaValue(textarea, "Saved on blur"));
+      await act(async () => {
+        textarea.focus();
+        textarea.blur();
+      });
+      expect(stored).toBe("Saved on blur");
+      expect(details.open).toBe(true);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("queues a reverted edit made while an auto-save is in flight so the final draft persists", async () => {
+    vi.useFakeTimers();
+    let stored = "A";
+    let finishFirst: ((state: { status: "success"; message: string }) => void) | undefined;
+    const submissions: Array<{ expected: string; note: string }> = [];
+    const action: OccurrenceFormAction = async (_state, form) => {
+      const expected = String(form.get("expected_note"));
+      const next = String(form.get("note")).trim();
+      submissions.push({ expected, note: next });
+      if (submissions.length === 1) {
+        return new Promise((resolve) => {
+          finishFirst = (result) => {
+            stored = next;
+            resolve(result);
+          };
+        });
+      }
+      stored = next;
+      return { status: "success", message: "Day note saved." };
+    };
+    const view = await render(<DayNoteControl localDate="2026-11-10" dayLabel="Tuesday" note="A" action={action} />);
+    try {
+      await act(async () => view.container.querySelector("summary")!.click());
+      const textarea = view.container.querySelector("textarea")!;
+      await act(async () => setTextareaValue(textarea, "B"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(NOTE_AUTO_SAVE_DELAY_MS);
+      });
+      expect(submissions).toEqual([{ expected: "A", note: "B" }]);
+      expect(finishFirst).toBeDefined();
+
+      // Revert back to "A" while "B" is still in flight.
+      await act(async () => setTextareaValue(textarea, "A"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(NOTE_AUTO_SAVE_DELAY_MS);
+      });
+
+      // Completing "B" automatically flushes the queued revert to "A".
+      await act(async () => finishFirst!({ status: "success", message: "Day note saved." }));
+      expect(submissions).toEqual([
+        { expected: "A", note: "B" },
+        { expected: "B", note: "A" },
+      ]);
+      expect(stored).toBe("A");
     } finally {
       await view.unmount();
     }
@@ -69,12 +218,21 @@ describe("Day note control", () => {
     }
   });
 
-  it("shows day note shortcuts only from the day pool", async () => {
-    const view = await render(<DayNoteControl localDate="2026-11-09" dayLabel="Monday" note="" action={idle} shortcuts={[{
+  it("shows day note shortcuts only from the day pool and saves immediately when tapped", async () => {
+    let stored = "";
+    const action: OccurrenceFormAction = async (_state, form) => {
+      stored = String(form.get("note")).trim();
+      return { status: "success", message: "Day note saved." };
+    };
+    const view = await render(<DayNoteControl localDate="2026-11-09" dayLabel="Monday" note="" action={action} shortcuts={[{
       key: "a".repeat(64), text: "Rest day", status: "accepted", source: "repeated_text", evidence: [], created_at: "2026-11-01T00:00:00Z", expires_at: null,
     }]} />);
     try {
       expect(view.container.querySelector('[aria-label="Day note shortcuts"]')?.textContent).toBe("Rest day");
+      await act(async () => view.container.querySelector("summary")!.click());
+      const chip = [...view.container.querySelectorAll("button")].find((b) => b.textContent === "Rest day")!;
+      await act(async () => chip.click());
+      expect(stored).toBe("Rest day");
     } finally {
       await view.unmount();
     }

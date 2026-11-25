@@ -138,73 +138,60 @@ Check the cited entry before acting on a row.
     `components/settings/GoogleCalendarPanel.tsx`, `components/briefing/DailyBriefSettingsPanel.tsx`,
     `lib/ui/google-calendar.ts`, `lib/ui/settings-sections.ts`,
     `apps/desktop/src/calendar/{google-calendar,use-google-calendar}.ts`, `apps/desktop/src/product.tsx`.
-- **Next actions (Phases 0, 5 & 6):** run Phase 0 live `calendarmcp.googleapis.com` wire check once a
-  fresh Google sign-in token is available, run local Supabase rehearsal (`db reset` + SQL fixtures),
-  deploy tester verification environment and submit Ticket 245 data-access verification for
-  `cadence-calendar-agent-prod` by mid-December 2026, and bundle into Cadence for Mac `0.1.16`.
+- **Next actions (Phases 0, 5 & 6):** complete code review & CI/Supabase rehearsal, run Phase 0 live
+  `calendarmcp.googleapis.com` wire check, finish Ticket 245 `P-090` disclosures & Model Armor
+  provisioning, and submit data-access verification for `cadence-calendar-agent-prod` before cutover
+  and Mac `0.1.16`.
 
 Platform impact: web implemented (Phases 1A–4 in source); desktop implemented (versioned `purpose=ai_mcp`
 broker and shared Settings UI bundled for Mac `0.1.16`); marketing follow-up in Ticket 246; future mobile
 deferred. Messaging impact: `P-090`. Legal: `L-001`, `L-021`, `L-026`, `L-027`.
 
-## Tickets 352–355: Persisted connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down — November 24, 2026
+## Note closure redesign: collapsed 1-line summary + auto-save + Done — November 25, 2026
 
-- **Owner's decision:** keep persisted connector activity until disconnect or account deletion;
-  persist minimized Hevy workout timing in hosted-only `recorded_activities` with bounded connect
-  backfill, incremental `/v1/workouts/events` sync on its own `ledger_cursor` (separate from
-  completion's `read_cursor`), daily background polling for unlinked accounts (prioritized behind
-  linked completion accounts, paused after 21 days of Cadence inactivity and re-armed on next
-  open), 15-minute on-demand freshness, and non-PII `reportMonitoringEvent` telemetry; persist
-  derived daily calendar busy-load rollups (`daily_calendar_load`, no event details) via
-  write-through on complete reads + 30-day backfill on selection and hard-delete on
-  disconnect/selection change; expose `list_calendar_load` and widen Chat `list_calendar_events`
-  to bounded past dates (≤31 days per call) with timezone-aware date coalescing and ephemeral
-  session caching (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:**
-  - Migrations: `supabase/migrations/20261124193000_recorded_activities_ledger.sql`,
-    `20261124193500_unlinked_hevy_background_sync.sql`,
-    `20261124194000_daily_calendar_load.sql`, and
-    `20261124195000_recorded_activity_ledger_cursor.sql`; updated `lib/db/database.types.ts`.
-  - Core resolvers: `packages/core/src/resolvers/calendar-load.resolver.ts` (re-exported in
-    `lib/resolvers/calendar-load.resolver.ts`, registered in `docs/AGENT_RESOLVERS.md` and
-    `scripts/check-resolvers.mjs`); `resolveUnlinkedDailySyncSchedule` / `isUnlinkedAccountInactive`
-    in `packages/core/src/resolvers/completion-check-schedule.resolver.ts`.
-  - Repos & services: `lib/db/recordedActivities.repo.ts`, `lib/db/dailyCalendarLoad.repo.ts`,
-    `lib/services/recorded-activity-sync.service.ts`, `lib/services/daily-calendar-load.service.ts`,
-    `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`,
-    `lib/services/connector-completion.service.ts`, `lib/services/connector-completion-job.service.ts`,
-    `lib/services/google-calendar.service.ts`, `lib/services/outlook-calendar.service.ts`,
-    `lib/services/icloud-calendar.service.ts`.
-  - Consumers & Chat: `app/api/hevy/activities/route.ts`, `lib/services/advisor-day-context.service.ts`,
-    `lib/services/chat/chat-calendar-cache.ts`, `lib/services/chat/chat-tools.ts`,
-    `lib/services/chat/chat-executor.ts`, `lib/services/chat/chat.service.ts`,
-    `lib/services/chat/chat-prompt.ts`, `lib/services/chat-eval/fake-tools.ts`.
-  - Tests: `tests/calendar-load.resolver.test.ts`, `tests/daily-calendar-load.service.test.ts`,
-    `tests/recorded-activity-sync.service.test.ts`, `tests/chat-past-calendar-drilldown.test.ts`.
-- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`, `resolvers:check`,
-  `core:check`, `lint` (0 errors), `typecheck`, `build`, `dagger check --cadence`, and full
-  `npm run test` all pass.
+- **Owner's decision:** use a collapsed one-line summary (`Add day note`/`Add note`, or `Day note`/`Note`
+  + single-line preview) and auto-save + **Done** for both Day notes and per-behavior (Occurrence) notes
+  (`docs/DECISIONS.md`, 2026-11-25).
+- **Implemented:** `components/notes/NoteEditor.tsx` (750ms debounced auto-save, immediate shortcut-chip
+  save, flush-on-blur without closing, `Done` / `Cmd+Enter` / `Escape` flush-and-close, `Try again` on
+  conflict/error, `hideLabel` for disclosure callers, `DesktopDraftGuard`),
+  `components/timeline/DayNoteControl.tsx` (controlled disclosure, optimistic preview update, fading
+  2.5s `Saved` indicator), `components/timeline/OccurrenceNoteForm.tsx` (matching one-line disclosure
+  that collapses independently of the parent occurrence row), notice catalog (`timeline.note-saving`,
+  `timeline.note-saved`), docs (`docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, `interaction-registry.json`,
+  `docs/DECISIONS.md`), and UI tests (`tests/day-note-ui.test.tsx`,
+  `tests/occurrence-note-shortcuts-ui.test.tsx`, `tests/timeline-interactions-ui.test.tsx`,
+  `tests/behavior-review-ui.test.tsx`).
 
-Platform impact: web implemented; desktop unaffected (hosted-only tables, no SQLite or `account_sync`
-changes; linked Macs inherit hosted Brief/Chat/Timeline reads); marketing not applicable; future mobile
-deferred. Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated, `L-026` logged.
+Platform impact: web implemented; desktop implemented (shares `NoteEditor`, `DayNoteControl`, and
+`OccurrenceNoteForm`, ships in next Mac release); marketing not applicable; future mobile deferred.
+Messaging impact: none.
 
-## Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine — November 24, 2026
+## Place and Home autocomplete with Geoapify and safe auto-marker — November 25, 2026
 
-- **Owner's decision:** remove `AdvisorDayLine` under today's date to reduce Timeline header
-  density; replace `"Advisor · 1 new"` with a rounded speech pill showing a concise teaser
-  (`advisorBubbleTeaser`) when something waits (hiding the `"Advisor"` label while the pill is
-  shown); increase the Timeline avatar to 72px on desktop/Mac (side-by-side speech pill, enables
-  full mane-ripple detail) and 60px on phones (moved out of the top nav bar onto the wave banner,
-  speech pill stacked below); let the advisor header scroll naturally with the page
-  (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:** `components/advisor/AdvisorParts.tsx`, `components/advisor/advisor-window.module.css`,
-  `components/advisor/AdvisorTimelineFrame.tsx`, `components/advisor/AdvisorAvatar.tsx`,
-  `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
-  `packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`,
-  `apps/desktop/vite.config.ts`, `DESIGN.md`, `tests/advisor-ui.dom.test.tsx`, and
-  `tests/advisor-avatar.dom.test.tsx`.
+- **Owner's decision:** use Geoapify (OpenStreetMap/ODbL, free 3,000 credits/day) for address
+  and named-place autocomplete on Behavior `Place` and `Settings → Travel → Home`; automatically
+  record completion place markers from selected specific places when Completion places is enabled,
+  with quick Undo and safeguards so wrong or edited coordinates are never stored.
+- **Implemented:** `packages/core/src/types/place-search.ts`,
+  `packages/core/src/services/place-search.ts` (instant local saved-place matching, Geoapify
+  parsing, coarse admin-area coordinate exclusion), `lib/services/geoapify-provider.ts`,
+  `lib/services/place-search.service.ts` (3-char minimum, 5-minute normalized-query cache,
+  per-account 30/min and 200/hr rate limit), `app/api/travel/place-search/route.ts`,
+  `lib/ui/place-search.ts`, `apps/desktop/src/place-search.ts`,
+  `components/travel/PlaceAutocomplete.tsx`, `usePlaceLabelActions` in
+  `components/travel/PlaceLabels.tsx`, `components/behaviors/BehaviorForm.tsx`,
+  `components/behaviors/BehaviorCreateSection.tsx`, `components/behaviors/BehaviorList.tsx`,
+  `components/settings/TravelSettingsPanel.tsx`, `app/(app)/behaviors/page.tsx`,
+  `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/product.tsx`, `.env.example`,
+  `docs/COSTS.md`, `docs/MESSAGING_CHANGES.md` (`P-091`), `tests/place-search.service.test.ts`,
+  and `tests/place-autocomplete.dom.test.tsx`.
+- **Verified live:** `GEOAPIFY_API_KEY` configured in `.env.local` and Vercel Production/Preview;
+  verified `/api/travel/place-search` (401 unauthenticated, 200 for `YMCA Greenpoint` POI and
+  `99 Meserole Ave Brooklyn` address, 0-call short query) and live autocomplete + Undo flows in
+  both Behavior → Where → Place and Settings → Travel → Home.
 
-Platform impact: web implemented; desktop implemented (shares components and bundles the 60px/72px
-avatar renditions in `apps/desktop/vite.config.ts`, ships in next Mac release); marketing not
-applicable; future mobile deferred. Messaging impact: P-086.
+Platform impact: web implemented; desktop implemented (shares components and wires
+`createDesktopPlaceSearchClient` for linked Macs, local-only Macs fall back to saved places and
+free text; ships in next Mac release); marketing not applicable; future mobile deferred.
+Messaging impact: P-091.

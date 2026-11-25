@@ -15,6 +15,7 @@ phase=preflight
 proxy_pid=""
 migration_count=0
 sql_count=0
+integration_count=0
 project_labels=(
   --filter label=com.supabase.cli.project=habit-tracking-app
   --filter label=com.docker.compose.project=habit-tracking-app
@@ -62,6 +63,7 @@ finish() {
       printf 'Migration replay: **%s passed**; exact tracked/applied versions matched.\n\n' "$migration_count"
       printf 'Rollback SQL fixtures: **%s passed**.\n\n' "$sql_count"
       printf 'Local RLS, account-sync and authenticated BehaviorStore contracts: **passed**.\n\n'
+      printf 'Database-backed local integration test files: **%s passed** with no skipped tests.\n\n' "$integration_count"
       printf 'Loopback bindings, service health and synthetic account cleanup: **passed**.\n'
     } >> "$GITHUB_STEP_SUMMARY" || result=1
   fi
@@ -144,8 +146,20 @@ import re, sys
 path = sys.argv[1]
 text = open(path).read()
 text = re.sub(r"^\[auth\.email\.template\.[a-z_]+\]\n(?:[^\[\n].*\n)*", "", text, flags=re.M)
+# The integration tests mint per-user tokens with a private ES256 key that Auth
+# must load at start. The CLI reads this file on the host and passes the keys to
+# Auth and PostgREST as container environment, so the proxy's no-mount rule holds.
+text, count = re.subn(r'^# signing_keys_path = "\./signing_keys\.json"$',
+  'signing_keys_path = "./signing_keys.json"', text, flags=re.M)
+if count != 1:
+  sys.exit("config.toml no longer has the commented signing_keys_path line; update scripts/supabase-rehearsal.sh.")
 open(path, "w").write(text)
 PY
+# A fresh key per run, inside the private workdir; never printed or uploaded.
+printf '[]\n' > "$SUPABASE_WORKDIR/supabase/signing_keys.json"
+chmod 600 "$SUPABASE_WORKDIR/supabase/signing_keys.json"
+npm run --silent supabase -- gen signing-key --algorithm ES256 --append \
+  --workdir "$SUPABASE_WORKDIR" >/dev/null 2>&1
 mapfile -t migrations < <(git ls-files 'supabase/migrations/*.sql')
 migration_count=${#migrations[@]}
 test "$migration_count" -gt 0
@@ -279,6 +293,32 @@ begin_phase 'local account-sync smoke'
 npm run smoke:account-sync:local
 begin_phase 'authenticated BehaviorStore contract'
 CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+begin_phase 'database-backed local integration tests (6-minute limit)'
+# An explicit allowlist, not a glob: scripts/supabase-rehearsal-integration-tests.json.
+# The variables live in a private file and only in this subshell. The report
+# check fails any listed file that skipped a test or ran none.
+integration_output="$(node scripts/supabase-rehearsal-diagnostics.mjs integration-tests)"
+mapfile -t integration_tests <<< "$integration_output"
+test "${#integration_tests[@]}" -gt 0
+npm run --silent supabase -- status -o env > "$CADENCE_DOCKER_PROXY_DIR/status.env" 2>/dev/null
+node scripts/supabase-rehearsal-diagnostics.mjs integration-env \
+  "$CADENCE_DOCKER_PROXY_DIR/status.env" "$SUPABASE_WORKDIR/supabase/signing_keys.json" \
+  "$CADENCE_DOCKER_PROXY_DIR/integration.env"
+rm -f "$CADENCE_DOCKER_PROXY_DIR/status.env"
+integration_status=0
+(
+  # shellcheck disable=SC1091
+  source "$CADENCE_DOCKER_PROXY_DIR/integration.env"
+  exec timeout --kill-after=5s 6m npx vitest run --no-file-parallelism \
+    --reporter=default --reporter=json \
+    --outputFile.json="$CADENCE_DOCKER_PROXY_DIR/integration-report.json" \
+    "${integration_tests[@]}"
+) || integration_status=$?
+rm -f "$CADENCE_DOCKER_PROXY_DIR/integration.env"
+node scripts/supabase-rehearsal-diagnostics.mjs integration-report \
+  "$CADENCE_DOCKER_PROXY_DIR/integration-report.json"
+test "$integration_status" = 0
+integration_count=${#integration_tests[@]}
 begin_phase 'final service health and synthetic account cleanup'
 test "$("${psql_local[@]}" -At -c 'select count(*) from auth.users')" = 0
 verify_stack

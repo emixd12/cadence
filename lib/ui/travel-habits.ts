@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TravelSettings } from "@cadence/core/types/travel";
 import { storedTravelLeaveCandidate, type StoredTravelLeaveCandidate, type TravelHabitChange, type TravelLeaveCandidate } from "@cadence/core/services/travel-habits";
 import { notifyTravelSettingsChanged, type TravelSettingsClient } from "./travel-settings";
+import { getSessionStorage } from "./browser-storage";
 
 export type TravelHabitsState = Readonly<{
   settings: TravelSettings | null;
@@ -89,7 +90,7 @@ type TravelLeaveRecord = Readonly<{
 let leaveMemory: TravelLeaveRecord | null = null;
 
 function leaveStorage(): Storage | null {
-  try { return typeof window === "undefined" ? null : window.sessionStorage; } catch { return null; }
+  return getSessionStorage();
 }
 
 function validLeaveRecord(value: unknown): value is TravelLeaveRecord {

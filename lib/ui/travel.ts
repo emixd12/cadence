@@ -16,6 +16,7 @@ import {
 import { changedTravelStops, mergeTravelLastEstimates, travelSourcesOnlyAddRoutedStops, withdrawChangedTravelTrips, type TravelStopRoute } from "@cadence/core/resolvers/travel.resolver";
 import { travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import { locatedStopsAhead } from "@cadence/core/services/departure-stops";
+import { getSessionStorage } from "./browser-storage";
 
 /** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
 export type TravelCorrection = Readonly<{ eventId: string; revision: string; locationText: string }>;
@@ -345,7 +346,7 @@ type TravelSessionRecord = Readonly<{
   tomorrow?: TravelTomorrowEntry | null;
 }>;
 function travelSessionStorage(): Storage | null {
-  try { return typeof window === "undefined" ? null : window.sessionStorage; } catch { return null; }
+  return getSessionStorage();
 }
 function readTravelSession(): TravelSessionRecord | null {
   const storage = travelSessionStorage();

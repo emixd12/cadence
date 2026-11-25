@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type {
   ChatAlert,
   ChatConfirm,
@@ -12,6 +12,8 @@ import type {
 import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import { AlertNotice, type AlertNoticeKind } from "@/components/feedback/AlertNotice";
 import { CHAT_ALERT_LABELS } from "@/lib/ui/chat";
+import { ChatThinkingHorse } from "./ChatThinkingHorse";
+import streamStyles from "./chat-stream-text.module.css";
 
 // Advisor plan Phase 5B: one conversation, text-like (DESIGN.md "Chat"). The
 // person's words sit in a Cold Surface block on the right; Cadence's reply is
@@ -42,6 +44,9 @@ export function ChatMessages({
   handlers: ChatMessageHandlers;
 }>) {
   const streamingVisible = streamingId !== null && messages.some((message) => message.id === streamingId);
+  // The reply that streamed last keeps its word spans after it ends, so the fade can finish.
+  const [liveId, setLiveId] = useState(streamingId);
+  if (streamingId !== null && streamingId !== liveId) setLiveId(streamingId);
   return (
     <ol className="flex flex-col gap-6" aria-label="Conversation">
       {messages.map((message) => (
@@ -52,6 +57,7 @@ export function ChatMessages({
             <AssistantMessage
               message={message}
               streaming={message.id === streamingId}
+              live={message.id === liveId}
               handlers={handlers}
             />
           )}
@@ -59,7 +65,7 @@ export function ChatMessages({
       ))}
       {streamingId !== null && !streamingVisible ? (
         <li data-chat-role="assistant">
-          <WaitingLine />
+          <WaitingLine started={false} />
         </li>
       ) : null}
     </ol>
@@ -81,16 +87,19 @@ function UserMessage({ message }: Readonly<{ message: ChatMessage }>) {
 function AssistantMessage({
   message,
   streaming,
+  live,
   handlers,
-}: Readonly<{ message: ChatMessage; streaming: boolean; handlers: ChatMessageHandlers }>) {
+}: Readonly<{ message: ChatMessage; streaming: boolean; live: boolean; handlers: ChatMessageHandlers }>) {
   const groups = groupParts(message.parts);
+  // The horse runs whenever the reply is under way and no words are arriving.
+  const waiting = streaming && message.parts.at(-1)?.type !== "text";
   return (
     <div className="flex max-w-prose flex-col gap-2 text-base leading-6 text-foreground" aria-busy={streaming || undefined}>
       <span className="sr-only">Cadence: </span>
       {groups.map((group, index) => (
-        <PartGroup key={index} group={group} handlers={handlers} />
+        <PartGroup key={index} group={group} live={live} handlers={handlers} />
       ))}
-      {streaming && message.parts.length === 0 ? <WaitingLine /> : null}
+      {waiting ? <WaitingLine started={message.parts.length > 0} /> : null}
     </div>
   );
 }
@@ -113,7 +122,11 @@ function groupParts(parts: readonly ChatPart[]): PartGroupValue[] {
   return groups;
 }
 
-function PartGroup({ group, handlers }: Readonly<{ group: PartGroupValue; handlers: ChatMessageHandlers }>) {
+function PartGroup({
+  group,
+  live,
+  handlers,
+}: Readonly<{ group: PartGroupValue; live: boolean; handlers: ChatMessageHandlers }>) {
   if (group.kind === "tools") {
     return (
       <ul className="flex flex-col text-sm leading-5 text-muted-readable" aria-label="What chat looked at">
@@ -128,7 +141,7 @@ function PartGroup({ group, handlers }: Readonly<{ group: PartGroupValue; handle
   const { part } = group;
   switch (part.type) {
     case "text":
-      return <p className="whitespace-pre-wrap break-words">{part.text}</p>;
+      return <p className="whitespace-pre-wrap break-words">{live ? <StreamedWords text={part.text} /> : part.text}</p>;
     case "outcome":
       return <OutcomeLine outcome={part.outcome} handlers={handlers} />;
     case "confirm":
@@ -293,11 +306,36 @@ function RefusalBlock({ refusal, handlers }: Readonly<{ refusal: ChatRefusal; ha
   );
 }
 
-function WaitingLine() {
+function WaitingLine({ started }: Readonly<{ started: boolean }>) {
   return (
     <p className="text-sm leading-5 text-muted-readable">
-      Reading your question…
+      <ChatThinkingHorse />
+      <span className="sr-only">{started ? "Working on your answer…" : "Reading your question…"}</span>
     </p>
+  );
+}
+
+const WORD_STAGGER_MS = 16;
+const WORD_STAGGER_MAX_MS = 900;
+
+/** A streamed reply's words: each batch that arrives fades in, word after word. */
+function StreamedWords({ text }: Readonly<{ text: string }>) {
+  const words = text.match(/\S+\s*|\s+/g) ?? [];
+  // `batchStart` is where the newest batch of words begins.
+  const [seen, setSeen] = useState({ count: 0, batchStart: 0 });
+  if (seen.count !== words.length) setSeen({ count: words.length, batchStart: Math.min(seen.count, words.length) });
+  return words.map((word, index) => (
+    <StreamedWord key={index} word={word} delayMs={Math.min(Math.max(index - seen.batchStart, 0) * WORD_STAGGER_MS, WORD_STAGGER_MAX_MS)} />
+  ));
+}
+
+function StreamedWord({ word, delayMs }: Readonly<{ word: string; delayMs: number }>) {
+  // The delay is fixed when the word first appears, so later batches do not restart it.
+  const [style] = useState<CSSProperties>(() => ({ animationDelay: `${delayMs}ms` }));
+  return (
+    <span className={streamStyles.word} style={style}>
+      {word}
+    </span>
   );
 }
 

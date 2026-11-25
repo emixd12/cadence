@@ -8,6 +8,7 @@ import type {
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
 import { createBriefOpportunityClient, type BriefOpportunityClient } from "./daily-brief-opportunities";
 import { ADVISOR_REQUEST_DEADLINE_MS, createAdvisorClient, type AdvisorClient } from "./advisor";
+import { getLocalStorage } from "./browser-storage";
 
 /** OpenAI's ChatGPT usage settings, where "Manage usage" goes (Ticket 299). */
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
@@ -211,15 +212,18 @@ function isOffline() {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
+/** Omit `storage` for `localStorage`. Rejects when no storage is available. */
 export async function dailyBriefInstallationId(
-  storage: Storage = window.localStorage,
+  storage?: Storage | null,
   signal?: AbortSignal,
 ): Promise<string> {
+  const target = storage === undefined ? getLocalStorage() : storage;
+  if (!target) throw new Error("Browser storage is unavailable.");
   return withDailyBriefDeadline(DAILY_BRIEF_CLIENT_DEADLINES.installationMs, signal, async (bounded) => {
     if ("locks" in navigator) {
-      return navigator.locks.request("cadence.daily-brief.installation.v1", { mode: "exclusive", signal: bounded }, () => installationId(storage));
+      return navigator.locks.request("cadence.daily-brief.installation.v1", { mode: "exclusive", signal: bounded }, () => installationId(target));
     }
-    return installationId(storage);
+    return installationId(target);
   });
 }
 
@@ -248,11 +252,13 @@ export type DailyBriefPresentation = Readonly<{
 export function readDailyBriefPresentation(
   accountRef: string,
   localDate: string,
-  storage: Storage = window.localStorage,
+  storage?: Storage | null,
 ): DailyBriefPresentation {
   try {
-    pruneDailyBriefPresentation(storage, accountRef, localDate);
-    const value = JSON.parse(storage.getItem(presentationKey(accountRef, localDate)) ?? "{}") as Record<string, unknown>;
+    const target = storage === undefined ? getLocalStorage() : storage;
+    if (!target) return { attempted: false, delivered: false, dismissed: false };
+    pruneDailyBriefPresentation(target, accountRef, localDate);
+    const value = JSON.parse(target.getItem(presentationKey(accountRef, localDate)) ?? "{}") as Record<string, unknown>;
     const attempted = value.attempted === true;
     return {
       attempted,
@@ -270,10 +276,13 @@ export function markDailyBriefPresentation(
   accountRef: string,
   localDate: string,
   value: DailyBriefPresentation,
-  storage: Storage = window.localStorage,
+  storage?: Storage | null,
 ) {
-  pruneDailyBriefPresentation(storage, accountRef, localDate);
-  storage.setItem(presentationKey(accountRef, localDate), JSON.stringify({
+  const target = storage === undefined ? getLocalStorage() : storage;
+  // No storage: the marker lasts only for this page session, as when a write throws.
+  if (!target) return;
+  pruneDailyBriefPresentation(target, accountRef, localDate);
+  target.setItem(presentationKey(accountRef, localDate), JSON.stringify({
     attempted: value.attempted,
     delivered: value.delivered,
     dismissed: value.dismissed,

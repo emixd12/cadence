@@ -9,21 +9,39 @@ on:
       - scripts/supabase-rehearsal.sh
       - scripts/supabase-rehearsal-diagnostics.mjs
       - scripts/supabase-docker-proxy.mjs
+      - scripts/supabase-rehearsal-integration-tests.json
       - scripts/supabase-rls-smoke.mjs
       - scripts/account-sync-rpc-smoke.mjs
       - tests/sql/**
       - tests/behavior-store-supabase.contract.test.ts
+      - tests/*.local-integration.test.*
       - tests/supabase-docker-proxy.test.ts
       - tests/supabase-rehearsal-diagnostics.test.ts
       - tests/helpers/**
       - tests/fixtures/**
+      - apps/desktop/src/account/canonical-json.ts
       - lib/db/**
+      - lib/integrations/**
       - lib/supabase/**
       - lib/types/**
+      # Services the allowlisted local integration tests import directly.
+      - lib/services/behavior.service.ts
+      - lib/services/behavior-change-proposals.service.ts
       - lib/services/behaviorlog*
+      - lib/services/brief-move-day.service.ts
+      - lib/services/brief-moves.service.ts
+      - lib/services/coach-signals-job.service.ts
+      - lib/services/daily-brief-agent-run.ts
       - lib/services/export.service.ts
+      - lib/services/integration-behavior-input.ts
+      - lib/services/integration-read-serialization.ts
+      - lib/services/integration-write.service.ts
+      - lib/services/oauth/**
       - lib/services/occurrence.service.ts
+      - lib/services/occurrence-move.service.ts
       - lib/services/time-tracking.service.ts
+      - lib/services/travel-conclusions-token.ts
+      - lib/services/travel-settings.service.ts
       - lib/services/zip.ts
       - packages/core/**
       - package.json

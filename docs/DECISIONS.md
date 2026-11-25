@@ -3087,6 +3087,29 @@ Macs inherit hosted Brief/Chat/Timeline reads automatically); marketing not appl
 deferred (inherits hosted path). Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated,
 `L-026` logged.
 
+## 2026-11-25: Note closure redesign (collapsed 1-line summary + auto-save + Done)
+
+Owner decision on November 25, 2026:
+
+- **Collapsed 1-line closure for both Day notes and Occurrence notes.** Both `DayNoteControl` and
+  `OccurrenceNoteForm` default to a compact one-line disclosure (`Add day note` / `Add note` when
+  empty, or `Day note` / `Note` followed by a single-line truncated preview when saved). Clicking the
+  summary opens `NoteEditor` inline without repeating a duplicate visible label above the textarea.
+  Closing returns to the one-line summary with a quiet `Saved` indicator that fades after ~2.5s.
+  Closing an Occurrence note collapses only the note itself, leaving the expanded parent occurrence
+  row or behavior review open.
+- **Auto-save + Done.** `NoteEditor` auto-saves after a ~750ms typing pause, saves immediately when
+  tapping a Note shortcut chip, and flushes any unsaved draft on blur outside the editor without
+  snapping the box shut. Clicking **Done** (or pressing `Cmd/Ctrl+Enter` or `Escape`) flushes any
+  pending save and collapses once confirmed. Compare-and-set (`expected_note`) protection and
+  `DesktopDraftGuard` stay intact: on conflict or error, the editor stays open with the draft
+  preserved, shows the factual alert, and offers **Try again**.
+
+Platform impact: web implemented (`components/notes/NoteEditor.tsx`,
+`components/timeline/DayNoteControl.tsx`, `components/timeline/OccurrenceNoteForm.tsx`); desktop
+implemented (shares the same components, ships in next Mac release); marketing not applicable; future
+mobile deferred. Messaging impact: none.
+
 ## 2026-11-25: Google Workspace Calendar MCP migration, AI Tools Addendum compliance, and conversational travel organizing
 
 Owner decisions Q1–Q8 on November 25, 2026 (`docs/LEGAL.md` **L-027**, **L-026**, **L-001**;
@@ -3101,7 +3124,7 @@ plan: `docs/plans/2026-11-25-google-workspace-mcp-migration.md`):
   MCP events (replacing `etag`-dependent matching in `withSuppliedConclusions` so Outlook and
   iCloud stay intact). Protect MCP and Routes quotas via short-TTL per-user MCP snapshot/list
   caching (5–15 min, keyed by `(userId, grantGeneration, selectionRevision)`) and
-  provenance-safe Routes estimate reuse by `(origin, destination, mode, departure time bucket)`.
+  provenance-safe Routes estimate reuse by `(accountId, origin, destination, mode, departure time bucket)`.
   Fold conversational travel organizing into this pre-Feb-1 track: hybrid Chat UI under `L-001`
   (deterministic fit/conflict conclusions & free windows to the LLM; structured exact leave-by
   and duration travel cards rendered inline by Cadence), **today + 7-day lookahead**, cross-day
@@ -3141,17 +3164,17 @@ plan: `docs/plans/2026-11-25-google-workspace-mcp-migration.md`):
   `subject: "calendar"`. Stale Oct 16 & Oct 23 `.local/briefing-bench/` live captures deleted
   November 25, 2026.
 - **Q5 — Google Cloud Model Armor + keep T12 immediate Chat writes:**
-  Enable Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) on
-  `cadence-calendar-agent-prod` alongside in-app sanitization/framing; keep T12 immediate
-  single-record Chat writes with Undo (confirmation gate deferred in `docs/FUTURE_UPDATES.md`).
+  Enable Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) alongside in-app
+  sanitization/framing; keep T12 immediate single-record Chat writes with Undo (confirmation
+  gate deferred in `docs/FUTURE_UPDATES.md`).
 - **Q7 — Bundle into Cadence for Mac `0.1.16`:**
   Hold Mac `0.1.16` to bundle the versioned `purpose=ai_mcp` broker and shared Settings UI
   after Phase 4.
 - **Q8 — Standard Tier ($0) budget posture:**
-  Stay on Standard Tier ($0, billing off) with a 3,500 req/day monitoring alert, 40
-  req/user/day per-account cap, snapshot + `list_calendars` caching, and graceful degradation
-  (one-line notice, never falling back to REST); defer any global monthly spend cap until
-  Scaled Tier is needed.
+  Stay on Standard Tier ($0, billing off) on `cadence-calendar-agent-prod` with a 3,500 req/day
+  monitoring alert, 40 req/user/day per-account cap, snapshot + `list_calendars` caching, and
+  graceful degradation (one-line notice, never falling back to REST); defer any global monthly
+  spend cap until Scaled Tier is needed.
 
 Platform impact: web (Phases 1A–6 + hybrid Chat travel UI + longitudinal review), desktop
 (bundled in Cadence for Mac `0.1.16` with `purpose=ai_mcp` and shared Settings UI), marketing

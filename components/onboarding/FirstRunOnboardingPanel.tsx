@@ -22,6 +22,7 @@ import {
 } from "@/lib/push/browser";
 import { resolveFirstRunOnboardingModel } from "@/lib/services/onboarding-model";
 import { readTravelRoutingReport, webTravelClient } from "@/lib/ui/travel";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 import type {
   FirstRunOnboardingClientSnapshot,
   FirstRunOnboardingItemKey,
@@ -70,13 +71,7 @@ export function FirstRunOnboardingPanel({
     }, 0);
 
     async function loadClientSnapshot() {
-      let dismissed = false;
-
-      try {
-        dismissed = window.localStorage.getItem(storageKey) === "true";
-      } catch {
-        dismissed = false;
-      }
+      const dismissed = readLocalItem(storageKey) === "true";
 
       const support = getBrowserPushSupport(onboarding.vapidPublicKey);
       const browserTimezone =
@@ -167,11 +162,8 @@ export function FirstRunOnboardingPanel({
   }
 
   function dismissSetup() {
-    try {
-      window.localStorage.setItem(storageKey, "true");
-    } catch {
-      // Local dismissal is a convenience; the app still works without it.
-    }
+    // Local dismissal is a convenience; the app still works when the write is refused.
+    writeLocalItem(storageKey, "true");
 
     setClientSnapshot((current) =>
       current ? { ...current, dismissed: true } : current,

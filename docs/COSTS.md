@@ -73,6 +73,7 @@ implement most of it in source; it is not deployed yet.
 | Google Cloud Model Armor (`cadence-calendar-agent-prod`) | US$0 | US$0 | US$0 | Enabled for MCP prompt-injection screening (`INSPECT_AND_BLOCK`, Cloud Logging OFF): 2,000,000 tokens/month free, then US$0.10/1M tokens |
 | Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 30 an hour since November 13, 2026, 21:24Z, with Turnstile on every request (3 an hour before CAPTCHA; 2 with the built-in sender). 30 an hour is a ceiling, not expected use: sustained, it would spend the free 2,500 in about 3.5 days | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 8 Supabase emails; go-live run 7 more and one test reminder. Live since November 13, 2026, 21:35Z (`CADENCE_SIGN_IN_EMAIL` on; SMTP through Sequenzy as `login@cadence-me.com`). Cloudflare Turnstile is free (not rechecked); since November 14, 2026 Cadence's server also calls Turnstile's free siteverify once per email request (Ticket 338), and the Ticket 338 go-live run sent 9 more sign-in emails. Measure the volume in the first week after launch; if it nears the monthly cap, lower the limit or upgrade |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
+| Place & Home autocomplete (Geoapify, OSM) | US$0 | US$0 | US$0 | Implemented in source (`GEOAPIFY_API_KEY`). Free tier: 3,000 credits/day (~90,000/mo, commercial OK). With 350 ms debounce, 3-char minimum, local saved-place matching first, and 5-min caching: ~15 / ~60 / ~120 calls/user/mo (assumed), covering ~1,500 typical users at US$0 before a paid plan (~US$49/mo) |
 
 ### Per-user total at 100 users
 
@@ -833,7 +834,7 @@ billing tier bucket: **US$0.25 per 1,000 HTTP 2xx requests** (US$0.00025 per req
 | --- | --- | --- | --- |
 | Calendar REST API (`calendar-json.googleapis.com`) | 10,000 req/min/project; 600 req/min/user; US$0 | **1,000,000 HTTP 2xx req/day** free allowance per billing account (resets midnight PT), then **US$0.25/1K** | Non-AI traffic (Timeline, Travel, Leave Reminders) stays on `cadence-calendar-498717` |
 | Calendar MCP server (`calendarmcp.googleapis.com`) | **5,000 req/day/project**; 10,000 query units/min/project; 600/min/user; US$0 | **0 free daily allowance** — billed from request #1 at **US$0.25/1K** | Required for AI traffic (Daily Brief + Chat) from Feb 1, 2027; `list_calendars` and `list_events` cost 1 unit each; HTTP 200 JSON-RPC `isError: true` still bills |
-| Google Cloud Model Armor (prompt-injection filter) | **2,000,000 tokens/month** free | **US$0.10 per 1M tokens** (input + output) | Owner decision 2026-11-25 (Q5): `INSPECT_AND_BLOCK`, Cloud Logging OFF on `cadence-calendar-agent-prod` |
+| Google Cloud Model Armor (prompt-injection filter) | **2,000,000 tokens/month** free (requires a billed GCP project) | **US$0.10 per 1M tokens** (input + output) | Owner decision 2026-11-25 (Q5): `INSPECT_AND_BLOCK`, Cloud Logging OFF; hosted in a separate billed GCP project so `cadence-calendar-agent-prod` stays unbilled on Standard Tier |
 
 Scaled Tier applies to the **entire GCP project**, not per API, so keeping REST
 (`cadence-calendar-498717`) and MCP (`cadence-calendar-agent-prod`) in separate projects
@@ -857,8 +858,8 @@ projects have `billingEnabled: false` and Standard Tier modeled impact **Low** (
 event reads and Settings calendar-list fetches. Short-TTL per-user MCP caching (5–15 min for
 snapshots and `list_calendars`, keyed by `(userId, grantGeneration, selectionRevision)` and
 invalidated on settings change/disconnect) plus provenance-safe in-memory Routes estimate
-reuse by `(origin, destination, mode, departure time bucket)` protect both the 5,000/day
-Standard Tier MCP cap and Google Routes spend.
+reuse by `(accountId, origin, destination, mode, departure time bucket)` protect both the
+5,000/day Standard Tier MCP cap and Google Routes spend.
 
 ### Owner tier & budget posture (2026-11-25, Q8)
 
@@ -881,6 +882,16 @@ Daily Brief, Advisor Chat, and opted-in weekly/monthly reviews.
 
 Per-user totals at 100 users remain unchanged (**US$0.00** for Calendar REST, Calendar MCP,
 and Model Armor under the 2M-token free tier).
+
+## Place and Home autocomplete (Geoapify, checked November 25, 2026)
+
+Provider: [Geoapify Address Autocomplete](https://www.geoapify.com/pricing/) (OpenStreetMap/ODbL),
+selected November 25, 2026. Free tier allows 3,000 credits/day (~90,000/month, commercial use
+permitted). With instant local saved-place matching, 350 ms debounce, 3-character minimum,
+5-minute client and server normalized-query caching, and per-account rate limits (30/min,
+200/hr), assumed usage is ~15 / ~60 / ~120 calls/month per light / typical / heavy user
+(covering ~1,500 typical users at US$0 before paid plans starting around US$49/month).
+Per-user totals at 100 users remain unchanged (US$0).
 
 ### Change log update (November 25, 2026)
 

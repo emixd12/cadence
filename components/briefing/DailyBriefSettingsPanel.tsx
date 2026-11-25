@@ -12,6 +12,7 @@ import {
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { useReportSettingsSection } from "@/components/settings/SettingsSections";
 import { dailyBriefSectionState, settingsSectionLoad } from "@/lib/ui/settings-sections";
+import { getLocalStorage } from "@/lib/ui/browser-storage";
 
 /**
  * Ticket 306: one choice covers every connected source, including one connected
@@ -109,7 +110,10 @@ export function DailyBriefSettingsPanel({
     setSaving(true); setError("");
     void resolvedClient.updatePreferences(next).then((updated) => {
       setSettings(updated);
-      localStorage.setItem("cadence.daily-brief.settings-revision.v1", `${updated.accountRef}:${updated.revision}`);
+      // Without storage this throws, as the bare global did, and the panel reports the save as failed.
+      const storage = getLocalStorage();
+      if (!storage) throw new Error("Browser storage is unavailable.");
+      storage.setItem("cadence.daily-brief.settings-revision.v1", `${updated.accountRef}:${updated.revision}`);
       window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: updated }));
     }).catch(() => {
       setError("AI settings could not save. Your change was undone. Try again.");
