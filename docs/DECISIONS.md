@@ -3086,3 +3086,26 @@ consumers); desktop unaffected (hosted-only, no SQLite migration or `account_syn
 Macs inherit hosted Brief/Chat/Timeline reads automatically); marketing not applicable; future mobile
 deferred (inherits hosted path). Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated,
 `L-026` logged.
+
+## 2026-11-25: Note closure redesign (collapsed 1-line summary + auto-save + Done)
+
+Owner decision on November 25, 2026:
+
+- **Collapsed 1-line closure for both Day notes and Occurrence notes.** Both `DayNoteControl` and
+  `OccurrenceNoteForm` default to a compact one-line disclosure (`Add day note` / `Add note` when
+  empty, or `Day note` / `Note` followed by a single-line truncated preview when saved). Clicking the
+  summary opens `NoteEditor` inline without repeating a duplicate visible label above the textarea.
+  Closing returns to the one-line summary with a quiet `Saved` indicator that fades after ~2.5s.
+  Closing an Occurrence note collapses only the note itself, leaving the expanded parent occurrence
+  row or behavior review open.
+- **Auto-save + Done.** `NoteEditor` auto-saves after a ~750ms typing pause, saves immediately when
+  tapping a Note shortcut chip, and flushes any unsaved draft on blur outside the editor without
+  snapping the box shut. Clicking **Done** (or pressing `Cmd/Ctrl+Enter` or `Escape`) flushes any
+  pending save and collapses once confirmed. Compare-and-set (`expected_note`) protection and
+  `DesktopDraftGuard` stay intact: on conflict or error, the editor stays open with the draft
+  preserved, shows the factual alert, and offers **Try again**.
+
+Platform impact: web implemented (`components/notes/NoteEditor.tsx`,
+`components/timeline/DayNoteControl.tsx`, `components/timeline/OccurrenceNoteForm.tsx`); desktop
+implemented (shares the same components, ships in next Mac release); marketing not applicable; future
+mobile deferred. Messaging impact: none.

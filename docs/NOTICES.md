@@ -8,9 +8,9 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 32 |
+| outcome | 33 |
 | error | 87 |
-| note | 23 |
+| note | 24 |
 | question | 3 |
 
 ## Behavior editor
@@ -195,6 +195,8 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `timeline.duration-save-failed` Says saving the Behavior's default duration failed. | error | Unable to save duration. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts`, `lib/services/timeline.service.ts` |
 | `timeline.duration-saved` Confirms the Behavior's default duration was saved from the Timeline row. | outcome | Default duration saved. | web | INT-BEHAVIOR-030, `app/(app)/timeline/actions.ts` |
 | `timeline.duration-unavailable` Says the Behavior whose default duration is being set is no longer available. | error | This Behavior is no longer available. | web | INT-BEHAVIOR-030, `lib/services/timeline.service.ts` |
+| `timeline.note-saved` Confirms that a day note or occurrence note has saved, both inline in the editor and briefly beside the collapsed one-line summary. | outcome | Saved | web, Mac | INT-TIMELINE-008, INT-TIMELINE-011, INT-TIMELINE-012, `components/notes/NoteEditor.tsx`, `components/timeline/DayNoteControl.tsx`, `components/timeline/OccurrenceNoteForm.tsx` |
+| `timeline.note-saving` Shows beside the note editor while a day note or occurrence note is saving. | note | Saving... | web, Mac | INT-TIMELINE-008, INT-TIMELINE-011, INT-TIMELINE-012, `components/notes/NoteEditor.tsx` |
 | `timeline.reload-incomplete` Says a reload finished but Cadence or a connector did not refresh, so shown data may be old. | error | Reload incomplete. Cadence or connector data may be stale. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reload-offline` Web: says a reload could not run while offline, so shown data may be old. | error | Reload failed while offline. Displayed data may be stale. | web | INT-TIMELINE-010, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |
 | `timeline.reloaded` Confirms that the Timeline reloaded Cadence and every connector. | outcome | Cadence and connectors reloaded. | web, Mac | INT-TIMELINE-010, `apps/desktop/src/timeline-screen.tsx`, `components/timeline/MobileTimelinePullToRefresh.tsx`, `components/timeline/TimelineReloadLine.tsx` |

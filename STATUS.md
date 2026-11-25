@@ -97,6 +97,26 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Note closure redesign: collapsed 1-line summary + auto-save + Done — November 25, 2026
+
+- **Owner's decision:** use a collapsed one-line summary (`Add day note`/`Add note`, or `Day note`/`Note`
+  + single-line preview) and auto-save + **Done** for both Day notes and per-behavior (Occurrence) notes
+  (`docs/DECISIONS.md`, 2026-11-25).
+- **Implemented:** `components/notes/NoteEditor.tsx` (750ms debounced auto-save, immediate shortcut-chip
+  save, flush-on-blur without closing, `Done` / `Cmd+Enter` / `Escape` flush-and-close, `Try again` on
+  conflict/error, `hideLabel` for disclosure callers, `DesktopDraftGuard`),
+  `components/timeline/DayNoteControl.tsx` (controlled disclosure, optimistic preview update, fading
+  2.5s `Saved` indicator), `components/timeline/OccurrenceNoteForm.tsx` (matching one-line disclosure
+  that collapses independently of the parent occurrence row), notice catalog (`timeline.note-saving`,
+  `timeline.note-saved`), docs (`docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, `interaction-registry.json`,
+  `docs/DECISIONS.md`), and UI tests (`tests/day-note-ui.test.tsx`,
+  `tests/occurrence-note-shortcuts-ui.test.tsx`, `tests/timeline-interactions-ui.test.tsx`,
+  `tests/behavior-review-ui.test.tsx`).
+
+Platform impact: web implemented; desktop implemented (shares `NoteEditor`, `DayNoteControl`, and
+`OccurrenceNoteForm`, ships in next Mac release); marketing not applicable; future mobile deferred.
+Messaging impact: none.
+
 ## Place and Home autocomplete with Geoapify and safe auto-marker — November 25, 2026
 
 - **Owner's decision:** use Geoapify (OpenStreetMap/ODbL, free 3,000 credits/day) for address
