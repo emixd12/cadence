@@ -43,6 +43,9 @@ const RESOLVER_IMPORTERS = new Set([
   // Ticket 359: the estimate call's parser and writer validate the guess's four values.
   "packages/core/src/services/description-duration.ts",
   "lib/services/brief-moves.service.ts",
+  // Ticket 359: the advisor day context's planning field (server-side; never in model facts).
+  "packages/core/src/types/advisor-day-context.ts",
+  "packages/core/src/services/advisor-day-context.ts",
 ]);
 /** The only sources that name the stored guess column. */
 const GUESS_READERS = new Set([

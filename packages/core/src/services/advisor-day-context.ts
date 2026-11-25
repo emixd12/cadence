@@ -25,6 +25,7 @@ import {
   type AdvisorMoveDay,
   type AdvisorOccurrence,
   type AdvisorOccurrenceMove,
+  type AdvisorOccurrencePlanning,
   type AdvisorSourceFailureCode,
 } from "../types/advisor-day-context";
 import {
@@ -37,6 +38,8 @@ import type { OccurrenceStatus } from "../types/database";
 import { TRAVEL_MODEL_PROJECTION_VERSION, type TravelLegRole, type TravelMode, type TravelModelFit } from "../types/travel";
 import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
 import { CURRENT_WHERE_SUGGESTION_RULES } from "../resolvers/place-label.resolver";
+import { ALONGSIDE_SOURCES } from "../resolvers/alongside.resolver";
+import { EFFECTIVE_WHERE_KINDS, EFFECTIVE_WHERE_SOURCES } from "../resolvers/effective-where.resolver";
 import { PLACE_LABEL_RETENTIONS } from "../types/place-labels";
 import { WEATHER_MARGIN_TABLE } from "../resolvers/weather-margin.resolver";
 import { TRAVEL_HABIT_RULES } from "./travel-habits";
@@ -75,6 +78,8 @@ type AdvisorCadenceOccurrenceInput = Readonly<{
   move?: AdvisorOccurrenceMove;
   /** Set for a routine's step (sub-behaviors, depth 1). */
   routine?: Readonly<{ parentBehaviorId: string; parentTitle: string; inheritParentSchedule: boolean; stepOrder: number }>;
+  /** Ticket 359: the Behavior's effective alongside value and Where, only while `CADENCE_ALONGSIDE` is on. */
+  planning?: AdvisorOccurrencePlanning;
   scheduleKind: "exact" | "range";
   scheduleStartTime: string;
   scheduleEndTime: string | null;
@@ -231,6 +236,7 @@ export function projectAdvisorCadenceSource(input: Readonly<{
         inheritParentSchedule: occurrence.routine.inheritParentSchedule,
         stepOrder: occurrence.routine.stepOrder,
       } } : {}),
+      ...(occurrence.planning ? { planning: occurrence.planning } : {}),
     };
   });
 
@@ -857,7 +863,7 @@ function projectDuration(estimate: AdvisorCadenceOccurrenceInput["duration"]): A
 
 function validateOccurrence(value: unknown, index: number, localDate: string): void {
   const occurrence = record(value, `occurrence[${index}]`);
-  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates", "move", "routine"], `occurrence[${index}]`);
+  exactOptionalKeys(occurrence, ["ref", "behaviorRef", "title", "status", "localDate", "scheduledFor", "schedule", "duration"], ["durationCandidates", "move", "routine", "planning"], `occurrence[${index}]`);
   nonempty(occurrence.ref, "occurrence.ref");
   nonempty(occurrence.behaviorRef, "occurrence.behaviorRef");
   if (typeof occurrence.title !== "string" || occurrence.title.length > 200) fail("occurrence.title is invalid.");
@@ -887,6 +893,22 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
     if (typeof routine.parentTitle !== "string" || routine.parentTitle.length > 200) fail("occurrence.routine.parentTitle is invalid.");
     if (typeof routine.inheritParentSchedule !== "boolean") fail("occurrence.routine.inheritParentSchedule is invalid.");
     if (!Number.isInteger(routine.stepOrder) || (routine.stepOrder as number) < 0) fail("occurrence.routine.stepOrder is invalid.");
+  }
+  if ("planning" in occurrence) validatePlanning(occurrence.planning);
+}
+
+/** Ticket 359: the effective alongside value and Where. A place key is a one-way key, never a name or address. */
+function validatePlanning(value: unknown): void {
+  const planning = record(value, "occurrence.planning");
+  exactKeys(planning, ["alongside", "alongsideSource", "where"], "occurrence.planning");
+  if (typeof planning.alongside !== "boolean") fail("occurrence.planning.alongside is invalid.");
+  if (!(ALONGSIDE_SOURCES as readonly unknown[]).includes(planning.alongsideSource)) fail("occurrence.planning.alongsideSource is invalid.");
+  const where = record(planning.where, "occurrence.planning.where");
+  exactOptionalKeys(where, ["kind", "source"], ["placeKey"], "occurrence.planning.where");
+  if (!(EFFECTIVE_WHERE_KINDS as readonly unknown[]).includes(where.kind)) fail("occurrence.planning.where.kind is invalid.");
+  if (!(EFFECTIVE_WHERE_SOURCES as readonly unknown[]).includes(where.source)) fail("occurrence.planning.where.source is invalid.");
+  if ("placeKey" in where && (where.kind !== "place" || typeof where.placeKey !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(where.placeKey))) {
+    fail("occurrence.planning.where.placeKey is invalid.");
   }
 }
 

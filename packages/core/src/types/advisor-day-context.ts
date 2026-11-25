@@ -1,4 +1,6 @@
 import type { CompletionTimingSummary } from "../resolvers/completion-timing.resolver";
+import type { AlongsideSource } from "../resolvers/alongside.resolver";
+import type { EffectiveWhereKind, EffectiveWhereSource } from "../resolvers/effective-where.resolver";
 
 import type {
   ExternalEventAvailability,
@@ -124,6 +126,24 @@ export type AdvisorOccurrence = Readonly<{
    * collide with each other and move together.
    */
   routine?: AdvisorOccurrenceRoutine;
+  /**
+   * Ticket 359 (D33): the Behavior's effective alongside value and effective Where, only
+   * while `CADENCE_ALONGSIDE` is on. Planning only and server-side: the brief's model
+   * facts never carry it (the projection lists its fields), and it never reaches travel,
+   * departure, route or leave-reminder code.
+   */
+  planning?: AdvisorOccurrencePlanning;
+}>;
+
+export type AdvisorOccurrencePlanning = Readonly<{
+  alongside: boolean;
+  alongsideSource: AlongsideSource;
+  where: Readonly<{
+    kind: EffectiveWhereKind;
+    source: EffectiveWhereSource;
+    /** Only for `place` with a saved place: its one-way key, for the same-place rule. Never sent to a model. */
+    placeKey?: string;
+  }>;
 }>;
 
 export type AdvisorOccurrenceRoutine = Readonly<{
