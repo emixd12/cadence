@@ -25,6 +25,7 @@ import {
   type AdvisorAvatarState,
 } from "@/lib/resolvers/advisor-avatar.resolver";
 import type { AdvisorAvatarGestureEvent } from "./AdvisorAvatar";
+import { getLocalStorage } from "@/lib/ui/browser-storage";
 
 /**
  * Advisor plan Phase 4, workstream 4E (placement K, DESIGN.md "Advisor placement").
@@ -291,5 +292,5 @@ function firstOpenToday(storage: Storage | null): boolean {
 }
 
 function safeStorage(): Storage | null {
-  try { return window.localStorage; } catch { return null; }
+  return getLocalStorage();
 }

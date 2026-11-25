@@ -1,3 +1,5 @@
+import { getLocalStorage } from "@/lib/ui/browser-storage";
+
 export const DESKTOP_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const AUTOMATIC_DOWNLOADS_KEY = "cadence.desktop-updater.automatic-downloads";
@@ -53,11 +55,9 @@ export type DesktopUpdaterDependencies = Readonly<{
 const memoryStorage = new Map<string, string>();
 
 function browserStorage(): DesktopUpdateStorage {
-  try {
-    if (globalThis.localStorage) return globalThis.localStorage;
-  } catch {
-    // Fall through to the test and non-browser fallback.
-  }
+  const storage = getLocalStorage();
+  if (storage) return storage;
+  // The test and non-browser fallback.
   return {
     getItem: (key) => memoryStorage.get(key) ?? null,
     setItem: (key, value) => { memoryStorage.set(key, value); },

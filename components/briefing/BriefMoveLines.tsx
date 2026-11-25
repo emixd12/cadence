@@ -19,6 +19,7 @@ import { Notice } from "@/components/feedback/Notice";
 import { moveTimeLabel, useOccurrenceMoves, wallTime } from "@/components/timeline/OccurrenceMoves";
 import type { BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { DailyBriefRequestError } from "@/lib/ui/daily-brief";
+import { getLocalStorage } from "@/lib/ui/browser-storage";
 
 /**
  * Advisor plan Phase 3 (3B): the brief's move lines. Each line reads like text: the
@@ -502,11 +503,13 @@ function revisionAfter(line: BriefMoveLine, ui: Readonly<Record<string, LineUi>>
 function firstUseExplainer(kind: BriefMoveAnswerKind): string | null {
   const text = BRIEF_ANSWER_EXPLAINERS[kind];
   if (!text) return null;
+  const storage = getLocalStorage();
+  if (!storage) return null;
   try {
-    const seen = new Set<string>(JSON.parse(window.localStorage.getItem(EXPLAINED_KEY) ?? "[]") as string[]);
+    const seen = new Set<string>(JSON.parse(storage.getItem(EXPLAINED_KEY) ?? "[]") as string[]);
     if (seen.has(kind)) return null;
     seen.add(kind);
-    window.localStorage.setItem(EXPLAINED_KEY, JSON.stringify([...seen]));
+    storage.setItem(EXPLAINED_KEY, JSON.stringify([...seen]));
     return text;
   } catch {
     return null;
