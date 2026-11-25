@@ -474,4 +474,71 @@ describe("model-armor.service", () => {
     expect(iamCalls).toBe(1);
     expect(modelArmorCalls).toBe(9);
   });
+
+  it("short-circuits multi-event batch screening after a single failed STS exchange instead of retrying per field", async () => {
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const jwtPayload = Buffer.from(JSON.stringify({
+      iss: "https://oidc.vercel.com/cadence",
+      aud: "https://vercel.com/cadence",
+      sub: "owner:cadence:project:cadence:environment:production",
+      owner_id: "owner_1",
+      project_id: "prj_1",
+      environment: "production",
+      iat: nowSeconds - 10,
+      nbf: nowSeconds - 10,
+      exp: nowSeconds + 600,
+    })).toString("base64url");
+    const subjectToken = `eyJhbGciOiJSUzI1NiJ9.${jwtPayload}.sig-fail`;
+
+    let stsCalls = 0;
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (new URL(String(url)).hostname === "sts.googleapis.com") {
+        stsCalls += 1;
+      }
+      return new Response("unavailable", { status: 503 });
+    });
+    const reportEvent = vi.fn();
+
+    const baseEvent = SAMPLE_SNAPSHOT.events[0]!;
+    const threeEventSnapshot: ExternalEventSnapshotV1 = {
+      ...SAMPLE_SNAPSHOT,
+      events: [
+        { ...baseEvent, id: "evt-1", title: "Standup", location: "Room A", calendarName: "Work" },
+        { ...baseEvent, id: "evt-2", title: "Lunch", location: "Cafe", calendarName: "Personal" },
+        { ...baseEvent, id: "evt-3", title: "1:1", location: "Zoom", calendarName: "Work" },
+      ],
+    };
+
+    const result = await screenSnapshotWithModelArmor(threeEventSnapshot, {
+      env: {
+        NODE_ENV: "test",
+        CADENCE_MODEL_ARMOR_LOCATION: "us-east1",
+        CADENCE_MODEL_ARMOR_TEMPLATE: "cadence-calendar-mcp-screen",
+        GOOGLE_CLOUD_PROJECT_ID: "habit-tracker-498717",
+        GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER:
+          "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-oidc",
+        GOOGLE_CLOUD_TRAVEL_SERVICE_ACCOUNT_EMAIL:
+          "cadence-travel@habit-tracker-498717.iam.gserviceaccount.com",
+        CADENCE_TRAVEL_VERCEL_OIDC_ISSUER: "https://oidc.vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_AUDIENCE: "https://vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_SUBJECT: "owner:cadence:project:cadence:environment:production",
+        CADENCE_TRAVEL_VERCEL_OIDC_OWNER_ID: "owner_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_PROJECT_ID: "prj_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_ENVIRONMENT: "production",
+        VERCEL_OIDC_TOKEN: subjectToken,
+      },
+      fetch: fetchMock,
+      reportEvent,
+    });
+
+    expect(result.screenedBy).toBe("in_app_fallback");
+    expect(stsCalls).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(reportEvent).toHaveBeenCalledTimes(1);
+    expect(reportEvent).toHaveBeenCalledWith({
+      name: "model_armor_screening_failed",
+      severity: "warning",
+      context: { reason: "missing_access_token" },
+    });
+  });
 });

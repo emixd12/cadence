@@ -377,13 +377,53 @@ export async function screenSnapshotWithModelArmor(
         sourceEnv,
       )
     : null;
-  const fieldAuthOptions = resolvedAccessToken
-    ? { accessToken: resolvedAccessToken }
-    : {
-        accessToken: undefined,
-        getAccessToken: undefined,
-        vercelOidcToken: undefined,
-      };
+
+  // Short-circuit the whole batch when token resolution fails so we never
+  // repeat STS/IAM timeouts or emit 3*N duplicate failure events per field.
+  if (hasFieldsToScreen && !resolvedAccessToken) {
+    emitEvent({
+      name: "model_armor_screening_failed",
+      severity: "warning",
+      context: { reason: "missing_access_token" },
+    });
+    const fallbackEvents: NormalizedExternalEvent[] = [];
+    let fallbackBlockedCount = 0;
+    for (const event of snapshot.events) {
+      const titleSanitized = event.title
+        ? sanitizeGoogleCalendarText(event.title, 1_024)
+        : "";
+      const locationSanitized = event.location
+        ? sanitizeGoogleCalendarText(event.location, 2_048)
+        : "";
+      const calendarNameSanitized = event.calendarName
+        ? sanitizeGoogleCalendarText(event.calendarName, 1_024)
+        : event.calendarName;
+      if (options.failClosed) {
+        if (titleSanitized) fallbackBlockedCount += 1;
+        if (locationSanitized) fallbackBlockedCount += 1;
+        if (calendarNameSanitized) fallbackBlockedCount += 1;
+      }
+      fallbackEvents.push({
+        ...event,
+        title: titleSanitized && options.failClosed ? MODEL_ARMOR_REDACTED_PLACEHOLDER : titleSanitized,
+        location: locationSanitized && options.failClosed ? MODEL_ARMOR_REDACTED_PLACEHOLDER : locationSanitized,
+        calendarName:
+          calendarNameSanitized && options.failClosed
+            ? MODEL_ARMOR_REDACTED_PLACEHOLDER
+            : calendarNameSanitized || MODEL_ARMOR_REDACTED_PLACEHOLDER,
+      });
+    }
+    return {
+      snapshot: {
+        ...snapshot,
+        events: fallbackEvents,
+      },
+      blockedCount: fallbackBlockedCount,
+      screenedBy: "in_app_fallback",
+    };
+  }
+
+  const fieldAuthOptions = { accessToken: resolvedAccessToken ?? undefined };
   let blockedCount = 0;
   let anyModelArmorCall = false;
 

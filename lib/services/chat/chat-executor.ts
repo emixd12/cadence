@@ -656,9 +656,16 @@ async function computeEphemeralGoogleCalendarLoad(
           ephemeralOnly: true,
         } as Parameters<typeof getCalendarEventsForAdvisor>[3],
       );
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      if (
+        read.result.ok &&
+        Array.isArray(snapshot.requestedRange?.selectedCalendarIds) &&
+        snapshot.requestedRange.selectedCalendarIds.length === 0
+      ) {
+        break;
+      }
       await onGoogleCalendarRead?.(extractGrantGeneration(read));
       if (!read.result.ok) partial = true;
-      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
       const computed = resolveDailyCalendarLoad({
         startLocalDate: cursor.toString(),
         endLocalDate: chunkEnd.toString(),

@@ -293,20 +293,19 @@ $$;
 
 -- 6. Cross-day move_occurrence_to_date RPC contract
 insert into public.behaviors (
-  id, user_id, title, schedule_kind, recurrence_type, scheduled_time, timezone, active
+  id, user_id, title, recurrence_rule, scheduled_time, timezone, default_duration_minutes
 ) values (
   '20261125-0000-4000-8000-000000003001',
   '20261125-0000-4000-8000-000000000001',
   'WS-1B Cross-Day Move Test',
-  'exact',
-  'daily',
-  '09:00:00',
+  '{"type":"daily"}'::jsonb,
+  '09:00',
   'America/New_York',
-  true
+  30
 );
 
 insert into public.occurrences (
-  id, user_id, behavior_id, local_date, scheduled_for, schedule_kind, status
+  id, user_id, behavior_id, local_date, scheduled_for, schedule_kind, schedule_start_time, schedule_end_time, status
 ) values (
   '20261125-0000-4000-8000-000000004001',
   '20261125-0000-4000-8000-000000000001',
@@ -314,6 +313,8 @@ insert into public.occurrences (
   '2026-11-26',
   '2026-11-26T14:00:00Z'::timestamptz,
   'exact',
+  '09:00',
+  null,
   'unresolved'
 );
 

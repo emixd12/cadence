@@ -473,6 +473,7 @@ async function readSuppliedEventLocations(
       const readEvents = provider === "outlook_calendar" ? getOutlookCalendarEventsForCaller : getIcloudCalendarEventsForCaller;
       const read = await readEvents(caller, localDate, localDate, {
         signal,
+        includeLocation: true,
         authorizedCalendarIds: fence.calendarIds,
         expectedConnectionGeneration: fence.connectionGeneration,
         expectedSelectionRevision: fence.selectionRevision,
