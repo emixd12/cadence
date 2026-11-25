@@ -2456,7 +2456,6 @@ cite has not changed.
   past date windows (up to 31 days per call) on demand without storing raw events.
 - **Status:** logged.
 
-<<<<<<< HEAD
 ## P-090: Google Workspace MCP migration, AI Calendar consent, retention, longitudinal review, and travel Chat
 
 - **Change:** locked November 25, 2026 (`docs/DECISIONS.md`, 2026-11-25; `docs/LEGAL.md` L-027;
