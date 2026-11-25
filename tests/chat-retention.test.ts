@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
-import { finishChatReply } from "@/lib/db/chat.repo";
+import { finishChatReply, markChatConversationGoogleCalendarTouched } from "@/lib/db/chat.repo";
 import {
   computeSummaryGoogleCalendarExpiresAt,
   filterChatHistoryForRetention,
 } from "@/lib/services/chat/chat.service";
-import { liveChatConnectorReads } from "@/lib/services/chat/chat-executor";
+import { createLiveChatExecutor, liveChatConnectorReads } from "@/lib/services/chat/chat-executor";
+import type { IntegrationContext } from "@/lib/integrations/request-context";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 
 const mockGetDailyCalendarLoadForUser = vi.fn();
@@ -115,5 +116,70 @@ describe("Chat summary retention leak & list_calendar_load false-positive stampi
     // Range is within last 30 days so no ephemeral MCP read is triggered, and persisted rows are Outlook-only.
     await reads.calendarLoad!("2026-11-20", "2026-11-25");
     expect(onGoogleCalendarRead).not.toHaveBeenCalled();
+  });
+
+  it("does NOT overwrite a previously stamped google_calendar_grant_generation with null (H3)", async () => {
+    const convUpdates: Array<Record<string, unknown>> = [];
+    const client = {
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: {
+                google_calendar_first_touched_at: "2026-11-20T10:00:00.000Z",
+                summary_google_calendar_expires_at: "2026-12-20T10:00:00.000Z",
+              },
+              error: null,
+            }),
+          }),
+        }),
+        update: (payload: Record<string, unknown>) => {
+          if (table === "chat_conversations") convUpdates.push(payload);
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    } as unknown as AppSupabaseClient;
+
+    await markChatConversationGoogleCalendarTouched(client, {
+      conversationId: "conv-1",
+      replyId: "reply-2",
+      grantGeneration: null,
+      touchedAt: "2026-11-25T10:00:00.000Z",
+    });
+
+    expect(convUpdates).toHaveLength(1);
+    expect("google_calendar_grant_generation" in convUpdates[0]!).toBe(false);
+  });
+
+  it("preserves the real grant generation during plan_travel_horizon instead of clobbering with null (H3)", async () => {
+    const observedGenerations: Array<number | null> = [];
+    const onGoogleCalendarRead = (gen: number | null) => {
+      observedGenerations.push(gen);
+    };
+
+    const executor = createLiveChatExecutor({
+      context: { userId: "user-1", supabase: {} } as unknown as IntegrationContext,
+      sources: { notes: true, googleCalendar: true, outlookCalendar: false, icloudCalendar: false, hevy: false },
+      reads: {
+        calendarEvents: async () => ({ events: [], sources: [] }),
+        workouts: async () => ({ workouts: [], sources: [] }),
+        travelHorizonData: async () => {
+          // Simulates readSource("googleCalendar") stamping the real generation
+          onGoogleCalendarRead(7);
+          return {
+            trips: [],
+            occurrences: [],
+            sources: [{ source: "googleCalendar", state: "read" }],
+          };
+        },
+      },
+      today: () => "2026-11-25",
+      timezone: "UTC",
+      onGoogleCalendarRead,
+    });
+
+    const result = await executor("plan_travel_horizon", { horizon_days: 7 }, { idempotencyKey: null });
+    expect(result.ok).toBe(true);
+    expect(observedGenerations).toEqual([7]);
   });
 });

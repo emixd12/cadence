@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -306,5 +310,168 @@ describe("model-armor.service", () => {
       screenedBy: "model_armor",
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("reads VERCEL_OIDC_TOKEN_FILE from disk and sends x-goog-user-project header", async () => {
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const jwtPayload = Buffer.from(JSON.stringify({
+      iss: "https://oidc.vercel.com/cadence",
+      aud: "https://vercel.com/cadence",
+      sub: "owner:cadence:project:cadence:environment:production",
+      owner_id: "owner_1",
+      project_id: "prj_1",
+      environment: "production",
+      iat: nowSeconds - 10,
+      nbf: nowSeconds - 10,
+      exp: nowSeconds + 600,
+    })).toString("base64url");
+    const subjectToken = `eyJhbGciOiJSUzI1NiJ9.${jwtPayload}.sig-file`;
+
+    const tempDir = await mkdtemp(join(tmpdir(), "cadence-ma-oidc-"));
+    const tokenFile = join(tempDir, "oidc.jwt");
+    await writeFile(tokenFile, `  ${subjectToken}\n`, "utf8");
+
+    try {
+      const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+        const target = String(url);
+        if (target === "https://sts.googleapis.com/v1/token") {
+          return new Response(
+            JSON.stringify({ access_token: "fed-file-token", token_type: "Bearer" }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (new URL(target).hostname === "iamcredentials.googleapis.com") {
+          return new Response(
+            JSON.stringify({
+              accessToken: "oidc-file-ma-token",
+              expireTime: new Date(Date.now() + 900_000).toISOString(),
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        const headers = new Headers(init?.headers);
+        expect(headers.get("authorization")).toBe("Bearer oidc-file-ma-token");
+        expect(headers.get("x-goog-user-project")).toBe("habit-tracker-498717");
+        return new Response(
+          JSON.stringify({ sanitizationResult: { filterMatchState: "NO_MATCH_FOUND" } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      });
+
+      const result = await screenExternalCalendarTextWithModelArmor({
+        text: "Dentist follow-up",
+        env: {
+          NODE_ENV: "test",
+          CADENCE_MODEL_ARMOR_LOCATION: "us-east1",
+          CADENCE_MODEL_ARMOR_TEMPLATE: "cadence-calendar-mcp-screen",
+          GOOGLE_CLOUD_PROJECT_ID: "habit-tracker-498717",
+          GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER:
+            "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-oidc",
+          GOOGLE_CLOUD_TRAVEL_SERVICE_ACCOUNT_EMAIL:
+            "cadence-travel@habit-tracker-498717.iam.gserviceaccount.com",
+          CADENCE_TRAVEL_VERCEL_OIDC_ISSUER: "https://oidc.vercel.com/cadence",
+          CADENCE_TRAVEL_VERCEL_OIDC_AUDIENCE: "https://vercel.com/cadence",
+          CADENCE_TRAVEL_VERCEL_OIDC_SUBJECT: "owner:cadence:project:cadence:environment:production",
+          CADENCE_TRAVEL_VERCEL_OIDC_OWNER_ID: "owner_1",
+          CADENCE_TRAVEL_VERCEL_OIDC_PROJECT_ID: "prj_1",
+          CADENCE_TRAVEL_VERCEL_OIDC_ENVIRONMENT: "production",
+          VERCEL_OIDC_TOKEN_FILE: tokenFile,
+        },
+        fetch: fetchMock,
+      });
+
+      expect(result).toEqual({
+        text: "Dentist follow-up",
+        blocked: false,
+        screenedBy: "model_armor",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("performs at most 1 STS and 1 IAM token exchange when screening a multi-event snapshot", async () => {
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const jwtPayload = Buffer.from(JSON.stringify({
+      iss: "https://oidc.vercel.com/cadence",
+      aud: "https://vercel.com/cadence",
+      sub: "owner:cadence:project:cadence:environment:production",
+      owner_id: "owner_1",
+      project_id: "prj_1",
+      environment: "production",
+      iat: nowSeconds - 10,
+      nbf: nowSeconds - 10,
+      exp: nowSeconds + 600,
+    })).toString("base64url");
+    const subjectToken = `eyJhbGciOiJSUzI1NiJ9.${jwtPayload}.sig-batch`;
+
+    let stsCalls = 0;
+    let iamCalls = 0;
+    let modelArmorCalls = 0;
+
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const target = String(url);
+      const hostname = new URL(target).hostname;
+      if (hostname === "sts.googleapis.com") {
+        stsCalls += 1;
+        return new Response(
+          JSON.stringify({ access_token: "fed-batch-token", token_type: "Bearer" }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (hostname === "iamcredentials.googleapis.com") {
+        iamCalls += 1;
+        return new Response(
+          JSON.stringify({
+            accessToken: "oidc-batch-ma-token",
+            expireTime: new Date(Date.now() + 900_000).toISOString(),
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      modelArmorCalls += 1;
+      return new Response(
+        JSON.stringify({ sanitizationResult: { filterMatchState: "NO_MATCH_FOUND" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const baseEvent = SAMPLE_SNAPSHOT.events[0]!;
+    const threeEventSnapshot: ExternalEventSnapshotV1 = {
+      ...SAMPLE_SNAPSHOT,
+      events: [
+        { ...baseEvent, id: "evt-1", title: "Standup", location: "Room A", calendarName: "Work" },
+        { ...baseEvent, id: "evt-2", title: "Lunch", location: "Cafe", calendarName: "Personal" },
+        { ...baseEvent, id: "evt-3", title: "1:1", location: "Zoom", calendarName: "Work" },
+      ],
+    };
+
+    const result = await screenSnapshotWithModelArmor(threeEventSnapshot, {
+      env: {
+        NODE_ENV: "test",
+        CADENCE_MODEL_ARMOR_LOCATION: "us-east1",
+        CADENCE_MODEL_ARMOR_TEMPLATE: "cadence-calendar-mcp-screen",
+        GOOGLE_CLOUD_PROJECT_ID: "habit-tracker-498717",
+        GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER:
+          "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/vercel-pool/providers/vercel-oidc",
+        GOOGLE_CLOUD_TRAVEL_SERVICE_ACCOUNT_EMAIL:
+          "cadence-travel@habit-tracker-498717.iam.gserviceaccount.com",
+        CADENCE_TRAVEL_VERCEL_OIDC_ISSUER: "https://oidc.vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_AUDIENCE: "https://vercel.com/cadence",
+        CADENCE_TRAVEL_VERCEL_OIDC_SUBJECT: "owner:cadence:project:cadence:environment:production",
+        CADENCE_TRAVEL_VERCEL_OIDC_OWNER_ID: "owner_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_PROJECT_ID: "prj_1",
+        CADENCE_TRAVEL_VERCEL_OIDC_ENVIRONMENT: "production",
+        VERCEL_OIDC_TOKEN: subjectToken,
+      },
+      fetch: fetchMock,
+    });
+
+    expect(result.screenedBy).toBe("model_armor");
+    expect(result.blockedCount).toBe(0);
+    expect(stsCalls).toBe(1);
+    expect(iamCalls).toBe(1);
+    expect(modelArmorCalls).toBe(9);
   });
 });

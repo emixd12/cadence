@@ -774,7 +774,7 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" state={connectorUnavailableSectionState(connectors.unavailableReason)} reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefState={dailyBriefClient ? undefined : connectorUnavailableSectionState(connectors.unavailableReason)}
-        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop onConnectGoogleCalendarAi={calendar.coordinator ? () => { void calendar.coordinator!.ai.beginConnect(); } : undefined} />}
+        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop onConnectGoogleCalendarAi={calendar.coordinator ? () => calendar.coordinator!.ai.beginConnect() : undefined} />}
         chatGptPlanControls={accountChatGpt && dailyBriefClient && !accountBusy ? <ChatGptPlanSettings key={`chatgpt-${accountUserId}`} connection={accountChatGpt} connect={accountChatGpt.connect} openUsage={openChatGptUsage} /> : undefined}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
           leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} homeLookupClient={homeLookupClient} />}

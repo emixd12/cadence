@@ -94,7 +94,7 @@ export class BriefMoveError extends Error {
 
 /** The person's own session, and the Daily Brief's agent client for the same person. */
 export type BriefMoveCallers = Readonly<{
-  person: OccurrenceMoveCaller;
+  person: OccurrenceMoveCaller & Readonly<{ user?: CalendarCaller["user"] }>;
   /** Created on first use: answers that move nothing never mint an agent token. */
   agent: () => Promise<AppSupabaseClient>;
   travelSecrets: TravelConclusionsSecrets;
@@ -924,10 +924,9 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
       continue;
     }
     positions.set(row.occurrence_id, { start: Temporal.Instant.from(candidate.to.startAt), end: Temporal.Instant.from(candidate.to.endAt) });
-    const prevRow = row as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
-    const resolvedGeneration = serverCalendar.googleCalendarGrantGeneration ?? prevRow.google_calendar_grant_generation ?? null;
-    const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevRow.contains_google_calendar === true && resolvedGeneration !== null);
-    const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
+    const prevGoogle = (row as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+    const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevGoogle && serverCalendar.googleCalendarGrantGeneration !== null);
+    const googleCalendarGrantGeneration = containsGoogleCalendar ? serverCalendar.googleCalendarGrantGeneration : null;
     const [saved] = await saveBriefProposals(await callers.agent(), {
       runId: row.agent_run_id, localDate: row.local_date, refresh: false, candidates: [candidate],
       replaces: new Map([[item.occurrenceId, row.id]]),
@@ -1090,10 +1089,9 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     travel: stop ? "checked" : old.travel === "checked" ? "not_checked" : old.travel,
     calendarDerived: (proposal.line as { calendarDerived?: boolean } | null)?.calendarDerived ?? false,
   };
-  const prevProposal = proposal as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
-  const resolvedGeneration = serverCalendar.googleCalendarGrantGeneration ?? prevProposal.google_calendar_grant_generation ?? null;
-  const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevProposal.contains_google_calendar === true && resolvedGeneration !== null);
-  const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
+  const prevGoogle = (proposal as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+  const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevGoogle && serverCalendar.googleCalendarGrantGeneration !== null);
+  const googleCalendarGrantGeneration = containsGoogleCalendar ? serverCalendar.googleCalendarGrantGeneration : null;
   const [line] = await saveBriefProposals(await callers.agent(), {
     runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false, candidates: [candidate],
     replaces: new Map([[item.occurrenceId, proposal.id]]),
@@ -1169,7 +1167,7 @@ function travelInput(callers: BriefMoveCallers, localDate: string) {
 }
 
 async function resolveBriefCalendarBusy(
-  person: OccurrenceMoveCaller,
+  person: BriefMoveCallers["person"],
   localDate: string,
   context: BriefPlanningContext,
 ): Promise<BriefServerCalendarBusyResult> {
@@ -1180,7 +1178,7 @@ async function resolveBriefCalendarBusy(
       googleCalendarGrantGeneration: null,
     };
   }
-  return readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now });
+  return readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now, user: person.user });
 }
 
 /** The same Accept all key always gives the same batch. */

@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { sanitizeGoogleCalendarText } from "@/lib/services/google-calendar-provider";
 import {
@@ -91,11 +93,56 @@ export function isModelArmorConfigured(env: NodeJS.ProcessEnv = process.env): bo
   return resolveModelArmorConfig(env) !== null;
 }
 
-function readModelArmorWorkloadIdentityConfig(
+const MAX_WORKLOAD_IDENTITY_CONFIG_CACHE_ENTRIES = 16;
+const workloadIdentityConfigCache = new Map<string, GoogleWorkloadIdentityConfig>();
+
+async function readVercelOidcTokenFromRequestHeaders(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    const headerList = await headers();
+    const token = headerList.get("x-vercel-oidc-token")?.trim();
+    return token ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveVercelOidcSubjectToken(
   sourceEnv: NodeJS.ProcessEnv,
+  explicitEnvOverride: boolean,
   vercelOidcToken?: string | null,
-): GoogleWorkloadIdentityConfig | null {
-  const subjectToken = (vercelOidcToken ?? readEnvVar(sourceEnv, "VERCEL_OIDC_TOKEN"))?.trim() || null;
+): Promise<string | null> {
+  const explicitToken = vercelOidcToken?.trim();
+  if (explicitToken) return explicitToken;
+
+  if (!explicitEnvOverride || sourceEnv.VERCEL === "1") {
+    const headerToken = await readVercelOidcTokenFromRequestHeaders();
+    if (headerToken) return headerToken;
+  }
+
+  const tokenFile = readEnvVar(sourceEnv, "VERCEL_OIDC_TOKEN_FILE");
+  if (tokenFile) {
+    try {
+      const fileToken = (await readFile(tokenFile, "utf8")).trim();
+      if (fileToken) return fileToken;
+    } catch {
+      // Fall through to VERCEL_OIDC_TOKEN env var.
+    }
+  }
+
+  return readEnvVar(sourceEnv, "VERCEL_OIDC_TOKEN") ?? null;
+}
+
+async function readModelArmorWorkloadIdentityConfig(
+  sourceEnv: NodeJS.ProcessEnv,
+  explicitEnvOverride: boolean,
+  vercelOidcToken?: string | null,
+): Promise<GoogleWorkloadIdentityConfig | null> {
+  const subjectToken = await resolveVercelOidcSubjectToken(
+    sourceEnv,
+    explicitEnvOverride,
+    vercelOidcToken,
+  );
   const values = [
     readEnvVar(sourceEnv, "GOOGLE_CLOUD_PROJECT_ID"),
     readEnvVar(sourceEnv, "GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER"),
@@ -111,7 +158,11 @@ function readModelArmorWorkloadIdentityConfig(
   if (!values.every((value): value is string => typeof value === "string" && value.length > 0)) {
     return null;
   }
-  return {
+  const cacheKey = `${values[1]}|${values[2]}|${values[3]}`;
+  const cached = workloadIdentityConfigCache.get(cacheKey);
+  if (cached) return cached;
+
+  const config: GoogleWorkloadIdentityConfig = {
     projectId: values[0]!,
     provider: values[1]!,
     serviceAccountEmail: values[2]!,
@@ -123,10 +174,21 @@ function readModelArmorWorkloadIdentityConfig(
     expectedProjectId: values[8]!,
     expectedEnvironment: values[9]!,
   };
+  if (workloadIdentityConfigCache.size >= MAX_WORKLOAD_IDENTITY_CONFIG_CACHE_ENTRIES) {
+    const oldestKey = workloadIdentityConfigCache.keys().next().value;
+    if (oldestKey !== undefined) workloadIdentityConfigCache.delete(oldestKey);
+  }
+  workloadIdentityConfigCache.set(cacheKey, config);
+  return config;
 }
 
+type ModelArmorTokenResolutionInput = Pick<
+  ModelArmorScreenTextInput,
+  "env" | "accessToken" | "getAccessToken" | "vercelOidcToken" | "fetch" | "signal" | "timeoutMs"
+>;
+
 async function resolveModelArmorAccessToken(
-  input: ModelArmorScreenTextInput,
+  input: ModelArmorTokenResolutionInput,
   sourceEnv: NodeJS.ProcessEnv,
 ): Promise<string | null> {
   if (input.accessToken) return input.accessToken;
@@ -137,7 +199,11 @@ async function resolveModelArmorAccessToken(
   const envToken = readEnvVar(sourceEnv, "CADENCE_MODEL_ARMOR_ACCESS_TOKEN");
   if (envToken) return envToken;
 
-  const workloadIdentity = readModelArmorWorkloadIdentityConfig(sourceEnv, input.vercelOidcToken);
+  const workloadIdentity = await readModelArmorWorkloadIdentityConfig(
+    sourceEnv,
+    input.env !== undefined,
+    input.vercelOidcToken,
+  );
   if (!workloadIdentity) return null;
 
   try {
@@ -293,6 +359,31 @@ export async function screenSnapshotWithModelArmor(
   }
 
   const emitEvent = options.reportEvent ?? reportMonitoringEvent;
+  const sourceEnv = options.env ?? process.env;
+  const hasFieldsToScreen = snapshot.events.some(
+    (event) => Boolean(event.title || event.location || event.calendarName),
+  );
+  const resolvedAccessToken = hasFieldsToScreen
+    ? await resolveModelArmorAccessToken(
+        {
+          env: options.env,
+          accessToken: options.accessToken,
+          getAccessToken: options.getAccessToken,
+          vercelOidcToken: options.vercelOidcToken,
+          fetch: options.fetch,
+          signal: options.signal,
+          timeoutMs: options.timeoutMs,
+        },
+        sourceEnv,
+      )
+    : null;
+  const fieldAuthOptions = resolvedAccessToken
+    ? { accessToken: resolvedAccessToken }
+    : {
+        accessToken: undefined,
+        getAccessToken: undefined,
+        vercelOidcToken: undefined,
+      };
   let blockedCount = 0;
   let anyModelArmorCall = false;
 
@@ -305,9 +396,7 @@ export async function screenSnapshotWithModelArmor(
             maximumLength: 1_024,
             html: false,
             env: options.env,
-            accessToken: options.accessToken,
-            getAccessToken: options.getAccessToken,
-            vercelOidcToken: options.vercelOidcToken,
+            ...fieldAuthOptions,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
@@ -322,9 +411,7 @@ export async function screenSnapshotWithModelArmor(
             maximumLength: 2_048,
             html: false,
             env: options.env,
-            accessToken: options.accessToken,
-            getAccessToken: options.getAccessToken,
-            vercelOidcToken: options.vercelOidcToken,
+            ...fieldAuthOptions,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
@@ -339,9 +426,7 @@ export async function screenSnapshotWithModelArmor(
             maximumLength: 1_024,
             html: false,
             env: options.env,
-            accessToken: options.accessToken,
-            getAccessToken: options.getAccessToken,
-            vercelOidcToken: options.vercelOidcToken,
+            ...fieldAuthOptions,
             fetch: options.fetch,
             signal: options.signal,
             timeoutMs: options.timeoutMs,

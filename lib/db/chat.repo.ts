@@ -149,14 +149,18 @@ export async function markChatConversationGoogleCalendarTouched(
     ? existingExpires
     : expiresAt;
 
+  const convPatch: Record<string, unknown> = {
+    google_calendar_first_touched_at: firstTouchedAt,
+    summary_google_calendar_expires_at: effectiveExpiresAt,
+  };
+  if (input.grantGeneration !== null) {
+    convPatch.google_calendar_grant_generation = input.grantGeneration;
+  }
+
   const [{ error: convError }, { error: msgError }] = await Promise.all([
     untypedClient
       .from("chat_conversations")
-      .update({
-        google_calendar_first_touched_at: firstTouchedAt,
-        google_calendar_grant_generation: input.grantGeneration,
-        summary_google_calendar_expires_at: effectiveExpiresAt,
-      })
+      .update(convPatch)
       .eq("id", input.conversationId),
     untypedClient
       .from("chat_messages")

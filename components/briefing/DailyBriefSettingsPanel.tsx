@@ -82,7 +82,7 @@ export function DailyBriefSettingsPanel({
 }: Readonly<{
   client?: DailyBriefClient | null;
   desktop?: boolean;
-  onConnectGoogleCalendarAi?: () => void;
+  onConnectGoogleCalendarAi?: () => Promise<void> | void;
 }>) {
   const resolvedClient = useMemo(() => client === undefined ? createWebDailyBriefClient() : client, [client]);
   const [settings, setSettings] = useState<DailyBriefSettings>();
@@ -204,6 +204,21 @@ export function DailyBriefSettingsPanel({
     </div>;
   };
 
+  const handleConnectAiCalendar = async () => {
+    const connect = onConnectGoogleCalendarAi
+      ?? (webGoogleCalendarCoordinator.ai ? () => webGoogleCalendarCoordinator.ai!.beginConnect() : null);
+    if (!connect) return;
+    setConnectingAiCalendar(true);
+    setError("");
+    try {
+      await connect();
+    } catch {
+      setError("Google Calendar for AI could not start connecting. Try again.");
+    } finally {
+      setConnectingAiCalendar(false);
+    }
+  };
+
   return (
     <SettingsPanel title={AI_FEATURES_TITLE}>
       {!settings ? <p role="status" className="text-sm text-muted-readable">{error || "Loading AI settings…"}</p> : <div className="grid gap-3 text-sm leading-6">
@@ -255,18 +270,7 @@ export function DailyBriefSettingsPanel({
             <button
               type="button"
               disabled={connectingAiCalendar}
-              onClick={() => {
-                if (onConnectGoogleCalendarAi) {
-                  onConnectGoogleCalendarAi();
-                  return;
-                }
-                if (!webGoogleCalendarCoordinator.ai) return;
-                setConnectingAiCalendar(true);
-                setError("");
-                void webGoogleCalendarCoordinator.ai.beginConnect().catch(() => {
-                  setError("Google Calendar for AI could not start connecting. Try again.");
-                }).finally(() => setConnectingAiCalendar(false));
-              }}
+              onClick={() => { void handleConnectAiCalendar(); }}
               className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold"
             >
               {connectingAiCalendar ? "Opening Google Calendar for AI…" : "Connect Google Calendar for AI"}

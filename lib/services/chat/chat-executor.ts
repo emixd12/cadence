@@ -120,6 +120,14 @@ export function liveChatConnectorReads(
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
           : await getIcloudCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true });
+      if (
+        source === "googleCalendar" &&
+        read.result.ok &&
+        Array.isArray(read.result.snapshot.requestedRange?.selectedCalendarIds) &&
+        read.result.snapshot.requestedRange.selectedCalendarIds.length === 0
+      ) {
+        return { events: [], report: { source, state: "no_calendars" } };
+      }
       if (source === "googleCalendar") {
         await readOptions.onGoogleCalendarRead?.(extractGrantGeneration(read));
       }
@@ -174,7 +182,12 @@ export function liveChatConnectorReads(
         let mergedDays = result.days;
         const hasPersistedGoogle = result.days.some((day) => day.sources.includes("google_calendar"));
         if (hasPersistedGoogle) {
-          await readOptions.onGoogleCalendarRead?.(null);
+          const rows = Array.isArray((result as { rows?: unknown }).rows)
+            ? (result as { rows: ReadonlyArray<{ source?: string; connection_generation?: number | null }> }).rows
+            : [];
+          const googleRows = rows.filter((row) => row.source === "google_calendar");
+          const generation = googleRows.find((r) => typeof r.connection_generation === "number")?.connection_generation ?? null;
+          await readOptions.onGoogleCalendarRead?.(generation);
         }
         if (sources.googleCalendar) {
           const ephemeral = await computeEphemeralGoogleCalendarLoad(
@@ -339,13 +352,12 @@ export function liveChatConnectorReads(
       try {
         const { data: moves } = await caller.client
           .from("occurrence_moves")
-          .select("kind, reason, local_date, occurrence_id, occurrences!occurrence_moves_occurrence_id_fkey(behavior_id)")
+          .select("kind, reason, local_date, behavior_id")
           .eq("user_id", caller.user.id)
           .gte("local_date", startStr)
           .lte("local_date", endStr);
         proposalOutcomes = (moves ?? []).flatMap((row) => {
-          const nested = row.occurrences as { behavior_id?: string } | null;
-          const behaviorId = nested?.behavior_id;
+          const behaviorId = row.behavior_id;
           if (!behaviorId || !row.local_date) return [];
           const outcome = row.kind === "revert" ? "undo" : "yes";
           const travelMotivated = typeof row.reason === "string" && row.reason.toLowerCase().includes("travel");
@@ -442,7 +454,7 @@ export function createLiveChatExecutor(input: Readonly<{
     if (name === "list_calendar_load") return calendarLoadTool(input.reads, args);
     if (name === "list_workouts") return workoutsTool(input.reads, args);
     if (name === "plan_travel_horizon") {
-      return travelHorizonTool(input.reads, args, input.today(), timezone, input.onTravelCards, input.onGoogleCalendarRead);
+      return travelHorizonTool(input.reads, args, input.today(), timezone, input.onTravelCards);
     }
     if (name === "get_longitudinal_patterns") {
       return longitudinalPatternsTool(input.reads, args, input.today());
@@ -722,7 +734,6 @@ async function travelHorizonTool(
   today: string,
   timezone: string,
   onTravelCards?: (cards: readonly ChatTravelUiCard[]) => void,
-  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>,
 ): Promise<ChatToolResult> {
   const requestedDays = typeof args.horizon_days === "number" && Number.isFinite(args.horizon_days)
     ? Math.max(1, Math.min(7, Math.trunc(args.horizon_days)))
@@ -730,9 +741,6 @@ async function travelHorizonTool(
   const data = reads.travelHorizonData
     ? await reads.travelHorizonData(requestedDays)
     : { trips: [], occurrences: [], sources: [] };
-  if (data.sources?.some((s) => s.source === "googleCalendar" && (s.state === "read" || s.state === "partial"))) {
-    await onGoogleCalendarRead?.(null);
-  }
   const horizon = resolveChatTravelHorizon({
     now: Temporal.Now.instant(),
     timezone,
@@ -933,26 +941,75 @@ async function moveOccurrenceToDateTool(
   }
 
   const newStartIso = newStartInstant.toString();
-  const newEndIso = durationSeconds !== null ? newStartInstant.add({ seconds: durationSeconds }).toString() : null;
+  const effectiveStartIso = durationSeconds !== null ? newStartIso : null;
+  const effectiveEndIso = durationSeconds !== null ? newStartInstant.add({ seconds: durationSeconds }).toString() : null;
 
-  const { data: updated, error: updateError } = await context.supabase
-    .from("occurrences")
-    .update({
-      local_date: targetLocalDate,
-      scheduled_for: newStartIso,
-      effective_start_at: newStartIso,
-      effective_end_at: newEndIso,
-    })
-    .eq("id", occurrenceId)
-    .eq("user_id", context.userId)
-    .eq("updated_at", occurrence.updated_at)
-    .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, updated_at")
-    .maybeSingle();
+  type MoveOccurrenceRpcResult =
+    | {
+        ok: true;
+        occurrence: {
+          id: string;
+          behavior_id: string;
+          local_date: string;
+          scheduled_for: string;
+          effective_start_at: string | null;
+          effective_end_at: string | null;
+          updated_at: string;
+        };
+        previous: {
+          local_date: string;
+          scheduled_for: string;
+          effective_start_at: string | null;
+          effective_end_at: string | null;
+        };
+      }
+    | {
+        ok: false;
+        reason: "not_found" | "already_resolved" | "revision_changed";
+      };
 
-  if (updateError) {
+  const rpcClient = context.supabase as unknown as {
+    rpc: (
+      fn: "move_occurrence_to_date",
+      params: {
+        p_occurrence_id: string;
+        p_target_local_date: string;
+        p_new_scheduled_for: string;
+        p_new_effective_start_at: string | null;
+        p_new_effective_end_at: string | null;
+        p_expected_revision: string;
+      },
+    ) => Promise<{ data: MoveOccurrenceRpcResult | null; error: unknown }>;
+  };
+
+  const { data: rpcResult, error: rpcError } = await rpcClient.rpc("move_occurrence_to_date", {
+    p_occurrence_id: occurrenceId,
+    p_target_local_date: targetLocalDate,
+    p_new_scheduled_for: newStartIso,
+    p_new_effective_start_at: effectiveStartIso,
+    p_new_effective_end_at: effectiveEndIso,
+    p_expected_revision: expectedRevision,
+  });
+
+  if (rpcError || !rpcResult) {
     return { ok: false, error: { code: "failed", message: "Could not move that item." } };
   }
-  if (!updated) {
+  if (!rpcResult.ok) {
+    if (rpcResult.reason === "not_found") {
+      return { ok: false, error: { code: "not_found", message: "Occurrence not found." } };
+    }
+    if (rpcResult.reason === "already_resolved") {
+      return {
+        ok: true,
+        result: {
+          outcome: "refused",
+          refusal: {
+            reason: "already_resolved",
+            message: "That item is already marked, so it cannot be moved.",
+          },
+        },
+      };
+    }
     return {
       ok: true,
       result: {
@@ -965,6 +1022,7 @@ async function moveOccurrenceToDateTool(
     };
   }
 
+  const updated = rpcResult.occurrence;
   return {
     ok: true,
     result: {
@@ -978,16 +1036,11 @@ async function moveOccurrenceToDateTool(
         scheduled_for: updated.scheduled_for,
         effective_start_at: updated.effective_start_at,
         effective_end_at: updated.effective_end_at,
-        status: updated.status,
+        status: "unresolved",
         updated_at: updated.updated_at,
         revision: updated.updated_at,
       },
-      previous: {
-        local_date: occurrence.local_date,
-        scheduled_for: occurrence.scheduled_for,
-        effective_start_at: occurrence.effective_start_at,
-        effective_end_at: occurrence.effective_end_at,
-      },
+      previous: rpcResult.previous,
     },
   };
 }

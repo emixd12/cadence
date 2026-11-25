@@ -220,7 +220,7 @@ it("returns an empty complete snapshot without calling MCP events when 0 AI cale
   repo.readCalendarCredential.mockResolvedValue(
     sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }),
   );
-  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
+  const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
   mcpProvider.listGoogleCalendarMcpCalendars.mockResolvedValue([{ id: "work", name: "Work", timezone: "UTC", primary: true, selected: true, accessRole: "owner" }]);
   const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "UTC" }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
   const today = Temporal.Now.instant().toZonedDateTimeISO("UTC").toPlainDate().toString();
@@ -231,5 +231,7 @@ it("returns an empty complete snapshot without calling MCP events when 0 AI cale
     expect(read.result.snapshot.coverage).toEqual([]);
     expect(read.result.snapshot.requestedRange.selectedCalendarIds).toEqual([]);
   }
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(mcpProvider.listGoogleCalendarMcpCalendars).not.toHaveBeenCalled();
   expect(mcpProvider.readGoogleCalendarMcpEvents).not.toHaveBeenCalled();
 });

@@ -4,7 +4,10 @@ import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolve
 import { buildTravelEventRevisionFingerprint } from "@cadence/core/resolvers/travel-horizon.resolver";
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import { overlapsTravelSpans, projectBriefTravelGuidance, type BriefTravelEvidence } from "@cadence/core/services/brief-travel-guidance";
+import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorTravelContext } from "@cadence/core/types/briefing-travel";
 import type { DepartureStop } from "@cadence/core/types/departure";
+import { withSuppliedConclusions } from "@/lib/services/briefing-account-context.service";
 
 // Dentist 15:00–16:00Z. Outbound leg leaves 14:30Z; return leg leaves 16:10Z; walk occurrence 14:45Z collides with outbound travel.
 const provenance = { originRef: "o", originSource: "device", originRevision: "1", destinationRef: "d", destinationSource: "calendar", destinationRevision: "1", grantRevision: "g" } as never;
@@ -122,6 +125,77 @@ describe("brief travel guidance", () => {
     expect(phrases(projectBriefTravelGuidance(input(evidence(), "2026-09-21T15:45:00Z")))).toEqual(["Last estimate: head home 12:10 PM · checked 9:00 AM."]);
     // After the trip home arrives nothing is left to say.
     expect(phrases(projectBriefTravelGuidance(input(evidence(), "2026-09-21T16:45:00Z")))).toEqual([]);
+  });
+
+  it("matches located calendar event fingerprint via eventLocationsByRef sidecar on location-stripped AdvisorDayContext and rejects when location changes", () => {
+    const makeOpaqueRef = (kind: string, value: string) => `${kind}_${value}`;
+    const eventRef = makeOpaqueRef("event", "primary\0evt-1");
+    const fingerprint = buildTravelEventRevisionFingerprint({
+      source: "google_calendar",
+      calendarId: "primary",
+      eventId: "evt-1",
+      startAt: "2026-09-21T15:00:00Z",
+      endAt: "2026-09-21T16:00:00Z",
+      location: "123 Main St",
+      status: "confirmed",
+      availability: "busy",
+    });
+    const strippedContext = {
+      connectors: [
+        {
+          source: "google_calendar",
+          state: "current",
+          complete: true,
+          events: [
+            {
+              ref: eventRef,
+              revision: "revision_evt-1",
+              interval: { kind: "timed", startAt: "2026-09-21T15:00:00Z", endAt: "2026-09-21T16:00:00Z" },
+              state: "confirmed",
+              availability: "busy",
+              // Note: location is intentionally omitted on AdvisorDayContext events!
+            },
+          ],
+        },
+      ],
+    } as unknown as AdvisorDayContext;
+    const travel: AdvisorTravelContext = {
+      version: "1.0",
+      routing: "on",
+      usualMode: "driving",
+      behaviors: [],
+      route: { state: "unavailable", reason: "not_supplied" },
+    };
+    const supplied = {
+      v: 2 as const,
+      sub: "user-1",
+      date: "2026-09-21",
+      src: "src-1",
+      iat: "2026-09-21T12:00:00Z",
+      exp: "2026-09-21T13:00:00Z",
+      googleSource: "agent_mcp" as const,
+      conclusions: {
+        version: "2.0" as const,
+        travelDay: "yes" as const,
+        calendarEvents: true,
+        trips: [{ destinationRef: "event:primary\0evt-1", role: "outbound" as const, mode: "driving" as const, estimate: "current" as const }],
+        fits: [],
+      },
+      weather: null,
+      events: { "event:primary\0evt-1": fingerprint },
+      stops: { outlook_calendar: false, icloud_calendar: false },
+      takingPart: ["google_calendar"] as const,
+    };
+
+    const matched = withSuppliedConclusions(strippedContext, travel, supplied, makeOpaqueRef, new Map([[eventRef, "123 Main St"]]));
+    expect(matched.route).toMatchObject({
+      state: "available",
+      conclusions: { trips: [{ destinationRef: eventRef, role: "outbound" }] },
+    });
+
+    // When location changes, fingerprint fails to match and withSuppliedConclusions throws (which withTravel catches -> not_supplied).
+    expect(() => withSuppliedConclusions(strippedContext, travel, supplied, makeOpaqueRef, new Map([[eventRef, "456 Oak Ave"]]))).toThrow();
+    expect(() => withSuppliedConclusions(strippedContext, travel, supplied, makeOpaqueRef)).toThrow();
   });
 
   it("covers every existing travel mode", () => {

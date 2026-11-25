@@ -349,7 +349,7 @@ async function slotView(callers: BriefMoveCallers, localDate: string, context: B
     latestOpportunityLines(person.supabase, person.userId, localDate),
     context.calendarBusy?.length
       ? Promise.resolve<BriefServerCalendarBusyResult>({ busy: briefMoveCalendar(null, context.calendarBusy).busy, containsGoogleCalendar: false, googleCalendarGrantGeneration: null })
-      : readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now }),
+      : readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now, user: person.user }),
   ]);
   const travel = briefMoveTravel(context.travelTimes, { secrets: callers.travelSecrets, userId: person.userId, localDate, now: person.now });
   const blocks = briefOpportunityBlocks({ items: day.items, movePositions, calendarBusy: serverCalendar.busy, travel });
@@ -414,10 +414,9 @@ export async function recheckBriefOpportunities(callers: BriefMoveCallers, reque
       replaced.push({ proposalId: row.id, line: null });
       continue;
     }
-    const prevRow = row as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
-    const resolvedGeneration = view.serverCalendar.googleCalendarGrantGeneration ?? prevRow.google_calendar_grant_generation ?? null;
-    const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevRow.contains_google_calendar === true && resolvedGeneration !== null);
-    const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
+    const prevGoogle = (row as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+    const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevGoogle && view.serverCalendar.googleCalendarGrantGeneration !== null);
+    const googleCalendarGrantGeneration = containsGoogleCalendar ? view.serverCalendar.googleCalendarGrantGeneration : null;
     const [saved] = await saveBriefOpportunityProposals(await callers.agent(), {
       runId: row.agent_run_id, localDate: row.local_date, refresh: false,
       candidates: [rebuilt(line, next, more)], replaces: new Map([[row.behavior_id, row.id]]),
@@ -454,10 +453,9 @@ export async function replanBriefOpportunity(callers: BriefMoveCallers, request:
     blocks: view.blocks, travel: view.travel, limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [shown[0]!],
   });
   if (!next) return { line: null, replacedProposalId: proposal.id };
-  const prevProposal = proposal as { contains_google_calendar?: boolean | null; google_calendar_grant_generation?: number | null };
-  const resolvedGeneration = view.serverCalendar.googleCalendarGrantGeneration ?? prevProposal.google_calendar_grant_generation ?? null;
-  const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevProposal.contains_google_calendar === true && resolvedGeneration !== null);
-  const googleCalendarGrantGeneration = containsGoogleCalendar ? resolvedGeneration : null;
+  const prevGoogle = (proposal as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+  const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevGoogle && view.serverCalendar.googleCalendarGrantGeneration !== null);
+  const googleCalendarGrantGeneration = containsGoogleCalendar ? view.serverCalendar.googleCalendarGrantGeneration : null;
   const [saved] = await saveBriefOpportunityProposals(await callers.agent(), {
     runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false,
     candidates: [rebuilt(line, next, more)], replaces: new Map([[proposal.behavior_id, proposal.id]]),

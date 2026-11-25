@@ -45,9 +45,10 @@ import {
   type AdvisorAuthorizationFence,
 } from "./advisor-day-context.service";
 import { assertBriefContextFresh, DailyBriefError } from "./daily-brief-consumer";
-import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
+import { getCalendarConnection, getCalendarEventsForAdvisor, type CalendarCaller } from "./google-calendar.service";
 import { getConnectorConnection } from "./connector-credentials";
-import { getOutlookCalendarConnection } from "./outlook-calendar.service";
+import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "./outlook-calendar.service";
+import { getIcloudCalendarEventsForCaller } from "./icloud-calendar.service";
 import { readTravelCalendarConnections, travelCalendarSourcesTakingPart, travelConnectorFence } from "./travel-calendar-sources";
 
 const CLIENT_ID = "cadence-daily-brief";
@@ -167,8 +168,16 @@ export async function prepareAccountBriefingContexts(
     ? await readSuppliedTravelConclusions(caller, input.travelConclusions, capturedContexts[0]!.localDate, clock()).catch(() => null)
     : null;
   input.signal.throwIfAborted();
+  const eventLocationsByRef = supplied && Object.values(supplied.events).some((rev) => rev.startsWith("evfp:v1:"))
+    ? await readSuppliedEventLocations(caller, authorization, {
+        includeGoogleCalendar: input.includeCalendar && authorization.calendar !== null,
+        outlookCalendar: !!sources && !!authorization.outlookCalendar,
+        icloudCalendar: !!sources && !!authorization.icloudCalendar,
+      }, capturedContexts[0]!.localDate, clock(), makeOpaqueRef, input.signal)
+    : undefined;
+  input.signal.throwIfAborted();
   // Expiry is checked on admission; delivery still fences the stored inputs behind accepted conclusions.
-  const contexts = capturedContexts.map((context) => withTravel(context, travel, supplied, makeOpaqueRef));
+  const contexts = capturedContexts.map((context) => withTravel(context, travel, supplied, makeOpaqueRef, eventLocationsByRef));
   const configurationRefs = Object.fromEntries(authorization.behaviorIds.map((behaviorId) => [
     workbenchBehaviorRef(caller.user.id, behaviorId),
     makeOpaqueRef("behavior", behaviorId),
@@ -398,7 +407,7 @@ async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly 
 
 /** Keeps only Behaviors this context carries, as the strict context validator requires. */
 function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions | null,
-  makeOpaqueRef: AdvisorOpaqueRef): AdvisorDayContext {
+  makeOpaqueRef: AdvisorOpaqueRef, eventLocationsByRef?: ReadonlyMap<string, string | null>): AdvisorDayContext {
   const refs = new Set([...context.cadence.occurrences.map(({ behaviorRef }) => behaviorRef), ...context.cadence.history.behaviors.map(({ behaviorRef }) => behaviorRef)]);
   const placeLabels = travel.placeLabels ? { ...travel.placeLabels,
     behaviors: travel.placeLabels.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)),
@@ -412,12 +421,73 @@ function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, su
   };
   if (supplied) {
     try {
-      return validateVersionedAdvisorDayContext({ ...context, travel: withSuppliedConclusions(context, stored, supplied, makeOpaqueRef) });
+      return validateVersionedAdvisorDayContext({ ...context, travel: withSuppliedConclusions(context, stored, supplied, makeOpaqueRef, eventLocationsByRef) });
     } catch {
       // A token naming a commitment this context lacks, or a changed Calendar event, supplies nothing.
     }
   }
   return validateVersionedAdvisorDayContext({ ...context, travel: stored });
+}
+
+/**
+ * Private non-model sidecar: maps each calendar event's opaque ref to its raw `location`
+ * so `withSuppliedConclusions` can hash the real current location into
+ * `buildTravelEventRevisionFingerprint` while `AdvisorDayContext` stays location-free.
+ */
+async function readSuppliedEventLocations(
+  caller: CalendarCaller,
+  authorization: AdvisorAuthorizationFence,
+  sources: Readonly<{ includeGoogleCalendar: boolean; outlookCalendar: boolean; icloudCalendar: boolean }>,
+  localDate: string,
+  now: Temporal.Instant,
+  makeOpaqueRef: AdvisorOpaqueRef,
+  signal: AbortSignal,
+): Promise<ReadonlyMap<string, string | null>> {
+  const locations = new Map<string, string | null>();
+  const readGoogle = async () => {
+    if (!sources.includeGoogleCalendar || !authorization.calendar) return;
+    try {
+      const read = await getCalendarEventsForAdvisor(caller, localDate, localDate, {
+        authorizedCalendarIds: authorization.calendar.calendarIds,
+        expectedConnectionGeneration: authorization.calendar.connectionGeneration,
+        expectedSelectionRevision: authorization.calendar.selectionRevision,
+        authorizationScope: `${authorization.clientId}:${authorization.grantGeneration}`,
+        ephemeralOnly: true,
+        now,
+        signal,
+      });
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      for (const event of snapshot.events) {
+        const ref = makeOpaqueRef("event", `${event.calendarId}\0${event.providerEventId}`);
+        locations.set(ref, event.location ?? null);
+      }
+    } catch {
+      // Best-effort sidecar; missing locations fail closed in fingerprint matching.
+    }
+  };
+  const readConnector = async (provider: "outlook_calendar" | "icloud_calendar") => {
+    const fence = provider === "outlook_calendar" ? authorization.outlookCalendar : authorization.icloudCalendar;
+    const enabled = provider === "outlook_calendar" ? sources.outlookCalendar : sources.icloudCalendar;
+    if (!enabled || !fence) return;
+    try {
+      const readEvents = provider === "outlook_calendar" ? getOutlookCalendarEventsForCaller : getIcloudCalendarEventsForCaller;
+      const read = await readEvents(caller, localDate, localDate, {
+        signal,
+        authorizedCalendarIds: fence.calendarIds,
+        expectedConnectionGeneration: fence.connectionGeneration,
+        expectedSelectionRevision: fence.selectionRevision,
+      });
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      for (const event of snapshot.events) {
+        const ref = makeOpaqueRef("event", `${provider}\0${event.calendarId}\0${event.providerEventId}`);
+        locations.set(ref, event.location ?? null);
+      }
+    } catch {
+      // Best-effort sidecar; missing locations fail closed in fingerprint matching.
+    }
+  };
+  await Promise.all([readGoogle(), readConnector("outlook_calendar"), readConnector("icloud_calendar")]);
+  return locations;
 }
 
 /**
@@ -462,7 +532,7 @@ async function readCurrentTravelSource(caller: CalendarCaller, localDate: string
  * travel), its events are left out of the comparison and the other Calendars' lines stay.
  */
 export function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
-  makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
+  makeOpaqueRef: AdvisorOpaqueRef, eventLocationsByRef?: ReadonlyMap<string, string | null>): AdvisorTravelContext {
   // WS-2B (Path 3): never accept Timeline-REST Google Calendar conclusions into AI context.
   if (supplied.googleSource === "standard") {
     throw new Error("Timeline-REST Google Calendar travel conclusions are not permitted in AI context.");
@@ -537,7 +607,7 @@ export function withSuppliedConclusions(context: AdvisorDayContext, travel: Advi
         eventId: parsed.eventId,
         startAt: current.startAt ?? "",
         endAt: current.endAt,
-        location: current.location ?? null,
+        location: eventLocationsByRef?.has(ref) ? (eventLocationsByRef.get(ref) ?? null) : (current.location ?? null),
         status: current.status,
         availability: current.availability,
       });

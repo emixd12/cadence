@@ -1229,6 +1229,16 @@ begin
       return false;
     end if;
   end if;
+  if v_google_derived then
+    perform 1
+    from public.google_calendar_agent_connections as connection
+    where connection.user_id = v_user_id
+      and connection.status = 'connected'
+    for share;
+    if not found then
+      return false;
+    end if;
+  end if;
   delete from cadence_advisor_private.agent_run_contents as content
   where content.user_id = v_user_id and content.expires_at <= v_now;
   insert into cadence_advisor_private.agent_run_contents (
@@ -1340,17 +1350,29 @@ security definer
 set search_path = ''
 as $$
 begin
-  if new.google_calendar_grant_generation is not null
-    and (
-      tg_op = 'INSERT'
+  if new.google_calendar_grant_generation is not null then
+    if tg_op = 'INSERT'
       or new.google_calendar_grant_generation is distinct from old.google_calendar_grant_generation
-      or (new.summary is distinct from old.summary and new.summary is not null)
-    )
-  then
-    perform cadence_advisor_private.assert_google_calendar_agent_generation(
-      new.user_id,
-      new.google_calendar_grant_generation
-    );
+    then
+      perform cadence_advisor_private.assert_google_calendar_agent_generation(
+        new.user_id,
+        new.google_calendar_grant_generation
+      );
+    elsif tg_op = 'UPDATE'
+      and new.summary is distinct from old.summary
+      and new.summary is not null
+    then
+      if new.summary_google_calendar_expires_at is not null then
+        perform 1
+        from public.google_calendar_agent_connections as connection
+        where connection.user_id = new.user_id
+          and connection.status = 'connected'
+        for share;
+        if not found then
+          raise exception 'calendar_connection_changed' using errcode = '55000';
+        end if;
+      end if;
+    end if;
   end if;
   return new;
 end;
@@ -1364,5 +1386,103 @@ create trigger chat_conversations_google_mcp_generation_fence
   before insert or update on public.chat_conversations
   for each row
   execute function cadence_advisor_private.fence_chat_conversations_google_mcp();
+
+-- ---------------------------------------------------------------------------
+-- 7. Cross-day occurrence move RPC (SECURITY DEFINER)
+-- ---------------------------------------------------------------------------
+
+create or replace function public.move_occurrence_to_date(
+  p_occurrence_id uuid,
+  p_target_local_date date,
+  p_new_scheduled_for timestamptz,
+  p_new_effective_start_at timestamptz,
+  p_new_effective_end_at timestamptz,
+  p_expected_revision timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := (select auth.uid());
+  v_occ public.occurrences;
+  v_updated public.occurrences;
+begin
+  perform cadence_private.occurrence_move_caller('move_occurrence_to_date');
+
+  if v_user_id is null then
+    raise exception 'Occurrence moves require an authenticated user.' using errcode = '42501';
+  end if;
+
+  if p_occurrence_id is null
+    or p_target_local_date is null
+    or p_new_scheduled_for is null
+    or p_expected_revision is null
+    or ((p_new_effective_start_at is null) <> (p_new_effective_end_at is null))
+    or (p_new_effective_start_at is not null and p_new_effective_end_at < p_new_effective_start_at)
+  then
+    raise exception 'move_occurrence_to_date_invalid_input' using errcode = '22023';
+  end if;
+
+  select * into v_occ
+  from public.occurrences
+  where id = p_occurrence_id and user_id = v_user_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'reason', 'not_found');
+  end if;
+
+  if v_occ.status <> 'unresolved' then
+    return jsonb_build_object('ok', false, 'reason', 'already_resolved');
+  end if;
+
+  if v_occ.updated_at is distinct from p_expected_revision then
+    return jsonb_build_object(
+      'ok', false,
+      'reason', 'revision_changed',
+      'current_revision', v_occ.updated_at
+    );
+  end if;
+
+  perform set_config('cadence.occurrence_move_write', 'on', true);
+
+  update public.occurrences
+  set local_date = p_target_local_date,
+      scheduled_for = p_new_scheduled_for,
+      effective_start_at = p_new_effective_start_at,
+      effective_end_at = p_new_effective_end_at,
+      updated_at = statement_timestamp()
+  where id = v_occ.id and user_id = v_user_id
+  returning * into v_updated;
+
+  perform set_config('cadence.occurrence_move_write', '', true);
+
+  return jsonb_build_object(
+    'ok', true,
+    'occurrence', jsonb_build_object(
+      'id', v_updated.id,
+      'behavior_id', v_updated.behavior_id,
+      'local_date', v_updated.local_date,
+      'scheduled_for', v_updated.scheduled_for,
+      'effective_start_at', v_updated.effective_start_at,
+      'effective_end_at', v_updated.effective_end_at,
+      'updated_at', v_updated.updated_at
+    ),
+    'previous', jsonb_build_object(
+      'local_date', v_occ.local_date,
+      'scheduled_for', v_occ.scheduled_for,
+      'effective_start_at', v_occ.effective_start_at,
+      'effective_end_at', v_occ.effective_end_at
+    )
+  );
+end;
+$$;
+
+revoke all on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz, timestamptz)
+  from public, anon, authenticated, service_role;
+grant execute on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz, timestamptz)
+  to authenticated;
 
 commit;

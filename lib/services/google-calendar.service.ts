@@ -423,6 +423,49 @@ export async function getCalendarEventsForWorkbenchHistory(
 
 const pendingMcpReads = new Map<string, Promise<GoogleCalendarReadResult>>();
 
+function buildEmptyCompleteMcpSnapshot(
+  accountId: string,
+  connectionGeneration: number,
+  start: string,
+  end: string,
+  timezone: string,
+  fetchedAt: string,
+): ExternalEventSnapshotV1 {
+  return {
+    schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION,
+    adapterVersion: EXTERNAL_EVENT_ADAPTER_VERSION,
+    accountId,
+    connectionGeneration,
+    source: "google_calendar",
+    requestedRange: {
+      startLocalDate: start,
+      endLocalDate: end,
+      timezone,
+      selectedCalendarIds: [],
+    },
+    fetchedAt,
+    completeness: "complete",
+    freshness: {
+      state: "current",
+      refreshedAt: fetchedAt,
+      label: "Calendar current",
+      canAssertNoOverlap: true,
+    },
+    capabilities: {
+      calendar_listing: { support: "supported", permission: "granted", availability: "available" },
+      timed_events: { support: "supported", permission: "granted", availability: "available" },
+      all_day_events: { support: "supported", permission: "granted", availability: "available" },
+      recurrence: { support: "supported", permission: "granted", availability: "available" },
+      details: { support: "supported", permission: "granted", availability: "available" },
+      source_links: { support: "supported", permission: "granted", availability: "available" },
+    },
+    coverage: [],
+    failures: [],
+    events: [],
+    tombstones: [],
+  };
+}
+
 async function readAuthorizedMcpCalendarRange(
   caller: CalendarReadCaller,
   start: string,
@@ -455,6 +498,14 @@ async function readAuthorizedMcpCalendarRange(
   }
   if (options.authorizationScope !== undefined && (!options.authorizationScope || options.authorizationScope.length > 512)) {
     throw new CalendarConnectionError("invalid_request");
+  }
+
+  const configuredSelectedIds = connection.preferences.selectedCalendarIds.filter((id) =>
+    authorizedCalendarIds === null || authorizedCalendarIds.includes(id));
+  if (configuredSelectedIds.length === 0) {
+    const emptySnapshot = buildEmptyCompleteMcpSnapshot(caller.user.id, connection.generation, start, end, profile.timezone, now.toString());
+    await assertCurrent(caller, connection);
+    return { connection, result: { ok: true, snapshot: emptySnapshot } };
   }
 
   const rangeKey = JSON.stringify([start, end, profile.timezone, authorizedCalendarIds]);
@@ -491,40 +542,7 @@ async function readAuthorizedMcpCalendarRange(
         return calendar;
       });
       if (selected.length === 0) {
-        const emptySnapshot: ExternalEventSnapshotV1 = {
-          schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION,
-          adapterVersion: EXTERNAL_EVENT_ADAPTER_VERSION,
-          accountId: caller.user.id,
-          connectionGeneration: connection.generation,
-          source: "google_calendar",
-          requestedRange: {
-            startLocalDate: start,
-            endLocalDate: end,
-            timezone: profile.timezone,
-            selectedCalendarIds: [],
-          },
-          fetchedAt: now.toString(),
-          completeness: "complete",
-          freshness: {
-            state: "current",
-            refreshedAt: now.toString(),
-            label: "Calendar current",
-            canAssertNoOverlap: true,
-          },
-          capabilities: {
-            calendar_listing: { support: "supported", permission: "granted", availability: "available" },
-            timed_events: { support: "supported", permission: "granted", availability: "available" },
-            all_day_events: { support: "supported", permission: "granted", availability: "available" },
-            recurrence: { support: "supported", permission: "granted", availability: "available" },
-            details: { support: "supported", permission: "granted", availability: "available" },
-            source_links: { support: "supported", permission: "granted", availability: "available" },
-          },
-          coverage: [],
-          failures: [],
-          events: [],
-          tombstones: [],
-        };
-        return { ok: true, snapshot: emptySnapshot };
+        return { ok: true, snapshot: buildEmptyCompleteMcpSnapshot(caller.user.id, connection.generation, start, end, profile.timezone, now.toString()) };
       }
       const budget = consumeGoogleCalendarMcpBudget(caller.user.id, selected.length);
       if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
