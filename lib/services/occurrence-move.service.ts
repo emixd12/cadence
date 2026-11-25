@@ -18,8 +18,10 @@ import {
   type MoveRefusalReason,
 } from "@cadence/core/resolvers/move.resolver";
 import {
+  briefMoveBlocksForSubject,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
+  briefMoveOverlapSubject,
   briefMoveRoutineMembers,
   collapseBriefMoveRoutines,
   checkBriefMoveSlot,
@@ -364,16 +366,20 @@ function moveDuration(occurrence: Occurrence, day: BriefMoveDay, shown: BriefMov
 
 type SlotInputs = Readonly<{ blocks: readonly BriefMoveBlock[]; before: number; after: number }>;
 
-/** The other items (neighbouring days included), calendar events and travel spans, and the item's own travel. */
+/**
+ * The other items (neighbouring days included), calendar events and travel spans, and
+ * the item's own travel. An alongside item follows the same-place rule (Ticket 357)
+ * while `CADENCE_ALONGSIDE` is on: blocks it may share time with are left out.
+ */
 function slotInputs(occurrenceId: string, day: BriefMoveDay, calendarBusy: readonly MoveCalendarBusy[] | undefined,
   travel: BriefMoveTravelInput | null): SlotInputs {
   const stop = travel?.stops.get(occurrenceId);
   return {
-    blocks: [
+    blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId),
       ...(calendarBusy ?? []).map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
       ...travelBlocksFor(travel, occurrenceId),
-    ],
+    ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,
     after: stop?.afterSeconds ?? 0,
   };

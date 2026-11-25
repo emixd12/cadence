@@ -4,8 +4,10 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartInstant } from "@cadence/core/resolvers/time.resolver";
 import {
   BRIEF_MOVE_OTHER_TIMES,
+  briefMoveBlocksForSubject,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
+  briefMoveOverlapSubject,
   checkBriefMoveSlot,
   planBriefMoveLinesFromInputs,
   travelBlocksFor,
@@ -56,7 +58,9 @@ import { behaviorEstimateInputHash, readBriefMoveDay, type BriefMoveBehaviorFact
 import { briefMoveTravelInput, verifyTravelTimesToken } from "@/lib/services/travel-times-token";
 import { readTravelConclusionsSecrets, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
 import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
-import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
+import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
+import { alongsideGuessWanted } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
 import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
 import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
@@ -332,6 +336,10 @@ const ESTIMATE_BATCH = 40;
  * step does), under a short local ref, never an id. A failed or partial answer leaves
  * those Behaviors at the next length source (30 minutes when none). No agent client
  * (the agent caller is not configured): nothing is asked or stored.
+ *
+ * Ticket 356: with `CADENCE_ALONGSIDE` on, a Behavior the person already answered is
+ * asked for its length only (no `alongside` in the schema or instructions). A batch with
+ * both kinds makes one call of each kind.
  */
 export async function ensureBehaviorEstimates(
   agent: AppSupabaseClient | null,
@@ -343,17 +351,20 @@ export async function ensureBehaviorEstimates(
   if (!agent) return;
   const userId = options.userId ?? await ownUserId(agent);
   const day = await readBriefMoveDay(agent, userId, context.localDate);
-  await cacheBehaviorEstimates({ agent, userId, localDate: context.localDate, day, model: options.model ?? "daily_brief", estimate: async (behaviors) => {
+  await cacheBehaviorEstimates({ agent, userId, localDate: context.localDate, day, model: options.model ?? "daily_brief", estimate: async (behaviors, ask = { alongside: true }) => {
     const refs = new Map(behaviors.map((behavior, index) => [`b${index + 1}`, behavior.id]));
     const items: DescriptionEstimateItem[] = behaviors.map((behavior, index) => ({
       behaviorRef: `b${index + 1}`, title: behavior.title, description: behavior.description?.trim() ?? "",
     }));
     try {
-      const raw = await generate({
+      const raw = await generate(ask.alongside ? {
         instructions: `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`,
         facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal, estimateVariant: "alongside",
+      } : {
+        instructions: `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS}`,
+        facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal,
       });
-      return parseDescriptionEstimates(raw, items, { alongside: true })
+      return parseDescriptionEstimates(raw, items, { alongside: ask.alongside })
         .map((estimate) => ({ behaviorId: refs.get(estimate.behaviorRef)!, minutes: estimate.minutes, alongside: estimate.alongside === true }));
     } catch (error) {
       if (signal?.aborted) throw error;
@@ -368,27 +379,45 @@ export async function cacheBehaviorEstimates(input: Readonly<{
   userId: string;
   localDate: string;
   day: BriefMoveDay;
-  estimate: (behaviors: readonly BriefMoveBehaviorFacts[]) => Promise<ReadonlyArray<Readonly<{
+  /**
+   * `ask.alongside` false: a length-only call for Behaviors the person already answered
+   * (Ticket 356); its `alongside` answers are ignored. Omitted: true.
+   */
+  estimate: (behaviors: readonly BriefMoveBehaviorFacts[], ask?: Readonly<{ alongside: boolean }>) => Promise<ReadonlyArray<Readonly<{
     behaviorId: string; minutes: number | null; alongside: boolean;
   }>>>;
   model: string;
+  env?: Readonly<Record<string, string | undefined>>;
 }>): Promise<BriefMoveDay> {
   const stale = [...input.day.staleEstimateBehaviorIds].map((id) => input.day.behaviors.get(id))
     .filter((item): item is BriefMoveBehaviorFacts => !!item).slice(0, ESTIMATE_BATCH);
   if (!stale.length) return input.day;
-  const answers = await input.estimate(stale);
+  // Flag off: every Behavior is asked about alongside, as before Ticket 356.
+  const personSetting = alongsideEnabled(input.env);
+  const withGuess = personSetting ? stale.filter((behavior) => alongsideGuessWanted(behavior.alongside)) : stale;
+  const lengthOnly = personSetting ? stale.filter((behavior) => !alongsideGuessWanted(behavior.alongside)) : [];
+  const [guessAnswers, lengthAnswers] = await Promise.all([
+    withGuess.length ? input.estimate(withGuess) : [],
+    lengthOnly.length ? input.estimate(lengthOnly, { alongside: false }) : [],
+  ]);
+  const asked = [
+    ...guessAnswers.map((answer) => ({ answer, alongsideAsked: true })),
+    ...lengthAnswers.map((answer) => ({ answer, alongsideAsked: false })),
+  ];
   const byId = new Map(stale.map((behavior) => [behavior.id, behavior]));
-  const rows = answers.filter((answer) => byId.has(answer.behaviorId)).map((answer) => ({
+  const groupOf = new Map([...withGuess.map((behavior) => [behavior.id, true] as const), ...lengthOnly.map((behavior) => [behavior.id, false] as const)]);
+  const rows = asked.filter(({ answer, alongsideAsked }) => byId.has(answer.behaviorId) && groupOf.get(answer.behaviorId) === alongsideAsked).map(({ answer, alongsideAsked }) => ({
     behavior_id: answer.behaviorId,
-    input_hash: behaviorEstimateInputHash(byId.get(answer.behaviorId)!),
+    input_hash: behaviorEstimateInputHash(byId.get(answer.behaviorId)!, { alongsideAsked }),
     duration_minutes: answer.minutes !== null && Number.isInteger(answer.minutes) && answer.minutes >= 1 && answer.minutes <= 1440 ? answer.minutes : null,
-    alongside: answer.alongside === true,
+    // A length-only row stores false; its hash keeps it from being read as a guess.
+    alongside: alongsideAsked && answer.alongside === true,
     model: input.model,
   }));
   if (!rows.length) return input.day;
   const { error } = await input.agent.rpc("upsert_behavior_advisor_estimates", { p_estimates: rows });
   if (error) throw error;
-  return readBriefMoveDay(input.agent, input.userId, input.localDate);
+  return readBriefMoveDay(input.agent, input.userId, input.localDate, input.env ? { env: input.env } : {});
 }
 
 /** Saves the planner's lines as the run's proposals. A Refresh closes the day's undecided lines first. */
@@ -752,11 +781,11 @@ function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonl
   : Readonly<{ blocks: BriefMoveBlock[]; before: number; after: number }> {
   const stop = travel?.stops.get(occurrenceId);
   return {
-    blocks: [
+    blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId, positions),
       ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
       ...travelBlocksFor(travel, occurrenceId),
-    ],
+    ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,
     after: stop?.afterSeconds ?? 0,
   };
@@ -1071,11 +1100,11 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   const starts = briefMoveFreeStarts({
     localDate: proposal.local_date, timezone: old.timezone, now: person.now,
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
-    blocks: [
+    blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
       ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
       ...travelBlocksFor(travel, item.occurrenceId),
-    ],
+    ], briefMoveOverlapSubject(day.items, item.occurrenceId)),
     travelBeforeSeconds: stop?.beforeSeconds, travelAfterSeconds: stop?.afterSeconds,
     limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [effectiveStartInstant(day.occurrences.get(item.occurrenceId)!), shown[0]!],
   });

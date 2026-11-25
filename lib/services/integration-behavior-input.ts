@@ -1,4 +1,4 @@
-import type { BehaviorOutput, IntegrationOperationInput, ScheduleInput } from "@cadence/core/integration";
+import type { AlongsideInputField, BehaviorOutput, IntegrationOperationInput, ScheduleInput } from "@cadence/core/integration";
 import { parseBehaviorFormData } from "@/lib/services/behavior-form";
 
 type BehaviorWriteInput = Omit<IntegrationOperationInput<"create_behavior">, "sub_behaviors"> | IntegrationOperationInput<"update_behavior">;
@@ -73,5 +73,9 @@ export function integrationBehaviorInput(
       }
     });
   });
-  return parseBehaviorFormData(form, { mode: current ? "update" : "create" });
+  const values = parseBehaviorFormData(form, { mode: current ? "update" : "create" });
+  // Contract 1.8.0 (Ticket 364): the 1.7.0 schema rejects the field, so it reaches here only
+  // with CADENCE_ALONGSIDE on. Omitted keeps the stored answer; null clears it.
+  const alongside = (input as AlongsideInputField).alongside;
+  return alongside === undefined ? values : { ...values, alongside };
 }

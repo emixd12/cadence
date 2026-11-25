@@ -12,6 +12,7 @@ import {
 } from "@cadence/core/resolvers/place-label.resolver";
 import { PLACE_SEARCH_MARKER_ACCURACY_METERS } from "@cadence/core/services/place-search";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
+import { noticeText } from "@cadence/core/notices";
 import type { BehaviorWhereKind } from "@cadence/core/types/behavior";
 import type { PlaceLabelRetention, PlaceLabelState, PlaceMarkerInput, PlaceRef } from "@cadence/core/types/place-labels";
 import type { PlaceSearchCoordinates } from "@cadence/core/types/place-search";
@@ -288,7 +289,8 @@ export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, o
   };
   const suggestion = entry.suggestion;
   if (suggestion) {
-    const text = suggestion.kind === "home" ? `Usually completed at Home (${suggestion.supportingCount} of ${suggestion.labelCount} recent completions).`
+    const text = suggestion.basis === "guess" ? noticeText("alongside.where-guess", { kind: suggestion.kind })
+      : suggestion.kind === "home" ? `Usually completed at Home (${suggestion.supportingCount} of ${suggestion.labelCount} recent completions).`
       : suggestion.kind === "saved_place" ? `Usually completed at ${entry.suggestedPlaceText} (${suggestion.supportingCount} of ${suggestion.labelCount} recent completions).`
         : suggestion.kind === "anywhere" ? `Completed in different places (${suggestion.labelCount} recent completions). Anywhere may fit.`
           : `Usually completed away from your saved places (${suggestion.supportingCount} of ${suggestion.labelCount}). Adding that place can help travel estimates.`;
@@ -296,7 +298,7 @@ export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, o
       : suggestion.kind === "saved_place" ? { whereKind: "place", locationText: entry.suggestedPlaceText ?? "" }
         : suggestion.kind === "anywhere" ? { whereKind: "anywhere", locationText: "" } : { whereKind: "place", locationText: "" };
     return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6" data-where-suggestion={suggestion.kind}
-      data-rule-version={suggestion.ruleVersion}>
+      data-rule-version={suggestion.ruleVersion} data-where-suggestion-basis={suggestion.basis}>
       <span>{text}</span>
       <button type="button" className="product-action product-action-secondary min-h-11 w-fit" disabled={pending} onClick={() => onReview(draft)}>Review Where</button>
       <button type="button" className="product-action product-action-secondary min-h-11 w-fit" disabled={pending}

@@ -259,6 +259,10 @@ export function OccurrenceRow({
                 data-notice="opportunity.added-from" data-opportunity-origin={occurrence.addedBy ?? "user"}>
                 {noticeText("opportunity.added-from", { source: occurrence.addedBy ?? "user" })}
               </p> : null}
+              {occurrence.alongside ? <p className={["timeline-occurrence-alongside col-start-2 min-w-0 text-xs font-normal leading-5", visibleOccurrence.visualTone === "default" ? "text-muted-readable" : TIME_TONE_CLASSES[visibleOccurrence.visualTone]].join(" ")}
+                data-notice="alongside.row-label" data-alongside={occurrence.alongside.source}>
+                {noticeText("alongside.row-label", { source: occurrence.alongside.source })}
+              </p> : null}
               {crowdedLine ? <p className="timeline-occurrence-crowded col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable group-open:hidden" data-next-trip-crowded>
                 {crowdedLine}
               </p> : null}

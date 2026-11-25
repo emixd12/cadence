@@ -24,6 +24,7 @@ import {
   qualifyCompletionForPlaceLabel,
   resolveCompletionPlaceLabel,
   resolvePlaceLabelState,
+  resolveWhereGuessSuggestion,
   resolveWhereSuggestion,
   savedPlaceRef,
   type PlaceLabelOccurrence,
@@ -321,5 +322,36 @@ describe("projectPlaceLabelCounts", () => {
     const [projection] = projectPlaceLabelCounts({ labels, behaviors: [{ id: "b1", whereKind: "place", locationText: "1 Gym Street" }], today: Temporal.PlainDate.from("2026-10-22") });
     expect(projection).toEqual({ behaviorId: "b1", periodDays: 60, total: 4, atHome: 1, atWherePlace: 1, atOtherSavedPlace: 1, elsewhere: 1 });
     expect(JSON.stringify(projection)).not.toContain("saved_place");
+  });
+});
+
+// Ticket 358 (D33): a guessed Where shares the one Where suggestion line.
+describe("resolveWhereGuessSuggestion", () => {
+  const rules = CURRENT_WHERE_SUGGESTION_RULES;
+  it("maps a guess to the suggestion keys the dismissal already stores", () => {
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "home", dismissal: null, rules }))
+      .toEqual({ ruleVersion: rules.version, kind: "home", key: "home", placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" });
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "anywhere", dismissal: null, rules })?.key).toBe("anywhere");
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "elsewhere", dismissal: null, rules })?.key).toBe("add_place");
+  });
+
+  it("shows nothing once Where is set, for unknown, or after the same suggestion was dismissed", () => {
+    expect(resolveWhereGuessSuggestion({ whereKind: "home", guess: "anywhere", dismissal: null, rules })).toBeNull();
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "unknown", dismissal: null, rules })).toBeNull();
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: null, dismissal: null, rules })).toBeNull();
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "home", dismissal: { suggestion: "home" }, rules })).toBeNull();
+    expect(resolveWhereGuessSuggestion({ whereKind: null, guess: "home", dismissal: { suggestion: "anywhere" }, rules })?.key).toBe("home");
+  });
+
+  it("joins the place label state only when guesses are passed, and a label suggestion comes first", () => {
+    const settings: PlaceLabelSettings = { enabled: true, retention: "90_days", enabledAt: "2026-10-01T00:00:00Z", markerPromptDismissedAt: null, updatedAt: "2026-10-01T00:00:00Z" };
+    const behaviors = [{ id: "b1", active: true, whereKind: null, locationText: null }, { id: "b2", active: false, whereKind: null, locationText: null }];
+    const today = Temporal.PlainDate.from("2026-10-22");
+    const input = { settings, homeText: "1 Home Lane", markers: [], labels: [], dismissals: [], behaviors, today };
+    expect(resolvePlaceLabelState(input).behaviors.map(({ suggestion }) => suggestion)).toEqual([null, null]);
+    const guessed = resolvePlaceLabelState({ ...input, whereGuesses: new Map([["b1", "home"], ["b2", "home"]]) });
+    expect(guessed.behaviors.map(({ suggestion }) => suggestion?.basis ?? null)).toEqual(["guess", null]);
+    const off = resolvePlaceLabelState({ ...input, settings: { ...settings, enabled: false }, whereGuesses: new Map([["b1", "home"]]) });
+    expect(off.behaviors[0]!.suggestion).toBeNull();
   });
 });

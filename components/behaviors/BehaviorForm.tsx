@@ -17,6 +17,7 @@ import type { ParentOption } from "@/components/behaviors/behavior-list-state";
 import { Notice } from "@/components/feedback/Notice";
 import { PlaceAutocomplete } from "@/components/travel/PlaceAutocomplete";
 import { PlaceMarkerControl, usePlaceLabelActions, type WhereDraft } from "@/components/travel/PlaceLabels";
+import type { AlongsideAnswer, AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
 import type { PlaceSearchCoordinates, PlaceSearchSuggestion } from "@cadence/core/types/place-search";
 import type { PlaceSearchClient } from "@/lib/ui/place-search";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
@@ -69,6 +70,14 @@ type BehaviorFormProps = Readonly<{
   savedPlaces?: readonly string[];
   /** Optional override for place autocomplete (tests / desktop). */
   placeSearchClient?: PlaceSearchClient | null;
+  /**
+   * Ticket 358 (D33): the alongside setting and any current guess. Passed only by the
+   * hosted web app while `CADENCE_ALONGSIDE` is on; without it the form has no alongside
+   * field and saving keeps the stored answer.
+   */
+  alongside?: AlongsideFormView;
+  /** Ticket 358: the Where suggestion line (`BehaviorPlaceAssist`), shown below Where. */
+  whereAssist?: ReactNode;
 }>;
 
 export type TimeEntryRow = {
@@ -141,6 +150,8 @@ export function BehaviorForm({
   allowSubBehaviorDrafts = false,
   savedPlaces = [],
   placeSearchClient,
+  alongside,
+  whereAssist = null,
 }: BehaviorFormProps) {
   const planningId = useId();
   const placeLabelActions = usePlaceLabelActions();
@@ -168,6 +179,7 @@ export function BehaviorForm({
     initialScheduleRows(behavior),
   );
   const [isOpportunity, setIsOpportunity] = useState(behavior?.isOpportunity === true);
+  const [alongsideAnswer, setAlongsideAnswer] = useState<AlongsideAnswer>(alongside?.answer ?? "unanswered");
   const unscheduled = scheduleRows.length === 0;
   const [parentId, setParentId] = useState(behavior?.parentBehaviorId ?? "");
   const [inheritSchedule, setInheritSchedule] = useState(behavior?.parentBehaviorId ? behavior.inheritParentSchedule ?? true : true);
@@ -334,18 +346,19 @@ export function BehaviorForm({
     setSelectedCategory(behavior?.categoryId ?? "");
     // React 19 fires form reset after every formAction, including validation/server errors.
     // Keep Where and the selected Place across an action reset so a failed submit does not
-    // drop the user's selected place or pending completion marker; explicit Cancel resets all.
+    // drop the user's selected place, pending completion marker or alongside answer; explicit Cancel resets all.
     if (!submittingActionRef.current) {
       setWhereKind(behavior?.whereKind ?? "");
       setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
       setPlaceSelection(null);
+      setAlongsideAnswer(alongside?.answer ?? "unanswered");
     }
     setIsOpportunity(behavior?.isOpportunity === true);
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
     setParentId(behavior?.parentBehaviorId ?? "");
     setInheritSchedule(behavior?.parentBehaviorId ? behavior.inheritParentSchedule ?? true : true);
     setSubBehaviorDrafts([]);
-  }, [behavior]);
+  }, [behavior, alongside?.answer]);
 
   return (
     <form
@@ -529,10 +542,23 @@ export function BehaviorForm({
             </div>
           ) : null}
         </div>
+        {whereAssist}
         {whereDraft ? <p className="text-sm" role="status">Where is filled in from a suggestion. Save to keep it.</p> : null}
         {whereKind === "home" ? <PlaceMarkerControl place={{ kind: "home" }} />
           : whereKind === "place" ? <PlaceMarkerControl place={{ kind: "saved_place", text: placeText }} /> : null}
         <p className="text-sm text-muted-readable">Travel estimates and scheduling advice work better when Where is set.</p>
+        {alongside ? (
+          <AlongsideField
+            answer={alongsideAnswer}
+            guess={alongside.guess}
+            error={fieldErrors.alongside}
+            onChange={setAlongsideAnswer}
+            onAcceptGuess={(answer) => {
+              setAlongsideAnswer(answer);
+              markDraftDirty();
+            }}
+          />
+        ) : null}
       </fieldset>
 
       <fieldset className="grid gap-3 border-0 p-0">
@@ -1050,6 +1076,59 @@ function TimeEntryEditor({
         >
           Remove time
         </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Ticket 358 (D33): one three-state control. Not answered posts an empty value; while it
+ * is chosen and a guess exists, the guess shows as a guess with one button to use it.
+ * Using it fills the field; Save stores it like every other field.
+ */
+function AlongsideField({
+  answer,
+  guess,
+  error,
+  onChange,
+  onAcceptGuess,
+}: Readonly<{
+  answer: AlongsideAnswer;
+  guess: boolean | null;
+  error?: string;
+  onChange: (answer: AlongsideAnswer) => void;
+  onAcceptGuess: (answer: AlongsideAnswer) => void;
+}>) {
+  const guessAnswer: AlongsideAnswer | null = guess === null ? null : guess ? "yes" : "no";
+  return (
+    <div className="grid gap-1 sm:max-w-[20rem] lg:max-w-[24rem]" data-alongside-field={answer}>
+      <SelectField
+        label="Can be done alongside other things"
+        name="alongside"
+        value={answer === "unanswered" ? "" : answer}
+        onChange={(value) => onChange(value === "yes" || value === "no" ? value : "unanswered")}
+        error={error}
+      >
+        <option value="">Not answered</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </SelectField>
+      {answer === "unanswered" && guessAnswer ? (
+        <Notice
+          id="alongside.form-guess"
+          params={{ guess: guessAnswer }}
+          className="text-sm leading-6"
+          data={{ "data-alongside-guess": guessAnswer }}
+          action={
+            <button
+              type="button"
+              className="product-action product-action-secondary min-h-11"
+              onClick={() => onAcceptGuess(guessAnswer)}
+            >
+              Use the guess
+            </button>
+          }
+        />
       ) : null}
     </div>
   );

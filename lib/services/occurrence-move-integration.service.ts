@@ -4,6 +4,7 @@ import {
   checkOperationScope, createIntegrationError, validateOperationInput, validateOperationOutput,
   type IntegrationError, type IntegrationOperationOutput,
 } from "@cadence/core/integration";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
 import { recordIntegrationActivity } from "@/lib/db/integration.repo";
@@ -35,7 +36,8 @@ export async function executeOccurrenceMoveWrite<N extends MoveOperationName>(
   let recorded = false;
   try {
     if (scopeError) return await failWith(context, name, scopeError);
-    const validated = validateOperationInput(name, raw);
+    const contract = integrationContractOptions();
+    const validated = validateOperationInput(name, raw, contract);
     if (!validated.ok) return await failWith(context, name, validated.error);
     const input = validated.value as {
       occurrence_id: string; expected_revision: string; start_time?: string; idempotency_key?: string;
@@ -80,7 +82,7 @@ export async function executeOccurrenceMoveWrite<N extends MoveOperationName>(
       invalidateBehaviorData(context.userId);
       revalidatePath("/timeline");
     }
-    const output = validateOperationOutput(name, projected);
+    const output = validateOperationOutput(name, projected, contract);
     if (!output.ok) throw new Error(output.error.message);
     return { ok: true, value: output.value as IntegrationOperationOutput<N> };
   } catch (error) {

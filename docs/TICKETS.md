@@ -20017,7 +20017,7 @@ Messaging impact: `P-089`. Legal: `L-026`.
 
 ## Ticket 356: Alongside setting: column, flag and effective-value resolver
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. Scope change: the column stays out of account sync and configuration history until Ticket 363, which adds them with the Mac's SQLite column and a sync contract bump (configuration events are synced, so either would force that bump now). Export, restore and MCP carriage stay with Ticket 364.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20048,7 +20048,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 357: Effective Where and the same-place overlap rule
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare).
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20079,7 +20079,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 358: Alongside in the Behavior form and on the Timeline (web)
 
-Status: not_started
+Status: complete (November 25, 2026; behind `CADENCE_ALONGSIDE`, off)
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20264,7 +20264,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 364: Alongside in the MCP contract, exports and BehaviorLog
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migrations `20261125140000` and `20261125180000` pending. Contract 1.8.0 is a flag-selected edition of the published 1.7.0 registry (`docs/MCP_CONTRACT.md`, "Alongside"); folding it into the registry and the public developer reference waits for the Production flag (Ticket 365). BehaviorLog has no fitting field, so the setting is a Cadence extension and the gap is recorded in `docs/EXPORT_FORMATS.md`, "Alongside".
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

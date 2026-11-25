@@ -10,6 +10,7 @@ import {
 } from "@/components/layout/ScreenFrame";
 import { getAnalyticsPageData } from "@/lib/services/analytics.service";
 import { getBehaviorPageData } from "@/lib/services/behavior.service";
+import { getAlongsideFormViewsForCurrentUser } from "@/lib/services/alongside-view.service";
 import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 import { parseBehaviorEditTarget, type BehaviorEditTarget } from "@/lib/ui/advisor";
@@ -107,6 +108,8 @@ async function BehaviorsContent({
   );
   const hasBehaviors =
     data.activeBehaviors.length > 0 || data.archivedBehaviors.length > 0;
+  // Ticket 358: null while CADENCE_ALONGSIDE is off; then no alongside field renders and nothing is read.
+  const alongsideViews = await getAlongsideFormViewsForCurrentUser(data.activeBehaviors.map((behavior) => behavior.id));
   const noteShortcutViews = Object.fromEntries(await Promise.all(
     [...data.activeBehaviors, ...data.archivedBehaviors].map(async (behavior) => [
       behavior.id,
@@ -123,6 +126,7 @@ async function BehaviorsContent({
         defaultOpen={!hasBehaviors}
         parentOptions={parentChoices(null, [...data.activeBehaviors, ...data.archivedBehaviors]).options}
         savedPlaces={collectSavedBehaviorPlaces([...data.activeBehaviors, ...data.archivedBehaviors])}
+        alongside={alongsideViews ? { answer: "unanswered", guess: null } : undefined}
       />
 
       <NoteShortcutDismissProvider onDismiss={dismissNoteShortcutAction}>
@@ -145,6 +149,7 @@ async function BehaviorsContent({
         editTarget={editTarget}
         reorderAction={reorderSubBehaviorsAction}
         createAction={createBehaviorAction}
+        alongsideViews={alongsideViews}
       />
       </NoteShortcutDismissProvider>
     </>

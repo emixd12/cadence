@@ -28,6 +28,11 @@ export type BehaviorInput = {
   active: boolean;
   /** Behaviors of Opportunity. Undefined keeps the stored flag (false on create). */
   isOpportunity?: boolean;
+  /**
+   * The person's alongside answer (D33). Undefined keeps the stored answer (unanswered
+   * on create); null clears it. Only hosted callers with `CADENCE_ALONGSIDE` on set it.
+   */
+  alongside?: boolean | null;
   /** Sub-behaviors (depth 1). Undefined leaves the stored link; null makes it standalone. */
   parentBehaviorId?: string | null;
   subBehaviorSortOrder?: number;
@@ -52,6 +57,8 @@ export type BehaviorFields = {
   scheduled_time: string | null;
   /** Behaviors of Opportunity. Absent on rows that predate the column; read as false. */
   is_opportunity?: boolean;
+  /** D33 alongside answer. Present only when the caller set it; the store then writes it. */
+  alongside?: boolean | null;
   timezone: string;
   browser_reminder_enabled: boolean;
   email_reminder_enabled: boolean;

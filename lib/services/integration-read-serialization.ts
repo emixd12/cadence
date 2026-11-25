@@ -1,8 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import {
-  OCCURRENCE_STATUS_LABELS, OPPORTUNITY_ADDED_BY_VALUES, type BehaviorOutput, type OccurrenceOutput, type ParentGroupOutput,
-  type SubBehaviorSummaryOutput,
+  OCCURRENCE_STATUS_LABELS, OPPORTUNITY_ADDED_BY_VALUES, type AlongsideOutputField, type BehaviorOutput, type OccurrenceOutput,
+  type ParentGroupOutput, type SubBehaviorSummaryOutput,
 } from "@cadence/core/integration";
 import { sortSubBehaviors } from "@cadence/core/resolvers/sub-behavior.resolver";
 import type { TimelineParentGroupView } from "@cadence/core/types/timeline";
@@ -12,6 +12,7 @@ import { resolvePersistedTimelineOccurrence } from "@cadence/core/services/timel
 import { normalizeScheduleKind, normalizeSchedulePreset } from "@cadence/core/services/occurrence-generation";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 import type { Occurrence } from "@/lib/types/database";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 const ADDED_BY: ReadonlySet<string> = new Set(OPPORTUNITY_ADDED_BY_VALUES);
 const addedByOf = (value: string | null | undefined): OccurrenceOutput["added_by"] =>
@@ -19,6 +20,16 @@ const addedByOf = (value: string | null | undefined): OccurrenceOutput["added_by
 
 export const integrationInstant = (value: string): string => Temporal.Instant.from(value).toString();
 const nullableInstant = (value: string | null): string | null => value === null ? null : integrationInstant(value);
+
+/**
+ * Contract 1.8.0 (Ticket 364): the person's alongside setting, only while
+ * `CADENCE_ALONGSIDE` is on. Rows come from `select *`, so the column may be present with
+ * the flag off; it is then left out and the output stays 1.7.0. The cached model guess
+ * lives in another table and never reaches this output.
+ */
+function alongsideField(behavior: BehaviorWithCategory): AlongsideOutputField {
+  return alongsideEnabled() ? { alongside: typeof behavior.alongside === "boolean" ? behavior.alongside : null } : {};
+}
 
 // Allowlist every field; database rows also contain private import and ownership metadata.
 /**
@@ -65,7 +76,7 @@ function subBehaviorSummary(child: BehaviorWithCategory, now: Temporal.Instant):
 export function serializeIntegrationBehavior(
   behavior: BehaviorWithCategory, externalRef: string | null, now: Temporal.Instant = Temporal.Now.instant(),
   subBehaviors: readonly BehaviorWithCategory[] = [],
-): BehaviorOutput {
+): BehaviorOutput & AlongsideOutputField {
   const parentId = behavior.parent_behavior_id ?? null;
   const view = toBehaviorView(behavior);
   return {
@@ -79,6 +90,7 @@ export function serializeIntegrationBehavior(
     auto_archived_at: nullableInstant(behavior.auto_archived_at ?? null),
     ...integrationRunFields(behavior, now),
     is_opportunity: behavior.is_opportunity === true,
+    ...alongsideField(behavior),
     default_duration_minutes: behavior.default_duration_minutes ?? null,
     timezone: behavior.timezone,
     schedules: (view.schedules ?? []).map((schedule) => {
@@ -128,7 +140,7 @@ export function serializeIntegrationBehavior(
 export function serializeIntegrationOccurrence(
   occurrence: Occurrence, behavior: BehaviorWithCategory, now: Temporal.Instant, timezone: string,
   parent?: { id: string; title: string } | null,
-): OccurrenceOutput {
+): OccurrenceOutput & AlongsideOutputField {
   const view = resolvePersistedTimelineOccurrence({ behavior, occurrence, timeSessions: [], now, timezone });
   if (!view) throw new Error("Occurrence has no Behavior.");
   return {
@@ -154,6 +166,7 @@ export function serializeIntegrationOccurrence(
     needs_decision: view.visualTone === "needs_decision",
     origin: occurrence.origin === "opportunity" ? "opportunity" : "scheduled",
     added_by: occurrence.origin === "opportunity" ? addedByOf(occurrence.added_by) : null,
+    ...alongsideField(behavior),
     completed_at: nullableInstant(occurrence.completed_at),
     status_marked_at: nullableInstant(occurrence.status_marked_at),
     note: occurrence.note,

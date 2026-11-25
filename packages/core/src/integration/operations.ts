@@ -59,7 +59,6 @@ import {
   root,
   string,
   type Infer,
-  type JsonSchemaObject,
   type SchemaNode,
 } from "./schema";
 import { INTEGRATION_SCOPES, INTEGRATION_SCOPE_LIST, type IntegrationScope } from "./scopes";
@@ -921,28 +920,4 @@ export function isIntegrationOperationName(value: unknown): value is Integration
 
 export function getIntegrationOperation<N extends IntegrationOperationName>(name: N): Operations[N] {
   return INTEGRATION_OPERATIONS[name];
-}
-
-/** Tool descriptor in the shape MCP `tools/list` uses. Transport-specific `_meta` is added by the endpoint. */
-export type IntegrationToolDescriptor = {
-  name: IntegrationOperationName;
-  title: string;
-  description: string;
-  inputSchema: JsonSchemaObject;
-  outputSchema: JsonSchemaObject;
-  annotations: IntegrationToolAnnotations;
-};
-
-export function listIntegrationToolDescriptors(): IntegrationToolDescriptor[] {
-  return INTEGRATION_OPERATION_NAMES.map((name) => {
-    const operation: IntegrationOperation = INTEGRATION_OPERATIONS[name];
-    return {
-      name,
-      title: operation.title,
-      description: operation.description,
-      inputSchema: operation.input.schema,
-      outputSchema: operation.output.schema,
-      annotations: { ...operation.annotations },
-    };
-  });
 }

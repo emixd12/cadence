@@ -629,6 +629,13 @@ activity) offers an underlined **Remove** at the end of its expanded details, on
 and in Needs decision. The result shows below it as `opportunity.removed` or an
 `opportunity.remove-refused.*` notice. Scheduled rows never show either.
 
+Alongside rows (Ticket 358, D33; behind `CADENCE_ALONGSIDE`): a row whose Behavior is
+alongside keeps its place in the list and shows one muted line under its title from
+`alongside.row-label`: "Alongside" for the person's answer, "Alongside · a guess" when
+the value is Cadence's guess. Its Possible overlap line and Calendar highlight stop for
+overlaps `alongsideMayOverlap` allows (every Calendar event, whose place is unknown);
+travel still shows. There is no parallel-lane layout. Bench: `composite.occurrence-row`.
+
 ### Routine rows and Semantic Zoom (Ticket 349)
 
 - A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine
@@ -798,6 +805,21 @@ any time). Add schedule brings a row back. Turning the flag off while no schedul
 left restores one default row, so the form stays valid. With no schedule the form
 shows the `opportunity.no-schedule` note and hides Reminder offset, which applies
 only to scheduled Occurrences; the stored offset is kept.
+
+Alongside (Ticket 358, D33; hosted web behind `CADENCE_ALONGSIDE`): below the Where
+hint the form shows one select, "Can be done alongside other things", with Not
+answered, Yes and No. While Not answered is chosen and a current model guess exists,
+one note line follows from `alongside.form-guess` ("Cadence guesses Yes. Planning uses
+the guess until you choose.") with a Use the guess button that fills the select; Save
+stores it like every other field. With the flag off, and on Cadence for Mac until
+Ticket 363, the form has no alongside field and saving keeps the stored answer. While
+the flag is on and Details and Settings is open, the Behavior record's one Where
+suggestion line moves below Where in the form; it returns to the record when Details
+and Settings closes. The same line also states a guessed Where for a Behavior with
+Where Not set (`alongside.where-guess`, for example "Cadence guesses this happens at
+Home. Planning uses the guess until Where is set.") with Review Where and Dismiss. It
+rides the Completion places state, so it shows only while labels are on. Bench:
+`composite.behavior-form` and `composite.behavior-place-assist`.
 
 Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.

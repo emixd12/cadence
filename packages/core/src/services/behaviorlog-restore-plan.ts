@@ -415,6 +415,10 @@ export function buildRestorePayload(input: {
             ...(behavior.cadenceIsOpportunity === undefined
               ? {}
               : { is_opportunity: behavior.cadenceIsOpportunity }),
+            // Ticket 364: only when the bundle carries it; restore apply keeps the stored answer otherwise.
+            ...(behavior.cadenceAlongside === undefined
+              ? {}
+              : { alongside: behavior.cadenceAlongside }),
             browser_reminder_enabled:
               reminderConfiguration.browserReminderEnabled,
             email_reminder_enabled:

@@ -596,3 +596,18 @@ appear. Both descriptions repeat that a day note is separate from Occurrence not
 and statuses. The minor bump follows the versioning table: a relaxed id pattern and
 a new `metadata.kind` value.
 
+## 16. Alongside (Ticket 364, contract 1.8.0 behind a flag)
+
+`CADENCE_ALONGSIDE` selects the contract edition the endpoint serves (`docs/MCP_CONTRACT.md`,
+"Alongside"). There was no earlier flag-gated contract change, so the registry stays
+1.7.0 and the 1.8.0 edition is derived from it in `editions.ts`. The flag is read per
+request in `lib/services/integration-contract-options.ts` by `lib/mcp/server.ts`
+(`tools/list`, server version, errors), the read handlers, the write, move and
+opportunity services, and Cadence chat's tool list, so chat and MCP stay on one
+edition. The serializers in `lib/services/integration-read-serialization.ts` add the
+person's answer only with the flag on, although `select *` may return the column with
+it off. Write receipts carry the answer through `cadence_private.integration_write_source`
+(migration `20261125180000`). Evidence: `tests/integration-alongside-contract.test.ts`,
+`tests/integration-alongside-write.test.ts` and the protocol suite's
+`alongside-*` checks, which run when a server reports 1.8.0. Live client acceptance
+for the field is Ticket 365.

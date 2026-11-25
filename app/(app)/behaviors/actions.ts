@@ -26,6 +26,7 @@ import {
   stopOccurrenceTimeTracking,
 } from "@/lib/services/time-tracking.service";
 import { createClient } from "@/lib/supabase/server";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { hasDraftSubBehaviors, parseBehaviorGroupFormData } from "@/components/behaviors/sub-behavior-form-data";
 import type {
@@ -42,7 +43,7 @@ export async function createBehaviorAction(
 ): Promise<BehaviorActionState> {
   try {
     if (hasDraftSubBehaviors(formData)) {
-      const group = parseBehaviorGroupFormData(formData);
+      const group = parseBehaviorGroupFormData(formData, { readAlongside: alongsideEnabled() });
       const supabase = await createClient();
       const userId = await requireCurrentUserId("Sign in again before saving behaviors.");
       const created = await createBehaviorGroupForUser(supabase, userId, group);

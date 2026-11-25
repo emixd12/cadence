@@ -1,0 +1,26 @@
+{
+  "feature": "alongside-behaviors",
+  "notices": {
+    "alongside.row-label": {
+      "meaning": "Marks a Timeline row whose Behavior can be done alongside other things, and says when that comes from Cadence's guess rather than the person's answer.",
+      "text": "{source, select, guess {Alongside · a guess} other {Alongside}}",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-046", "INT-BEHAVIOR-047"]
+    },
+    "alongside.form-guess": {
+      "meaning": "Shows Cadence's guess beside the unanswered alongside setting in the Behavior form, which planning uses until the person answers.",
+      "text": "Cadence guesses {guess, select, yes {Yes} other {No}}. Planning uses the guess until you choose.",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-BEHAVIOR-047"]
+    },
+    "alongside.where-guess": {
+      "meaning": "The Where suggestion line for a Behavior with Where not set, when planning uses Cadence's guess of where it happens.",
+      "text": "{kind, select, home {Cadence guesses this happens at Home.} anywhere {Cadence guesses this can happen anywhere.} other {Cadence guesses this happens away from home.}} Planning uses the guess until Where is set.",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-PLACE-008", "INT-PLACE-009"]
+    }
+  }
+}

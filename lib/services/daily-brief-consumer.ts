@@ -12,6 +12,7 @@ import { briefingBehaviorNames } from "@cadence/core/services/daily-brief-presen
 import { briefingSetupTip } from "@cadence/core/services/briefing-setup-tip";
 import { briefingMoveOverview, briefingMoveReason } from "@cadence/core/services/briefing-move-overview";
 import { briefingTravelOptionPolicy, briefingUsesWeather } from "@cadence/core/services/briefing-travel";
+import { alongsideMayOverlap, type OverlapPlace } from "@cadence/core/resolvers/alongside.resolver";
 
 // Ticket 290: the instruction text lives in daily-brief-instructions.ts. These re-exports keep every existing import working.
 export {
@@ -102,6 +103,13 @@ export type DailyBriefPrepareInput = Readonly<{
   onUsage?: (usage: DailyBriefCallUsage) => void;
   /** Ticket 290: development workbench only. Production omits it and sends the "layered" text. */
   promptVariant?: DailyBriefPromptVariant;
+  /**
+   * Ticket 357: each Behavior's effective Where, keyed by behaviorRef, for the same-place
+   * rule on overlap and tight-fit findings. Server-side only; it never enters the model
+   * payload. Omitted (or a Behavior missing): that place is unknown, so an alongside
+   * Behavior is never one side of a conflict, as before.
+   */
+  alongsidePlaces?: Readonly<Record<string, OverlapPlace>>;
 }>;
 
 /** The model request: the same two strings every generator receives. */
@@ -174,6 +182,8 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
   const instructions = composeDailyBriefInstructions(promptVariant, { config, route: plan.route, analysis: Boolean(analysis),
     connectorSources: "connectorSources" in facts, travel: Boolean(facts.travel) });
   const alongsideRefs = new Set(planned.cadence.occurrences.filter((item) => alongside.has(item.behaviorRef)).map((item) => item.ref));
+  const behaviorRefOf = new Map(planned.cadence.occurrences.map((item) => [item.ref, item.behaviorRef]));
+  const placeOf = (ref: string): OverlapPlace => input.alongsidePlaces?.[behaviorRefOf.get(ref) ?? ""];
   // Keep detailed rejection diagnostics in the inspector, not the prose inputs.
   const modelPlan = {
     version: plan.version, route: plan.route, outcome: plan.outcome,
@@ -185,8 +195,8 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
       findings: plan.dayEvidence.findings.filter((finding) => finding.kind !== "unknown_feasibility" &&
         // Recipe 1.2 states a move only in its option block, so no opening reaches the prose.
         !(v12 && finding.kind === "feasible_opportunity") &&
-        // Recipe 1.2: a Behavior that can happen alongside other things is never one side of a conflict.
-        !(v12 && (finding.kind === "known_overlap" || finding.kind === "tight_transition") && finding.refs.occurrenceRefs.some((ref) => alongsideRefs.has(ref))) &&
+        // Recipe 1.2: an alongside Behavior is one side of a conflict only where the same-place rule refuses the overlap (Ticket 357).
+        !(v12 && (finding.kind === "known_overlap" || finding.kind === "tight_transition") && alongsideFindingAllowed(finding.refs.occurrenceRefs, alongsideRefs, placeOf)) &&
         // Recipe 1.1 mentions a different time only through an option, so a move-only opening without one is noise.
         !(v11 && finding.kind === "feasible_opportunity" && finding.hypotheticalMoveRequired && !offeredOptions.some((option) => option.occurrenceRef === finding.occurrenceRef)))
         .map((finding) => v12 ? withMinutes(finding) : withoutParticipants(finding)),
@@ -212,6 +222,20 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
       analysis: analysis ? { tip: analysis.tip, modelTip: analysis.modelTip, recordFingerprints: analysis.recordFingerprints } : null,
     },
   };
+}
+
+/**
+ * Ticket 357: whether an overlap or tight-fit finding is one `alongsideMayOverlap`
+ * allows, so it is not a conflict. A finding with one Cadence item has a calendar event
+ * on the other side, whose place is unknown. Findings carry no travel spans.
+ */
+export function alongsideFindingAllowed(occurrenceRefs: readonly string[], alongsideRefs: ReadonlySet<string>,
+  placeOf: (ref: string) => OverlapPlace): boolean {
+  const alongside = occurrenceRefs.filter((ref) => alongsideRefs.has(ref));
+  if (!alongside.length) return false;
+  const others = occurrenceRefs.filter((ref) => ref !== alongside[0]);
+  if (!others.length) return alongsideMayOverlap({ where: placeOf(alongside[0]!) }, { kind: "calendar" });
+  return others.every((ref) => alongsideMayOverlap({ where: placeOf(alongside[0]!) }, { kind: "item", where: placeOf(ref) }));
 }
 
 /**

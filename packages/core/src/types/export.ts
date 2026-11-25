@@ -127,6 +127,11 @@ export type ExportBehaviorInput = {
   scheduledTime: string | null;
   /** Behaviors of Opportunity. Absent on inputs that predate it; read as false. */
   isOpportunity?: boolean;
+  /**
+   * The person's alongside answer (D33, Ticket 364); null is unanswered. Read only when
+   * the export includes alongside. Never the model's guess.
+   */
+  alongside?: boolean | null;
   schedules?: BehaviorScheduleView[];
   scheduleSlots: ScheduleSlotView[];
   timezone: string;
@@ -351,6 +356,8 @@ export type ExportJsonBehavior = {
   scheduled_time: string | null;
   /** Behaviors of Opportunity. Present when the source carries it. */
   is_opportunity?: boolean;
+  /** D33 alongside answer, null when unanswered. Present only when the export includes alongside (Ticket 364). */
+  alongside?: boolean | null;
   schedules: BehaviorScheduleView[];
   schedule_slots: ScheduleSlotView[];
   timezone: string;

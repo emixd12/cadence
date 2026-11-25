@@ -94,6 +94,7 @@ import type {
   OccurrenceStatus,
 } from "@/lib/types/database";
 import { DEFAULT_TIMEZONE, type RecurrenceRule, type Weekday } from "@/lib/types/recurrence";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 const BEHAVIORLOG_FORMAT = "behaviorlog.bundle";
 const SUPPORTED_RECURRENCE_PROFILE = "behaviorlog.calendar_simple.v1";
@@ -185,6 +186,7 @@ export async function createBehaviorLogMergePreviewRunFromFiles(
     files: input.files,
     existing: input.existing,
     supportedSchemaVersions: input.supportedSchemaVersions,
+    ...(alongsideEnabled() ? { readAlongside: true } : {}),
   });
   const importRun = await createBehaviorLogImportRunFromPreview(supabase, {
     userId: input.userId,
@@ -542,6 +544,8 @@ export async function applyCreateMissingBehaviorLogImportPlan(
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
           ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
+          // Ticket 364: present only when the preview read alongside (CADENCE_ALONGSIDE on).
+          ...(behavior.cadenceAlongside === undefined ? {} : { alongside: behavior.cadenceAlongside }),
           ...importedSubBehaviorLink(behavior, behaviorIds, result),
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,
@@ -1055,6 +1059,8 @@ export async function applyApprovedBehaviorLogMergePlan(
           default_duration_minutes: behavior.expectedDurationMinutes ?? null,
           ...(behavior.cadenceRun ? storedRunColumns(behavior.cadenceRun) : {}),
           auto_archived_at: behavior.cadenceAutoArchivedAt ?? null,
+          // Ticket 364: present only when the preview read alongside (CADENCE_ALONGSIDE on).
+          ...(behavior.cadenceAlongside === undefined ? {} : { alongside: behavior.cadenceAlongside }),
           ...importedSubBehaviorLink(behavior, behaviorIds, result),
           created_at: behavior.createdAtUtc ?? undefined,
         } satisfies NewBehavior,

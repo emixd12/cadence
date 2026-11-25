@@ -1864,6 +1864,16 @@
       "reason": "Saving with no schedule is the existing Behavior create or update with an empty schedule graph."
     },
     {
+      "id": "INT-BEHAVIOR-046",
+      "classification": "browser_only",
+      "reason": "The alongside field only changes the form draft; the save is the existing Behavior create or update."
+    },
+    {
+      "id": "INT-BEHAVIOR-047",
+      "classification": "browser_only",
+      "reason": "Use the guess only fills the form field; nothing is sent until the existing Behavior save."
+    },
+    {
       "id": "INT-TIMELINE-021",
       "classification": "browser_only",
       "reason": "Opening the basket reads the pool the Timeline page already loads."

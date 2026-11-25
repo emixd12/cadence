@@ -31,6 +31,12 @@ export type ParsedBehaviorFormData = BehaviorInput & {
 export type ParseBehaviorFormOptions = {
   mode: "create" | "update";
   categories?: CategoryOption[];
+  /**
+   * Ticket 358 (D33): read the `alongside` field. Only hosted callers with
+   * `CADENCE_ALONGSIDE` on pass true; otherwise the field is ignored and the stored
+   * answer is kept, so no write reaches `behaviors.alongside`.
+   */
+  readAlongside?: boolean;
 };
 
 const UUID_PATTERN =
@@ -95,6 +101,7 @@ export function parseBehaviorFormData(
   }
 
   const isOpportunity = parseOpportunityFlag(formData);
+  const alongside = options.readAlongside ? parseAlongsideAnswer(formData, fieldErrors) : undefined;
   const { recurrenceRule, schedules, scheduleSlots } =
     parseSchedulesAndLegacyFieldsFromForm(formData, fieldErrors, isOpportunity === true);
   const reminderOffsetMinutes = parseReminderOffset(formData, fieldErrors);
@@ -125,8 +132,27 @@ export function parseBehaviorFormData(
     active:
       options.mode === "create" ? true : getCheckboxValue(formData, "active"),
     ...(isOpportunity === undefined ? {} : { isOpportunity }),
+    ...(alongside === undefined ? {} : { alongside }),
     ...link,
   };
+}
+
+/**
+ * Ticket 358 (D33): "Can be done alongside other things". `yes` and `no` are the
+ * person's answer; an empty value is unanswered (null). A form without the field keeps
+ * the stored answer (undefined).
+ */
+function parseAlongsideAnswer(
+  formData: FormData,
+  fieldErrors: Partial<Record<BehaviorFormField, string>>,
+): boolean | null | undefined {
+  if (!formData.has("alongside")) return undefined;
+  const value = getOptionalString(formData, "alongside").trim();
+  if (value === "yes") return true;
+  if (value === "no") return false;
+  if (value === "") return null;
+  fieldErrors.alongside = "Choose Yes, No or Not answered.";
+  return undefined;
 }
 
 /**
