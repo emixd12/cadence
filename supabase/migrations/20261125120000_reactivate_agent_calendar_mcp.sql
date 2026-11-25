@@ -1390,13 +1390,23 @@ create trigger chat_conversations_google_mcp_generation_fence
 -- ---------------------------------------------------------------------------
 -- 7. Cross-day occurrence move RPC (SECURITY DEFINER)
 -- ---------------------------------------------------------------------------
+-- A cross-day move keeps the Occurrence's recurrence identity: scheduled_for and the
+-- schedule fields stay the plan. It changes local_date (the Timeline day) and the
+-- effective time, and appends an occurrence_moves record, so linked Macs derive the
+-- same effective time from the synced moves. Occurrence generation reads the planned
+-- day from scheduled_for and never recreates it or rewrites the moved row
+-- (packages/core occurrence.resolver, isCrossDayMove). A destination day that already
+-- holds the same schedule slot is refused, since occurrences_schedule_identity_key
+-- allows one row per slot and day. Undo is the same call back to the planned day and
+-- time, which clears the effective time.
+
+drop function if exists public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz, timestamptz);
 
 create or replace function public.move_occurrence_to_date(
   p_occurrence_id uuid,
   p_target_local_date date,
-  p_new_scheduled_for timestamptz,
-  p_new_effective_start_at timestamptz,
-  p_new_effective_end_at timestamptz,
+  p_target_start_at timestamptz,
+  p_target_end_at timestamptz,
   p_expected_revision timestamptz
 )
 returns jsonb
@@ -1406,10 +1416,20 @@ set search_path = ''
 as $$
 declare
   v_user_id uuid := (select auth.uid());
+  v_caller record;
   v_occ public.occurrences;
   v_updated public.occurrences;
+  v_behavior public.behaviors;
+  v_latest public.occurrence_moves;
+  v_timezone text;
+  v_planned_date date;
+  v_planned_length interval;
+  v_to_end timestamptz;
+  v_to_planned boolean;
+  v_from_planned boolean;
+  v_move_id uuid := gen_random_uuid();
 begin
-  perform cadence_private.occurrence_move_caller('move_occurrence_to_date');
+  select * into v_caller from cadence_private.occurrence_move_caller('move_occurrence_to_date');
 
   if v_user_id is null then
     raise exception 'Occurrence moves require an authenticated user.' using errcode = '42501';
@@ -1417,10 +1437,9 @@ begin
 
   if p_occurrence_id is null
     or p_target_local_date is null
-    or p_new_scheduled_for is null
+    or p_target_start_at is null
     or p_expected_revision is null
-    or ((p_new_effective_start_at is null) <> (p_new_effective_end_at is null))
-    or (p_new_effective_start_at is not null and p_new_effective_end_at < p_new_effective_start_at)
+    or (p_target_end_at is not null and p_target_end_at < p_target_start_at)
   then
     raise exception 'move_occurrence_to_date_invalid_input' using errcode = '22023';
   end if;
@@ -1446,18 +1465,98 @@ begin
     );
   end if;
 
+  select * into v_behavior
+  from public.behaviors b
+  where b.user_id = v_user_id and b.id = v_occ.behavior_id;
+  v_timezone := coalesce(nullif(v_behavior.timezone, ''), 'America/New_York');
+
+  if (p_target_start_at at time zone v_timezone)::date <> p_target_local_date then
+    return jsonb_build_object('ok', false, 'reason', 'start_not_on_day');
+  end if;
+
+  v_planned_date := (v_occ.scheduled_for at time zone v_timezone)::date;
+  v_planned_length := case
+    when v_occ.schedule_kind = 'exact' or v_occ.schedule_end_time is null then interval '0'
+    when v_occ.schedule_end_time >= v_occ.schedule_start_time then v_occ.schedule_end_time - v_occ.schedule_start_time
+    else v_occ.schedule_end_time - v_occ.schedule_start_time + interval '24 hours'
+  end;
+  v_to_end := coalesce(p_target_end_at, p_target_start_at + v_planned_length);
+
+  select * into v_latest
+  from public.occurrence_moves m
+  where m.user_id = v_user_id and m.occurrence_id = v_occ.id
+  order by m.chain_position desc
+  limit 1;
+
+  -- Back on the planned day at the planned time: the Occurrence follows its plan again.
+  -- A revert needs a move to revise; a row with no move history stays explicit.
+  v_to_planned := p_target_local_date = v_planned_date
+    and p_target_start_at = v_occ.scheduled_for
+    and v_to_end = v_occ.scheduled_for + v_planned_length
+    and v_latest.id is not null;
+  v_from_planned := v_occ.effective_start_at is null;
+
+  if p_target_local_date = v_occ.local_date
+    and ((v_to_planned and v_from_planned)
+      or (not v_to_planned and v_occ.effective_start_at = p_target_start_at and v_occ.effective_end_at = v_to_end))
+  then
+    return jsonb_build_object('ok', false, 'reason', 'no_change');
+  end if;
+
+  -- One row per schedule slot and day (occurrences_schedule_identity_key).
+  if v_occ.origin = 'scheduled'
+    and p_target_local_date <> v_occ.local_date
+    and exists (
+      select 1
+      from public.occurrences other
+      where other.user_id = v_user_id
+        and other.behavior_id = v_occ.behavior_id
+        and other.origin = 'scheduled'
+        and other.local_date = p_target_local_date
+        and other.schedule_start_time = v_occ.schedule_start_time
+        and other.schedule_range_identity = v_occ.schedule_range_identity
+        and other.id <> v_occ.id
+    )
+  then
+    return jsonb_build_object('ok', false, 'reason', 'destination_conflict');
+  end if;
+
+  insert into public.occurrence_moves (
+    id, user_id, occurrence_id, behavior_id, local_date, weekday, timezone, kind,
+    from_start_at, from_end_at, from_planned, to_start_at, to_end_at, to_planned, duration_source,
+    revises_move_id, chain_root_id, chain_position, reason, source, client_ref
+  ) values (
+    v_move_id, v_user_id, v_occ.id, v_occ.behavior_id, p_target_local_date,
+    extract(isodow from p_target_local_date)::smallint, v_timezone,
+    case when v_to_planned then 'revert' else 'move' end,
+    coalesce(v_occ.effective_start_at, v_occ.scheduled_for),
+    coalesce(v_occ.effective_end_at, v_occ.scheduled_for + v_planned_length),
+    v_from_planned,
+    p_target_start_at, v_to_end, v_to_planned,
+    case when v_to_planned then 'restored' when p_target_end_at is null then 'planned_length' else 'explicit' end,
+    v_latest.id, coalesce(v_latest.chain_root_id, v_move_id), coalesce(v_latest.chain_position, 0) + 1,
+    'cross_day_move', v_caller.source, v_caller.client_ref
+  );
+
   perform set_config('cadence.occurrence_move_write', 'on', true);
 
   update public.occurrences
   set local_date = p_target_local_date,
-      scheduled_for = p_new_scheduled_for,
-      effective_start_at = p_new_effective_start_at,
-      effective_end_at = p_new_effective_end_at,
-      updated_at = statement_timestamp()
+      effective_start_at = case when v_to_planned then null else p_target_start_at end,
+      effective_end_at = case when v_to_planned then null else v_to_end end
   where id = v_occ.id and user_id = v_user_id
   returning * into v_updated;
 
   perform set_config('cadence.occurrence_move_write', '', true);
+
+  -- Open proposals for this Occurrence now describe a place it no longer sits.
+  update public.move_proposals p
+  set status = 'superseded', status_changed_at = now()
+  where p.user_id = v_user_id and p.occurrence_id = v_occ.id and p.status = 'proposed';
+
+  if v_caller.integration then
+    perform public.integration_record_activity('move_occurrence_to_date', array[v_occ.id], 'success', null);
+  end if;
 
   return jsonb_build_object(
     'ok', true,
@@ -1480,9 +1579,29 @@ begin
 end;
 $$;
 
-revoke all on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz, timestamptz)
+revoke all on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
-grant execute on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz, timestamptz)
+grant execute on function public.move_occurrence_to_date(uuid, date, timestamptz, timestamptz, timestamptz)
   to authenticated;
+
+-- A same-day Undo (revert_occurrence_move) restores the latest record's from time,
+-- which for a cross-day move lies on another day while local_date stays. Refuse it;
+-- the cross-day Undo above moves the row back with its day.
+do $migration$
+declare
+  definition text;
+  anchor text := $a$    elsif p_kind = 'revert' and p_revert_move_id is not null and p_revert_move_id <> v_latest.id then$a$;
+begin
+  select pg_get_functiondef('cadence_private.apply_occurrence_move(text, uuid, timestamptz, timestamptz, timestamptz, integer, text, text, uuid, uuid, text, text)'::regprocedure)
+    into definition;
+  if (length(definition) - length(replace(definition, anchor, ''))) / length(anchor) <> 1 then
+    raise exception 'apply_occurrence_move changed unexpectedly (cross-day revert).';
+  end if;
+  execute replace(definition, anchor,
+    $r$    elsif p_kind = 'revert' and v_latest.reason = 'cross_day_move' then
+      v_reason := 'cross_day_move';
+$r$ || anchor);
+end
+$migration$;
 
 commit;

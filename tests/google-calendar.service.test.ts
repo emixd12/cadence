@@ -235,3 +235,96 @@ it("returns an empty complete snapshot without calling MCP events when 0 AI cale
   expect(mcpProvider.listGoogleCalendarMcpCalendars).not.toHaveBeenCalled();
   expect(mcpProvider.readGoogleCalendarMcpEvents).not.toHaveBeenCalled();
 });
+
+describe("per-request MCP daily budget", () => {
+  type McpProviderModule = typeof import("@/lib/services/google-calendar-mcp-provider");
+  const mcpPage = (payload: unknown) => new Response(JSON.stringify({ jsonrpc: "2.0", id: "1", result: { structuredContent: payload } }), {
+    status: 200, headers: { "content-type": "application/json" },
+  });
+  const eventsPage = (id: string, nextPageToken?: string) => mcpPage({
+    events: [{ id, status: "confirmed", summary: id, start: { dateTime: "2026-09-19T09:00:00Z" }, end: { dateTime: "2026-09-19T09:30:00Z" } }],
+    ...(nextPageToken ? { nextPageToken } : {}),
+  });
+  const calendarsPage = () => mcpPage({ calendars: [{ id: "work", summary: "Work", timeZone: "UTC", accessRole: "owner" }] });
+
+  async function setup(responses: Response[]) {
+    const { resetGoogleCalendarMcpCacheForTests } = await import("@/lib/services/google-calendar-mcp-cache");
+    resetGoogleCalendarMcpCacheForTests();
+    vi.stubEnv("CADENCE_GOOGLE_CALENDAR_AI_TRANSPORT", "agent_mcp");
+    vi.stubEnv("GOOGLE_CALENDAR_PROJECT_ID", "standard-project");
+    vi.stubEnv("GOOGLE_CALENDAR_AGENT_PROJECT_ID", "agent-project");
+    vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_ID", "agent-client");
+    vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_SECRET", "agent-secret");
+    const connection = {
+      userId: user.id, googleSubject: "subject", grantPurpose: "agent" as const, oauthClientId: "agent-client",
+      generation: 5, selectionRevision: 2, status: "connected" as const,
+      preferences: { selectedCalendarIds: ["work"], hiddenCalendarIds: [], visible: true, showAllDay: true },
+    };
+    repo.readCalendarConnection.mockResolvedValue(connection);
+    repo.readCalendarCredential.mockResolvedValue(
+      sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
+    const mcpFetch = vi.fn(async () => {
+      const next = responses.shift();
+      if (!next) throw new Error("unexpected MCP request");
+      return next;
+    });
+    const actual = await vi.importActual<McpProviderModule>("@/lib/services/google-calendar-mcp-provider");
+    mcpProvider.listGoogleCalendarMcpCalendars.mockImplementation((input: Parameters<McpProviderModule["listGoogleCalendarMcpCalendars"]>[0]) =>
+      actual.listGoogleCalendarMcpCalendars({ ...input, fetch: mcpFetch, sleep: async () => {} }));
+    mcpProvider.readGoogleCalendarMcpEvents.mockImplementation((input: Parameters<McpProviderModule["readGoogleCalendarMcpEvents"]>[0]) =>
+      actual.readGoogleCalendarMcpEvents({ ...input, fetch: mcpFetch, sleep: async () => {} }));
+    const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "UTC" }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
+    const now = Temporal.Instant.from("2026-09-19T12:00:00Z");
+    const read = () => getCalendarEventsForAdvisor({ client, user }, "2026-09-19", "2026-09-19", { ephemeralOnly: true, now });
+    return { mcpFetch, read };
+  }
+
+  /** Units left today: consumes the rest and checks that one more is refused. */
+  async function remainingBudget(): Promise<number> {
+    const { consumeGoogleCalendarMcpBudget } = await import("@/lib/services/google-calendar-mcp-cache");
+    const status = consumeGoogleCalendarMcpBudget(user.id, 41);
+    expect(status.allowed).toBe(false);
+    if (status.remaining > 0) expect(consumeGoogleCalendarMcpBudget(user.id, status.remaining).allowed).toBe(true);
+    expect(consumeGoogleCalendarMcpBudget(user.id, 1).allowed).toBe(false);
+    return status.remaining;
+  }
+
+  it("charges one unit per page: one calendar list plus three event pages cost four", async () => {
+    const { mcpFetch, read } = await setup([calendarsPage(), eventsPage("e1", "p2"), eventsPage("e2", "p3"), eventsPage("e3")]);
+    const result = await read();
+    expect(result.result.ok).toBe(true);
+    if (result.result.ok) expect(result.result.snapshot.events.map((event) => event.title)).toEqual(["e1", "e2", "e3"]);
+    expect(mcpFetch).toHaveBeenCalledTimes(4);
+    expect(await remainingBudget()).toBe(36);
+  });
+
+  it("charges each retry attempt: a 503 then a 200 on list_events costs two units", async () => {
+    const { mcpFetch, read } = await setup([calendarsPage(), new Response("unavailable", { status: 503 }), eventsPage("e1")]);
+    const result = await read();
+    expect(result.result.ok).toBe(true);
+    expect(mcpFetch).toHaveBeenCalledTimes(3);
+    expect(await remainingBudget()).toBe(37);
+  });
+
+  it("charges nothing when the calendar list and snapshot come from the cache", async () => {
+    const { mcpFetch, read } = await setup([calendarsPage(), eventsPage("e1")]);
+    await read();
+    await read();
+    expect(mcpFetch).toHaveBeenCalledTimes(2);
+    expect(await remainingBudget()).toBe(38);
+  });
+
+  it("stops before the 41st request mid-pagination with rate_limited and no REST fallback", async () => {
+    const { consumeGoogleCalendarMcpBudget } = await import("@/lib/services/google-calendar-mcp-cache");
+    const { mcpFetch, read } = await setup([calendarsPage(), eventsPage("e1", "p2"), eventsPage("e2")]);
+    expect(consumeGoogleCalendarMcpBudget(user.id, 38).allowed).toBe(true);
+    await expect(read()).rejects.toMatchObject({ code: "rate_limited" });
+    // Request 39 lists calendars, request 40 reads page one; page two would be the 41st.
+    expect(mcpFetch).toHaveBeenCalledTimes(2);
+    expect(provider.readGoogleCalendarCalendars).not.toHaveBeenCalled();
+    expect(provider.readGoogleCalendarEvents).not.toHaveBeenCalled();
+    expect(await remainingBudget()).toBe(0);
+  });
+});

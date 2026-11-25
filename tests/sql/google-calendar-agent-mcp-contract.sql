@@ -52,9 +52,9 @@ begin
     or has_function_privilege('service_role', 'cadence_advisor_private.purge_google_calendar_ai_data(uuid)', 'EXECUTE')
     or has_function_privilege('authenticated', 'cadence_advisor_private.assert_google_calendar_agent_generation(uuid,bigint)', 'EXECUTE')
     or has_function_privilege('service_role', 'cadence_advisor_private.assert_google_calendar_agent_generation(uuid,bigint)', 'EXECUTE')
-    or has_function_privilege('anon', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
-    or has_function_privilege('service_role', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
-    or not has_function_privilege('authenticated', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
+    or has_function_privilege('service_role', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.move_occurrence_to_date(uuid,date,timestamptz,timestamptz,timestamptz)', 'EXECUTE')
   then
     raise exception 'Unexpected privilege exposure on private/service_role functions.';
   end if;
@@ -292,6 +292,7 @@ end;
 $$;
 
 -- 6. Cross-day move_occurrence_to_date RPC contract
+-- A daily 09:00 Behavior with rows on 2026-11-26 and 2026-11-27 (the same slot).
 insert into public.behaviors (
   id, user_id, title, recurrence_rule, scheduled_time, timezone, default_duration_minutes
 ) values (
@@ -306,17 +307,16 @@ insert into public.behaviors (
 
 insert into public.occurrences (
   id, user_id, behavior_id, local_date, scheduled_for, schedule_kind, schedule_start_time, schedule_end_time, status
-) values (
-  '20261125-0000-4000-8000-000000004001',
-  '20261125-0000-4000-8000-000000000001',
-  '20261125-0000-4000-8000-000000003001',
-  '2026-11-26',
-  '2026-11-26T14:00:00Z'::timestamptz,
-  'exact',
-  '09:00',
-  null,
-  'unresolved'
-);
+) values
+  ('20261125-0000-4000-8000-000000004001', '20261125-0000-4000-8000-000000000001', '20261125-0000-4000-8000-000000003001',
+   '2026-11-26', '2026-11-26T14:00:00Z'::timestamptz, 'exact', '09:00', null, 'unresolved'),
+  ('20261125-0000-4000-8000-000000004002', '20261125-0000-4000-8000-000000000001', '20261125-0000-4000-8000-000000003001',
+   '2026-11-27', '2026-11-27T14:00:00Z'::timestamptz, 'exact', '09:00', null, 'unresolved'),
+  -- Planned yesterday, for the same-day Undo refusal below.
+  ('20261125-0000-4000-8000-000000004003', '20261125-0000-4000-8000-000000000001', '20261125-0000-4000-8000-000000003001',
+   ((now() at time zone 'America/New_York')::date - 1),
+   (((now() at time zone 'America/New_York')::date - 1)::timestamp + time '09:00') at time zone 'America/New_York',
+   'exact', '09:00', null, 'unresolved');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -327,6 +327,9 @@ declare
   v_rev timestamptz;
   v_res jsonb;
   v_row public.occurrences;
+  v_move public.occurrence_moves;
+  v_today date := (now() at time zone 'America/New_York')::date;
+  v_today_start timestamptz;
 begin
   select updated_at into v_rev
   from public.occurrences
@@ -334,81 +337,152 @@ begin
 
   -- Stale expected_revision returns ok = false, reason = 'revision_changed'.
   v_res := public.move_occurrence_to_date(
-    '20261125-0000-4000-8000-000000004001',
-    '2026-11-27',
-    '2026-11-27T15:00:00Z'::timestamptz,
-    '2026-11-27T15:00:00Z'::timestamptz,
-    '2026-11-27T15:30:00Z'::timestamptz,
+    '20261125-0000-4000-8000-000000004001', '2026-11-28',
+    '2026-11-28T15:00:00Z'::timestamptz, '2026-11-28T15:30:00Z'::timestamptz,
     v_rev - interval '1 minute'
   );
   if (v_res ->> 'ok')::boolean or v_res ->> 'reason' <> 'revision_changed' then
     raise exception 'Expected revision_changed for stale revision, got %', v_res;
   end if;
 
-  -- Valid timed cross-day move updates local_date, scheduled_for, effective_start_at, effective_end_at.
+  -- (a) The destination already holds this Behavior's 09:00 slot: a refusal, not a
+  -- unique-constraint error, and nothing changes.
   v_res := public.move_occurrence_to_date(
-    '20261125-0000-4000-8000-000000004001',
-    '2026-11-27',
-    '2026-11-27T15:00:00Z'::timestamptz,
-    '2026-11-27T15:00:00Z'::timestamptz,
-    '2026-11-27T15:30:00Z'::timestamptz,
+    '20261125-0000-4000-8000-000000004001', '2026-11-27',
+    '2026-11-27T15:00:00Z'::timestamptz, '2026-11-27T15:30:00Z'::timestamptz,
+    v_rev
+  );
+  if (v_res ->> 'ok')::boolean or v_res ->> 'reason' <> 'destination_conflict' then
+    raise exception 'Expected destination_conflict onto an occupied slot, got %', v_res;
+  end if;
+  select * into v_row from public.occurrences where id = '20261125-0000-4000-8000-000000004001';
+  if v_row.local_date <> '2026-11-26' or v_row.effective_start_at is not null or v_row.updated_at <> v_rev then
+    raise exception 'A refused cross-day move changed the occurrence.';
+  end if;
+
+  -- A start that is not on the target day is refused.
+  v_res := public.move_occurrence_to_date(
+    '20261125-0000-4000-8000-000000004001', '2026-11-28',
+    '2026-11-27T15:00:00Z'::timestamptz, null,
+    v_rev
+  );
+  if (v_res ->> 'ok')::boolean or v_res ->> 'reason' <> 'start_not_on_day' then
+    raise exception 'Expected start_not_on_day, got %', v_res;
+  end if;
+
+  -- (b) A move to a free day keeps the recurrence identity: scheduled_for and the
+  -- schedule fields stay the plan, so generation reads 2026-11-26 as the planned day.
+  v_res := public.move_occurrence_to_date(
+    '20261125-0000-4000-8000-000000004001', '2026-11-28',
+    '2026-11-28T15:00:00Z'::timestamptz, '2026-11-28T15:30:00Z'::timestamptz,
     v_rev
   );
   if not (v_res ->> 'ok')::boolean
     or v_res -> 'previous' ->> 'local_date' <> '2026-11-26'
-    or v_res -> 'occurrence' ->> 'local_date' <> '2026-11-27'
+    or v_res -> 'occurrence' ->> 'local_date' <> '2026-11-28'
   then
-    raise exception 'Expected timed cross-day move to succeed, got %', v_res;
+    raise exception 'Expected cross-day move to succeed, got %', v_res;
   end if;
 
   select * into v_row from public.occurrences where id = '20261125-0000-4000-8000-000000004001';
-  if v_row.local_date <> '2026-11-27'
-    or v_row.scheduled_for <> '2026-11-27T15:00:00Z'::timestamptz
-    or v_row.effective_start_at <> '2026-11-27T15:00:00Z'::timestamptz
-    or v_row.effective_end_at <> '2026-11-27T15:30:00Z'::timestamptz
+  if v_row.local_date <> '2026-11-28'
+    or v_row.scheduled_for <> '2026-11-26T14:00:00Z'::timestamptz
+    or (v_row.scheduled_for at time zone 'America/New_York')::date <> '2026-11-26'
+    or v_row.schedule_start_time <> '09:00'
+    or v_row.origin <> 'scheduled'
+    or v_row.effective_start_at <> '2026-11-28T15:00:00Z'::timestamptz
+    or v_row.effective_end_at <> '2026-11-28T15:30:00Z'::timestamptz
   then
-    raise exception 'Timed cross-day move did not persist expected occurrence columns.';
+    raise exception 'Cross-day move did not keep the planned identity: %', to_jsonb(v_row);
   end if;
 
-  -- Valid null-duration cross-day move succeeds and restores the original date.
-  v_rev := v_row.updated_at;
+  -- The planned day's slot stays unoccupied by any row: the TypeScript generation
+  -- planner (isCrossDayMove) holds it for this row instead of recreating it.
+  if exists (
+    select 1 from public.occurrences
+    where behavior_id = '20261125-0000-4000-8000-000000003001' and local_date = '2026-11-26'
+  ) then
+    raise exception 'The planned day still has a row after the cross-day move.';
+  end if;
+
+  -- Linked Macs derive the same effective time from the synced move record.
+  select * into v_move from public.occurrence_moves
+  where occurrence_id = '20261125-0000-4000-8000-000000004001'
+  order by chain_position desc limit 1;
+  if v_move.kind <> 'move' or v_move.reason <> 'cross_day_move' or v_move.local_date <> '2026-11-28'
+    or not v_move.from_planned or v_move.to_planned or v_move.source <> 'person'
+    or v_move.to_start_at <> '2026-11-28T15:00:00Z'::timestamptz
+  then
+    raise exception 'Cross-day move wrote an unexpected move record: %', to_jsonb(v_move);
+  end if;
+
+  -- Undo: the same call back to the planned day and time follows the plan again.
   v_res := public.move_occurrence_to_date(
-    '20261125-0000-4000-8000-000000004001',
-    '2026-11-26',
-    '2026-11-26T14:00:00Z'::timestamptz,
-    null,
-    null,
-    v_rev
+    '20261125-0000-4000-8000-000000004001', '2026-11-26',
+    '2026-11-26T14:00:00Z'::timestamptz, null,
+    v_row.updated_at
   );
   if not (v_res ->> 'ok')::boolean
-    or v_res -> 'previous' ->> 'local_date' <> '2026-11-27'
+    or v_res -> 'previous' ->> 'local_date' <> '2026-11-28'
     or v_res -> 'occurrence' ->> 'local_date' <> '2026-11-26'
   then
-    raise exception 'Expected null-duration cross-day move to succeed, got %', v_res;
+    raise exception 'Expected cross-day Undo to succeed, got %', v_res;
   end if;
 
   select * into v_row from public.occurrences where id = '20261125-0000-4000-8000-000000004001';
   if v_row.local_date <> '2026-11-26'
+    or v_row.scheduled_for <> '2026-11-26T14:00:00Z'::timestamptz
     or v_row.effective_start_at is not null
     or v_row.effective_end_at is not null
   then
-    raise exception 'Null-duration cross-day move did not clear effective times or restore date.';
+    raise exception 'Cross-day Undo did not restore the planned day and time.';
+  end if;
+  select * into v_move from public.occurrence_moves
+  where occurrence_id = '20261125-0000-4000-8000-000000004001'
+  order by chain_position desc limit 1;
+  if v_move.kind <> 'revert' or not v_move.to_planned or v_move.chain_position <> 2 then
+    raise exception 'Cross-day Undo wrote an unexpected move record: %', to_jsonb(v_move);
   end if;
 
-  -- Unpaired (non-null, null) raises SQLSTATE 22023.
+  -- Back at the plan, the same call again is no change.
+  v_res := public.move_occurrence_to_date(
+    '20261125-0000-4000-8000-000000004001', '2026-11-26',
+    '2026-11-26T14:00:00Z'::timestamptz, null,
+    v_row.updated_at
+  );
+  if (v_res ->> 'ok')::boolean or v_res ->> 'reason' <> 'no_change' then
+    raise exception 'Expected no_change at the plan, got %', v_res;
+  end if;
+
+  -- An end before the start raises SQLSTATE 22023.
   begin
     perform public.move_occurrence_to_date(
-      '20261125-0000-4000-8000-000000004001',
-      '2026-11-27',
-      '2026-11-27T15:00:00Z'::timestamptz,
-      '2026-11-27T15:00:00Z'::timestamptz,
-      null,
+      '20261125-0000-4000-8000-000000004001', '2026-11-28',
+      '2026-11-28T15:00:00Z'::timestamptz, '2026-11-28T14:00:00Z'::timestamptz,
       v_row.updated_at
     );
-    raise exception 'Unpaired effective_start_at / effective_end_at should have raised 22023.';
+    raise exception 'An end before the start should have raised 22023.';
   exception when sqlstate '22023' then
     null;
   end;
+
+  -- A same-day Undo (revert_occurrence_move) of a cross-day move is refused: it would
+  -- restore yesterday's time while the row sits today.
+  v_today_start := (v_today::timestamp + time '23:00') at time zone 'America/New_York';
+  select updated_at into v_rev from public.occurrences where id = '20261125-0000-4000-8000-000000004003';
+  v_res := public.move_occurrence_to_date(
+    '20261125-0000-4000-8000-000000004003', v_today,
+    v_today_start, v_today_start + interval '30 minutes',
+    v_rev
+  );
+  if not (v_res ->> 'ok')::boolean then
+    raise exception 'Expected a move from yesterday to today, got %', v_res;
+  end if;
+  select * into v_row from public.occurrences where id = '20261125-0000-4000-8000-000000004003';
+  v_res := public.revert_occurrence_move('20261125-0000-4000-8000-000000004003', v_row.updated_at);
+  if v_res ->> 'outcome' <> 'refused' or v_res ->> 'reason' <> 'cross_day_move' then
+    raise exception 'Expected revert_occurrence_move to refuse a cross-day move, got %', v_res;
+  end if;
 end;
 $$;
 

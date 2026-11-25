@@ -286,9 +286,19 @@ function planOccurrenceGenerationForWindow(
   const runFields = runFieldsOf(input.behavior, timezone);
   const stoppedByRun = (occurrence: ExistingOccurrenceForGeneration) =>
     isStoppedByRunFields(runFields, existingStopCandidate(occurrence, timezone));
-  const existingOccurrenceKeys = new Set(
-    input.existingOccurrences.map(occurrenceIdentityKey),
-  );
+  // A row moved to another day (move_occurrence_to_date) keeps its planned time, so it
+  // still holds its planned day's slot: that day gets no second copy, and the row also
+  // holds the slot on the day it now sits.
+  const isCrossDay = (occurrence: ExistingOccurrenceForGeneration) =>
+    isCrossDayMove(occurrence, timezone);
+  const plannedIdentity = (occurrence: ExistingOccurrenceForGeneration): ExistingOccurrenceForGeneration =>
+    isCrossDay(occurrence)
+      ? { ...occurrence, localDate: plannedLocalDate(occurrence, timezone) }
+      : occurrence;
+  const existingOccurrenceKeys = new Set([
+    ...input.existingOccurrences.map(occurrenceIdentityKey),
+    ...input.existingOccurrences.filter(isCrossDay).map((occurrence) => occurrenceIdentityKey(plannedIdentity(occurrence))),
+  ]);
   // A row the stop removes by its effective (moved) time keeps its slot empty (T4).
   const stoppedExistingKeys = new Set(
     input.existingOccurrences.filter(stoppedByRun).map(occurrenceIdentityKey),
@@ -331,7 +341,9 @@ function planOccurrenceGenerationForWindow(
     (stoppedByRun(occurrence) ||
       (isAfter(normalizeInstant(occurrence.scheduledFor), input.now) && !occurrence.moved));
   const keptByMove = desiredKeysKeptByExisting(
-    input.existingOccurrences.filter((occurrence) => !removedByPlan(occurrence) && !stoppedByRun(occurrence)),
+    input.existingOccurrences
+      .filter((occurrence) => !removedByPlan(occurrence) && !stoppedByRun(occurrence))
+      .map(plannedIdentity),
     desiredOccurrences,
     existingOccurrenceKeys,
     desiredOccurrenceKeys,
@@ -367,7 +379,9 @@ function planOccurrenceGenerationForWindow(
           ) &&
           isAfter(normalizeInstant(occurrence.scheduledFor), input.now) &&
           !hasNonEmptyNote(occurrence.note) &&
-          !occurrence.hasTimeSessions,
+          !occurrence.hasTimeSessions &&
+          // Rewriting a cross-day row's plan would drop the day it was moved from.
+          !isCrossDay(occurrence),
       )
       .flatMap((occurrence) => {
         const desired = desiredByOccurrenceKey.get(
@@ -632,6 +646,26 @@ function desiredKeysKeptByExisting(
     if (choice) kept.add(occurrenceIdentityKey(choice));
   }
   return kept;
+}
+
+/** The local date of an Occurrence's planned time in the Behavior's timezone. */
+function plannedLocalDate(
+  occurrence: Pick<ExistingOccurrenceForGeneration, "scheduledFor">,
+  timezone: string,
+): string {
+  return normalizeInstant(occurrence.scheduledFor).toZonedDateTimeISO(timezone).toPlainDate().toString();
+}
+
+/**
+ * True for a moved row whose day differs from its planned time's day: a cross-day move
+ * (move_occurrence_to_date) changes `local_date` and the effective time and keeps the
+ * planned time and the schedule fields, so the planned day stays derivable.
+ */
+function isCrossDayMove(
+  occurrence: Pick<ExistingOccurrenceForGeneration, "scheduledFor" | "localDate" | "moved">,
+  timezone: string,
+): boolean {
+  return Boolean(occurrence.moved) && plannedLocalDate(occurrence, timezone) !== occurrence.localDate;
 }
 
 function occurrenceIdentityKey(occurrence: {

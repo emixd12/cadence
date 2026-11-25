@@ -402,4 +402,87 @@ describe("google-calendar-mcp-provider", () => {
     expect(result.partialSnapshot.events).toHaveLength(1);
     expect(() => validateExternalEventSnapshot(result.partialSnapshot)).not.toThrow();
   });
+
+  describe("beforeRequest (per-request MCP budget charge)", () => {
+    const eventPage = (id: string, nextPageToken?: string) => jsonRpcResponse({
+      events: [{
+        id,
+        status: "confirmed",
+        summary: id,
+        start: { dateTime: "2026-11-25T09:00:00Z" },
+        end: { dateTime: "2026-11-25T09:30:00Z" },
+      }],
+      ...(nextPageToken ? { nextPageToken } : {}),
+    });
+
+    it("runs once before each list_events page", async () => {
+      const order: string[] = [];
+      const pages = [eventPage("e1", "p2"), eventPage("e2", "p3"), eventPage("e3")];
+      const fetchMock = vi.fn(async () => { order.push("fetch"); return pages.shift()!; });
+      const beforeRequest = vi.fn(() => { order.push("charge"); });
+
+      const result = await readGoogleCalendarMcpEvents({
+        accessToken: "tok", accountId: "user-1", connectionGeneration: 1,
+        calendars: [BASE_CALENDAR], range: BASE_RANGE, fetchedAt: "2026-11-25T12:00:00Z",
+        fetch: fetchMock, beforeRequest,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(beforeRequest).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(order).toEqual(["charge", "fetch", "charge", "fetch", "charge", "fetch"]);
+    });
+
+    it("runs before each retry attempt and each list_calendars page", async () => {
+      const responses = [
+        new Response("unavailable", { status: 503 }),
+        jsonRpcResponse({ calendars: [{ id: "a", summary: "A", accessRole: "owner" }], nextPageToken: "p2" }),
+        jsonRpcResponse({ calendars: [{ id: "b", summary: "B", accessRole: "owner" }] }),
+      ];
+      const fetchMock = vi.fn(async () => responses.shift()!);
+      const beforeRequest = vi.fn();
+
+      const calendars = await listGoogleCalendarMcpCalendars({
+        accessToken: "tok", fetch: fetchMock, beforeRequest, sleep: async () => {},
+      });
+
+      expect(calendars.map((calendar) => calendar.id)).toEqual(["a", "b"]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(beforeRequest).toHaveBeenCalledTimes(3);
+    });
+
+    it("propagates a beforeRequest throw without fetching or retrying", async () => {
+      class BudgetSpent extends Error {}
+      const fetchMock = vi.fn();
+      const sleep = vi.fn(async () => {});
+      const beforeRequest = vi.fn(() => { throw new BudgetSpent("spent"); });
+
+      await expect(callGoogleCalendarMcpTool({
+        accessToken: "tok", toolName: "list_calendars", arguments: {},
+        fetch: fetchMock, beforeRequest, sleep, maxRetries: 2,
+      })).rejects.toBeInstanceOf(BudgetSpent);
+      expect(beforeRequest).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(sleep).not.toHaveBeenCalled();
+    });
+
+    it("ends an event read with the beforeRequest error mid-pagination instead of a partial provider failure", async () => {
+      class BudgetSpent extends Error {}
+      const pages = [eventPage("e1", "p2"), eventPage("e2", "p3"), eventPage("e3")];
+      const fetchMock = vi.fn(async () => pages.shift()!);
+      let allowed = 2;
+      const beforeRequest = vi.fn(() => {
+        if (allowed === 0) throw new BudgetSpent("spent");
+        allowed -= 1;
+      });
+
+      await expect(readGoogleCalendarMcpEvents({
+        accessToken: "tok", accountId: "user-1", connectionGeneration: 1,
+        calendars: [BASE_CALENDAR], range: BASE_RANGE, fetchedAt: "2026-11-25T12:00:00Z",
+        fetch: fetchMock, beforeRequest,
+      })).rejects.toBeInstanceOf(BudgetSpent);
+      expect(beforeRequest).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });

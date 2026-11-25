@@ -21,9 +21,13 @@ import { getCalendarConnection, getCalendarEventsForAdvisor, type CalendarCaller
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { screenExternalCalendarTextWithModelArmor } from "@/lib/services/model-armor.service";
+import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { assertTravelProviderReady, readTravelProviderConfig } from "@/lib/services/travel-provider";
+import type { TravelRouteDisplay } from "@/lib/services/travel-display.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
 import { getPersistedHevyActivities } from "@/lib/services/recorded-activity-sync.service";
+import { listTimeSessionsByOccurrenceIds } from "@/lib/db/timeSessions.repo";
 import {
   CALENDAR_LOAD_MAX_QUERY_DAYS,
   getDailyCalendarLoadForUser,
@@ -83,6 +87,12 @@ export type LiveChatConnectorReadsOptions = Readonly<{
   today?: () => string;
   timezone?: string;
   onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>;
+  /**
+   * One local day's route estimates, or null when travel is off or cannot run. Defaults
+   * to the Timeline's own refresh (`refreshTravelRoutes`): the person's travel consent,
+   * Home, remembered places, the spend budget and the reused-route cache all apply.
+   */
+  travelRouteEvidence?: (localDate: string) => Promise<TravelRouteDisplay | null>;
 }>;
 
 const CALENDAR_READ_MS = 12_000;
@@ -248,25 +258,42 @@ export function liveChatConnectorReads(
         ),
       );
       const events = reads.flatMap((read) => read.events).sort((a, b) => a.start.localeCompare(b.start));
-      const trips: ChatTravelHorizonTripInput[] = [];
+      const located: Array<Readonly<{ event: ChatCalendarEvent; localDate: string }>> = [];
       for (const event of events) {
         if (event.all_day || !event.busy || !event.location || !event.location.trim()) continue;
         try {
-          const startZdt = Temporal.Instant.from(event.start).toZonedDateTimeISO(timezone);
-          trips.push({
-            localDate: startZdt.toPlainDate().toString(),
-            tripLabel: event.title,
-            destinationLabel: event.location.trim(),
-            mode: "driving",
-            departureAt: null,
-            arrivalAt: event.start,
-            durationSeconds: null,
-            bufferMinutes: 10,
-          });
+          const localDate = Temporal.Instant.from(event.start).toZonedDateTimeISO(timezone).toPlainDate().toString();
+          located.push({ event, localDate });
         } catch {
           // Skip malformed event timestamps
         }
       }
+      // Route estimates for the days that have a located event. A day that fails or has
+      // travel off keeps its trips without estimates (null leave-by and duration).
+      const routeEvidence = readOptions.travelRouteEvidence ?? ((localDate: string) => defaultTravelRouteEvidence(caller, localDate));
+      const estimatesByDay = new Map<string, ReadonlyMap<number, ChatTripRouteEstimate>>();
+      await Promise.all([...new Set(located.map((item) => item.localDate))].map(async (localDate) => {
+        try {
+          const evidence = await routeEvidence(localDate);
+          if (evidence) estimatesByDay.set(localDate, tripEstimatesByStart(evidence));
+        } catch {
+          // Travel off, not configured, over budget or changed: no estimates for this day.
+        }
+      }));
+      const trips: ChatTravelHorizonTripInput[] = located.map(({ event, localDate }) => {
+        const estimate = estimatesByDay.get(localDate)?.get(Temporal.Instant.from(event.start).epochMilliseconds) ?? null;
+        return {
+          localDate,
+          tripLabel: event.title,
+          destinationLabel: event.location!.trim(),
+          mode: estimate?.mode ?? "driving",
+          departureAt: estimate?.departureAt ?? null,
+          arrivalAt: estimate?.arrivalAt ?? event.start,
+          durationSeconds: estimate?.durationSeconds ?? null,
+          bufferMinutes: CHAT_TRIP_BUFFER_MINUTES,
+          ...(estimate?.late ? { late: true } : {}),
+        };
+      });
       let occurrences: ChatTravelHorizonOccurrenceInput[] = [];
       try {
         const { data } = await caller.client
@@ -318,22 +345,16 @@ export function liveChatConnectorReads(
       try {
         const { data } = await caller.client
           .from("occurrences")
-          .select("behavior_id, local_date, status, effective_start_at, effective_end_at")
+          .select("id, behavior_id, local_date, status")
           .eq("user_id", caller.user.id)
           .gte("local_date", startStr)
           .lte("local_date", endStr);
-        occurrences = (data ?? []).map((row) => {
-          let trackedDurationMinutes: number | null = null;
-          if (row.effective_start_at && row.effective_end_at) {
-            try {
-              const sec = Temporal.Instant.from(row.effective_start_at)
-                .until(Temporal.Instant.from(row.effective_end_at))
-                .total({ unit: "seconds" });
-              if (sec > 0) trackedDurationMinutes = Math.round(sec / 60);
-            } catch {
-              trackedDurationMinutes = null;
-            }
-          }
+        const rows = data ?? [];
+        // Tracked time comes from finished time sessions only, never from the planned or
+        // moved time: no finished session means no tracked duration.
+        const trackedMinutes = await trackedMinutesByOccurrence(caller, rows.map((row) => row.id));
+        occurrences = rows.map((row) => {
+          const trackedDurationMinutes = trackedMinutes.get(row.id) ?? null;
           const status = row.status === "completed" || row.status === "not_completed" ? row.status : "unresolved";
           return {
             behaviorId: row.behavior_id,
@@ -375,6 +396,97 @@ export function liveChatConnectorReads(
       return { proposalOutcomes, occurrences };
     },
   };
+}
+
+const CHAT_TRIP_BUFFER_MINUTES = 10;
+
+/** Minutes of finished time sessions per Occurrence; an unreadable history gives none. */
+async function trackedMinutesByOccurrence(caller: CalendarCaller, occurrenceIds: readonly string[]): Promise<ReadonlyMap<string, number>> {
+  const minutes = new Map<string, number>();
+  if (occurrenceIds.length === 0) return minutes;
+  let sessions: Awaited<ReturnType<typeof listTimeSessionsByOccurrenceIds>>;
+  try {
+    sessions = await listTimeSessionsByOccurrenceIds(caller.client, { userId: caller.user.id, occurrenceIds: [...occurrenceIds] });
+  } catch {
+    return minutes;
+  }
+  const seconds = new Map<string, number>();
+  for (const session of sessions) {
+    if (!session.stopped_at) continue;
+    try {
+      const length = Temporal.Instant.from(session.started_at).until(Temporal.Instant.from(session.stopped_at)).total({ unit: "seconds" });
+      if (length > 0) seconds.set(session.occurrence_id, (seconds.get(session.occurrence_id) ?? 0) + length);
+    } catch {
+      // A malformed session adds nothing.
+    }
+  }
+  for (const [occurrenceId, total] of seconds) {
+    const rounded = Math.round(total / 60);
+    if (rounded > 0) minutes.set(occurrenceId, rounded);
+  }
+  return minutes;
+}
+
+type ChatTripRouteEstimate = Readonly<{
+  mode: ChatTravelHorizonTripInput["mode"];
+  departureAt: string;
+  arrivalAt: string;
+  durationSeconds: number;
+  late: boolean;
+}>;
+
+/**
+ * Current outbound and onward legs keyed by their destination commitment's start
+ * (epoch milliseconds). The commitment segment carries that start, so a Calendar event
+ * read for chat matches its routed leg by start time without any event id.
+ */
+function tripEstimatesByStart(evidence: TravelRouteDisplay): ReadonlyMap<number, ChatTripRouteEstimate> {
+  const startByRef = new Map<string, number>();
+  for (const segment of evidence.segments) {
+    if (segment.kind !== "commitment") continue;
+    const start = Temporal.Instant.from(segment.startAt).epochMilliseconds;
+    for (const ref of segment.sourceRefs) startByRef.set(ref, start);
+  }
+  const estimates = new Map<number, ChatTripRouteEstimate>();
+  for (const item of evidence.legs) {
+    const ref = item.leg.destinationCommitmentRef;
+    if (item.leg.role === "return" || !ref || item.state !== "current" || !item.estimate) continue;
+    const start = startByRef.get(ref);
+    if (start === undefined || estimates.has(start)) continue;
+    estimates.set(start, {
+      mode: item.leg.mode,
+      departureAt: item.estimate.departureAt,
+      arrivalAt: item.estimate.arrivalAt,
+      durationSeconds: item.estimate.durationSeconds,
+      late: item.late === true,
+    });
+  }
+  return estimates;
+}
+
+/** The Timeline's one-day refresh, or null when the travel provider is not ready. */
+async function defaultTravelRouteEvidence(caller: CalendarCaller, localDate: string): Promise<TravelRouteDisplay | null> {
+  const config = readTravelProviderConfig(process.env, await requestOidcToken());
+  try {
+    assertTravelProviderReady(config);
+  } catch {
+    return null;
+  }
+  const response = await refreshTravelRoutes(
+    caller,
+    { scope: "day", startLocalDate: localDate, endLocalDate: localDate, device: null, corrections: [] },
+    config,
+  );
+  return response.evidence;
+}
+
+async function requestOidcToken(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    return (await headers()).get("x-vercel-oidc-token")?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Source, error code and error class only: never event content, ids or messages. */
@@ -947,10 +1059,22 @@ async function moveOccurrenceToDateTool(
     durationSeconds = Math.round(behavior.default_duration_minutes * 60);
   }
 
-  const newStartIso = newStartInstant.toString();
-  const effectiveStartIso = durationSeconds !== null ? newStartIso : null;
-  const effectiveEndIso = durationSeconds !== null ? newStartInstant.add({ seconds: durationSeconds }).toString() : null;
+  // The RPC keeps the planned time and writes the target as effective time; a null end
+  // takes the schedule's own length.
+  const targetStartIso = newStartInstant.toString();
+  // Back on the planned day at the planned time (Undo): send no end, so the row follows its plan again.
+  const backToPlan = Temporal.Instant.compare(newStartInstant, Temporal.Instant.from(occurrence.scheduled_for)) === 0;
+  const targetEndIso = durationSeconds !== null && !backToPlan
+    ? newStartInstant.add({ seconds: durationSeconds }).toString()
+    : null;
 
+  type MoveOccurrenceRefusal =
+    | "not_found"
+    | "already_resolved"
+    | "revision_changed"
+    | "start_not_on_day"
+    | "no_change"
+    | "destination_conflict";
   type MoveOccurrenceRpcResult =
     | {
         ok: true;
@@ -970,10 +1094,7 @@ async function moveOccurrenceToDateTool(
           effective_end_at: string | null;
         };
       }
-    | {
-        ok: false;
-        reason: "not_found" | "already_resolved" | "revision_changed";
-      };
+    | { ok: false; reason: MoveOccurrenceRefusal };
 
   const rpcClient = context.supabase as unknown as {
     rpc: (
@@ -981,9 +1102,8 @@ async function moveOccurrenceToDateTool(
       params: {
         p_occurrence_id: string;
         p_target_local_date: string;
-        p_new_scheduled_for: string;
-        p_new_effective_start_at: string | null;
-        p_new_effective_end_at: string | null;
+        p_target_start_at: string;
+        p_target_end_at: string | null;
         p_expected_revision: string;
       },
     ) => Promise<{ data: MoveOccurrenceRpcResult | null; error: unknown }>;
@@ -992,9 +1112,8 @@ async function moveOccurrenceToDateTool(
   const { data: rpcResult, error: rpcError } = await rpcClient.rpc("move_occurrence_to_date", {
     p_occurrence_id: occurrenceId,
     p_target_local_date: targetLocalDate,
-    p_new_scheduled_for: newStartIso,
-    p_new_effective_start_at: effectiveStartIso,
-    p_new_effective_end_at: effectiveEndIso,
+    p_target_start_at: targetStartIso,
+    p_target_end_at: targetEndIso,
     p_expected_revision: expectedRevision,
   });
 
@@ -1005,28 +1124,7 @@ async function moveOccurrenceToDateTool(
     if (rpcResult.reason === "not_found") {
       return { ok: false, error: { code: "not_found", message: "Occurrence not found." } };
     }
-    if (rpcResult.reason === "already_resolved") {
-      return {
-        ok: true,
-        result: {
-          outcome: "refused",
-          refusal: {
-            reason: "already_resolved",
-            message: "That item is already marked, so it cannot be moved.",
-          },
-        },
-      };
-    }
-    return {
-      ok: true,
-      result: {
-        outcome: "refused",
-        refusal: {
-          reason: "revision_changed",
-          message: "That item changed since it was read.",
-        },
-      },
-    };
+    return { ok: true, result: { outcome: "refused", refusal: crossDayMoveRefusal(rpcResult.reason) } };
   }
 
   const updated = rpcResult.occurrence;
@@ -1050,4 +1148,16 @@ async function moveOccurrenceToDateTool(
       previous: rpcResult.previous,
     },
   };
+}
+
+const CROSS_DAY_MOVE_REFUSALS: Readonly<Record<string, string>> = {
+  already_resolved: "That item is already marked, so it cannot be moved.",
+  revision_changed: "That item changed since it was read.",
+  start_not_on_day: "That start time is not on the chosen day.",
+  no_change: "That item is already there.",
+  destination_conflict: "That day already has this item at the same time slot.",
+};
+
+function crossDayMoveRefusal(reason: string): { reason: string; message: string } {
+  return { reason, message: CROSS_DAY_MOVE_REFUSALS[reason] ?? "That item could not be moved." };
 }

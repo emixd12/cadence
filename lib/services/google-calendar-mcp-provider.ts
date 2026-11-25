@@ -102,6 +102,13 @@ export type GoogleCalendarMcpListInput = Readonly<{
   timeoutMs?: number;
   maxPages?: number;
   maxRetries?: number;
+  /**
+   * Runs before every outbound MCP HTTP request, including retries and later pages.
+   * A throw stops the call before `fetch` runs and propagates unchanged: it is never
+   * retried or reported as a provider failure. The service uses it to charge the
+   * per-user daily MCP budget once per request.
+   */
+  beforeRequest?: () => void;
   maxTotalBytes?: number;
   maxElapsedMs?: number;
   sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
@@ -123,6 +130,13 @@ export type GoogleCalendarMcpReadInput = Readonly<{
   timeoutMs?: number;
   maxPagesPerCalendar?: number;
   maxRetries?: number;
+  /**
+   * Runs before every outbound MCP HTTP request, including retries and later pages.
+   * A throw stops the call before `fetch` runs and propagates unchanged: it is never
+   * retried or reported as a provider failure. The service uses it to charge the
+   * per-user daily MCP budget once per request.
+   */
+  beforeRequest?: () => void;
   maxTotalBytes?: number;
   maxElapsedMs?: number;
   sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
@@ -142,6 +156,13 @@ export type GoogleCalendarMcpToolCallInput = Readonly<{
   signal?: AbortSignal;
   timeoutMs?: number;
   maxRetries?: number;
+  /**
+   * Runs before every outbound MCP HTTP request, including retries and later pages.
+   * A throw stops the call before `fetch` runs and propagates unchanged: it is never
+   * retried or reported as a provider failure. The service uses it to charge the
+   * per-user daily MCP budget once per request.
+   */
+  beforeRequest?: () => void;
   sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
 }>;
@@ -234,6 +255,10 @@ export async function callGoogleCalendarMcpTool(
     if (input.sessionId) {
       headers["MCP-Session-Id"] = input.sessionId;
     }
+
+    // Outside the try below: a throw here (budget exhausted) must not be retried
+    // or turned into a provider failure, and no request is sent.
+    input.beforeRequest?.();
 
     try {
       response = await runProviderCallWithTimeout(
@@ -398,6 +423,7 @@ export async function listGoogleCalendarMcpCalendars(
       signal: input.signal,
       timeoutMs: input.timeoutMs,
       maxRetries: input.maxRetries,
+      beforeRequest: input.beforeRequest,
       sleep: input.sleep,
       random: input.random,
     });
@@ -485,6 +511,20 @@ export async function readGoogleCalendarMcpEvents(
   let sessionId: string | null = input.sessionId ?? null;
   let requestCount = 0;
   let totalBytes = 0;
+  // A `beforeRequest` throw ends the whole read and propagates unchanged. It is not a
+  // calendar failure, so no partial snapshot is returned for it.
+  const gate: { blocked: boolean; error: unknown } = { blocked: false, error: undefined };
+  const beforeRequest = input.beforeRequest
+    ? () => {
+        try {
+          input.beforeRequest?.();
+        } catch (error) {
+          gate.blocked = true;
+          gate.error = error;
+          throw error;
+        }
+      }
+    : undefined;
 
   for (const calendar of input.calendars) {
     let pageToken: string | null = null;
@@ -539,6 +579,7 @@ export async function readGoogleCalendarMcpEvents(
             signal: input.signal,
             timeoutMs: input.timeoutMs,
             maxRetries: input.maxRetries,
+            beforeRequest,
             sleep: input.sleep,
             random: input.random,
           });
@@ -610,6 +651,7 @@ export async function readGoogleCalendarMcpEvents(
         }
       }
     } catch (error) {
+      if (gate.blocked) throw gate.error;
       const requestFailure = error instanceof McpRequestError
         ? error
         : new McpRequestError(mcpFailure({

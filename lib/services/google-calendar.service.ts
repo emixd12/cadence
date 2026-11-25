@@ -180,7 +180,7 @@ async function seedAiSelectionFromTimeline(userId: string, mcpAccessToken: strin
   ]);
   if (!standard || standard.status !== "connected" || standard.preferences.selectedCalendarIds.length === 0) return 0;
   if (!agent || agent.status !== "connected" || agent.preferences.selectedCalendarIds.length > 0) return 0;
-  const mcpCalendars = await listGoogleCalendarMcpCalendars({ accessToken: mcpAccessToken });
+  const mcpCalendars = await listGoogleCalendarMcpCalendars({ accessToken: mcpAccessToken, beforeRequest: chargeMcpRequest(userId) });
   const mcpIds = new Set(mcpCalendars.map((calendar) => calendar.id));
   const copied = standard.preferences.selectedCalendarIds.filter((id) => mcpIds.has(id));
   const skipped = standard.preferences.selectedCalendarIds.length - copied.length;
@@ -283,6 +283,18 @@ function mapMcpErrorToCalendarConnectionError(error: GoogleCalendarMcpProviderEr
   }
 }
 
+/**
+ * Charges one unit of the per-user daily MCP budget before each outbound MCP request,
+ * including retries and later pages. Cache hits send no request and cost nothing.
+ * When the budget is spent it throws before the request is sent.
+ */
+function chargeMcpRequest(userId: string): () => void {
+  return () => {
+    const budget = consumeGoogleCalendarMcpBudget(userId, 1);
+    if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
+  };
+}
+
 async function listMcpCalendarsForConnection(
   caller: CalendarReadCaller,
   connection: CalendarConnection,
@@ -296,11 +308,9 @@ async function listMcpCalendarsForConnection(
   };
   const cached = getCachedGoogleCalendarMcpCalendars(cacheKey);
   if (cached) return cached;
-  const budget = consumeGoogleCalendarMcpBudget(caller.user.id, 1);
-  if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
   const access = token ?? await accessToken(connection);
   try {
-    const calendars = await listGoogleCalendarMcpCalendars({ accessToken: access, signal });
+    const calendars = await listGoogleCalendarMcpCalendars({ accessToken: access, signal, beforeRequest: chargeMcpRequest(caller.user.id) });
     setCachedGoogleCalendarMcpCalendars(cacheKey, calendars);
     return calendars;
   } catch (error) {
@@ -544,8 +554,6 @@ async function readAuthorizedMcpCalendarRange(
       if (selected.length === 0) {
         return { ok: true, snapshot: buildEmptyCompleteMcpSnapshot(caller.user.id, connection.generation, start, end, profile.timezone, now.toString()) };
       }
-      const budget = consumeGoogleCalendarMcpBudget(caller.user.id, selected.length);
-      if (!budget.allowed) throw new CalendarConnectionError("rate_limited");
       const mcpResult = await readGoogleCalendarMcpEvents({
         accessToken: token,
         accountId: caller.user.id,
@@ -559,6 +567,7 @@ async function readAuthorizedMcpCalendarRange(
         },
         fetchedAt: now.toString(),
         signal: options.signal,
+        beforeRequest: chargeMcpRequest(caller.user.id),
       });
       if (mcpResult.ok) {
         const screened = await screenSnapshotWithModelArmor(mcpResult.snapshot, { signal: options.signal });
