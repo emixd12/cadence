@@ -237,6 +237,7 @@ export function NoteEditor({
           }}
           rows={3}
           autoFocus={autoFocus}
+          data-surface="default"
           className="min-h-24 resize-y border border-line bg-background px-3 py-2 text-base font-normal leading-7 text-foreground placeholder:text-muted-readable"
           placeholder={placeholder}
         />
@@ -289,9 +290,7 @@ function ActionMessage({ state }: Readonly<{ state: OccurrenceActionState }>) {
     <p
       className={[
         "text-sm leading-6",
-        state.status === "success"
-          ? "text-[color:var(--timeline-detail-strong,var(--foreground))]"
-          : "text-[color:var(--timeline-detail-error,var(--accent))]",
+        state.status === "success" ? "text-foreground" : "text-alert-signal",
       ].join(" ")}
       role={state.status === "error" ? "alert" : "status"}
     >

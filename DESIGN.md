@@ -277,6 +277,14 @@ The palette is almost monochrome: black ink, bleached paper, subtle gray, and on
 
 **The Contrast Rule.** Use Ash Line for all borders and quiet separators. Use Readable Ash or Ink Black for text that the user must read.
 
+### Surface-Scoped Semantic Tokens
+
+`packages/ui/tokens.css` separates **theme-level base tokens** (`--theme-background`, `--theme-foreground`, `--theme-muted-readable`, `--theme-line`, `--theme-primary`, `--theme-primary-foreground`, `--theme-accent`, `--theme-accent-foreground`, `--theme-focus`) from **surface-scoped semantic tokens** (`--foreground`, `--muted-readable`, `--muted-foreground`, `--line`, `--alert-signal`, `--alert-foreground`, `--focus`).
+
+- Any container with a colored fill declares `data-surface="primary"` (Monolith Blue) or `data-surface="accent"` (Rust Signal). Descendants written with standard semantic classes (`text-foreground`, `text-muted-readable`, `border-line`, `text-alert-signal`, `.product-action`) adapt automatically without component-specific color overrides.
+- Any nested default-background island inside a colored container (such as a `bg-background` `<input>` or `<textarea>`) resets with `data-surface="default"`, which re-binds semantic tokens back to `--theme-*`.
+- Because `[data-surface="default"]` references `--theme-*` rather than hardcoded light colors, a future dark/night mode only needs to override `--theme-*` on `:root` (for example `:root[data-theme="dark"]`).
+
 ## 3. Typography
 
 **Display Font:** IBM Plex Sans
