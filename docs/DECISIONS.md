@@ -3086,3 +3086,75 @@ consumers); desktop unaffected (hosted-only, no SQLite migration or `account_syn
 Macs inherit hosted Brief/Chat/Timeline reads automatically); marketing not applicable; future mobile
 deferred (inherits hosted path). Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated,
 `L-026` logged.
+
+## 2026-11-25: Google Workspace Calendar MCP migration, AI Tools Addendum compliance, and conversational travel organizing
+
+Owner decisions Q1–Q8 on November 25, 2026 (`docs/LEGAL.md` **L-027**, **L-026**, **L-001**;
+plan: `docs/plans/2026-11-25-google-workspace-mcp-migration.md`):
+
+- **Q1 — Mandatory Calendar MCP + Option B AI travel rebuild + hybrid Chat travel organizing:**
+  Migrate all AI Google Calendar reads (Daily Brief, Advisor Chat, Google `daily_calendar_load`)
+  to `calendarmcp.googleapis.com` using the separate agent-classified OAuth client
+  (`cadence-calendar-agent-prod`), closing all four REST-to-AI leak paths (direct reads,
+  `daily_calendar_load`, Travel signed tokens, client-relayed `calendarBusy`, plus latent
+  `day_loads`). Rebuild Google-event travel fit and travel-time buffers for AI from authorized
+  MCP events (replacing `etag`-dependent matching in `withSuppliedConclusions` so Outlook and
+  iCloud stay intact). Protect MCP and Routes quotas via short-TTL per-user MCP snapshot/list
+  caching (5–15 min, keyed by `(userId, grantGeneration, selectionRevision)`) and
+  provenance-safe Routes estimate reuse by `(origin, destination, mode, departure time bucket)`.
+  Fold conversational travel organizing into this pre-Feb-1 track: hybrid Chat UI under `L-001`
+  (deterministic fit/conflict conclusions & free windows to the LLM; structured exact leave-by
+  and duration travel cards rendered inline by Cadence), **today + 7-day lookahead**, cross-day
+  occurrence moves and recurring schedule remodeling (with explicit user confirmation), and a
+  two-layer longitudinal baseline (rolling ≤30-day live MCP/travel layer + indefinite
+  first-party behavioral records layer). Log an AI-friendly routing provider investigation in
+  `docs/FUTURE_UPDATES.md`. If Google Data Access verification slips past Feb 1, 2027,
+  temporarily disable Google Calendar in AI inputs until approved.
+- **Q2 — `daily_calendar_load` ≤30-day cap + ephemeral >30-day Chat lookbacks + opted-in longitudinal review:**
+  Populate Google rows in `daily_calendar_load` strictly from AI MCP reads (no Timeline REST
+  write-through or Timeline-save backfill), cap persisted Google rows at **≤30 days**, and
+  hard-delete atomically on AI disconnect (Outlook/iCloud keep 366-day rollups). Extend Chat's
+  `list_calendar_load` to compute missing >30-day Google spans ephemerally in memory via MCP
+  and discard them immediately after the turn. Add an explicit, separate user opt-in (with
+  Settings off switch) for an activity-gated (active within 7–14 days) weekly/monthly
+  longitudinal calendar-load review whose >30-day Google inputs are discarded immediately and
+  whose persisted summary follows the ≤30-day cap and disconnect purge.
+- **Q3 & Q6 — Canonical Settings home, chained onboarding, independent AI picker, no cutover banner:**
+  Keep one canonical `Connected sources → Google Calendar` row (status pill: `Not connected` /
+  `Timeline only` / `AI only` / `Timeline & AI`), split internally into **Timeline & Travel**
+  and **AI features (Daily Brief & Chat)** with separate disconnects. Chain AI connect
+  immediately after Timeline connect when AI features are enabled. Keep the AI picker
+  collapsed by default as selected-calendar pills with simple checkboxes only, seeded once from
+  Timeline's selected calendars on first AI connect (with a one-time note only if hidden
+  calendars could not be copied), plus a quiet drift hint under Timeline's picker (*"AI features
+  use a separate selection (N calendars)."*) with one-click **Sync to AI**. In `AI features`,
+  show a compact inline **Connect Google Calendar for AI** shortcut when Timeline is connected
+  and AI is not, and a read summary + **Manage in Connected sources** link under Choose sources.
+  No 2-week pre-cutover banner; cut production over once Phases 0–4 pass QA.
+- **Q4 — Atomic §2(d) disconnect deletion, keep Chat threads until disconnect with ≤30d summary cap:**
+  On AI disconnect or token revocation only (not on AI source toggle-off or AI features off),
+  atomically delete Google-Calendar-touched Chat conversations (warning that Undo clears while
+  completed schedule changes stay) along with `daily_brief_days`, `move_proposals`,
+  `opportunity_proposals`, `agent_run_contents`, Google `daily_calendar_load`, and longitudinal
+  review rows. Keep Calendar-touched Chat threads until disconnect/delete while capping
+  `chat_conversations.summary` at ≤30 days. Backfill-tag existing chats since Nov 19 with
+  `subject: "calendar"`. Stale Oct 16 & Oct 23 `.local/briefing-bench/` live captures deleted
+  November 25, 2026.
+- **Q5 — Google Cloud Model Armor + keep T12 immediate Chat writes:**
+  Enable Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) on
+  `cadence-calendar-agent-prod` alongside in-app sanitization/framing; keep T12 immediate
+  single-record Chat writes with Undo (confirmation gate deferred in `docs/FUTURE_UPDATES.md`).
+- **Q7 — Bundle into Cadence for Mac `0.1.16`:**
+  Hold Mac `0.1.16` to bundle the versioned `purpose=ai_mcp` broker and shared Settings UI
+  after Phase 4.
+- **Q8 — Standard Tier ($0) budget posture:**
+  Stay on Standard Tier ($0, billing off) with a 3,500 req/day monitoring alert, 40
+  req/user/day per-account cap, snapshot + `list_calendars` caching, and graceful degradation
+  (one-line notice, never falling back to REST); defer any global monthly spend cap until
+  Scaled Tier is needed.
+
+Platform impact: web (Phases 1A–6 + hybrid Chat travel UI + longitudinal review), desktop
+(bundled in Cadence for Mac `0.1.16` with `purpose=ai_mcp` and shared Settings UI), marketing
+(Ticket 246 follow-up), future mobile (deferred; inherits separated REST/MCP contract).
+Messaging impact: `P-090` (relates to `P-010`, `P-012`, `P-035`, `P-060`, `P-065`, `P-066`,
+`P-088`, `P-089`). Legal: `L-001`, `L-021`, `L-026`, `L-027`.

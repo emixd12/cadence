@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-086` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-091` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -131,6 +131,12 @@ Status values:
 | [P-075](#p-075-pause-back-on-day-rule) | Pause back-on day rule | logged | Ended and Paused plan | in-app copy, MCP |
 | [P-076](#p-076-behaviors-no-longer-archive-by-themselves) | Behaviors no longer archive by themselves | logged | Ended and Paused plan | in-app copy, user guide, MCP |
 | [P-077](#p-077-ended-and-paused-on-the-web) | Ended and Paused on the web | logged | Ended and Paused plan | in-app copy, user guide |
+| [P-085](#p-085-recorded-activity--hevy-section-removed-from-timeline-header) | Recorded activity · Hevy section removed from Timeline header | logged | — | user guide |
+| [P-086](#p-086-advisor-speech-pill-replaces-advisordayline-and-advisor--1-new) | Advisor speech pill replaces AdvisorDayLine and "Advisor · 1 new" | logged | — | user guide |
+| [P-087](#p-087-persisted-hevy-workout-timing-recorded_activities-and-daily-background-sync-for-unlinked-accounts) | Persisted Hevy workout timing (`recorded_activities`) and daily background sync for unlinked accounts | logged | 352, 353 | Privacy, Trust, in-app copy, user guide, marketing |
+| [P-088](#p-088-persisted-derived-daily-calendar-busy-load-rollups-daily_calendar_load) | Persisted derived daily calendar busy-load rollups (`daily_calendar_load`) | logged | 354 | Privacy, Trust, user guide, provider submissions |
+| [P-089](#p-089-ai-chat-and-daily-brief-reading-past-calendar-history-on-demand) | AI (Chat and Daily Brief) reading past calendar history on demand | logged | 355 | Privacy, user guide, provider submissions |
+| [P-090](#p-090-google-workspace-mcp-migration-ai-calendar-consent-retention-longitudinal-review-and-travel-chat) | Google Workspace MCP migration, AI Calendar consent, retention, longitudinal review, and travel Chat | logged | 187, 245, 246, 307, 354, 355 | Privacy, Terms, in-app copy, user guide, provider submissions |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -2447,4 +2453,66 @@ cite has not changed.
   and upcoming days only.
 - **Update needed:** note that when AI calendar access is enabled, Chat may live-read bounded
   past date windows (up to 31 days per call) on demand without storing raw events.
+- **Status:** logged.
+
+## P-090: Google Workspace MCP migration, AI Calendar consent, retention, longitudinal review, and travel Chat
+
+- **Change:** locked November 25, 2026 (`docs/DECISIONS.md`, 2026-11-25; `docs/LEGAL.md` L-027;
+  `docs/plans/2026-11-25-google-workspace-mcp-migration.md`) in response to Google's November
+  24, 2026 Workspace AI Tools Addendum (effective February 1, 2027):
+  1. **Two Google Calendar grants in one canonical Settings home:** `Connected sources → Google Calendar`
+     splits into **Timeline & Travel** (`cadence-calendar-498717`, REST) and **AI features
+     (Daily Brief & Chat)** (`cadence-calendar-agent-prod`, `calendarmcp.googleapis.com`), with
+     independent disconnects, chained Step-2 onboarding when AI is on, independent AI calendar
+     picker (seeded once from Timeline with one-click Sync to AI), and a compact shortcut in
+     `AI features`.
+  2. **Derived-data retention & disconnect deletion:** Google rows in `daily_calendar_load` are
+     populated strictly from AI MCP reads and capped at ≤30 days; `chat_conversations.summary`,
+     `agent_run_contents`, and longitudinal review outputs are capped at ≤30 days; Chat
+     conversations touching Google Calendar stay until disconnect/delete, and disconnecting or
+     revoking the AI Google Calendar grant atomically deletes all Google-Calendar-touched Chat
+     conversations (clearing Undo while keeping completed schedule changes), `daily_brief_days`,
+     `move_proposals`, `opportunity_proposals`, `agent_run_contents`, Google
+     `daily_calendar_load`, and longitudinal review rows.
+  3. **Ephemeral >30-day lookbacks & opted-in longitudinal review:** Chat's `list_calendar_load`
+     may read >30-day Google spans ephemerally via MCP (discarded immediately after the turn).
+     An explicit, separate user opt-in (with an off switch in Settings) authorizes an
+     activity-gated weekly/monthly longitudinal calendar-load review whose >30-day Google inputs
+     are discarded immediately and whose derived summary follows the ≤30-day cap and disconnect
+     purge.
+  4. **Prompt-injection screening:** Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud
+     Logging OFF) screens AI Calendar inputs alongside Cadence's in-app sanitization while
+     keeping T12 immediate single-record Chat writes with Undo.
+  5. **Hybrid Chat travel organizing (7-day lookahead):** Chat gains travel-fit tools (sending
+     only deterministic fit/conflict conclusions and free windows to the model, rendering exact
+     leave-by times and durations inline in Cadence UI cards under `L-001`) plus cross-day
+     moves and recurring schedule remodeling with user confirmation.
+- **Affected:** Tickets 245 (Google sensitive-scope verification for `cadence-calendar-agent-prod`,
+  branding already verified) and 246 (pre-launch messaging pass);
+  `components/settings/LegalContent.tsx`, `components/settings/GoogleCalendarPanel.tsx`,
+  `components/briefing/DailyBriefSettingsPanel.tsx`, `docs/user-guide/privacy-and-account.md`,
+  `docs/user-guide/timeline.md`, `docs/user-guide/travel.md`,
+  `docs/qa/2026-10-12-agentic-calendar.md`.
+- **Surfaces:** Privacy and Terms, in-app copy (Settings two-grant panel, disconnect warning,
+  longitudinal review opt-in, degraded-MCP notice), user guide, provider submissions (Ticket
+  245 OAuth verification narrative and demo video).
+- **Conflicting current text:**
+  - P-035 and Ticket 307 assume one Google Calendar OAuth connection covers Timeline, Travel,
+    Daily Brief, and Chat.
+  - P-088 describes `daily_calendar_load` populated from Timeline reads and persisted until
+    disconnect rather than MCP-only and ≤30 days for Google.
+  - `components/settings/LegalContent.tsx` does not describe Google Workspace MCP transport,
+    atomic disconnect deletion across AI stores, Model Armor screening (with payload logging
+    off), opted-in longitudinal reviews, or hybrid Chat travel organizing.
+  - Ticket 245's October 24 submission draft describes Daily Brief only over REST rather than
+    Daily Brief + Advisor Chat + opted-in longitudinal reviews over `calendarmcp.googleapis.com`.
+- **Update needed:**
+  1. For Ticket 245 (December 2026 submission): update scope justification, Privacy section,
+     in-app disclosures, and demo video to cover both grants, `calendarmcp.googleapis.com`,
+     atomic disconnect deletion, ≤30-day derived caps, opted-in longitudinal review, and Model
+     Armor screening.
+  2. For Ticket 246 (pre-launch pass): reconcile P-010, P-012, P-035, P-060, P-065, P-066,
+     P-088, P-089, and this entry across Privacy, Terms, Settings, and the user guide.
+- **Related:** L-001, L-021, L-026, L-027, P-010, P-012, P-035, P-060, P-065, P-066, P-088,
+  P-089.
 - **Status:** logged.

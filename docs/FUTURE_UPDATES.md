@@ -96,6 +96,39 @@ The owner wants the Daily Brief to read day notes (Ticket 292) as part of a late
 Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
 before any day note reaches a provider.
 
+## AI-friendly routing provider for prose-level travel reasoning
+
+Follow-up logged November 25, 2026 (unscheduled; cross-referenced with `docs/LEGAL.md` **L-001**
+and `docs/DECISIONS.md`, 2026-11-25):
+
+- Today, Cadence keeps Google Routes under `L-001`'s conclusions-only regime and uses a hybrid
+  UI in Advisor Chat (deterministic fit/conflict conclusions and free windows sent to the model;
+  exact leave-by times and durations rendered directly by Cadence in structured inline travel
+  cards without passing raw Google Maps durations to the model).
+- Investigate an AI-friendly routing provider — such as **OpenStreetMap / Valhalla** (self-hosted
+  or hosted ODbL routing) or **Google Maps Grounding Lite** (under Maps Service Specific Terms
+  §10.2.1) — so future Advisor turns can reason directly over travel durations, transit options,
+  and mode trade-offs in prose without `L-001` restrictions.
+
+## Confirmation gate for Calendar-informed Advisor Chat writes
+
+Deferred security-hardening / potential feature logged November 25, 2026 (unscheduled;
+tracked for risk review in `docs/LEGAL.md` **L-027**):
+
+- Today, Advisor Chat executes the first eligible single-record write immediately with
+  an **Undo** action (`lib/services/chat/chat-turn.ts`, T12), while Behavior changes and
+  subsequent writes wait for a `Yes / No` confirmation card.
+- Because external calendar event titles and locations (`list_calendar_events`) can
+  originate from third-party invites, a future defense-in-depth hardening option is to
+  disable the immediate-write shortcut—requiring an explicit `Yes / No` confirmation
+  card—whenever a Chat turn (or earlier history in the same conversation) has read
+  untrusted external calendar text.
+- Deferred for now because Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging
+  OFF) plus in-app sanitization satisfy Google's MCP prompt-injection screening rule, and
+  immediate Chat writes remain low-blast-radius, local-only, non-destructive, and
+  reversible via Undo. Revisit before adding irreversible or outbound Chat actions, or
+  if Model Armor is ever removed.
+
 ## Day note follow-ups
 
 Found during Ticket 292 review and acceptance on November 11, 2026. Neither is scheduled.

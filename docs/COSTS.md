@@ -67,7 +67,10 @@ implement most of it in source; it is not deployed yet.
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Connector completion job (Ticket 321) | Not measured | Not measured | Not measured | On in Production since November 13, 2026, 04:30 UTC; measured after one full day against a US$5/month ceiling |
-| Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
+| Browser push, Google sign-in | US$0 | US$0 | US$0 | No per-call charge |
+| Google Calendar API (REST, `cadence-calendar-498717`) | US$0 | US$0 | US$0 | Live on Standard Tier (no billing account; 0% project / 1% user quota; 10,156 calls in 30d). Scaled Tier includes 1,000,000 free HTTP 2xx calls/day per billing account, then US$0.25/1K (`Plus` bucket) from April 1, 2027 |
+| Google Calendar MCP (AI features, `cadence-calendar-agent-prod`) | US$0 today (US$0.04 on Scaled) | US$0 today (US$0.075 on Scaled) | US$0 today (US$0.225 on Scaled) | Pre-Feb 1, 2027 migration (`calendarmcp.googleapis.com` enabled Nov 25, 2026). Stays on Standard Tier ($0, 5,000 req/day/project, 40 req/user/day cap, 3,500 req/day alert, snapshot + `list_calendars` cache, graceful degradation). Scaled Tier (deferred) removes free MCP allowance and bills US$0.25/1K from request #1 starting April 1, 2027 |
+| Google Cloud Model Armor (`cadence-calendar-agent-prod`) | US$0 | US$0 | US$0 | Enabled for MCP prompt-injection screening (`INSPECT_AND_BLOCK`, Cloud Logging OFF): 2,000,000 tokens/month free, then US$0.10/1M tokens |
 | Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 30 an hour since November 13, 2026, 21:24Z, with Turnstile on every request (3 an hour before CAPTCHA; 2 with the built-in sender). 30 an hour is a ceiling, not expected use: sustained, it would spend the free 2,500 in about 3.5 days | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 8 Supabase emails; go-live run 7 more and one test reminder. Live since November 13, 2026, 21:35Z (`CADENCE_SIGN_IN_EMAIL` on; SMTP through Sequenzy as `login@cadence-me.com`). Cloudflare Turnstile is free (not rechecked); since November 14, 2026 Cadence's server also calls Turnstile's free siteverify once per email request (Ticket 338), and the Ticket 338 go-live run sent 9 more sign-in emails. Measure the volume in the first week after launch; if it nears the monthly cap, lower the limit or upgrade |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
 
@@ -809,3 +812,81 @@ while the flag was off. Owner rule (`docs/DECISIONS.md`, 2026-11-12): after one 
 measure the job's Vercel usage; if it projects over US$5/month above that baseline, turn
 the flag off and tell the owner. Measurement: pending, due after November 14, 2026,
 04:30 UTC.
+
+## Google Calendar API and MCP server (checked November 24–25, 2026)
+
+On November 24, 2026 Google launched standardized usage tiers (Standard and Scaled) and GA
+Google Workspace MCP servers, with MCP enforcement on **February 1, 2027** and Scaled Tier
+billing starting **April 1, 2027** (`docs/LEGAL.md` L-027; `docs/DECISIONS.md`, 2026-11-25).
+Sources checked 2026-11-24:
+[Workspace API and MCP pricing](https://developers.google.com/workspace/guides/quota-pricing),
+[Usage tiers and quotas](https://developers.google.com/workspace/guides/quota-usage-tiers),
+[Calendar API and MCP quotas](https://developers.google.com/workspace/calendar/api/guides/quotas),
+and [Workspace API Billing Terms](https://workspace.google.com/terms/api-billing/).
+
+### Published prices and limits
+
+All Google Calendar REST API methods and all Calendar MCP tool calls map to the **Plus**
+billing tier bucket: **US$0.25 per 1,000 HTTP 2xx requests** (US$0.00025 per request).
+
+| Surface | Standard Tier (free, no billing account) | Scaled Tier (billing from April 1, 2027) | Notes |
+| --- | --- | --- | --- |
+| Calendar REST API (`calendar-json.googleapis.com`) | 10,000 req/min/project; 600 req/min/user; US$0 | **1,000,000 HTTP 2xx req/day** free allowance per billing account (resets midnight PT), then **US$0.25/1K** | Non-AI traffic (Timeline, Travel, Leave Reminders) stays on `cadence-calendar-498717` |
+| Calendar MCP server (`calendarmcp.googleapis.com`) | **5,000 req/day/project**; 10,000 query units/min/project; 600/min/user; US$0 | **0 free daily allowance** — billed from request #1 at **US$0.25/1K** | Required for AI traffic (Daily Brief + Chat) from Feb 1, 2027; `list_calendars` and `list_events` cost 1 unit each; HTTP 200 JSON-RPC `isError: true` still bills |
+| Google Cloud Model Armor (prompt-injection filter) | **2,000,000 tokens/month** free | **US$0.10 per 1M tokens** (input + output) | Owner decision 2026-11-25 (Q5): `INSPECT_AND_BLOCK`, Cloud Logging OFF on `cadence-calendar-agent-prod` |
+
+Scaled Tier applies to the **entire GCP project**, not per API, so keeping REST
+(`cadence-calendar-498717`) and MCP (`cadence-calendar-agent-prod`) in separate projects
+protects the free REST project if MCP ever upgrades to Scaled Tier. Programmatic monthly
+volume discounts apply on separate REST and MCP tracks starting at US$20,000/month (17% up to
+40% flat above US$165,000/month). Google may update prices with 30 days' notice.
+
+### Measured 30-day production telemetry (October 25 – November 24, 2026)
+
+Source: Cloud Monitoring (`serviceruntime.googleapis.com/api/request_count`) via `gcloud` and
+Google Cloud Console Workspace Dashboard / Cost Estimator readback on 2026-11-25. All three
+projects have `billingEnabled: false` and Standard Tier modeled impact **Low** (0 throttles).
+
+| Project | 30-day requests | Breakdown | Peak day | Peak 1-min (7d) | Console Cost Estimator |
+| --- | --- | --- | --- | --- | --- |
+| `cadence-calendar-498717` (Prod) | **10,156** (100% HTTP 200) | `CalendarList.List`: 2,569 (25.3%); `Events.List`: 7,587 (74.7%) | 954 (Nov 8) | 67 / min (0.67% of 10K cap) | US$0.00 |
+| `cadence-calendar-agent-prod` (Agent MCP) | **77** | `CalendarList.List`: 48; `Events.List`: 29 (zero after Nov 10) | 10 (Nov 10) | 0 | US$0.00 |
+| `cadence-qa-498717` (QA) | **6** | 1 active day (Nov 8) | 6 | 0 | US$0.00 |
+
+`CalendarList.List` represented 25.3% of aggregate production Calendar REST requests across
+event reads and Settings calendar-list fetches. Short-TTL per-user MCP caching (5–15 min for
+snapshots and `list_calendars`, keyed by `(userId, grantGeneration, selectionRevision)` and
+invalidated on settings change/disconnect) plus provenance-safe in-memory Routes estimate
+reuse by `(origin, destination, mode, departure time bucket)` protect both the 5,000/day
+Standard Tier MCP cap and Google Routes spend.
+
+### Owner tier & budget posture (2026-11-25, Q8)
+
+- Stay on **Standard Tier (US$0)** with billing off and a monitoring alert at **3,500 req/day**
+  (70% of the 5,000/day cap); no Scaled Tier enrollment or quota-increase request yet.
+- Enforce a **40 MCP requests/user/day** per-account cap plus snapshot & `list_calendars`
+  caching, and degrade gracefully on cap hit (one-line notice, never falling back to REST).
+- Defer any global monthly MCP spend cap (e.g. US$100/month) until Scaled Tier is needed.
+
+### Projected Calendar MCP cost per user (assumed)
+
+Assumes 5 / 10 / 30 Calendar MCP requests per user per day (150 / 300 / 900 per month) across
+Daily Brief, Advisor Chat, and opted-in weekly/monthly reviews.
+
+| Scale | Standard Tier (≤5,000 req/day) | Scaled Tier (US$0.25 / 1K from request #1) | Per user / month |
+| --- | --- | --- | --- |
+| Up to ~250–500 active AI DAU *(with caching)* | **US$0/month** *(hard-throttled if exceeded)* | Not needed | **US$0.00** |
+| 1,000 typical DAU (300K req/mo) | Exceeds 5K/day cap | **US$75/month** | **US$0.075** |
+| 1,000 heavy DAU (900K req/mo) | Exceeds 5K/day cap | **US$225/month** | **US$0.225** |
+
+Per-user totals at 100 users remain unchanged (**US$0.00** for Calendar REST, Calendar MCP,
+and Model Armor under the 2M-token free tier).
+
+### Change log update (November 25, 2026)
+
+- 2026-11-25: Recorded Google Workspace API & MCP standardized tiering/pricing (Nov 24, 2026
+  announcement; Plus bucket US$0.25/1K; 1M/day REST free allowance on Scaled; 5K/day Standard
+  MCP cap and 0 free allowance on Scaled MCP from April 1, 2027), Google Cloud Model Armor
+  (2M tokens/mo free then US$0.10/1M), live 30-day Cloud Monitoring & Cost Estimator readback
+  across all three Calendar projects, and Owner Q1/Q5/Q8 caching and Standard Tier budget
+  posture. Per-user totals at 100 users remain unchanged (US$0).
