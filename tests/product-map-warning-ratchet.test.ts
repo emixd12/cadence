@@ -31,7 +31,9 @@ function copy(): Baseline {
   return JSON.parse(JSON.stringify(committed)) as Baseline;
 }
 
-describe("product map warning ratchet", () => {
+// Each test runs the map builder once or twice as a child process. That takes about
+// 2 s here and has passed 5 s on a loaded CI shard, so the default timeout is too short.
+describe("product map warning ratchet", { timeout: 30_000 }, () => {
   it("keeps design-system.usage.json differences out of the ratchet", () => {
     expect(committed.unratcheted).toHaveProperty(["design-system.usage.json differences"]);
     expect(committed.ratcheted).not.toHaveProperty(["design-system.usage.json differences"]);
