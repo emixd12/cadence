@@ -1,4 +1,9 @@
-import { DAILY_BRIEF_CONNECTED_SOURCES, type DailyBriefConnectedSource, type DailyBriefSourceFlags } from "@cadence/core/types/daily-brief";
+import {
+  DAILY_BRIEF_CONNECTED_SOURCES,
+  type DailyBriefConnectedSource,
+  type DailyBriefGoogleCalendarSource,
+  type DailyBriefSourceFlags,
+} from "@cadence/core/types/daily-brief";
 import { dailyBriefChoiceFromAllowed, dailyBriefSourceFlags } from "@cadence/core/services/daily-brief-sources";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 
@@ -12,10 +17,10 @@ export type DailyBriefPreferences = {
   useConnectedSources: boolean;
   excludedSources: DailyBriefSourceFlags;
   /**
-   * Ticket 307: "timeline" once the hosted migration moved Google Calendar to the
-   * Timeline connection. Null before it, when no Google Calendar is read.
+   * Google Calendar source reported by the hosted database: `"agent_mcp"` (MCP grant),
+   * `"timeline"` (legacy during zero-downtime migration), or `null`.
    */
-  googleCalendarSource: "timeline" | null;
+  googleCalendarSource: DailyBriefGoogleCalendarSource;
   /** Separate choice for reminder delivery history (Ticket 172). */
   includeReminderHistory: boolean;
   /** Separate choice for Notes on Not Completed occurrences (Ticket 172). */
@@ -155,10 +160,12 @@ export async function saveDailyBrief(
   input: Readonly<{
     installationId: string; leaseToken: string; expectedRevision: number;
     runId: string | null; refresh: boolean; withMoves: boolean; briefing: unknown;
+    includedGoogleCalendar?: boolean;
+    googleCalendarGrantGeneration?: number | null;
   }>,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  const request = client.rpc("save_daily_brief", {
+  const params: Record<string, unknown> = {
     p_installation_id: input.installationId,
     p_lease_token: input.leaseToken,
     p_expected_revision: input.expectedRevision,
@@ -166,7 +173,14 @@ export async function saveDailyBrief(
     p_refresh: input.refresh,
     p_with_moves: input.withMoves,
     p_briefing: JSON.parse(JSON.stringify(input.briefing)),
-  });
+  };
+  if (input.includedGoogleCalendar !== undefined) {
+    params.p_included_google_calendar = input.includedGoogleCalendar;
+    params.p_google_calendar_grant_generation = input.googleCalendarGrantGeneration ?? null;
+  }
+  const request = (client as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => ReturnType<AppSupabaseClient["rpc"]>;
+  }).rpc("save_daily_brief", params);
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   if (typeof data !== "boolean") throw new Error("Daily Brief save returned an invalid result.");
@@ -290,7 +304,6 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
     || (record.include_reminder_history !== undefined && typeof record.include_reminder_history !== "boolean")
     || (record.include_notes !== undefined && typeof record.include_notes !== "boolean")
     || DAILY_BRIEF_CONNECTED_SOURCES.some((source) => record[ALLOWED_SOURCE_KEYS[source]] !== undefined && typeof record[ALLOWED_SOURCE_KEYS[source]] !== "boolean")
-    || (record.google_calendar_source !== undefined && record.google_calendar_source !== "timeline")
   ) {
     throw new Error("Daily Brief preferences returned an invalid result.");
   }
@@ -302,10 +315,16 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
   // Advisor 4F (migration 20261120100000): source choices are shared by every AI
   // feature, so they may stay on while Daily Brief is off. The brief still reads a
   // source only while it is on (`dailyBriefSourceAllowed`).
+  const googleCalendarSource: DailyBriefGoogleCalendarSource =
+    record.google_calendar_source === "timeline"
+      ? "timeline"
+      : record.google_calendar_source === "agent_mcp"
+        ? "agent_mcp"
+        : null;
   return {
     enabled,
     ...choice,
-    googleCalendarSource: record.google_calendar_source === "timeline" ? "timeline" : null,
+    googleCalendarSource,
     // Absent before migration 20260926170000; absence never allows a source.
     includeReminderHistory: record.include_reminder_history === true,
     includeNotes: record.include_notes === true,

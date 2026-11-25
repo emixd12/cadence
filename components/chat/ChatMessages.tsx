@@ -10,6 +10,7 @@ import type {
   ChatRefusal,
   ChatToolLine,
 } from "@cadence/core/types/chat";
+import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import { AlertNotice, type AlertNoticeKind } from "@/components/feedback/AlertNotice";
 import { CHAT_ALERT_LABELS } from "@/lib/ui/chat";
 import { ChatThinkingHorse } from "./ChatThinkingHorse";
@@ -149,9 +150,52 @@ function PartGroup({
       );
     case "alert":
       return <ChatAlertLine alert={part.alert} />;
+    case "travel_card":
+      return <TravelCardBlock card={part.card} />;
     default:
       return null;
   }
+}
+
+const TRAVEL_MODE_LABELS: Readonly<Record<ChatTravelUiCard["mode"], string>> = {
+  driving: "Drive",
+  transit: "Transit",
+  walking: "Walk",
+  cycling: "Bike",
+};
+
+function TravelCardBlock({ card }: Readonly<{ card: ChatTravelUiCard }>) {
+  return (
+    <section
+      aria-label={`Travel to ${card.destinationLabel}`}
+      data-chat-travel-card={card.localDate}
+      className="flex flex-col gap-1 border border-border bg-surface px-3 py-2.5 text-sm leading-5 text-foreground"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <p className="font-medium text-foreground">
+          {card.tripLabel}
+          {card.destinationLabel && card.destinationLabel !== card.tripLabel ? (
+            <span className="font-normal text-muted-readable"> — {card.destinationLabel}</span>
+          ) : null}
+        </p>
+        <span className="text-xs text-muted-readable">
+          {card.localDate} · {TRAVEL_MODE_LABELS[card.mode] ?? card.mode}
+        </span>
+      </div>
+      <p className="text-foreground">
+        <span className="font-medium">Leave by {card.leaveByLocalTime}</span>
+        <Dot />
+        <span>{card.durationMinutes} min</span>
+        <Dot />
+        <span>Arrive {card.arrivalLocalTime}</span>
+      </p>
+      {card.conflictSummary ? (
+        <p className="text-xs text-muted-readable" data-chat-travel-conflict="true">
+          {card.conflictSummary}
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 /** One Rust Signal sentence: "Chat paused. …". Also used above the composer. */

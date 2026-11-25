@@ -1,6 +1,7 @@
 import {
   DAILY_BRIEF_CONNECTED_SOURCES,
   type DailyBriefConnectedSource,
+  type DailyBriefGoogleCalendarSource,
   type DailyBriefSourceFlags,
   type DailyBriefSourceStatus,
 } from "../types/daily-brief";
@@ -51,9 +52,19 @@ export function dailyBriefChoiceFromAllowed(enabled: boolean, allowed: DailyBrie
 }
 
 /**
- * Ticket 307: the brief reads Google Calendar only through the Timeline connection,
- * and only once the hosted migration reports it; before that no Google Calendar is read.
+ * Reports whether the hosted migration allows Daily Brief / AI features to read
+ * Google Calendar. Accepts both `"agent_mcp"` and `"timeline"` during zero-downtime
+ * rollout; `null` disables Google Calendar reads.
  */
-export function dailyBriefReadsGoogleCalendar(preferences: Readonly<{ googleCalendarSource: "timeline" | null }>): boolean {
-  return preferences.googleCalendarSource === "timeline";
+export function dailyBriefReadsGoogleCalendar(
+  preferences: Readonly<{ googleCalendarSource: DailyBriefGoogleCalendarSource }>,
+): boolean {
+  return preferences.googleCalendarSource === "agent_mcp" || preferences.googleCalendarSource === "timeline";
+}
+
+/** True only when AI Google Calendar reads are routed through the dedicated MCP grant. */
+export function googleCalendarUsesAgentMcp(
+  preferences: Readonly<{ googleCalendarSource: DailyBriefGoogleCalendarSource }>,
+): boolean {
+  return preferences.googleCalendarSource === "agent_mcp";
 }

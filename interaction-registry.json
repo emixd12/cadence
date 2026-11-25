@@ -1016,7 +1016,7 @@
     {
       "path": "components/settings/GoogleCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 20,
+      "interaction_marker_count": 31,
       "interaction_ids": [
         "INT-CALENDAR-001",
         "INT-CALENDAR-002",
@@ -1125,7 +1125,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 21,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -13859,7 +13859,6 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts",
           "tests/calendar-google-sign-in.local-integration.test.ts"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
@@ -13964,8 +13963,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts"
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
@@ -14059,7 +14057,6 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-client.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts",
           "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
@@ -14160,8 +14157,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts"
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },

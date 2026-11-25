@@ -1,4 +1,8 @@
-import { purgeEndedDailyBriefDays, purgeExpiredAgentRunContents } from "@/lib/db/agent-runs.repo";
+import {
+  purgeEndedDailyBriefDays,
+  purgeExpiredAgentRunContents,
+  purgeExpiredGoogleCalendarAiData,
+} from "@/lib/db/agent-runs.repo";
 import { purgeEndedBriefMoveText } from "@/lib/services/brief-moves.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -14,8 +18,10 @@ export async function runAgentRunContentMaintenance(
   // Advisor Phase 3: saved brief text and move-line calendar titles also go once their local day has ended.
   purge: (signal: AbortSignal) => Promise<number> = async (signal) => {
     const client = createServiceRoleClient();
-    return await purgeExpiredAgentRunContents(client, signal) + await purgeEndedDailyBriefDays(client, signal)
-      + await purgeEndedBriefMoveText(client, signal);
+    return await purgeExpiredAgentRunContents(client, signal)
+      + await purgeEndedDailyBriefDays(client, signal)
+      + await purgeEndedBriefMoveText(client, signal)
+      + await purgeExpiredGoogleCalendarAiData(client, signal);
   },
 ): Promise<void> {
   const controller = new AbortController();

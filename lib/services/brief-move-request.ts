@@ -1,6 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type {
-  BriefCalendarBusy,
   BriefMoveAnswerRequest,
   BriefMoveErrorCode,
   BriefMoveLengthRequest,
@@ -26,7 +25,6 @@ import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
 export const briefMovePreflight = calendarPreflight;
 
 const BODY_LIMIT_BYTES = 64_000;
-const MAX_CALENDAR_EVENTS = 200;
 const KEY = /^[A-Za-z0-9._:-]{1,200}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,7 +34,7 @@ export async function runBriefMoveRequest(request: Request,
     const caller = await authenticateCalendarRequest(request);
     let agent: Promise<BriefMoveCallers["person"]["supabase"]> | null = null;
     const callers: BriefMoveCallers = {
-      person: { supabase: caller.client, userId: caller.user.id, now: Temporal.Now.instant() },
+      person: { supabase: caller.client, userId: caller.user.id, now: Temporal.Now.instant(), user: caller.user },
       agent: () => {
         if (!agentCallerConfigured()) throw new BriefMoveError("advisor_unavailable");
         agent ??= createAgentContext(caller.user.id, "daily_brief").then((context) => context.supabase);
@@ -113,17 +111,10 @@ function revision(value: unknown): string {
 export function parsePlanningContext(value: unknown): BriefPlanningContext {
   if (value === undefined) return { calendarBusy: [] };
   const item = record(value, [], ["calendarBusy", "travelTimes"]);
-  const busy = item.calendarBusy ?? [];
-  if (!Array.isArray(busy) || busy.length > MAX_CALENDAR_EVENTS) invalid();
-  const calendarBusy: BriefCalendarBusy[] = busy.map((event) => {
-    const entry = record(event, ["startAt", "endAt"], ["ref", "title"]);
-    if (entry.ref !== undefined && (typeof entry.ref !== "string" || entry.ref.length > 512)) invalid();
-    if (entry.title !== undefined && (typeof entry.title !== "string" || entry.title.length > 200)) invalid();
-    return { startAt: instant(entry.startAt), endAt: instant(entry.endAt),
-      ...(entry.ref !== undefined ? { ref: entry.ref as string } : {}), ...(entry.title !== undefined ? { title: (entry.title as string).trim() } : {}) };
-  });
+  if (item.calendarBusy !== undefined && (!Array.isArray(item.calendarBusy) || item.calendarBusy.length > 200)) invalid();
   if (item.travelTimes !== undefined && item.travelTimes !== null && (typeof item.travelTimes !== "string" || item.travelTimes.length > 32_768)) invalid();
-  return { calendarBusy, ...(typeof item.travelTimes === "string" ? { travelTimes: item.travelTimes } : {}) };
+  // WS-2B (Path 4): always strip client-supplied calendarBusy on HTTP routes so server-side AI calendar reads are authoritative.
+  return { calendarBusy: [], ...(typeof item.travelTimes === "string" ? { travelTimes: item.travelTimes } : {}) };
 }
 
 export function parseBriefMoveAnswer(value: unknown): BriefMoveAnswerRequest {

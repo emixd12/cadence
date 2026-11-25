@@ -29,6 +29,20 @@ export function chatSources(settings: ChatAiSettings): ChatSourceFlags {
   };
 }
 
+export function chatGoogleCalendarSource(settings: ChatAiSettings): "agent_mcp" | "standard" {
+  return settings.googleCalendarSource ?? "agent_mcp";
+}
+
+export function chatLongitudinalReviewSettings(settings: ChatAiSettings): Readonly<{
+  enabled: boolean;
+  cadence: "weekly" | "monthly";
+}> {
+  return {
+    enabled: settings.longitudinalCalendarReviewEnabled === true,
+    cadence: settings.longitudinalCalendarReviewCadence === "monthly" ? "monthly" : "weekly",
+  };
+}
+
 /** Plain names of the sources that are off, for the prompt. */
 export function chatSourcesOff(sources: ChatSourceFlags): string[] {
   const names: Array<[keyof ChatSourceFlags, string]> = [

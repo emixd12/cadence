@@ -108,7 +108,7 @@ function turn(steps: Step[], account = routineAccount()) {
 
 describe("chat routines (chat-1.6)", () => {
   it("tells the model about routines and steps", () => {
-    expect(CHAT_PROMPT_VERSION).toBe("chat-1.6");
+    expect(CHAT_PROMPT_VERSION).toBe("chat-1.7");
     const prompt = buildChatSystemPrompt({ timezone: "UTC", today: DAY, localTime: "09:00", weekday: "Thursday", sourcesOff: [] });
     expect(prompt).toContain("set_parent_occurrence_status");
     expect(prompt).toContain("sub_behaviors");

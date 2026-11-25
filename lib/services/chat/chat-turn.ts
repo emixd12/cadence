@@ -146,6 +146,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
       case "refusal": parts.push({ type: "refusal", refusal: event.refusal }); break;
       case "notice": parts.push({ type: "notice", notice: event.notice }); break;
       case "alert": parts.push({ type: "alert", alert: event.alert }); break;
+      case "travel_card": parts.push({ type: "travel_card", card: event.card }); break;
       default: break;
     }
   };
@@ -273,8 +274,16 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
 
       if (!isChatWrite(name)) {
         const read = await run(name, args, false);
-        if (read.ok) toolLine(CHAT_TOOL_SUBJECT[name], sourceState(read.result));
-        else toolLine(CHAT_TOOL_SUBJECT[name], read.error.code === "source_off" ? "off" : "failed");
+        if (read.ok) {
+          toolLine(CHAT_TOOL_SUBJECT[name], sourceState(read.result));
+          if (read.uiTravelCards?.length) {
+            for (const card of read.uiTravelCards) {
+              emit({ type: "travel_card", card });
+            }
+          }
+        } else {
+          toolLine(CHAT_TOOL_SUBJECT[name], read.error.code === "source_off" ? "off" : "failed");
+        }
         answer(read.ok ? read.result : { error: read.error.code, message: read.error.message });
         continue;
       }

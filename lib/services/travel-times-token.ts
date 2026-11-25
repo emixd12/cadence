@@ -3,7 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import type { BriefMoveTravelInput } from "@cadence/core/resolvers/brief-move.resolver";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
-import type { TravelConclusionsSecrets } from "./travel-conclusions-token";
+import type { TravelConclusionsGoogleSource, TravelConclusionsSecrets } from "./travel-conclusions-token";
 
 /**
  * Advisor Phase 3A1 (docs/DECISIONS.md, 2026-11-18, "Brief moves see travel"). The
@@ -17,10 +17,11 @@ import type { TravelConclusionsSecrets } from "./travel-conclusions-token";
  *   stops: per occurrence, known travel seconds needed before it and after it
  *   unknown: occurrences with a leg whose travel time is not known (the line says "travel not checked")
  */
-export const TRAVEL_TIMES_TOKEN_VERSION = 1 as const;
-const DOMAIN = "cadence.travel-times.v1";
+export const TRAVEL_TIMES_TOKEN_VERSION = 2 as const;
+const DOMAIN = "cadence.travel-times.v2";
 const MAX_TOKEN_LENGTH = 32_768;
 const ISSUED_SKEW_SECONDS = 60;
+const GOOGLE_SOURCES: ReadonlySet<string> = new Set(["standard", "agent_mcp", "none"]);
 
 export type TravelTimesPayload = Readonly<{
   v: typeof TRAVEL_TIMES_TOKEN_VERSION;
@@ -28,6 +29,8 @@ export type TravelTimesPayload = Readonly<{
   date: string;
   iat: string;
   exp: string;
+  /** Provenance of Google Calendar events in this token. AI routes reject `"standard"`. */
+  googleSource: TravelConclusionsGoogleSource;
   /** [startAt, endAt, refs] with refs named `occurrence:<id>` or the calendar event id. */
   spans: readonly (readonly [string, string, readonly string[]])[];
   /** occurrence id -> [seconds before, seconds after]. */
@@ -37,7 +40,7 @@ export type TravelTimesPayload = Readonly<{
 
 /** The token's content from a routed day's evidence. Null when the evidence has no legs. */
 export function travelTimesFromEvidence(evidence: TravelEvidenceResult, occurrenceIds: ReadonlySet<string>)
-  : Omit<TravelTimesPayload, "v" | "sub" | "date" | "iat" | "exp"> | null {
+  : Omit<TravelTimesPayload, "v" | "sub" | "date" | "iat" | "exp" | "googleSource"> | null {
   if (!evidence.legs.length && !(evidence.unknownLegs?.length)) return null;
   const name = (ref: string) => occurrenceIds.has(ref) ? `occurrence:${ref}` : ref;
   const legs = new Map(evidence.legs.map((item) => [item.leg.id, item]));
@@ -120,8 +123,10 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z$/;
 function isPayload(value: unknown): value is TravelTimesPayload {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
-  return Object.keys(item).sort().join() === "date,exp,iat,spans,stops,sub,unknown,v"
-    && item.v === TRAVEL_TIMES_TOKEN_VERSION && typeof item.sub === "string" && typeof item.date === "string"
+  return Object.keys(item).sort().join() === "date,exp,googleSource,iat,spans,stops,sub,unknown,v"
+    && item.v === TRAVEL_TIMES_TOKEN_VERSION
+    && typeof item.googleSource === "string" && GOOGLE_SOURCES.has(item.googleSource)
+    && typeof item.sub === "string" && typeof item.date === "string"
     && typeof item.iat === "string" && INSTANT.test(item.iat) && typeof item.exp === "string" && INSTANT.test(item.exp)
     && Array.isArray(item.spans) && item.spans.every((span) => Array.isArray(span) && span.length === 3
       && typeof span[0] === "string" && INSTANT.test(span[0]) && typeof span[1] === "string" && INSTANT.test(span[1])

@@ -46,8 +46,10 @@ import {
   BriefMoveError,
   briefMoveCalendar,
   briefMoveTravel,
+  readServerBriefCalendarBusy,
   type BriefMoveCallers,
   type BriefMovePlanningInput,
+  type BriefServerCalendarBusyResult,
 } from "@/lib/services/brief-moves.service";
 import { addOpportunityToToday, removeOpportunityFromToday, type OpportunityCaller } from "@/lib/services/opportunity.service";
 import type { TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
@@ -150,6 +152,8 @@ export async function saveBriefOpportunityProposals(agent: AppSupabaseClient | n
   candidates: readonly BriefOpportunityCandidate[];
   /** Behavior id to the proposal a new line replaces (Re-plan, Re-check). */
   replaces?: ReadonlyMap<string, string>;
+  containsGoogleCalendar?: boolean;
+  googleCalendarGrantGeneration?: number | null;
 }>): Promise<BriefOpportunityLine[]> {
   if (!agent || (!input.candidates.length && !input.refresh)) return [];
   const { data, error } = await agent.rpc("record_brief_opportunity_proposals", {
@@ -163,6 +167,10 @@ export async function saveBriefOpportunityProposals(agent: AppSupabaseClient | n
       reason: candidate.reasonCode,
       line: Object.fromEntries(Object.entries(candidate).filter(([name]) => name !== "key")),
       replaces_proposal_id: input.replaces?.get(candidate.behaviorId) ?? null,
+      ...(input.containsGoogleCalendar ? {
+        contains_google_calendar: true,
+        google_calendar_grant_generation: input.googleCalendarGrantGeneration ?? null,
+      } : {}),
     })) as unknown as Json,
   });
   if (error) throw error;
@@ -333,20 +341,23 @@ async function slotRefusal(callers: BriefMoveCallers, proposal: ProposalRow, lin
 
 /** What blocks an opportunity time now: the day's items, open move lines, other open opportunity lines, calendar and travel. */
 async function slotView(callers: BriefMoveCallers, localDate: string, context: BriefPlanningContext, excludeProposalId: string | null)
-  : Promise<Readonly<{ blocks: BriefMoveBlock[]; travel: BriefMoveTravelInput | null; day: BriefMoveDay; latest: Map<string, ProposalRow> }>> {
+  : Promise<Readonly<{ blocks: BriefMoveBlock[]; travel: BriefMoveTravelInput | null; day: BriefMoveDay; latest: Map<string, ProposalRow>; serverCalendar: BriefServerCalendarBusyResult }>> {
   const { person } = callers;
-  const [day, movePositions, latest] = await Promise.all([
+  const [day, movePositions, latest, serverCalendar] = await Promise.all([
     readBriefMoveDay(person.supabase, person.userId, localDate),
     openMovePositions(person.supabase, person.userId, localDate),
     latestOpportunityLines(person.supabase, person.userId, localDate),
+    context.calendarBusy?.length
+      ? Promise.resolve<BriefServerCalendarBusyResult>({ busy: briefMoveCalendar(null, context.calendarBusy).busy, containsGoogleCalendar: false, googleCalendarGrantGeneration: null })
+      : readServerBriefCalendarBusy({ supabase: person.supabase, userId: person.userId, localDate, now: person.now, user: person.user }),
   ]);
   const travel = briefMoveTravel(context.travelTimes, { secrets: callers.travelSecrets, userId: person.userId, localDate, now: person.now });
-  const blocks = briefOpportunityBlocks({ items: day.items, movePositions, calendarBusy: briefMoveCalendar(null, context.calendarBusy).busy, travel });
+  const blocks = briefOpportunityBlocks({ items: day.items, movePositions, calendarBusy: serverCalendar.busy, travel });
   for (const row of latest.values()) {
     if (row.status !== "proposed" || row.id === excludeProposalId) continue;
     blocks.push({ kind: "item", ref: `opportunity:${row.behavior_id}`, start: Temporal.Instant.from(row.proposed_start_at), end: Temporal.Instant.from(row.proposed_end_at) });
   }
-  return { blocks, travel, day, latest };
+  return { blocks, travel, day, latest, serverCalendar };
 }
 
 async function openMovePositions(supabase: AppSupabaseClient, userId: string, localDate: string): Promise<Map<string, BriefMoveInterval>> {
@@ -403,9 +414,14 @@ export async function recheckBriefOpportunities(callers: BriefMoveCallers, reque
       replaced.push({ proposalId: row.id, line: null });
       continue;
     }
+    const prevGoogle = (row as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+    const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevGoogle && view.serverCalendar.googleCalendarGrantGeneration !== null);
+    const googleCalendarGrantGeneration = containsGoogleCalendar ? view.serverCalendar.googleCalendarGrantGeneration : null;
     const [saved] = await saveBriefOpportunityProposals(await callers.agent(), {
       runId: row.agent_run_id, localDate: row.local_date, refresh: false,
       candidates: [rebuilt(line, next, more)], replaces: new Map([[row.behavior_id, row.id]]),
+      containsGoogleCalendar,
+      googleCalendarGrantGeneration,
     });
     blocks.push({ kind: "item", ref: own, start: next, end: next.add({ minutes: line.length.minutes }) });
     replaced.push({ proposalId: row.id, line: saved ?? null });
@@ -437,9 +453,14 @@ export async function replanBriefOpportunity(callers: BriefMoveCallers, request:
     blocks: view.blocks, travel: view.travel, limit: 1 + BRIEF_MOVE_OTHER_TIMES, exclude: [shown[0]!],
   });
   if (!next) return { line: null, replacedProposalId: proposal.id };
+  const prevGoogle = (proposal as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+  const containsGoogleCalendar = view.serverCalendar.containsGoogleCalendar || (prevGoogle && view.serverCalendar.googleCalendarGrantGeneration !== null);
+  const googleCalendarGrantGeneration = containsGoogleCalendar ? view.serverCalendar.googleCalendarGrantGeneration : null;
   const [saved] = await saveBriefOpportunityProposals(await callers.agent(), {
     runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false,
     candidates: [rebuilt(line, next, more)], replaces: new Map([[proposal.behavior_id, proposal.id]]),
+    containsGoogleCalendar,
+    googleCalendarGrantGeneration,
   });
   return { line: saved ?? null, replacedProposalId: proposal.id };
 }

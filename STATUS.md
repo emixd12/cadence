@@ -98,6 +98,56 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Google Workspace Calendar MCP migration, AI Tools Addendum compliance, and conversational travel organizing — November 25, 2026
+
+- **Owner's decisions (Q1–Q8, `docs/DECISIONS.md`, 2026-11-25; `docs/plans/2026-11-25-google-workspace-mcp-migration.md`):**
+  migrate all AI Google Calendar reads to `calendarmcp.googleapis.com` (`cadence-calendar-agent-prod`),
+  close all 4 REST-to-AI leak paths + latent `day_loads` + workbench §2(f), rebuild AI Google-event
+  travel fit from authorized MCP events with provenance-safe MCP/Routes caching, add hybrid `L-001`
+  7-day Chat travel organizing (inline exact travel cards, confirmed cross-day moves and recurring
+  remodeling, two-layer longitudinal patterns), cap persisted Google `daily_calendar_load` at ≤30d
+  with ephemeral >30d Chat MCP lookbacks and an opted-in activity-gated weekly/monthly longitudinal
+  review, enable Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) while keeping T12
+  immediate single-record Chat writes with Undo, keep one canonical `Connected sources → Google Calendar`
+  dual-grant home with lightweight collapsed pills AI picker and inline `AI features` shortcut, bundle
+  versioned `purpose=ai_mcp` desktop support into Cadence for Mac `0.1.16`, and stay on Standard Tier
+  ($0, 40 req/user/day cap, 3,500 req/day alert, graceful degradation).
+- **Implemented (Phases 1A–4 in source on `feat/google-calendar-mcp-migration`):**
+  - Tolerant readers, transport gate & §2(f) guards: `lib/db/daily-brief.repo.ts`,
+    `packages/core/src/services/daily-brief-sources.ts`, `lib/services/google-calendar-ai-transport.ts`,
+    `lib/services/day-load.service.ts`, `lib/services/briefing-workbench.service.ts`,
+    `lib/services/briefing-history.service.ts`, `lib/services/briefing-sequence.service.ts` (and
+    deleted the two stale Oct 16 & Oct 23 `.local/briefing-bench/` live captures).
+  - Database & maintenance: `supabase/migrations/20261125120000_reactivate_agent_calendar_mcp.sql`
+    (5 `calendar_agent_*` RPCs, Ticket 335 identity-lock parity, provenance columns, Nov 19 Chat
+    backfill, atomic §2(d) disconnect purge, ≤30d summary/rollup/review expiry, `longitudinal_calendar_reviews`),
+    deleted retired `app/api/google-calendar/agent-grants/retire/route.ts`, updated
+    `lib/services/sign-in-methods.service.ts`, `lib/services/agent-run-maintenance.service.ts`, and
+    `tests/sql/google-calendar-agent-mcp-contract.sql`.
+  - MCP adapter, caching, Model Armor & leak closure: `lib/services/google-calendar-mcp-provider.ts`,
+    `lib/services/google-calendar-mcp-cache.ts`, `lib/services/model-armor.service.ts`,
+    `lib/services/google-calendar.service.ts`, `lib/services/daily-calendar-load.service.ts`,
+    `lib/services/travel-conclusions-token.ts` (`v2`), `lib/services/travel-route-refresh.service.ts`,
+    `lib/services/briefing-account-context.service.ts`, `lib/services/daily-brief.service.ts`,
+    `lib/services/brief-moves.service.ts`, `lib/services/brief-opportunities.service.ts`.
+  - Core resolvers & Chat: `packages/core/src/types/chat-travel.ts`,
+    `packages/core/src/resolvers/travel-horizon.resolver.ts`,
+    `packages/core/src/resolvers/longitudinal-patterns.resolver.ts`, `lib/db/chat.repo.ts`,
+    `lib/services/chat/{chat-tools,chat-executor,chat-turn,chat-writes,chat-prompt,chat.service,chat-settings}.ts`,
+    `components/chat/ChatMessages.tsx` (`travel_card`), `lib/services/longitudinal-calendar-review.service.ts`.
+  - Settings & Mac `0.1.16` broker: `app/api/google-calendar/{connection,calendars}/route.ts`,
+    `components/settings/GoogleCalendarPanel.tsx`, `components/briefing/DailyBriefSettingsPanel.tsx`,
+    `lib/ui/google-calendar.ts`, `lib/ui/settings-sections.ts`,
+    `apps/desktop/src/calendar/{google-calendar,use-google-calendar}.ts`, `apps/desktop/src/product.tsx`.
+- **Next actions (Phases 0, 5 & 6):** complete code review & CI/Supabase rehearsal, run Phase 0 live
+  `calendarmcp.googleapis.com` wire check, finish Ticket 245 `P-090` disclosures & Model Armor
+  provisioning, and submit data-access verification for `cadence-calendar-agent-prod` before cutover
+  and Mac `0.1.16`.
+
+Platform impact: web implemented (Phases 1A–4 in source); desktop implemented (versioned `purpose=ai_mcp`
+broker and shared Settings UI bundled for Mac `0.1.16`); marketing follow-up in Ticket 246; future mobile
+deferred. Messaging impact: `P-090`. Legal: `L-001`, `L-021`, `L-026`, `L-027`.
+
 ## Tickets 356–365 written: alongside Behaviors and the guessed Where (D33) — November 25, 2026
 
 - **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D33). A Behavior can be marked as done
@@ -159,82 +209,3 @@ Platform impact: web implemented; desktop implemented (shares components and wir
 `createDesktopPlaceSearchClient` for linked Macs, local-only Macs fall back to saved places and
 free text; ships in next Mac release); marketing not applicable; future mobile deferred.
 Messaging impact: P-091.
-
-## Tickets 352–355: Persisted connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down — November 24, 2026
-
-- **Owner's decision:** keep persisted connector activity until disconnect or account deletion;
-  persist minimized Hevy workout timing in hosted-only `recorded_activities` with bounded connect
-  backfill, incremental `/v1/workouts/events` sync on its own `ledger_cursor` (separate from
-  completion's `read_cursor`), daily background polling for unlinked accounts (prioritized behind
-  linked completion accounts, paused after 21 days of Cadence inactivity and re-armed on next
-  open), 15-minute on-demand freshness, and non-PII `reportMonitoringEvent` telemetry; persist
-  derived daily calendar busy-load rollups (`daily_calendar_load`, no event details) via
-  write-through on complete reads + 30-day backfill on selection and hard-delete on
-  disconnect/selection change; expose `list_calendar_load` and widen Chat `list_calendar_events`
-  to bounded past dates (≤31 days per call) with timezone-aware date coalescing and ephemeral
-  session caching (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:**
-  - Migrations: `supabase/migrations/20261124193000_recorded_activities_ledger.sql`,
-    `20261124193500_unlinked_hevy_background_sync.sql`,
-    `20261124194000_daily_calendar_load.sql`, and
-    `20261124195000_recorded_activity_ledger_cursor.sql`; updated `lib/db/database.types.ts`.
-  - Core resolvers: `packages/core/src/resolvers/calendar-load.resolver.ts` (re-exported in
-    `lib/resolvers/calendar-load.resolver.ts`, registered in `docs/AGENT_RESOLVERS.md` and
-    `scripts/check-resolvers.mjs`); `resolveUnlinkedDailySyncSchedule` / `isUnlinkedAccountInactive`
-    in `packages/core/src/resolvers/completion-check-schedule.resolver.ts`.
-  - Repos & services: `lib/db/recordedActivities.repo.ts`, `lib/db/dailyCalendarLoad.repo.ts`,
-    `lib/services/recorded-activity-sync.service.ts`, `lib/services/daily-calendar-load.service.ts`,
-    `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`,
-    `lib/services/connector-completion.service.ts`, `lib/services/connector-completion-job.service.ts`,
-    `lib/services/google-calendar.service.ts`, `lib/services/outlook-calendar.service.ts`,
-    `lib/services/icloud-calendar.service.ts`.
-  - Consumers & Chat: `app/api/hevy/activities/route.ts`, `lib/services/advisor-day-context.service.ts`,
-    `lib/services/chat/chat-calendar-cache.ts`, `lib/services/chat/chat-tools.ts`,
-    `lib/services/chat/chat-executor.ts`, `lib/services/chat/chat.service.ts`,
-    `lib/services/chat/chat-prompt.ts`, `lib/services/chat-eval/fake-tools.ts`.
-  - Tests: `tests/calendar-load.resolver.test.ts`, `tests/daily-calendar-load.service.test.ts`,
-    `tests/recorded-activity-sync.service.test.ts`, `tests/chat-past-calendar-drilldown.test.ts`.
-- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`, `resolvers:check`,
-  `core:check`, `lint` (0 errors), `typecheck`, `build`, `dagger check --cadence`, and full
-  `npm run test` all pass.
-
-Platform impact: web implemented; desktop unaffected (hosted-only tables, no SQLite or `account_sync`
-changes; linked Macs inherit hosted Brief/Chat/Timeline reads); marketing not applicable; future mobile
-deferred. Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated, `L-026` logged.
-
-## Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine — November 24, 2026
-
-- **Owner's decision:** remove `AdvisorDayLine` under today's date to reduce Timeline header
-  density; replace `"Advisor · 1 new"` with a rounded speech pill showing a concise teaser
-  (`advisorBubbleTeaser`) when something waits (hiding the `"Advisor"` label while the pill is
-  shown); increase the Timeline avatar to 72px on desktop/Mac (side-by-side speech pill, enables
-  full mane-ripple detail) and 60px on phones (moved out of the top nav bar onto the wave banner,
-  speech pill stacked below); let the advisor header scroll naturally with the page
-  (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:** `components/advisor/AdvisorParts.tsx`, `components/advisor/advisor-window.module.css`,
-  `components/advisor/AdvisorTimelineFrame.tsx`, `components/advisor/AdvisorAvatar.tsx`,
-  `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
-  `packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`,
-  `apps/desktop/vite.config.ts`, `DESIGN.md`, `tests/advisor-ui.dom.test.tsx`, and
-  `tests/advisor-avatar.dom.test.tsx`.
-
-Platform impact: web implemented; desktop implemented (shares components and bundles the 60px/72px
-avatar renditions in `apps/desktop/vite.config.ts`, ships in next Mac release); marketing not
-applicable; future mobile deferred. Messaging impact: P-086.
-
-## Remove Recorded activity · Hevy section from Timeline header — November 24, 2026
-
-- **Owner's decision:** remove the dedicated `"Recorded activity · Hevy"` section (including
-  `"No recorded workouts today."`) from the Timeline header while preserving internal Hevy
-  reads, connector completion (`occurrence_source_matches`), Daily Brief/Chat context, and
-  `countableWorkouts` on occurrences (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:** removed `<RecordedActivityList>` from `components/timeline/DayProgressTimeline.tsx`,
-  deleted `components/timeline/RecordedActivityList.tsx` and its unused `.activity` CSS rules in
-  `components/timeline/day-progress-timeline.module.css`, updated the design-system bench and
-  manifests (`app/design-system/ConnectorBench.tsx`, `app/design-system/page.tsx`,
-  `design-system.{manifest,surfaces,usage}.json`), regenerated `docs/PRODUCT_MAP.md`, and updated
-  `tests/day-progress-timeline.dom.test.tsx`, `tests/connector-library.dom.test.tsx`, and
-  `tests/recorded-activity-refresh.test.ts`.
-
-Platform impact: web implemented; desktop implemented (shares `DayProgressTimeline`, ships in
-next Mac release); marketing not applicable; future mobile deferred. Messaging impact: P-085.

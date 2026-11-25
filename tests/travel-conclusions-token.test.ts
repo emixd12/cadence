@@ -17,6 +17,7 @@ const OLD_SECRET = "test-only-previous-secret-0123456789abcd";
 const NOW = Temporal.Instant.from("2026-11-01T13:00:00Z");
 const payload: Omit<TravelConclusionsPayload, "v"> = {
   sub: "user-1", date: "2026-11-01", src: "source-1", iat: "2026-11-01T12:59:00Z", exp: "2026-11-01T13:05:00Z",
+  googleSource: "agent_mcp",
   conclusions: { version: "2.0", travelDay: "yes", calendarEvents: false,
     trips: [{ destinationRef: "occurrence:o1", role: "outbound", mode: "cycling", estimate: "current" }],
     fits: [{ ref: "occurrence:o2", conclusion: "does_not_fit", basis: "travel_overlap", trip: { destinationRef: "occurrence:o1", role: "outbound" }, position: null }] },
@@ -30,10 +31,10 @@ const verify = (token: unknown, overrides: Partial<Parameters<typeof verifyTrave
 
 describe("travel conclusions token", () => {
   it("round-trips Cadence's conclusions for the same user, day and window", () => {
-    expect(verify(issueTravelConclusionsToken(payload, SECRET))).toEqual({ v: 1, ...payload });
+    expect(verify(issueTravelConclusionsToken(payload, SECRET))).toEqual({ v: 2, ...payload });
     // Signed, not encrypted: the payload names only the user's own commitments and holds no timing.
     const body = JSON.parse(Buffer.from(issueTravelConclusionsToken(payload, SECRET).split(".")[0]!, "base64url").toString());
-    expect(Object.keys(body).sort()).toEqual(["conclusions", "date", "events", "exp", "iat", "src", "stops", "sub", "v", "weather"]);
+    expect(Object.keys(body).sort()).toEqual(["conclusions", "date", "events", "exp", "googleSource", "iat", "src", "stops", "sub", "v", "weather"]);
     // Decision D18: one boolean per Outlook and iCloud Calendar, nothing else about their events.
     expect(body.stops).toEqual({ outlook_calendar: false, icloud_calendar: true });
   });
@@ -41,7 +42,7 @@ describe("travel conclusions token", () => {
   it("verifies a token signed with the previous secret only during rotation", () => {
     const old = issueTravelConclusionsToken(payload, OLD_SECRET);
     expect(verify(old)).toBeNull();
-    expect(verify(old, { secrets: { current: SECRET, previous: OLD_SECRET } })).toEqual({ v: 1, ...payload });
+    expect(verify(old, { secrets: { current: SECRET, previous: OLD_SECRET } })).toEqual({ v: 2, ...payload });
     // A previous secret never stands in for a missing current one.
     expect(verify(old, { secrets: { current: null, previous: OLD_SECRET } })).toBeNull();
   });

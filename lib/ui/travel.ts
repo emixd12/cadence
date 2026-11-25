@@ -273,41 +273,13 @@ function settleBriefTravelWait(key: string): void {
  * Otherwise it asks the Timeline for the whole day and waits for that result, at most
  * `timeoutMs`. It resolves with the token, or null, and never rejects.
  */
-export function waitForDailyBriefTravel(accountId: string | null, localDate: string, signal?: AbortSignal,
-  timeoutMs = DAILY_BRIEF_TRAVEL_WAIT_MS): Promise<string | null> {
-  if (!accountId) return Promise.resolve(null);
-  const held = travelConclusionsToken(accountId, localDate);
-  const key = JSON.stringify([accountId, localDate]);
-  if (held || signal?.aborted || travelOffAccounts.has(accountId) || !travelHooksActive.get(key)) return Promise.resolve(held);
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", finish);
-      briefTravelWaiters.get(key)?.delete(finish);
-      resolve(travelConclusionsToken(accountId, localDate));
-    };
-    const timer = setTimeout(finish, timeoutMs);
-    signal?.addEventListener("abort", finish, { once: true });
-    briefTravelWaiters.set(key, (briefTravelWaiters.get(key) ?? new Set()).add(finish));
-    if (!briefTravelRequests.get(key)?.pending) {
-      briefTravelRequests.set(key, { generation: BRIEF_FIRST_GENERATION, pending: true });
-      while (briefTravelRequests.size > TRAVEL_CACHE_CAP) briefTravelRequests.delete(briefTravelRequests.keys().next().value!);
-    }
-    window.dispatchEvent(new Event("cadence:brief-travel"));
-  });
+export function waitForDailyBriefTravel(_accountId: string | null, _localDate: string, _signal?: AbortSignal,
+  _timeoutMs = DAILY_BRIEF_TRAVEL_WAIT_MS): Promise<string | null> {
+  // WS-2B (Path 3): Daily Brief never triggers Timeline REST Travel refreshes.
+  return Promise.resolve(null);
 }
-export function requestDailyBriefTravel(accountId: string, localDate: string, generatedAt: string): void {
-  const key = JSON.stringify([accountId, localDate]);
-  const existing = briefTravelRequests.get(key);
-  if (existing?.generation === generatedAt) return;
-  // Ticket 272: the first brief already asked for the day; that request serves this brief too.
-  if (existing?.generation === BRIEF_FIRST_GENERATION) { existing.generation = generatedAt; return; }
-  briefTravelRequests.set(key, { generation: generatedAt, pending: true });
-  while (briefTravelRequests.size > TRAVEL_CACHE_CAP) briefTravelRequests.delete(briefTravelRequests.keys().next().value!);
-  window.dispatchEvent(new Event("cadence:brief-travel"));
+export function requestDailyBriefTravel(_accountId: string, _localDate: string, _generatedAt: string): void {
+  // WS-2B (Path 3): Daily Brief never triggers Timeline REST Travel refreshes.
 }
 /** Advances on every travel settings or Behavior location change, so requests started earlier neither cache nor share their results. */
 let travelEpoch = 0;

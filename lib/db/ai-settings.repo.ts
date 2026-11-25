@@ -8,6 +8,8 @@ import { DailyBriefStorageError } from "@/lib/db/daily-brief.repo";
 // shared by every feature. Source choices are stored on the Daily Brief preference
 // row; tips, Chat and the approval on their own private row.
 
+export type LongitudinalReviewCadence = "weekly" | "monthly";
+
 export type StoredAiSettings = Readonly<{
   /** ISO time the person first answered the AI features question; null before. */
   approvedAt: string | null;
@@ -19,6 +21,9 @@ export type StoredAiSettings = Readonly<{
   includeReminderHistory: boolean;
   useConnectedSources: boolean;
   excludedSources: DailyBriefSourceFlags;
+  googleCalendarSource?: "agent_mcp" | "standard";
+  longitudinalCalendarReviewEnabled?: boolean;
+  longitudinalCalendarReviewCadence?: LongitudinalReviewCadence;
 }>;
 
 export type AiSettingsWrite = Omit<StoredAiSettings, "approvedAt" | "revision">;
@@ -47,7 +52,7 @@ export async function saveStoredAiSettings(
   expectedRevision: number,
   signal?: AbortSignal,
 ): Promise<StoredAiSettings> {
-  const request = client.rpc("save_ai_settings", {
+  const params = {
     p_daily_brief_enabled: input.dailyBriefEnabled,
     p_tips_enabled: input.tipsEnabled,
     p_chat_enabled: input.chatEnabled,
@@ -59,7 +64,14 @@ export async function saveStoredAiSettings(
     p_include_reminder_history: input.includeReminderHistory,
     p_include_notes: input.includeNotes,
     p_expected_revision: expectedRevision,
-  });
+    ...(input.longitudinalCalendarReviewEnabled !== undefined || input.longitudinalCalendarReviewCadence !== undefined
+      ? {
+          p_longitudinal_calendar_review_enabled: input.longitudinalCalendarReviewEnabled ?? false,
+          p_longitudinal_calendar_review_cadence: input.longitudinalCalendarReviewCadence ?? "weekly",
+        }
+      : {}),
+  };
+  const request = client.rpc("save_ai_settings", params as never);
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   return parseAiSettings(data);
@@ -77,6 +89,14 @@ export function parseAiSettings(value: unknown): StoredAiSettings {
       DAILY_BRIEF_CONNECTED_SOURCES.some((source) => typeof (flags as JsonRecord)[EXCLUDED_KEYS[source]] !== "boolean")) {
     throw invalid();
   }
+  const googleCalendarSource =
+    record.google_calendar_source === "agent_mcp" || record.google_calendar_source === "standard"
+      ? record.google_calendar_source
+      : "agent_mcp";
+  const longitudinalCalendarReviewEnabled = record.longitudinal_calendar_review_enabled === true;
+  const longitudinalCalendarReviewCadence: LongitudinalReviewCadence =
+    record.longitudinal_calendar_review_cadence === "monthly" ? "monthly" : "weekly";
+
   return {
     approvedAt: record.approved_at as string | null,
     revision: record.revision as number,
@@ -87,6 +107,9 @@ export function parseAiSettings(value: unknown): StoredAiSettings {
     includeReminderHistory: record.include_reminder_history as boolean,
     useConnectedSources: record.use_connected_sources as boolean,
     excludedSources: dailyBriefSourceFlags((source) => (flags as JsonRecord)[EXCLUDED_KEYS[source]] === true),
+    googleCalendarSource,
+    longitudinalCalendarReviewEnabled,
+    longitudinalCalendarReviewCadence,
   };
 }
 
