@@ -99,20 +99,106 @@ async function findQuestion(client: AppSupabaseClient, clientMessageId: string):
   return { kind: "in_progress", conversation: summary(conversation), userMessageId: question.id, replyId: reply.id, startedAt: reply.created_at };
 }
 
+const GOOGLE_CALENDAR_SUMMARY_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
+
+/**
+ * Stamps a chat conversation and reply as having touched Google Calendar data (Q4).
+ * Preserves the earliest `google_calendar_first_touched_at` so later turns cannot
+ * extend retention, and sets `summary_google_calendar_expires_at` to `touchedAt + 30 days`.
+ */
+export async function markChatConversationGoogleCalendarTouched(
+  client: AppSupabaseClient,
+  input: Readonly<{
+    conversationId: string;
+    replyId: string;
+    grantGeneration: number | null;
+    touchedAt?: string;
+  }>,
+): Promise<void> {
+  const touchedAt = input.touchedAt ?? new Date().toISOString();
+  const touchedMs = Date.parse(touchedAt);
+  const expiresAt = new Date((Number.isNaN(touchedMs) ? Date.now() : touchedMs) + GOOGLE_CALENDAR_SUMMARY_TTL_MS).toISOString();
+
+  const untypedClient = client as unknown as {
+    from: (table: string) => {
+      select: (cols: string) => { eq: (col: string, val: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }> } };
+      update: (payload: Record<string, unknown>) => { eq: (col: string, val: string) => Promise<{ error: unknown }> };
+    };
+  };
+
+  const { data: existing, error: readError } = await untypedClient
+    .from("chat_conversations")
+    .select("google_calendar_first_touched_at, summary_google_calendar_expires_at")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (readError) fail(readError);
+
+  const existingFirst =
+    existing && typeof existing.google_calendar_first_touched_at === "string"
+      ? existing.google_calendar_first_touched_at
+      : null;
+  const firstTouchedAt = existingFirst && Date.parse(existingFirst) <= Date.parse(touchedAt)
+    ? existingFirst
+    : touchedAt;
+
+  const existingExpires =
+    existing && typeof existing.summary_google_calendar_expires_at === "string"
+      ? existing.summary_google_calendar_expires_at
+      : null;
+  const effectiveExpiresAt = existingExpires && Date.parse(existingExpires) <= Date.parse(expiresAt)
+    ? existingExpires
+    : expiresAt;
+
+  const [{ error: convError }, { error: msgError }] = await Promise.all([
+    untypedClient
+      .from("chat_conversations")
+      .update({
+        google_calendar_first_touched_at: firstTouchedAt,
+        google_calendar_grant_generation: input.grantGeneration,
+        summary_google_calendar_expires_at: effectiveExpiresAt,
+      })
+      .eq("id", input.conversationId),
+    untypedClient
+      .from("chat_messages")
+      .update({ contains_google_calendar: true })
+      .eq("id", input.replyId),
+  ]);
+  if (convError || msgError) fail(convError ?? msgError);
+}
+
 /** Finished messages, oldest first, without the given reply. */
-export async function readChatHistory(client: AppSupabaseClient, conversationId: string, exceptId?: string): Promise<Readonly<{
+export async function readChatHistory(
+  client: AppSupabaseClient,
+  conversationId: string,
+  exceptId?: string,
+  nowMs: number = Date.now(),
+): Promise<Readonly<{
   messages: ChatMessage[]; summary: string | null;
 }>> {
+  const untypedConvClient = client as unknown as {
+    from: (table: string) => {
+      select: (cols: string) => { eq: (col: string, val: string) => { single: () => Promise<{ data: Record<string, unknown> | null; error: unknown }> } };
+    };
+  };
   const [{ data: rows, error }, { data: conversation, error: conversationError }] = await Promise.all([
     client.from("chat_messages").select("id, role, created_at, parts, state").eq("conversation_id", conversationId)
       .order("created_at", { ascending: true }).order("id", { ascending: true }).limit(500),
-    client.from("chat_conversations").select("summary").eq("id", conversationId).single(),
+    untypedConvClient.from("chat_conversations").select("summary, summary_google_calendar_expires_at").eq("id", conversationId).single(),
   ]);
   if (error || conversationError) return fail(error ?? conversationError);
   const { data: confirms, error: confirmsError } = await client.from("chat_confirms").select("id, state").eq("conversation_id", conversationId);
   if (confirmsError) fail(confirmsError);
   const messages = (rows ?? []).filter((row) => row.id !== exceptId && row.state === "complete").map(message);
-  return { messages: withCurrentConfirmStates(messages, confirms ?? []), summary: conversation?.summary ?? null };
+  const convRecord = conversation ?? {};
+  const rawSummary = typeof convRecord.summary === "string" ? convRecord.summary : null;
+  const expiresAt = typeof convRecord.summary_google_calendar_expires_at === "string"
+    ? convRecord.summary_google_calendar_expires_at
+    : null;
+  const summaryExpired = expiresAt !== null && !Number.isNaN(Date.parse(expiresAt)) && Date.parse(expiresAt) <= nowMs;
+  return {
+    messages: withCurrentConfirmStates(messages, confirms ?? []),
+    summary: summaryExpired ? null : rawSummary,
+  };
 }
 
 export async function finishChatReply(client: AppSupabaseClient, input: Readonly<{

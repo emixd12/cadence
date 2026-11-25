@@ -1,6 +1,6 @@
 import { NO_DAILY_BRIEF_SOURCES } from "@cadence/core/services/daily-brief-sources";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
-import { readStoredAiSettings, type AiSettingsWrite, type StoredAiSettings } from "@/lib/db/ai-settings.repo";
+import { readStoredAiSettings, type AiSettingsWrite, type LongitudinalReviewCadence, type StoredAiSettings } from "@/lib/db/ai-settings.repo";
 
 // Advisor plan Phase 4, workstream 4F (owner decision D2, 2026-11-19).
 //
@@ -22,6 +22,9 @@ export type AiSettings = Readonly<{
   approved: boolean;
   features: Readonly<Record<AiFeature, boolean>>;
   sources: Readonly<Record<AiSource, boolean>>;
+  googleCalendarSource?: "agent_mcp" | "standard";
+  longitudinalCalendarReviewEnabled?: boolean;
+  longitudinalCalendarReviewCadence?: LongitudinalReviewCadence;
 }>;
 
 export async function readAiSettings(client: AppSupabaseClient, signal?: AbortSignal): Promise<AiSettings> {
@@ -41,6 +44,9 @@ export function aiSettingsFromStored(stored: StoredAiSettings): AiSettings {
       icloudCalendar: connected(stored.excludedSources.icloudCalendar),
       hevy: connected(stored.excludedSources.hevy),
     },
+    googleCalendarSource: stored.googleCalendarSource ?? "agent_mcp",
+    longitudinalCalendarReviewEnabled: stored.longitudinalCalendarReviewEnabled ?? false,
+    longitudinalCalendarReviewCadence: stored.longitudinalCalendarReviewCadence ?? "weekly",
   };
 }
 

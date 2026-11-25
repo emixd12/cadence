@@ -1,12 +1,26 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { IntegrationOperationName } from "@cadence/core/integration";
+import { resolveDailyCalendarLoad } from "@cadence/core/resolvers/calendar-load.resolver";
+import {
+  mergeLongitudinalLayers,
+  resolveFirstPartyLongitudinalPatterns,
+  type LongitudinalOccurrenceOutcomeRecord,
+  type LongitudinalProposalOutcomeRecord,
+} from "@cadence/core/resolvers/longitudinal-patterns.resolver";
 import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
+import {
+  resolveChatTravelHorizon,
+  type ChatTravelHorizonOccurrenceInput,
+  type ChatTravelHorizonTripInput,
+} from "@cadence/core/resolvers/travel-horizon.resolver";
+import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { executeMcpOperation } from "@/lib/integrations/operations/execute";
 import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { screenExternalCalendarTextWithModelArmor } from "@/lib/services/model-armor.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
 import { getPersistedHevyActivities } from "@/lib/services/recorded-activity-sync.service";
@@ -34,7 +48,10 @@ import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
  */
 
 export type ChatCalendarSource = "googleCalendar" | "outlookCalendar" | "icloudCalendar";
-export type ChatSourceReport = Readonly<{ source: ChatCalendarSource | "hevy"; state: "read" | "partial" | "off" | "not_connected" | "no_calendars" | "failed" }>;
+export type ChatSourceReport = Readonly<{
+  source: ChatCalendarSource | "hevy";
+  state: "read" | "partial" | "off" | "not_connected" | "no_calendars" | "failed" | "unavailable";
+}>;
 
 export type ChatCalendarEvent = Readonly<{
   title: string;
@@ -51,12 +68,47 @@ export type ChatConnectorReads = Readonly<{
   calendarEvents: (start: string, end: string) => Promise<Readonly<{ events: ChatCalendarEvent[]; sources: ChatSourceReport[] }>>;
   calendarLoad?: (start: string, end: string) => Promise<Readonly<{ days: DailyCalendarLoadSummary[]; sources: ChatSourceReport[] }>>;
   workouts: (start: string, end: string) => Promise<Readonly<{ workouts: unknown[]; sources: ChatSourceReport[] }>>;
+  travelHorizonData?: (horizonDays: number) => Promise<Readonly<{
+    trips: readonly ChatTravelHorizonTripInput[];
+    occurrences: readonly ChatTravelHorizonOccurrenceInput[];
+    sources?: readonly ChatSourceReport[];
+  }>>;
+  longitudinalData?: (windowDays: number) => Promise<Readonly<{
+    proposalOutcomes: readonly LongitudinalProposalOutcomeRecord[];
+    occurrences: readonly LongitudinalOccurrenceOutcomeRecord[];
+  }>>;
+}>;
+
+export type LiveChatConnectorReadsOptions = Readonly<{
+  today?: () => string;
+  timezone?: string;
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>;
 }>;
 
 const CALENDAR_READ_MS = 12_000;
+const EPHEMERAL_LOAD_PERSISTED_DAYS = 30;
+const EPHEMERAL_LOAD_MAX_CHUNKS = 6;
+
+function isGracefulDegradationCode(code: string): boolean {
+  return code === "rate_limited" || code === "mcp_daily_budget_exceeded" || code === "not_configured";
+}
+
+function extractGrantGeneration(read: unknown): number | null {
+  if (!read || typeof read !== "object") return null;
+  const candidate = (read as Record<string, unknown>).grantGeneration ?? (read as Record<string, unknown>).connectionGeneration;
+  return typeof candidate === "number" && Number.isSafeInteger(candidate) ? candidate : null;
+}
 
 /** Live connector reads for one signed-in person. */
-export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSourceFlags, signal: AbortSignal): ChatConnectorReads {
+export function liveChatConnectorReads(
+  caller: CalendarCaller,
+  sources: ChatSourceFlags,
+  signal: AbortSignal,
+  readOptions: LiveChatConnectorReadsOptions = {},
+): ChatConnectorReads {
+  const timezone = readOptions.timezone ?? DEFAULT_TIMEZONE;
+  const getToday = readOptions.today ?? (() => Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString());
+
   const readSource = async (source: ChatCalendarSource, start: string, end: string): Promise<Readonly<{ events: ChatCalendarEvent[]; report: ChatSourceReport }>> => {
     if (!sources[source]) return { events: [], report: { source, state: "off" } };
     const options = { signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]), allowPastDates: true };
@@ -64,12 +116,20 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
           : await getIcloudCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true });
+      if (source === "googleCalendar") {
+        await readOptions.onGoogleCalendarRead?.(extractGrantGeneration(read));
+      }
       if (!read.result.ok) logConnectorRead("chat_source_read_partial", source, read.result.error.code, null);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      const events = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
+      const projected = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
+      const events = await screenCalendarEvents(projected, signal);
       return { events, report: { source, state: read.result.ok ? "read" : "partial" } };
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (source === "googleCalendar" && isGracefulDegradationCode(code)) {
+        logConnectorRead("chat_source_read_unavailable", source, code, error);
+        return { events: [], report: { source, state: "unavailable" } };
+      }
       const notConnected = code === "reconnect_required" || code === "not_connected" || code === "same_account_required" || code === "not_configured";
       if (!notConnected && code === "invalid_request" && await connectedWithNoCalendars(caller, source)) {
         return { events: [], report: { source, state: "no_calendars" } };
@@ -107,7 +167,36 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
           sources: enabledSources,
           signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
         });
-        return { days: result.days, sources: reports };
+        let mergedDays = result.days;
+        if (sources.googleCalendar) {
+          await readOptions.onGoogleCalendarRead?.(null);
+          const ephemeral = await computeEphemeralGoogleCalendarLoad(
+            caller,
+            start,
+            end,
+            getToday(),
+            timezone,
+            signal,
+            readOptions.onGoogleCalendarRead,
+          );
+          if (ephemeral.days.length > 0) {
+            mergedDays = mergeCalendarLoadSummaries(mergedDays, ephemeral.days);
+          }
+          if (ephemeral.unavailable) {
+            for (let i = 0; i < reports.length; i += 1) {
+              if (reports[i]?.source === "googleCalendar") {
+                reports[i] = { source: "googleCalendar", state: "unavailable" };
+              }
+            }
+          } else if (ephemeral.partial) {
+            for (let i = 0; i < reports.length; i += 1) {
+              if (reports[i]?.source === "googleCalendar") {
+                reports[i] = { source: "googleCalendar", state: "partial" };
+              }
+            }
+          }
+        }
+        return { days: mergedDays, sources: reports };
       } catch (error) {
         logConnectorRead("chat_calendar_load_failed", "googleCalendar", "provider_unavailable", error);
         return { days: [], sources: reports.map((r) => r.state === "read" ? { ...r, state: "failed" as const } : r) };
@@ -185,19 +274,32 @@ export function createLiveChatExecutor(input: Readonly<{
   today: () => string;
   /** Person's IANA timezone for local-day cache filtering. */
   timezone?: string;
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>;
+  onTravelCards?: (cards: readonly ChatTravelUiCard[]) => void;
 }>): ChatToolExecutor {
+  const timezone = input.timezone ?? DEFAULT_TIMEZONE;
   const sessionCache = createEphemeralCalendarSessionCache(
     (start, end) => input.reads.calendarEvents(start, end),
-    input.timezone ?? DEFAULT_TIMEZONE,
+    timezone,
   );
-  let todayBusy: Promise<MoveCalendarBusy[]> | null = null;
+  let todayBusy: Promise<Readonly<{ busy: MoveCalendarBusy[]; partial: boolean }>> | null = null;
   const busyToday = () => (todayBusy ??= sessionCache.readSpan(input.today(), input.today())
-    .then((read) => calendarBusyFrom(read.events)).catch(() => []));
+    .then((read) => ({
+      busy: calendarBusyFrom(read.events),
+      partial: read.sources.some((s) => s.state === "partial" || s.state === "failed" || s.state === "unavailable"),
+    }))
+    .catch(() => ({ busy: [], partial: true })));
 
   return async (name: ChatToolName, args, options): Promise<ChatToolResult> => {
     if (name === "list_calendar_events") return calendarTool(sessionCache, args, input.today());
     if (name === "list_calendar_load") return calendarLoadTool(input.reads, args);
     if (name === "list_workouts") return workoutsTool(input.reads, args);
+    if (name === "plan_travel_horizon") {
+      return travelHorizonTool(input.reads, args, input.today(), timezone, input.onTravelCards, input.onGoogleCalendarRead);
+    }
+    if (name === "get_longitudinal_patterns") {
+      return longitudinalPatternsTool(input.reads, args, input.today());
+    }
     if (name === "search_advice") {
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
       return { ok: true, result: searchAdviceCards(args.query.slice(0, 200)) };
@@ -209,10 +311,20 @@ export function createLiveChatExecutor(input: Readonly<{
     // Adding an opportunity at an exact time passes the same busy times: the handler then
     // checks today's items and events with the shared free-slot rule, as a move does.
     const exactAdd = name === "add_opportunity_occurrence" && typeof args.start_time === "string" && args.end_time === undefined && args.mark_completed !== true;
-    const calendarBusy = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
-    const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, calendarBusy ? { calendarBusy } : {});
+    const busyState = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
+    const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, busyState ? { calendarBusy: busyState.busy } : {});
     if (!result.ok) return { ok: false, error: { code: result.error.code, message: result.error.message } };
-    return { ok: true, result: input.sources.notes ? result.value : withoutNotes(result.value) };
+    const value = input.sources.notes ? result.value : withoutNotes(result.value);
+    if (busyState?.partial && value && typeof value === "object" && !Array.isArray(value)) {
+      return {
+        ok: true,
+        result: {
+          ...(value as Record<string, unknown>),
+          calendar_check_partial: true,
+        },
+      };
+    }
+    return { ok: true, result: value };
   };
 }
 
@@ -298,11 +410,13 @@ function sourceNote(sources: readonly ChatSourceReport[]): string | null {
   const names: Readonly<Record<ChatSourceReport["source"], string>> = {
     googleCalendar: "Google Calendar", outlookCalendar: "Outlook Calendar", icloudCalendar: "iCloud Calendar", hevy: "Hevy",
   };
+  const unavailable = sources.filter((item) => item.state === "unavailable").map((item) => names[item.source]);
   const failed = sources.filter((item) => item.state === "failed").map((item) => names[item.source]);
   const partial = sources.filter((item) => item.state === "partial").map((item) => names[item.source]);
   const off = sources.filter((item) => item.state === "off").map((item) => names[item.source]);
   const unselected = sources.filter((item) => item.state === "no_calendars").map((item) => names[item.source]);
   const lines = [
+    unavailable.length ? `${unavailable.join(" and ")} ${unavailable.length === 1 ? "is" : "are"} temporarily unavailable for AI features.` : null,
     failed.length ? `Could not read ${failed.join(" and ")} just now; do not guess what is there.` : null,
     partial.length ? `Only part of ${partial.join(" and ")} could be read.` : null,
     off.length ? `${off.join(" and ")} ${off.length === 1 ? "is" : "are"} off in Settings.` : null,
@@ -310,4 +424,234 @@ function sourceNote(sources: readonly ChatSourceReport[]): string | null {
     sources.length === 0 ? "No calendar is connected." : null,
   ].filter(Boolean);
   return lines.length ? lines.join(" ") : null;
+}
+
+async function screenCalendarEvents(
+  events: readonly ChatCalendarEvent[],
+  signal: AbortSignal,
+): Promise<ChatCalendarEvent[]> {
+  return Promise.all(
+    events.map(async (event) => {
+      const [screenedTitle, screenedLocation] = await Promise.all([
+        screenExternalCalendarTextWithModelArmor({ text: event.title, signal, emitMonitoringEvent: false }),
+        event.location
+          ? screenExternalCalendarTextWithModelArmor({ text: event.location, signal, emitMonitoringEvent: false })
+          : Promise.resolve(null),
+      ]);
+      return {
+        ...event,
+        title: screenedTitle.text || "(no title)",
+        location: screenedLocation ? (screenedLocation.text || null) : null,
+      };
+    }),
+  );
+}
+
+/**
+ * Q2 Ephemeral >30-day Google Calendar load computation:
+ * Reads older Google Calendar chunks live in memory via MCP (`ephemeralOnly: true`),
+ * computes numeric load via `resolveDailyCalendarLoad`, and discards raw events immediately.
+ */
+async function computeEphemeralGoogleCalendarLoad(
+  caller: CalendarCaller,
+  start: string,
+  end: string,
+  today: string,
+  timezone: string,
+  signal: AbortSignal,
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>,
+): Promise<Readonly<{ days: DailyCalendarLoadSummary[]; partial: boolean; unavailable: boolean }>> {
+  const cutoff = Temporal.PlainDate.from(today).subtract({ days: EPHEMERAL_LOAD_PERSISTED_DAYS });
+  const startDate = Temporal.PlainDate.from(start);
+  const endDate = Temporal.PlainDate.from(end);
+  if (Temporal.PlainDate.compare(startDate, cutoff) >= 0) {
+    return { days: [], partial: false, unavailable: false };
+  }
+  const ephemeralEnd = Temporal.PlainDate.compare(endDate, cutoff.subtract({ days: 1 })) < 0
+    ? endDate
+    : cutoff.subtract({ days: 1 });
+
+  const days: DailyCalendarLoadSummary[] = [];
+  let cursor = startDate;
+  let chunks = 0;
+  let partial = false;
+  let unavailable = false;
+
+  while (Temporal.PlainDate.compare(cursor, ephemeralEnd) <= 0 && chunks < EPHEMERAL_LOAD_MAX_CHUNKS) {
+    const chunkEndCandidate = cursor.add({ days: MAX_CALENDAR_LIVE_SPAN_DAYS - 1 });
+    const chunkEnd = Temporal.PlainDate.compare(chunkEndCandidate, ephemeralEnd) <= 0
+      ? chunkEndCandidate
+      : ephemeralEnd;
+    chunks += 1;
+    try {
+      const read = await getCalendarEventsForAdvisor(
+        caller,
+        cursor.toString(),
+        chunkEnd.toString(),
+        {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
+          allowPastDates: true,
+          ephemeralOnly: true,
+        } as Parameters<typeof getCalendarEventsForAdvisor>[3],
+      );
+      await onGoogleCalendarRead?.(extractGrantGeneration(read));
+      if (!read.result.ok) partial = true;
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      const computed = resolveDailyCalendarLoad({
+        startLocalDate: cursor.toString(),
+        endLocalDate: chunkEnd.toString(),
+        timezone,
+        events: snapshot.events as readonly NormalizedExternalEvent[],
+      });
+      for (const entry of computed) {
+        days.push({
+          local_date: entry.localDate,
+          busy_minutes: entry.busyMinutes,
+          event_count: entry.eventCount,
+          earliest_start_minute: entry.earliestStartMinute,
+          latest_end_minute: entry.latestEndMinute,
+          has_all_day_busy: entry.hasAllDayBusy,
+          sources: ["google_calendar"],
+        });
+      }
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (isGracefulDegradationCode(code)) {
+        unavailable = true;
+        break;
+      }
+      partial = true;
+    }
+    cursor = chunkEnd.add({ days: 1 });
+  }
+
+  return { days, partial, unavailable };
+}
+
+function mergeCalendarLoadSummaries(
+  persisted: readonly DailyCalendarLoadSummary[],
+  ephemeral: readonly DailyCalendarLoadSummary[],
+): DailyCalendarLoadSummary[] {
+  const byDate = new Map<string, DailyCalendarLoadSummary>();
+  for (const day of persisted) {
+    byDate.set(day.local_date, day);
+  }
+  for (const day of ephemeral) {
+    const existing = byDate.get(day.local_date);
+    if (!existing) {
+      byDate.set(day.local_date, day);
+      continue;
+    }
+    if (existing.sources.includes("google_calendar")) continue;
+    byDate.set(day.local_date, {
+      local_date: existing.local_date,
+      busy_minutes: existing.busy_minutes + day.busy_minutes,
+      event_count: existing.event_count + day.event_count,
+      earliest_start_minute:
+        existing.earliest_start_minute === null
+          ? day.earliest_start_minute
+          : day.earliest_start_minute === null
+            ? existing.earliest_start_minute
+            : Math.min(existing.earliest_start_minute, day.earliest_start_minute),
+      latest_end_minute:
+        existing.latest_end_minute === null
+          ? day.latest_end_minute
+          : day.latest_end_minute === null
+            ? existing.latest_end_minute
+            : Math.max(existing.latest_end_minute, day.latest_end_minute),
+      has_all_day_busy: existing.has_all_day_busy || day.has_all_day_busy,
+      sources: [...existing.sources, "google_calendar"],
+    });
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.local_date.localeCompare(b.local_date));
+}
+
+async function travelHorizonTool(
+  reads: ChatConnectorReads,
+  args: Readonly<Record<string, unknown>>,
+  today: string,
+  timezone: string,
+  onTravelCards?: (cards: readonly ChatTravelUiCard[]) => void,
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>,
+): Promise<ChatToolResult> {
+  const requestedDays = typeof args.horizon_days === "number" && Number.isFinite(args.horizon_days)
+    ? Math.max(1, Math.min(7, Math.trunc(args.horizon_days)))
+    : 7;
+  const data = reads.travelHorizonData
+    ? await reads.travelHorizonData(requestedDays)
+    : { trips: [], occurrences: [], sources: [] };
+  if (data.sources?.some((s) => s.source === "googleCalendar" && (s.state === "read" || s.state === "partial"))) {
+    await onGoogleCalendarRead?.(null);
+  }
+  const horizon = resolveChatTravelHorizon({
+    now: Temporal.Now.instant(),
+    timezone,
+    todayLocalDate: today,
+    horizonDays: requestedDays,
+    trips: data.trips,
+    occurrences: data.occurrences,
+  });
+  if (horizon.uiCards.length > 0) {
+    onTravelCards?.(horizon.uiCards);
+  }
+  // L-001: Return ONLY `modelSummary` to the LLM; `uiCards` are emitted directly to UI.
+  return {
+    ok: true,
+    result: {
+      travel_horizon: horizon.modelSummary,
+      ui_cards_emitted: horizon.uiCards.length,
+      note: data.sources ? sourceNote(data.sources) : null,
+    },
+    uiTravelCards: horizon.uiCards,
+  };
+}
+
+async function longitudinalPatternsTool(
+  reads: ChatConnectorReads,
+  args: Readonly<Record<string, unknown>>,
+  today: string,
+): Promise<ChatToolResult> {
+  const windowDays = typeof args.window_days === "number" && Number.isFinite(args.window_days)
+    ? Math.max(7, Math.min(180, Math.trunc(args.window_days)))
+    : 30;
+  const data = reads.longitudinalData
+    ? await reads.longitudinalData(windowDays)
+    : { proposalOutcomes: [], occurrences: [] };
+  const firstParty = resolveFirstPartyLongitudinalPatterns({
+    now: Temporal.Now.instant(),
+    proposalOutcomes: data.proposalOutcomes,
+    occurrences: data.occurrences,
+  });
+
+  let rollingCalendarSummary = null;
+  if (reads.calendarLoad) {
+    const endDate = Temporal.PlainDate.from(today);
+    const startDate = endDate.subtract({ days: windowDays - 1 });
+    const load = await reads.calendarLoad(startDate.toString(), endDate.toString());
+    if (load.days.length > 0) {
+      const totalBusy = load.days.reduce((sum, d) => sum + d.busy_minutes, 0);
+      const heavyDayCount = load.days.filter((d) => d.busy_minutes >= 240).length;
+      const weekdayTotals = new Map<number, { sum: number; count: number }>();
+      for (const d of load.days) {
+        const wd = Temporal.PlainDate.from(d.local_date).dayOfWeek;
+        const cur = weekdayTotals.get(wd) ?? { sum: 0, count: 0 };
+        weekdayTotals.set(wd, { sum: cur.sum + d.busy_minutes, count: cur.count + 1 });
+      }
+      const busiestWeekdays = Array.from(weekdayTotals.entries())
+        .sort((a, b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count))
+        .slice(0, 2)
+        .map(([wd]) => wd);
+      rollingCalendarSummary = {
+        windowDays,
+        heavyDayCount,
+        averageBusyMinutes: totalBusy / load.days.length,
+        busiestWeekdays,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    result: mergeLongitudinalLayers(firstParty, rollingCalendarSummary),
+  };
 }

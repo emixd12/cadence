@@ -8,7 +8,7 @@ import {
 import { finishAgentRun, reserveAgentSpend, settleAgentSpend, startAgentRun } from "@/lib/db/agent-runs.repo";
 import {
   ChatStorageError, chatStopRequested, claimChatConfirm, claimChatUndo, releaseChatConfirm, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
-  readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
+  markChatConversationGoogleCalendarTouched, readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
 } from "@/lib/db/chat.repo";
 import { agentCallerConfigured, createAgentContext } from "@/lib/integrations/agent-caller";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
@@ -154,6 +154,7 @@ function partEvent(part: ChatPart): ChatEvent {
     case "refusal": return { type: "refusal", refusal: part.refusal };
     case "notice": return { type: "notice", notice: part.notice };
     case "alert": return { type: "alert", alert: part.alert };
+    case "travel_card": return { type: "travel_card", card: part.card };
   }
 }
 
@@ -181,8 +182,26 @@ async function runAndStore(input: Readonly<{
   const now = localNow(timezone);
   const tools = buildChatToolDefinitions(sources);
   const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources) });
-  const reads = liveChatConnectorReads(caller, sources, signal);
-  const executor = createLiveChatExecutor({ context, sources, reads, today: () => localNow(timezone).today, timezone });
+  const onGoogleCalendarRead = async (grantGeneration: number | null) => {
+    await markChatConversationGoogleCalendarTouched(client, {
+      conversationId: input.conversationId,
+      replyId: input.replyId,
+      grantGeneration,
+    }).catch(() => undefined);
+  };
+  const reads = liveChatConnectorReads(caller, sources, signal, {
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
+  const executor = createLiveChatExecutor({
+    context,
+    sources,
+    reads,
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
 
   let firstTextMs: number | null = null;
   const usage: AgentModelUsage[] = [];
@@ -454,6 +473,7 @@ export function recordSentPart(parts: ChatPart[], event: ChatEvent): void {
     case "refusal": parts.push({ type: "refusal", refusal: event.refusal }); return;
     case "notice": parts.push({ type: "notice", notice: event.notice }); return;
     case "alert": parts.push({ type: "alert", alert: event.alert }); return;
+    case "travel_card": parts.push({ type: "travel_card", card: event.card }); return;
     // A confirm is stored only with its pending writes, so a failed turn leaves it out.
     default: return;
   }

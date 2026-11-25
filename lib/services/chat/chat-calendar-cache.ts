@@ -155,6 +155,7 @@ export function createEphemeralCalendarSessionCache(
 
 function mergeSourceReports(groups: readonly (readonly ChatSourceReport[])[]): ChatSourceReport[] {
   const priority: Record<ChatSourceReport["state"], number> = {
+    unavailable: 6,
     failed: 5,
     partial: 4,
     no_calendars: 3,

@@ -8,6 +8,8 @@ import { DailyBriefStorageError } from "@/lib/db/daily-brief.repo";
 // shared by every feature. Source choices are stored on the Daily Brief preference
 // row; tips, Chat and the approval on their own private row.
 
+export type LongitudinalReviewCadence = "weekly" | "monthly";
+
 export type StoredAiSettings = Readonly<{
   /** ISO time the person first answered the AI features question; null before. */
   approvedAt: string | null;
@@ -19,6 +21,9 @@ export type StoredAiSettings = Readonly<{
   includeReminderHistory: boolean;
   useConnectedSources: boolean;
   excludedSources: DailyBriefSourceFlags;
+  googleCalendarSource?: "agent_mcp" | "standard";
+  longitudinalCalendarReviewEnabled?: boolean;
+  longitudinalCalendarReviewCadence?: LongitudinalReviewCadence;
 }>;
 
 export type AiSettingsWrite = Omit<StoredAiSettings, "approvedAt" | "revision">;
@@ -77,6 +82,14 @@ export function parseAiSettings(value: unknown): StoredAiSettings {
       DAILY_BRIEF_CONNECTED_SOURCES.some((source) => typeof (flags as JsonRecord)[EXCLUDED_KEYS[source]] !== "boolean")) {
     throw invalid();
   }
+  const googleCalendarSource =
+    record.google_calendar_source === "agent_mcp" || record.google_calendar_source === "standard"
+      ? record.google_calendar_source
+      : "agent_mcp";
+  const longitudinalCalendarReviewEnabled = record.longitudinal_calendar_review_enabled === true;
+  const longitudinalCalendarReviewCadence: LongitudinalReviewCadence =
+    record.longitudinal_calendar_review_cadence === "monthly" ? "monthly" : "weekly";
+
   return {
     approvedAt: record.approved_at as string | null,
     revision: record.revision as number,
@@ -87,6 +100,9 @@ export function parseAiSettings(value: unknown): StoredAiSettings {
     includeReminderHistory: record.include_reminder_history as boolean,
     useConnectedSources: record.use_connected_sources as boolean,
     excludedSources: dailyBriefSourceFlags((source) => (flags as JsonRecord)[EXCLUDED_KEYS[source]] === true),
+    googleCalendarSource,
+    longitudinalCalendarReviewEnabled,
+    longitudinalCalendarReviewCadence,
   };
 }
 

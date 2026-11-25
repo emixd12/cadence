@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { ChatConfirmItem, ChatOutcomeKind } from "@cadence/core/types/chat";
+import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import { CHAT_OUTCOME_KIND, type ChatToolName, type ChatWriteName } from "./chat-tools";
 
 /**
@@ -12,7 +13,9 @@ export type ChatToolError = Readonly<{
   message: string;
   alternatives?: readonly Readonly<{ start_at: string; start_time: string }>[];
 }>;
-export type ChatToolResult = Readonly<{ ok: true; result: unknown }> | Readonly<{ ok: false; error: ChatToolError }>;
+export type ChatToolResult =
+  | Readonly<{ ok: true; result: unknown; uiTravelCards?: readonly ChatTravelUiCard[] }>
+  | Readonly<{ ok: false; error: ChatToolError }>;
 
 /**
  * Runs one tool as the person, through chat's grant. It only executes: chat-turn.ts
@@ -167,6 +170,7 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
       return str(args.note) ? `Save your note for ${date}` : `Clear your note for ${date}`;
     }
     case "move_occurrence_for_day": return `Move ${title} to ${chatClockFromLocal(str(args.start_time) ?? "")} today`;
+    case "move_occurrence_to_date": return `Move ${title} to ${chatDateText(str(args.target_local_date) ?? "")} at ${chatClockFromLocal(str(args.start_time) ?? "")}`;
     case "revert_occurrence_move": return `Move ${title} back to where it was`;
     case "add_opportunity_occurrence": return `Add ${title} to today${placementText(args)}`;
     case "remove_opportunity_occurrence": return `Take ${title} off today`;
@@ -225,6 +229,7 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
       return str(call.args.note) ? `Saved your note for ${date}.` : `Cleared your note for ${date}.`;
     }
     case "move_occurrence_for_day": return `Moved ${title} to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)} today.`;
+    case "move_occurrence_to_date": return `Moved ${title} to ${chatDateText(str(call.args.target_local_date) ?? "")} at ${chatClockFromLocal(str(call.args.start_time) ?? "")}.`;
     case "revert_occurrence_move": return `Moved ${title} back to ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`;
     case "add_opportunity_occurrence": return out.outcome === "logged"
       ? `Marked ${title} done at ${chatClockText(str(occurrence.effective_start_at) ?? "", timezone)}.`
@@ -314,6 +319,11 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
     // Move Undo carries the revision right after this move, so it refuses once anyone
     // moves or changes the item again; revert would otherwise undo that newer move.
     case "move_occurrence_for_day": {
+      const revision = str(occurrence.revision);
+      if (!occurrenceId || out.outcome !== "moved" || !revision) return null;
+      return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId, expected_revision: revision } } };
+    }
+    case "move_occurrence_to_date": {
       const revision = str(occurrence.revision);
       if (!occurrenceId || out.outcome !== "moved" || !revision) return null;
       return { call: { name: "revert_occurrence_move", args: { occurrence_id: occurrenceId, expected_revision: revision } } };

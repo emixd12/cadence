@@ -115,6 +115,8 @@ export function applyChatEvent(
       return updateStreamingReply(state, (parts) => [...parts, { type: "refusal", refusal: event.refusal }]);
     case "notice":
       return updateStreamingReply(state, (parts) => [...parts, { type: "notice", notice: event.notice }]);
+    case "travel_card":
+      return updateStreamingReply(state, (parts) => [...parts, { type: "travel_card", card: event.card }]);
     case "alert":
       return addAlertToReply(state, event.alert, clientMessageId, now);
     case "done":
