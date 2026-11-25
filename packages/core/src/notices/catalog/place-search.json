@@ -1,0 +1,74 @@
+{
+  "feature": "travel-and-leave-times",
+  "notices": {
+    "place-search.searching": {
+      "meaning": "Says inside the open place autocomplete list that Geoapify results are loading.",
+      "text": "Searching places…",
+      "style": "note",
+      "interactions": [
+        "INT-TRAVEL-002",
+        "INT-TRAVEL-005"
+      ]
+    },
+    "place-search.rate-limited": {
+      "meaning": "Says inside the open place autocomplete list that the account hit the place-search rate limit and free-text typing still works.",
+      "text": "Too many searches for now. You can keep typing the place directly.",
+      "style": "note",
+      "interactions": [
+        "INT-TRAVEL-002",
+        "INT-TRAVEL-005"
+      ]
+    },
+    "place-search.place-selected": {
+      "meaning": "Says below Behavior Place that a place suggestion was chosen, with Undo beside it.",
+      "text": "Selected {title}.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-005"
+      ]
+    },
+    "place-search.place-selected-with-marker": {
+      "meaning": "Says below Behavior Place that a specific Geoapify place was chosen and its completion marker will save when the Behavior saves, with Undo beside it.",
+      "text": "Selected {title}. Its marker will save when you save this behavior.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-005",
+        "INT-PLACE-006"
+      ]
+    },
+    "place-search.home-selected": {
+      "meaning": "Says below Settings Home that a place suggestion was chosen and will save on Enter or blur, with Undo beside it.",
+      "text": "Selected {title}. Press Enter or leave the field to save.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-002"
+      ]
+    },
+    "place-search.home-selected-with-marker": {
+      "meaning": "Says below Settings Home that a specific Geoapify place was chosen and its Home completion marker will save when Home saves, with Undo beside it.",
+      "text": "Selected {title}. Press Enter or leave the field to save. Its Home marker will save with it.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-002",
+        "INT-PLACE-006"
+      ]
+    },
+    "place-search.home-updated": {
+      "meaning": "Says below Settings Home that the selected address saved, with Undo beside it.",
+      "text": "Home updated from selection.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-002"
+      ]
+    },
+    "place-search.home-updated-with-marker": {
+      "meaning": "Says below Settings Home that the selected address and its Home completion marker saved, with Undo beside it.",
+      "text": "Home and its marker updated from selection.",
+      "style": "outcome",
+      "interactions": [
+        "INT-TRAVEL-002",
+        "INT-PLACE-006"
+      ]
+    }
+  }
+}

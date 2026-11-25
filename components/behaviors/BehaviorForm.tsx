@@ -15,7 +15,10 @@ import { ReminderEditor } from "@/components/behaviors/ReminderEditor";
 import { SubBehaviorDraftEditor, type SubBehaviorDraft } from "@/components/behaviors/SubBehaviorEditor";
 import type { ParentOption } from "@/components/behaviors/behavior-list-state";
 import { Notice } from "@/components/feedback/Notice";
-import { PlaceMarkerControl, type WhereDraft } from "@/components/travel/PlaceLabels";
+import { PlaceAutocomplete } from "@/components/travel/PlaceAutocomplete";
+import { PlaceMarkerControl, usePlaceLabelActions, type WhereDraft } from "@/components/travel/PlaceLabels";
+import type { PlaceSearchCoordinates, PlaceSearchSuggestion } from "@cadence/core/types/place-search";
+import type { PlaceSearchClient } from "@/lib/ui/place-search";
 import { DesktopFormDraftGuard } from "@/lib/desktop-draft";
 import { formatRunDay, localDateIn } from "@/lib/ui/behavior-run";
 import type {
@@ -62,6 +65,10 @@ type BehaviorFormProps = Readonly<{
   parentLocked?: boolean;
   /** Create mode: let the person draft sub-behaviors that save with this Behavior. */
   allowSubBehaviorDrafts?: boolean;
+  /** Unique saved places from other Behaviors for instant zero-cost local matching. */
+  savedPlaces?: readonly string[];
+  /** Optional override for place autocomplete (tests / desktop). */
+  placeSearchClient?: PlaceSearchClient | null;
 }>;
 
 export type TimeEntryRow = {
@@ -132,12 +139,22 @@ export function BehaviorForm({
   parentOptions,
   parentLocked = false,
   allowSubBehaviorDrafts = false,
+  savedPlaces = [],
+  placeSearchClient,
 }: BehaviorFormProps) {
   const planningId = useId();
+  const placeLabelActions = usePlaceLabelActions();
   const [selectedCategory, setSelectedCategory] = useState(behavior?.categoryId ?? "");
   const initialPlaceText = whereDraft ? whereDraft.locationText : behavior?.whereKind === "place" ? behavior.locationText ?? "" : "";
   const [whereKind, setWhereKind] = useState<BehaviorWhereKind | "">(whereDraft?.whereKind ?? behavior?.whereKind ?? "");
   const [placeText, setPlaceText] = useState(initialPlaceText);
+  const [placeSelection, setPlaceSelection] = useState<Readonly<{
+    title: string;
+    text: string;
+    previousText: string;
+    position: PlaceSearchCoordinates | null;
+    forState: BehaviorActionState;
+  }> | null>(null);
   const [endDay, setEndDay] = useState(behavior?.endOn ?? "");
   const [showEndTime, setShowEndTime] = useState(Boolean(behavior?.endTime));
   const pauseToday = behavior ? localDateIn(behavior.timezone) : "";
@@ -166,6 +183,8 @@ export function BehaviorForm({
   const draftRevisionRef = useRef(0);
   const submittedRevisionRef = useRef<number | null>(null);
   const submittedLocationRef = useRef<string | null>(null);
+  const submittedPlaceMarkerRef = useRef<Readonly<{ text: string; position: PlaceSearchCoordinates }> | null>(null);
+  const submittingActionRef = useRef(false);
 
   const markDraftDirty = useCallback(() => {
     draftRevisionRef.current += 1;
@@ -173,6 +192,7 @@ export function BehaviorForm({
   }, []);
 
   useEffect(() => {
+    submittingActionRef.current = false;
     if (state.status === "success" && state.message) {
       if (submittedRevisionRef.current === draftRevisionRef.current) {
         setDraftDirty(false);
@@ -183,9 +203,17 @@ export function BehaviorForm({
       if (submitted !== null && submitted !== whereSignature(behavior?.whereKind ?? "", behavior?.locationText ?? "") && typeof window !== "undefined") {
         window.dispatchEvent(new Event("cadence:travel-changed"));
       }
+      const pendingMarker = submittedPlaceMarkerRef.current;
+      submittedPlaceMarkerRef.current = null;
+      if (pendingMarker && placeLabelActions?.enabled) {
+        void placeLabelActions.recordMarkerFromCoordinates(
+          { kind: "saved_place", text: pendingMarker.text },
+          pendingMarker.position,
+        );
+      }
       onSuccess?.(state);
     }
-  }, [behavior?.locationText, behavior?.whereKind, onSuccess, state]);
+  }, [behavior?.locationText, behavior?.whereKind, onSuccess, placeLabelActions, state]);
 
   function addScheduleRow() {
     if (scheduleRows.length >= MAX_SCHEDULE_ROWS) {
@@ -304,8 +332,14 @@ export function BehaviorForm({
     submittedRevisionRef.current = null;
     setDraftDirty(false);
     setSelectedCategory(behavior?.categoryId ?? "");
-    setWhereKind(behavior?.whereKind ?? "");
-    setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
+    // React 19 fires form reset after every formAction, including validation/server errors.
+    // Keep Where and the selected Place across an action reset so a failed submit does not
+    // drop the user's selected place or pending completion marker; explicit Cancel resets all.
+    if (!submittingActionRef.current) {
+      setWhereKind(behavior?.whereKind ?? "");
+      setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
+      setPlaceSelection(null);
+    }
     setIsOpportunity(behavior?.isOpportunity === true);
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
     setParentId(behavior?.parentBehaviorId ?? "");
@@ -320,11 +354,21 @@ export function BehaviorForm({
       onChangeCapture={markDraftDirty}
       onReset={resetFormDraft}
       onSubmitCapture={(event) => {
+        submittingActionRef.current = true;
         submittedRevisionRef.current = draftRevisionRef.current;
         const data = new FormData(event.currentTarget);
         const where = data.get("where_kind");
         const location = data.get("location_text");
-        submittedLocationRef.current = whereSignature(typeof where === "string" ? where : "", typeof location === "string" ? location : "");
+        const whereString = typeof where === "string" ? where : "";
+        const locationString = typeof location === "string" ? location : "";
+        submittedLocationRef.current = whereSignature(whereString, locationString);
+        const activeSelection = placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? placeSelection : null;
+        submittedPlaceMarkerRef.current =
+          whereString === "place" &&
+          activeSelection?.position &&
+          locationString.trim() === activeSelection.text.trim()
+            ? { text: activeSelection.text, position: activeSelection.position }
+            : null;
       }}
       className="grid gap-6"
     >
@@ -412,7 +456,11 @@ export function BehaviorForm({
             label="Where"
             name="where_kind"
             value={whereKind}
-            onChange={(value) => setWhereKind(value as BehaviorWhereKind | "")}
+            onChange={(value) => {
+              const next = value as BehaviorWhereKind | "";
+              setWhereKind(next);
+              if (next !== "place") setPlaceSelection(null);
+            }}
             error={fieldErrors.where_kind}
           >
             {WHERE_OPTIONS.map((option) => (
@@ -422,10 +470,63 @@ export function BehaviorForm({
             ))}
           </SelectField>
           {whereKind === "place" ? (
-            <TextField label="Place" name="location_text"
-              defaultValue={initialPlaceText}
-              onValueChange={setPlaceText}
-              required error={fieldErrors.location_text} />
+            <div className="grid min-w-0 gap-1 text-sm">
+              <label htmlFor={`${planningId}-place`}>Place</label>
+              <PlaceAutocomplete
+                id={`${planningId}-place`}
+                name="location_text"
+                value={placeText}
+                required
+                ariaInvalid={Boolean(fieldErrors.location_text)}
+                placeholder="Search an address or place name"
+                savedPlaces={savedPlaces}
+                searchClient={placeSearchClient}
+                className={`w-full min-w-0 ${COMPACT_UNDERLINED_FIELD_CONTROL_CLASS}`}
+                onChange={(nextValue) => {
+                  setPlaceText(nextValue);
+                  setPlaceSelection(null);
+                  markDraftDirty();
+                }}
+                onSelect={(suggestion: PlaceSearchSuggestion) => {
+                  const activeSelection = placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? placeSelection : null;
+                  const previousText = activeSelection ? activeSelection.previousText : placeText;
+                  setPlaceText(suggestion.formatted);
+                  setPlaceSelection({
+                    title: suggestion.title,
+                    text: suggestion.formatted,
+                    previousText,
+                    position: suggestion.position,
+                    forState: state,
+                  });
+                  markDraftDirty();
+                }}
+              />
+              <FieldError message={fieldErrors.location_text} />
+              {placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? (
+                <Notice
+                  id={placeSelection.position && placeLabelActions?.enabled
+                    ? "place-search.place-selected-with-marker"
+                    : "place-search.place-selected"}
+                  params={{ title: placeSelection.title }}
+                  className="text-xs leading-5"
+                  data={{ "data-place-selection": true }}
+                  action={
+                    <button
+                      type="button"
+                      className="product-action product-action-secondary ml-2"
+                      onClick={() => {
+                        setPlaceText(placeSelection.previousText);
+                        setPlaceSelection(null);
+                        submittedPlaceMarkerRef.current = null;
+                        markDraftDirty();
+                      }}
+                    >
+                      Undo
+                    </button>
+                  }
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
         {whereDraft ? <p className="text-sm" role="status">Where is filled in from a suggestion. Save to keep it.</p> : null}
