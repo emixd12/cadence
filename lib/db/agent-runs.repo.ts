@@ -168,3 +168,14 @@ export async function purgeExpiredAgentRunContents(serviceClient: AppSupabaseCli
   if (typeof data !== "number") throw new AgentRunStorageError("malformed_result");
   return data;
 }
+
+/** Service role only: <=30-day derived-finding expiry sweep for Google Calendar MCP AI data. */
+export async function purgeExpiredGoogleCalendarAiData(serviceClient: AppSupabaseClient, signal?: AbortSignal): Promise<number> {
+  const request = (serviceClient as unknown as {
+    rpc: (fn: string) => { abortSignal: (s: AbortSignal) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }> } & Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+  }).rpc("purge_expired_google_calendar_ai_data");
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  if (typeof data !== "number") throw new AgentRunStorageError("malformed_result");
+  return data;
+}
