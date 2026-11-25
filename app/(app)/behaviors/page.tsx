@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { collectSavedBehaviorPlaces } from "@cadence/core/services/place-search";
 import { BehaviorCreateSection } from "@/components/behaviors/BehaviorCreateSection";
 import { BehaviorList } from "@/components/behaviors/BehaviorList";
 import {
@@ -121,6 +122,7 @@ async function BehaviorsContent({
         defaultTimezone={data.defaultTimezone}
         defaultOpen={!hasBehaviors}
         parentOptions={parentChoices(null, [...data.activeBehaviors, ...data.archivedBehaviors]).options}
+        savedPlaces={collectSavedBehaviorPlaces([...data.activeBehaviors, ...data.archivedBehaviors])}
       />
 
       <NoteShortcutDismissProvider onDismiss={dismissNoteShortcutAction}>

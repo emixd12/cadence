@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-086` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-092` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -131,6 +131,7 @@ Status values:
 | [P-075](#p-075-pause-back-on-day-rule) | Pause back-on day rule | logged | Ended and Paused plan | in-app copy, MCP |
 | [P-076](#p-076-behaviors-no-longer-archive-by-themselves) | Behaviors no longer archive by themselves | logged | Ended and Paused plan | in-app copy, user guide, MCP |
 | [P-077](#p-077-ended-and-paused-on-the-web) | Ended and Paused on the web | logged | Ended and Paused plan | in-app copy, user guide |
+| [P-091](#p-091-geoapify-place-and-home-autocomplete-and-auto-saved-completion-markers) | Geoapify place and Home autocomplete and auto-saved completion markers | logged | — | Privacy and Terms, in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -2447,4 +2448,27 @@ cite has not changed.
   and upcoming days only.
 - **Update needed:** note that when AI calendar access is enabled, Chat may live-read bounded
   past date windows (up to 31 days per call) on demand without storing raw events.
+- **Status:** logged.
+
+## P-091: Geoapify place and Home autocomplete and auto-saved completion markers
+
+- **Change:** implemented November 25, 2026. Typing in Behavior `Place` or `Settings → Travel → Home`
+  sends debounced search queries (3+ characters) to Geoapify (`api.geoapify.com`, OpenStreetMap
+  data) through `/api/travel/place-search` after instant local saved-place matching. Queries are
+  not stored or logged; no device GPS position is sent to Geoapify. When Completion places is
+  enabled, selecting a specific Geoapify place (never a coarse city/state/postcode centroid) also
+  records its completion marker once the Behavior or Home address is saved, with an inline Undo
+  control before and after saving.
+- **Affected:** `app/api/travel/place-search/route.ts`, `lib/services/geoapify-provider.ts`,
+  `lib/services/place-search.service.ts`, `components/travel/PlaceAutocomplete.tsx`,
+  `components/behaviors/BehaviorForm.tsx`, `components/settings/TravelSettingsPanel.tsx`.
+- **Surfaces:** Privacy and Terms (`components/settings/LegalContent.tsx`), user guide
+  (`docs/user-guide/travel.md`), in-app attribution (`Powered by Geoapify · © OpenStreetMap contributors`).
+- **Conflicting current text:** `components/settings/LegalContent.tsx` and
+  `docs/user-guide/travel.md` do not yet list Geoapify as a subprocessor for typed place/Home
+  autocomplete queries, and describe completion place markers as recorded only via "I'm here".
+- **Update needed:** add Geoapify (OpenStreetMap) to the Privacy subprocessor list for place/Home
+  search queries, note that selecting a searched place can record its completion marker when
+  Completion places is enabled, and document the Undo flow in `docs/user-guide/travel.md`.
+- **Related:** P-001, P-036, L-003.
 - **Status:** logged.
