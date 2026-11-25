@@ -72,6 +72,7 @@ export type LedgerSyncResult = Readonly<{
   upsertedCount: number;
   removedCount: number;
   connectionGeneration: number | null;
+  backfillComplete: boolean;
 }>;
 
 export type RecordedActivityReadResult = Readonly<{
@@ -163,8 +164,10 @@ export async function clearRecordedActivitiesOnDisconnect(
       .update({
         next_check_at: null,
         read_cursor: null,
+        ledger_cursor: null,
         last_synced_at: null,
         backfilled_at: null,
+        backfill_complete: false,
         paused_for_inactivity: false,
       })
       .eq("user_id", userId)
@@ -187,11 +190,11 @@ export async function backfillHevyOnConnect(
   try {
     const connection = await readConnectorConnection(caller.client, caller.user.id, "hevy");
     if (!connection || connection.status !== "connected" || !connection.accountDigest || !HEX_64.test(connection.accountDigest)) {
-      return { outcome: "failed", pagesFetched: 0, durationMs: Math.max(0, clock() - startedMs), upsertedCount: 0, removedCount: 0, connectionGeneration: null };
+      return { outcome: "failed", pagesFetched: 0, durationMs: Math.max(0, clock() - startedMs), upsertedCount: 0, removedCount: 0, connectionGeneration: null, backfillComplete: false };
     }
     return await syncHevyLedger(caller, { ...options, touchUserActivity: true, freshnessSeconds: 0 });
   } catch {
-    return { outcome: "failed", pagesFetched: 0, durationMs: Math.max(0, clock() - startedMs), upsertedCount: 0, removedCount: 0, connectionGeneration: null };
+    return { outcome: "failed", pagesFetched: 0, durationMs: Math.max(0, clock() - startedMs), upsertedCount: 0, removedCount: 0, connectionGeneration: null, backfillComplete: false };
   }
 }
 
@@ -244,6 +247,7 @@ export async function syncHevyLedger(
           upsertedCount: 0,
           removedCount: 0,
           connectionGeneration: connection.generation,
+          backfillComplete: stateRow.backfill_complete,
         };
       }
     }
@@ -258,16 +262,19 @@ export async function syncHevyLedger(
           throw new ConnectorError("connection_changed");
         }
 
-        const cursor = parseCompletionCursor(stateRow?.read_cursor ?? null);
+        // Keep `ledger_cursor` completely separate from connector-completion's `read_cursor`
+        // so foreground Timeline/Brief/Chat reads never skip events for completion reconciliation.
+        const cursor = parseCompletionCursor(stateRow?.ledger_cursor ?? null);
         const canIncremental = Boolean(cursor && cursor.generation === connection.generation && stateRow?.backfilled_at);
         const today = Temporal.Instant.fromEpochMilliseconds(clock()).toZonedDateTimeISO(timezone).toPlainDate();
 
         let pagesFetched = 0;
         let upsertedCount = 0;
         let removedCount = 0;
-        let nextCursor: string | null = stateRow?.read_cursor ?? null;
+        let nextLedgerCursor: string | null = stateRow?.ledger_cursor ?? null;
         let outcome: HevySyncOutcome = "full_fallback";
         let backfilledAt = stateRow?.backfilled_at ?? null;
+        let backfillComplete = stateRow?.backfill_complete ?? false;
 
         if (canIncremental && cursor) {
           const changes = await readHevyMatchChanges({
@@ -294,7 +301,7 @@ export async function syncHevyLedger(
             const advanced = Temporal.Instant.compare(Temporal.Instant.from(cursor.since), Temporal.Instant.from(margin)) >= 0
               ? cursor.since
               : margin;
-            nextCursor = formatCompletionCursor(connection.generation, advanced);
+            nextLedgerCursor = formatCompletionCursor(connection.generation, advanced);
           }
         }
 
@@ -316,8 +323,9 @@ export async function syncHevyLedger(
           );
           upsertedCount = await upsertRecordedActivities(caller.client, caller.user.id, rows);
           backfilledAt = finishedIso;
+          backfillComplete = full.complete;
           const margin = Temporal.Instant.from(full.fetchedAt).subtract({ minutes: CURSOR_MARGIN_MINUTES }).toString();
-          nextCursor = formatCompletionCursor(connection.generation, margin);
+          nextLedgerCursor = formatCompletionCursor(connection.generation, margin);
         }
 
         const finishedInstant = Temporal.Instant.fromEpochMilliseconds(clock());
@@ -334,10 +342,11 @@ export async function syncHevyLedger(
           : null;
 
         await upsertSyncState(caller.client, caller.user.id, "hevy", {
-          read_cursor: nextCursor,
+          ledger_cursor: nextLedgerCursor,
           last_synced_at: finishedIso,
           last_attempted_at: finishedIso,
           backfilled_at: backfilledAt,
+          backfill_complete: backfillComplete,
           consecutive_failures: 0,
           sync_priority: isLinked ? 1 : 2,
           ...(options.touchUserActivity ? { last_user_activity_at: nowIso, paused_for_inactivity: false } : {}),
@@ -351,6 +360,7 @@ export async function syncHevyLedger(
           upsertedCount,
           removedCount,
           connectionGeneration: connection.generation,
+          backfillComplete,
         };
       });
     } catch (error) {
@@ -371,6 +381,7 @@ export async function syncHevyLedger(
         upsertedCount: 0,
         removedCount: 0,
         connectionGeneration: null,
+        backfillComplete: stateRow?.backfill_complete ?? false,
       };
     }
   });
@@ -431,7 +442,9 @@ export async function getPersistedHevyActivities(
     { signal: options.signal, connectionGeneration: connection.generation },
   );
   const completeness: "complete" | "incomplete" =
-    sync.outcome === "failed" || sync.outcome === "timeout" ? "incomplete" : "complete";
+    sync.outcome === "failed" || sync.outcome === "timeout" || !sync.backfillComplete
+      ? "incomplete"
+      : "complete";
 
   return {
     activities: rows.map(toRecordedActivity),
@@ -487,10 +500,16 @@ export async function getPersistedHevySnapshotV1(
     failures: read.completeness === "complete"
       ? []
       : [{
-        code: read.sync.outcome === "timeout" ? "timeout" : "provider_unavailable",
-        retryable: true,
+        code: read.sync.outcome === "timeout"
+          ? "timeout"
+          : !read.sync.backfillComplete
+            ? "incomplete_pagination"
+            : "provider_unavailable",
+        retryable: read.sync.backfillComplete,
         retryAfterSeconds: null,
-        message: "Hevy sync did not complete; showing last synced workouts.",
+        message: !read.sync.backfillComplete
+          ? "Hevy history exceeded the 500-workout backfill cap; older unchanged workouts may be omitted."
+          : "Hevy sync did not complete; showing last synced workouts.",
       }],
     activities: read.activities,
   };
@@ -498,11 +517,13 @@ export async function getPersistedHevySnapshotV1(
 
 type SyncStateRow = Readonly<{
   read_cursor: string | null;
+  ledger_cursor: string | null;
   last_reconciled_at: string | null;
   last_synced_at: string | null;
   last_attempted_at: string | null;
   last_user_activity_at: string | null;
   backfilled_at: string | null;
+  backfill_complete: boolean;
   paused_for_inactivity: boolean;
   sync_priority: number;
   consecutive_failures: number;
@@ -515,7 +536,7 @@ async function readSyncState(
 ): Promise<SyncStateRow | null> {
   const { data, error } = await client
     .from("connector_completion_state")
-    .select("read_cursor,last_reconciled_at,last_synced_at,last_attempted_at,last_user_activity_at,backfilled_at,paused_for_inactivity,sync_priority,consecutive_failures")
+    .select("read_cursor,ledger_cursor,last_reconciled_at,last_synced_at,last_attempted_at,last_user_activity_at,backfilled_at,backfill_complete,paused_for_inactivity,sync_priority,consecutive_failures")
     .eq("user_id", userId)
     .eq("source", source)
     .maybeSingle();
@@ -525,10 +546,12 @@ async function readSyncState(
 
 type SyncStatePatch = Readonly<{
   read_cursor?: string | null;
+  ledger_cursor?: string | null;
   last_synced_at?: string | null;
   last_attempted_at?: string | null;
   last_user_activity_at?: string | null;
   backfilled_at?: string | null;
+  backfill_complete?: boolean;
   paused_for_inactivity?: boolean;
   sync_priority?: number;
   consecutive_failures?: number;

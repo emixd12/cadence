@@ -101,18 +101,20 @@ Check the cited entry before acting on a row.
 
 - **Owner's decision:** keep persisted connector activity until disconnect or account deletion;
   persist minimized Hevy workout timing in hosted-only `recorded_activities` with bounded connect
-  backfill, incremental `/v1/workouts/events` sync, daily background polling for unlinked accounts
-  (prioritized behind linked completion accounts, paused after 21 days of Cadence inactivity and
-  re-armed on next open), 15-minute on-demand freshness, and non-PII `reportMonitoringEvent`
-  telemetry; persist derived daily calendar busy-load rollups (`daily_calendar_load`, no event
-  details) via write-through on complete reads and hard-delete on disconnect/selection change;
-  expose `list_calendar_load` and widen Chat `list_calendar_events` to bounded past dates
-  (≤31 days per call) with date coalescing and ephemeral session caching (`docs/DECISIONS.md`,
-  2026-11-24).
+  backfill, incremental `/v1/workouts/events` sync on its own `ledger_cursor` (separate from
+  completion's `read_cursor`), daily background polling for unlinked accounts (prioritized behind
+  linked completion accounts, paused after 21 days of Cadence inactivity and re-armed on next
+  open), 15-minute on-demand freshness, and non-PII `reportMonitoringEvent` telemetry; persist
+  derived daily calendar busy-load rollups (`daily_calendar_load`, no event details) via
+  write-through on complete reads + 30-day backfill on selection and hard-delete on
+  disconnect/selection change; expose `list_calendar_load` and widen Chat `list_calendar_events`
+  to bounded past dates (≤31 days per call) with timezone-aware date coalescing and ephemeral
+  session caching (`docs/DECISIONS.md`, 2026-11-24).
 - **Implemented:**
   - Migrations: `supabase/migrations/20261124193000_recorded_activities_ledger.sql`,
-    `20261124193500_unlinked_hevy_background_sync.sql`, and
-    `20261124194000_daily_calendar_load.sql`; updated `lib/db/database.types.ts`.
+    `20261124193500_unlinked_hevy_background_sync.sql`,
+    `20261124194000_daily_calendar_load.sql`, and
+    `20261124195000_recorded_activity_ledger_cursor.sql`; updated `lib/db/database.types.ts`.
   - Core resolvers: `packages/core/src/resolvers/calendar-load.resolver.ts` (re-exported in
     `lib/resolvers/calendar-load.resolver.ts`, registered in `docs/AGENT_RESOLVERS.md` and
     `scripts/check-resolvers.mjs`); `resolveUnlinkedDailySyncSchedule` / `isUnlinkedAccountInactive`
@@ -125,16 +127,37 @@ Check the cited entry before acting on a row.
     `lib/services/icloud-calendar.service.ts`.
   - Consumers & Chat: `app/api/hevy/activities/route.ts`, `lib/services/advisor-day-context.service.ts`,
     `lib/services/chat/chat-calendar-cache.ts`, `lib/services/chat/chat-tools.ts`,
-    `lib/services/chat/chat-executor.ts`, `lib/services/chat/chat-prompt.ts`,
-    `lib/services/chat-eval/fake-tools.ts`.
+    `lib/services/chat/chat-executor.ts`, `lib/services/chat/chat.service.ts`,
+    `lib/services/chat/chat-prompt.ts`, `lib/services/chat-eval/fake-tools.ts`.
   - Tests: `tests/calendar-load.resolver.test.ts`, `tests/daily-calendar-load.service.test.ts`,
     `tests/recorded-activity-sync.service.test.ts`, `tests/chat-past-calendar-drilldown.test.ts`.
 - **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`, `resolvers:check`,
-  `core:check`, `lint` (0 errors), `typecheck`, `build`, and full `npm run test` (7,251 passed) all pass.
+  `core:check`, `lint` (0 errors), `typecheck`, `build`, `dagger check --cadence`, and full
+  `npm run test` all pass.
 
 Platform impact: web implemented; desktop unaffected (hosted-only tables, no SQLite or `account_sync`
 changes; linked Macs inherit hosted Brief/Chat/Timeline reads); marketing not applicable; future mobile
-deferred. Messaging impact: `P-086`, `P-087`, `P-088`. Legal: `L-023` updated, `L-026` logged.
+deferred. Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated, `L-026` logged.
+
+## Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine — November 24, 2026
+
+- **Owner's decision:** remove `AdvisorDayLine` under today's date to reduce Timeline header
+  density; replace `"Advisor · 1 new"` with a rounded speech pill showing a concise teaser
+  (`advisorBubbleTeaser`) when something waits (hiding the `"Advisor"` label while the pill is
+  shown); increase the Timeline avatar to 72px on desktop/Mac (side-by-side speech pill, enables
+  full mane-ripple detail) and 60px on phones (moved out of the top nav bar onto the wave banner,
+  speech pill stacked below); let the advisor header scroll naturally with the page
+  (`docs/DECISIONS.md`, 2026-11-24).
+- **Implemented:** `components/advisor/AdvisorParts.tsx`, `components/advisor/advisor-window.module.css`,
+  `components/advisor/AdvisorTimelineFrame.tsx`, `components/advisor/AdvisorAvatar.tsx`,
+  `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
+  `packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`,
+  `apps/desktop/vite.config.ts`, `DESIGN.md`, `tests/advisor-ui.dom.test.tsx`, and
+  `tests/advisor-avatar.dom.test.tsx`.
+
+Platform impact: web implemented; desktop implemented (shares components and bundles the 60px/72px
+avatar renditions in `apps/desktop/vite.config.ts`, ships in next Mac release); marketing not
+applicable; future mobile deferred. Messaging impact: P-086.
 
 ## Remove Recorded activity · Hevy section from Timeline header — November 24, 2026
 

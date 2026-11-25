@@ -100,6 +100,27 @@ export function connectBackfillDateRange(
 }
 
 /**
+ * Best-effort bounded 30-day lookback backfill invoked when a user connects or
+ * selects calendars, so `daily_calendar_load` is immediately warm for Chat and
+ * Daily Brief. Uses a tight timeout and swallows errors so selection saves never fail.
+ */
+export async function backfillCalendarLoadAfterSelection(
+  client: AppSupabaseClient,
+  userId: string,
+  runRead: (startLocalDate: string, endLocalDate: string, signal: AbortSignal) => Promise<unknown>,
+  now: Temporal.Instant = Temporal.Now.instant(),
+): Promise<void> {
+  try {
+    const { data: profile, error } = await client.from("profiles").select("timezone").eq("id", userId).single();
+    if (error || !profile || typeof profile.timezone !== "string") return;
+    const range = connectBackfillDateRange(profile.timezone, now, CALENDAR_LOAD_CONNECT_BACKFILL_DAYS);
+    await runRead(range.startLocalDate, range.endLocalDate, AbortSignal.timeout(CALENDAR_LOAD_CONNECT_BACKFILL_DEADLINE_MS));
+  } catch {
+    // Best-effort backfill; never blocks connection or preference save.
+  }
+}
+
+/**
  * Reads persisted per-source rollups and aggregates them per local date across
  * the requested (enabled) sources for Chat and Daily Brief.
  */

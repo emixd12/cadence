@@ -11,7 +11,11 @@ import { CalendarConnectionError, calendarGoogleSubject, googleSignInSubjects, t
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
-import { clearCalendarLoadForSource, persistCalendarLoadFromSnapshot } from "./daily-calendar-load.service";
+import {
+  backfillCalendarLoadAfterSelection,
+  clearCalendarLoadForSource,
+  persistCalendarLoadFromSnapshot,
+} from "./daily-calendar-load.service";
 
 /** `via: "bearer"` marks the Mac's token requests; the web sends its session cookie. */
 export type CalendarCaller = { client: AppSupabaseClient; user: User; via?: "cookie" | "bearer" };
@@ -154,6 +158,10 @@ export async function updateCalendarPreferences(caller: CalendarCaller, raw: unk
   await assertCurrent(caller, connection);
   await saveCalendarPreferences(caller.client, caller.user.id, preferences, grantPurpose);
   await clearCalendarLoadForSource(caller.client, caller.user.id, "google_calendar");
+  if (preferences.selectedCalendarIds.length > 0) {
+    await backfillCalendarLoadAfterSelection(caller.client, caller.user.id, (start, end, signal) =>
+      getCalendarEventsForAdvisor(caller, start, end, { allowPastDates: true, signal }));
+  }
   return getCalendarConnection(caller, grantPurpose);
 }
 const pendingReads = new Map<string, Promise<Awaited<ReturnType<typeof readGoogleCalendarEvents>>>>();

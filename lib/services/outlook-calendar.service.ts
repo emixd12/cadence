@@ -3,7 +3,11 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
 import { saveConnectorPreferences } from "@/lib/db/connectors.repo";
 import { assertConnectorReadActive, withConnectorReadDeadline } from "./connector-read-deadline";
-import { clearCalendarLoadForSource, persistCalendarLoadFromSnapshot } from "./daily-calendar-load.service";
+import {
+  backfillCalendarLoadAfterSelection,
+  clearCalendarLoadForSource,
+  persistCalendarLoadFromSnapshot,
+} from "./daily-calendar-load.service";
 import {
   ConnectorError,
   DEFAULT_CONNECTOR_PREFERENCES,
@@ -246,6 +250,10 @@ export async function updateOutlookCalendarPreferences(caller: ConnectorCaller, 
   await saveConnectorPreferences(caller.client, caller.user.id, PROVIDER,
     { selectedSourceIds, hiddenSourceIds, visible: body.visible, showAllDay: body.showAllDay }, before.selectionRevision);
   await clearCalendarLoadForSource(caller.client, caller.user.id, PROVIDER);
+  if (selectedSourceIds.length > 0) {
+    await backfillCalendarLoadAfterSelection(caller.client, caller.user.id, (start, end, signal) =>
+      getOutlookCalendarEventsForCaller(caller, start, end, { ...options, allowPastDates: true, signal }));
+  }
   return getOutlookCalendarConnection(caller);
 }
 

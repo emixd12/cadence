@@ -32,7 +32,7 @@ describe("chat past calendar drill-down, coalescing & ephemeral cache (Ticket 35
       events: [makeEvent("2026-11-01", "Planning"), makeEvent("2026-11-03", "Review")],
       sources: [{ source: "googleCalendar" as const, state: "read" as const }],
     }));
-    const cache = createEphemeralCalendarSessionCache(fetchSpan);
+    const cache = createEphemeralCalendarSessionCache(fetchSpan, "America/New_York");
 
     const first = await cache.readSpan("2026-11-01", "2026-11-05");
     expect(first.events).toHaveLength(2);
@@ -40,6 +40,32 @@ describe("chat past calendar drill-down, coalescing & ephemeral cache (Ticket 35
 
     const second = await cache.readSpan("2026-11-03", "2026-11-03");
     expect(second.events.map((e) => e.title)).toEqual(["Review"]);
+    expect(fetchSpan).toHaveBeenCalledTimes(1);
+  });
+
+  it("filters cached evening events using the person's local timezone rather than UTC date", async () => {
+    const eveningEst: ChatCalendarEvent = {
+      title: "Late Dinner",
+      calendar: "Personal",
+      source: "googleCalendar",
+      // 2026-11-24 20:00–21:30 America/New_York (EST = UTC-5) -> UTC date is 2026-11-25!
+      start: "2026-11-25T01:00:00Z",
+      end: "2026-11-25T02:30:00Z",
+      all_day: false,
+      location: null,
+      busy: true,
+    };
+    const fetchSpan = vi.fn(async () => ({
+      events: [eveningEst],
+      sources: [{ source: "googleCalendar" as const, state: "read" as const }],
+    }));
+    const cache = createEphemeralCalendarSessionCache(fetchSpan, "America/New_York");
+    await cache.readSpan("2026-11-24", "2026-11-25");
+
+    const nov24 = await cache.readSpan("2026-11-24", "2026-11-24");
+    expect(nov24.events.map((e) => e.title)).toEqual(["Late Dinner"]);
+    const nov25 = await cache.readSpan("2026-11-25", "2026-11-25");
+    expect(nov25.events).toEqual([]);
     expect(fetchSpan).toHaveBeenCalledTimes(1);
   });
 

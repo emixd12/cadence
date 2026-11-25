@@ -8,7 +8,7 @@ export type AdvisorAvatarRendition = (typeof catalog.art.renditions)[number];
 
 /**
  * The shipped file for a size in CSS pixels on a screen of the given density.
- * A product size (40, 48, 120) has a file per density, made at exactly its pixels; the
+ * A product size (40, 48, 60, 72, 120) has a file per density, made at exactly its pixels; the
  * densest one serves denser screens. Any other size gets the general file.
  */
 export function advisorAvatarRendition(size: number, density = 2): AdvisorAvatarRendition {

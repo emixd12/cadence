@@ -2370,7 +2370,26 @@ cite has not changed.
   rather than a dedicated `"Recorded activity · Hevy"` header section.
 - **Status:** logged.
 
-## P-086: Persisted Hevy workout timing (`recorded_activities`) and daily background sync for unlinked accounts
+## P-086: Advisor speech pill replaces AdvisorDayLine and "Advisor · 1 new"
+
+- **Change:** implemented November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24). Removed the
+  inline line under today's date (`AdvisorDayLine`) and replaced `"Advisor · 1 new"` with a
+  rounded speech pill beside (desktop/Mac, 72px horse) or below (phones, 60px horse) the
+  advisor avatar on the top wave banner, scrolling naturally with the page. When nothing
+  waits (or while the panel is open), the speech pill hides and the quiet `"Advisor"` label
+  appears.
+- **Affected:** `components/advisor/AdvisorParts.tsx`, `components/advisor/AdvisorTimelineFrame.tsx`,
+  `components/timeline/DayProgressTimeline.tsx`.
+- **Surfaces:** user guide (`docs/user-guide/timeline.md`, Advisor section).
+- **Conflicting current text:** `docs/user-guide/timeline.md` says the advisor stays in view
+  when you scroll, reads **Advisor · 1 new**, and shows one line under today's date for the
+  brief, schedule questions, check-ins, and tips.
+- **Update needed:** update the Advisor section in `docs/user-guide/timeline.md` to describe
+  the speech pill on the banner, natural scrolling, and answering tips/check-ins in the
+  Advisor panel.
+- **Status:** logged.
+
+## P-087: Persisted Hevy workout timing (`recorded_activities`) and daily background sync for unlinked accounts
 
 - **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Tickets 352–353).
   Cadence now persists minimized Hevy workout timing (start/end, local date, duration, opaque
@@ -2392,15 +2411,15 @@ cite has not changed.
   inactivity), with no titles/exercises stored.
 - **Status:** logged.
 
-## P-087: Persisted derived daily calendar busy-load rollups (`daily_calendar_load`)
+## P-088: Persisted derived daily calendar busy-load rollups (`daily_calendar_load`)
 
 - **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Ticket 354). Cadence
   persists a compact derived daily busy-load rollup per connected calendar source (Google,
   Outlook, iCloud): `busy_minutes`, `event_count`, `earliest_start_minute`, `latest_end_minute`,
   and `has_all_day_busy`. No event titles, descriptions, locations, or attendees are stored.
-  Populated via write-through on normal calendar reads plus a bounded one-time connect backfill,
-  and hard-deleted when the calendar source is disconnected, its selected calendars change, or
-  the account is deleted.
+  Populated via write-through on normal calendar reads plus a bounded 30-day backfill on
+  selection/connect, and hard-deleted when the calendar source is disconnected, its selected
+  calendars change, or the account is deleted.
 - **Affected:** Ticket 354. Files: `components/settings/LegalContent.tsx`,
   `docs/user-guide/privacy-and-account.md`, Google OAuth verification materials. Related legal
   entry: `L-026`.
@@ -2412,7 +2431,7 @@ cite has not changed.
   or account deletion).
 - **Status:** logged.
 
-## P-088: AI (Chat and Daily Brief) reading past calendar history on demand
+## P-089: AI (Chat and Daily Brief) reading past calendar history on demand
 
 - **Change:** decided November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24; Ticket 355). Cadence
   Chat can now live-read past calendar dates (bounded to ≤31 days per tool call) in addition to

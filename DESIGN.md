@@ -982,28 +982,25 @@ no advisor.
   shows the still drawing in every state. Bench: `/design-system?preview=advisor-avatar`.
 - **On Chat.** The Chat page shows the avatar at 48px to the left of its links. It shows
   it is working while a reply arrives.
-- **Where it sits.** Top centre of the page, and it stays there when you scroll. It is 48px on
-  desktop and the Mac. On phones it is 40px and sits in the middle of the top bar. It is never
-  smaller than 40px.
-- **Its label.** Plain "Advisor" text under the horse, with no pill and no shadow. When
-  something is new, the label reads "Advisor · 1 new". There is no dot, so nothing can be
-  confused with the banner's decorative dots.
-- **The line under today's date.** One line of plain text, with no avatar, shows the most
-  pressing item, in this order:
-  - the brief: "2 moves suggested for today. Open"
-  - a schedule question: a short form, with the full choice in the panel
-  - a trial check-in: "Keep Gym at 6:30 PM on Tuesdays? Keep · Go back", answered on the line
-  - a tip: one short sentence, then "Why this? · Helpful · Not now" on one line
+- **Where it sits (updated November 24, 2026).** Centered straddling the top wave banner, and the
+  whole advisor header scrolls naturally with the page (not fixed or sticky). It is **72px** on
+  desktop and the Mac (which enables full mane-ripple detail in `AdvisorAvatar`) and **60px** on
+  phones, moving out of the mobile top bar onto the wave banner. Exact-size WebP renditions exist
+  for 40, 48, 60, 72, and 120px (`npm run avatar:build`).
+- **Speech pill and dynamic label (updated November 24, 2026).** There is no inline line under
+  today's date (`AdvisorDayLine` removed) and no `"Advisor · 1 new"` text. When the advisor has
+  something waiting (an unread brief, a schedule question, a trial check-in, a notice, or an
+  unanswered tip) and the panel is closed, the `"Advisor"` label hides and a rounded speech pill
+  with a tail shows a concise teaser (`advisorBubbleTeaser`) pointing into the panel:
+  - Desktop and Mac: side-by-side to the right of the 72px horse, with a left-pointing tail.
+  - Phones: stacked directly below the 60px horse, with an upward-pointing tail.
+  - When nothing is waiting (or while the panel is open), the speech pill disappears and the quiet
+    `"Advisor"` label sits below the horse.
   - The brief is not drawn on the Timeline any more: it renders inside the panel's "Today’s
     brief" section with no frame or Close. Opening the panel counts it as read for that day
-    on that device, and the line moves on. The line steps aside while the panel is open.
-- **Line rules.**
-  - "Don't suggest this again" is only in the panel.
-  - After an answer, the italic outcome ("Saved as helpful.") replaces the links.
-  - "Why this?" opens the research card under the line, with a 1px left rule.
-  - A day with nothing shows no line, and the label reads just "Advisor".
-- **The panel.** Tapping the horse opens it. It holds a large avatar and the name, then these
-  sections, separated by thin rules:
+    on that device, and the speech pill moves on to the next waiting item if any.
+- **The panel.** Tapping the horse or speech pill opens it. It holds a large avatar and the name,
+  then these sections, separated by thin rules:
   - Today's brief
   - Needs your answer (schedule proposals: "Try for two weeks · Change for good · No")
   - Today's tip, with all four reactions and a "See past tips (N)" link when tips were shown in

@@ -182,7 +182,7 @@ async function runAndStore(input: Readonly<{
   const tools = buildChatToolDefinitions(sources);
   const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources) });
   const reads = liveChatConnectorReads(caller, sources, signal);
-  const executor = createLiveChatExecutor({ context, sources, reads, today: () => localNow(timezone).today });
+  const executor = createLiveChatExecutor({ context, sources, reads, today: () => localNow(timezone).today, timezone });
 
   let firstTextMs: number | null = null;
   const usage: AgentModelUsage[] = [];
@@ -333,7 +333,7 @@ export async function answerChatConfirm(session: ChatSession, body: Readonly<{ c
     const sources = chatSources(settings);
     const timezone = await profileTimezone(caller);
     const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
-    const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today });
+    const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today, timezone });
     run = await runChatConfirm({ confirmId: row.id, writes: row.writes as ChatPendingWrite[], executor, resumed: claim.resumed === true });
     if (run.state !== "expired") {
       await saveChatActions(client, { userId: caller.user.id, conversationId: row.conversationId, messageId: row.messageId,

@@ -638,7 +638,7 @@ part of L-002.
 - **Affected:** Tickets 310, 311, 315, 321, 323 (decision D28) and Tickets 352–353 (2026-11-24).
   Files: `lib/services/hevy-provider.ts`, `lib/services/connector-completion.service.ts`,
   `lib/services/connector-completion-job.service.ts`, `lib/services/recorded-activity-sync.service.ts`.
-  Related messaging entries: P-039, P-041, P-042, and P-086.
+  Related messaging entries: P-039, P-041, P-042, and P-087.
 - **Provider, clause, source and check date:** Hevy.
   - Public API document, `https://api.hevyapp.com/docs/swagger-ui-init.js`, read
     2026-11-10: "we make no guarantees that we won't completely change the structure or
@@ -776,7 +776,7 @@ part of L-002.
 - **Affected:** Tickets 354–355 (decision 2026-11-24). Files:
   `packages/core/src/resolvers/calendar-load.resolver.ts`,
   `lib/services/daily-calendar-load.service.ts`, `lib/services/chat/chat-executor.ts`. Related
-  messaging entries: `P-087`, `P-088`.
+  messaging entries: `P-088`, `P-089`.
 - **Provider, clause, source and check date:** Google API Services User Data Policy (Limited
   Use), Microsoft Graph API terms, Apple iCloud terms; reviewed 2026-11-24.
 - **Current reading:** `daily_calendar_load` persists only numeric per-day aggregates

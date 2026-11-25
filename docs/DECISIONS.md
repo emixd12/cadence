@@ -3018,6 +3018,29 @@ Platform impact: web implemented (`components/timeline/DayProgressTimeline.tsx`,
 removed); desktop implemented (shares `DayProgressTimeline`, ships in next Mac release); marketing not
 applicable; future mobile deferred. Messaging impact: `P-085`.
 
+## 2026-11-24: Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine
+
+Owner decision on November 24, 2026:
+
+- **Remove `AdvisorDayLine` under today's date.** Keep tips, briefs, schedule questions, and
+  check-ins inside the Advisor side panel so the Timeline header stays low-density and regular
+  tracking flows stay uncluttered.
+- **Replace `"Advisor · 1 new"` with a speech pill.** When the advisor has something waiting and
+  the panel is closed, hide the `"Advisor"` label and show a rounded speech pill with a concise
+  teaser (`advisorBubbleTeaser`) pointing to the horse: side-by-side to the right on desktop/Mac
+  (left tail) and stacked directly below on phones (top tail). When nothing is waiting (or while
+  the panel is open), show the quiet `"Advisor"` label below the horse.
+- **Larger avatar, natural scroll, out of the phone top bar.** Increase the Timeline horse to
+  **72px** on desktop/Mac (enabling full mane-ripple detail in `AdvisorAvatar`) and **60px** on
+  phones, moving the mobile horse out of the top nav bar onto the wave banner. Let the entire
+  advisor header scroll naturally with the page.
+
+Platform impact: web implemented (`components/advisor/AdvisorParts.tsx`, `AdvisorTimelineFrame.tsx`,
+`AdvisorAvatar.tsx`, `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
+`packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`);
+desktop implemented (shares components and lists new assets in `apps/desktop/vite.config.ts`, ships
+in next Mac release); marketing not applicable; future mobile deferred. Messaging impact: `P-086`.
+
 ## 2026-11-24: Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down
 
 Owner decision on November 24, 2026 (Tickets 352–355):
@@ -3031,9 +3054,10 @@ Owner decision on November 24, 2026 (Tickets 352–355):
   matching `RecordedActivity` (opaque `activity_ref`, `kind`, `start_at`, `end_at`, `local_start_date`,
   `duration_seconds`, optional opaque `selector_digest`, `provider_updated_at`, `state`,
   `account_digest`, `connection_generation`, `synced_at`). No titles, exercises, sets, weights, or
-  raw provider IDs are stored. Initial connect runs a bounded backfill and initializes the incremental
-  `/v1/workouts/events` cursor; disconnect hard-deletes the source's rows. `occurrence_source_matches`
-  stays focused on Behavior-completion provenance.
+  raw provider IDs are stored. Initial connect runs a bounded backfill and initializes its own
+  incremental `ledger_cursor` (separate from connector completion's `read_cursor`); disconnect
+  hard-deletes the source's rows. `occurrence_source_matches` stays focused on Behavior-completion
+  provenance.
 - **Unlinked Hevy daily background sync, freshness & telemetry (Ticket 353):** Include connected,
   unlinked Hevy accounts in the background job (`connector-completion-job.service.ts`) on a
   lightweight **daily** schedule (once per 24h in the user's timezone, ahead of morning Brief),
@@ -3048,16 +3072,17 @@ Owner decision on November 24, 2026 (Tickets 352–355):
   Do **not** persist raw Calendar events (Google, Outlook, iCloud). Instead, persist a compact
   per-source daily busy-load rollup (`daily_calendar_load`: `busy_minutes`, `event_count`,
   `earliest_start_minute`, `latest_end_minute`, `has_all_day_busy`, `connection_generation`,
-  `synced_at`) populated via write-through on normal calendar reads plus a bounded one-time backfill
-  on connect, with hard-delete on disconnect or calendar-selection change (no background calendar
-  cron). Widen Chat's `list_calendar_events` to allow past dates with a strict ≤31-day span cap per
-  call, coalescing nearby requested dates into minimal bounding-window reads with a short-lived
-  ephemeral session cache, keeping live fields to `title`, `start`, `end`, `calendar`, `location`,
-  `all_day`, and `busy` (no descriptions or attendees), and guiding the agent to inspect
-  `daily_calendar_load` first and sample top outlier days.
+  `synced_at`) populated via write-through on normal calendar reads plus a bounded 30-day backfill
+  on selection/connect, with hard-delete on disconnect or calendar-selection change (no background
+  calendar cron). Widen Chat's `list_calendar_events` to allow past dates with a strict ≤31-day
+  span cap per call, coalescing nearby requested dates into minimal bounding-window reads with a
+  short-lived ephemeral session cache (filtered in the user's timezone), keeping live fields to
+  `title`, `start`, `end`, `calendar`, `location`, `all_day`, and `busy` (no descriptions or
+  attendees), and guiding the agent to inspect `daily_calendar_load` first and sample top outlier
+  days.
 
 Platform impact: web implemented (hosted Postgres migrations, services, cron extension, Brief/Chat/Timeline
 consumers); desktop unaffected (hosted-only, no SQLite migration or `account_sync` contract bump; linked
 Macs inherit hosted Brief/Chat/Timeline reads automatically); marketing not applicable; future mobile
-deferred (inherits hosted path). Messaging impact: `P-086`, `P-087`, `P-088`. Legal: `L-023` updated,
+deferred (inherits hosted path). Messaging impact: `P-087`, `P-088`, `P-089`. Legal: `L-023` updated,
 `L-026` logged.

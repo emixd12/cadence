@@ -51,26 +51,35 @@ export function coalesceTargetDates(
   return spans;
 }
 
-/** Filters events to those overlapping any of the inclusive target dates. */
+/** Filters events to those overlapping any of the inclusive target local dates in `timezone`. */
 export function filterEventsToDates(
   events: readonly ChatCalendarEvent[],
   targetDates: ReadonlySet<string>,
+  timezone: string,
 ): ChatCalendarEvent[] {
   if (targetDates.size === 0) return [];
+  const bounds = [...targetDates].map((date) => {
+    const plain = Temporal.PlainDate.from(date);
+    const startMs = plain.toZonedDateTime({ timeZone: timezone }).toInstant().epochMilliseconds;
+    const endMs = plain.add({ days: 1 }).toZonedDateTime({ timeZone: timezone }).toInstant().epochMilliseconds;
+    return { date, startMs, endMs };
+  });
+
   return events.filter((event) => {
     if (event.all_day) {
       const start = event.start.slice(0, 10);
       const end = (event.end ?? start).slice(0, 10);
-      for (const date of targetDates) {
+      for (const { date } of bounds) {
         if (date >= start && date <= end) return true;
       }
       return false;
     }
-    const startDate = event.start.slice(0, 10);
-    const endDate = (event.end ?? event.start).slice(0, 10);
-    if (targetDates.has(startDate) || targetDates.has(endDate)) return true;
-    for (const date of targetDates) {
-      if (date >= startDate && date <= endDate) return true;
+    const eventStartMs = Temporal.Instant.from(event.start).epochMilliseconds;
+    const eventEndMs = event.end
+      ? Math.max(eventStartMs + 1, Temporal.Instant.from(event.end).epochMilliseconds)
+      : eventStartMs + 1;
+    for (const { startMs, endMs } of bounds) {
+      if (eventStartMs < endMs && eventEndMs > startMs) return true;
     }
     return false;
   });
@@ -101,6 +110,7 @@ type CachedWindow = Readonly<{
  */
 export function createEphemeralCalendarSessionCache(
   fetchSpan: (start: string, end: string) => Promise<Readonly<{ events: ChatCalendarEvent[]; sources: ChatSourceReport[] }>>,
+  timezone: string,
 ) {
   const windows: CachedWindow[] = [];
 
@@ -111,7 +121,7 @@ export function createEphemeralCalendarSessionCache(
     const covered = findCovering(start, end);
     if (covered) {
       const targets = new Set(expandDateSpan(start, end));
-      return { events: filterEventsToDates(covered.events, targets), sources: [...covered.sources] };
+      return { events: filterEventsToDates(covered.events, targets, timezone), sources: [...covered.sources] };
     }
     const fetched = await fetchSpan(start, end);
     const allClean = fetched.sources.every((source) => source.state !== "failed" && source.state !== "partial");
@@ -128,7 +138,7 @@ export function createEphemeralCalendarSessionCache(
     const seenEvents = new Set<string>();
     const events: ChatCalendarEvent[] = [];
     for (const read of reads) {
-      for (const event of filterEventsToDates(read.events, targetSet)) {
+      for (const event of filterEventsToDates(read.events, targetSet, timezone)) {
         const key = `${event.source}|${event.calendar}|${event.start}|${event.end ?? ""}|${event.title}`;
         if (seenEvents.has(key)) continue;
         seenEvents.add(key);

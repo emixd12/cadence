@@ -19903,10 +19903,10 @@ Platform impact:
 |---|---|
 | Web | Hosted Postgres migration, repo, sync service, Hevy connect/disconnect and completion wiring. |
 | Desktop | Not applicable: hosted-only table, excluded from SQLite and `account_sync`; linked Macs benefit via hosted reads. |
-| Marketing | Not applicable: deferred to messaging track (`P-086`). |
+| Marketing | Not applicable: deferred to messaging track (`P-087`). |
 | Future mobile | Deferred (no mobile track active); inherits hosted reads automatically. |
 
-Messaging impact: `P-086`. Legal: `L-023`.
+Messaging impact: `P-087`. Legal: `L-023`.
 
 ## Ticket 353: Unlinked Hevy daily background sync, freshness, telemetry & consumers
 
@@ -19941,10 +19941,10 @@ Platform impact:
 |---|---|
 | Web | Hosted migration, cron job extension, freshness/telemetry service, Brief/Chat/Timeline consumers. |
 | Desktop | Not applicable: linked Macs read via hosted APIs; no desktop code changes needed. |
-| Marketing | Not applicable: deferred to messaging track (`P-086`). |
+| Marketing | Not applicable: deferred to messaging track (`P-087`). |
 | Future mobile | Deferred (no mobile track active); inherits hosted reads automatically. |
 
-Messaging impact: `P-086`. Legal: `L-023`.
+Messaging impact: `P-087`. Legal: `L-023`.
 
 ## Ticket 354: Derived `daily_calendar_load` rollup (resolver, persistence, write-through & consumption)
 
@@ -19975,10 +19975,10 @@ Platform impact:
 |---|---|
 | Web | Core resolver, hosted migration, repo, rollup service, calendar service write-through/cleanup. |
 | Desktop | Not applicable: hosted-only table; linked Macs inherit hosted Brief/Chat rollups automatically. |
-| Marketing | Not applicable: deferred to messaging track (`P-087`). |
+| Marketing | Not applicable: deferred to messaging track (`P-088`). |
 | Future mobile | Deferred (no mobile track active); inherits core resolver and hosted reads. |
 
-Messaging impact: `P-087`. Legal: `L-026`.
+Messaging impact: `P-088`. Legal: `L-026`.
 
 ## Ticket 355: Bounded past calendar drill-down and `list_calendar_load` in Chat
 
@@ -20010,7 +20010,7 @@ Platform impact:
 |---|---|
 | Web | Chat tools, executor, ephemeral cache/coalescing, and prompt guidance. |
 | Desktop | Not applicable: Chat runs against the hosted server. |
-| Marketing | Not applicable: deferred to messaging track (`P-088`). |
+| Marketing | Not applicable: deferred to messaging track (`P-089`). |
 | Future mobile | Deferred (no mobile track active); inherits hosted Chat tools. |
 
-Messaging impact: `P-088`. Legal: `L-026`.
+Messaging impact: `P-089`. Legal: `L-026`.

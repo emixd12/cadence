@@ -952,6 +952,7 @@ export type Database = {
       }
       connector_completion_state: {
         Row: {
+          backfill_complete: boolean
           backfilled_at: string | null
           check_count: number
           check_count_date: string | null
@@ -960,6 +961,7 @@ export type Database = {
           last_reconciled_at: string | null
           last_synced_at: string | null
           last_user_activity_at: string | null
+          ledger_cursor: string | null
           next_check_at: string | null
           paused_for_inactivity: boolean
           read_cursor: string | null
@@ -969,6 +971,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          backfill_complete?: boolean
           backfilled_at?: string | null
           check_count?: number
           check_count_date?: string | null
@@ -977,6 +980,7 @@ export type Database = {
           last_reconciled_at?: string | null
           last_synced_at?: string | null
           last_user_activity_at?: string | null
+          ledger_cursor?: string | null
           next_check_at?: string | null
           paused_for_inactivity?: boolean
           read_cursor?: string | null
@@ -986,6 +990,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          backfill_complete?: boolean
           backfilled_at?: string | null
           check_count?: number
           check_count_date?: string | null
@@ -994,6 +999,7 @@ export type Database = {
           last_reconciled_at?: string | null
           last_synced_at?: string | null
           last_user_activity_at?: string | null
+          ledger_cursor?: string | null
           next_check_at?: string | null
           paused_for_inactivity?: boolean
           read_cursor?: string | null

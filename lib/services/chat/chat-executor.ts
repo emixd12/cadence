@@ -20,6 +20,7 @@ import {
   createEphemeralCalendarSessionCache,
   MAX_CALENDAR_LIVE_SPAN_DAYS,
 } from "./chat-calendar-cache";
+import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import { withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
 import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
 
@@ -182,8 +183,13 @@ export function createLiveChatExecutor(input: Readonly<{
   reads: ChatConnectorReads;
   /** Today's local date in the person's timezone. */
   today: () => string;
+  /** Person's IANA timezone for local-day cache filtering. */
+  timezone?: string;
 }>): ChatToolExecutor {
-  const sessionCache = createEphemeralCalendarSessionCache((start, end) => input.reads.calendarEvents(start, end));
+  const sessionCache = createEphemeralCalendarSessionCache(
+    (start, end) => input.reads.calendarEvents(start, end),
+    input.timezone ?? DEFAULT_TIMEZONE,
+  );
   let todayBusy: Promise<MoveCalendarBusy[]> | null = null;
   const busyToday = () => (todayBusy ??= sessionCache.readSpan(input.today(), input.today())
     .then((read) => calendarBusyFrom(read.events)).catch(() => []));
