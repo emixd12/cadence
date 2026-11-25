@@ -47,6 +47,8 @@ function jsonl(files: Files, file: string): Row[] {
 }
 
 const cadence = (row: Row) => (row.extensions as Record<string, Row>)["app.cadence"]!;
+/** A bundle written before Ticket 364: no alongside key. */
+const withoutKey = (extension: Row): Row => Object.fromEntries(Object.entries(extension).filter(([key]) => key !== "alongside"));
 
 /** Rewrites the Cadence extension of every Behavior and fixes the manifest digest. */
 function rewriteAlongside(files: Files, edit: (extension: Row) => Row): Files {
@@ -145,7 +147,7 @@ describe("alongside import (Ticket 364)", () => {
   });
 
   it("leaves a bundle without the key unanswered", () => {
-    const legacy = rewriteAlongside(files(true), ({ alongside: _dropped, ...rest }) => rest);
+    const legacy = rewriteAlongside(files(true), withoutKey);
     const preview = resolveBehaviorLogImportPreview({ files: legacy, readAlongside: true });
     expect(preview.valid).toBe(true);
     expect(preview.plan.behaviors[0]).not.toHaveProperty("cadenceAlongside");
@@ -162,7 +164,7 @@ describe("alongside import (Ticket 364)", () => {
 describe("alongside restore (Ticket 364)", () => {
   const restore = (bundleSetting: boolean | null | "absent", local: boolean | null, read = true) => {
     const exported = assembleExportBundle(input(bundleSetting === "absent" ? true : bundleSetting, { includeAlongside: true })).behaviorLog.files;
-    const files = bundleSetting === "absent" ? rewriteAlongside(exported, ({ alongside: _dropped, ...rest }) => rest) : exported;
+    const files = bundleSetting === "absent" ? rewriteAlongside(exported, withoutKey) : exported;
     const importPreview = resolveBehaviorLogImportPreview({ files, ...(read ? { readAlongside: true } : {}) });
     const records = existing(local, read);
     const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: records });

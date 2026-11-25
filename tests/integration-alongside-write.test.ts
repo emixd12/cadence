@@ -52,8 +52,8 @@ describe("alongside in integration outputs (Ticket 364)", () => {
     expect(serializeIntegrationBehavior(current, null).alongside).toBe(true);
     expect(serializeIntegrationBehavior({ ...current, alongside: false }, null).alongside).toBe(false);
     expect(serializeIntegrationBehavior({ ...current, alongside: null }, null).alongside).toBeNull();
-    const { alongside: _unread, ...withoutColumn } = current;
-    expect(serializeIntegrationBehavior(withoutColumn as BehaviorWithCategory, null).alongside).toBeNull();
+    const withoutColumn = Object.fromEntries(Object.entries(current).filter(([key]) => key !== "alongside"));
+    expect(serializeIntegrationBehavior(withoutColumn as unknown as BehaviorWithCategory, null).alongside).toBeNull();
     const keys = Object.keys(serializeIntegrationBehavior(current, null));
     expect(keys.indexOf("alongside")).toBe(keys.indexOf("is_opportunity") + 1);
   });
