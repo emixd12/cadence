@@ -8,6 +8,7 @@ import type {
   ChatOutcome,
   ChatPart,
   ChatRefusal,
+  ChatToolLine,
 } from "@cadence/core/types/chat";
 import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import { AlertNotice, type AlertNoticeKind } from "@/components/feedback/AlertNotice";
@@ -93,13 +94,15 @@ function AssistantMessage({
   const groups = groupParts(message.parts);
   // The horse runs whenever the reply is under way and no words are arriving.
   const waiting = streaming && message.parts.at(-1)?.type !== "text";
+  // After a tool line the horse sits in that line; otherwise it gets a line of its own.
+  const runningGroup = waiting && groups.at(-1)?.kind === "tools" ? groups.length - 1 : -1;
   return (
     <div className="flex max-w-prose flex-col gap-2 text-base leading-6 text-foreground" aria-busy={streaming || undefined}>
       <span className="sr-only">Cadence: </span>
       {groups.map((group, index) => (
-        <PartGroup key={index} group={group} live={live} handlers={handlers} />
+        <PartGroup key={index} group={group} live={live} running={index === runningGroup} handlers={handlers} />
       ))}
-      {waiting ? <WaitingLine started={message.parts.length > 0} /> : null}
+      {waiting && runningGroup === -1 ? <WaitingLine started={message.parts.length > 0} /> : null}
     </div>
   );
 }
@@ -125,19 +128,10 @@ function groupParts(parts: readonly ChatPart[]): PartGroupValue[] {
 function PartGroup({
   group,
   live,
+  running,
   handlers,
-}: Readonly<{ group: PartGroupValue; live: boolean; handlers: ChatMessageHandlers }>) {
-  if (group.kind === "tools") {
-    return (
-      <ul className="flex flex-col text-sm leading-5 text-muted-readable" aria-label="What chat looked at">
-        {group.parts.map(({ tool }) => (
-          <li key={tool.id} data-chat-tool={tool.subject} data-chat-tool-state={tool.state}>
-            {tool.text}
-          </li>
-        ))}
-      </ul>
-    );
-  }
+}: Readonly<{ group: PartGroupValue; live: boolean; running: boolean; handlers: ChatMessageHandlers }>) {
+  if (group.kind === "tools") return <ToolLines tools={group.parts.map((part) => part.tool)} running={running} />;
   const { part } = group;
   switch (part.type) {
     case "text":
@@ -303,6 +297,58 @@ function RefusalBlock({ refusal, handlers }: Readonly<{ refusal: ChatRefusal; ha
     <AlertNotice kind="write_refused" variant="inline" action={action}>
       {refusal.text}
     </AlertNotice>
+  );
+}
+
+/**
+ * What chat looked at, as one line: the newest action replaces the one before it. The
+ * line is a button that opens a box listing every action. While the reply is under way
+ * the horse runs beside it.
+ */
+function ToolLines({ tools, running }: Readonly<{ tools: readonly ChatToolLine[]; running: boolean }>) {
+  const [open, setOpen] = useState(false);
+  const latest = tools[tools.length - 1];
+  return (
+    <div className="flex flex-col gap-2 text-sm leading-5 text-muted-readable" data-chat-tools>
+      <p className="flex items-center gap-2">
+        {running ? <ChatThinkingHorse /> : null}
+        {running ? <span className="sr-only">Working on your answer… </span> : null}
+        <button
+          type="button"
+          className="-my-2 inline-flex items-center gap-1.5 py-2 text-left hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
+          aria-expanded={open}
+          data-chat-tools-toggle
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span key={latest.id} className={streamStyles.word}>
+            {latest.text}
+          </span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 10 10"
+            className={`size-2.5 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3.5 1.5 7 5 3.5 8.5" />
+          </svg>
+        </button>
+      </p>
+      <ul
+        className={`flex-col gap-1.5 rounded-xl border border-line px-3.5 py-2.5 ${open ? "flex" : ""} ${running ? "ml-[58px]" : ""}`}
+        hidden={!open}
+        aria-label="What chat looked at"
+      >
+        {tools.map((tool) => (
+          <li key={tool.id} data-chat-tool={tool.subject} data-chat-tool-state={tool.state}>
+            {tool.text}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

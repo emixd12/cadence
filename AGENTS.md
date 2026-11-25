@@ -58,7 +58,8 @@ let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
 (`docs/DECISIONS.md`, 2026-11-07, D27). Tickets 310–324 plan connector completion: a
 Behavior can be marked Completed from activity recorded in a connected service, starting
 with Hevy (`docs/DECISIONS.md`, 2026-11-10, D28). Tickets 310–324 are complete; connector completion is on in
-Production since November 13, 2026. Tickets 331–337 add sign-in by email and Apple beside Google, on Supabase
+Production since November 13, 2026. Tickets 356–365 plan alongside Behaviors and the guessed Where
+(`docs/DECISIONS.md`, 2026-11-25, D33); none has started. Tickets 331–337 add sign-in by email and Apple beside Google, on Supabase
 Auth (`docs/DECISIONS.md`, 2026-11-13, D31); email, Apple and Settings sign-in methods are
 live on web since November 13, 2026; the Mac gets them in its next release. Mobile and broader
 workspace restructuring remain deferred. The owner
@@ -353,6 +354,12 @@ In scope:
   Note shortcuts on by default; one Daily Brief choice for every connected source, which
   replaces the separate per-source disclosures when Tickets 306 and 307 land; and Home from
   the current location
+- Alongside Behaviors under Tickets 356–365 (`docs/DECISIONS.md`, 2026-11-25, D33): a
+  Behavior setting for things done during other things. The model's guess applies until
+  the person answers and is shown as a guess. Overlap is allowed at the same place only.
+  Planning also uses a guessed Where, which never requests a route or a reminder. The
+  Daily Brief and Chat may pair items for today; the coach may propose a schedule change
+  the person confirms. Behind `CADENCE_ALONGSIDE`, off in production
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -411,6 +418,11 @@ Use these terms consistently:
 - Source match: the stored record that ties one recorded activity to one occurrence.
 - Connector completion: the status change written from a source match.
 - Reconcile: one run of read, match and apply for one account and one completion source.
+- Alongside: a Behavior setting meaning it can be done during other things at the same
+  place (D33). "Behaviors of Concurrency" is the feature's working title, not a UI term.
+- Effective Where: the place planning uses for a Behavior: the person's Where, else
+  counted completion places, else a model guess (D33).
+- Pairing: a proposal to do an alongside item during another item, the host.
 
 Do not use “missed” as a stored status in v1.
 

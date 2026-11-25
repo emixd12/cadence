@@ -20014,3 +20014,307 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits hosted Chat tools. |
 
 Messaging impact: `P-089`. Legal: `L-026`.
+
+## Ticket 356: Alongside setting: column, flag and effective-value resolver
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: none.
+
+Goal: Make "alongside" a Behavior setting the person owns and give every reader one resolver for its effective value.
+
+Requirements:
+
+- Additive migration: `behaviors.alongside boolean` (nullable, no default; null means unanswered). Include it in the Behavior configuration revision and history snapshot, the definition RPCs and `account_sync`, as `where_kind` is. Update `docs/DATA_MODEL.md` and regenerate `lib/db/database.types.ts`.
+- Pure resolver `packages/core/src/resolvers/alongside.resolver.ts` (re-exported from `lib/resolvers/`, registered in `docs/AGENT_RESOLVERS.md`, paired tests): `resolveAlongside({ setting, guess })` returns `{ value, source: "person" | "guess" | "default" }`. The person's answer wins, then the cached guess, then false.
+- A routine block is alongside only when every step that follows it is; move that rule out of `brief-move.resolver.ts` into the new resolver unchanged.
+- Server flag `CADENCE_ALONGSIDE` (off in production, documented in `.env.example` and `docs/OPERATIONS.md`). With the flag off, behavior matches `origin/main` at `2c413585`.
+- `lib/services/brief-move-day.service.ts` reads the setting and builds each item's `alongside` through the resolver, keeping the source on the item.
+- Stop asking the model about `alongside` for a Behavior whose setting is not null; the length estimate is unaffected.
+- Add the domain term to `AGENTS.md` if not present and the field to `docs/PRODUCT_SPEC.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Migration, resolver, flag, repositories and services. |
+| Desktop | Follow-up: Ticket 363 (SQLite schema and sync contract). |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 357: Effective Where and the same-place overlap rule
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Ticket 356.
+
+Goal: Give planning a baseline place for every Behavior and replace "an alongside item blocks nothing" with the same-place rule in the one free-slot rule.
+
+Requirements:
+
+- Pure resolver `packages/core/src/resolvers/effective-where.resolver.ts` (re-export, registry entry, paired tests): returns `{ kind: "home" | "anywhere" | "elsewhere" | "place" | "unknown", placeKey?, source: "person" | "evidence" | "guess" | "none" }`. Order: the Behavior's `where_kind`, then counted `completion_place_labels` (a clear majority over a minimum count; put the thresholds in the resolver and its tests), then the cached model guess, then unknown.
+- Storage for the model guess: additive column `behavior_advisor_estimates.where_guess text` checked to `home`, `anywhere`, `elsewhere`, `unknown`. Never a place name, coordinate or place key.
+- Pure function `alongsideMayOverlap(alongsideItem, other)` in `alongside.resolver.ts`: true when the other side is a Cadence item or calendar event at the same place, or when either side is Anywhere or unknown; false for travel spans and for an item at a different place. Calendar event places use the existing place-key rule where a location exists and unknown otherwise.
+- `brief-move.resolver.ts`: an alongside item blocks only what `alongsideMayOverlap` refuses. `checkBriefMoveSlot`, `briefMoveFreeStarts`, the overlap and tight-fit findings in `daily-brief-consumer.ts` and the Timeline's "Move for today" all use it. Keep the drift test green.
+- A guessed or evidence-based Where never reaches travel, departure or leave-reminder code; add a test that those readers see only `where_kind`.
+- Update `docs/DATETIME_STRATEGY.md`, "Brief moves", and `docs/DATA_MODEL.md`.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Resolvers, migration and free-slot rule. |
+| Desktop | Follow-up: Ticket 363. Local mode has no model guess; evidence and the person's setting still apply. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 358: Alongside in the Behavior form and on the Timeline (web)
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 356 and 357.
+
+Goal: Let the person see and change the setting, and show alongside items honestly on the Timeline.
+
+Requirements:
+
+- Run the impeccable workflow and the design-system-bench skill before editing UI.
+- `components/behaviors/BehaviorForm.tsx`: one control, "Can be done alongside other things", with three states (unanswered, yes, no). When unanswered and a guess exists, show the guess with one tap to accept. Auto-save rules match the rest of the form.
+- The form also shows an evidence-based or guessed Where beside Where through the existing Where suggestion surface. Dismissing it stores the existing dismissal and does not change planning.
+- Timeline rows: a small "Alongside" label; when the value comes from a guess the label says so. Overlap cues stop for overlaps `alongsideMayOverlap` allows. No parallel-lane layout.
+- Words come from the notices library where they are notices. Update `interaction-registry.json`, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, `DESIGN.md` and the design-system bench.
+- Mobile-responsive; DOM tests for the control states and the label.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `BehaviorForm.tsx`, Timeline row components, timeline service and resolver. |
+| Desktop | Follow-up: Ticket 363 (shared components reach the Mac there). |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 359: Advisor readers and the Where guess in the estimate call
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 356 and 357.
+
+Goal: Make every advisor surface read the effective alongside value and effective Where, and produce the Where guess.
+
+Requirements:
+
+- The estimate call (`lib/services/daily-brief-model.ts`, `daily-brief-instructions.ts`, `packages/core/src/services/description-duration.ts`) gains `whereGuess` (`home`, `anywhere`, `elsewhere`, `unknown`) under a new recipe version; `cacheBehaviorEstimates` stores it. No extra model call. Record the change in `docs/COSTS.md`.
+- The model input stays title, description and Where kind. Add a test that no coordinate, place key or place label reaches the call.
+- Chat (`lib/services/chat/chat-executor.ts`, `chat-prompt.ts`, `chat-tools.ts`): timeline and Behavior reads carry `alongside`, its source and the effective Where kind; the executor's free-slot checks use Ticket 357's rule. Bump the Chat prompt version.
+- `lib/services/advisor-day-context.service.ts` carries the same fields.
+- Coach signals: `crowded_hour` does not count alongside items; `done_together` facts say when one side is alongside. New signal version; update `docs/DATA_MODEL.md` and the advice matcher where facts change.
+- Update the brief, coach and chat eval fixtures and rules for the helmet, pill and gym cases.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Daily Brief, Chat, day context, coach signals and evals. |
+| Desktop | Not applicable: these run on the hosted server; a linked Mac calls the same routes. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 360: The agent asks whether a Behavior is alongside
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 358 and 359.
+
+Goal: Collect the person's answer on five surfaces with one shared rule and one stored answer.
+
+Requirements:
+
+- Pure function `alongsideQuestionOpen(behavior, guess)` in `alongside.resolver.ts`: open when the setting is null and the guess is yes. An answer on any surface writes `behaviors.alongside` through the Behavior definition service and closes the question everywhere. No new table.
+- Timeline row: a third line kind in `components/timeline/OccurrenceMarkDetails.tsx` after a Completed mark, "Done alongside other things? Yes · No", picked with `markDetailPromptPicked` and its own share setting in `status.resolver.ts`. A row shows one line at a time; `done_at` keeps priority.
+- Daily Brief: one Yes or No line, at most one question per brief and once per Behavior, derived from recorded brief answers. No typing.
+- Advisor tip: `setup_gaps` gains an unanswered-alongside fact and a reviewed advice card (or an extension of `give-it-a-length`) in `packages/core/src/data/advice-library.json`. The card's research basis follows the existing card review rule; if no reviewed source fits, ship the other four surfaces and record the gap in `STATUS.md`.
+- Chat: the prompt allows the question only when the answer changes a plan in progress; the write uses the existing confirmed Behavior update.
+- Behavior form: covered by Ticket 358; this ticket only connects it to `alongsideQuestionOpen`.
+- Notices in the notices library; `interaction-registry.json`, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md` updated; resolver and DOM tests.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Timeline row line, brief line, tip, Chat prompt. |
+| Desktop | Follow-up: Ticket 363 (Timeline row line and brief line on the Mac). |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 361: Pairing for today in the Daily Brief and Chat
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 357 and 359.
+
+Goal: Let the agent book an alongside item during another item for today.
+
+Requirements:
+
+- Pure planner in `packages/core/src/resolvers/alongside-pairing.resolver.ts` (re-export, registry, paired tests). Guest: an Unresolved, exact-time alongside item today. Host: an Unresolved, exact-time Cadence item today that is not alongside, at least as long as the guest, with both places known or guessed and compatible under `alongsideMayOverlap`. Prefer a host the `done_together` signal names, then the nearest host. At most one pairing per guest and per host.
+- Propose a pairing only when it helps: the guest sits in a crowded hour, conflicts with travel or an item elsewhere, or has `done_together` evidence. Otherwise leave it.
+- Daily Brief: a pairing is a move line with its own reason code ("Do {guest} during {host} at {time}.") and Yes · No · Other time. Yes applies an ordinary move through the existing move functions with source `daily_brief`; re-check on open and refusal causes work as for other lines. The model only writes the words.
+- Pairing lines count toward `BRIEF_MOVE_MAX_LINES`. "Don't suggest moving this" on the guest also stops pairing lines.
+- Chat: the executor exposes the planner so Chat can propose and, on confirmation, apply the same move.
+- No stored link between guest and host. Document that a later host move does not carry the guest.
+- Update `docs/DATETIME_STRATEGY.md`, the brief notices catalog, `DailyBriefMovesBench` fixtures and the brief and chat evals.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Pairing planner, brief move lines, Chat executor. |
+| Desktop | Follow-up: Ticket 363 (the Mac renders the same brief lines from the same routes). |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 362: Pairing the schedule through the coach
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 359 and 361.
+
+Goal: Let the coach propose a lasting schedule change that puts an alongside Behavior at its host's time.
+
+Requirements:
+
+- Extend the existing schedule proposal (`app/api/advisor/coach/schedule-proposal/route.ts` and its service) with a pairing proposal: set the guest Behavior's scheduled time to the host's on the days both are scheduled.
+- Evidence rule in a resolver with tests: the `done_together` signal names the pair, or the person answered Yes to the same pairing on four different days (from recorded brief answers).
+- The person confirms before anything changes. The change goes through the Behavior definition service, so configuration history records it.
+- Never propose for a sub-behavior that follows its parent's schedule, an Opportunity Behavior without a schedule, or a Behavior marked "Don't suggest moving this".
+- Coach eval fixtures cover the accept, refuse and no-evidence cases.
+- Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Coach schedule proposal route, service and resolver. |
+| Desktop | Not applicable: the proposal runs on the hosted server; a linked Mac shows the advisor's proposal through the same route. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 363: Alongside on Cadence for Mac
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 358, 360 and 361.
+
+Goal: Bring the setting, the label, the question lines and pairing lines to the Mac with local and linked modes.
+
+Requirements:
+
+- SQLite schema bump: `behaviors.alongside`. Account sync contract bump that carries it; keep the minimum writer contract unless the planner proves a bump is needed. Update `docs/DESKTOP_DATA_MODEL.md`, `docs/DESKTOP_PARITY.md` and the sync planner tests.
+- Behavior form control, Timeline label, overlap cues and the Timeline row question through the shared components and DataStore methods.
+- Local mode has no model guess: unanswered reads as false, and evidence and the person's setting still apply. A linked Mac reads guesses from the hosted server when online and uses the last read value offline; guesses are not written to SQLite backups or exports.
+- Daily Brief pairing and question lines render from the hosted routes as other brief lines do.
+- Installed check on a dev-signed build under the standing approval. Notarization and publication wait for the owner's instruction.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: Tickets 356–362. |
+| Desktop | SQLite migration, sync contract, desktop screens. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 364: Alongside in the MCP contract, exports and BehaviorLog
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Ticket 356.
+
+Goal: Carry the setting to outside AI clients and portable data.
+
+Requirements:
+
+- MCP contract minor bump: `alongside` (true, false or null) on Behavior reads and timeline items, and as an optional field on `create_behavior` and `update_behavior`. Update `docs/MCP_CONTRACT.md`, `docs/MCP_INTEGRATION.md`, the developer docs and the Claude and ChatGPT plugin skill text.
+- Full JSON, JSONL and CSV exports carry the setting; restore and import read it. Model guesses are not exported.
+- BehaviorLog: check the standard at `https://github.com/emixd12/BehaviorLog-Bundle` for a fitting field. If none exists, write the setting in the bundle's extension area and log the gap for the standard; do not invent a core field.
+- Export resolver tests and the MCP protocol suite cover the field.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | MCP server, export and import resolvers. |
+| Desktop | Follow-up: Ticket 363 covers desktop export of the local column. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.
+
+## Ticket 365: Alongside acceptance and release
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
+
+Dependencies: Tickets 356–364.
+
+Goal: Verify the feature end to end and hand the owner the turn-on decision.
+
+Requirements:
+
+- Web acceptance as test account A with `CADENCE_ALONGSIDE` on in Preview: set and clear the setting; guess label; same-place refusal with travel and with an item elsewhere; each asking surface closes the others; a pairing Yes, No, Other time and Undo; a schedule proposal accepted and refused.
+- Installed Mac acceptance through the `desktop-acceptance` skill on a dev-signed build.
+- MCP acceptance for the new field through the `mcp-acceptance` skill.
+- Record evidence under `docs/qa/` and update `STATUS.md`. The owner decides when `CADENCE_ALONGSIDE` turns on in Production and when the Mac release ships.
+- Add the user guide page section; public text changes stay with the messaging track.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Acceptance runs and evidence. |
+| Desktop | Installed acceptance on the test Mac. |
+| Marketing | Not applicable: no public claim changes until the messaging pass (`P-093`). |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-093`.

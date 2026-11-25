@@ -3181,3 +3181,64 @@ Platform impact: web (Phases 1A–6 + hybrid Chat travel UI + longitudinal revie
 (Ticket 246 follow-up), future mobile (deferred; inherits separated REST/MCP contract).
 Messaging impact: `P-090` (relates to `P-010`, `P-012`, `P-035`, `P-060`, `P-065`, `P-066`,
 `P-088`, `P-089`). Legal: `L-001`, `L-021`, `L-026`, `L-027`.
+## 2026-11-25: Alongside Behaviors and the guessed Where (D33)
+
+The owner decided the "Behaviors of Concurrency" design in chat on November 25, 2026
+(Tickets 356–365). Some Behaviors can happen during other things: a red-light helmet
+takes 10 minutes and leaves the person free. Cadence calls such a Behavior **alongside**.
+
+What existed before: since Daily Brief recipe 1.2 the length-estimate call also returns
+a model guess, `alongside`, cached per Behavior in `behavior_advisor_estimates`. The
+free-slot rule treated a guessed item as blocking nothing and never moved it. The person
+could not see or change the guess, and only the Daily Brief read it.
+
+The choices:
+
+- **A setting the person owns.** `behaviors.alongside` is a nullable boolean. Null means
+  unanswered. It is part of the Behavior configuration, account sync, export and the MCP
+  contract.
+- **The guess applies and is shown.** One resolver returns the effective value and its
+  source: the person's answer, else the cached model guess, else false. Every planner
+  reads that resolver. Where a guess drives a result, the UI labels it as a guess. After
+  the person answers, the model is no longer asked about that Behavior.
+- **Same-place overlap only.** An alongside item may overlap a Cadence item or a calendar
+  event at the same place, or where either side's place is unknown or Anywhere. It may
+  not overlap travel or an item somewhere else; there it blocks like any other item.
+  This replaces "an alongside item blocks nothing" in the one free-slot rule.
+- **A guessed Where.** One resolver returns a Behavior's effective Where and its source:
+  the person's setting, else counted completion place labels, else a model guess
+  (`home`, `anywhere`, `elsewhere` or `unknown`) returned by the same estimate call, else
+  unknown. The model never names a specific place and never sees coordinates or place
+  labels. A guessed Where is used for planning only. It never requests a route, a leave
+  time or a leave reminder. A dismissed Where suggestion stops the question, not the
+  guess: planning keeps the baseline.
+- **Pairing for today.** The Daily Brief may propose doing an alongside item during
+  another item ("Do Red light helmet during Reading at 8:00 PM") as a move for today,
+  with Yes · No · Other time. Chat can do the same on request. A resolver picks the host;
+  the model only writes the words. Hosts are Cadence items. The brief proposes a pairing
+  only when both places are known or guessed. A pairing is an ordinary move; no link
+  between the two items is stored.
+- **Pairing the schedule.** The coach may propose a lasting schedule change that puts an
+  alongside Behavior at its host's time, for the person to confirm. It needs the
+  `done_together` signal or the same pairing accepted on four different days.
+- **The agent asks.** When the answer is missing and the guess is yes, Cadence may ask
+  "Can this be done alongside other things?" in the Behavior form, on a Timeline row
+  after it is marked Completed (the "Done at · Just now · Other time" pattern), as one
+  Daily Brief line, as an advisor tip and in Chat. One answer on any surface writes the
+  Behavior setting and closes the question everywhere. The Where question keeps its
+  existing suggestion surface.
+- **Timeline.** An alongside item keeps its row and gets a small label. Overlap cues stop
+  for overlaps the rule allows. No parallel-lane layout.
+- **Routines and Opportunity.** A sub-behavior or an Opportunity Behavior may be
+  alongside. A routine block is alongside only when every step that follows it is.
+- **Rollout.** Everything lands behind `CADENCE_ALONGSIDE`, off in production until
+  Ticket 365's acceptance passes. No new model call: the guesses ride the existing
+  estimate call and pairing lines ride the existing brief call.
+
+Out of scope: calendar events as pairing hosts, a stored pairing link, a parallel-lane
+Timeline layout, per-Behavior overlap exceptions, and any route or reminder from a
+guessed Where.
+
+Platform impact: web Tickets 356–362 and 364; desktop Ticket 363, in the next Mac
+release; marketing not applicable until the messaging pass; future mobile inherits the
+resolvers in `@cadence/core` and the server rules. Messaging impact: P-093.

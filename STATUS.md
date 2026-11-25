@@ -48,6 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | Tickets and decision written November 25, 2026; all `not_started`; behind `CADENCE_ALONGSIDE` | Implement 356 and 357 first; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -146,6 +147,19 @@ Check the cited entry before acting on a row.
 Platform impact: web implemented (Phases 1A–4 in source); desktop implemented (versioned `purpose=ai_mcp`
 broker and shared Settings UI bundled for Mac `0.1.16`); marketing follow-up in Ticket 246; future mobile
 deferred. Messaging impact: `P-090`. Legal: `L-001`, `L-021`, `L-026`, `L-027`.
+
+## Tickets 356–365 written: alongside Behaviors and the guessed Where (D33) — November 25, 2026
+
+- **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D33). A Behavior can be marked as done
+  alongside other things; the model's guess applies until the person answers and is shown as a
+  guess; overlap is allowed at the same place only; planning also uses a guessed Where; the Daily
+  Brief and Chat pair items for today and the coach can propose a lasting schedule change.
+- **Written:** Tickets 356–365 in `docs/TICKETS.md`, messaging entry `P-093`, scope and domain
+  lines in `AGENTS.md`. No code changed.
+- **Next:** Tickets 356 and 357.
+
+Platform impact: web Tickets 356–362 and 364; desktop Ticket 363; marketing not applicable until
+the messaging pass; future mobile inherits the core resolvers. Messaging impact: P-093.
 
 ## Note closure redesign: collapsed 1-line summary + auto-save + Done — November 25, 2026
 
