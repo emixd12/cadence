@@ -150,6 +150,8 @@ export async function saveBriefOpportunityProposals(agent: AppSupabaseClient | n
   candidates: readonly BriefOpportunityCandidate[];
   /** Behavior id to the proposal a new line replaces (Re-plan, Re-check). */
   replaces?: ReadonlyMap<string, string>;
+  containsGoogleCalendar?: boolean;
+  googleCalendarGrantGeneration?: number | null;
 }>): Promise<BriefOpportunityLine[]> {
   if (!agent || (!input.candidates.length && !input.refresh)) return [];
   const { data, error } = await agent.rpc("record_brief_opportunity_proposals", {
@@ -163,6 +165,10 @@ export async function saveBriefOpportunityProposals(agent: AppSupabaseClient | n
       reason: candidate.reasonCode,
       line: Object.fromEntries(Object.entries(candidate).filter(([name]) => name !== "key")),
       replaces_proposal_id: input.replaces?.get(candidate.behaviorId) ?? null,
+      ...(input.containsGoogleCalendar ? {
+        contains_google_calendar: true,
+        google_calendar_grant_generation: input.googleCalendarGrantGeneration ?? null,
+      } : {}),
     })) as unknown as Json,
   });
   if (error) throw error;

@@ -160,10 +160,12 @@ export async function saveDailyBrief(
   input: Readonly<{
     installationId: string; leaseToken: string; expectedRevision: number;
     runId: string | null; refresh: boolean; withMoves: boolean; briefing: unknown;
+    includedGoogleCalendar?: boolean;
+    googleCalendarGrantGeneration?: number | null;
   }>,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  const request = client.rpc("save_daily_brief", {
+  const params: Record<string, unknown> = {
     p_installation_id: input.installationId,
     p_lease_token: input.leaseToken,
     p_expected_revision: input.expectedRevision,
@@ -171,7 +173,14 @@ export async function saveDailyBrief(
     p_refresh: input.refresh,
     p_with_moves: input.withMoves,
     p_briefing: JSON.parse(JSON.stringify(input.briefing)),
-  });
+  };
+  if (input.includedGoogleCalendar !== undefined) {
+    params.p_included_google_calendar = input.includedGoogleCalendar;
+    params.p_google_calendar_grant_generation = input.googleCalendarGrantGeneration ?? null;
+  }
+  const request = (client as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => ReturnType<AppSupabaseClient["rpc"]>;
+  }).rpc("save_daily_brief", params);
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   if (typeof data !== "boolean") throw new Error("Daily Brief save returned an invalid result.");

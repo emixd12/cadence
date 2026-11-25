@@ -62,3 +62,10 @@ export async function readCalendarCallbackUser(userId: string) {
   if (error || !data.user) throw new CalendarConnectionError("unauthenticated");
   return data.user;
 }
+export async function countGoogleCalendarAiChats(client: AppSupabaseClient): Promise<number> {
+  const { data, error } = await (client as unknown as {
+    rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
+  }).rpc("count_google_calendar_ai_chats");
+  if (error) throw new CalendarConnectionError("provider_unavailable");
+  return typeof data === "number" && Number.isFinite(data) ? Math.max(0, Math.trunc(data)) : 0;
+}

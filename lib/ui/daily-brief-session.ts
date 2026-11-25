@@ -26,9 +26,20 @@ export type DailyBriefAttempt = Readonly<{
 
 const attemptsByClient = new WeakMap<DailyBriefClient, DailyBriefAttempt>();
 
-/** Account, day, timezone, disclosure and configuration revision fence a remembered attempt. */
-export function dailyBriefFence(settings: DailyBriefSettings): string {
-  return JSON.stringify([settings.accountRef, settings.localDate, settings.timezone, settings.revision, settings.configurationRevision ?? null]);
+/** Account, day, timezone, disclosure, configuration, and AI Google Calendar grant fence a remembered attempt. */
+export function dailyBriefFence(settings: DailyBriefSettings & Readonly<{
+  googleCalendarAiGeneration?: number | null;
+  googleCalendarAiSelectionRevision?: number | null;
+}>): string {
+  return JSON.stringify([
+    settings.accountRef,
+    settings.localDate,
+    settings.timezone,
+    settings.revision,
+    settings.configurationRevision ?? null,
+    settings.googleCalendarAiGeneration ?? null,
+    settings.googleCalendarAiSelectionRevision ?? null,
+  ]);
 }
 
 /** Returns the remembered attempt only when its fence still matches; otherwise discards it. */

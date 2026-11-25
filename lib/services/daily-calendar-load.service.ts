@@ -6,9 +6,11 @@ import {
 import type { ExternalEventSource, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import {
+  capGoogleCalendarLoadExpiresAt,
   deleteDailyCalendarLoadForSource,
   listDailyCalendarLoad,
   upsertDailyCalendarLoad,
+  type DailyCalendarLoadGrantPurpose,
   type DailyCalendarLoadRow,
 } from "@/lib/db/dailyCalendarLoad.repo";
 
@@ -53,9 +55,16 @@ export async function persistCalendarLoadFromSnapshot(
   connectionGeneration: number,
   snapshot: CalendarLoadSnapshotLike,
   syncedAt: string = Temporal.Now.instant().toString(),
+  options: Readonly<{ grantPurpose?: DailyCalendarLoadGrantPurpose; expiresAt?: string | null }> = {},
 ): Promise<number> {
   if (snapshot.completeness !== "complete") return 0;
   if (!Number.isSafeInteger(connectionGeneration) || connectionGeneration < 1) return 0;
+  const grantPurpose: DailyCalendarLoadGrantPurpose = options.grantPurpose ?? "standard";
+  // Q2 invariant: Google Calendar rows in daily_calendar_load are strictly populated from AI MCP reads.
+  if (source === "google_calendar" && grantPurpose !== "agent_mcp") return 0;
+  const expiresAt = source === "google_calendar"
+    ? capGoogleCalendarLoadExpiresAt(syncedAt, options.expiresAt)
+    : null;
   try {
     const entries: DailyCalendarLoadEntry[] = resolveDailyCalendarLoad({
       startLocalDate: snapshot.requestedRange.startLocalDate,
@@ -64,7 +73,10 @@ export async function persistCalendarLoadFromSnapshot(
       events: snapshot.events,
     });
     if (entries.length === 0) return 0;
-    return await upsertDailyCalendarLoad(client, userId, source, connectionGeneration, entries, syncedAt);
+    return await upsertDailyCalendarLoad(client, userId, source, connectionGeneration, entries, syncedAt, {
+      grantPurpose,
+      expiresAt,
+    });
   } catch {
     return 0;
   }
@@ -129,7 +141,7 @@ export async function getDailyCalendarLoadForUser(
   userId: string,
   startLocalDate: string,
   endLocalDate: string,
-  options: Readonly<{ sources?: readonly ExternalEventSource[]; signal?: AbortSignal }> = {},
+  options: Readonly<{ sources?: readonly ExternalEventSource[]; signal?: AbortSignal; now?: Temporal.Instant }> = {},
 ): Promise<Readonly<{ days: DailyCalendarLoadSummary[]; rows: DailyCalendarLoadRow[] }>> {
   const rows = await listDailyCalendarLoad(client, userId, startLocalDate, endLocalDate, options);
   const byDate = new Map<string, DailyCalendarLoadRow[]>();

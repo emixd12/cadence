@@ -13,6 +13,11 @@ import { listOccurrencesBetweenLocalDates, listOccurrencesByIds } from "@/lib/db
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { readTravelRouteSource } from "./travel-settings.service";
 import {
+  matchTravelConclusionsToEvents,
+  type SuppliedTravelConclusionEventRef,
+  type TravelEventMatchCandidate,
+} from "@cadence/core/resolvers/travel-horizon.resolver";
+import {
   renameTravelConclusionRefs,
   travelConclusionsSourceKey,
   travelDurationHistoryRange,
@@ -252,9 +257,9 @@ async function readBriefingAuthorization(caller: CalendarCaller, preferences: Da
   const behaviorIds = await listDailyBriefBehaviorIds(caller.client, caller.user.id, signal);
   signal.throwIfAborted();
   let calendar: AdvisorAuthorizationFence["calendar"] = null;
-  // Ticket 307: Google Calendar is the Timeline connection and its selected calendars.
+  // WS-2B: AI features read exclusively from the dedicated Google Calendar AI MCP grant.
   if (dailyBriefSourceAllowed(preferences, "googleCalendar") && dailyBriefReadsGoogleCalendar(preferences)) {
-    const connection = await getCalendarConnection(caller);
+    const connection = await getCalendarConnection(caller, "agent");
     signal.throwIfAborted();
     if (connection.status === "connected" && connection.preferences.selectedCalendarIds.length > 0) {
       calendar = {
@@ -423,6 +428,8 @@ async function readSuppliedTravelConclusions(caller: CalendarCaller, supplied: R
   localDate: string, now: Temporal.Instant): Promise<VerifiedTravelConclusions | null> {
   const payload = verifyTravelConclusionsToken(supplied.token, { secrets: supplied.secrets, userId: caller.user.id, localDate, now });
   if (!payload) return null;
+  // WS-2B (Path 3): AI routes MUST reject Timeline-REST Google Calendar travel tokens.
+  if (payload.googleSource === "standard") return null;
   const current = await readCurrentTravelSource(caller, localDate, now);
   return current.key === payload.src ? { ...payload, takingPart: current.takingPart } : null;
 }
@@ -454,13 +461,17 @@ async function readCurrentTravelSource(caller: CalendarCaller, localDate: string
  * nothing is supplied; when it had none (only unlocated or past events, which D12 keeps out of
  * travel), its events are left out of the comparison and the other Calendars' lines stay.
  */
-function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
+export function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
   makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
+  // WS-2B (Path 3): never accept Timeline-REST Google Calendar conclusions into AI context.
+  if (supplied.googleSource === "standard") {
+    throw new Error("Timeline-REST Google Calendar travel conclusions are not permitted in AI context.");
+  }
   const calendars = context.connectors.filter((connector) => TRAVEL_CALENDAR_SOURCES.includes(connector.source));
   const ignored: TravelCalendarSource[] = [];
   for (const source of supplied.takingPart) {
     const calendar = calendars.find((connector) => connector.source === source);
-    // Google is required, as before D18. Outlook or iCloud is checked when disclosed.
+    // Google is required when taking part. Outlook or iCloud is checked when disclosed.
     if (source !== "google_calendar" && (!calendar || calendar.state === "not_requested")) {
       if (supplied.stops[source]) throw new Error("An undisclosed Calendar had a travel stop.");
       ignored.push(source);
@@ -471,19 +482,83 @@ function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTrav
     }
   }
   const compared = Object.entries(supplied.events).filter(([key]) => !ignored.some((source) => key.startsWith(`event:${source}\0`)));
-  const eventRevisions = new Map(calendars.flatMap((connector) =>
+  const currentEvents: Array<Readonly<{
+    ref: string;
+    revision: string;
+    source: string;
+    startAt: string | null;
+    endAt: string | null;
+    status: string;
+    availability: string;
+  }>> = calendars.flatMap((connector) =>
     connector.state !== "not_requested" && "events" in connector
-      ? connector.events.map((event) => [event.ref, event.revision] as const) : []));
-  if (compared.length !== eventRevisions.size || compared.some(([key, revision]) =>
-    !key.startsWith("event:") || eventRevisions.get(makeOpaqueRef("event", key.slice("event:".length))) !== makeOpaqueRef("revision", revision))) {
+      ? connector.events.map((event) => ({
+          ref: event.ref,
+          revision: event.revision,
+          source: connector.source,
+          startAt: event.interval.kind === "timed" ? event.interval.startAt : event.interval.startLocalDate,
+          endAt: event.interval.kind === "timed" ? event.interval.endAt : event.interval.endLocalDate,
+          status: event.state,
+          availability: event.availability,
+        }))
+      : [],
+  );
+  const eventByRef = new Map(currentEvents.map((event) => [event.ref, event]));
+  if (compared.length !== currentEvents.length) {
+    throw new Error("Calendar event set changed after travel was planned.");
+  }
+  const parseEventKey = (key: string): { source: string; calendarId: string; eventId: string; rawId: string } => {
+    const rawId = key.slice("event:".length);
+    const parts = rawId.split("\0");
+    if (parts.length >= 3 && (parts[0] === "outlook_calendar" || parts[0] === "icloud_calendar")) {
+      return { source: parts[0], calendarId: parts[1]!, eventId: parts.slice(2).join("\0"), rawId };
+    }
+    return { source: "google_calendar", calendarId: parts[0] ?? "", eventId: parts.slice(1).join("\0"), rawId };
+  };
+  const usesFingerprints = compared.length > 0 && compared.every(([, rev]) => rev.startsWith("evfp:v1:"));
+  let matchedRefs: Readonly<Record<string, string>> | null = null;
+  if (usesFingerprints) {
+    const suppliedRefs: SuppliedTravelConclusionEventRef[] = compared.map(([key, fingerprint]) => {
+      const parsed = parseEventKey(key);
+      return { eventKey: key, source: parsed.source, calendarId: parsed.calendarId, eventId: parsed.eventId, fingerprint };
+    });
+    const candidates: TravelEventMatchCandidate[] = [];
+    for (const [key] of compared) {
+      const parsed = parseEventKey(key);
+      const ref = makeOpaqueRef("event", parsed.rawId);
+      const current = eventByRef.get(ref);
+      if (!current) throw new Error("Calendar event set changed after travel was planned.");
+      candidates.push({
+        ref,
+        source: parsed.source,
+        calendarId: parsed.calendarId,
+        eventId: parsed.eventId,
+        startAt: current.startAt ?? "",
+        endAt: current.endAt,
+        status: current.status,
+        availability: current.availability,
+      });
+    }
+    const match = matchTravelConclusionsToEvents(suppliedRefs, candidates);
+    if (!match.matched) {
+      throw new Error("Calendar event set changed after travel was planned.");
+    }
+    matchedRefs = match.matchedRefs;
+  } else if (compared.some(([key, revision]) =>
+    !key.startsWith("event:") || eventByRef.get(makeOpaqueRef("event", key.slice("event:".length)))?.revision !== makeOpaqueRef("revision", revision))) {
     throw new Error("Calendar event set changed after travel was planned.");
   }
   const rename = (key: string) => {
     if (key.startsWith("occurrence:")) return makeOpaqueRef("occurrence", key.slice("occurrence:".length));
     if (!key.startsWith("event:")) throw new Error("Unknown travel commitment.");
+    if (matchedRefs) {
+      const matched = matchedRefs[key];
+      if (!matched) throw new Error("Calendar event changed after travel was planned.");
+      return matched;
+    }
     const ref = makeOpaqueRef("event", key.slice("event:".length));
     const revision = supplied.events[key];
-    if (revision === undefined || eventRevisions.get(ref) !== makeOpaqueRef("revision", revision)) throw new Error("Calendar event changed after travel was planned.");
+    if (revision === undefined || eventByRef.get(ref)?.revision !== makeOpaqueRef("revision", revision)) throw new Error("Calendar event changed after travel was planned.");
     return ref;
   };
   const facts = renameTravelConclusionRefs({ conclusions: supplied.conclusions, weather: supplied.weather }, rename);

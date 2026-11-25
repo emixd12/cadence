@@ -13,10 +13,11 @@ import type { TravelHabits, TravelTimingModelProjection } from "@cadence/core/ty
  * arrival or leave-by times, places or place keys. It is signed, not encrypted: it
  * names the user's own occurrences and Calendar events, which the client already has.
  */
-export const TRAVEL_CONCLUSIONS_TOKEN_VERSION = 1 as const;
+export const TRAVEL_CONCLUSIONS_TOKEN_VERSION = 2 as const;
+export type TravelConclusionsGoogleSource = "standard" | "agent_mcp" | "none";
 export const TRAVEL_CONCLUSIONS_SECRET_ENV = "TRAVEL_CONCLUSIONS_SIGNING_SECRET";
 export const TRAVEL_CONCLUSIONS_PREVIOUS_SECRET_ENV = "TRAVEL_CONCLUSIONS_SIGNING_SECRET_PREVIOUS";
-const DOMAIN = "cadence.travel-conclusions.v1";
+const DOMAIN = "cadence.travel-conclusions.v2";
 const MIN_SECRET_LENGTH = 32;
 const MAX_TOKEN_LENGTH = 32_768;
 /** Clock skew tolerated between the instance that signed and the one that verifies. */
@@ -53,6 +54,12 @@ export type TravelConclusionsPayload = Readonly<{
    * events of an undisclosed Calendar only when it had no stop; with a stop it withholds every line.
    */
   stops: TravelConclusionsStops;
+  /**
+   * WS-2B (v2): provenance of any Google Calendar events included in this token.
+   * AI routes MUST reject `"standard"` tokens (Path 3 REST-to-AI leak closure) and accept
+   * only `"agent_mcp"` or `"none"`.
+   */
+  googleSource: TravelConclusionsGoogleSource;
 }>;
 
 export type TravelConclusionsStops = Readonly<{ outlook_calendar: boolean; icloud_calendar: boolean }>;
@@ -163,12 +170,15 @@ function sameSignature(left: string, right: string): boolean {
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z$/;
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+const GOOGLE_SOURCES: ReadonlySet<string> = new Set(["standard", "agent_mcp", "none"]);
+
 /** Shape only; the strict advisor-context validator checks every value before model use. */
 function isPayload(value: unknown): value is TravelConclusionsPayload {
   if (!record(value)) return false;
   const keys = Object.keys(value).sort().join();
-  return keys === "conclusions,date,events,exp,iat,src,stops,sub,v,weather"
+  return keys === "conclusions,date,events,exp,googleSource,iat,src,stops,sub,v,weather"
     && value.v === TRAVEL_CONCLUSIONS_TOKEN_VERSION
+    && typeof value.googleSource === "string" && GOOGLE_SOURCES.has(value.googleSource)
     && typeof value.sub === "string" && !!value.sub
     && typeof value.date === "string" && LOCAL_DATE.test(value.date)
     && typeof value.src === "string" && !!value.src
