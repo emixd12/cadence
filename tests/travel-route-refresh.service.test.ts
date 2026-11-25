@@ -43,7 +43,8 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
   routeTravelLegs: mocks.route,
 }));
 
-import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { clearTravelRoutesReuseCacheForTests, refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { buildTravelEventRevisionFingerprint } from "@cadence/core/resolvers/travel-horizon.resolver";
 import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
 import { briefMoveTravelInput, verifyTravelTimesToken } from "@/lib/services/travel-times-token";
 import { ConnectorError } from "@/lib/types/connectors";
@@ -78,6 +79,7 @@ const occurrence = (id: string, behaviorId: string, scheduledFor: string) => ({
 });
 
 beforeEach(() => {
+  clearTravelRoutesReuseCacheForTests();
   vi.clearAllMocks();
   mocks.spend.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, resetsAt: null });
   mocks.readPlaces.mockResolvedValue([]);
@@ -759,7 +761,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
     const verify = (token: unknown, overrides: Partial<{ userId: string; localDate: string; now: Temporal.Instant }> = {}) =>
       verifyTravelTimesToken(token, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now, ...overrides });
     const payload = verify(result.travelTimesToken)!;
-    expect(payload).toMatchObject({ v: 1, sub: "owner", date: "2026-09-22", exp: result.expiresAt });
+    expect(payload).toMatchObject({ v: 2, sub: "owner", date: "2026-09-22", exp: result.expiresAt });
     expect(payload.stops["occurrence-1"]![0]).toBeGreaterThan(0);
     expect(payload.spans.some(([, , refs]) => refs.includes("occurrence:occurrence-1"))).toBe(true);
     expect(JSON.stringify(payload)).not.toMatch(/Main|Street|walking|meters/i);
@@ -778,7 +780,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
     const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready, secret);
     expect(result.conclusionsToken).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/);
     const payload = verifyTravelConclusionsToken(result.conclusionsToken, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
-    expect(payload).toMatchObject({ v: 1, sub: "owner", date: "2026-09-22", iat: now.toString(), exp: result.expiresAt,
+    expect(payload).toMatchObject({ v: 2, sub: "owner", date: "2026-09-22", iat: now.toString(), exp: result.expiresAt,
       conclusions: { version: "2.0", travelDay: "yes", trips: [
         { destinationRef: "occurrence:occurrence-1", role: "outbound", mode: "walking", estimate: "current" },
         { destinationRef: null, role: "return", mode: "walking", estimate: "unknown" },
@@ -797,7 +799,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
       expect(text).not.toContain(leaked);
     }
     // The only numbers are the token version and the weather table margins; the only instants are issue and expiry.
-    expect(numbers(body)).toEqual([1, 10, 10]);
+    expect(numbers(body)).toEqual([2, 10, 10]);
     expect(strings(body).filter((value) => /^\d{4}-\d{2}-\d{2}T/.test(value)).sort()).toEqual([result.expiresAt, now.toString()].sort());
   });
 
@@ -811,7 +813,17 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
     const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
     const payload = decode(result.conclusionsToken!);
     expect(JSON.stringify(payload.conclusions)).toContain(JSON.stringify("event:primary\u0000provider-1").slice(1, -1));
-    expect(payload.events).toEqual({ "event:primary\u0000provider-1": JSON.stringify({ providerEtag: "etag-1", providerUpdatedAt: null }) });
+    expect(payload.events).toEqual({
+      "event:primary\u0000provider-1": buildTravelEventRevisionFingerprint({
+        source: undefined as unknown as string,
+        calendarId: "primary",
+        eventId: "provider-1",
+        startAt: "2026-09-22T11:00:00Z",
+        endAt: "2026-09-22T11:30:00Z",
+        status: "confirmed",
+        availability: undefined,
+      }),
+    });
     expect(JSON.stringify(payload)).not.toContain("3 Event St");
     expect(JSON.stringify(payload)).not.toContain("event-row-1");
   });
@@ -837,7 +849,16 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
 
     expect(payload).not.toBeNull();
     expect(payload!.events).toEqual(Object.fromEntries(events.map((event) => [
-      `event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision),
+      `event:${event.calendarId}\0${event.providerEventId}`,
+      buildTravelEventRevisionFingerprint({
+        source: undefined as unknown as string,
+        calendarId: event.calendarId,
+        eventId: event.providerEventId,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        status: event.state,
+        availability: undefined,
+      }),
     ])));
     expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-past");
     expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-cancelled");
@@ -1275,10 +1296,19 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
     const mixed = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
     const payload = verifyTravelConclusionsToken(mixed.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!;
     const outlookName = "event:outlook_calendar\0cal-1\0outlook_calendar/o1", icloudName = "event:icloud_calendar\0cal-1\0icloud_calendar/i1";
+    const fingerprint = (event: typeof google) => buildTravelEventRevisionFingerprint({
+      source: event.source,
+      calendarId: event.calendarId,
+      eventId: event.providerEventId,
+      startAt: event.startAt,
+      endAt: event.endAt,
+      status: event.state,
+      availability: undefined,
+    });
     expect(payload.events).toEqual({
-      "event:primary\0g1": JSON.stringify(google.revision),
-      [outlookName]: `outlook_calendar\0${JSON.stringify(outlook.revision)}`,
-      [icloudName]: `icloud_calendar\0${JSON.stringify(icloud.revision)}`,
+      "event:primary\0g1": fingerprint(google),
+      [outlookName]: fingerprint(outlook),
+      [icloudName]: fingerprint(icloud),
     });
     expect(payload.conclusions.trips.map((trip) => trip.destinationRef)).toEqual(["event:primary\0g1", outlookName, icloudName, null]);
     expect(payload.stops).toEqual({ outlook_calendar: true, icloud_calendar: true });

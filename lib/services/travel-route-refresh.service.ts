@@ -77,18 +77,20 @@ function departureBucket(isoInstant: string | null | undefined): string {
   }
 }
 
-export function travelRouteEstimateCacheKey(request: TravelRouteRequest): string {
+export function travelRouteEstimateCacheKey(request: TravelRouteRequest, accountId = "__default__"): string {
   return JSON.stringify([
+    accountId,
     travelPointKey(request.origin),
     travelPointKey(request.destination),
     request.mode,
     departureBucket(request.readyAt),
     request.timing.kind,
+    departureBucket(request.timing.at),
   ]);
 }
 
-export function getCachedTravelRouteEstimate(request: TravelRouteRequest, nowMs = Date.now()): TravelRouteEstimate | null {
-  const key = travelRouteEstimateCacheKey(request);
+export function getCachedTravelRouteEstimate(request: TravelRouteRequest, nowMs: number, accountId = "__default__"): TravelRouteEstimate | null {
+  const key = travelRouteEstimateCacheKey(request, accountId);
   const entry = routeEstimateReuseCache.get(key);
   if (!entry) return null;
   if (nowMs >= entry.expiresAtMs || Date.parse(entry.estimate.expiresAt) <= nowMs) {
@@ -100,8 +102,8 @@ export function getCachedTravelRouteEstimate(request: TravelRouteRequest, nowMs 
   return entry.estimate;
 }
 
-export function setCachedTravelRouteEstimate(request: TravelRouteRequest, estimate: TravelRouteEstimate, nowMs = Date.now()): void {
-  const key = travelRouteEstimateCacheKey(request);
+export function setCachedTravelRouteEstimate(request: TravelRouteRequest, estimate: TravelRouteEstimate, nowMs: number, accountId = "__default__"): void {
+  const key = travelRouteEstimateCacheKey(request, accountId);
   if (routeEstimateReuseCache.has(key)) routeEstimateReuseCache.delete(key);
   routeEstimateReuseCache.set(key, {
     estimate,
@@ -114,22 +116,29 @@ export function setCachedTravelRouteEstimate(request: TravelRouteRequest, estima
   }
 }
 
-export function resetTravelRouteEstimateCacheForTests(): void {
+export function clearTravelRoutesReuseCacheForTests(): void {
   routeEstimateReuseCache.clear();
 }
 
+export function resetTravelRouteEstimateCacheForTests(): void {
+  clearTravelRoutesReuseCacheForTests();
+}
+
 export async function routeTravelLegsWithReuseCache(input: Readonly<{
+  accountId?: string;
+  bypassCache?: boolean;
   routes: readonly Readonly<{ id: string; request: TravelRouteRequest }>[];
   provider: TravelProviderConfig;
   reserve: TravelSpendReservation;
   now: Temporal.Instant;
   signal?: AbortSignal;
 }>): Promise<Awaited<ReturnType<typeof routeTravelLegs>>> {
+  const accountId = input.accountId ?? "__default__";
   const nowMs = input.now.epochMilliseconds;
   const cachedResults = new Map<string, TravelRouteEstimate>();
   const uncached: Array<Readonly<{ id: string; request: TravelRouteRequest }>> = [];
   for (const route of input.routes) {
-    const hit = getCachedTravelRouteEstimate(route.request, nowMs);
+    const hit = input.bypassCache ? null : getCachedTravelRouteEstimate(route.request, nowMs, accountId);
     if (hit) cachedResults.set(route.id, hit);
     else uncached.push(route);
   }
@@ -145,7 +154,7 @@ export async function routeTravelLegsWithReuseCache(input: Readonly<{
   const freshById = new Map(fresh.map((item) => [item.id, item]));
   for (const route of uncached) {
     const result = freshById.get(route.id);
-    if (result?.estimate) setCachedTravelRouteEstimate(route.request, result.estimate, nowMs);
+    if (result?.estimate) setCachedTravelRouteEstimate(route.request, result.estimate, nowMs, accountId);
   }
   return input.routes.map((route) => {
     const hit = cachedResults.get(route.id);
@@ -344,7 +353,15 @@ export async function refreshTravelRoutesReportingCalendars(
   if (due.length) {
     await beforeFirstProviderCall();
     routed = await measurePerformanceSpan({ span: "travel.route_legs", counts: { routed_legs: due.length, later_legs: later.length } },
-      () => routeTravelLegsWithReuseCache({ routes: due.map((leg) => ({ id: leg.id, request: leg.request })), provider: config, reserve, now, signal: deadline }));
+      () => routeTravelLegsWithReuseCache({
+        accountId: caller.user.id,
+        bypassCache: Boolean(trips),
+        routes: due.map((leg) => ({ id: leg.id, request: leg.request })),
+        provider: config,
+        reserve,
+        now,
+        signal: deadline,
+      }));
   }
   const weather = await weatherRequest;
   await assertAllCurrent();

@@ -41,7 +41,7 @@ vi.mock("@/lib/services/travel-provider", async (load) => ({ ...(await load<Reco
 vi.mock("@/lib/services/weather-forecast.service", () => ({ readTravelWeather: mocks.weather }));
 vi.mock("@/lib/services/travel-routing.service", async (load) => ({ ...(await load<Record<string, unknown>>()), routeTravelLegs: mocks.route }));
 
-import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { clearTravelRoutesReuseCacheForTests, refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
 import { resetTravelViewCacheForTest, travelStopRoutes, useTravelContext, TravelClientError, type TravelClient, type TravelState, type TravelRoutesInput } from "@/lib/ui/travel";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
@@ -63,12 +63,13 @@ const settings = { enabled: true, mode: "walking" as const, baseLocationText: "1
   routingConsentAt: "2026-09-20T00:00:00Z", onboardingCompletedAt: null, updatedAt: "settings-1" };
 
 function calendarEvents() {
-  return world.events.map((e) => ({ id: e.id, kind: "timed", state: "confirmed", currentUserResponse: "accepted", startAt: e.start, endAt: e.end,
+  return world.events.map((e) => ({ id: e.id, source: "google_calendar" as const, calendarId: "primary", providerEventId: e.id, kind: "timed", state: "confirmed", currentUserResponse: "accepted", availability: "busy" as const, startAt: e.start, endAt: e.end,
     endUnspecified: false, location: e.location, conference: null, revision: { providerEtag: e.etag ?? `etag-${e.id}`, providerUpdatedAt: null } }));
 }
 let routedThisCall = 0;
 beforeEach(() => {
   vi.clearAllMocks();
+  clearTravelRoutesReuseCacheForTests();
   world.events = []; world.device = null; world.fail = false; world.quota = false; world.log = [];
   mocks.source.mockResolvedValue(source);
   mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
@@ -210,7 +211,7 @@ it("another trip's refresh never takes away a known leave time (R1)", async () =
   }
   await d.done();
   // A dentist trip before a close gym trip: the trip home's refresh keeps the dentist's time.
-  resetTravelViewCacheForTest(); world.log = [];
+  resetTravelViewCacheForTest(); clearTravelRoutesReuseCacheForTests(); world.log = [];
   world.events = [
     { id: "dentist", start: et("11:30"), end: et("12:20"), location: "2 Dentist St" },
     { id: "gym", start: et("13:20"), end: et("14:00"), location: "3 Gym St" },

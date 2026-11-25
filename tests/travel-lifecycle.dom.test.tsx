@@ -436,28 +436,23 @@ it("invalidates cached and in-flight travel when settings change while no Timeli
 });
 
 
-it("routes the day once per generated brief, without repeating on remount", async () => {
+it("does not trigger Timeline REST travel refreshes from Daily Brief (Path 3 closure)", async () => {
   const routes = vi.fn(async () => view("account-a"));
   const { remount, unmount } = await mount(routes);
   try {
     await act(async () => {
       requestDailyBriefTravel("account-b", "2026-09-21", "generation-1");
       requestDailyBriefTravel("account-a", "2026-09-22", "generation-1");
-      await vi.advanceTimersByTimeAsync(350);
-    });
-    expect(routes).toHaveBeenCalledTimes(1);
-    await act(async () => {
       requestDailyBriefTravel("account-a", "2026-09-21", "generation-1");
       await vi.advanceTimersByTimeAsync(350);
     });
-    expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
-    await act(() => requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"));
+    expect(routes).toHaveBeenCalledTimes(1);
     await remount();
-    expect(routes).toHaveBeenCalledTimes(2);
+    expect(routes).toHaveBeenCalledTimes(1);
   } finally { await unmount(); }
 });
 
-it("queues the day when a brief finishes during a Timeline request", async () => {
+it("does not queue a Timeline REST day refresh when a brief finishes during a Timeline request (Path 3 closure)", async () => {
   let resolve!: (value: TravelRoutesView) => void;
   const routes = vi.fn().mockImplementationOnce(() => new Promise<TravelRoutesView>(done => { resolve = done; }))
     .mockImplementation(async () => view("account-a"));
@@ -465,8 +460,7 @@ it("queues the day when a brief finishes during a Timeline request", async () =>
   try {
     await act(() => requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"));
     await act(async () => { resolve(view("account-a")); await vi.advanceTimersByTimeAsync(350); });
-    expect(routes).toHaveBeenCalledTimes(2);
-    expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
+    expect(routes).toHaveBeenCalledTimes(1);
   } finally { await unmount(); }
 });
 
@@ -841,59 +835,40 @@ it("waits 5 minutes after a revision mismatch instead of requesting on every foc
   } finally { await unmount(); }
 });
 
-describe("Ticket 272: the first Daily Brief's travel wait", () => {
+describe("Path 3 closure: Daily Brief never waits for or triggers Timeline REST travel", () => {
   const signed = (accountId: string): TravelRoutesView => ({ ...view(accountId), conclusionsToken: "signed.token" });
 
-  it("uses the page-load request already in flight, and the delivered brief routes nothing more", async () => {
+  it("returns null immediately even while a Timeline page-load request is in flight", async () => {
     let answer!: (value: TravelRoutesView) => void;
     const routes = vi.fn<TravelClient["routes"]>().mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }))
       .mockImplementation(async () => signed("account-a"));
     const { unmount } = await mount(routes);
     try {
       expect(routes).toHaveBeenCalledOnce();
-      const token = waitForDailyBriefTravel("account-a", "2026-09-21");
+      await expect(waitForDailyBriefTravel("account-a", "2026-09-21")).resolves.toBeNull();
       await act(async () => { answer(signed("account-a")); await vi.advanceTimersByTimeAsync(0); });
-      await expect(token).resolves.toBe("signed.token");
       await act(async () => { requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"); await vi.advanceTimersByTimeAsync(1_000); });
       expect(routes).toHaveBeenCalledOnce();
     } finally { await unmount(); }
   });
 
-  it("asks for the day when nothing is in flight and resolves with its token", async () => {
+  it("does not trigger a Timeline REST day refresh when no token is held", async () => {
     const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
     const { unmount } = await mount(routes);
     try {
-      routes.mockImplementation(async () => signed("account-a"));
-      // The page-load response carried no token, so a later first brief asks for the day.
-      const token = waitForDailyBriefTravel("account-a", "2026-09-21");
+      await expect(waitForDailyBriefTravel("account-a", "2026-09-21")).resolves.toBeNull();
       await act(async () => { await vi.advanceTimersByTimeAsync(350); });
-      await expect(token).resolves.toBe("signed.token");
-      expect(routes).toHaveBeenCalledTimes(2);
-      expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
+      expect(routes).toHaveBeenCalledTimes(1);
     } finally { await unmount(); }
   });
 
-  it("returns a held token at once and null without a mounted travel view", async () => {
+  it("returns null even when a Timeline view holds a signed token", async () => {
     const routes = vi.fn<TravelClient["routes"]>(async () => signed("account-a"));
     const { unmount } = await mount(routes);
     try {
-      await expect(waitForDailyBriefTravel("account-a", "2026-09-21")).resolves.toBe("signed.token");
+      await expect(waitForDailyBriefTravel("account-a", "2026-09-21")).resolves.toBeNull();
       await expect(waitForDailyBriefTravel("account-b", "2026-09-21")).resolves.toBeNull();
       await expect(waitForDailyBriefTravel(null, "2026-09-21")).resolves.toBeNull();
-    } finally { await unmount(); }
-  });
-
-  it("never waits longer than 5 seconds", async () => {
-    const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
-    const { unmount } = await mount(routes);
-    try {
-      routes.mockImplementation(() => new Promise(() => {}));
-      let settled: string | null | undefined;
-      void waitForDailyBriefTravel("account-a", "2026-09-21").then((value) => { settled = value; });
-      await act(async () => { await vi.advanceTimersByTimeAsync(DAILY_BRIEF_TRAVEL_WAIT_MS - 1); });
-      expect(settled).toBeUndefined();
-      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-      expect(settled).toBeNull();
     } finally { await unmount(); }
   });
 });
