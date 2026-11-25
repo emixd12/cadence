@@ -88,7 +88,6 @@
     "packages/core/src/services/departure-stops.ts": 6,
     "packages/core/src/services/export-assembly.ts": 1,
     "packages/core/src/services/occurrence-generation.ts": 1,
-    "packages/core/src/resolvers/occurrence.resolver.ts": "Three lines read the planned time to find a cross-day move's planned day (isCrossDayMove), so generation never recreates or rewrites it.",
     "packages/core/src/services/opportunity-pool.ts": 1,
     "packages/core/src/services/timeline.service.ts": 1,
     "packages/core/src/services/travel-habits.ts": 2,
