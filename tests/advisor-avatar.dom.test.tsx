@@ -45,7 +45,7 @@ describe("AdvisorAvatar", () => {
 
   it("has a file at exactly its pixels for each product size and screen density", () => {
     const { window: view } = advisorAvatarCatalog.art.anchors;
-    for (const size of [40, 48, 120]) {
+    for (const size of [40, 48, 60, 72, 120]) {
       for (const density of [1, 2, 3]) {
         const rendition = advisorAvatarRendition(size, density);
         expect(rendition.file).toBe(`public/brand/advisor/advisor-${size}-${density}x.webp`);
@@ -81,9 +81,13 @@ describe("AdvisorAvatar", () => {
     expect(Number(image.getAttribute("width"))).toBe(rendition.area.width);
   });
 
-  it("ripples the mane only above 72px", () => {
+  it("ripples the mane from 72px upward", () => {
     act(() => root.render(<AdvisorAvatar size={48} />));
     expect(avatar().querySelector("feTurbulence")).toBeNull();
+    act(() => root.render(<AdvisorAvatar size={60} />));
+    expect(avatar().querySelector("feTurbulence")).toBeNull();
+    act(() => root.render(<AdvisorAvatar size={72} />));
+    expect(avatar().querySelector("feTurbulence")).not.toBeNull();
     act(() => root.render(<AdvisorAvatar size={120} />));
     expect(avatar().querySelector("feTurbulence")).not.toBeNull();
   });

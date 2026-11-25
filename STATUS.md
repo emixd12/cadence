@@ -97,6 +97,26 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine — November 24, 2026
+
+- **Owner's decision:** remove `AdvisorDayLine` under today's date to reduce Timeline header
+  density; replace `"Advisor · 1 new"` with a rounded speech pill showing a concise teaser
+  (`advisorBubbleTeaser`) when something waits (hiding the `"Advisor"` label while the pill is
+  shown); increase the Timeline avatar to 72px on desktop/Mac (side-by-side speech pill, enables
+  full mane-ripple detail) and 60px on phones (moved out of the top nav bar onto the wave banner,
+  speech pill stacked below); let the advisor header scroll naturally with the page
+  (`docs/DECISIONS.md`, 2026-11-24).
+- **Implemented:** `components/advisor/AdvisorParts.tsx`, `components/advisor/advisor-window.module.css`,
+  `components/advisor/AdvisorTimelineFrame.tsx`, `components/advisor/AdvisorAvatar.tsx`,
+  `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
+  `packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`,
+  `apps/desktop/vite.config.ts`, `DESIGN.md`, `tests/advisor-ui.dom.test.tsx`, and
+  `tests/advisor-avatar.dom.test.tsx`.
+
+Platform impact: web implemented; desktop implemented (shares components and bundles the 60px/72px
+avatar renditions in `apps/desktop/vite.config.ts`, ships in next Mac release); marketing not
+applicable; future mobile deferred. Messaging impact: P-086.
+
 ## Remove Recorded activity · Hevy section from Timeline header — November 24, 2026
 
 - **Owner's decision:** remove the dedicated `"Recorded activity · Hevy"` section (including
