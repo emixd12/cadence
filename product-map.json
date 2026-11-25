@@ -28,18 +28,18 @@
       "component": 70,
       "family": 16,
       "feature": 36,
-      "file": 344,
+      "file": 347,
       "interaction": 231,
       "journey": 29,
       "mcp-tool": 26,
       "notice": 137,
-      "repository": 48,
+      "repository": 50,
       "route": 77,
-      "service": 216,
+      "service": 219,
       "surface": 12,
-      "table": 55,
+      "table": 57,
       "term": 287,
-      "test": 158,
+      "test": 159,
       "token": 93
     },
     "links": {
@@ -47,10 +47,10 @@
       "belongs-to (asserted)": 211,
       "calls (derived)": 667,
       "contains (asserted)": 588,
-      "defined-in (asserted)": 629,
+      "defined-in (asserted)": 631,
       "explained-in (asserted)": 251,
       "follows (asserted)": 17,
-      "implemented-in (asserted)": 1015,
+      "implemented-in (asserted)": 1016,
       "implemented-in (derived)": 52,
       "on (asserted)": 631,
       "relates-to (asserted)": 564,
@@ -59,8 +59,8 @@
       "shown-by (asserted)": 179,
       "shows (derived)": 172,
       "styled-by (derived)": 515,
-      "tested-by (asserted)": 595,
-      "uses (derived)": 1792
+      "tested-by (asserted)": 596,
+      "uses (derived)": 1819
     }
   },
   "nodes": [
@@ -3248,6 +3248,13 @@
       "source": "repository file"
     },
     {
+      "id": "file:components/layout/DockableSidebar.tsx",
+      "kind": "file",
+      "name": "components/layout/DockableSidebar.tsx",
+      "path": "components/layout/DockableSidebar.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "file:components/layout/ScreenFrame.tsx",
       "kind": "file",
       "name": "components/layout/ScreenFrame.tsx",
@@ -4393,6 +4400,20 @@
       "kind": "file",
       "name": "supabase/migrations/20261121130000_brief_opportunity_proposals.sql",
       "path": "supabase/migrations/20261121130000_brief_opportunity_proposals.sql",
+      "source": "repository file"
+    },
+    {
+      "id": "file:supabase/migrations/20261124193000_recorded_activities_ledger.sql",
+      "kind": "file",
+      "name": "supabase/migrations/20261124193000_recorded_activities_ledger.sql",
+      "path": "supabase/migrations/20261124193000_recorded_activities_ledger.sql",
+      "source": "repository file"
+    },
+    {
+      "id": "file:supabase/migrations/20261124194000_daily_calendar_load.sql",
+      "kind": "file",
+      "name": "supabase/migrations/20261124194000_daily_calendar_load.sql",
+      "path": "supabase/migrations/20261124194000_daily_calendar_load.sql",
       "source": "repository file"
     },
     {
@@ -9543,6 +9564,13 @@
       "source": "repository file"
     },
     {
+      "id": "repository:lib/db/dailyCalendarLoad.repo.ts",
+      "kind": "repository",
+      "name": "lib/db/dailyCalendarLoad.repo.ts",
+      "path": "lib/db/dailyCalendarLoad.repo.ts",
+      "source": "repository file"
+    },
+    {
       "id": "repository:lib/db/database.types.ts",
       "kind": "repository",
       "name": "lib/db/database.types.ts",
@@ -9701,6 +9729,13 @@
       "kind": "repository",
       "name": "lib/db/pushSubscriptions.repo.ts",
       "path": "lib/db/pushSubscriptions.repo.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "repository:lib/db/recordedActivities.repo.ts",
+      "kind": "repository",
+      "name": "lib/db/recordedActivities.repo.ts",
+      "path": "lib/db/recordedActivities.repo.ts",
       "source": "repository file"
     },
     {
@@ -10593,6 +10628,13 @@
       "source": "repository file"
     },
     {
+      "id": "service:lib/services/chat/chat-calendar-cache.ts",
+      "kind": "service",
+      "name": "lib/services/chat/chat-calendar-cache.ts",
+      "path": "lib/services/chat/chat-calendar-cache.ts",
+      "source": "repository file"
+    },
+    {
       "id": "service:lib/services/chat/chat-confirm.ts",
       "kind": "service",
       "name": "lib/services/chat/chat-confirm.ts",
@@ -10786,6 +10828,13 @@
       "kind": "service",
       "name": "lib/services/daily-brief.service.ts",
       "path": "lib/services/daily-brief.service.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "service:lib/services/daily-calendar-load.service.ts",
+      "kind": "service",
+      "name": "lib/services/daily-calendar-load.service.ts",
+      "path": "lib/services/daily-calendar-load.service.ts",
       "source": "repository file"
     },
     {
@@ -11136,6 +11185,13 @@
       "kind": "service",
       "name": "lib/services/push-subscription.service.ts",
       "path": "lib/services/push-subscription.service.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "service:lib/services/recorded-activity-sync.service.ts",
+      "kind": "service",
+      "name": "lib/services/recorded-activity-sync.service.ts",
+      "path": "lib/services/recorded-activity-sync.service.ts",
       "source": "repository file"
     },
     {
@@ -11931,6 +11987,12 @@
       "source": "supabase/migrations/20261019040000_connector_lifecycle.sql#connector_preferences"
     },
     {
+      "id": "table:daily_calendar_load",
+      "kind": "table",
+      "name": "daily_calendar_load",
+      "source": "supabase/migrations/20261124194000_daily_calendar_load.sql#daily_calendar_load"
+    },
+    {
       "id": "table:day_notes",
       "kind": "table",
       "name": "day_notes",
@@ -12079,6 +12141,12 @@
       "kind": "table",
       "name": "push_subscriptions",
       "source": "supabase/migrations/20260607204951_create_database_schema.sql#push_subscriptions"
+    },
+    {
+      "id": "table:recorded_activities",
+      "kind": "table",
+      "name": "recorded_activities",
+      "source": "supabase/migrations/20261124193000_recorded_activities_ledger.sql#recorded_activities"
     },
     {
       "id": "table:reminder_deliveries",
@@ -15326,6 +15394,13 @@
       "source": "repository file"
     },
     {
+      "id": "test:tests/dockable-sidebar.dom.test.tsx",
+      "kind": "test",
+      "name": "tests/dockable-sidebar.dom.test.tsx",
+      "path": "tests/dockable-sidebar.dom.test.tsx",
+      "source": "repository file"
+    },
+    {
       "id": "test:tests/email-sign-in.local-integration.test.ts",
       "kind": "test",
       "name": "tests/email-sign-in.local-integration.test.ts",
@@ -17201,9 +17276,9 @@
     {
       "from": "api:/api/hevy/activities",
       "type": "uses",
-      "to": "service:lib/services/hevy.service.ts",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
       "grade": "derived",
-      "source": "scan:app/api/hevy/activities/route.ts#lib/services/hevy.service.ts"
+      "source": "scan:app/api/hevy/activities/route.ts#lib/services/recorded-activity-sync.service.ts"
     },
     {
       "from": "api:/api/hevy/connection",
@@ -46334,6 +46409,13 @@
     },
     {
       "from": "interaction:INT-SHELL-004",
+      "type": "implemented-in",
+      "to": "file:components/layout/DockableSidebar.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-SHELL-004/implementation/components/layout/DockableSidebar.tsx"
+    },
+    {
+      "from": "interaction:INT-SHELL-004",
       "type": "on",
       "to": "route:/behaviors",
       "grade": "asserted",
@@ -46373,6 +46455,13 @@
       "to": "test:tests/desktop-controls.dom.test.tsx",
       "grade": "asserted",
       "source": "interaction-registry.json#INT-SHELL-004/platforms/desktop/evidence/tests/desktop-controls.dom.test.tsx"
+    },
+    {
+      "from": "interaction:INT-SHELL-004",
+      "type": "tested-by",
+      "to": "test:tests/dockable-sidebar.dom.test.tsx",
+      "grade": "asserted",
+      "source": "interaction-registry.json#INT-SHELL-004/platforms/web/evidence/tests/dockable-sidebar.dom.test.tsx"
     },
     {
       "from": "interaction:INT-SHELL-004",
@@ -56882,6 +56971,20 @@
       "source": "scan:lib/db/daily-brief.repo.ts#from(behaviors)"
     },
     {
+      "from": "repository:lib/db/dailyCalendarLoad.repo.ts",
+      "type": "uses",
+      "to": "repository:lib/db/behaviors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/db/dailyCalendarLoad.repo.ts#lib/db/behaviors.repo.ts"
+    },
+    {
+      "from": "repository:lib/db/dailyCalendarLoad.repo.ts",
+      "type": "uses",
+      "to": "table:daily_calendar_load",
+      "grade": "derived",
+      "source": "scan:lib/db/dailyCalendarLoad.repo.ts#from(daily_calendar_load)"
+    },
+    {
       "from": "repository:lib/db/dayNotes.repo.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -57421,6 +57524,20 @@
       "source": "scan:lib/db/pushSubscriptions.repo.ts#from(push_subscriptions)"
     },
     {
+      "from": "repository:lib/db/recordedActivities.repo.ts",
+      "type": "uses",
+      "to": "repository:lib/db/behaviors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/db/recordedActivities.repo.ts#lib/db/behaviors.repo.ts"
+    },
+    {
+      "from": "repository:lib/db/recordedActivities.repo.ts",
+      "type": "uses",
+      "to": "table:recorded_activities",
+      "grade": "derived",
+      "source": "scan:lib/db/recordedActivities.repo.ts#from(recorded_activities)"
+    },
+    {
       "from": "repository:lib/db/reminderDeliveries.repo.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -57689,13 +57806,6 @@
     {
       "from": "service:lib/services/advisor-day-context.service.ts",
       "type": "uses",
-      "to": "service:lib/services/hevy.service.ts",
-      "grade": "derived",
-      "source": "scan:lib/services/advisor-day-context.service.ts#lib/services/hevy.service.ts"
-    },
-    {
-      "from": "service:lib/services/advisor-day-context.service.ts",
-      "type": "uses",
       "to": "service:lib/services/icloud-calendar.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/advisor-day-context.service.ts#lib/services/icloud-calendar.service.ts"
@@ -57706,6 +57816,13 @@
       "to": "service:lib/services/outlook-calendar.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/advisor-day-context.service.ts#lib/services/outlook-calendar.service.ts"
+    },
+    {
+      "from": "service:lib/services/advisor-day-context.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/advisor-day-context.service.ts#lib/services/recorded-activity-sync.service.ts"
     },
     {
       "from": "service:lib/services/advisor-day-context.service.ts",
@@ -60921,6 +61038,13 @@
       "source": "scan:lib/services/chat/chat-advice.ts#packages/core/src/services/advice-library.ts"
     },
     {
+      "from": "service:lib/services/chat/chat-calendar-cache.ts",
+      "type": "uses",
+      "to": "service:lib/services/chat/chat-executor.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/chat/chat-calendar-cache.ts#lib/services/chat/chat-executor.ts"
+    },
+    {
       "from": "service:lib/services/chat/chat-confirm.ts",
       "type": "calls",
       "to": "api:/api/advisor/chat",
@@ -61007,6 +61131,13 @@
     {
       "from": "service:lib/services/chat/chat-executor.ts",
       "type": "uses",
+      "to": "service:lib/services/chat/chat-calendar-cache.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/chat/chat-calendar-cache.ts"
+    },
+    {
+      "from": "service:lib/services/chat/chat-executor.ts",
+      "type": "uses",
       "to": "service:lib/services/chat/chat-tools.ts",
       "grade": "derived",
       "source": "scan:lib/services/chat/chat-executor.ts#lib/services/chat/chat-tools.ts"
@@ -61021,16 +61152,16 @@
     {
       "from": "service:lib/services/chat/chat-executor.ts",
       "type": "uses",
-      "to": "service:lib/services/google-calendar.service.ts",
+      "to": "service:lib/services/daily-calendar-load.service.ts",
       "grade": "derived",
-      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/google-calendar.service.ts"
+      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/daily-calendar-load.service.ts"
     },
     {
       "from": "service:lib/services/chat/chat-executor.ts",
       "type": "uses",
-      "to": "service:lib/services/hevy.service.ts",
+      "to": "service:lib/services/google-calendar.service.ts",
       "grade": "derived",
-      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/hevy.service.ts"
+      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/google-calendar.service.ts"
     },
     {
       "from": "service:lib/services/chat/chat-executor.ts",
@@ -61080,6 +61211,13 @@
       "to": "service:lib/services/outlook-calendar.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/chat/chat-executor.ts#lib/services/outlook-calendar.service.ts"
+    },
+    {
+      "from": "service:lib/services/chat/chat-executor.ts",
+      "type": "uses",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/chat/chat-executor.ts#lib/services/recorded-activity-sync.service.ts"
     },
     {
       "from": "service:lib/services/chat/chat-request.ts",
@@ -61714,6 +61852,13 @@
     {
       "from": "service:lib/services/connector-completion-job.service.ts",
       "type": "uses",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/connector-completion-job.service.ts#lib/services/recorded-activity-sync.service.ts"
+    },
+    {
+      "from": "service:lib/services/connector-completion-job.service.ts",
+      "type": "uses",
       "to": "table:behaviors",
       "grade": "derived",
       "source": "scan:lib/services/connector-completion-job.service.ts#from(behaviors)"
@@ -61808,6 +61953,13 @@
       "to": "service:lib/services/occurrence.service.ts",
       "grade": "derived",
       "source": "scan:lib/services/connector-completion.service.ts#lib/services/occurrence.service.ts"
+    },
+    {
+      "from": "service:lib/services/connector-completion.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/connector-completion.service.ts#lib/services/recorded-activity-sync.service.ts"
     },
     {
       "from": "service:lib/services/connector-completion.service.ts",
@@ -62440,6 +62592,27 @@
       "source": "scan:lib/services/daily-brief.service.ts#packages/core/src/services/daily-brief-sources.ts"
     },
     {
+      "from": "service:lib/services/daily-calendar-load.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/behaviors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/daily-calendar-load.service.ts#lib/db/behaviors.repo.ts"
+    },
+    {
+      "from": "service:lib/services/daily-calendar-load.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/dailyCalendarLoad.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/daily-calendar-load.service.ts#lib/db/dailyCalendarLoad.repo.ts"
+    },
+    {
+      "from": "service:lib/services/daily-calendar-load.service.ts",
+      "type": "uses",
+      "to": "table:profiles",
+      "grade": "derived",
+      "source": "scan:lib/services/daily-calendar-load.service.ts#from(profiles)"
+    },
+    {
       "from": "service:lib/services/day-load.service.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -62778,6 +62951,13 @@
     {
       "from": "service:lib/services/google-calendar.service.ts",
       "type": "uses",
+      "to": "service:lib/services/daily-calendar-load.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/google-calendar.service.ts#lib/services/daily-calendar-load.service.ts"
+    },
+    {
+      "from": "service:lib/services/google-calendar.service.ts",
+      "type": "uses",
       "to": "service:lib/services/google-calendar-oauth.ts",
       "grade": "derived",
       "source": "scan:lib/services/google-calendar.service.ts#lib/services/google-calendar-oauth.ts"
@@ -62855,6 +63035,13 @@
     {
       "from": "service:lib/services/hevy.service.ts",
       "type": "uses",
+      "to": "service:lib/services/recorded-activity-sync.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/hevy.service.ts#lib/services/recorded-activity-sync.service.ts"
+    },
+    {
+      "from": "service:lib/services/hevy.service.ts",
+      "type": "uses",
       "to": "service:packages/core/src/services/recorded-activity-refresh.ts",
       "grade": "derived",
       "source": "scan:lib/services/hevy.service.ts#packages/core/src/services/recorded-activity-refresh.ts"
@@ -62914,6 +63101,13 @@
       "to": "service:lib/services/connector-read-deadline.ts",
       "grade": "derived",
       "source": "scan:lib/services/icloud-calendar.service.ts#lib/services/connector-read-deadline.ts"
+    },
+    {
+      "from": "service:lib/services/icloud-calendar.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/daily-calendar-load.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/icloud-calendar.service.ts#lib/services/daily-calendar-load.service.ts"
     },
     {
       "from": "service:lib/services/icloud-calendar.service.ts",
@@ -64318,6 +64512,13 @@
     {
       "from": "service:lib/services/outlook-calendar.service.ts",
       "type": "uses",
+      "to": "service:lib/services/daily-calendar-load.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/outlook-calendar.service.ts#lib/services/daily-calendar-load.service.ts"
+    },
+    {
+      "from": "service:lib/services/outlook-calendar.service.ts",
+      "type": "uses",
       "to": "service:lib/services/outlook-calendar-oauth.ts",
       "grade": "derived",
       "source": "scan:lib/services/outlook-calendar.service.ts#lib/services/outlook-calendar-oauth.ts"
@@ -64426,6 +64627,83 @@
       "to": "repository:lib/db/pushSubscriptions.repo.ts",
       "grade": "derived",
       "source": "scan:lib/services/push-subscription.service.ts#lib/db/pushSubscriptions.repo.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/behaviors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/db/behaviors.repo.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/connectors.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/db/connectors.repo.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/recordedActivities.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/db/recordedActivities.repo.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "repository:lib/db/sourceLinks.repo.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/db/sourceLinks.repo.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/completion-sources.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/services/completion-sources.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/connector-credentials.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/services/connector-credentials.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/connector-read-deadline.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/services/connector-read-deadline.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/hevy-provider.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/services/hevy-provider.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/hevy.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#lib/services/hevy.service.ts"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "table:connector_completion_state",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#from(connector_completion_state)"
+    },
+    {
+      "from": "service:lib/services/recorded-activity-sync.service.ts",
+      "type": "uses",
+      "to": "table:profiles",
+      "grade": "derived",
+      "source": "scan:lib/services/recorded-activity-sync.service.ts#from(profiles)"
     },
     {
       "from": "service:lib/services/reminder.service.ts",
@@ -66304,6 +66582,13 @@
       "source": "supabase/migrations/20261019040000_connector_lifecycle.sql#create-table/connector_preferences"
     },
     {
+      "from": "table:daily_calendar_load",
+      "type": "defined-in",
+      "to": "file:supabase/migrations/20261124194000_daily_calendar_load.sql",
+      "grade": "asserted",
+      "source": "supabase/migrations/20261124194000_daily_calendar_load.sql#create-table/daily_calendar_load"
+    },
+    {
       "from": "table:day_notes",
       "type": "defined-in",
       "to": "file:supabase/migrations/20261110120000_day_notes.sql",
@@ -66477,6 +66762,13 @@
       "to": "file:supabase/migrations/20260607204951_create_database_schema.sql",
       "grade": "asserted",
       "source": "supabase/migrations/20260607204951_create_database_schema.sql#create-table/push_subscriptions"
+    },
+    {
+      "from": "table:recorded_activities",
+      "type": "defined-in",
+      "to": "file:supabase/migrations/20261124193000_recorded_activities_ledger.sql",
+      "grade": "asserted",
+      "source": "supabase/migrations/20261124193000_recorded_activities_ledger.sql#create-table/recorded_activities"
     },
     {
       "from": "table:reminder_deliveries",

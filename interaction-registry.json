@@ -241,7 +241,7 @@
     {
       "path": "apps/desktop/src/desktop-app.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 24,
+      "interaction_marker_count": 22,
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-SHELL-002",
@@ -761,7 +761,7 @@
     {
       "path": "components/layout/AppShell.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 27,
+      "interaction_marker_count": 26,
       "interaction_ids": [
         "INT-SHELL-001",
         "INT-SHELL-002",
@@ -772,6 +772,14 @@
         "INT-SHELL-007",
         "INT-SHELL-008",
         "INT-CHAT-004"
+      ]
+    },
+    {
+      "path": "components/layout/DockableSidebar.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-SHELL-004"
       ]
     },
     {
@@ -3814,8 +3822,8 @@
           "result": "Expand the collapsed desktop navigation rail without navigating."
         }
       ],
-      "availability": "Available at desktop widths; the separate collapse button is visible while expanded and the top icon cell is an expand-only button while collapsed.",
-      "success_result": "Changes rail width and persists the preference in localStorage when available.",
+      "availability": "Available at desktop widths; supports collapsed, hover-to-reveal overlay, and docked states. The separate collapse button is visible while docked, and the top icon cell acts as the hover-to-reveal and dock trigger while collapsed or in overlay.",
+      "success_result": "Hovering the collapsed trigger temporarily expands the rail as a non-modal overlay without shifting main content; clicking the toggle docks or collapses the rail and persists the preference in localStorage when available.",
       "failure_result": "The rail still changes for the current session if localStorage is unavailable.",
       "effects": [
         "ui_state",
@@ -3824,34 +3832,40 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/layout/AppShell.tsx"
+        "components/layout/AppShell.tsx",
+        "components/layout/DockableSidebar.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/sign-out-shell.test.tsx"
+          "tests/sign-out-shell.test.tsx",
+          "tests/dockable-sidebar.dom.test.tsx"
         ],
-        "notes": "The app-shell test renders the collapsed header as Expand navigation and verifies that its brand cell is no longer a Timeline destination."
+        "notes": "App-shell and dockable-sidebar DOM tests cover collapsed, hover-to-reveal overlay, docking, Escape dismissal, keyboard focus retention, scroll preservation, preference persistence, and layout stability."
       },
       "platforms": {
         "web": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/layout/AppShell.tsx"
+            "components/layout/AppShell.tsx",
+            "components/layout/DockableSidebar.tsx"
           ],
           "evidence": [
-            "tests/sign-out-shell.test.tsx"
+            "tests/sign-out-shell.test.tsx",
+            "tests/dockable-sidebar.dom.test.tsx"
           ]
         },
         "desktop": {
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "apps/desktop/src/desktop-app.tsx#DesktopApp"
+            "apps/desktop/src/desktop-app.tsx#DesktopApp",
+            "components/layout/DockableSidebar.tsx"
           ],
           "evidence": [
-            "tests/desktop-controls.dom.test.tsx"
+            "tests/desktop-controls.dom.test.tsx",
+            "tests/dockable-sidebar.dom.test.tsx"
           ],
           "reason": "Executed collapse, remount, and expand preserve the local preference. Blocked storage still permits a session toggle without navigation."
         },
