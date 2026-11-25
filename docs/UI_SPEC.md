@@ -21,24 +21,12 @@ Avoid:
 
 ## Primary navigation
 
-Use a fixed retractable sidebar on desktop and a drawer on mobile.
+Use a fixed dockable, hover-to-reveal sidebar on desktop (`collapsed`, `overlay`, and `docked` states via `components/layout/DockableSidebar.tsx`) and a drawer on mobile.
 
-On desktop, the sidebar remains fixed while page content scrolls. Expanded
-width is 16rem. Collapsed width is 4rem. Width changes animate over 200ms, and
-the main content uses matching large-breakpoint left padding so content never
-sits underneath the fixed rail.
+On desktop, the sidebar remains fixed while page content scrolls. Expanded width is 16rem (`overlay` and `docked`) and collapsed width is 4rem. Width, elevation shadow, and label opacity animate over 180ms (`motion-reduce:transition-none`). Only the `docked` state reserves `lg:pl-64` left padding on main content; `collapsed` and `overlay` keep main content at `lg:pl-16` so temporary hover expansion never resizes, repositions, or reflows the main content. The `overlay` state is non-modal (no backdrop, no focus trap, no body scroll lock), dismisses after a 160ms delay when the pointer leaves both the trigger and sidebar, and dismisses immediately on Escape. Only the persistent `docked` or `collapsed` preference is saved to `localStorage`.
 
-The desktop sidebar uses a stable 64px icon column in both states. Header,
-navigation, and footer account rows keep icons or avatar centered in that
-column. Navigation and footer labels remain in the DOM and collapse visually
-with `opacity-0`, `pointer-events-none`, `w-0`, and `overflow-hidden`; expanded
-labels use `opacity-100` and `whitespace-nowrap`.
-The desktop sidebar header does not draw a bottom divider. In the expanded
-rail, the Cadence mark and name link to `/timeline`, and the collapse control
-stays separate from the brand link. In the collapsed rail, the same 64px cell
-becomes an **Expand navigation** button with no navigation side effect.
-Hovering that button swaps the Cadence mark to the open-sidebar icon. Brand
-links use a 70% opacity state on hover and press.
+The desktop sidebar uses a stable 64px icon column in all three states, keeping the scrollable navigation list mounted across transitions so scroll position and navigation state are preserved. Header, navigation, and footer account rows keep icons or avatar centered in that column. Navigation and footer labels remain in the DOM and collapse visually with `opacity-0`, `pointer-events-none`, `w-0`, and `overflow-hidden`; expanded labels use `opacity-100` and `whitespace-nowrap`.
+The desktop sidebar header does not draw a bottom divider. In the docked rail, the Cadence mark and name link to `/timeline`, and the collapse control stays separate from the brand link. In the collapsed rail, the top 64px cell is an **Expand navigation** trigger with no navigation side effect: hovering it swaps the Cadence mark to the open-sidebar icon and temporarily reveals the sidebar in `overlay` mode while keeping that trigger in place so clicking it docks the sidebar. Brand links use a 70% opacity state on hover and press.
 
 Expanded navigation applies hover and active treatment to the whole row.
 Collapsed navigation applies hover and active treatment only to the 64px icon

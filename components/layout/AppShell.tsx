@@ -13,8 +13,6 @@ import {
   LogIn,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   X,
   type LucideIcon,
@@ -25,6 +23,10 @@ import {
   type AppNavHref,
 } from "@/lib/navigation";
 import { readCurrentBrowserPushEndpoint } from "@/lib/push/browser";
+import {
+  DockableSidebar,
+  useDockableSidebar,
+} from "@/components/layout/DockableSidebar";
 import { WebRuntimeProvider } from "@/components/layout/WebRuntimeProvider";
 import {
   ChatNavRecents,
@@ -45,7 +47,6 @@ const navIcons: Record<AppNavHref, LucideIcon> = {
   "/settings": Settings,
 };
 
-const SIDEBAR_STORAGE_KEY = "sidebar-open";
 const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
 const EDGE_SWIPE_WIDTH = 20;
 const SWIPE_THRESHOLD = 48;
@@ -106,7 +107,8 @@ function PrimaryNav({
         const isActive = pathname === item.href;
         const isPending = pendingHref === item.href && !isActive;
         // Chat carries a small arrow that opens its recent chats underneath.
-        const withRecents = item.href === "/chat" && chatRecents && !isCollapsed;
+        const supportsRecents = item.href === "/chat" && Boolean(chatRecents);
+        const withRecents = supportsRecents && !isCollapsed;
 
         const link = (
           <Link
@@ -146,7 +148,7 @@ function PrimaryNav({
             </span>
             <span
               className={[
-                "relative min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-200",
+                "relative min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
                 isCollapsed
                   ? "w-0 opacity-0 pointer-events-none"
                   : "w-[calc(100%-4rem)] opacity-100",
@@ -163,14 +165,16 @@ function PrimaryNav({
           </Link>
         );
 
-        if (!withRecents) return link;
+        if (!supportsRecents || !chatRecents) return link;
         return (
           <div key={item.href} data-nav-chat>
-            <div className={["flex items-center", isActive ? "bg-timeline-row-hover" : ""].join(" ")}>
+            <div className={["flex items-center", isActive && !isCollapsed ? "bg-timeline-row-hover" : ""].join(" ")}>
               {link}
-              <ChatRecentsToggle open={chatRecents.open} onToggle={chatRecents.onToggle} />
+              {withRecents ? (
+                <ChatRecentsToggle open={chatRecents.open} onToggle={chatRecents.onToggle} />
+              ) : null}
             </div>
-            {chatRecents.open ? (
+            {withRecents && chatRecents.open ? (
               <ChatNavRecents load={chatRecents.load} pathname={pathname} onNavigate={() => onNavigate?.("/chat")} />
             ) : null}
           </div>
@@ -223,7 +227,7 @@ function AccountTrigger({
       </span>
       <span
         className={[
-          "min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-200",
+          "min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
           isCollapsed
             ? "w-0 opacity-0 pointer-events-none"
             : "w-[calc(100%-4rem)] opacity-100",
@@ -267,7 +271,7 @@ function LoginPreviewLink({
       </span>
       <span
         className={[
-          "min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-200",
+          "min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
           isCollapsed
             ? "w-0 opacity-0 pointer-events-none"
             : "w-[calc(100%-4rem)] opacity-100",
@@ -338,7 +342,7 @@ export function SignOutControl({
         </span>
         <span
           className={[
-            "min-w-0 overflow-hidden whitespace-nowrap text-left transition-opacity duration-200",
+            "min-w-0 overflow-hidden whitespace-nowrap text-left transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
             isCollapsed
               ? "w-0 opacity-0 pointer-events-none"
               : "w-[calc(100%-4rem)] opacity-100",
@@ -354,7 +358,7 @@ export function SignOutControl({
 export function AppShell({
   children,
   user,
-  defaultDesktopSidebarOpen = true,
+  defaultDesktopSidebarOpen,
   chatRecentsLoader = defaultChatRecentsLoader,
   defaultChatRecentsOpen,
   defaultMobileNavOpen = false,
@@ -378,14 +382,16 @@ export function AppShell({
   const pathname = usePathname();
   const [chatRecentsOpen, toggleChatRecents] = useChatRecentsOpen(defaultChatRecentsOpen);
   const chatRecents = { open: chatRecentsOpen, onToggle: toggleChatRecents, load: chatRecentsLoader };
-  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(
-    defaultDesktopSidebarOpen,
-  );
+  const sidebar = useDockableSidebar({
+    defaultPreference:
+      defaultDesktopSidebarOpen === false ? "collapsed" : "docked",
+    desktopMediaQuery:
+      defaultDesktopSidebarOpen === undefined ? DESKTOP_MEDIA_QUERY : undefined,
+  });
   const [isMobileOpen, setIsMobileOpen] = useState(defaultMobileNavOpen);
   const [mobileHeaderBorderOpacity, setMobileHeaderBorderOpacity] = useState(0);
   const [pendingHref, setPendingHref] = useState<AppNavHref | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
-  const hasStoredSidebarPreferenceRef = useRef(false);
   const touchGestureRef = useRef<TouchGesture | null>(null);
 
   const displayName = user?.name?.trim() || user?.email?.trim() || "Account";
@@ -402,8 +408,9 @@ export function AppShell({
       }
 
       closeMobileNav();
+      sidebar.dismissOverlay();
     },
-    [closeMobileNav, pathname],
+    [closeMobileNav, pathname, sidebar],
   );
 
   const handleMobileBrandNavigate = useCallback(() => {
@@ -418,56 +425,9 @@ export function AppShell({
     if (DEFAULT_APP_ROUTE !== pathname) {
       setPendingHref(DEFAULT_APP_ROUTE);
     }
-  }, [pathname]);
 
-  const toggleDesktopSidebar = useCallback(() => {
-    setIsDesktopSidebarOpen((current) => {
-      const nextValue = !current;
-      hasStoredSidebarPreferenceRef.current = true;
-
-      try {
-        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(nextValue));
-      } catch {
-        // Persistence is a convenience; the sidebar still works without it.
-      }
-
-      return nextValue;
-    });
-  }, []);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
-
-    let storedValue: string | null = null;
-
-    try {
-      storedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    } catch {
-      storedValue = null;
-    }
-
-    const handleDesktopChange = (event: MediaQueryListEvent) => {
-      if (!hasStoredSidebarPreferenceRef.current) {
-        setIsDesktopSidebarOpen(event.matches);
-      }
-    };
-
-    const frameId = window.requestAnimationFrame(() => {
-      if (storedValue === "true" || storedValue === "false") {
-        hasStoredSidebarPreferenceRef.current = true;
-        setIsDesktopSidebarOpen(storedValue === "true");
-      } else {
-        setIsDesktopSidebarOpen(mediaQuery.matches);
-      }
-    });
-
-    mediaQuery.addEventListener("change", handleDesktopChange);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      mediaQuery.removeEventListener("change", handleDesktopChange);
-    };
-  }, []);
+    sidebar.dismissOverlay();
+  }, [pathname, sidebar]);
 
   useEffect(() => {
     if (!isMobileOpen) {
@@ -769,19 +729,16 @@ export function AppShell({
           </div>
         </aside>
 
-        <aside
-          className={[
-            "fixed inset-y-0 left-0 z-50 hidden flex-col overflow-hidden border-r border-line bg-card transition-[width] duration-200 ease-out motion-reduce:transition-none lg:flex",
-            isDesktopSidebarOpen ? "w-64" : "w-16",
-          ].join(" ")}
-        >
-          <div className="relative grid h-16 grid-cols-[4rem_1fr] items-center">
-            {isDesktopSidebarOpen ? (
+        <DockableSidebar
+          controller={sidebar}
+          brandMark={<BrandMark />}
+          renderBrandLink={(state) =>
+            state.isDocked ? (
               <Link
                 href={DEFAULT_APP_ROUTE}
                 aria-label="Open Timeline"
                 onClick={handleDesktopBrandNavigate}
-                className="grid h-16 min-w-0 grid-cols-[4rem_1fr] items-center text-left transition-opacity duration-150 ease-out hover:opacity-70 active:opacity-70 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="col-span-2 grid h-16 min-w-0 grid-cols-[4rem_1fr] items-center text-left transition-opacity duration-150 ease-out hover:opacity-70 active:opacity-70 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <span className="flex h-16 w-16 items-center justify-center">
                   <BrandMark />
@@ -791,65 +748,53 @@ export function AppShell({
                 </span>
               </Link>
             ) : (
-              <button
-                type="button"
-                title="Expand navigation"
-                aria-label="Expand navigation"
-                onClick={toggleDesktopSidebar}
-                className="group relative flex h-16 w-16 items-center justify-center transition-opacity duration-150 ease-out hover:opacity-70 active:opacity-70 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              <Link
+                href={DEFAULT_APP_ROUTE}
+                aria-label="Open Timeline"
+                onClick={handleDesktopBrandNavigate}
+                className="flex h-16 min-w-0 items-center pr-3 text-left transition-opacity duration-150 ease-out hover:opacity-70 active:opacity-70 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <BrandMark className="absolute h-6 w-6 transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" />
-                <PanelLeftOpen
-                  aria-hidden="true"
-                  className="absolute h-4 w-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 motion-reduce:transition-none"
-                  strokeWidth={2}
-                />
-              </button>
-            )}
-            {isDesktopSidebarOpen ? (
-              <button
-                type="button"
-                aria-label="Collapse navigation"
-                onClick={toggleDesktopSidebar}
-                className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <PanelLeftClose
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  strokeWidth={2}
-                />
-              </button>
-            ) : null}
-          </div>
-
-          <PrimaryNav
-            pathname={pathname}
-            pendingHref={pendingHref}
-            isCollapsed={!isDesktopSidebarOpen}
-            onNavigate={handlePrimaryNavNavigate}
-            chatRecents={chatRecents}
-            accessory={navAccessory?.(!isDesktopSidebarOpen)}
-          />
-
-          <div className="border-t border-line">
-            {SHOW_LOGIN_PREVIEW_LINK ? (
-              <LoginPreviewLink
-                href={loginPreviewHref}
-                isCollapsed={!isDesktopSidebarOpen}
-              />
-            ) : null}
-            <AccountTrigger
-              displayName={displayName}
-              isCollapsed={!isDesktopSidebarOpen}
+                <span className="block truncate text-lg">Cadence</span>
+              </Link>
+            )
+          }
+          renderNav={(state) => (
+            <PrimaryNav
+              pathname={pathname}
+              pendingHref={pendingHref}
+              isCollapsed={state.isCollapsed}
+              onNavigate={handlePrimaryNavNavigate}
+              chatRecents={chatRecents}
+              accessory={navAccessory?.(state.isCollapsed)}
             />
-            <SignOutControl isCollapsed={!isDesktopSidebarOpen} />
-          </div>
-        </aside>
+          )}
+          renderFooter={(state) => (
+            <div className="border-t border-line">
+              {SHOW_LOGIN_PREVIEW_LINK ? (
+                <LoginPreviewLink
+                  href={loginPreviewHref}
+                  isCollapsed={state.isCollapsed}
+                  onNavigate={sidebar.dismissOverlay}
+                />
+              ) : null}
+              <AccountTrigger
+                displayName={displayName}
+                isCollapsed={state.isCollapsed}
+                onNavigate={sidebar.dismissOverlay}
+              />
+              <SignOutControl
+                isCollapsed={state.isCollapsed}
+                onSubmit={sidebar.dismissOverlay}
+              />
+            </div>
+          )}
+        />
 
         <main
+          data-sidebar-layout={sidebar.isDocked ? "docked" : "collapsed"}
           className={[
-            "min-w-0 transition-[padding] duration-200 ease-out motion-reduce:transition-none",
-            isDesktopSidebarOpen ? "lg:pl-64" : "lg:pl-16",
+            "min-w-0 transition-[padding] duration-[180ms] ease-out motion-reduce:transition-none",
+            sidebar.isDocked ? "lg:pl-64" : "lg:pl-16",
           ].join(" ")}
         >
           <WebRuntimeProvider><PlaceLabelProvider>{children}</PlaceLabelProvider></WebRuntimeProvider>
