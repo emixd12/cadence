@@ -111,6 +111,7 @@ function revision(value: unknown): string {
 export function parsePlanningContext(value: unknown): BriefPlanningContext {
   if (value === undefined) return { calendarBusy: [] };
   const item = record(value, [], ["calendarBusy", "travelTimes"]);
+  if (item.calendarBusy !== undefined && (!Array.isArray(item.calendarBusy) || item.calendarBusy.length > 200)) invalid();
   if (item.travelTimes !== undefined && item.travelTimes !== null && (typeof item.travelTimes !== "string" || item.travelTimes.length > 32_768)) invalid();
   // WS-2B (Path 4): always strip client-supplied calendarBusy on HTTP routes so server-side AI calendar reads are authoritative.
   return { calendarBusy: [], ...(typeof item.travelTimes === "string" ? { travelTimes: item.travelTimes } : {}) };
