@@ -9,8 +9,10 @@ import {
   createInitialSidebarState,
   deriveSidebarVisualState,
   parseSidebarDockPreference,
+  readStoredSidebarPreference,
   reduceSidebarState,
   serializeSidebarDockPreference,
+  writeStoredSidebarPreference,
 } from "@/components/layout/sidebar-state";
 import { DesktopApp } from "@/apps/desktop/src/desktop-app";
 import { CHAT_FIXTURE_CONVERSATIONS } from "@/app/design-system/chat-fixtures";
@@ -146,6 +148,47 @@ describe("sidebar state model", () => {
     expect(parseSidebarDockPreference(null)).toBeNull();
     expect(serializeSidebarDockPreference("docked")).toBe("true");
     expect(serializeSidebarDockPreference("collapsed")).toBe("false");
+  });
+
+  it("handles SecurityError when reading the window.localStorage getter itself throws", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      window,
+      "localStorage",
+    );
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+
+    try {
+      expect(readStoredSidebarPreference()).toBeNull();
+      expect(() => writeStoredSidebarPreference("collapsed")).not.toThrow();
+
+      await act(async () => {
+        root.render(
+          <DesktopApp
+            activeScreen="timeline"
+            availableScreens={["timeline", "behaviors", "export", "settings"]}
+            onNavigate={vi.fn()}
+          >
+            <p>Desktop content</p>
+          </DesktopApp>,
+        );
+      });
+
+      expect(getDesktopAside().dataset.sidebarState).toBe("docked");
+      await act(async () => {
+        getCollapseToggle()!.click();
+      });
+      expect(getDesktopAside().dataset.sidebarState).toBe("collapsed");
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, "localStorage", originalDescriptor);
+      }
+    }
   });
 });
 

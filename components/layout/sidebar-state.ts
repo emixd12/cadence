@@ -172,16 +172,22 @@ export function serializeSidebarDockPreference(
 }
 
 export function readStoredSidebarPreference(
-  storage: Pick<Storage, "getItem"> | null | undefined =
-    typeof window !== "undefined" ? window.localStorage : null,
+  storage?: Pick<Storage, "getItem"> | null,
   storageKey = SIDEBAR_STORAGE_KEY,
 ): SidebarDockPreference | null {
-  if (!storage) {
-    return null;
-  }
-
   try {
-    return parseSidebarDockPreference(storage.getItem(storageKey));
+    const target =
+      storage === undefined
+        ? typeof window !== "undefined"
+          ? window.localStorage
+          : null
+        : storage;
+
+    if (!target) {
+      return null;
+    }
+
+    return parseSidebarDockPreference(target.getItem(storageKey));
   } catch {
     return null;
   }
@@ -189,16 +195,22 @@ export function readStoredSidebarPreference(
 
 export function writeStoredSidebarPreference(
   preference: SidebarDockPreference,
-  storage: Pick<Storage, "setItem"> | null | undefined =
-    typeof window !== "undefined" ? window.localStorage : null,
+  storage?: Pick<Storage, "setItem"> | null,
   storageKey = SIDEBAR_STORAGE_KEY,
 ): void {
-  if (!storage) {
-    return;
-  }
-
   try {
-    storage.setItem(storageKey, serializeSidebarDockPreference(preference));
+    const target =
+      storage === undefined
+        ? typeof window !== "undefined"
+          ? window.localStorage
+          : null
+        : storage;
+
+    if (!target) {
+      return;
+    }
+
+    target.setItem(storageKey, serializeSidebarDockPreference(preference));
   } catch {
     // Persistence is a convenience; the sidebar still works without it.
   }
