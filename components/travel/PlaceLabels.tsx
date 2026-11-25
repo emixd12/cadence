@@ -10,9 +10,11 @@ import {
   positionFromSample,
   resolveCompletionPlaceLabel,
 } from "@cadence/core/resolvers/place-label.resolver";
+import { PLACE_SEARCH_MARKER_ACCURACY_METERS } from "@cadence/core/services/place-search";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import type { BehaviorWhereKind } from "@cadence/core/types/behavior";
 import type { PlaceLabelRetention, PlaceLabelState, PlaceMarkerInput, PlaceRef } from "@cadence/core/types/place-labels";
+import type { PlaceSearchCoordinates } from "@cadence/core/types/place-search";
 import { PLACE_LABELS_CHANGED_EVENT, notifyPlaceLabelsChanged, webPlaceLabelClient, type PlaceLabelClient } from "@/lib/ui/place-labels";
 import { useSettingsResult } from "@/components/settings/settings-result";
 
@@ -113,6 +115,53 @@ function usePlaceLabels(): PlaceLabelContextValue | null {
 /** For StatusButtons: labels a completion this device just marked, silently. */
 export function useCompletionPlaceCapture(): ((occurrenceId: string) => void) | null {
   return useContext(PlaceLabelContext)?.captureCompletion ?? null;
+}
+
+export type PlaceLabelActions = Readonly<{
+  enabled: boolean;
+  recordMarkerFromCoordinates: (place: MarkerPlace, coordinates: PlaceSearchCoordinates) => Promise<boolean>;
+  removeMarker: (ref: PlaceRef) => Promise<boolean>;
+}>;
+
+/**
+ * Allows BehaviorForm and TravelSettingsPanel to save or undo a marker from a
+ * selected Geoapify place only when Completion places is enabled.
+ */
+export function usePlaceLabelActions(): PlaceLabelActions | null {
+  const context = usePlaceLabels();
+  const enabled = Boolean(context?.state?.settings.enabled);
+  const recordMarkerFromCoordinates = useCallback(async (place: MarkerPlace, coordinates: PlaceSearchCoordinates) => {
+    if (!context || !context.state?.settings.enabled) return false;
+    try {
+      const next = await context.client.recordMarker({
+        place,
+        position: positionFromSample({
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+          accuracyMeters: PLACE_SEARCH_MARKER_ACCURACY_METERS,
+        }),
+        sampleAgeSeconds: 0,
+      });
+      context.adopt(next);
+      notifyPlaceLabelsChanged();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [context]);
+  const removeMarker = useCallback(async (ref: PlaceRef) => {
+    if (!context || !context.state?.settings.enabled) return false;
+    try {
+      const next = await context.client.removeMarkers(ref);
+      context.adopt(next);
+      notifyPlaceLabelsChanged();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [context]);
+  return useMemo(() => (context ? { enabled, recordMarkerFromCoordinates, removeMarker } : null),
+    [context, enabled, recordMarkerFromCoordinates, removeMarker]);
 }
 
 type MarkerPlace = PlaceMarkerInput["place"];
