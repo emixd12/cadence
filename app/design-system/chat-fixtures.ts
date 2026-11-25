@@ -13,7 +13,7 @@ import { CHAT_STARTER_PROMPTS, type ChatClient, type ChatThreadState } from "@/l
 // Advisor plan Phase 5B bench: synthetic conversations in 5A's stored shapes.
 // No account, no model call. The fixture client answers in memory.
 
-export const CHAT_BENCH_STATES = ["opening", "today", "confirm", "refusal", "medical", "budget", "stopped", "unsent", "past"] as const;
+export const CHAT_BENCH_STATES = ["opening", "today", "thinking", "confirm", "refusal", "medical", "budget", "stopped", "unsent", "past"] as const;
 export type ChatBenchState = (typeof CHAT_BENCH_STATES)[number];
 
 export function parseChatBenchState(value: string | null): ChatBenchState {
@@ -57,6 +57,13 @@ const BEHAVIOR_CONFIRM: ChatConfirm = {
   ],
   expiresAt: new Date(CHAT_FIXTURE_NOW.getTime() + 15 * 60_000).toISOString(),
   state: "pending",
+};
+
+/** A question whose reply has not started: the thinking horse. */
+export const CHAT_FIXTURE_THINKING: ChatThreadState = {
+  conversationId: "conv-thinking",
+  streamingId: "bench-thinking",
+  messages: [user("m1", "How did my week go?", 12)],
 };
 
 /** "What is on today?" with tool lines, a calendar answer, then a single write with Undo. */
