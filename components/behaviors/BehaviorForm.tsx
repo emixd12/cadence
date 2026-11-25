@@ -184,6 +184,7 @@ export function BehaviorForm({
   const submittedRevisionRef = useRef<number | null>(null);
   const submittedLocationRef = useRef<string | null>(null);
   const submittedPlaceMarkerRef = useRef<Readonly<{ text: string; position: PlaceSearchCoordinates }> | null>(null);
+  const submittingActionRef = useRef(false);
 
   const markDraftDirty = useCallback(() => {
     draftRevisionRef.current += 1;
@@ -191,6 +192,7 @@ export function BehaviorForm({
   }, []);
 
   useEffect(() => {
+    submittingActionRef.current = false;
     if (state.status === "success" && state.message) {
       if (submittedRevisionRef.current === draftRevisionRef.current) {
         setDraftDirty(false);
@@ -330,9 +332,14 @@ export function BehaviorForm({
     submittedRevisionRef.current = null;
     setDraftDirty(false);
     setSelectedCategory(behavior?.categoryId ?? "");
-    setWhereKind(behavior?.whereKind ?? "");
-    setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
-    setPlaceSelection(null);
+    // React 19 fires form reset after every formAction, including validation/server errors.
+    // Keep Where and the selected Place across an action reset so a failed submit does not
+    // drop the user's selected place or pending completion marker; explicit Cancel resets all.
+    if (!submittingActionRef.current) {
+      setWhereKind(behavior?.whereKind ?? "");
+      setPlaceText(behavior?.whereKind === "place" ? behavior.locationText ?? "" : "");
+      setPlaceSelection(null);
+    }
     setIsOpportunity(behavior?.isOpportunity === true);
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
     setParentId(behavior?.parentBehaviorId ?? "");
@@ -347,6 +354,7 @@ export function BehaviorForm({
       onChangeCapture={markDraftDirty}
       onReset={resetFormDraft}
       onSubmitCapture={(event) => {
+        submittingActionRef.current = true;
         submittedRevisionRef.current = draftRevisionRef.current;
         const data = new FormData(event.currentTarget);
         const where = data.get("where_kind");
@@ -354,7 +362,7 @@ export function BehaviorForm({
         const whereString = typeof where === "string" ? where : "";
         const locationString = typeof location === "string" ? location : "";
         submittedLocationRef.current = whereSignature(whereString, locationString);
-        const activeSelection = placeSelection && placeSelection.forState === state ? placeSelection : null;
+        const activeSelection = placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? placeSelection : null;
         submittedPlaceMarkerRef.current =
           whereString === "place" &&
           activeSelection?.position &&
@@ -480,7 +488,7 @@ export function BehaviorForm({
                   markDraftDirty();
                 }}
                 onSelect={(suggestion: PlaceSearchSuggestion) => {
-                  const activeSelection = placeSelection && placeSelection.forState === state ? placeSelection : null;
+                  const activeSelection = placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? placeSelection : null;
                   const previousText = activeSelection ? activeSelection.previousText : placeText;
                   setPlaceText(suggestion.formatted);
                   setPlaceSelection({
@@ -494,27 +502,29 @@ export function BehaviorForm({
                 }}
               />
               <FieldError message={fieldErrors.location_text} />
-              {placeSelection && placeSelection.forState === state ? (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" aria-live="polite" data-place-selection>
-                  <span>
-                    Selected {placeSelection.title}.
-                    {placeSelection.position && placeLabelActions?.enabled
-                      ? " Its marker will save when you save this behavior."
-                      : ""}
-                  </span>
-                  <button
-                    type="button"
-                    className="product-action product-action-secondary"
-                    onClick={() => {
-                      setPlaceText(placeSelection.previousText);
-                      setPlaceSelection(null);
-                      submittedPlaceMarkerRef.current = null;
-                      markDraftDirty();
-                    }}
-                  >
-                    Undo
-                  </button>
-                </div>
+              {placeSelection && !(state.status === "success" && placeSelection.forState !== state) ? (
+                <Notice
+                  id={placeSelection.position && placeLabelActions?.enabled
+                    ? "place-search.place-selected-with-marker"
+                    : "place-search.place-selected"}
+                  params={{ title: placeSelection.title }}
+                  className="text-xs leading-5"
+                  data={{ "data-place-selection": true }}
+                  action={
+                    <button
+                      type="button"
+                      className="product-action product-action-secondary ml-2"
+                      onClick={() => {
+                        setPlaceText(placeSelection.previousText);
+                        setPlaceSelection(null);
+                        submittedPlaceMarkerRef.current = null;
+                        markDraftDirty();
+                      }}
+                    >
+                      Undo
+                    </button>
+                  }
+                />
               ) : null}
             </div>
           ) : null}

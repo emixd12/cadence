@@ -20,6 +20,7 @@ import {
   normalizePlaceSearchQuery,
 } from "@cadence/core/services/place-search";
 import type { PlaceSearchSuggestion } from "@cadence/core/types/place-search";
+import { Notice } from "@/components/feedback/Notice";
 import { webPlaceSearchClient, type PlaceSearchClient } from "@/lib/ui/place-search";
 
 const DEBOUNCE_MS = 350;
@@ -282,12 +283,10 @@ export function PlaceAutocomplete({
             </div>
           ) : null}
           {searching && suggestions.length === 0 ? (
-            <div className="px-3 py-2 text-xs leading-4 text-muted-readable">Searching places…</div>
+            <Notice id="place-search.searching" as="div" className="px-3 py-2 text-xs leading-4" />
           ) : null}
           {rateLimited ? (
-            <div className="border-t border-line px-3 py-2 text-xs leading-4 text-muted-readable">
-              Too many searches for now. You can keep typing the place directly.
-            </div>
+            <Notice id="place-search.rate-limited" as="div" className="border-t border-line px-3 py-2 text-xs leading-4" />
           ) : null}
           {hasRemote && attribution ? (
             <div className="border-t border-line px-3 py-1.5 text-[11px] leading-4 text-muted-readable">

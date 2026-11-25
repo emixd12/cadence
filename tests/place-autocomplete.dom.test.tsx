@@ -291,6 +291,75 @@ describe("BehaviorForm place autocomplete & safe marker handling", () => {
     await act(async () => { host.querySelector("form")!.requestSubmit(); await Promise.resolve(); });
     expect(placeLabels.recordMarker).not.toHaveBeenCalled();
   });
+
+  it("preserves the selected place and marker across a failed Behavior save so retrying still saves the marker", async () => {
+    const placeLabels = createPlaceLabelClient(ON_STATE);
+    const searchClient: PlaceSearchClient = {
+      search: vi.fn(async () => ({
+        kind: "ok" as const,
+        suggestions: [YMCA_SUGGESTION],
+        attribution: GEOAPIFY_ATTRIBUTION,
+      })),
+    };
+    let attempt = 0;
+    const flakyAction: BehaviorFormAction = async () => {
+      attempt += 1;
+      if (attempt === 1) {
+        return { status: "error", message: "Please fix title.", fieldErrors: { title: "Title is required." } } as BehaviorActionState;
+      }
+      return { status: "success", message: "Saved." } as BehaviorActionState;
+    };
+
+    await act(async () => {
+      root.render(
+        <PlaceLabelProvider client={placeLabels}>
+          <BehaviorForm
+            mode="create"
+            action={flakyAction}
+            categories={[{ id: "cat-1", name: "Fitness" }]}
+            placeSearchClient={searchClient}
+          />
+        </PlaceLabelProvider>,
+      );
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    const where = host.querySelector<HTMLSelectElement>('select[name="where_kind"]')!;
+    await act(async () => {
+      where.value = "place";
+      where.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const placeInput = host.querySelector<HTMLInputElement>('input[name="location_text"]')!;
+    await act(async () => {
+      placeInput.focus();
+      setInputValue(placeInput, "YMCA");
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(360);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector<HTMLElement>('[role="option"]')!.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+      );
+    });
+
+    // First submit fails validation: Undo and pending marker must remain intact.
+    const titleInput = host.querySelector<HTMLInputElement>('input[name="title"]')!;
+    await act(async () => { setInputValue(titleInput, "Workout"); });
+    await act(async () => { host.querySelector("form")!.requestSubmit(); await Promise.resolve(); });
+    expect(placeLabels.recordMarker).not.toHaveBeenCalled();
+    expect(host.querySelector("[data-place-selection]")).not.toBeNull();
+
+    // Fix title and retry -> succeeds and marker IS recorded!
+    await act(async () => { setInputValue(titleInput, "Workout"); });
+    await act(async () => { host.querySelector("form")!.requestSubmit(); await Promise.resolve(); });
+    expect(placeLabels.recordMarker).toHaveBeenCalledWith({
+      place: { kind: "saved_place", text: YMCA_SUGGESTION.formatted },
+      position: { latitudeE6: 40_727_100, longitudeE6: -73_954_200, accuracyMeters: 25 },
+      sampleAgeSeconds: 0,
+    });
+  });
 });
 
 describe("TravelSettingsPanel Home autocomplete & Undo", () => {
@@ -400,5 +469,95 @@ describe("TravelSettingsPanel Home autocomplete & Undo", () => {
       baseLocationText: "1 Old Home St",
     }));
     expect(placeLabels.removeMarkers).toHaveBeenCalledWith("home");
+  });
+
+  it("enqueues a compensating revert and skips recording the marker when Undo is clicked while Home save is in flight", async () => {
+    const placeLabels = createPlaceLabelClient(ON_STATE);
+    const searchClient: PlaceSearchClient = {
+      search: vi.fn(async () => ({
+        kind: "ok" as const,
+        suggestions: [HOME_SUGGESTION],
+        attribution: GEOAPIFY_ATTRIBUTION,
+      })),
+    };
+    let currentSettings: TravelSettings = {
+      enabled: true,
+      baseLocationText: "1 Old Home St",
+      mode: "walking",
+      navigationPreference: null,
+      routingConsentAt: "2026-10-01T12:00:00Z",
+      onboardingCompletedAt: null,
+      updatedAt: "2026-10-01T12:00:00Z",
+    };
+    let resolveFirstSave: ((value: TravelSettings) => void) | null = null;
+    const travelClient = {
+      load: vi.fn(async () => currentSettings),
+      save: vi.fn(async (input: { baseLocationText: string | null }) => {
+        if (!resolveFirstSave && input.baseLocationText === HOME_SUGGESTION.formatted) {
+          return new Promise<TravelSettings>((resolve) => {
+            resolveFirstSave = resolve;
+          });
+        }
+        currentSettings = { ...currentSettings, baseLocationText: input.baseLocationText, updatedAt: new Date().toISOString() };
+        return currentSettings;
+      }),
+    };
+
+    await act(async () => {
+      root.render(
+        <PlaceLabelProvider client={placeLabels}>
+          <TravelSettingsPanel
+            client={travelClient}
+            homeLookupClient={null}
+            placeSearchClient={searchClient}
+            readLocation={async () => ({ state: "prompt" as const })}
+          />
+        </PlaceLabelProvider>,
+      );
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    const homeInput = host.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+    await act(async () => {
+      homeInput.focus();
+      setInputValue(homeInput, "123 Bedford");
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(360);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector<HTMLElement>('[role="option"]')!.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+      );
+    });
+
+    // Press Enter to start the Home save (still in flight).
+    await act(async () => {
+      homeInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    expect(travelClient.save).toHaveBeenCalledTimes(1);
+
+    // Click Undo BEFORE the first save resolves!
+    await act(async () => {
+      const undo = findButton("Undo");
+      undo.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+      undo.click();
+    });
+    expect(homeInput.value).toBe("1 Old Home St");
+
+    // Now resolve the first save -> compensating revert save runs and no Home marker is recorded!
+    await act(async () => {
+      resolveFirstSave!({ ...currentSettings, baseLocationText: HOME_SUGGESTION.formatted, updatedAt: "2026-10-02T12:00:00Z" });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(travelClient.save).toHaveBeenCalledTimes(2);
+    expect(travelClient.save).toHaveBeenLastCalledWith(expect.objectContaining({
+      baseLocationText: "1 Old Home St",
+    }));
+    expect(placeLabels.recordMarker).not.toHaveBeenCalled();
   });
 });

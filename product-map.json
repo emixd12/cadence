@@ -16,6 +16,7 @@
     "packages/core/src/notices/catalog/ending-pausing-archiving.json",
     "packages/core/src/notices/catalog/move-for-today.json",
     "packages/core/src/notices/catalog/opportunity.json",
+    "packages/core/src/notices/catalog/place-search.json",
     "packages/core/src/notices/catalog/sub-behaviors.json",
     "packages/core/src/notices/catalog/timeline.json",
     "packages/ui/tokens.css",
@@ -28,11 +29,11 @@
       "component": 70,
       "family": 16,
       "feature": 36,
-      "file": 347,
+      "file": 348,
       "interaction": 231,
       "journey": 29,
       "mcp-tool": 26,
-      "notice": 137,
+      "notice": 145,
       "repository": 50,
       "route": 77,
       "service": 222,
@@ -44,7 +45,7 @@
     },
     "links": {
       "aliases (asserted)": 42,
-      "belongs-to (asserted)": 211,
+      "belongs-to (asserted)": 219,
       "calls (derived)": 667,
       "contains (asserted)": 588,
       "defined-in (asserted)": 639,
@@ -55,10 +56,10 @@
       "on (asserted)": 631,
       "relates-to (asserted)": 564,
       "renders (asserted)": 2,
-      "renders (derived)": 239,
-      "shown-by (asserted)": 179,
-      "shows (derived)": 172,
-      "styled-by (derived)": 514,
+      "renders (derived)": 241,
+      "shown-by (asserted)": 192,
+      "shows (derived)": 180,
+      "styled-by (derived)": 522,
       "tested-by (asserted)": 596,
       "uses (derived)": 1836
     }
@@ -3665,6 +3666,13 @@
       "kind": "file",
       "name": "components/timeline/use-semantic-zoom.ts",
       "path": "components/timeline/use-semantic-zoom.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "file:components/travel/PlaceAutocomplete.tsx",
+      "kind": "file",
+      "name": "components/travel/PlaceAutocomplete.tsx",
+      "path": "components/travel/PlaceAutocomplete.tsx",
       "source": "repository file"
     },
     {
@@ -9007,6 +9015,126 @@
         "mac"
       ],
       "source": "packages/core/src/notices/catalog/opportunity.json#opportunity.removed"
+    },
+    {
+      "id": "notice:place-search.home-selected",
+      "kind": "notice",
+      "name": "place-search.home-selected",
+      "meaning": "Says below Settings Home that a place suggestion was chosen and will save on Enter or blur, with Undo beside it.",
+      "text": "Selected {title}. Press Enter or leave the field to save.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected"
+    },
+    {
+      "id": "notice:place-search.home-selected-with-marker",
+      "kind": "notice",
+      "name": "place-search.home-selected-with-marker",
+      "meaning": "Says below Settings Home that a specific Geoapify place was chosen and its Home completion marker will save when Home saves, with Undo beside it.",
+      "text": "Selected {title}. Press Enter or leave the field to save. Its Home marker will save with it.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected-with-marker"
+    },
+    {
+      "id": "notice:place-search.home-updated",
+      "kind": "notice",
+      "name": "place-search.home-updated",
+      "meaning": "Says below Settings Home that the selected address saved, with Undo beside it.",
+      "text": "Home updated from selection.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated"
+    },
+    {
+      "id": "notice:place-search.home-updated-with-marker",
+      "kind": "notice",
+      "name": "place-search.home-updated-with-marker",
+      "meaning": "Says below Settings Home that the selected address and its Home completion marker saved, with Undo beside it.",
+      "text": "Home and its marker updated from selection.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated-with-marker"
+    },
+    {
+      "id": "notice:place-search.place-selected",
+      "kind": "notice",
+      "name": "place-search.place-selected",
+      "meaning": "Says below Behavior Place that a place suggestion was chosen, with Undo beside it.",
+      "text": "Selected {title}.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected"
+    },
+    {
+      "id": "notice:place-search.place-selected-with-marker",
+      "kind": "notice",
+      "name": "place-search.place-selected-with-marker",
+      "meaning": "Says below Behavior Place that a specific Geoapify place was chosen and its completion marker will save when the Behavior saves, with Undo beside it.",
+      "text": "Selected {title}. Its marker will save when you save this behavior.",
+      "style": "outcome",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected-with-marker"
+    },
+    {
+      "id": "notice:place-search.rate-limited",
+      "kind": "notice",
+      "name": "place-search.rate-limited",
+      "meaning": "Says inside the open place autocomplete list that the account hit the place-search rate limit and free-text typing still works.",
+      "text": "Too many searches for now. You can keep typing the place directly.",
+      "style": "note",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.rate-limited"
+    },
+    {
+      "id": "notice:place-search.searching",
+      "kind": "notice",
+      "name": "place-search.searching",
+      "meaning": "Says inside the open place autocomplete list that Geoapify results are loading.",
+      "text": "Searching places…",
+      "style": "note",
+      "channel": "in-app",
+      "status": "active",
+      "platforms": [
+        "web",
+        "mac"
+      ],
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.searching"
     },
     {
       "id": "notice:reminder.open-failed",
@@ -30286,6 +30414,20 @@
     {
       "from": "file:components/behaviors/BehaviorForm.tsx",
       "type": "shows",
+      "to": "notice:place-search.place-selected",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#place-search.place-selected"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "shows",
+      "to": "notice:place-search.place-selected-with-marker",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#place-search.place-selected-with-marker"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "shows",
       "to": "notice:sub-behaviors.follows-parent",
       "grade": "derived",
       "source": "scan:components/behaviors/BehaviorForm.tsx#sub-behaviors.follows-parent"
@@ -32330,6 +32472,13 @@
     {
       "from": "file:components/settings/TravelSettingsPanel.tsx",
       "type": "renders",
+      "to": "component:module.notice",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#Notice"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "renders",
       "to": "component:module.settings-saving",
       "grade": "derived",
       "source": "scan:components/settings/TravelSettingsPanel.tsx#SettingsResultLine"
@@ -32340,6 +32489,34 @@
       "to": "component:module.travel-habits-section",
       "grade": "derived",
       "source": "scan:components/settings/TravelSettingsPanel.tsx#TravelHabitsSection"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "shows",
+      "to": "notice:place-search.home-selected",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#place-search.home-selected"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "shows",
+      "to": "notice:place-search.home-selected-with-marker",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#place-search.home-selected-with-marker"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "shows",
+      "to": "notice:place-search.home-updated",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#place-search.home-updated"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "shows",
+      "to": "notice:place-search.home-updated-with-marker",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#place-search.home-updated-with-marker"
     },
     {
       "from": "file:components/settings/TravelSettingsPanel.tsx",
@@ -33229,6 +33406,27 @@
       "to": "service:packages/core/src/services/departure-phrases.ts",
       "grade": "derived",
       "source": "scan:components/timeline/TravelWeather.tsx#packages/core/src/services/departure-phrases.ts"
+    },
+    {
+      "from": "file:components/travel/PlaceAutocomplete.tsx",
+      "type": "renders",
+      "to": "component:module.notice",
+      "grade": "derived",
+      "source": "scan:components/travel/PlaceAutocomplete.tsx#Notice"
+    },
+    {
+      "from": "file:components/travel/PlaceAutocomplete.tsx",
+      "type": "shows",
+      "to": "notice:place-search.rate-limited",
+      "grade": "derived",
+      "source": "scan:components/travel/PlaceAutocomplete.tsx#place-search.rate-limited"
+    },
+    {
+      "from": "file:components/travel/PlaceAutocomplete.tsx",
+      "type": "shows",
+      "to": "notice:place-search.searching",
+      "grade": "derived",
+      "source": "scan:components/travel/PlaceAutocomplete.tsx#place-search.searching"
     },
     {
       "from": "file:components/travel/PlaceLabels.tsx",
@@ -55897,6 +56095,209 @@
       "source": "packages/core/src/notices/catalog/opportunity.json#opportunity.removed/style/outcome"
     },
     {
+      "from": "notice:place-search.home-selected",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected/feature"
+    },
+    {
+      "from": "notice:place-search.home-selected",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.home-selected",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected/style/outcome"
+    },
+    {
+      "from": "notice:place-search.home-selected-with-marker",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected-with-marker/feature"
+    },
+    {
+      "from": "notice:place-search.home-selected-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-PLACE-006",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected-with-marker/interactions/INT-PLACE-006"
+    },
+    {
+      "from": "notice:place-search.home-selected-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected-with-marker/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.home-selected-with-marker",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-selected-with-marker/style/outcome"
+    },
+    {
+      "from": "notice:place-search.home-updated",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated/feature"
+    },
+    {
+      "from": "notice:place-search.home-updated",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.home-updated",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated/style/outcome"
+    },
+    {
+      "from": "notice:place-search.home-updated-with-marker",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated-with-marker/feature"
+    },
+    {
+      "from": "notice:place-search.home-updated-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-PLACE-006",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated-with-marker/interactions/INT-PLACE-006"
+    },
+    {
+      "from": "notice:place-search.home-updated-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated-with-marker/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.home-updated-with-marker",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.home-updated-with-marker/style/outcome"
+    },
+    {
+      "from": "notice:place-search.place-selected",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected/feature"
+    },
+    {
+      "from": "notice:place-search.place-selected",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-005",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected/interactions/INT-TRAVEL-005"
+    },
+    {
+      "from": "notice:place-search.place-selected",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected/style/outcome"
+    },
+    {
+      "from": "notice:place-search.place-selected-with-marker",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected-with-marker/feature"
+    },
+    {
+      "from": "notice:place-search.place-selected-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-PLACE-006",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected-with-marker/interactions/INT-PLACE-006"
+    },
+    {
+      "from": "notice:place-search.place-selected-with-marker",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-005",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected-with-marker/interactions/INT-TRAVEL-005"
+    },
+    {
+      "from": "notice:place-search.place-selected-with-marker",
+      "type": "styled-by",
+      "to": "token:--foreground",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.place-selected-with-marker/style/outcome"
+    },
+    {
+      "from": "notice:place-search.rate-limited",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.rate-limited/feature"
+    },
+    {
+      "from": "notice:place-search.rate-limited",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.rate-limited/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.rate-limited",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-005",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.rate-limited/interactions/INT-TRAVEL-005"
+    },
+    {
+      "from": "notice:place-search.rate-limited",
+      "type": "styled-by",
+      "to": "token:--muted-readable",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.rate-limited/style/note"
+    },
+    {
+      "from": "notice:place-search.searching",
+      "type": "belongs-to",
+      "to": "feature:travel-and-leave-times",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.searching/feature"
+    },
+    {
+      "from": "notice:place-search.searching",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-002",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.searching/interactions/INT-TRAVEL-002"
+    },
+    {
+      "from": "notice:place-search.searching",
+      "type": "shown-by",
+      "to": "interaction:INT-TRAVEL-005",
+      "grade": "asserted",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.searching/interactions/INT-TRAVEL-005"
+    },
+    {
+      "from": "notice:place-search.searching",
+      "type": "styled-by",
+      "to": "token:--muted-readable",
+      "grade": "derived",
+      "source": "packages/core/src/notices/catalog/place-search.json#place-search.searching/style/note"
+    },
+    {
       "from": "notice:reminder.open-failed",
       "type": "belongs-to",
       "to": "feature:reminders",
@@ -74265,11 +74666,13 @@
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefMoveLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/BriefOpportunityLines.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/briefing/DailyBriefBubble.tsx",
+      "found in code, missing from design-system.usage.json: module.notice in components/settings/TravelSettingsPanel.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/InlineDurationControl.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/MoveConflictNotices.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/OccurrenceMoves.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/OpportunityBasket.tsx",
       "found in code, missing from design-system.usage.json: module.notice in components/timeline/TimelineReloadLine.tsx",
+      "found in code, missing from design-system.usage.json: module.notice in components/travel/PlaceAutocomplete.tsx",
       "found in code, missing from design-system.usage.json: module.occurrence-mark-details in app/(app)/timeline/page.tsx",
       "found in code, missing from design-system.usage.json: module.occurrence-mark-details in apps/desktop/src/timeline-screen.tsx",
       "found in code, missing from design-system.usage.json: module.occurrence-move in components/timeline/OccurrenceRow.tsx",

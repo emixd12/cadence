@@ -7,6 +7,7 @@ import { useReportSettingsSection } from "./SettingsSections";
 import { settingsSectionLoad, travelSectionState } from "@/lib/ui/settings-sections";
 import { CompletionPlacesSection, PlaceMarkerControl, usePlaceLabelActions } from "@/components/travel/PlaceLabels";
 import { PlaceAutocomplete } from "@/components/travel/PlaceAutocomplete";
+import { Notice } from "@/components/feedback/Notice";
 import type { PlaceSearchCoordinates, PlaceSearchSuggestion } from "@cadence/core/types/place-search";
 import type { PlaceSearchClient } from "@/lib/ui/place-search";
 import { readBrowserForegroundLocation, readBrowserLocationPermission, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
@@ -70,6 +71,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     address: string;
     previousHome: string | null;
     position: PlaceSearchCoordinates | null;
+    committed: boolean;
     saved: boolean;
     markerSaved: boolean;
   }>;
@@ -151,16 +153,22 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
         if (change.baseLocationText !== undefined && requestedHome.current === change.baseLocationText) {
           requestedHome.current = next.baseLocationText; setHome(next.baseLocationText ?? "");
         }
-        // If Home was chosen from place autocomplete, save its marker only after Home itself saved.
+        // If Home was chosen from place autocomplete, save its marker only after Home itself saved
+        // and only while the selection has not been undone or edited.
         if (change.baseLocationText !== undefined) {
           const pending = homeSelectionRef.current;
           if (pending && next.baseLocationText && next.baseLocationText.trim() === pending.address.trim()) {
             let markerSaved = pending.markerSaved;
             if (pending.position && placeLabelActions?.enabled && !pending.markerSaved) {
               markerSaved = await placeLabelActions.recordMarkerFromCoordinates({ kind: "home" }, pending.position);
+              // If the user clicked Undo while the marker write was in flight, remove the stale marker.
+              if (markerSaved && (current !== sequence.current || homeSelectionRef.current !== pending)) {
+                void placeLabelActions.removeMarker("home");
+                return;
+              }
             }
             if (current === sequence.current && homeSelectionRef.current === pending) {
-              setHomeSelection({ ...pending, saved: true, markerSaved });
+              setHomeSelection({ ...pending, committed: true, saved: true, markerSaved });
             }
           }
         }
@@ -200,6 +208,10 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     if (!saved.current) return;
     const next = home.trim() || null;
     if (next === requestedHome.current) return;
+    const active = homeSelectionRef.current;
+    if (active && next !== null && next === active.address.trim() && !active.committed) {
+      setHomeSelection({ ...active, committed: true });
+    }
     requestedHome.current = next;
     persist({ baseLocationText: next }, `Home could not save. ${RELOAD_HINT}`);
   };
@@ -209,7 +221,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     setHomeSelection(null);
     const previous = active.previousHome;
     setHome(previous ?? "");
-    if (!active.saved) return;
+    if (!active.committed && !active.saved) return;
     if (saved.current && previous !== requestedHome.current) {
       requestedHome.current = previous;
       persist({ baseLocationText: previous }, `Home could not revert. ${RELOAD_HINT}`);
@@ -282,15 +294,22 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
                   address: suggestion.formatted.slice(0, 500),
                   previousHome,
                   position: suggestion.position,
+                  committed: false,
                   saved: false,
                   markerSaved: false,
                 });
                 homeInput.current?.focus();
               }}
               onBlur={commitHome}
-              onEnter={commitHome} /></HomeCurrentLocation>{homeSelection ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" aria-live="polite" data-home-selection><span>{homeSelection.saved
-                ? (homeSelection.markerSaved ? "Home and its marker updated from selection." : "Home updated from selection.")
-                : `Selected ${homeSelection.title}. Press Enter or leave the field to save.${homeSelection.position && placeLabelActions?.enabled ? " Its Home marker will save with it." : ""}`}</span><button type="button" className="product-action product-action-secondary" onMouseDown={(event) => event.preventDefault()} onClick={undoHomeSelection}>Undo</button></div> : null}<p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
+              onEnter={commitHome} /></HomeCurrentLocation>{homeSelection ? <Notice
+                id={homeSelection.saved
+                  ? (homeSelection.markerSaved ? "place-search.home-updated-with-marker" : "place-search.home-updated")
+                  : (homeSelection.position && placeLabelActions?.enabled ? "place-search.home-selected-with-marker" : "place-search.home-selected")}
+                params={{ title: homeSelection.title }}
+                className="text-xs leading-5"
+                data={{ "data-home-selection": true }}
+                action={<button type="button" className="product-action product-action-secondary ml-2" onMouseDown={(event) => event.preventDefault()} onClick={undoHomeSelection}>Undo</button>}
+              /> : null}<p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
           <SettingsResultLine channel={result} />
           <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
           {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked Cadence account, a finished sync and an internet connection.</p> : null}
