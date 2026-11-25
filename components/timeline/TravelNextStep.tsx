@@ -8,6 +8,7 @@ import {
   departureTravelOffPhrase,
 } from "@cadence/core/services/departure-phrases";
 import type { DepartureTrip } from "@cadence/core/types/departure";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 
 /** Web links by address; the Mac app navigates by callback. */
 export type TravelLinkTarget = Readonly<{ href: string }> | Readonly<{ onOpen: () => void }>;
@@ -100,11 +101,12 @@ const OFFER_DISMISSED_KEY = "cadence:travel-offer-dismissed";
 
 /** The offer stays hidden on this device once dismissed. Nothing about the event is stored. */
 export function travelOfferDismissed(): boolean {
-  try { return window.localStorage.getItem(OFFER_DISMISSED_KEY) === "true"; } catch { return false; }
+  return readLocalItem(OFFER_DISMISSED_KEY) === "true";
 }
 
 export function dismissTravelOffer(): void {
-  try { window.localStorage.setItem(OFFER_DISMISSED_KEY, "true"); } catch { /* Storage unavailable: hidden until reload. */ }
+  // A refused write leaves the offer hidden until reload.
+  writeLocalItem(OFFER_DISMISSED_KEY, "true");
 }
 
 /**

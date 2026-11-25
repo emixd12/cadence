@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { ChatConversationSummary } from "@cadence/core/types/chat";
 import { CHAT_CONVERSATIONS_CHANGED_EVENT, type ChatConversationsChangedDetail } from "@/lib/ui/chat";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 
 // Advisor plan Phase 5B: recent chats as a quiet drawer under the Chat item in the
 // side menu. Open on the first visit (Emi, Nov 20) and remembered per browser, so Chat stays one
@@ -37,20 +38,13 @@ export function chatRecentsHref(target: ChatRecentsTarget): string {
 }
 
 function readStoredOpen(): boolean {
-  try {
-    // Open on the first visit; after that, whatever the person last chose.
-    return window.localStorage.getItem(STORAGE_KEY) !== "false";
-  } catch {
-    return true;
-  }
+  // Open on the first visit; after that, whatever the person last chose.
+  return readLocalItem(STORAGE_KEY) !== "false";
 }
 
 function storeOpen(open: boolean) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, String(open));
-  } catch {
-    // Remembering is a convenience; the drawer still works without it.
-  }
+  // Remembering is a convenience; the drawer still works when the write is refused.
+  writeLocalItem(STORAGE_KEY, String(open));
 }
 
 /** The arrow button that sits at the right end of the Chat menu row. */

@@ -140,6 +140,21 @@ npm run smoke:account-sync:local
 CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
 ```
 
+Last, it runs the database-backed `tests/*.local-integration.test.*` files listed
+under `run` in `scripts/supabase-rehearsal-integration-tests.json`, one file at a
+time, with a 6-minute limit. Before the stack starts, the rehearsal generates a
+fresh ES256 key in the private workdir and enables `signing_keys_path` in its
+config copy. The CLI passes the key to Auth as container environment, not as a
+mount. The helper maps `supabase status -o env` and that key to the
+`CADENCE_LOCAL_*` variables in a private file used only by that vitest run. The
+run fails if a listed file skips any test or runs none, from vitest's JSON
+report. Every other local integration file is under `excluded` with its reason,
+usually an app server, a separate opt-in flag or its own isolated project. A unit
+test fails when a new `*.local-integration.test.*` file is in neither list. The
+tests delete their own users; the final `auth.users` check confirms it. Type drift
+(`supabase gen types --local`) is not checked here: the rehearsal excludes
+`postgres-meta`, which that command needs.
+
 Registry evidence, October 27, 2026: authenticated GHCR
 [run 40561396997](https://github.com/emixd12/cadence/actions/runs/40561396997)
 failed the isolated `postgres:17.6.1.132` pull with the fixed
@@ -506,6 +521,7 @@ call the shared command.
 | Piece | File | Runs for |
 | --- | --- | --- |
 | Branch guard | `.githooks/reference-transaction` | Any Git client, once `core.hooksPath` is `.githooks` |
+| Pre-push checks | `.githooks/pre-push` | Any Git client, once `core.hooksPath` is `.githooks` |
 | Freshness and pruning | `scripts/git-freshness.mjs` (`npm run git:fresh`) | Anyone who runs it |
 | Claude Code adapter | `.claude/settings.json` SessionStart, and `worktree.baseRef: fresh` | Claude Code sessions |
 | Codex adapter | `.codex/hooks.json` SessionStart | Codex sessions, after the owner trusts the hook |
@@ -524,14 +540,51 @@ which the refusal message also names:
 - `git config cadence.branchGuard off`.
 
 `core.hooksPath` lives in the repository's shared config, so one setting covers
-the main checkout and every worktree on the machine. A worktree whose branch
-predates `.githooks` has no hook until it is rebased.
+the main checkout and every worktree on the machine. The value must be the
+relative `.githooks`: Git then runs each worktree's own copy of the hooks. An
+absolute path makes every worktree run one checkout's copy. A worktree whose
+branch predates a hook has no copy of it until it is rebased.
+
+**Pre-push checks.** Git runs `.githooks/pre-push` before every push. It runs,
+in order:
+
+- `npm run agents:check`, `interactions:check`, `map:check` and
+  `resolvers:check`;
+- a fixed list of tests that read source, docs or registries through `fs`,
+  which `vitest related` cannot find: `tests/scheduled-for-drift.test.ts`,
+  `tests/developer-docs.test.ts`, `tests/acceptance-watch.test.mjs`,
+  `tests/integration-contract.test.ts`, `tests/desktop-parity.test.ts`,
+  `tests/interaction-registry-labels.test.ts` and
+  `tests/rls-policy-registry.test.ts`;
+- `npx vitest related --run` for the `.ts`, `.tsx` and `.mjs` files changed
+  between `git merge-base HEAD origin/main` and `HEAD`. It excludes
+  `.local/**`, `.claude/**` and `tests/acceptance-web-client/**`, as
+  `vitest.config.ts` does.
+
+It prints one line per step. When a step fails, it prints that step's output,
+runs the remaining steps and blocks the push. It uses Node 24 from
+`/opt/homebrew/opt/node@24/bin` when the shell's `node` is another major
+version. It lets the push through, with a one-line note, when the push only
+deletes branches, `origin/main` is missing, `git merge-base` fails,
+`node_modules` is missing, or the session is a Claude Code cloud session
+(`CLAUDE_CODE_REMOTE=true`). Skip it for one push with
+`CADENCE_SKIP_PRE_PUSH=1 git push ...`, and say why in the PR.
+
+Measured on the owner's Mac on November 25, 2026: 7 seconds when the branch
+changes only docs, and 30 to 45 seconds when it changes one widely used
+component (`components/feedback/Notice.tsx`, 48 related test files). With a
+load average above 100 from parallel agents, one run took 97 seconds and a DOM
+test hit its 5-second timeout, which blocked the push. The hook
+checks the working tree, so uncommitted changes count. It does not replace
+`npm run test`, `lint`, `typecheck` or `build`.
 
 **`npm run git:fresh`.** It exits 0 on every error and prints nothing when
 everything is current. In about one second, it:
 
-- sets `core.hooksPath` to `.githooks` when it is unset. When another value is
-  set, it reports that and changes nothing;
+- sets `core.hooksPath` to `.githooks` when it is unset. When the value is an
+  absolute path to the `.githooks` directory of this repository's main checkout
+  or one of its worktrees, it rewrites the value to `.githooks` and says so.
+  When another value is set, it reports that and changes nothing;
 - runs `git fetch origin --prune` with a 15-second limit;
 - fast-forwards local `main` to `origin/main`. Where `main` is checked out, it
   runs `git merge --ff-only`, which refuses when uncommitted changes overlap.
@@ -542,7 +595,9 @@ everything is current. In about one second, it:
 - reports, without changing anything: how far the current branch is behind
   `origin/main`; clean worktrees whose branch is already merged; worktrees with
   uncommitted changes and no commit for 14 days; unmerged branches with no
-  commit for 14 days; and folders in `.claude/worktrees` that Git does not track.
+  commit for 14 days; and folders in `.claude/worktrees` that Git does not track;
+- prompts for a `STATUS.md` archive when `STATUS.md` on `origin/main` is above
+  34,000 bytes (see "Status updates").
 
 It skips Claude Code cloud sessions (`CLAUDE_CODE_REMOTE=true`), which start
 from a fresh clone.
@@ -554,8 +609,10 @@ Branch protection on `main` also blocks a merge while the PR has an open code-sc
 alert or an unresolved review thread, even when `verify` passes. Fix the alert
 and resolve the threads before merging (seen on PR #210, November 11, 2026).
 
-Tests: `tests/git-freshness.test.ts` runs the real hook and command against
-throwaway repositories.
+Tests: `tests/git-freshness.test.ts`, `tests/git-freshness-hooks-archive.test.ts`
+and `tests/pre-push-hook.test.ts` run the real hooks and command against
+throwaway repositories. The pre-push tests put stub `npm`, `npx` and `node`
+commands on `PATH`.
 
 ### Codex local timing QA action
 
@@ -1846,6 +1903,14 @@ fails when `STATUS.md` exceeds 40,000 bytes. Run `npm run status:archive` to mov
 older entries to `docs/status/archive/YYYY-MM.md`. `docs/status/README.md` maps
 each ticket number to its archive file. Search the archive with grep; never read
 it in full.
+
+Run the archive in its own docs-only PR, never inside a feature commit. Use the
+branch `chore/status-archive`, created from `origin/main`. The fixed name makes
+a second session's archive collide on push instead of moving the same entries
+twice. `npm run git:fresh` prints the prompt at session start when `STATUS.md`
+on `origin/main` is above 34,000 bytes. When `origin/chore/status-archive`
+already exists, it says the archive is in progress instead. Merge that PR before
+your feature branch adds more entries.
 
 Do not use `STATUS.md` to expand v1 product scope. Put future ideas in `docs/FUTURE_UPDATES.md` unless the user explicitly changes v1 scope.
 

@@ -119,7 +119,7 @@ describe("Timeline interaction controls", () => {
     expect(html).toContain("<span>Unmark</span>");
     expect(html).toContain('name="note"');
     expect(html).toContain('name="expected_note" value=""');
-    expect(html).toContain(">Save note</button>");
+    expect(html).toContain(">Done</button>");
 
     const statusForms = (html.match(/<form\b.*?<\/form>/g) ?? []).filter(
       (form) => form.includes('name="status"'),

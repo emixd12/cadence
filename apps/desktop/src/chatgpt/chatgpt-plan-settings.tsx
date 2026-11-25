@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatGptPlanCard, type ChatGptPlanCardState } from "@/components/briefing/ChatGptPlanCard";
 import type { ChatGptConnection, ChatGptConnectionStatus } from "./connection";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 
 /**
  * Ticket 299: the Mac's "Use your ChatGPT plan" Settings card, rendered only with the
@@ -12,8 +13,9 @@ export const CHATGPT_PLAN_CONFIRMED_KEY = "cadence.chatgpt-plan.confirmed.v1";
 type Flag = Readonly<{ read: () => boolean; write: () => void }>;
 
 const localFlag: Flag = {
-  read: () => { try { return window.localStorage.getItem(CHATGPT_PLAN_CONFIRMED_KEY) === "1"; } catch { return false; } },
-  write: () => { try { window.localStorage.setItem(CHATGPT_PLAN_CONFIRMED_KEY, "1"); } catch { /* Shown again next time; harmless. */ } },
+  read: () => readLocalItem(CHATGPT_PLAN_CONFIRMED_KEY) === "1",
+  // A refused write is harmless: the card is shown again next time.
+  write: () => { writeLocalItem(CHATGPT_PLAN_CONFIRMED_KEY, "1"); },
 };
 
 export function ChatGptPlanSettings({ connection, connect, openUsage, confirmed = localFlag }: Readonly<{
