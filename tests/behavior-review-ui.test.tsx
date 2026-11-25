@@ -299,7 +299,7 @@ describe("behavior date review UI", () => {
     expect(html).toContain("<span>Not Completed</span>");
     expect(html).toContain('name="note"');
     expect(html).toContain('name="expected_note"');
-    expect(html).toContain(">Save note</button>");
+    expect(html).toContain(">Done</button>");
     expect(html).toContain("Details and Settings");
     expect(html).toContain("Archived behaviors (1)");
     expect(html).toContain(">Restore</button>");
