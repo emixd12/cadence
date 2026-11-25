@@ -58,8 +58,12 @@ import { behaviorEstimateInputHash, readBriefMoveDay, type BriefMoveBehaviorFact
 import { briefMoveTravelInput, verifyTravelTimesToken } from "@/lib/services/travel-times-token";
 import { readTravelConclusionsSecrets, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
 import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
-import { DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS } from "@/lib/services/daily-brief-instructions";
+import {
+  DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS, DURATION_ESTIMATE_V1_3_INSTRUCTIONS,
+  DURATION_ESTIMATE_V1_3_LENGTH_INSTRUCTIONS,
+} from "@/lib/services/daily-brief-instructions";
 import { alongsideGuessWanted } from "@cadence/core/resolvers/alongside.resolver";
+import { isWhereGuess, type WhereGuess } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
 import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
@@ -224,6 +228,11 @@ const ESTIMATE_BATCH = 40;
  * Ticket 356: with `CADENCE_ALONGSIDE` on, a Behavior the person already answered is
  * asked for its length only (no `alongside` in the schema or instructions). A batch with
  * both kinds makes one call of each kind.
+ *
+ * Ticket 359: with the flag on, both calls are estimate recipe 1.3 and also return the
+ * coarse Where guess (`whereGuess`: home, anywhere, elsewhere or unknown). The model input
+ * is unchanged: title and description under a local ref. No Where, place, label or
+ * coordinate is sent. With the flag off the request is recipe 1.2, byte for byte.
  */
 export async function ensureBehaviorEstimates(
   agent: AppSupabaseClient | null,
@@ -237,19 +246,23 @@ export async function ensureBehaviorEstimates(
   const day = await readBriefMoveDay(agent, userId, context.localDate);
   await cacheBehaviorEstimates({ agent, userId, localDate: context.localDate, day, model: options.model ?? "daily_brief", estimate: async (behaviors, ask = { alongside: true }) => {
     const refs = new Map(behaviors.map((behavior, index) => [`b${index + 1}`, behavior.id]));
+    // Only these three fields reach the model (Ticket 359 pins it): never Where, a place or a label.
     const items: DescriptionEstimateItem[] = behaviors.map((behavior, index) => ({
       behaviorRef: `b${index + 1}`, title: behavior.title, description: behavior.description?.trim() ?? "",
     }));
+    const where = ask.where === true;
+    const instructions = ask.alongside
+      ? `${DURATION_ESTIMATE_INSTRUCTIONS}\n${where ? DURATION_ESTIMATE_V1_3_INSTRUCTIONS : DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`
+      : `${DURATION_ESTIMATE_INSTRUCTIONS}\n${where ? DURATION_ESTIMATE_V1_3_LENGTH_INSTRUCTIONS : DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS}`;
+    const estimateVariant = ask.alongside ? (where ? "alongside_where" as const : "alongside" as const) : where ? "where" as const : undefined;
     try {
-      const raw = await generate(ask.alongside ? {
-        instructions: `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`,
-        facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal, estimateVariant: "alongside",
-      } : {
-        instructions: `${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS}`,
-        facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal,
+      const raw = await generate({
+        instructions, facts: JSON.stringify({ items }), signal: signal ?? new AbortController().signal,
+        ...(estimateVariant ? { estimateVariant } : {}),
       });
-      return parseDescriptionEstimates(raw, items, { alongside: ask.alongside })
-        .map((estimate) => ({ behaviorId: refs.get(estimate.behaviorRef)!, minutes: estimate.minutes, alongside: estimate.alongside === true }));
+      return parseDescriptionEstimates(raw, items, { alongside: ask.alongside, whereGuess: where })
+        .map((estimate) => ({ behaviorId: refs.get(estimate.behaviorRef)!, minutes: estimate.minutes, alongside: estimate.alongside === true,
+          ...(estimate.whereGuess ? { whereGuess: estimate.whereGuess } : {}) }));
     } catch (error) {
       if (signal?.aborted) throw error;
       return [];
@@ -266,9 +279,11 @@ export async function cacheBehaviorEstimates(input: Readonly<{
   /**
    * `ask.alongside` false: a length-only call for Behaviors the person already answered
    * (Ticket 356); its `alongside` answers are ignored. Omitted: true.
+   * `ask.where` true (Ticket 359, flag on): the call also returns each Behavior's Where
+   * guess. Omitted: false.
    */
-  estimate: (behaviors: readonly BriefMoveBehaviorFacts[], ask?: Readonly<{ alongside: boolean }>) => Promise<ReadonlyArray<Readonly<{
-    behaviorId: string; minutes: number | null; alongside: boolean;
+  estimate: (behaviors: readonly BriefMoveBehaviorFacts[], ask?: Readonly<{ alongside: boolean; where?: boolean }>) => Promise<ReadonlyArray<Readonly<{
+    behaviorId: string; minutes: number | null; alongside: boolean; whereGuess?: WhereGuess;
   }>>>;
   model: string;
   env?: Readonly<Record<string, string | undefined>>;
@@ -280,9 +295,11 @@ export async function cacheBehaviorEstimates(input: Readonly<{
   const personSetting = alongsideEnabled(input.env);
   const withGuess = personSetting ? stale.filter((behavior) => alongsideGuessWanted(behavior.alongside)) : stale;
   const lengthOnly = personSetting ? stale.filter((behavior) => !alongsideGuessWanted(behavior.alongside)) : [];
+  // Flag on: both calls also return the Where guess (estimate recipe 1.3). Flag off: the
+  // call and its arguments are exactly the recipe 1.2 call.
   const [guessAnswers, lengthAnswers] = await Promise.all([
-    withGuess.length ? input.estimate(withGuess) : [],
-    lengthOnly.length ? input.estimate(lengthOnly, { alongside: false }) : [],
+    withGuess.length ? (personSetting ? input.estimate(withGuess, { alongside: true, where: true }) : input.estimate(withGuess)) : [],
+    lengthOnly.length ? input.estimate(lengthOnly, { alongside: false, where: true }) : [],
   ]);
   const asked = [
     ...guessAnswers.map((answer) => ({ answer, alongsideAsked: true })),
@@ -292,11 +309,15 @@ export async function cacheBehaviorEstimates(input: Readonly<{
   const groupOf = new Map([...withGuess.map((behavior) => [behavior.id, true] as const), ...lengthOnly.map((behavior) => [behavior.id, false] as const)]);
   const rows = asked.filter(({ answer, alongsideAsked }) => byId.has(answer.behaviorId) && groupOf.get(answer.behaviorId) === alongsideAsked).map(({ answer, alongsideAsked }) => ({
     behavior_id: answer.behaviorId,
-    input_hash: behaviorEstimateInputHash(byId.get(answer.behaviorId)!, { alongsideAsked }),
+    input_hash: behaviorEstimateInputHash(byId.get(answer.behaviorId)!, personSetting ? { alongsideAsked, whereAsked: true } : { alongsideAsked }),
     duration_minutes: answer.minutes !== null && Number.isInteger(answer.minutes) && answer.minutes >= 1 && answer.minutes <= 1440 ? answer.minutes : null,
     // A length-only row stores false; its hash keeps it from being read as a guess.
     alongside: alongsideAsked && answer.alongside === true,
     model: input.model,
+    // Ticket 359, flag on only: the Where guess, null when the person set Where (none is
+    // needed). The database function writes null when the key is absent, so a stale
+    // guess never survives a new input hash.
+    ...(personSetting ? { where_guess: byId.get(answer.behaviorId)!.whereKind ? null : isWhereGuess(answer.whereGuess) ? answer.whereGuess : null } : {}),
   }));
   if (!rows.length) return input.day;
   const { error } = await input.agent.rpc("upsert_behavior_advisor_estimates", { p_estimates: rows });

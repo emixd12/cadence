@@ -62,6 +62,8 @@ function fakeClient(tables: Readonly<{ behaviors: BehaviorRow[]; estimates: Esti
 }
 
 const facts = (title: string) => ({ title, description: null, whereKind: null });
+/** Flag on, estimates come from recipe 1.3 (Ticket 359), whose hash marks the Where guess as asked. */
+const WHERE = { whereAsked: true } as const;
 
 beforeEach(() => {
   mocks.occurrences = [occurrence("pill"), occurrence("reading")];
@@ -103,7 +105,8 @@ describe("readBriefMoveDay alongside", () => {
   });
 
   it("flag on: an unanswered Behavior keeps the guess, and one without an estimate is false", async () => {
-    const fake = fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: null }, { id: "reading", title: "Reading", alongside: null }], estimates: [estimates[0]!] });
+    const current: EstimateRow = { ...estimates[0]!, input_hash: behaviorEstimateInputHash(facts("Pill"), WHERE) };
+    const fake = fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: null }, { id: "reading", title: "Reading", alongside: null }], estimates: [current] });
     const day = await readBriefMoveDay(fake.client, "user", DAY, { env: ON });
     expect(day.items.map((item) => [item.behaviorId, item.alongside, item.alongsideSource])).toEqual([
       ["pill", true, "guess"], ["reading", false, "default"],
@@ -112,7 +115,7 @@ describe("readBriefMoveDay alongside", () => {
   });
 
   it("flag on: a length-only estimate is current while answered and stale once the answer is cleared", async () => {
-    const lengthOnly: EstimateRow = { behavior_id: "pill", input_hash: behaviorEstimateInputHash(facts("Pill"), { alongsideAsked: false }), duration_minutes: 2, alongside: false };
+    const lengthOnly: EstimateRow = { behavior_id: "pill", input_hash: behaviorEstimateInputHash(facts("Pill"), { alongsideAsked: false, ...WHERE }), duration_minutes: 2, alongside: false };
     const answered = await readBriefMoveDay(fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: true }], estimates: [lengthOnly] }).client, "user", DAY, { env: ON });
     expect(answered.staleEstimateBehaviorIds.has("pill")).toBe(false);
     expect(answered.items[0]).toMatchObject({ alongside: true, alongsideSource: "person" });
@@ -143,7 +146,7 @@ describe("readBriefMoveDay effective Where (Ticket 357)", () => {
         { id: "pill", title: "Pill", alongside: null, where_kind: "home" },
         { id: "reading", title: "Reading", alongside: null },
       ],
-      estimates: [{ behavior_id: "reading", input_hash: behaviorEstimateInputHash(facts("Reading")), duration_minutes: 30, alongside: false, where_guess: "anywhere" }],
+      estimates: [{ behavior_id: "reading", input_hash: behaviorEstimateInputHash(facts("Reading"), WHERE), duration_minutes: 30, alongside: false, where_guess: "anywhere" }],
       labels: labels("pill", "elsewhere", 6),
     });
     const day = await readBriefMoveDay(fake.client, "user", DAY, { env: ON });
@@ -167,7 +170,7 @@ describe("readBriefMoveDay effective Where (Ticket 357)", () => {
 });
 
 describe("cacheBehaviorEstimates alongside", () => {
-  type Ask = Readonly<{ ids: string[]; alongside: boolean }>;
+  type Ask = Readonly<{ ids: string[]; alongside: boolean; where?: boolean }>;
   const run = async (env: Record<string, string>) => {
     const fake = fakeClient({ behaviors: [{ id: "pill", title: "Pill", alongside: null }, { id: "reading", title: "Reading", alongside: false }], estimates: [] });
     const day = await readBriefMoveDay(fake.client, "user", DAY, { env });
@@ -175,11 +178,11 @@ describe("cacheBehaviorEstimates alongside", () => {
     await cacheBehaviorEstimates({
       agent: fake.client, userId: "user", localDate: DAY, day, model: "test", env,
       estimate: async (behaviors, ask) => {
-        asks.push({ ids: behaviors.map((behavior) => behavior.id), alongside: ask?.alongside ?? true });
-        return behaviors.map((behavior) => ({ behaviorId: behavior.id, minutes: 7, alongside: true }));
+        asks.push({ ids: behaviors.map((behavior) => behavior.id), alongside: ask?.alongside ?? true, ...(ask?.where ? { where: true } : {}) });
+        return behaviors.map((behavior) => ({ behaviorId: behavior.id, minutes: 7, alongside: true, ...(ask?.where ? { whereGuess: "home" as const } : {}) }));
       },
     });
-    const stored = (fake.rpcs[0]?.args as { p_estimates: Array<{ behavior_id: string; input_hash: string; alongside: boolean }> }).p_estimates;
+    const stored = (fake.rpcs[0]?.args as { p_estimates: Array<{ behavior_id: string; input_hash: string; alongside: boolean; where_guess?: string | null }> }).p_estimates;
     return { asks, stored };
   };
 
@@ -188,14 +191,16 @@ describe("cacheBehaviorEstimates alongside", () => {
     expect(asks).toEqual([{ ids: ["pill", "reading"], alongside: true }]);
     expect(stored.map((row) => [row.behavior_id, row.alongside])).toEqual([["pill", true], ["reading", true]]);
     expect(stored.find((row) => row.behavior_id === "reading")!.input_hash).toBe(behaviorEstimateInputHash(facts("Reading")));
+    // Ticket 359: with the flag off the stored rows carry no Where guess key at all.
+    expect(stored.every((row) => !("where_guess" in row))).toBe(true);
   });
 
   it("flag on: asks only unanswered Behaviors about alongside and the rest for length only", async () => {
     const { asks, stored } = await run(ON);
-    expect(asks).toEqual([{ ids: ["pill"], alongside: true }, { ids: ["reading"], alongside: false }]);
+    expect(asks).toEqual([{ ids: ["pill"], alongside: true, where: true }, { ids: ["reading"], alongside: false, where: true }]);
     const reading = stored.find((row) => row.behavior_id === "reading")!;
-    expect(reading).toMatchObject({ alongside: false, input_hash: behaviorEstimateInputHash(facts("Reading"), { alongsideAsked: false }) });
-    expect(stored.find((row) => row.behavior_id === "pill")).toMatchObject({ alongside: true, input_hash: behaviorEstimateInputHash(facts("Pill")) });
+    expect(reading).toMatchObject({ alongside: false, where_guess: "home", input_hash: behaviorEstimateInputHash(facts("Reading"), { alongsideAsked: false, ...WHERE }) });
+    expect(stored.find((row) => row.behavior_id === "pill")).toMatchObject({ alongside: true, where_guess: "home", input_hash: behaviorEstimateInputHash(facts("Pill"), WHERE) });
   });
 });
 
@@ -209,13 +214,17 @@ describe("ensureBehaviorEstimates alongside", () => {
         calls.push(input);
         const items = (JSON.parse(input.facts) as { items: Array<{ behaviorRef: string }> }).items;
         return { estimates: items.map((item) => ({ behaviorRef: item.behaviorRef, minutes: 7, basis: "inferred",
-          ...(input.estimateVariant === "alongside" ? { alongside: true } : {}) })) };
+          ...(input.estimateVariant === "alongside" || input.estimateVariant === "alongside_where" ? { alongside: true } : {}),
+          ...(input.estimateVariant === "alongside_where" || input.estimateVariant === "where" ? { whereGuess: "anywhere" } : {}) })) };
       }, undefined, { userId: "user" });
       expect(calls).toHaveLength(2);
-      expect(calls[0]).toMatchObject({ estimateVariant: "alongside" });
+      // Ticket 359: both calls are estimate recipe 1.3 and also ask for the Where guess.
+      expect(calls[0]).toMatchObject({ estimateVariant: "alongside_where" });
       expect(calls[0]!.instructions).toContain("alongside");
-      expect(calls[1]).not.toHaveProperty("estimateVariant");
+      expect(calls[0]!.instructions).toContain("whereGuess");
+      expect(calls[1]).toMatchObject({ estimateVariant: "where" });
       expect(calls[1]!.instructions).not.toContain("alongside");
+      expect(calls[1]!.instructions).toContain("whereGuess");
       expect(JSON.parse(calls[1]!.facts)).toEqual({ items: [{ behaviorRef: "b1", title: "Reading", description: "" }] });
       const stored = (fake.rpcs[0]!.args as { p_estimates: Array<{ behavior_id: string; duration_minutes: number | null }> }).p_estimates;
       expect(stored.map((row) => [row.behavior_id, row.duration_minutes])).toEqual([["pill", 7], ["reading", 7]]);

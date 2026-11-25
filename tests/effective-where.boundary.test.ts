@@ -40,12 +40,17 @@ const RESOLVER_IMPORTERS = new Set([
   "lib/services/brief-move-day.service.ts",
   "packages/core/src/resolvers/alongside.resolver.ts",
   "packages/core/src/resolvers/brief-move.resolver.ts",
+  // Ticket 359: the estimate call's parser and writer validate the guess's four values.
+  "packages/core/src/services/description-duration.ts",
+  "lib/services/brief-moves.service.ts",
 ]);
-/** The only sources that name the stored guess column. Ticket 359 adds the estimate writer. */
+/** The only sources that name the stored guess column. */
 const GUESS_READERS = new Set([
   "lib/db/database.types.ts",
   "packages/core/src/resolvers/effective-where.resolver.ts",
   "lib/services/brief-move-day.service.ts",
+  // Ticket 359: the estimate writer (`cacheBehaviorEstimates`).
+  "lib/services/brief-moves.service.ts",
 ]);
 
 describe("effective Where boundary", () => {

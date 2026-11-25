@@ -78,6 +78,22 @@ const DURATION_ESTIMATE_ALONGSIDE_INSTRUCTIONS = `Also set alongside to true whe
  */
 export const DURATION_ESTIMATE_V1_2_INSTRUCTIONS = `${DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS}\n${DURATION_ESTIMATE_ALONGSIDE_INSTRUCTIONS}`;
 
+/**
+ * Estimate recipe 1.3 (Ticket 359, D33): the coarse Where guess. Sent only while
+ * `CADENCE_ALONGSIDE` is on; with it off the estimate call stays recipe 1.2, byte for byte.
+ */
+export const DURATION_ESTIMATE_RECIPE_VERSION = "1.2";
+export const DURATION_ESTIMATE_RECIPE_VERSION_WHERE = "1.3";
+
+/** Recipe 1.3 estimate addition: where the activity usually happens. Never a specific place. */
+export const DURATION_ESTIMATE_WHERE_INSTRUCTIONS = `Also set whereGuess to where the activity usually happens: "home" when it is usually done at home, such as using a device kept at home or a home routine; "anywhere" when it can be done wherever the person is, such as taking a pill or listening to something; "elsewhere" when it usually means going somewhere away from home, such as a gym session, a class or an appointment; "unknown" when the title and description give no reasonable basis. Never name a specific place.`;
+
+/** Recipe 1.3, for Behaviors the person has not answered alongside: length, alongside and Where. */
+export const DURATION_ESTIMATE_V1_3_INSTRUCTIONS = `${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}\n${DURATION_ESTIMATE_WHERE_INSTRUCTIONS}`;
+
+/** Recipe 1.3, for Behaviors the person already answered alongside: length and Where only. */
+export const DURATION_ESTIMATE_V1_3_LENGTH_INSTRUCTIONS = `${DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS}\n${DURATION_ESTIMATE_WHERE_INSTRUCTIONS}`;
+
 /** Appended only when separately disclosed connector sources are present (Ticket 239). */
 export const DAILY_BRIEF_CONNECTOR_INSTRUCTIONS = `Connector sources policy:
 context.connectorSources holds sources the user disclosed separately. calendars are scheduled Outlook or iCloud Calendar timing with the same meaning as Google Calendar timing; the deterministic planner already includes them, so use plan findings and options for any overlap, transition or fit.

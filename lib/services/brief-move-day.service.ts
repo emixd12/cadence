@@ -4,7 +4,7 @@ import { effectiveEndAt, effectiveStartInstant, zonedInstant } from "@cadence/co
 import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
 import { resolveBriefMoveLength, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
 import { alongsideGuessWanted, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
-import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, resolveEffectiveWhere, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
+import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, resolveEffectiveWhere, type EffectiveWhere, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
 import type { Occurrence } from "@/lib/types/database";
@@ -69,26 +69,35 @@ export type BriefMoveDay = Readonly<{
  * person's answer was set and the model was not asked about alongside. It hashes
  * differently, so its stored `alongside` is never read as a guess, and clearing the
  * answer makes the estimate stale and asks again.
+ *
+ * `whereAsked: true` (Ticket 359) marks an estimate from recipe 1.3, which also returned
+ * the Where guess. Only `CADENCE_ALONGSIDE` on asks for it and reads it, so turning the
+ * flag on asks each Behavior once more, and turning it off reads only recipe 1.2 rows.
  */
 export function behaviorEstimateInputHash(
   behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind">,
-  options: Readonly<{ alongsideAsked?: boolean }> = {},
+  options: Readonly<{ alongsideAsked?: boolean; whereAsked?: boolean }> = {},
 ): string {
   const inputs = { v: 1, title: behavior.title.trim(), description: behavior.description?.trim() ?? "", where: behavior.whereKind ?? null };
-  return createHash("sha256").update(JSON.stringify(options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs)).digest("hex");
+  const asked = options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs;
+  return createHash("sha256").update(JSON.stringify(options.whereAsked === true ? { ...asked, whereGuess: "asked" } : asked)).digest("hex");
 }
 
 /** The cached estimate's guess when it is still current for `behavior`, null when current without a guess, undefined when stale. */
 function currentEstimate(
   cached: Readonly<{ input_hash: string; duration_minutes: number | null; alongside: boolean; where_guess?: string | null }> | undefined,
-  behavior: BriefMoveBehaviorFacts,
+  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind" | "alongside">,
   personSetting: boolean,
 ): Readonly<{ minutes: number | null; alongside: boolean | null; whereGuess: string | null }> | undefined {
   if (!cached) return undefined;
-  const whereGuess = cached.where_guess ?? null;
-  if (cached.input_hash === behaviorEstimateInputHash(behavior)) return { minutes: cached.duration_minutes, alongside: cached.alongside, whereGuess };
-  if (personSetting && !alongsideGuessWanted(behavior.alongside)
-    && cached.input_hash === behaviorEstimateInputHash(behavior, { alongsideAsked: false })) {
+  // Flag off: recipe 1.2 rows only, and no Where guess is read.
+  if (!personSetting) return cached.input_hash === behaviorEstimateInputHash(behavior) ? { minutes: cached.duration_minutes, alongside: cached.alongside, whereGuess: null } : undefined;
+  // Flag on: recipe 1.3 rows only (Ticket 359), so every current row carries its Where guess.
+  // A Behavior whose Where the person set was not given one.
+  const whereGuess = behavior.whereKind ? null : cached.where_guess ?? null;
+  if (cached.input_hash === behaviorEstimateInputHash(behavior, { whereAsked: true })) return { minutes: cached.duration_minutes, alongside: cached.alongside, whereGuess };
+  if (!alongsideGuessWanted(behavior.alongside)
+    && cached.input_hash === behaviorEstimateInputHash(behavior, { alongsideAsked: false, whereAsked: true })) {
     return { minutes: cached.duration_minutes, alongside: null, whereGuess };
   }
   return undefined;
@@ -212,3 +221,61 @@ function dayItem(row: Occurrence, behavior: BriefMoveBehaviorFacts, length: Brie
     } } : {}),
   };
 }
+
+/**
+ * Ticket 359: one Behavior's effective alongside value and effective Where, as every
+ * advisor surface reads them (Chat, the day context and the coach). The same rules as
+ * `readBriefMoveDay`: the person's answer, then the current cached guess, then false; the
+ * person's Where, then counted completion place labels, then the current cached guess,
+ * then unknown. Planning only: never passed to travel, departure, route or leave-reminder
+ * code, and never sent to a model (a `place` Where's key stays server-side).
+ */
+export type BehaviorPlanningFacts = Readonly<{
+  alongside: ReturnType<typeof resolveAlongside>;
+  where: EffectiveWhere;
+}>;
+
+/**
+ * Reads the planning facts for `behaviorIds`, counting labels for `localDate`. With
+ * `CADENCE_ALONGSIDE` off it reads nothing and returns an empty map, so every caller's
+ * output stays exactly as before.
+ */
+export async function readBehaviorPlanningFacts(
+  supabase: AppSupabaseClient,
+  userId: string,
+  behaviorIds: readonly string[],
+  localDate: string,
+  options: Readonly<{ env?: Readonly<Record<string, string | undefined>> }> = {},
+): Promise<ReadonlyMap<string, BehaviorPlanningFacts>> {
+  const ids = [...new Set(behaviorIds)];
+  if (!alongsideEnabled(options.env) || ids.length === 0) return new Map();
+  const date = Temporal.PlainDate.from(localDate);
+  const [behaviorRows, estimates, labels] = await Promise.all([
+    supabase.from("behaviors").select("id, title, description, where_kind, location_text, alongside").eq("user_id", userId).in("id", ids),
+    supabase.from("behavior_advisor_estimates").select("behavior_id, input_hash, duration_minutes, alongside, where_guess")
+      .eq("user_id", userId).in("behavior_id", ids),
+    supabase.from("completion_place_labels").select("behavior_id, label, local_date")
+      .eq("user_id", userId).in("behavior_id", ids)
+      .gte("local_date", date.subtract({ days: EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS - 1 }).toString()).lte("local_date", localDate),
+  ]);
+  for (const result of [behaviorRows, estimates, labels]) if (result.error) throw result.error;
+  const labelsByBehavior = new Map<string, EffectiveWhereLabel[]>();
+  for (const row of (labels.data ?? []) as readonly LabelRow[]) {
+    labelsByBehavior.set(row.behavior_id, [...(labelsByBehavior.get(row.behavior_id) ?? []), { label: row.label, localDate: row.local_date }]);
+  }
+  const facts = new Map<string, BehaviorPlanningFacts>();
+  for (const row of (behaviorRows.data ?? []) as readonly PlanningBehaviorRow[]) {
+    const behavior = { title: row.title, description: row.description, whereKind: row.where_kind, alongside: row.alongside ?? null };
+    const estimate = currentEstimate((estimates.data ?? []).find((item) => item.behavior_id === row.id), behavior, true);
+    facts.set(row.id, {
+      alongside: resolveAlongside({ setting: behavior.alongside, guess: estimate?.alongside ?? null }),
+      where: resolveEffectiveWhere({ whereKind: row.where_kind, locationText: row.location_text ?? null,
+        labels: labelsByBehavior.get(row.id) ?? [], guess: estimate?.whereGuess ?? null, localDate }),
+    });
+  }
+  return facts;
+}
+
+type PlanningBehaviorRow = Readonly<{
+  id: string; title: string; description: string | null; where_kind: string | null; location_text: string | null; alongside: boolean | null;
+}>;

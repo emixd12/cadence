@@ -59,8 +59,12 @@ export type DailyBriefGenerator = (input: Readonly<{
   instructions: string;
   facts: string;
   signal: AbortSignal;
-  /** Recipe 1.2 estimate calls also return `alongside`; the adapter picks the matching schema. */
-  estimateVariant?: "alongside";
+  /**
+   * Recipe 1.2 estimate calls also return `alongside`; the adapter picks the matching schema.
+   * Estimate recipe 1.3 (Ticket 359, `CADENCE_ALONGSIDE` on) adds `whereGuess`:
+   * "alongside_where" for Behaviors not answered alongside, "where" for the rest.
+   */
+  estimateVariant?: "alongside" | "alongside_where" | "where";
   /**
    * Ticket 288: present only when the caller asked for usage. The adapter calls it
    * once per provider response that reports usage. It never changes the request.
