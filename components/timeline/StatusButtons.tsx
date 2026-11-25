@@ -383,7 +383,7 @@ function ActionMessage({ state }: Readonly<{ state: OccurrenceActionState }>) {
     <p
       className={[
         "border-t border-line pt-2 text-sm leading-6",
-        state.status === "success" ? "text-foreground" : "text-accent",
+        state.status === "success" ? "text-foreground" : "text-alert-signal",
       ].join(" ")}
       role={state.status === "error" ? "alert" : "status"}
     >

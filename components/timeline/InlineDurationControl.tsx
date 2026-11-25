@@ -89,7 +89,7 @@ export function InlineDurationControl({
           <button
             type="button"
             onClick={openEditor}
-            className="text-xs font-bold text-foreground underline underline-offset-4 hover:text-primary"
+            className="product-action product-action-primary text-xs font-bold"
           >
             {effectiveEstimate.kind === "known" &&
             effectiveEstimate.provenance === "behavior_default"
@@ -120,6 +120,7 @@ export function InlineDurationControl({
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Minutes"
             aria-label="Default duration in minutes"
+            data-surface="default"
             className="w-24 rounded-md border border-line bg-background px-2.5 py-1 text-sm text-foreground"
             autoFocus
           />
@@ -135,7 +136,7 @@ export function InlineDurationControl({
             type="button"
             disabled={isPending}
             onClick={() => setEditing(false)}
-            className="text-xs font-bold text-muted-readable underline underline-offset-4 hover:text-foreground"
+            className="product-action product-action-secondary text-xs font-bold"
           >
             Cancel
           </button>

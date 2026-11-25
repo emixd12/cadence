@@ -1993,6 +1993,7 @@ const previewFactories: Record<
           <div
             className="timeline-occurrence-row bg-timeline-row-hover p-4"
             data-visual-tone="default"
+            data-surface="default"
           >
             <TimeTracker
               occurrenceId="bench-time-default"
@@ -2006,6 +2007,7 @@ const previewFactories: Record<
           <div
             className="timeline-occurrence-row bg-timeline-completed-hover p-4"
             data-visual-tone="completed"
+            data-surface="primary"
           >
             <TimeTracker
               occurrenceId="bench-time-completed"
@@ -2022,6 +2024,7 @@ const previewFactories: Record<
           <div
             className="timeline-occurrence-row bg-accent p-4"
             data-visual-tone="not_completed"
+            data-surface="accent"
           >
             <TimeTracker
               occurrenceId="bench-time-not-completed"

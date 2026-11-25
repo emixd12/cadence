@@ -129,7 +129,7 @@ button:disabled {
 }
 
 .product-action-danger {
-  color: var(--accent);
+  color: var(--alert-signal);
 }
 
 .product-action:disabled,
@@ -279,47 +279,21 @@ details[open] > .product-disclosure-trigger .product-disclosure-indicator {
   }
 }
 
-.timeline-occurrence-row {
-  --timeline-detail-strong: var(--foreground);
-  --timeline-detail-muted: var(--muted-readable);
-  --timeline-detail-error: var(--accent);
-}
-
-.timeline-occurrence-row[data-visual-tone="completed"] {
-  --timeline-detail-strong: var(--primary-foreground);
-  --timeline-detail-muted: color-mix(
-    in srgb,
-    var(--primary-foreground) 82%,
-    var(--timeline-completed-hover)
-  );
-  --timeline-detail-error: var(--primary-foreground);
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"] {
-  --timeline-detail-strong: var(--primary-foreground);
-  --timeline-detail-muted: color-mix(
-    in srgb,
-    var(--primary-foreground) 85%,
-    var(--accent)
-  );
-  --timeline-detail-error: var(--primary-foreground);
-}
-
 .timeline-time-tracker-strong,
 .timeline-time-tracker-action {
-  color: var(--timeline-detail-strong);
+  color: var(--foreground);
 }
 
 .timeline-time-tracker-action:disabled {
-  color: var(--timeline-detail-muted);
+  color: var(--muted-readable);
 }
 
 .timeline-time-tracker-feedback {
-  color: var(--timeline-detail-muted);
+  color: var(--muted-readable);
 }
 
 .timeline-time-tracker-feedback[data-status="error"] {
-  color: var(--timeline-detail-error);
+  color: var(--alert-signal);
 }
 
 .timeline-occurrence-details {
@@ -343,63 +317,7 @@ details[open] > .timeline-occurrence-details {
 }
 
 .timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open]) {
-  background: color-mix(in srgb, var(--accent) 85%, var(--foreground));
-}
-
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-details,
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-details h4,
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-details label,
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-details .timeline-status-action {
-  color: var(--primary-foreground);
-}
-
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-details textarea {
-  color: var(--foreground);
-}
-
-.timeline-occurrence-row[data-visual-tone="completed"]:has(details[open])
-  .timeline-occurrence-detail-value {
-  color: color-mix(
-    in srgb,
-    var(--primary-foreground) 82%,
-    var(--timeline-completed-hover)
-  );
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"]
-  .timeline-status-action,
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-details,
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-details h4,
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-details label {
-  color: var(--primary-foreground);
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"]
-  .timeline-status-action:disabled {
-  color: color-mix(in srgb, var(--primary-foreground) 68%, var(--accent));
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-details {
-  border-color: color-mix(in srgb, var(--primary-foreground) 34%, var(--accent));
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-details textarea {
-  color: var(--foreground);
-}
-
-.timeline-occurrence-row[data-visual-tone="not_completed"]:has(details[open])
-  .timeline-occurrence-detail-value {
-  color: color-mix(in srgb, var(--primary-foreground) 85%, var(--accent));
+  background: color-mix(in srgb, var(--accent) 85%, var(--theme-foreground));
 }
 
 @media (width <= 39.9375rem) {

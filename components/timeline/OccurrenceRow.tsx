@@ -62,22 +62,32 @@ const ROW_TONE_CLASSES: Record<TimelineOccurrenceView["visualTone"], string> = {
   default: "bg-background text-foreground hover:bg-timeline-row-hover",
   needs_decision:
     "bg-surface text-foreground hover:bg-timeline-needs-decision-hover",
-  completed: "bg-primary text-primary-foreground hover:bg-timeline-completed-hover",
-  not_completed: "bg-accent text-primary-foreground hover:bg-accent",
+  completed: "bg-primary text-foreground hover:bg-timeline-completed-hover",
+  not_completed: "bg-accent text-foreground hover:bg-accent",
+};
+
+const ROW_SURFACE: Record<
+  TimelineOccurrenceView["visualTone"],
+  "default" | "primary" | "accent"
+> = {
+  default: "default",
+  needs_decision: "default",
+  completed: "primary",
+  not_completed: "accent",
 };
 
 const TIME_TONE_CLASSES: Record<TimelineOccurrenceView["visualTone"], string> = {
   default: "text-muted-readable",
   needs_decision: "text-foreground",
-  completed: "text-primary-foreground",
-  not_completed: "text-primary-foreground",
+  completed: "text-foreground",
+  not_completed: "text-foreground",
 };
 
 const RESOLVED_LABEL_CLASSES: Record<TimelineOccurrenceView["visualTone"], string> = {
   default: "text-muted-readable",
   needs_decision: "text-foreground",
-  completed: "text-primary-foreground",
-  not_completed: "text-primary-foreground",
+  completed: "text-foreground",
+  not_completed: "text-foreground",
 };
 
 type LabelDensity = "normal" | "compact";
@@ -187,6 +197,7 @@ export function OccurrenceRow({
       aria-busy={optimisticView.isPending ? "true" : undefined}
       data-optimistic-status={optimisticStatus.pendingStatus ?? undefined}
       data-visual-tone={visibleOccurrence.visualTone}
+      data-surface={ROW_SURFACE[visibleOccurrence.visualTone]}
       className={[
         "timeline-occurrence-row transition-colors",
         ROW_TONE_CLASSES[visibleOccurrence.visualTone],

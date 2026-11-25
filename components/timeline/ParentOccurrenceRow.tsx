@@ -36,15 +36,25 @@ type BulkStatus = "completed" | "not_completed";
 const TONE_CLASSES: Record<TimelineParentGroupView["visualTone"], string> = {
   default: "bg-background text-foreground hover:bg-timeline-row-hover",
   needs_decision: "bg-surface text-foreground hover:bg-timeline-needs-decision-hover",
-  completed: "bg-primary text-primary-foreground hover:bg-timeline-completed-hover",
-  not_completed: "bg-accent text-primary-foreground hover:bg-accent",
+  completed: "bg-primary text-foreground hover:bg-timeline-completed-hover",
+  not_completed: "bg-accent text-foreground hover:bg-accent",
+};
+
+const TONE_SURFACE: Record<
+  TimelineParentGroupView["visualTone"],
+  "default" | "primary" | "accent"
+> = {
+  default: "default",
+  needs_decision: "default",
+  completed: "primary",
+  not_completed: "accent",
 };
 
 const MUTED_TONE: Record<TimelineParentGroupView["visualTone"], string> = {
   default: "text-muted-readable",
   needs_decision: "text-foreground",
-  completed: "text-primary-foreground",
-  not_completed: "text-primary-foreground",
+  completed: "text-foreground",
+  not_completed: "text-foreground",
 };
 
 const IDLE: OccurrenceActionState = { status: "idle", message: "" };
@@ -94,6 +104,7 @@ export function ParentOccurrenceRow({
           headerClassName ?? "",
         ].join(" ")}
         data-visual-tone={group.visualTone}
+        data-surface={TONE_SURFACE[group.visualTone]}
         data-status-icons-only={statusIconsOnly ? "true" : "false"}
         data-parent-marks={showBulk ? "actions" : isResolved ? "label" : "none"}
       >
