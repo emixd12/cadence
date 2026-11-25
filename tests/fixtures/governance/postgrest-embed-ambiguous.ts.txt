@@ -1,0 +1,28 @@
+// Negative fixture for scripts/check-postgrest-embeds.mjs. Trimmed pre-fix text of
+// lib/db/coach-signals.repo.ts at d13b715e^. The reminders read embeds occurrences under
+// reminder_deliveries with no foreign key hint; the two tables have two foreign keys, so
+// PostgREST returned PGRST201 on every call. The check must keep reporting it. The
+// sessions read is unambiguous and must not be reported.
+import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
+
+/** Reads under RLS as the person. Every query is bounded by date and paged. */
+export function createCoachSignalReads(client: AppSupabaseClient, userId: string): CoachSignalReads {
+  return {
+    async reminders(since, before) {
+      // Joined to the Occurrence for its local date; a reminder belongs to its item's day.
+      const rows = await pages("read_reminders_failed", (from, to) => client.from("reminder_deliveries")
+        .select("id,occurrence_id,sent_at,occurrences!inner(local_date)").eq("user_id", userId).eq("status", "sent")
+        .not("sent_at", "is", null).gte("occurrences.local_date", since).lt("occurrences.local_date", before)
+        .order("id").range(from, to));
+      return rows.flatMap((row) => row.sent_at ? [{ occurrenceId: row.occurrence_id, sentAt: row.sent_at }] : []);
+    },
+    async sessions(since, before) {
+      const rows = await pages("read_sessions_failed", (from, to) => client.from("occurrence_time_sessions")
+        .select("id,occurrence_id,behavior_id,started_at,stopped_at,occurrences!inner(local_date)").eq("user_id", userId)
+        .not("stopped_at", "is", null).gte("occurrences.local_date", since).lt("occurrences.local_date", before)
+        .order("id").range(from, to));
+      return rows.flatMap((row) => row.stopped_at
+        ? [{ occurrenceId: row.occurrence_id, behaviorId: row.behavior_id, startedAt: row.started_at, stoppedAt: row.stopped_at }] : []);
+    },
+  };
+}
