@@ -5,8 +5,9 @@ import type { CalendarPreferences } from "@/lib/types/google-calendar";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { DesktopCalendarCache, type CalendarCacheRequest } from "./cache";
 import { DesktopCalendarCoordinator, type CalendarRefreshTrigger } from "./coordinator";
-import { CalendarBrokerError, createDesktopCalendarBroker, DesktopCalendarConnection,
-  DesktopGoogleCalendarPanelCoordinator, isDesktopCalendarCallback, type CalendarEventRange } from "./google-calendar";
+import { CalendarBrokerError, createDesktopCalendarBroker, DesktopAiCalendarConnection, DesktopCalendarConnection,
+  DesktopGoogleCalendarPanelCoordinator, isDesktopAiCalendarCallback, isDesktopCalendarCallback,
+  type CalendarEventRange, type DesktopCalendarCallbackResult } from "./google-calendar";
 
 export type DesktopGoogleCalendarHookOptions = Readonly<{
   client: SupabaseClient | null;
@@ -21,6 +22,7 @@ export type DesktopGoogleCalendarHookResult = Readonly<{
   coordinator: DesktopGoogleCalendarPanelCoordinator | null;
   panelVersion: number;
   wrongAccount: boolean;
+  callbackMessage?: string;
   snapshot: ExternalEventSnapshotV1 | null;
   preferences: CalendarPreferences | null;
   stale: boolean;
@@ -38,28 +40,31 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
   const broker = useMemo(() => client ? createDesktopCalendarBroker(client) : null, [client]);
   const snapshots = useMemo(() => broker ? new DesktopCalendarCoordinator(broker, cache) : null, [broker, cache]);
   const connection = useMemo(() => broker ? new DesktopCalendarConnection(broker) : null, [broker]);
+  const aiConnection = useMemo(() => broker ? new DesktopAiCalendarConnection(broker) : null, [broker]);
   const lease = useRef(0);
   const [panelVersion, setPanelVersion] = useState(0);
   const [wrongAccountOwner, setWrongAccountOwner] = useState<string | null>(null);
+  const [aiCallbackState, setAiCallbackState] = useState<{ accountId: string; message: string } | null>(null);
   const scope = JSON.stringify([accountId, timezone, range.startLocalDate, range.endLocalDate]);
   const scopeRef = useRef(scope);
   const timezoneRef = useRef(timezone);
   timezoneRef.current = timezone;
   if (scopeRef.current !== scope) { scopeRef.current = scope; lease.current += 1; }
-  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "refresh" | "panelVersion" | "wrongAccount">>({
+  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "refresh" | "panelVersion" | "wrongAccount" | "callbackMessage">>({
     snapshot: null, preferences: null, stale: true, label: broker ? DESKTOP_CALENDAR_NOT_LOADED_LABEL : "Calendar is unavailable in this build.", error: null,
   });
   const panelChanged = useCallback((view: Awaited<ReturnType<DesktopGoogleCalendarPanelCoordinator["getConnection"]>> | null, snapshot?: ExternalEventSnapshotV1) => {
     lease.current += 1;
     setWrongAccountOwner(null);
+    setAiCallbackState(null);
     setState({ snapshot: snapshot ?? null, preferences: view?.preferences ?? null, stale: !snapshot,
       label: snapshot ? freshnessLabel(snapshot, false) : view?.status === "connected" ? "Calendar refresh required." : "Google Calendar is not connected.", error: null });
   }, []);
-  const panel = useMemo(() => broker && snapshots && connection
+  const panel = useMemo(() => broker && snapshots && connection && aiConnection
     ? new DesktopGoogleCalendarPanelCoordinator(broker, () => timezoneRef.current, snapshots, connection, (view, snapshot) => {
       if (scopeRef.current === scope) panelChanged(view, snapshot);
-    }) : null,
-  [broker, connection, panelChanged, snapshots, scope]);
+    }, aiConnection) : null,
+  [aiConnection, broker, connection, panelChanged, snapshots, scope]);
 
   const refresh = useCallback(async (trigger: CalendarRefreshTrigger = "manual") => {
     if (trigger !== "manual" && !desktopVisible()) return false;
@@ -131,7 +136,7 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
   callbackRefresh.current = refresh;
 
   useEffect(() => {
-    if (!enabled || !connection || !accountId) return;
+    if (!enabled || !connection || !aiConnection || !accountId) return;
     let active = true;
     let stop: (() => void) | undefined;
     const seen = new Set<string>();
@@ -139,12 +144,29 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
       for (const value of urls) {
         if (!active || seen.has(value) || !isDesktopCalendarCallback(value)) continue;
         seen.add(value);
-        // Ticket 307: the retired Daily Brief grant's callbacks are ignored.
+        if (isDesktopAiCalendarCallback(value)) {
+          try {
+            const callback = await aiConnection.complete(value, accountId);
+            if (active && callback) {
+              setWrongAccountOwner(callback.result === "same_account_required" ? accountId : null);
+              setAiCallbackState({ accountId, message: aiCallbackResultMessage(callback.result) });
+              setPanelVersion((version) => version + 1);
+            }
+          } catch (error) {
+            if (active) {
+              setAiCallbackState({ accountId, message: code(error) });
+              setPanelVersion((version) => version + 1);
+            }
+          }
+          continue;
+        }
+        // Retired purpose=agent or unknown purposes are ignored.
         if (new URL(value).searchParams.has("purpose")) continue;
         try {
           const callback = await connection.complete(value, accountId);
           if (active && callback) {
             setWrongAccountOwner(callback.result === "same_account_required" ? accountId : null);
+            setAiCallbackState(null);
             setPanelVersion((version) => version + 1);
             await callbackRefresh.current("manual");
           }
@@ -164,7 +186,7 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
       if (!active) stop();
     })().catch((error) => { if (active) setState((current) => ({ ...current, error: code(error) })); });
     return () => { active = false; stop?.(); };
-  }, [accountId, connection, enabled]);
+  }, [accountId, aiConnection, connection, enabled]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -193,8 +215,29 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
     && state.snapshot.requestedRange.timezone === timezone
     && state.snapshot.requestedRange.startLocalDate === range.startLocalDate
     && state.snapshot.requestedRange.endLocalDate === range.endLocalDate;
-  return { coordinator: panel, panelVersion, wrongAccount: accountId !== null && wrongAccountOwner === accountId, ...state, snapshot: owned ? state.snapshot : null,
-    preferences: owned || !state.snapshot ? state.preferences : null, refresh };
+  return {
+    coordinator: panel,
+    panelVersion,
+    wrongAccount: accountId !== null && wrongAccountOwner === accountId,
+    callbackMessage: accountId !== null && aiCallbackState?.accountId === accountId ? aiCallbackState.message : undefined,
+    ...state,
+    snapshot: owned ? state.snapshot : null,
+    preferences: owned || !state.snapshot ? state.preferences : null,
+    refresh,
+  };
+}
+
+function aiCallbackResultMessage(result: DesktopCalendarCallbackResult): string {
+  switch (result) {
+    case "connected":
+      return "Google Calendar for AI features is connected.";
+    case "cancelled":
+      return "Google Calendar for AI connection was cancelled.";
+    case "same_account_required":
+      return "Connect the same Google account you use for Cadence.";
+    case "error":
+      return "Google Calendar for AI could not finish connecting. Try again.";
+  }
 }
 
 function preferences(request: CalendarCacheRequest): CalendarPreferences {

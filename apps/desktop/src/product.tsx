@@ -729,7 +729,7 @@ export function Product() {
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
         calendarControls={<ConnectorLibrary rows sources={[
-          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} nested />
+          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} callbackMessage={calendar.callbackMessage} openExternalUrl={openCalendarSourceUrl} nested />
             : <ConnectorUnavailable id="google_calendar" state={connectorUnavailableSectionState(connectors.unavailableReason)}
               reason={connectors.unavailableReason ? connectorUnavailableReason("Google Calendar", connectors.unavailableReason) : calendar.label} /> },
           { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
