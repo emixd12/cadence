@@ -36,7 +36,10 @@ afterEach(async () => { vi.unstubAllEnvs(); vi.restoreAllMocks(); await rm(root,
 async function save(id: string, date: string, account = false, evidenceType?: BenchCase["evidenceType"],
   extra: Readonly<{ fixtureId?: "sparse" | "missing_duration"; descriptions?: Record<string, string> }> = {}) {
   const day = Temporal.PlainDate.from(date), logical = day.toZonedDateTime({ timeZone: "America/New_York", plainTime: "07:00" }).toInstant();
-  const context = historicalFixture(extra.fixtureId ?? "sparse", config(), day, "America/New_York", logical);
+  const baseContext = historicalFixture(extra.fixtureId ?? "sparse", config(), day, "America/New_York", logical);
+  const context = account
+    ? { ...baseContext, connectors: [{ source: "google_calendar" as const, state: "not_requested" as const }] }
+    : baseContext;
   const saved: BenchCase = { schemaVersion: 1, kind: "case", id, createdAt: new Date().toISOString(),
     source: account ? { mode: "account", accountRef: "account_reference_owner", preferenceRevision: 1 }
       : { mode: "synthetic", fixtureId: "sparse", fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: "marking_offset", analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
