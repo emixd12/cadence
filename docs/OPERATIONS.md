@@ -2080,6 +2080,24 @@ migration, `20261111150000`; the owner approved its hosted push on November 10, 
 Logs and telemetry from reconcile carry counts and stable codes only. Never log a
 routine title, an activity reference, a provider identifier, a credential or a token.
 
+## Alongside setting operation (Tickets 356–365, D33)
+
+`CADENCE_ALONGSIDE` gates the person's alongside setting on the hosted app. Only the
+exact value `on` enables it; any other value or no value leaves planning as it was
+before Ticket 356: planners read the cached model guess, then false, the estimate step
+asks the model about alongside for every Behavior, and no web code reads
+`behaviors.alongside`. Default: off. Server-only.
+
+Turn it on only after migration `20261125140000_behavior_alongside.sql` is on the
+database: with the flag on, the move-day read selects the column. The migration is
+additive and grants nothing new, so it fits the standing approval for additive
+migrations (`docs/DECISIONS.md`, 2026-11-10) once its conditions hold. The owner turns
+the flag on in Production after Ticket 365's acceptance. Turning it off again restores
+the guess-only behavior at once; stored answers stay.
+
+The column is hosted-only until Ticket 363: account sync contract 9 leaves it out and
+a Mac write keeps the stored answer (`docs/DATA_MODEL.md`, "Alongside setting").
+
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115

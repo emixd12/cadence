@@ -1005,7 +1005,11 @@ title. When the model gives no tip, a deterministic "Setup tip" asks the user to
 typical length for the first such Behavior today. The recipe 1.2 estimate step covers
 every unresolved Behavior today and also returns `alongside`: whether the activity can
 usually happen during other activities. Such Behaviors get no moves and are never one
-side of a raised conflict; a recorded length still beats the estimate. Every planner
+side of a raised conflict; a recorded length still beats the estimate. Since Ticket 356
+(D33) "alongside" is also a Behavior setting the person owns (`behaviors.alongside`;
+unanswered by default). Behind `CADENCE_ALONGSIDE`, the person's answer outranks the
+model's guess, the guess applies only while the answer is missing, and the model is no
+longer asked about alongside for a Behavior the person answered. Every planner
 move is shown, and the overview states each move's reason (overlap, too close, or its
 time has passed and it is still undecided). When the model returns no overview while
 moves are shown, Cadence writes one plain sentence per move from those reasons.

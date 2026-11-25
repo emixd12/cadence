@@ -526,7 +526,11 @@ Recipes 1.1 and 1.2 can opt into one additional model request before each brief.
 `generateOpenAIDurationEstimates` uses the same model, transport and 2,000-token
 output ceiling. It sends at most 20 Behavior titles and descriptions, with each
 description capped at 1,000 characters. Recipe 1.2 also requests the `alongside`
-classification. No estimate call runs for recipe 1.0, when the input is disabled,
+classification. With `CADENCE_ALONGSIDE` on (Ticket 356), the cached estimate step for
+move lines does not ask about `alongside` for Behaviors the person already answered:
+those get a length-only request. When one batch holds both kinds, the step makes two
+requests instead of one. Estimates are cached per Behavior, so this happens only when
+a new or edited Behavior needs an estimate. No new paid provider; not measured. No estimate call runs for recipe 1.0, when the input is disabled,
 or when no Behavior qualifies. The shared abort signal bounds both requests;
 the estimate request adds no automatic retry.
 

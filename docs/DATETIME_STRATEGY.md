@@ -231,7 +231,9 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 - **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time
   item blocks its own length. A range item blocks its own length at the earliest
   free point in its range. An item done alongside others (a pill, a device) blocks
-  nothing. Travel spans already carry their margins.
+  nothing. Whether an item is alongside comes from `alongside.resolver.ts` (Ticket 356):
+  the person's setting (behind `CADENCE_ALONGSIDE`), then the cached model guess, then
+  false. Travel spans already carry their margins.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it

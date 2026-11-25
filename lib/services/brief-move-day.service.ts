@@ -3,9 +3,11 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartInstant, zonedInstant } from "@cadence/core/resolvers/time.resolver";
 import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
 import { resolveBriefMoveLength, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
+import { alongsideGuessWanted, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
 import type { Occurrence } from "@/lib/types/database";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 /**
  * Advisor Phase 3A1: the day as the one free-slot rule sees it. The Daily Brief's
@@ -13,6 +15,9 @@ import type { Occurrence } from "@/lib/types/database";
  * day here, so every caller resolves the same lengths for the same items:
  * the Behavior's setting, the logged average (last 20 finished sessions, two or more),
  * the cached model estimate (only while its inputs are unchanged), then 30 minutes.
+ * Each item's `alongside` comes from `resolveAlongside` (Ticket 356): with
+ * `CADENCE_ALONGSIDE` on, the person's setting, then the cached guess, then false;
+ * with it off, the cached guess, then false, and `behaviors.alongside` is not read.
  */
 
 const SESSION_SAMPLE = 20;
@@ -25,6 +30,11 @@ export type BriefMoveBehaviorFacts = Readonly<{
   defaultDurationMinutes: number | null;
   whereKind: string | null;
   updatedAt: string;
+  /**
+   * The person's alongside answer (Ticket 356). Null: unanswered. Undefined while
+   * `CADENCE_ALONGSIDE` is off, when the column is not read.
+   */
+  alongside?: boolean | null;
   /** Sub-behaviors (depth 1): the routine this step belongs to, with its title. */
   parentBehaviorId?: string | null;
   parentTitle?: string | null;
@@ -46,18 +56,42 @@ export type BriefMoveDay = Readonly<{
 /**
  * The inputs an estimate depends on. A different hash means the model is asked again;
  * the same hash reuses the cached length and "alongside" answer.
+ *
+ * `alongsideAsked: false` (Ticket 356) marks a length-only estimate, made while the
+ * person's answer was set and the model was not asked about alongside. It hashes
+ * differently, so its stored `alongside` is never read as a guess, and clearing the
+ * answer makes the estimate stale and asks again.
  */
-export function behaviorEstimateInputHash(behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind">): string {
-  return createHash("sha256").update(JSON.stringify({
-    v: 1, title: behavior.title.trim(), description: behavior.description?.trim() ?? "", where: behavior.whereKind ?? null,
-  })).digest("hex");
+export function behaviorEstimateInputHash(
+  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind">,
+  options: Readonly<{ alongsideAsked?: boolean }> = {},
+): string {
+  const inputs = { v: 1, title: behavior.title.trim(), description: behavior.description?.trim() ?? "", where: behavior.whereKind ?? null };
+  return createHash("sha256").update(JSON.stringify(options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs)).digest("hex");
+}
+
+/** The cached estimate's guess when it is still current for `behavior`, null when current without a guess, undefined when stale. */
+function currentEstimate(
+  cached: Readonly<{ input_hash: string; duration_minutes: number | null; alongside: boolean }> | undefined,
+  behavior: BriefMoveBehaviorFacts,
+  personSetting: boolean,
+): Readonly<{ minutes: number | null; alongside: boolean | null }> | undefined {
+  if (!cached) return undefined;
+  if (cached.input_hash === behaviorEstimateInputHash(behavior)) return { minutes: cached.duration_minutes, alongside: cached.alongside };
+  if (personSetting && !alongsideGuessWanted(behavior.alongside)
+    && cached.input_hash === behaviorEstimateInputHash(behavior, { alongsideAsked: false })) {
+    return { minutes: cached.duration_minutes, alongside: null };
+  }
+  return undefined;
 }
 
 export async function readBriefMoveDay(
   supabase: AppSupabaseClient,
   userId: string,
   localDate: string,
+  options: Readonly<{ env?: Readonly<Record<string, string | undefined>> }> = {},
 ): Promise<BriefMoveDay> {
+  const personSetting = alongsideEnabled(options.env);
   const date = Temporal.PlainDate.from(localDate);
   const rows = await listOccurrencesBetweenLocalDates(supabase, userId,
     date.subtract({ days: 1 }).toString(), date.add({ days: 1 }).toString());
@@ -66,8 +100,12 @@ export async function readBriefMoveDay(
     return { items: [], behaviors: new Map(), occurrences: new Map(), neverMoveBehaviorIds: new Set(), staleEstimateBehaviorIds: new Set() };
   }
   const [behaviorRows, sessions, estimates, preferences] = await Promise.all([
-    supabase.from("behaviors").select("id, title, description, timezone, default_duration_minutes, where_kind, updated_at, parent_behavior_id, inherit_parent_schedule, sub_behavior_sort_order")
-      .eq("user_id", userId).in("id", behaviorIds),
+    // The column is read only while the flag is on, so the flag never runs ahead of the migration.
+    personSetting
+      ? supabase.from("behaviors").select("id, title, description, timezone, default_duration_minutes, where_kind, updated_at, parent_behavior_id, inherit_parent_schedule, sub_behavior_sort_order, alongside")
+        .eq("user_id", userId).in("id", behaviorIds)
+      : supabase.from("behaviors").select("id, title, description, timezone, default_duration_minutes, where_kind, updated_at, parent_behavior_id, inherit_parent_schedule, sub_behavior_sort_order")
+        .eq("user_id", userId).in("id", behaviorIds),
     supabase.from("occurrence_time_sessions").select("behavior_id, started_at, stopped_at")
       .eq("user_id", userId).in("behavior_id", behaviorIds).not("stopped_at", "is", null)
       .order("started_at", { ascending: false }).limit(SESSION_SAMPLE * behaviorIds.length),
@@ -78,17 +116,19 @@ export async function readBriefMoveDay(
   ]);
   for (const result of [behaviorRows, sessions, estimates, preferences]) if (result.error) throw result.error;
 
-  const parentIds = [...new Set((behaviorRows.data ?? []).flatMap((row) => row.parent_behavior_id ? [row.parent_behavior_id] : []))];
+  const behaviorData: readonly BehaviorFactsRow[] = behaviorRows.data ?? [];
+  const parentIds = [...new Set(behaviorData.flatMap((row) => row.parent_behavior_id ? [row.parent_behavior_id] : []))];
   const parents = parentIds.length
     ? await supabase.from("behaviors").select("id, title").eq("user_id", userId).in("id", parentIds)
     : { data: [] as { id: string; title: string }[], error: null };
   if (parents.error) throw parents.error;
   const parentTitles = new Map((parents.data ?? []).map((row) => [row.id, row.title]));
-  const behaviors = new Map<string, BriefMoveBehaviorFacts>((behaviorRows.data ?? []).map((row) => [row.id, {
+  const behaviors = new Map<string, BriefMoveBehaviorFacts>(behaviorData.map((row) => [row.id, {
     id: row.id, title: row.title, description: row.description, timezone: row.timezone,
     defaultDurationMinutes: row.default_duration_minutes, whereKind: row.where_kind, updatedAt: row.updated_at,
     parentBehaviorId: row.parent_behavior_id ?? null, parentTitle: row.parent_behavior_id ? parentTitles.get(row.parent_behavior_id) ?? null : null,
     inheritParentSchedule: row.inherit_parent_schedule === true, subBehaviorSortOrder: row.sub_behavior_sort_order ?? 0,
+    ...(personSetting ? { alongside: row.alongside ?? null } : {}),
   }]));
   const sessionsByBehavior = new Map<string, Array<{ started_at: string; stopped_at: string | null }>>();
   for (const session of sessions.data ?? []) {
@@ -97,14 +137,11 @@ export async function readBriefMoveDay(
     sessionsByBehavior.set(session.behavior_id, list);
   }
   const staleEstimateBehaviorIds = new Set<string>();
-  const estimateByBehavior = new Map<string, Readonly<{ minutes: number | null; alongside: boolean }>>();
+  const estimateByBehavior = new Map<string, Readonly<{ minutes: number | null; alongside: boolean | null }>>();
   for (const behavior of behaviors.values()) {
-    const cached = (estimates.data ?? []).find((row) => row.behavior_id === behavior.id);
-    if (cached && cached.input_hash === behaviorEstimateInputHash(behavior)) {
-      estimateByBehavior.set(behavior.id, { minutes: cached.duration_minutes, alongside: cached.alongside });
-    } else {
-      staleEstimateBehaviorIds.add(behavior.id);
-    }
+    const current = currentEstimate((estimates.data ?? []).find((row) => row.behavior_id === behavior.id), behavior, personSetting);
+    if (current) estimateByBehavior.set(behavior.id, current);
+    else staleEstimateBehaviorIds.add(behavior.id);
   }
   const neverMoveBehaviorIds = new Set((preferences.data ?? []).filter((row) => row.never_suggest_move).map((row) => row.behavior_id));
 
@@ -118,12 +155,19 @@ export async function readBriefMoveDay(
       loggedAverageSeconds: loggedAverageSeconds(sessionsByBehavior.get(behavior.id) ?? []),
       estimateMinutes: estimate?.minutes ?? null,
     });
-    items.push(dayItem(row, behavior, length, estimate?.alongside ?? false));
+    const alongside = resolveAlongside({ setting: personSetting ? behavior.alongside : null, guess: estimate?.alongside ?? null });
+    items.push(dayItem(row, behavior, length, alongside));
   }
   return { items, behaviors, occurrences: new Map(rows.map((row) => [row.id, row])), neverMoveBehaviorIds, staleEstimateBehaviorIds };
 }
 
-function dayItem(row: Occurrence, behavior: BriefMoveBehaviorFacts, length: BriefMoveDayItem["length"], alongside: boolean): BriefMoveDayItem {
+type BehaviorFactsRow = Readonly<{
+  id: string; title: string; description: string | null; timezone: string; default_duration_minutes: number | null;
+  where_kind: string | null; updated_at: string; parent_behavior_id: string | null; inherit_parent_schedule: boolean;
+  sub_behavior_sort_order: number; alongside?: boolean | null;
+}>;
+
+function dayItem(row: Occurrence, behavior: BriefMoveBehaviorFacts, length: BriefMoveDayItem["length"], alongside: ReturnType<typeof resolveAlongside>): BriefMoveDayItem {
   const start = effectiveStartInstant(row);
   const moved = effectiveEndAt(row);
   const range = row.schedule_kind !== "exact";
@@ -133,7 +177,7 @@ function dayItem(row: Occurrence, behavior: BriefMoveBehaviorFacts, length: Brie
   return {
     occurrenceId: row.id, behaviorId: row.behavior_id, title: behavior.title, status: row.status, localDate: row.local_date,
     scheduleKind: range ? "range" : "exact", start, end: Temporal.Instant.compare(end, start) > 0 ? end : start.add({ minutes: length.minutes }),
-    length, alongside, revision: row.updated_at, behaviorRevision: behavior.updatedAt,
+    length, alongside: alongside.value, alongsideSource: alongside.source, revision: row.updated_at, behaviorRevision: behavior.updatedAt,
     ...(behavior.parentBehaviorId && behavior.parentTitle ? { routine: {
       parentBehaviorId: behavior.parentBehaviorId, parentTitle: behavior.parentTitle,
       inheritParentSchedule: behavior.inheritParentSchedule === true, stepOrder: behavior.subBehaviorSortOrder ?? 0,
