@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 
 /**
  * Timeline Semantic Zoom. Layer 1 ("parents") shows each routine as one collapsed row beside
@@ -29,22 +30,13 @@ function parseLayer(value: string | null): SemanticZoomLayer {
 }
 
 export function readStoredSemanticZoomLayer(): SemanticZoomLayer {
-  try {
-    return parseLayer(window.localStorage.getItem(SEMANTIC_ZOOM_STORAGE_KEY));
-  } catch {
-    return SEMANTIC_ZOOM_DEFAULT_LAYER;
-  }
+  return parseLayer(readLocalItem(SEMANTIC_ZOOM_STORAGE_KEY));
 }
 
 export function storeSemanticZoomLayer(layer: SemanticZoomLayer): void {
   memoryLayer = layer;
-  try {
-    window.localStorage.setItem(SEMANTIC_ZOOM_STORAGE_KEY, layer);
-    storageRefused = false;
-  } catch {
-    // Private windows may refuse storage; the layer still applies for this page.
-    storageRefused = true;
-  }
+  // Private windows may refuse storage; the layer still applies for this page.
+  storageRefused = !writeLocalItem(SEMANTIC_ZOOM_STORAGE_KEY, layer);
   window.dispatchEvent(new Event(LAYER_EVENT));
 }
 

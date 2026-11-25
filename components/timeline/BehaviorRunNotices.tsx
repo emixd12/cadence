@@ -8,6 +8,7 @@ import type { BehaviorRunNotice } from "@cadence/core/types/timeline";
 import type { BehaviorActionState, BehaviorFormAction } from "@/lib/types/behavior";
 import { noticeText } from "@cadence/core/notices";
 import { formatRunDay } from "@/lib/ui/behavior-run";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 
 /**
  * The three one-line Timeline notices for Ended and Paused Behaviors (plan answer 5A,
@@ -27,7 +28,7 @@ export function noticeKey(notice: Pick<BehaviorRunNotice, "behaviorId" | "kind">
 const CLOSED_EVENT = "cadence:behavior-run-notices-closed";
 
 function rawClosed(): string {
-  try { return window.localStorage.getItem(CLOSED_KEY) ?? "[]"; } catch { return "[]"; }
+  return readLocalItem(CLOSED_KEY) ?? "[]";
 }
 
 function subscribeClosed(onChange: () => void): () => void {
@@ -52,7 +53,7 @@ function parseClosed(raw: string, todayLocalDate: string): Set<string> {
 
 function writeClosed(keys: ReadonlySet<string>) {
   // Only today's keys are kept, so the list never grows past one day's notices.
-  try { window.localStorage.setItem(CLOSED_KEY, JSON.stringify([...keys])); } catch { /* storage unavailable */ }
+  writeLocalItem(CLOSED_KEY, JSON.stringify([...keys]));
   window.dispatchEvent(new Event(CLOSED_EVENT));
 }
 
