@@ -496,7 +496,7 @@ Not verified: the JSON key names of `supabase status` at CLI 2.105.0, the format
 
 ## Implementation status (2026-11-25)
 
-Each automation is implemented on its own local branch from `origin/main` (`568df087`). A second model reviewed the plan first; its findings changed several designs, noted below. All seven branches merged cleanly into one test branch, where the eight required commands and `npm run desktop:build` passed (7,364 tests passed, 206 skipped).
+Each automation was implemented on its own branch and merged through PRs #386–#392. A second model reviewed the plan first; its findings changed several designs, noted below. Before the PRs opened, all seven branches merged cleanly into one test branch, where the eight required commands and `npm run desktop:build` passed (7,364 tests passed, 206 skipped).
 
 | Rank | Automation | Branch | Result |
 |---|---|---|---|
@@ -504,7 +504,7 @@ Each automation is implemented on its own local branch from `origin/main` (`568d
 | 2 | `merge=union`; duplicate-ticket check | same branch | Done for `docs/TICKETS.md` and `docs/DECISIONS.md` only. Union would bring back archived `STATUS.md` entries and duplicate the "is next" counters in `docs/MESSAGING_CHANGES.md` and `docs/LEGAL.md`. Conflict-marker check now covers all five ledgers. |
 | 3 | `scripts/check-contract-numbers.mjs` | `chore/contract-number-check-and-next-id` | Done. `tests/sql/sub-behaviors-smoke.sql` is excluded: it tests fixed contracts on purpose. |
 | 4 | `.githooks/pre-push` | `chore/pre-push-hook-and-archive-prompt` | Done. Measured 7 s for a docs-only change and 45 s for one component under heavy load. |
-| 5 | Local-integration tests in the rehearsal | `ci/rehearsal-local-integration-tests` | Done for 16 of 33 files, with a run-time ES256 signing key. Not run against a database yet; the first GitHub run proves it. |
+| 5 | Local-integration tests in the rehearsal | `ci/rehearsal-local-integration-tests` | Done, with a run-time ES256 signing key. The first GitHub run passed 13 of the 16 database-only files. `behavior-where`, `place-labels` and `coach-signals` failed on their own assertions and are listed as excluded with the failure until fixed. The other 17 files need an app server or other setup. |
 | 6 | `scripts/check-postgrest-embeds.mjs` | `chore/postgrest-embed-check` | Done, with the TypeScript compiler API instead of a regex. 220 select calls analysed; none ambiguous at HEAD. |
 | 7 | `scripts/next-id.mjs` (`npm run ids:next`) | `chore/contract-number-check-and-next-id` | Done |
 | 8 | Storage helper and ESLint rule | `chore/browser-storage-helper` | Done. 18 files migrated; all three access forms banned. |
@@ -513,6 +513,9 @@ Each automation is implemented on its own local branch from `origin/main` (`568d
 | 11 | Type drift check in the rehearsal | none | Not done. The rehearsal excludes the `postgres-meta` image, which `gen types --local` needs. |
 
 Open follow-ups:
+
+- Three local-integration tests fail on `main` (see rank 5). The `place-labels` failure is a fingerprint mismatch between TypeScript and the database and may be a real sync defect. Not investigated.
+- A PR that gains a Codex review thread cannot merge until the thread is resolved, and every merge puts the other open PRs behind `main`. Seven PRs needed about six rounds of branch updates. The planned merge queue (Ticket 350) removes this.
 
 - `tests/sql/account-sync-contract-write-smoke.sql` line 145: `contract_probe` is still 9 and probably should be 10. The test passes either way. Not changed.
 - The pre-push hook can block a push when the machine is overloaded and a DOM test times out.

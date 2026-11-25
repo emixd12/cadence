@@ -280,9 +280,9 @@ Gotchas:
 - `tests/sql/*.sql` run only in the `Local Supabase rehearsal` workflow or by hand with
   `psql` against port 55322. `npm run test` does not run them.
 - `tests/*.local-integration.test.*` skip unless `CADENCE_LOCAL_SUPABASE_*` variables
-  are set. The `Local Supabase rehearsal` workflow runs the 16 database-only files
-  listed in `scripts/supabase-rehearsal-integration-tests.json`; the other 17 need an
-  app server or other setup and run only by hand.
+  are set. The `Local Supabase rehearsal` workflow runs the files listed under `run` in
+  `scripts/supabase-rehearsal-integration-tests.json` (13 as of 2026-11-25); the
+  rest are listed there as excluded, each with its reason.
 
 ## 5. Cadence for Mac (`apps/desktop`)
 
