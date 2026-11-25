@@ -136,17 +136,15 @@ describe("answerBriefOpportunity", () => {
     expect(fresh.refusal?.reason).toBe("slot_taken");
   });
 
-  it("refuses a time a calendar event now holds, with free times, and adds nothing", async () => {
+  it("ignores client-supplied calendarBusy (Path 4 closure) and adds normally", async () => {
     const row = proposal();
     const rpc = answerRpc(row);
     const busy = { calendarBusy: [{ startAt: local("14:45").toString(), endAt: local("16:00").toString() }] };
     const result = await answerBriefOpportunity(callers({ opportunity_proposals: [row] }, rpc),
       { target: "opportunity", kind: "yes", proposalId: PROPOSAL, idempotencyKey: "tap-2", context: busy });
-    expect(mocks.add).not.toHaveBeenCalled();
-    expect(result.outcome).toBe("refused");
-    expect(result.refusal).toMatchObject({ reason: "calendar_busy", message: "3:00 PM is not free now." });
-    expect(result.refusal!.alternatives.length).toBeGreaterThan(0);
-    expect(rpc).toHaveBeenCalledWith("answer_opportunity_proposal", expect.objectContaining({ p_outcome: "refused", p_refusal_reason: "calendar_busy" }));
+    expect(mocks.add).toHaveBeenCalledOnce();
+    expect(result.outcome).toBe("applied");
+    expect(result.refusal).toBeNull();
   });
 
   it("refuses a time an item of the day holds now", async () => {
@@ -207,10 +205,18 @@ describe("recheckBriefOpportunities", () => {
       { localDate: DAY, context, proposalIds: [PROPOSAL] })).toEqual({ replaced: [] });
     expect(quiet).not.toHaveBeenCalled();
 
+    // Client-supplied calendarBusy is ignored (Path 4 closure) and does not withdraw the line.
     const full = { calendarBusy: [{ startAt: local("14:00").toString(), endAt: local("23:59").toString() }] };
+    const ignored = vi.fn(async () => ({ data: null, error: null }));
+    expect(await recheckBriefOpportunities(callers({ opportunity_proposals: [proposal()], move_proposals: [] }, vi.fn(), ignored),
+      { localDate: DAY, context: full, proposalIds: [PROPOSAL] })).toEqual({ replaced: [] });
+    expect(ignored).not.toHaveBeenCalled();
+
+    // When day items fill the rest of the day, nothing fits and the line is withdrawn.
+    mocks.readDay.mockResolvedValue({ items: [item("all-day", "14:00", 599)], behaviors: new Map(), occurrences: new Map() });
     const withdraw = vi.fn(async () => ({ data: null, error: null }));
     const closed = await recheckBriefOpportunities(callers({ opportunity_proposals: [proposal()], move_proposals: [] }, vi.fn(), withdraw),
-      { localDate: DAY, context: full, proposalIds: [PROPOSAL] });
+      { localDate: DAY, context, proposalIds: [PROPOSAL] });
     expect(withdraw).toHaveBeenCalledWith("withdraw_brief_opportunity_proposal", { p_proposal_id: PROPOSAL });
     expect(closed.replaced).toEqual([{ proposalId: PROPOSAL, line: null }]);
   });

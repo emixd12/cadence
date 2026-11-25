@@ -57,7 +57,7 @@ it('captures once, freezes planning, narrows each scope and never consumes daily
   const generate = vi.fn(async () => { vi.setSystemTime(Date.now() + 1000); return output; });
   const response = await runBriefingComparison(request({ configs: [config(), narrow] }), generate);
   expect(response.status).toBe(200); expect(mocks.capture).toHaveBeenCalledOnce();
-  expect(mocks.capture.mock.calls[0][1]).toMatchObject({ historyDays: [90, 30], includeCalendar: true, includeRecordedElapsedDurations: false });
+  expect(mocks.capture.mock.calls[0][1]).toMatchObject({ historyDays: [90, 30], includeCalendar: false, includeRecordedElapsedDurations: false });
   const calls = generate.mock.calls as unknown as [{ facts: string }][];
   const facts = calls.map(([input]) => JSON.parse(input.facts));
   expect(facts.map(value => value.context.snapshotId)).toEqual([facts[0].context.snapshotId, facts[0].context.snapshotId]);
@@ -208,9 +208,9 @@ it('sends descriptions only after workbench confirmation and only for estimating
 });
 
 
-it('refuses rerunning Calendar-derived cases captured before agent grant separation', async () => {
+it('refuses rerunning Calendar-derived cases under §2(f)', async () => {
   const { assertSavedCaseAuthorized } = await import('@/lib/services/briefing-workbench.service');
   const saved = { source: { mode: 'account', accountRef: 'account_owner' }, capture: { includeCalendar: true } };
   await expect(assertSavedCaseAuthorized(caller as Parameters<typeof assertSavedCaseAuthorized>[0], preferences as Parameters<typeof assertSavedCaseAuthorized>[1],
-    saved as Parameters<typeof assertSavedCaseAuthorized>[2], new AbortController().signal)).rejects.toThrow('review_only');
+    saved as Parameters<typeof assertSavedCaseAuthorized>[2], new AbortController().signal)).rejects.toThrow('access_denied');
 });

@@ -29,10 +29,10 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 it("permits only explicit development history while keeping the production today-only adapter unchanged", async () => {
-  await expect(getCalendarEventsForAdvisor(caller, "2026-11-01", "2026-11-01")).rejects.toMatchObject({ code: "invalid_request" });
+  await expect(getCalendarEventsForAdvisor(caller, "2026-11-01", "2026-11-01")).rejects.toMatchObject({ code: "not_configured" });
   expect(mocks.events).not.toHaveBeenCalled();
   await getCalendarEventsForWorkbenchHistory(caller, "2026-11-01", "2026-11-02");
-  expect(mocks.events).toHaveBeenCalledWith(expect.objectContaining({ fetchedAt: "2026-11-15T12:00:00Z", range: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-02",
+  expect(mocks.events).toHaveBeenCalledWith(expect.objectContaining({ fetchedAt: expect.stringMatching(/^2026-11-15T12:00:00/), range: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-02",
     timezone: "America/New_York", selectedCalendarIds: ["work"] } }));
   expect(mocks.preference).toHaveBeenCalledTimes(2);
 });

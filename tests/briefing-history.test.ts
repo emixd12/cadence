@@ -194,40 +194,27 @@ it("inspects retained retrospective analysis with a half-open lookback and no in
   expect(body.days[0].inspections[0].analysis?.result.lanes.find(row => row.laneId === "cross-source-context")).toMatchObject({ state: "unavailable", reason: "historical_calendar_not_read" });
 });
 
-it("requires a separate past Calendar choice and preserves its live read time in retrospective coverage", async () => {
+it("refuses live past Google Calendar reads in workbench history (§2(f))", async () => {
   const disclosed = dailyBriefPreferences({ allow: ["googleCalendar"] });
   mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed, calendar: calendarFence,
     assertCurrent: mocks.current, configurationRefs: { [workbenchBehaviorRef("owner", "owned")]: "old_capture_ref" } }));
-  const snapshot = structuredClone(calendarSnapshot);
-  snapshot.requestedRange.endLocalDate = "2026-11-02"; snapshot.coverage[0].endLocalDate = "2026-11-02";
-  snapshot.fetchedAt = "2026-11-15T12:00:00Z"; snapshot.freshness.refreshedAt = snapshot.fetchedAt;
-  mocks.pastCalendar.mockResolvedValue({ result: { ok: true, snapshot }, connection: { selectionRevision: 4 } });
-  await inspectBriefingHistory(post(account()), store); expect(mocks.pastCalendar).not.toHaveBeenCalled();
-  const body = await (await inspectBriefingHistory(post(account({ includePastCalendar: true, saveLocalDate: "2026-11-01" })), store)).json() as BriefingHistoryResponse;
-  expect(mocks.pastCalendar).toHaveBeenCalledWith(expect.objectContaining({ user: { id: "owner" } }), "2026-11-01", "2026-11-02", expect.objectContaining({ signal: expect.any(AbortSignal) }));
-  const calendar = body.days[0].coverage.find(row => row.source === "calendar")!;
-  expect(calendar.state).toBe("retained"); expect(calendar.limitations.join()).toContain("2026-11-15T12:00:00Z");
-  expect(body.days[0].evidenceType).toBe("retrospective");
-  const saved = (await store.readCase(`account-${briefingAccountRef("owner")}`, body.savedCaseId!)).case;
-  expect(saved.inputs?.contexts[0].connectors[0]).toMatchObject({ state: "current", complete: true, fetchedAt: "2026-11-01T12:00:00Z" });
-  expect(saved.history?.observedAt).toBe("2026-11-15T12:00:00Z");
-  expect(body.days[0].inspections[0].plan.dayEvidence.coverage).toMatchObject({ cadence: "partial", canClaimFeasibleOpportunities: false });
+  await inspectBriefingHistory(post(account()), store);
+  expect(mocks.pastCalendar).not.toHaveBeenCalled();
+  const response = await inspectBriefingHistory(post(account({ includePastCalendar: true, saveLocalDate: "2026-11-01" })), store);
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toBe("invalid_request");
+  expect(mocks.pastCalendar).not.toHaveBeenCalled();
 });
 
-it("never expands a returned Calendar range into complete coverage for an unfetched day", async () => {
+it("refuses past Google Calendar history requests even across multi-day ranges (§2(f))", async () => {
   const disclosed = dailyBriefPreferences({ allow: ["googleCalendar"] });
   mocks.capture.mockImplementation(async (_caller, input) => ({ contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config(days))), preferences: disclosed, calendar: calendarFence,
     assertCurrent: mocks.current, configurationRefs: { [workbenchBehaviorRef("owner", "owned")]: "old_capture_ref" } }));
   mocks.occurrences.mockResolvedValue([occurrence("day-one", "2026-11-01"), occurrence("day-two", "2026-11-02")]);
-  const snapshot = structuredClone(calendarSnapshot);
-  snapshot.requestedRange.endLocalDate = "2026-11-01"; snapshot.coverage[0].endLocalDate = "2026-11-01";
-  snapshot.events = [snapshot.events[0]]; snapshot.coverage[0].itemCount = 1;
-  snapshot.fetchedAt = "2026-11-15T12:00:00Z"; snapshot.freshness.refreshedAt = snapshot.fetchedAt;
-  mocks.pastCalendar.mockResolvedValue({ result: { ok: true, snapshot }, connection: { selectionRevision: 4 } });
-  const body = await (await inspectBriefingHistory(post(account({ includePastCalendar: true })), store)).json() as BriefingHistoryResponse;
-  expect(body.days[1].coverage.find(row => row.source === "calendar")?.state).toBe("unavailable");
-  expect(body.days[1].inspections[0].plan.dayEvidence.coverage.canClaimFeasibleOpportunities).toBe(false);
-  expect(body.days[1].inspections[0].facts.connectors?.[0]).toMatchObject({ complete: false, state: "incomplete", coverage: [], events: [] });
+  const response = await inspectBriefingHistory(post(account({ includePastCalendar: true })), store);
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toBe("invalid_request");
+  expect(mocks.pastCalendar).not.toHaveBeenCalled();
 });
 
 it("marks capped targets unavailable and does not save a truncated day", async () => {
